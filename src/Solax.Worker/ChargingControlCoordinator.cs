@@ -36,7 +36,7 @@ public sealed class ChargingControlCoordinator
         _logger = logger;
     }
 
-    public async Task RunCycleAsync(EnergyState state, CancellationToken cancellationToken)
+    public async Task<ChargeControlCycleResult> RunCycleAsync(EnergyState state, CancellationToken cancellationToken)
     {
         try
         {
@@ -78,6 +78,19 @@ public sealed class ChargingControlCoordinator
                     await PauseChargingAsync(decision.Reason, cancellationToken).ConfigureAwait(false);
                     break;
             }
+
+            var reportedState = decision.Action switch
+            {
+                ChargingControlAction.Charge => ChargeControlState.Charging,
+                ChargingControlAction.Pause => ChargeControlState.Paused,
+                _ => ChargeControlState.Idle,
+            };
+
+            return new ChargeControlCycleResult(
+                reportedState,
+                averagedSurplus,
+                decision.TargetSettings?.ChargeCurrentAmps,
+                _hasControl);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -86,15 +99,20 @@ public sealed class ChargingControlCoordinator
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Charge-control cycle failed; will retry next poll.");
+            return new ChargeControlCycleResult(
+                _hasControl ? ChargeControlState.Charging : ChargeControlState.Idle,
+                SurplusWatts: null,
+                TargetCurrentAmps: null,
+                HoldingControl: _hasControl);
         }
     }
 
     /// <summary>
-    /// Pauses charging when the service is shutting down, so we never leave the charger drawing under
-    /// our override. No-op when we don't hold control, and failures are logged rather than blocking
-    /// shutdown.
+    /// Releases control by pausing charging — used when control is switched off at runtime or the
+    /// service is shutting down, so we never leave the charger drawing under our override. No-op when
+    /// we don't hold control; failures are logged rather than thrown.
     /// </summary>
-    public async Task PauseOnShutdownAsync(CancellationToken cancellationToken)
+    public async Task ReleaseControlAsync(string reason, CancellationToken cancellationToken)
     {
         if (!_hasControl)
         {
@@ -103,11 +121,11 @@ public sealed class ChargingControlCoordinator
 
         try
         {
-            await PauseChargingAsync("Service stopping.", cancellationToken).ConfigureAwait(false);
+            await PauseChargingAsync(reason, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to pause the charger on shutdown; it may still be charging under our override.");
+            _logger.LogWarning(ex, "Failed to release charge control; the charger may still be charging under our override.");
         }
     }
 

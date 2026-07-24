@@ -11,7 +11,8 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
-    private readonly bool _chargeControlEnabled;
+    private readonly IChargeControlSwitch _chargeControlSwitch;
+    private readonly ChargeControlStatusHolder _statusHolder;
     private readonly bool _chargeControlDryRun;
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
@@ -20,6 +21,8 @@ public sealed class SolaxPollingService : BackgroundService
         IEnergyStateReader energyStateReader,
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
+        IChargeControlSwitch chargeControlSwitch,
+        ChargeControlStatusHolder statusHolder,
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
         ILogger<SolaxPollingService> logger)
@@ -27,7 +30,8 @@ public sealed class SolaxPollingService : BackgroundService
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
-        _chargeControlEnabled = chargeControlOptions.Value.Enabled;
+        _chargeControlSwitch = chargeControlSwitch;
+        _statusHolder = statusHolder;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
         _logger = logger;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
@@ -37,22 +41,16 @@ public sealed class SolaxPollingService : BackgroundService
     // still reach the charger. Without this we'd leave our override on the device after stopping.
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_chargeControlEnabled)
-        {
-            await _chargingControl.PauseOnShutdownAsync(cancellationToken);
-        }
-
+        await _chargingControl.ReleaseControlAsync("Service stopping.", cancellationToken);
         await base.StopAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (_chargeControlEnabled)
-        {
-            _logger.LogInformation(
-                "Live-solar charge control is ENABLED ({Mode}).",
-                _chargeControlDryRun ? "DRY RUN — no writes to the charger" : "live — writing to the charger");
-        }
+        _logger.LogInformation(
+            "Charge control at startup: {State} ({Mode}). It can be toggled at runtime.",
+            _chargeControlSwitch.IsEnabled ? "ENABLED" : "disabled",
+            _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -73,10 +71,29 @@ public sealed class SolaxPollingService : BackgroundService
 
                 LogSolarActualVsForecast(state);
 
-                if (_chargeControlEnabled)
+                ChargeControlCycleResult result;
+                if (_chargeControlSwitch.IsEnabled)
                 {
-                    await _chargingControl.RunCycleAsync(state, stoppingToken);
+                    result = await _chargingControl.RunCycleAsync(state, stoppingToken);
                 }
+                else
+                {
+                    // Switched off: release the charger if we were driving it (pauses, keeps the
+                    // session), then report Disabled.
+                    await _chargingControl.ReleaseControlAsync("Charge control switched off.", stoppingToken);
+                    result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
+                }
+
+                _statusHolder.Set(new ChargeControlStatus(
+                    Enabled: _chargeControlSwitch.IsEnabled,
+                    DryRun: _chargeControlDryRun,
+                    HoldingControl: result.HoldingControl,
+                    State: result.State,
+                    SurplusWatts: result.SurplusWatts,
+                    TargetCurrentAmps: result.TargetCurrentAmps,
+                    ActiveCurrentAmps: state.ChargeCurrentAmps,
+                    BatterySocPercent: state.BatterySocPercent,
+                    Timestamp: state.Timestamp));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

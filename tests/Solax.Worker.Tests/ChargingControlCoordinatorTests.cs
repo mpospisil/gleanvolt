@@ -73,15 +73,15 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
-    public async Task PauseOnShutdown_PausesOnlyWhenControlIsHeld()
+    public async Task ReleaseControl_PausesOnlyWhenControlIsHeld()
     {
-        await _coordinator.PauseOnShutdownAsync(CancellationToken.None);
+        await _coordinator.ReleaseControlAsync("test", CancellationToken.None);
         Assert.Equal(0, _charger.PauseCount); // never took control
 
         _controller.NextDecision = new(ChargingControlAction.Charge, new EvChargerSettings(EvChargerMode.Fast, 10), "charge");
         await Cycle(EvChargerStatus.Charging);
 
-        await _coordinator.PauseOnShutdownAsync(CancellationToken.None);
+        await _coordinator.ReleaseControlAsync("test", CancellationToken.None);
         Assert.Equal(1, _charger.PauseCount);
     }
 

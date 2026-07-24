@@ -254,6 +254,42 @@ In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice
 
 > ⚠️ **This feature writes to your charger's Modbus holding registers.** The control-register addresses (`ChargerUseMode 0x60D`, `ChargeCurrentSetpoint 0x628`) and `EvChargerMode` values come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** — GEN1 uses Datahub Charge Current `0x624`, some GEN2 units use EVSE Mode `0x669`. **Verify them against your specific charger before setting `Enabled: true`.** It is disabled by default for exactly this reason.
 
+### Home Assistant (MQTT)
+
+The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
+
+- a **Charge control** switch — turn charge control on/off **at runtime**, no restart (the config `ChargeControl:Enabled` is only the boot default; a runtime toggle doesn't persist across restarts). Switching off while a session is active pauses it.
+- **Control state**, **Solar surplus**, **Target/Active charging current**, **Battery SOC** sensors, and a **Driving charger** binary sensor.
+- an availability topic, so HA marks the device unavailable if the controller stops.
+
+Disabled by default. Non-secret settings live in `appsettings.json`:
+
+```jsonc
+"HomeAssistant": {
+  "Enabled": false,
+  "BrokerHost": "localhost",
+  "BrokerPort": 1883,
+  "DiscoveryPrefix": "homeassistant", // HA's discovery prefix
+  "BaseTopic": "solax",
+  "DeviceId": "solax_controller",
+  "DeviceName": "SolaX Local Controller",
+  "StatusInterval": "00:00:15"
+}
+```
+
+Broker credentials are secrets — supply via `.env` / env var, not `appsettings.json`:
+
+```
+HomeAssistant__Username=<user>
+HomeAssistant__Password=<pass>
+```
+
+A ready-to-run broker + Home Assistant for local development lives in [`dev/homeassistant/`](dev/homeassistant/) (`docker compose up -d`). Watch the traffic with:
+
+```bash
+docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
+```
+
 ## License
 
 Licensed under the [MIT License](LICENSE).

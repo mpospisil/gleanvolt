@@ -8,6 +8,7 @@ using Solax.Infrastructure.Modbus;
 using Solax.Infrastructure.Solcast;
 using Solax.Worker;
 using Solax.Worker.Configuration;
+using Solax.Worker.HomeAssistant;
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
@@ -103,7 +104,18 @@ builder.Services.AddSingleton(services =>
 
 builder.Services.AddSingleton<ChargingControlCoordinator>();
 
+// Runtime on/off switch for charge control, seeded from config; toggled at runtime (e.g. by HA).
+builder.Services.AddSingleton<IChargeControlSwitch>(services => new ChargeControlSwitch(
+    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled,
+    services.GetRequiredService<ILogger<ChargeControlSwitch>>()));
+builder.Services.AddSingleton<ChargeControlStatusHolder>();
+
 builder.Services.AddHostedService<SolaxPollingService>();
+
+// Home Assistant integration over MQTT (issue #17). Disabled by default; broker credentials are
+// secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).
+builder.Services.Configure<HomeAssistantOptions>(builder.Configuration.GetSection(HomeAssistantOptions.SectionName));
+builder.Services.AddHostedService<HomeAssistantMqttWorker>();
 
 var host = builder.Build();
 host.Run();
