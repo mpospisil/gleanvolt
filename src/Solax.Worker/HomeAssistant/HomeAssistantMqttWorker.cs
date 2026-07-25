@@ -16,20 +16,20 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 {
     private readonly HomeAssistantOptions _options;
     private readonly HaDiscovery _discovery;
-    private readonly IChargeControlSwitch _switch;
+    private readonly IChargeControlModeSelector _mode;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ILogger<HomeAssistantMqttWorker> _logger;
     private IMqttClient? _client;
 
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
-        IChargeControlSwitch chargeControlSwitch,
+        IChargeControlModeSelector mode,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger)
     {
         _options = options.Value;
         _discovery = new HaDiscovery(_options);
-        _switch = chargeControlSwitch;
+        _mode = mode;
         _statusHolder = statusHolder;
         _logger = logger;
     }
@@ -101,13 +101,19 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     {
         _logger.LogInformation("Connected to MQTT broker; publishing Home Assistant discovery.");
 
+        // Remove any entities from older versions (e.g. the previous on/off switch).
+        foreach (var topic in _discovery.RetiredDiscoveryTopics())
+        {
+            await PublishAsync(topic, string.Empty, retain: true, cancellationToken).ConfigureAwait(false);
+        }
+
         foreach (var (topic, payload) in _discovery.DiscoveryMessages())
         {
             await PublishAsync(topic, payload, retain: true, cancellationToken).ConfigureAwait(false);
         }
 
         await PublishAsync(_discovery.AvailabilityTopic, HaDiscovery.PayloadOnline, retain: true, cancellationToken).ConfigureAwait(false);
-        await _client!.SubscribeAsync(_discovery.SwitchCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await _client!.SubscribeAsync(_discovery.ModeCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -118,7 +124,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
-        await PublishAsync(_discovery.SwitchStateTopic, _discovery.SwitchState(_switch.IsEnabled), retain: true, cancellationToken).ConfigureAwait(false);
+        await PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, cancellationToken).ConfigureAwait(false);
 
         var status = _statusHolder.Current;
         if (status is not null)
@@ -129,17 +135,23 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
     {
-        if (e.ApplicationMessage.Topic != _discovery.SwitchCommandTopic)
+        if (e.ApplicationMessage.Topic != _discovery.ModeCommandTopic)
         {
             return Task.CompletedTask;
         }
 
         var payload = e.ApplicationMessage.ConvertPayloadToString();
-        var enable = string.Equals(payload, HaDiscovery.SwitchOn, StringComparison.OrdinalIgnoreCase);
-        _switch.Set(enable, "Home Assistant");
+        if (HaDiscovery.TryParseMode(payload, out var mode))
+        {
+            _mode.Set(mode, "Home Assistant");
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown charge mode command '{Payload}'.", payload);
+        }
 
-        // Reflect the new state back immediately so the HA switch settles.
-        _ = PublishAsync(_discovery.SwitchStateTopic, _discovery.SwitchState(_switch.IsEnabled), retain: true, CancellationToken.None);
+        // Reflect the current mode back immediately so the HA select settles.
+        _ = PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
         return Task.CompletedTask;
     }
 

@@ -258,7 +258,12 @@ In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
 
-- a **Charge control** switch — turn charge control on/off **at runtime**, no restart (the config `ChargeControl:Enabled` is only the boot default; a runtime toggle doesn't persist across restarts). Switching off while a session is active pauses it.
+- a **Charge mode** select — change the mode **at runtime**, no restart:
+  - **Off** — don't touch the charger; if a session was running it's paused.
+  - **Solar** — automatic surplus charging (charge on live surplus while the battery is full).
+  - **Force** — charge now at the maximum allowed current, ignoring surplus and the SOC gate (may pull from the grid / discharge the battery).
+
+  The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
 - **Control state**, **Solar surplus**, **Target/Active charging current**, **Battery SOC** sensors, and a **Driving charger** binary sensor.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 

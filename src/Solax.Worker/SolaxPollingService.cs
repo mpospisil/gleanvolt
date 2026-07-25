@@ -11,7 +11,7 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
-    private readonly IChargeControlSwitch _chargeControlSwitch;
+    private readonly IChargeControlModeSelector _mode;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly bool _chargeControlDryRun;
     private readonly ILogger<SolaxPollingService> _logger;
@@ -21,7 +21,7 @@ public sealed class SolaxPollingService : BackgroundService
         IEnergyStateReader energyStateReader,
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
-        IChargeControlSwitch chargeControlSwitch,
+        IChargeControlModeSelector mode,
         ChargeControlStatusHolder statusHolder,
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
@@ -30,7 +30,7 @@ public sealed class SolaxPollingService : BackgroundService
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
-        _chargeControlSwitch = chargeControlSwitch;
+        _mode = mode;
         _statusHolder = statusHolder;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
         _logger = logger;
@@ -48,8 +48,8 @@ public sealed class SolaxPollingService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "Charge control at startup: {State} ({Mode}). It can be toggled at runtime.",
-            _chargeControlSwitch.IsEnabled ? "ENABLED" : "disabled",
+            "Charge control at startup: mode {Mode} ({Writes}). It can be changed at runtime.",
+            _mode.Mode,
             _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
         while (!stoppingToken.IsCancellationRequested)
@@ -71,21 +71,17 @@ public sealed class SolaxPollingService : BackgroundService
 
                 LogSolarActualVsForecast(state);
 
-                ChargeControlCycleResult result;
-                if (_chargeControlSwitch.IsEnabled)
+                var mode = _mode.Mode;
+                var result = mode switch
                 {
-                    result = await _chargingControl.RunCycleAsync(state, stoppingToken);
-                }
-                else
-                {
-                    // Switched off: release the charger if we were driving it (pauses, keeps the
-                    // session), then report Disabled.
-                    await _chargingControl.ReleaseControlAsync("Charge control switched off.", stoppingToken);
-                    result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
-                }
+                    ChargeControlMode.Solar => await _chargingControl.RunCycleAsync(state, stoppingToken),
+                    ChargeControlMode.Force => await _chargingControl.ForceChargeAsync(stoppingToken),
+                    // Off: release the charger if we were driving it (pauses, keeps the session).
+                    _ => await ReleaseAndReportDisabledAsync(stoppingToken),
+                };
 
                 _statusHolder.Set(new ChargeControlStatus(
-                    Enabled: _chargeControlSwitch.IsEnabled,
+                    Mode: mode,
                     DryRun: _chargeControlDryRun,
                     HoldingControl: result.HoldingControl,
                     State: result.State,
@@ -115,6 +111,12 @@ public sealed class SolaxPollingService : BackgroundService
                 break;
             }
         }
+    }
+
+    private async Task<ChargeControlCycleResult> ReleaseAndReportDisabledAsync(CancellationToken cancellationToken)
+    {
+        await _chargingControl.ReleaseControlAsync("Charge control mode Off.", cancellationToken);
+        return new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
     }
 
     // Logs actual solar generation against what Solcast forecast for this moment, plus their

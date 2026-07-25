@@ -20,6 +20,7 @@ public class ChargingControlCoordinatorTests
             _controller,
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            forceChargeCurrentAmps: 16,
             NullLogger<ChargingControlCoordinator>.Instance);
     }
 
@@ -83,6 +84,21 @@ public class ChargingControlCoordinatorTests
 
         await _coordinator.ReleaseControlAsync("test", CancellationToken.None);
         Assert.Equal(1, _charger.PauseCount);
+    }
+
+    [Fact]
+    public async Task ForceChargeAsync_ChargesAtTheMaxCurrentAndStartsTheSession()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+
+        var result = await _coordinator.ForceChargeAsync(CancellationToken.None);
+
+        // Applied Fast at the configured force current (16A), regardless of surplus/SOC.
+        var applied = Assert.Single(_charger.Applied);
+        Assert.Equal(new EvChargerSettings(EvChargerMode.Fast, 16), applied.Target);
+        Assert.Equal([EvChargerControlCommand.StartCharging], _charger.Commands);
+        Assert.Equal(ChargeControlState.Charging, result.State);
+        Assert.Equal(16, result.TargetCurrentAmps);
     }
 
     [Fact]

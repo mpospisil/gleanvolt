@@ -15,57 +15,75 @@ public class HaDiscoveryTests
         DiscoveryPrefix = "homeassistant",
     });
 
+    private static ChargeControlStatus Status(
+        ChargeControlMode mode = ChargeControlMode.Solar,
+        ChargeControlState state = ChargeControlState.Charging,
+        double? surplus = 4180.7,
+        int? target = 6,
+        int? active = 16) =>
+        new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6, Timestamp: DateTimeOffset.UtcNow);
+
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
     {
         Assert.Equal("solax/solax_controller/availability", Discovery.AvailabilityTopic);
         Assert.Equal("solax/solax_controller/state", Discovery.StateTopic);
-        Assert.Equal("solax/solax_controller/charge_control/set", Discovery.SwitchCommandTopic);
-        Assert.Equal("solax/solax_controller/charge_control/state", Discovery.SwitchStateTopic);
+        Assert.Equal("solax/solax_controller/charge_mode/set", Discovery.ModeCommandTopic);
+        Assert.Equal("solax/solax_controller/charge_mode/state", Discovery.ModeStateTopic);
     }
 
     [Fact]
-    public void DiscoveryMessages_IncludeSwitchAndControlStateOnHaDiscoveryTopics()
+    public void DiscoveryMessages_IncludeAModeSelectWithTheThreeOptions()
     {
         var messages = Discovery.DiscoveryMessages().ToList();
 
-        var switchMsg = messages.Single(m => m.Topic == "homeassistant/switch/solax_controller/charge_control/config");
-        using var switchJson = JsonDocument.Parse(switchMsg.Payload);
-        var s = switchJson.RootElement;
-        Assert.Equal("solax_controller_charge_control", s.GetProperty("unique_id").GetString());
-        Assert.Equal(Discovery.SwitchCommandTopic, s.GetProperty("command_topic").GetString());
-        Assert.Equal(Discovery.AvailabilityTopic, s.GetProperty("availability_topic").GetString());
-        Assert.Equal("solax_controller", s.GetProperty("device").GetProperty("identifiers")[0].GetString());
+        var selectMsg = messages.Single(m => m.Topic == "homeassistant/select/solax_controller/charge_mode/config");
+        using var json = JsonDocument.Parse(selectMsg.Payload);
+        var s = json.RootElement;
+
+        Assert.Equal("solax_controller_charge_mode", s.GetProperty("unique_id").GetString());
+        Assert.Equal(Discovery.ModeCommandTopic, s.GetProperty("command_topic").GetString());
+        Assert.Equal(Discovery.ModeStateTopic, s.GetProperty("state_topic").GetString());
+        var options = s.GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToArray();
+        Assert.Equal(["Off", "Solar", "Force"], options);
 
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
     }
 
     [Fact]
-    public void SensorConfigs_ReadFromTheJsonStateTopicViaValueTemplate()
+    public void RetiredDiscoveryTopics_IncludeTheOldSwitch()
     {
-        var surplus = Discovery.DiscoveryMessages().Single(m => m.Topic.EndsWith("/surplus/config"));
-        using var json = JsonDocument.Parse(surplus.Payload);
-        var s = json.RootElement;
-
-        Assert.Equal(Discovery.StateTopic, s.GetProperty("state_topic").GetString());
-        Assert.Equal("{{ value_json.surplus_w }}", s.GetProperty("value_template").GetString());
-        Assert.Equal("W", s.GetProperty("unit_of_measurement").GetString());
-        Assert.Equal("power", s.GetProperty("device_class").GetString());
+        Assert.Contains("homeassistant/switch/solax_controller/charge_control/config", Discovery.RetiredDiscoveryTopics());
     }
+
+    [Theory]
+    [InlineData("Off", ChargeControlMode.Off)]
+    [InlineData("solar", ChargeControlMode.Solar)]
+    [InlineData("FORCE", ChargeControlMode.Force)]
+    public void TryParseMode_AcceptsTheOptionStrings(string payload, ChargeControlMode expected)
+    {
+        Assert.True(HaDiscovery.TryParseMode(payload, out var mode));
+        Assert.Equal(expected, mode);
+    }
+
+    [Fact]
+    public void TryParseMode_RejectsUnknown() =>
+        Assert.False(HaDiscovery.TryParseMode("nonsense", out _));
+
+    [Fact]
+    public void ModeState_RoundTripsTheEnumName() =>
+        Assert.Equal("Force", Discovery.ModeState(ChargeControlMode.Force));
 
     [Fact]
     public void StateJson_SerialisesEveryFieldTheSensorsReference()
     {
-        var status = new ChargeControlStatus(
-            Enabled: true, DryRun: true, HoldingControl: true, State: ChargeControlState.Charging,
-            SurplusWatts: 4180.7, TargetCurrentAmps: 6, ActiveCurrentAmps: 16,
-            BatterySocPercent: 98.6, Timestamp: DateTimeOffset.UtcNow);
-
-        using var json = JsonDocument.Parse(Discovery.StateJson(status));
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
         var s = json.RootElement;
 
         Assert.Equal("Charging", s.GetProperty("state").GetString());
+        Assert.Equal("Solar", s.GetProperty("mode").GetString());
         Assert.Equal(4181, s.GetProperty("surplus_w").GetDouble());
         Assert.Equal(6, s.GetProperty("target_a").GetInt32());
         Assert.Equal(16, s.GetProperty("active_a").GetInt32());
@@ -76,20 +94,11 @@ public class HaDiscoveryTests
     [Fact]
     public void StateJson_OmitsNullMetricsWhenIdle()
     {
-        var status = new ChargeControlStatus(
-            Enabled: true, DryRun: false, HoldingControl: false, State: ChargeControlState.Idle,
-            SurplusWatts: null, TargetCurrentAmps: null, ActiveCurrentAmps: null,
-            BatterySocPercent: 50, Timestamp: DateTimeOffset.UtcNow);
+        var status = Status(mode: ChargeControlMode.Off, state: ChargeControlState.Disabled, surplus: null, target: null, active: null);
 
         using var json = JsonDocument.Parse(Discovery.StateJson(status));
 
         Assert.False(json.RootElement.TryGetProperty("target_a", out _));
-        Assert.Equal("Idle", json.RootElement.GetProperty("state").GetString());
+        Assert.Equal("Disabled", json.RootElement.GetProperty("state").GetString());
     }
-
-    [Theory]
-    [InlineData(true, "ON")]
-    [InlineData(false, "OFF")]
-    public void SwitchState_MapsToHaSwitchPayloads(bool enabled, string expected) =>
-        Assert.Equal(expected, Discovery.SwitchState(enabled));
 }

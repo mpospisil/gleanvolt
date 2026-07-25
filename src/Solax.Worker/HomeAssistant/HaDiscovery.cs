@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Solax.Core.Enums;
 using Solax.Core.Models;
 using Solax.Worker.Configuration;
 
@@ -6,7 +7,7 @@ namespace Solax.Worker.HomeAssistant;
 
 /// <summary>
 /// Builds the MQTT topics and payloads for the Home Assistant integration: the retained discovery
-/// configs that make HA auto-create the entities, the JSON state payload, and the switch state.
+/// configs that make HA auto-create the entities, the JSON state payload, and the charge-mode state.
 /// Pure — no I/O — so it can be unit-tested.
 /// </summary>
 public sealed class HaDiscovery
@@ -30,26 +31,35 @@ public sealed class HaDiscovery
 
     public string AvailabilityTopic => $"{_options.BaseTopic}/{_options.DeviceId}/availability";
     public string StateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/state";
-    public string SwitchCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_control/set";
-    public string SwitchStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_control/state";
+    public string ModeCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/set";
+    public string ModeStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/state";
 
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
-    public const string SwitchOn = "ON";
-    public const string SwitchOff = "OFF";
 
-    public string SwitchState(bool enabled) => enabled ? SwitchOn : SwitchOff;
+    public string ModeState(ChargeControlMode mode) => mode.ToString();
+
+    public static bool TryParseMode(string? payload, out ChargeControlMode mode) =>
+        Enum.TryParse(payload, ignoreCase: true, out mode);
+
+    /// <summary>
+    /// Discovery config topics that older versions published but are no longer used. Publish an empty
+    /// retained payload to each so Home Assistant removes the stale entity (e.g. the old switch).
+    /// </summary>
+    public IEnumerable<string> RetiredDiscoveryTopics()
+    {
+        yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/charge_control/config";
+    }
 
     /// <summary>The retained discovery configs. Publish each on connect so HA (re)creates the entities.</summary>
     public IEnumerable<(string Topic, string Payload)> DiscoveryMessages()
     {
-        yield return Config("switch", "charge_control", new Dictionary<string, object?>
+        yield return Config("select", "charge_mode", new Dictionary<string, object?>
         {
-            ["name"] = "Charge control",
-            ["command_topic"] = SwitchCommandTopic,
-            ["state_topic"] = SwitchStateTopic,
-            ["payload_on"] = SwitchOn,
-            ["payload_off"] = SwitchOff,
+            ["name"] = "Charge mode",
+            ["command_topic"] = ModeCommandTopic,
+            ["state_topic"] = ModeStateTopic,
+            ["options"] = Enum.GetNames<ChargeControlMode>(),
             ["icon"] = "mdi:ev-station",
         });
 
@@ -74,12 +84,12 @@ public sealed class HaDiscovery
         var payload = new Dictionary<string, object?>
         {
             ["state"] = s.State.ToString(),
+            ["mode"] = s.Mode.ToString(),
             ["surplus_w"] = s.SurplusWatts is null ? null : Math.Round(s.SurplusWatts.Value),
             ["target_a"] = s.TargetCurrentAmps,
             ["active_a"] = s.ActiveCurrentAmps,
             ["soc"] = Math.Round(s.BatterySocPercent),
             ["holding"] = s.HoldingControl,
-            ["enabled"] = s.Enabled,
             ["dry_run"] = s.DryRun,
         };
 

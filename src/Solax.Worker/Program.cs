@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Solax.Core.Enums;
 using Solax.Core.Interfaces;
 using Solax.Core.Strategies;
 using Solax.Infrastructure;
@@ -102,12 +103,22 @@ builder.Services.AddSingleton<IChargingController>(services =>
 builder.Services.AddSingleton(services =>
     new SurplusMovingAverage(services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
-builder.Services.AddSingleton<ChargingControlCoordinator>();
+builder.Services.AddSingleton(services =>
+{
+    var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return new ChargingControlCoordinator(
+        services.GetRequiredService<IChargingController>(),
+        services.GetRequiredService<IEvChargerControl>(),
+        services.GetRequiredService<SurplusMovingAverage>(),
+        forceChargeCurrentAmps: options.MaxChargingCurrentAmps,
+        services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
+});
 
-// Runtime on/off switch for charge control, seeded from config; toggled at runtime (e.g. by HA).
-builder.Services.AddSingleton<IChargeControlSwitch>(services => new ChargeControlSwitch(
-    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled,
-    services.GetRequiredService<ILogger<ChargeControlSwitch>>()));
+// Runtime charge-control mode (Off/Solar/Force), seeded from config; changed at runtime (e.g. by HA).
+// The config Enabled flag is the boot default: enabled -> Solar, disabled -> Off.
+builder.Services.AddSingleton<IChargeControlModeSelector>(services => new ChargeControlModeSelector(
+    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled ? ChargeControlMode.Solar : ChargeControlMode.Off,
+    services.GetRequiredService<ILogger<ChargeControlModeSelector>>()));
 builder.Services.AddSingleton<ChargeControlStatusHolder>();
 
 builder.Services.AddHostedService<SolaxPollingService>();

@@ -19,6 +19,7 @@ public sealed class ChargingControlCoordinator
     private readonly IChargingController _controller;
     private readonly IEvChargerControl _chargerControl;
     private readonly SurplusMovingAverage _surplusAverage;
+    private readonly int _forceChargeCurrentAmps;
     private readonly ILogger<ChargingControlCoordinator> _logger;
 
     // True once we've overridden the charger, until it has been reset back to the idle state.
@@ -28,11 +29,13 @@ public sealed class ChargingControlCoordinator
         IChargingController controller,
         IEvChargerControl chargerControl,
         SurplusMovingAverage surplusAverage,
+        int forceChargeCurrentAmps,
         ILogger<ChargingControlCoordinator> logger)
     {
         _controller = controller;
         _chargerControl = chargerControl;
         _surplusAverage = surplusAverage;
+        _forceChargeCurrentAmps = Math.Clamp(forceChargeCurrentAmps, EvChargerLimits.MinCurrentAmps, EvChargerLimits.MaxCurrentAmps);
         _logger = logger;
     }
 
@@ -104,6 +107,39 @@ public sealed class ChargingControlCoordinator
                 SurplusWatts: null,
                 TargetCurrentAmps: null,
                 HoldingControl: _hasControl);
+        }
+    }
+
+    /// <summary>
+    /// Force mode: charge now at the maximum allowed current, ignoring the surplus and the SOC gate.
+    /// Takes control (and issues the start command) on the transition into charging, like the solar
+    /// path, but the setpoint is fixed at the configured maximum.
+    /// </summary>
+    public async Task<ChargeControlCycleResult> ForceChargeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var current = await _chargerControl.ReadSettingsAsync(cancellationToken).ConfigureAwait(false);
+            var target = new EvChargerSettings(EvChargerMode.Fast, _forceChargeCurrentAmps);
+            var decision = new ChargingControlDecision(
+                ChargingControlAction.Charge, target, $"Force charge (manual) at {_forceChargeCurrentAmps}A.");
+
+            _logger.LogInformation(
+                "Charge control: Mode=Force Setpoint={SetpointAmps}A Target={TargetAmps}A.",
+                current.ChargeCurrentAmps, _forceChargeCurrentAmps);
+
+            await ChargeAsync(current, decision, cancellationToken).ConfigureAwait(false);
+
+            return new ChargeControlCycleResult(ChargeControlState.Charging, SurplusWatts: null, _forceChargeCurrentAmps, _hasControl);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Force-charge cycle failed; will retry next poll.");
+            return new ChargeControlCycleResult(ChargeControlState.Charging, null, null, _hasControl);
         }
     }
 
