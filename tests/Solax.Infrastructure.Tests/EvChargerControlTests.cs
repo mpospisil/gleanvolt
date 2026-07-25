@@ -143,6 +143,21 @@ public class EvChargerControlTests
     }
 
     [Fact]
+    public async Task StopAsync_SuspendsAndAlsoTerminatesTheSessionWithAStopCommand()
+    {
+        var client = new FakeModbusClient();
+        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Fast);
+        client.SetHolding(CurrentAddress, 2000); // 20A
+
+        await Create(client).StopAsync("off");
+
+        Assert.Contains((ModeAddress, (ushort)EvChargerMode.Stop), client.Writes);
+        Assert.Contains((CurrentAddress, (ushort)600), client.Writes); // 6A * 100
+        // Unlike PauseAsync, the session IS torn down.
+        Assert.Contains((CommandAddress, (ushort)EvChargerControlCommand.StopCharging), client.Writes);
+    }
+
+    [Fact]
     public async Task PauseAsync_AlreadySuspended_WritesNothing()
     {
         var client = new FakeModbusClient();

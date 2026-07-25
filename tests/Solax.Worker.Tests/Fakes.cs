@@ -14,6 +14,9 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     /// <summary>How many times <see cref="PauseAsync"/> ran.</summary>
     public int PauseCount { get; private set; }
 
+    /// <summary>How many times <see cref="StopAsync"/> ran.</summary>
+    public int StopCount { get; private set; }
+
     public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(CurrentSettings);
 
@@ -40,6 +43,14 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     public Task PauseAsync(string reason, CancellationToken cancellationToken = default)
     {
         PauseCount++;
+        CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        StopCount++;
+        Commands.Add(EvChargerControlCommand.StopCharging);
         CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
         return Task.CompletedTask;
     }

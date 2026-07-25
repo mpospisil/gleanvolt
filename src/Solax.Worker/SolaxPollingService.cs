@@ -76,8 +76,8 @@ public sealed class SolaxPollingService : BackgroundService
                 {
                     ChargeControlMode.Solar => await _chargingControl.RunCycleAsync(state, stoppingToken),
                     ChargeControlMode.Force => await _chargingControl.ForceChargeAsync(stoppingToken),
-                    // Off: release the charger if we were driving it (pauses, keeps the session).
-                    _ => await ReleaseAndReportDisabledAsync(stoppingToken),
+                    // Off: stop (terminate) any session we were driving; leave an unmanaged charger alone.
+                    _ => await StopAndReportDisabledAsync(stoppingToken),
                 };
 
                 _statusHolder.Set(new ChargeControlStatus(
@@ -113,9 +113,11 @@ public sealed class SolaxPollingService : BackgroundService
         }
     }
 
-    private async Task<ChargeControlCycleResult> ReleaseAndReportDisabledAsync(CancellationToken cancellationToken)
+    private async Task<ChargeControlCycleResult> StopAndReportDisabledAsync(CancellationToken cancellationToken)
     {
-        await _chargingControl.ReleaseControlAsync("Charge control mode Off.", cancellationToken);
+        // Off: terminate any session we were driving (stop, not just pause); if we hold no control the
+        // charger is left entirely alone.
+        await _chargingControl.StopControlAsync("Charge control mode Off.", cancellationToken);
         return new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
     }
 

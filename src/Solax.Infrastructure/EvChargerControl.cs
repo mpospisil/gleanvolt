@@ -153,6 +153,14 @@ public sealed class EvChargerControl : IEvChargerControl
         await ApplyAsync(current, PausedSettings, reason, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task StopAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        // Like PauseAsync, but also issue StopCharging to terminate the session.
+        var current = await ReadSettingsAsync(cancellationToken).ConfigureAwait(false);
+        await ApplyAsync(current, PausedSettings, reason, cancellationToken).ConfigureAwait(false);
+        await SendCommandAsync(EvChargerControlCommand.StopCharging, reason, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<ushort> ReadRegisterAsync(RegisterDescriptor register, CancellationToken cancellationToken)
     {
         try

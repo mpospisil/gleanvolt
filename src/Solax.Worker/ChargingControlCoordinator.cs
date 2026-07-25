@@ -144,9 +144,9 @@ public sealed class ChargingControlCoordinator
     }
 
     /// <summary>
-    /// Releases control by pausing charging — used when control is switched off at runtime or the
-    /// service is shutting down, so we never leave the charger drawing under our override. No-op when
-    /// we don't hold control; failures are logged rather than thrown.
+    /// Releases control by pausing charging (session kept alive) — used when the service is shutting
+    /// down, so we never leave the charger drawing under our override but a restart can resume. No-op
+    /// when we don't hold control; failures are logged rather than thrown.
     /// </summary>
     public async Task ReleaseControlAsync(string reason, CancellationToken cancellationToken)
     {
@@ -162,6 +162,29 @@ public sealed class ChargingControlCoordinator
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to release charge control; the charger may still be charging under our override.");
+        }
+    }
+
+    /// <summary>
+    /// Stops charging and terminates the session, releasing control — used when the mode is switched to
+    /// Off. No-op when we don't hold control (the charger is left untouched); failures are logged.
+    /// </summary>
+    public async Task StopControlAsync(string reason, CancellationToken cancellationToken)
+    {
+        if (!_hasControl)
+        {
+            return;
+        }
+
+        try
+        {
+            await _chargerControl.StopAsync(reason, cancellationToken).ConfigureAwait(false);
+            _hasControl = false;
+            _logger.LogInformation("Stopped charging and released control; the session was terminated.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to stop charging; the charger may still be charging under our override.");
         }
     }
 

@@ -87,6 +87,32 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task StopControlAsync_TerminatesTheSessionWhenHoldingControl()
+    {
+        _charger.CurrentSettings = Original;
+        _controller.NextDecision = new(ChargingControlAction.Charge, new EvChargerSettings(EvChargerMode.Fast, 10), "charge");
+        await Cycle(EvChargerStatus.Charging); // take control
+
+        await _coordinator.StopControlAsync("off", CancellationToken.None);
+
+        Assert.Equal(1, _charger.StopCount);          // stopped (terminated), not paused
+        Assert.Equal(0, _charger.PauseCount);
+
+        // Control released: a further stop does nothing.
+        await _coordinator.StopControlAsync("off", CancellationToken.None);
+        Assert.Equal(1, _charger.StopCount);
+    }
+
+    [Fact]
+    public async Task StopControlAsync_WithoutControl_LeavesTheChargerAlone()
+    {
+        await _coordinator.StopControlAsync("off", CancellationToken.None);
+
+        Assert.Equal(0, _charger.StopCount);
+        Assert.Empty(_charger.Applied);
+    }
+
+    [Fact]
     public async Task ForceChargeAsync_ChargesAtTheMaxCurrentAndStartsTheSession()
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);

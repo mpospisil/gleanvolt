@@ -43,4 +43,13 @@ public interface IEvChargerControl
     /// halting the draw (so the charger never makes up a shortfall from the grid).
     /// </summary>
     Task PauseAsync(string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stops charging and <em>terminates</em> the session: sets use-mode
+    /// <see cref="Enums.EvChargerMode.Stop"/> at the 6 A minimum <em>and</em> issues
+    /// <see cref="Enums.EvChargerControlCommand.StopCharging"/>. Unlike <see cref="PauseAsync"/> this
+    /// ends the session (which on many cars needs a re-plug to restart) — used when charge control is
+    /// switched Off.
+    /// </summary>
+    Task StopAsync(string reason, CancellationToken cancellationToken = default);
 }

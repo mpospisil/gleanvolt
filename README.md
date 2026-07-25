@@ -259,7 +259,7 @@ In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
 
 - a **Charge mode** select — change the mode **at runtime**, no restart:
-  - **Off** — don't touch the charger; if a session was running it's paused.
+  - **Off** — stop and **terminate** any session we were driving (sends the Stop-charging command, which on many cars needs a re-plug to restart); a charger we weren't already driving is left untouched. (This is a hard stop, unlike Solar's low-surplus *pause*, which keeps the session alive.)
   - **Solar** — automatic surplus charging (charge on live surplus while the battery is full).
   - **Force** — charge now at the maximum allowed current, ignoring surplus and the SOC gate (may pull from the grid / discharge the battery).
 
