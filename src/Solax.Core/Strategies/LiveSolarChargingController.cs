@@ -82,7 +82,10 @@ public sealed class LiveSolarChargingController : IChargingController
             return new ChargingControlDecision(ChargingControlAction.None, null, $"Charger state {status} is not controllable; leaving it untouched.");
         }
 
-        var currentlyCharging = IsCharging(input.CurrentSettings);
+        // "Are we charging?" for the hysteresis comes from whether WE currently hold a session (driven
+        // by the HA mode), not from reading the charger's own mode/current registers — that read can
+        // lag or disagree, whereas our control state is authoritative for our own decisions.
+        var currentlyCharging = input.HasControl;
 
         // Battery-SOC gate with hysteresis: engage only at/above the full threshold, but once engaged
         // keep going down to the release threshold, so EV load dipping the battery doesn't immediately
@@ -118,9 +121,6 @@ public sealed class LiveSolarChargingController : IChargingController
             new EvChargerSettings(EvChargerMode.Fast, targetAmps),
             $"Live surplus {availableWatts:F0}W -> fast charge at {targetAmps}A.");
     }
-
-    private bool IsCharging(EvChargerSettings settings) =>
-        settings.Mode == EvChargerMode.Fast && settings.ChargeCurrentAmps >= _minChargingCurrentAmps;
 
     // Converts available watts to a whole-amp setpoint the charger accepts: convert to amps
     // (phase-aware), floor to the current step, then clamp to the charger's max. May return below the

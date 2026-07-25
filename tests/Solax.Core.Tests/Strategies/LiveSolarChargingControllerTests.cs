@@ -122,20 +122,22 @@ public class LiveSolarChargingControllerTests
     [Fact]
     public void BatteryFull_SurplusAboveResumeThreshold_StartsCharging()
     {
-        // 96% >= 95%, surplus 4000W: charge at floor(4000/230) = 17A.
-        var result = Controller.Decide(Input(96, EvChargerStatus.Preparing, 4000, Stopped, hasControl: true));
+        // Not charging (no control held), 96% >= 95%, surplus 4000W clears the resume threshold ->
+        // start, charging at floor(4000/230) = 17A.
+        var result = Controller.Decide(Input(96, EvChargerStatus.Preparing, 4000, Stopped, hasControl: false));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(new EvChargerSettings(EvChargerMode.Fast, 17), result.TargetSettings);
     }
 
     [Fact]
-    public void BatteryFull_NotCharging_SurplusBetweenMinAndResume_StaysPaused()
+    public void BatteryFull_NotCharging_SurplusBetweenMinAndResume_DoesNotStart()
     {
-        // Surplus 1450W: above min (1380) but below resume threshold (1580); not charging -> pause.
-        var result = Controller.Decide(Input(96, EvChargerStatus.ChargePaused, 1450, Stopped, hasControl: true));
+        // Surplus 1450W: above min (1380) but below the resume threshold (1580). Not charging and not
+        // holding control, so we don't start and leave the charger alone.
+        var result = Controller.Decide(Input(96, EvChargerStatus.ChargePaused, 1450, Stopped, hasControl: false));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.None, result.Action);
     }
 
     [Fact]
