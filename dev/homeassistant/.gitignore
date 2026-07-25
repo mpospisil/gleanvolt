@@ -1,0 +1,6 @@
+# Runtime state produced by the dev containers -- never commit it, but keep the folders (via
+# .gitkeep) so the compose bind mounts have somewhere to attach on a fresh clone.
+mosquitto/data/*
+homeassistant/config/*
+!mosquitto/data/.gitkeep
+!homeassistant/config/.gitkeep

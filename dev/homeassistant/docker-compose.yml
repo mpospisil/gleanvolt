@@ -1,0 +1,33 @@
+# Local development stack for the Home Assistant integration (issue #17).
+#
+# Brings up an MQTT broker (Mosquitto) and a Home Assistant instance so the controller --
+# run on the host with `dotnet run` -- can be developed and verified against a real HA.
+#
+#   cd dev/homeassistant && docker compose up -d
+#
+# Addresses:
+#   - Controller (host)   -> broker at  localhost:1883
+#   - Home Assistant (UI) -> http://localhost:8123
+#   - HA -> broker         (same compose network) at  mosquitto:1883
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: solax-dev-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/data:/mosquitto/data
+    restart: unless-stopped
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: solax-dev-homeassistant
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
