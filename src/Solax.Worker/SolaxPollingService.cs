@@ -38,10 +38,10 @@ public sealed class SolaxPollingService : BackgroundService
     }
 
     // Shutdown runs with a fresh token (ExecuteAsync's is already cancelled), so the pause write can
-    // still reach the charger. Without this we'd leave our override on the device after stopping.
+    // still reach the charger. Without this we'd leave the charger drawing at our last setpoint.
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await _chargingControl.ReleaseControlAsync("Service stopping.", cancellationToken);
+        await _chargingControl.PauseOnShutdownAsync(cancellationToken);
         await base.StopAsync(cancellationToken);
     }
 
@@ -72,13 +72,17 @@ public sealed class SolaxPollingService : BackgroundService
                 LogSolarActualVsForecast(state);
 
                 var mode = _mode.Mode;
-                var result = mode switch
+                ChargeControlCycleResult result;
+                if (mode == ChargeControlMode.Solar)
                 {
-                    ChargeControlMode.Solar => await _chargingControl.RunCycleAsync(state, stoppingToken),
-                    ChargeControlMode.Force => await _chargingControl.ForceChargeAsync(stoppingToken),
-                    // Off: stop (terminate) any session we were driving; leave an unmanaged charger alone.
-                    _ => await StopAndReportDisabledAsync(stoppingToken),
-                };
+                    result = await _chargingControl.RunCycleAsync(state, stoppingToken);
+                }
+                else
+                {
+                    // Off: stop controlling and leave the charger's current setpoint exactly as it is.
+                    _chargingControl.ReleaseControl();
+                    result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
+                }
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -111,14 +115,6 @@ public sealed class SolaxPollingService : BackgroundService
                 break;
             }
         }
-    }
-
-    private async Task<ChargeControlCycleResult> StopAndReportDisabledAsync(CancellationToken cancellationToken)
-    {
-        // Off: terminate any session we were driving (stop, not just pause); if we hold no control the
-        // charger is left entirely alone.
-        await _chargingControl.StopControlAsync("Charge control mode Off.", cancellationToken);
-        return new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
     }
 
     // Logs actual solar generation against what Solcast forecast for this moment, plus their

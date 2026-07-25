@@ -45,7 +45,7 @@ public class HaDiscoveryTests
         Assert.Equal(Discovery.ModeCommandTopic, s.GetProperty("command_topic").GetString());
         Assert.Equal(Discovery.ModeStateTopic, s.GetProperty("state_topic").GetString());
         var options = s.GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToArray();
-        Assert.Equal(["Off", "Solar", "Force"], options);
+        Assert.Equal(["Off", "Solar"], options);
 
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
@@ -61,7 +61,6 @@ public class HaDiscoveryTests
     [Theory]
     [InlineData("Off", ChargeControlMode.Off)]
     [InlineData("solar", ChargeControlMode.Solar)]
-    [InlineData("FORCE", ChargeControlMode.Force)]
     public void TryParseMode_AcceptsTheOptionStrings(string payload, ChargeControlMode expected)
     {
         Assert.True(HaDiscovery.TryParseMode(payload, out var mode));
@@ -74,7 +73,7 @@ public class HaDiscoveryTests
 
     [Fact]
     public void ModeState_RoundTripsTheEnumName() =>
-        Assert.Equal("Force", Discovery.ModeState(ChargeControlMode.Force));
+        Assert.Equal("Solar", Discovery.ModeState(ChargeControlMode.Solar));
 
     [Fact]
     public void StateJson_SerialisesEveryFieldTheSensorsReference()

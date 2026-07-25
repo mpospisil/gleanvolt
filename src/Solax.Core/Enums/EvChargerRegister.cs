@@ -15,5 +15,4 @@ public enum EvChargerRegister : ushort
     // some GEN2 units expose EVSE Mode 0x669 {0:Fast,1:ECO,2:Green} instead of Charger Use Mode.
     ChargerUseMode = 0x060D,        // 0=Stop, 1=Fast, 2=ECO, 3=Green (see EvChargerMode)
     ChargeCurrentSetpoint = 0x0628, // target charging current; scale 0.01A (value = amps*100), range 6-32A
-    ControlCommand = 0x0627,        // start/stop a session independently of the mode (see EvChargerControlCommand)
 }

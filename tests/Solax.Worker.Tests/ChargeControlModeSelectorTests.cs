@@ -11,7 +11,6 @@ public class ChargeControlModeSelectorTests
     [Theory]
     [InlineData(ChargeControlMode.Off)]
     [InlineData(ChargeControlMode.Solar)]
-    [InlineData(ChargeControlMode.Force)]
     public void SeedsFromTheInitialMode(ChargeControlMode initial) =>
         Assert.Equal(initial, Create(initial).Mode);
 
@@ -20,9 +19,9 @@ public class ChargeControlModeSelectorTests
     {
         var selector = Create(ChargeControlMode.Off);
 
-        selector.Set(ChargeControlMode.Force, "test");
+        selector.Set(ChargeControlMode.Solar, "test");
 
-        Assert.Equal(ChargeControlMode.Force, selector.Mode);
+        Assert.Equal(ChargeControlMode.Solar, selector.Mode);
     }
 
     [Fact]

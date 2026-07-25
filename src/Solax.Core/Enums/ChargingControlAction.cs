@@ -7,12 +7,12 @@ namespace Solax.Core.Enums;
 /// </summary>
 public enum ChargingControlAction
 {
-    /// <summary>Do nothing — the controller is not taking control this cycle.</summary>
+    /// <summary>Do nothing — leave the charger's current setpoint as it is (e.g. it's not in Fast mode).</summary>
     None,
 
-    /// <summary>Charge: apply the decision's target settings (fast mode at the target current).</summary>
+    /// <summary>Charge: set the current setpoint to the decision's <c>ChargeCurrentAmps</c>.</summary>
     Charge,
 
-    /// <summary>Stop charging and reset the charger to its idle state, releasing control.</summary>
+    /// <summary>Pause: drop the current setpoint to the pause value so the car stops drawing.</summary>
     Pause,
 }

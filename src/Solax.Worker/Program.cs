@@ -110,7 +110,7 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<IChargingController>(),
         services.GetRequiredService<IEvChargerControl>(),
         services.GetRequiredService<SurplusMovingAverage>(),
-        forceChargeCurrentAmps: options.MaxChargingCurrentAmps,
+        pauseCurrentAmps: options.PauseCurrentAmps,
         services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
 });
 
