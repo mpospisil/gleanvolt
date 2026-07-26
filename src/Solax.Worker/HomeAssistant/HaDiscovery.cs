@@ -139,7 +139,11 @@ public sealed class HaDiscovery
         config["payload_not_available"] = PayloadOffline;
         config["device"] = _device;
 
+        // Dictionary null values are serialised as JSON null regardless of the ignore condition, and
+        // Home Assistant rejects the whole config on a null field (e.g. "icon": null). Drop them.
+        var present = config.Where(kvp => kvp.Value is not null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
         var topic = $"{_options.DiscoveryPrefix}/{component}/{_options.DeviceId}/{objectId}/config";
-        return (topic, JsonSerializer.Serialize(config, Json));
+        return (topic, JsonSerializer.Serialize(present, Json));
     }
 }

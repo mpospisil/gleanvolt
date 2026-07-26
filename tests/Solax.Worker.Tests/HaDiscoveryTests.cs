@@ -77,6 +77,21 @@ public class HaDiscoveryTests
     }
 
     [Fact]
+    public void DiscoveryMessages_NeverContainNullFields()
+    {
+        // Home Assistant rejects a whole config on any null field (e.g. "icon": null), which silently
+        // drops the entity. So every payload must omit unset keys rather than send null.
+        foreach (var (topic, payload) in Discovery.DiscoveryMessages())
+        {
+            using var json = JsonDocument.Parse(payload);
+            foreach (var property in json.RootElement.EnumerateObject())
+            {
+                Assert.False(property.Value.ValueKind == JsonValueKind.Null, $"{topic} has null field '{property.Name}'");
+            }
+        }
+    }
+
+    [Fact]
     public void RetiredDiscoveryTopics_IncludeTheOldSwitch()
     {
         Assert.Contains("homeassistant/switch/solax_controller/charge_control/config", Discovery.RetiredDiscoveryTopics());
