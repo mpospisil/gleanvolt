@@ -5,33 +5,18 @@ using Solax.Core.Models;
 namespace Solax.Core.Strategies;
 
 /// <summary>
-/// Drives the EV charger from <em>live</em> solar surplus, and only once the home battery is
-/// essentially full. The available surplus is the actual <c>SolarPowerWatts - OtherLoadsPowerWatts</c>
-/// (equivalently EV + battery − grid: the power that would otherwise be exported). It is converted to
-/// a hardware-legal, phase-aware whole-amp setpoint, clamped to the charger's min/max, with resume
-/// hysteresis so a surplus hovering near the minimum doesn't flap the charger.
+/// Decides the charging <em>current</em> from live solar surplus, while the home battery is full. It
+/// never changes the charger's use-mode or starts/stops the session — the owner keeps the charger in
+/// Fast mode, and this only modulates the current setpoint (or drops it to the pause value when there
+/// isn't enough sun).
 ///
-/// A battery-SOC gate sits in front of the surplus logic: charging only engages at or above
-/// <see cref="_fullSocPercent"/> (default 95%) and, once charging, keeps going until SOC falls below
-/// <see cref="_releaseSocPercent"/> — a hysteresis band so the car drawing solar (which can dip the
-/// battery slightly) doesn't flap the gate on and off. On disconnect it asks for the original charger
-/// settings to be restored.
+/// It only acts while the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — in any other
+/// mode (Green/Eco/Stop) it returns <see cref="ChargingControlAction.None"/> and leaves the charger
+/// alone. Above the battery-SOC gate it sets the current the surplus can cover (phase-aware, whole
+/// amps, clamped to min/max), with resume hysteresis; below the gate or below the minimum it pauses.
 /// </summary>
 public sealed class LiveSolarChargingController : IChargingController
 {
-    // Charger states we may drive. Available is included so a session can be STARTED from the idle
-    // "stopped" state (which is exactly where our own reset leaves the charger). Anything else
-    // (Faulted, Unavailable, Update, ...) is left untouched to avoid fighting the device.
-    private static readonly HashSet<EvChargerStatus> ControllableStates =
-    [
-        EvChargerStatus.Available,
-        EvChargerStatus.Preparing,
-        EvChargerStatus.Charging,
-        EvChargerStatus.SuspendedEv,
-        EvChargerStatus.SuspendedEvse,
-        EvChargerStatus.ChargePaused,
-    ];
-
     private readonly ChargePowerConverter _power;
     private readonly int _minChargingCurrentAmps;
     private readonly int _maxChargingCurrentAmps;
@@ -63,8 +48,8 @@ public sealed class LiveSolarChargingController : IChargingController
 
         _power = powerConverter ?? throw new ArgumentNullException(nameof(powerConverter));
 
-        // Constrain the configured range to what the hardware accepts, so the controller can never
-        // target (or log) a setpoint the charger would reject.
+        // Constrain the configured range to what the hardware accepts, so we never target (or log) a
+        // current the charger would reject.
         _minChargingCurrentAmps = Math.Clamp(minChargingCurrentAmps, EvChargerLimits.MinCurrentAmps, EvChargerLimits.MaxCurrentAmps);
         _maxChargingCurrentAmps = Math.Clamp(maxChargingCurrentAmps, _minChargingCurrentAmps, EvChargerLimits.MaxCurrentAmps);
         _currentStepAmps = currentStepAmps;
@@ -75,24 +60,27 @@ public sealed class LiveSolarChargingController : IChargingController
 
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
-        var status = input.State.EvChargerStatus;
-
-        if (!ControllableStates.Contains(status))
+        // Precondition: only modulate the current while the owner has the charger in Fast mode. In any
+        // other mode we don't control it at all.
+        if (input.CurrentSettings.Mode != EvChargerMode.Fast)
         {
-            return new ChargingControlDecision(ChargingControlAction.None, null, $"Charger state {status} is not controllable; leaving it untouched.");
+            return new ChargingControlDecision(
+                ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
         }
 
-        var currentlyCharging = IsCharging(input.CurrentSettings);
+        // "Are we charging?" for the hysteresis is our own state (driven by the HA mode), not a read of
+        // the charger's registers.
+        var charging = input.Charging;
 
         // Battery-SOC gate with hysteresis: engage only at/above the full threshold, but once engaged
         // keep going down to the release threshold, so EV load dipping the battery doesn't immediately
         // close the gate.
         var soc = input.State.BatterySocPercent;
-        var gateOpen = currentlyCharging ? soc >= _releaseSocPercent : soc >= _fullSocPercent;
+        var gateOpen = charging ? soc >= _releaseSocPercent : soc >= _fullSocPercent;
         if (!gateOpen)
         {
-            var threshold = currentlyCharging ? _releaseSocPercent : _fullSocPercent;
-            return Idle(input, $"Battery {soc:F0}% below {threshold:F0}% full-battery gate.");
+            var threshold = charging ? _releaseSocPercent : _fullSocPercent;
+            return Pause($"Battery {soc:F0}% below {threshold:F0}% full-battery gate.");
         }
 
         // The smoothed (moving-average) surplus, so a passing cloud doesn't interrupt the session.
@@ -101,26 +89,24 @@ public sealed class LiveSolarChargingController : IChargingController
 
         // Asymmetric threshold: keep charging down to the minimum, but only (re)start once we're a
         // hysteresis margin above it.
-        var startThresholdWatts = currentlyCharging ? minWatts : minWatts + _hysteresisWatts;
+        var startThresholdWatts = charging ? minWatts : minWatts + _hysteresisWatts;
         if (availableWatts < startThresholdWatts)
         {
-            return Idle(input, $"Live surplus {availableWatts:F0}W below {(currentlyCharging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
+            return Pause($"Live surplus {availableWatts:F0}W below {(charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
         }
 
         var targetAmps = ToHardwareCurrent(availableWatts);
         if (targetAmps < _minChargingCurrentAmps)
         {
-            return Idle(input, $"Live surplus {availableWatts:F0}W quantises below minimum {_minChargingCurrentAmps}A.");
+            return Pause($"Live surplus {availableWatts:F0}W quantises below minimum {_minChargingCurrentAmps}A.");
         }
 
         return new ChargingControlDecision(
-            ChargingControlAction.Charge,
-            new EvChargerSettings(EvChargerMode.Fast, targetAmps),
-            $"Live surplus {availableWatts:F0}W -> fast charge at {targetAmps}A.");
+            ChargingControlAction.Charge, targetAmps, $"Live surplus {availableWatts:F0}W -> charge at {targetAmps}A.");
     }
 
-    private bool IsCharging(EvChargerSettings settings) =>
-        settings.Mode == EvChargerMode.Fast && settings.ChargeCurrentAmps >= _minChargingCurrentAmps;
+    private static ChargingControlDecision Pause(string reason) =>
+        new(ChargingControlAction.Pause, null, reason);
 
     // Converts available watts to a whole-amp setpoint the charger accepts: convert to amps
     // (phase-aware), floor to the current step, then clamp to the charger's max. May return below the
@@ -131,11 +117,4 @@ public sealed class LiveSolarChargingController : IChargingController
         var steppedAmps = (int)Math.Floor(rawAmps / _currentStepAmps) * _currentStepAmps;
         return Math.Min(steppedAmps, _maxChargingCurrentAmps);
     }
-
-    // Conditions aren't met. If we're driving the charger, ask for it to be put back to idle; if we
-    // never took control, leave the owner's charger completely alone.
-    private static ChargingControlDecision Idle(ChargingControlInput input, string reason) =>
-        input.HasControl
-            ? new ChargingControlDecision(ChargingControlAction.Pause, null, $"{reason} Resetting charger to idle.")
-            : new ChargingControlDecision(ChargingControlAction.None, null, $"{reason} Leaving charger untouched.");
 }

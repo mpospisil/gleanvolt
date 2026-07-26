@@ -4,43 +4,24 @@ using Solax.Core.Models;
 
 namespace Solax.Worker.Tests;
 
-/// <summary>Records applied settings and reflects them back as the new "current", like real hardware.</summary>
+/// <summary>Records current-setpoint writes and reflects them back as the new "current", like hardware.</summary>
 internal sealed class FakeEvChargerControl : IEvChargerControl
 {
-    public EvChargerSettings CurrentSettings { get; set; } = new(EvChargerMode.Stop, 0);
+    public EvChargerSettings CurrentSettings { get; set; } = new(EvChargerMode.Fast, 0);
 
-    public List<(EvChargerSettings Current, EvChargerSettings Target, string Reason)> Applied { get; } = [];
+    /// <summary>Every SetCurrentAsync call, in order.</summary>
+    public List<(int Active, int Target, string Reason)> CurrentWrites { get; } = [];
 
-    /// <summary>How many times <see cref="PauseAsync"/> ran.</summary>
-    public int PauseCount { get; private set; }
+    /// <summary>The target amps of the last write, or null if none.</summary>
+    public int? LastTarget => CurrentWrites.Count == 0 ? null : CurrentWrites[^1].Target;
 
     public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(CurrentSettings);
 
-    public Task<EvChargerSettings> ApplyAsync(
-        EvChargerSettings current,
-        EvChargerSettings target,
-        string reason,
-        CancellationToken cancellationToken = default)
+    public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
     {
-        Applied.Add((current, target, reason));
-        CurrentSettings = target;
-        return Task.FromResult(target);
-    }
-
-    /// <summary>Commands sent via <see cref="SendCommandAsync"/>, in order.</summary>
-    public List<EvChargerControlCommand> Commands { get; } = [];
-
-    public Task SendCommandAsync(EvChargerControlCommand command, string reason, CancellationToken cancellationToken = default)
-    {
-        Commands.Add(command);
-        return Task.CompletedTask;
-    }
-
-    public Task PauseAsync(string reason, CancellationToken cancellationToken = default)
-    {
-        PauseCount++;
-        CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        CurrentWrites.Add((activeAmps, targetAmps, reason));
+        CurrentSettings = CurrentSettings with { ChargeCurrentAmps = targetAmps };
         return Task.CompletedTask;
     }
 }

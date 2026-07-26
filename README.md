@@ -190,31 +190,25 @@ and the telemetry line now carries the charger's active current:
 SOC=96% ... EvCharger=Charging EvMode=Fast EvCurrent=16A EvPower=3680W
 ```
 
-#### The 6 A hard cutoff — why the controller must explicitly stop
+#### Current-only control: what it changes, and what it doesn't
 
-This project bypasses the charger's native surplus modes: it runs its own Modbus loop and sets the exact current from its own `Surplus = PV − Load` calculation. That makes one rule critical.
+The controller runs its own Modbus loop and sets the charging **current** from its `Surplus = PV − household load` calculation. It deliberately does the **minimum**:
 
-An EV will not accept a 2 A or 4 A charge — **6 A is the floor** (IEC 61851). So the logic engine has a hard cutoff (applied to the *averaged* surplus):
+- It **only writes the current setpoint** (`0x628`). It **never** changes the charger's use-mode (Green/ECO/Fast) and **never** sends a start/stop command.
+- It **only acts when all three hold**: the SolaX device is reachable, its own use-mode reads **Fast**, and the HA mode is **Solar**. In any other mode (Green/ECO/Stop) it leaves the charger completely alone — you keep the charger in Fast; the controller just modulates the current under it.
 
-- **Surplus ≥ 6 A** → write the charger's amperage to match the surplus.
-- **Surplus < 6 A** → **explicitly send a Stop/Pause command.**
+#### The 6 A hard cutoff — pause by dropping the current
 
-That second branch is the important one. If the controller simply left the charger running at its lowest setting (6 A) when the surplus dropped below it, the charger would **make up the missing power from the grid** — silently importing exactly what solar-only charging is meant to avoid.
+An EV won't accept a 2 A or 4 A charge — **6 A is the floor** (IEC 61851). So (on the *averaged* surplus):
 
-**How this is implemented here:**
-
-| Surplus | Decision | What is written |
+| Surplus | Decision | Current written |
 |---|---|---|
-| ≥ 6 A equivalent | `Charge` | Fast mode + the computed current (whole amps, clamped 6–32 A) |
-| < 6 A equivalent | `Pause` | use-mode `Stop` + current `6 A` — charging is suspended, **not** terminated |
+| ≥ 6 A equivalent | `Charge` | the computed current (whole amps, clamped to the min/max) |
+| < 6 A equivalent | `Pause` | `PauseCurrentAmps` (default **0 A**) |
 
-The pause is explicit — the charger is actively suspended rather than left sitting at its 6 A minimum, so it can never make up a shortfall from the grid. It is *not* a session teardown: no `Stop Charging` command is sent, so charging resumes as soon as surplus returns. Note the threshold is **phase-aware** — the 6 A floor is ~1.4 kW single-phase but ~4.2 kW three-phase (see `Phases`), so on a three-phase charger the cutoff triggers far earlier in watt terms.
+If it simply left the charger at its 6 A minimum when the surplus dropped below it, the charger would **make up the shortfall from the grid** — exactly what solar-only charging avoids. So the pause drops the current to `PauseCurrentAmps`: **0 A**, which suspends the car the way Green mode does, without changing the mode or ending the session — charging resumes when surplus returns. (SolaX documents the current register as 6–32 A; if your charger doesn't accept 0, set `PauseCurrentAmps` to a sub-6 A value the car refuses instead.)
 
-Two related details:
-- **Hysteresis is asymmetric on purpose:** charging continues down to exactly the 6 A floor, but only *starts* once the surplus clears `6 A + ResumeHysteresisWatts`. So the cutoff is sharp while start-up isn't twitchy.
-- **We only pause what we started.** If the controller isn't holding control (it never started the session), it leaves the charger completely alone rather than suspending a session you began manually.
-
-When the surplus runs out (or the service shuts down) charging is **paused, never terminated**: use-mode is set to `Stop` and the current setpoint to `6 A`, written only if they differ. The `Stop Charging` command (`0x627`) is deliberately **not** sent — that would end the session, which on many cars needs a re-plug to restart. Suspending via the use-mode halts the draw while leaving the session intact so it can resume the moment surplus returns.
+The threshold is **phase-aware** — the 6 A floor is ~1.4 kW single-phase but ~4.2 kW three-phase (see `Phases`), so on a three-phase charger the cutoff triggers far earlier in watt terms. Hysteresis is asymmetric on purpose: charging continues down to exactly the 6 A floor, but only *restarts* once the surplus clears `6 A + ResumeHysteresisWatts`.
 
 A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages only at/above `BatteryFullSocPercent` (so the car never competes with charging the home battery) and, once charging, keeps going until SOC falls below `BatteryReleaseSocPercent` — the band stops the car's own draw from flapping the gate.
 
@@ -227,6 +221,7 @@ A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages 
   "MinChargingCurrentAmps": 6,
   "MaxChargingCurrentAmps": 16, // setpoint is clamped to this (see "vehicle limit" below)
   "CurrentStepAmps": 1,         // whole-amp granularity the charger accepts
+  "PauseCurrentAmps": 0,        // current written to pause (0 = suspend like Green mode)
   "SurplusAverageWindow": "00:03:00",  // rolling window the surplus is averaged over
   "CurrentChangeThresholdAmps": 1,     // min amp change before re-commanding the charger
   "ResumeHysteresisWatts": 200, // extra surplus needed to (re)start, to avoid flapping
@@ -246,13 +241,54 @@ Setting a max above what the car will accept isn't dangerous (it simply won't dr
 
 **Set `Phases` to match your charger.** The 6 A EVSE minimum is a *current* limit; its power floor depends on phase count — ~1.4 kW single-phase vs **~4.2 kW three-phase** — and the watts↔amps setpoint uses `watts / (NominalVoltage × Phases)`. A three-phase charger left at `Phases: 1` would start on a ~1.4 kW surplus while the car pulls ~4.2 kW, importing the difference from the grid.
 
-The current setpoint is encoded to the SolaX hardware's requirements automatically: rounded to a whole amp, clamped to the charger's **6–32 A** range, and written with the register's **0.01 A scale** (value = amps × 100). Pausing switches the use-mode to `Stop` and leaves the current setpoint untouched (0 A would be below the hardware minimum).
+The current setpoint is encoded to the SolaX hardware's requirements automatically: rounded to a whole amp, clamped to `0…32 A` (0 for pause), and written with the register's **0.01 A scale** (value = amps × 100).
 
 **Validate first with `DryRun`.** Set `Enabled: true` and `DryRun: true` to run the full control loop and log exactly what it *would* write — e.g. `[DRY RUN] would set charger current setpoint: 6A -> 16A (register 1600)` — without touching the charger. This is the safe way to confirm the register values against your device before allowing real writes.
 
 In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice: each write site is skipped, and the Modbus clients are wrapped in a read-only decorator that drops writes outright, so even a caller that forgot its guard cannot reach the hardware. A suppressed write logs a warning as a tripwire — it should never appear.
 
-> ⚠️ **This feature writes to your charger's Modbus holding registers.** The control-register addresses (`ChargerUseMode 0x60D`, `ChargeCurrentSetpoint 0x628`) and `EvChargerMode` values come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** — GEN1 uses Datahub Charge Current `0x624`, some GEN2 units use EVSE Mode `0x669`. **Verify them against your specific charger before setting `Enabled: true`.** It is disabled by default for exactly this reason.
+> ⚠️ **This feature writes to your charger.** It writes only the charge-current setpoint (`ChargeCurrentSetpoint 0x628`) and reads the use-mode (`ChargerUseMode 0x60D`) as a precondition — both from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Verify against your charger before setting `Enabled: true`.** Disabled by default for exactly this reason.
+
+### Home Assistant (MQTT)
+
+The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
+
+- a **Charge mode** select — change the mode **at runtime**, no restart:
+  - **Off** — the controller doesn't touch the charger; its current setpoint is left exactly as it is.
+  - **Solar** — modulate the charging current from live surplus while the battery is full (and only while the charger's own use-mode is Fast); pause when there isn't enough sun.
+
+  The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**.
+- binary sensors: **Car connected** and **Charging now**.
+- an availability topic, so HA marks the device unavailable if the controller stops.
+
+Disabled by default. Non-secret settings live in `appsettings.json`:
+
+```jsonc
+"HomeAssistant": {
+  "Enabled": false,
+  "BrokerHost": "localhost",
+  "BrokerPort": 1883,
+  "DiscoveryPrefix": "homeassistant", // HA's discovery prefix
+  "BaseTopic": "solax",
+  "DeviceId": "solax_controller",
+  "DeviceName": "SolaX Local Controller",
+  "StatusInterval": "00:00:15"
+}
+```
+
+Broker credentials are secrets — supply via `.env` / env var, not `appsettings.json`:
+
+```
+HomeAssistant__Username=<user>
+HomeAssistant__Password=<pass>
+```
+
+A ready-to-run broker + Home Assistant for local development lives in [`dev/homeassistant/`](dev/homeassistant/) (`docker compose up -d`). Watch the traffic with:
+
+```bash
+docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
+```
 
 ## License
 

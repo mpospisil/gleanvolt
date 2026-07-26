@@ -9,199 +9,100 @@ public class EvChargerControlTests
 {
     private static readonly ushort ModeAddress = EvChargerRegisterMap.ChargerUseMode.Address;
     private static readonly ushort CurrentAddress = EvChargerRegisterMap.ChargeCurrentSetpoint.Address;
-    private static readonly ushort CommandAddress = EvChargerRegisterMap.ControlCommand.Address;
 
-    private static EvChargerControl Create(FakeModbusClient client) =>
-        new(client, NullLogger<EvChargerControl>.Instance);
+    private static EvChargerControl Create(FakeModbusClient client, int threshold = 1) =>
+        new(client, NullLogger<EvChargerControl>.Instance, dryRun: false, currentChangeThresholdAmps: threshold);
 
     private static EvChargerControl CreateDryRun(FakeModbusClient client) =>
         new(client, NullLogger<EvChargerControl>.Instance, dryRun: true);
 
     [Fact]
-    public async Task ReadSettingsAsync_DecodesCurrentFrom001AScale()
+    public async Task ReadSettingsAsync_ReadsModeAndDecodesCurrentFrom001AScale()
     {
         var client = new FakeModbusClient();
-        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Eco);
-        client.SetHolding(CurrentAddress, 800); // 0.01A scale -> 8A
+        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Fast);
+        client.SetHolding(CurrentAddress, 1600); // 16A
 
         var settings = await Create(client).ReadSettingsAsync();
 
-        Assert.Equal(new EvChargerSettings(EvChargerMode.Eco, 8), settings);
+        Assert.Equal(new EvChargerSettings(EvChargerMode.Fast, 16), settings);
     }
 
     [Fact]
-    public async Task ApplyAsync_NoChange_WritesNothing()
+    public async Task SetCurrentAsync_WritesCurrentEncodedWith001AScale()
     {
         var client = new FakeModbusClient();
-        var settings = new EvChargerSettings(EvChargerMode.Fast, 10);
 
-        await Create(client).ApplyAsync(current: settings, target: settings, "no change");
+        await Create(client).SetCurrentAsync(activeAmps: 6, targetAmps: 16, "charge");
+
+        Assert.Equal([(CurrentAddress, (ushort)1600)], client.Writes); // 16A * 100, current register only
+    }
+
+    [Fact]
+    public async Task SetCurrentAsync_ChangeBelowThreshold_WritesNothing()
+    {
+        var client = new FakeModbusClient();
+
+        await Create(client).SetCurrentAsync(activeAmps: 10, targetAmps: 10, "no change");
 
         Assert.Empty(client.Writes);
     }
 
     [Fact]
-    public async Task ApplyAsync_OnlyModeDiffers_WritesOnlyModeRegister()
+    public async Task SetCurrentAsync_PauseValueZero_IsAllowed()
     {
         var client = new FakeModbusClient();
 
-        await Create(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Stop, 10),
-            target: new EvChargerSettings(EvChargerMode.Fast, 10),
-            "mode only");
+        await Create(client).SetCurrentAsync(activeAmps: 16, targetAmps: 0, "pause");
 
-        Assert.Equal([(ModeAddress, (ushort)EvChargerMode.Fast)], client.Writes);
+        Assert.Equal([(CurrentAddress, (ushort)0)], client.Writes); // 0 = pause, not clamped up to 6A
     }
 
     [Fact]
-    public async Task ApplyAsync_OnlyCurrentDiffers_WritesCurrentEncodedWith001AScale()
+    public async Task SetCurrentAsync_AboveHardwareMax_ClampsTo32A()
     {
         var client = new FakeModbusClient();
 
-        await Create(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Fast, 6),
-            target: new EvChargerSettings(EvChargerMode.Fast, 16),
-            "current only");
-
-        Assert.Equal([(CurrentAddress, (ushort)1600)], client.Writes); // 16A * 100
-    }
-
-    [Fact]
-    public async Task ApplyAsync_BothDiffer_WritesBothRegisters()
-    {
-        var client = new FakeModbusClient();
-
-        await Create(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Stop, 6),
-            target: new EvChargerSettings(EvChargerMode.Fast, 12),
-            "both");
-
-        Assert.Contains((ModeAddress, (ushort)EvChargerMode.Fast), client.Writes);
-        Assert.Contains((CurrentAddress, (ushort)1200), client.Writes); // 12A * 100
-        Assert.Equal(2, client.Writes.Count);
-    }
-
-    [Fact]
-    public async Task ApplyAsync_CurrentAboveHardwareMax_ClampsTo32A()
-    {
-        var client = new FakeModbusClient();
-
-        await Create(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Fast, 10),
-            target: new EvChargerSettings(EvChargerMode.Fast, 40), // beyond the 32A hardware max
-            "clamp");
+        await Create(client).SetCurrentAsync(activeAmps: 10, targetAmps: 40, "clamp");
 
         Assert.Equal([(CurrentAddress, (ushort)3200)], client.Writes); // clamped to 32A -> 3200
     }
 
-    // 1A hysteresis: a charger sitting at 10A is only re-commanded once the target reaches 11A or 9A.
-    [Theory]
-    [InlineData(10, 10, false)] // no change
-    [InlineData(10, 11, true)]  // +1A -> write
-    [InlineData(10, 9, true)]   // -1A -> write
-    public async Task ApplyAsync_OnlyWritesCurrentWhenItMovesByAtLeastTheThreshold(int currentAmps, int targetAmps, bool expectWrite)
-    {
-        var client = new FakeModbusClient();
-
-        await Create(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Fast, currentAmps),
-            target: new EvChargerSettings(EvChargerMode.Fast, targetAmps),
-            "threshold");
-
-        Assert.Equal(expectWrite, client.Writes.Count > 0);
-    }
-
     [Fact]
-    public async Task ApplyAsync_LargerThreshold_SuppressesSmallSetpointMoves()
+    public async Task SetCurrentAsync_LargerThreshold_SuppressesSmallMoves()
     {
-        // With a 3A threshold, 10A -> 12A is not worth a write, but 10A -> 13A is.
         var client = new FakeModbusClient();
-        var control = new EvChargerControl(client, NullLogger<EvChargerControl>.Instance, currentChangeThresholdAmps: 3);
+        var control = Create(client, threshold: 3);
 
-        await control.ApplyAsync(new EvChargerSettings(EvChargerMode.Fast, 10), new EvChargerSettings(EvChargerMode.Fast, 12), "small move");
+        await control.SetCurrentAsync(activeAmps: 10, targetAmps: 12, "small"); // +2 < 3 -> no write
         Assert.Empty(client.Writes);
 
-        await control.ApplyAsync(new EvChargerSettings(EvChargerMode.Fast, 10), new EvChargerSettings(EvChargerMode.Fast, 13), "big move");
+        await control.SetCurrentAsync(activeAmps: 10, targetAmps: 13, "big"); // +3 -> write
         Assert.Equal([(CurrentAddress, (ushort)1300)], client.Writes);
     }
 
     [Fact]
-    public async Task PauseAsync_SuspendsViaModeAndNeverSendsAStopCommand()
+    public async Task SetCurrentAsync_NeverWritesTheModeRegister()
+    {
+        var client = new FakeModbusClient();
+
+        await Create(client).SetCurrentAsync(activeAmps: 0, targetAmps: 16, "charge");
+
+        Assert.DoesNotContain(client.Writes, w => w.Address == ModeAddress);
+    }
+
+    [Fact]
+    public async Task DryRun_SetCurrentAsync_WritesNothingButSimulatesTheValue()
     {
         var client = new FakeModbusClient();
         client.SetHolding(ModeAddress, (ushort)EvChargerMode.Fast);
-        client.SetHolding(CurrentAddress, 2000); // 20A
-
-        await Create(client).PauseAsync("no surplus");
-
-        Assert.Contains((ModeAddress, (ushort)EvChargerMode.Stop), client.Writes);
-        Assert.Contains((CurrentAddress, (ushort)600), client.Writes); // 6A * 100
-        Assert.Equal(2, client.Writes.Count);
-
-        // Critically: the session is NOT terminated, so it can resume without a re-plug.
-        Assert.DoesNotContain(client.Writes, w => w.Address == CommandAddress);
-    }
-
-    [Fact]
-    public async Task PauseAsync_AlreadySuspended_WritesNothing()
-    {
-        var client = new FakeModbusClient();
-        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Stop);
-        client.SetHolding(CurrentAddress, 600); // already 6A
-
-        await Create(client).PauseAsync("no surplus");
-
-        Assert.Empty(client.Writes);
-    }
-
-    [Fact]
-    public async Task SendCommandAsync_StartCharging_WritesTheCommandRegister()
-    {
-        var client = new FakeModbusClient();
-
-        await Create(client).SendCommandAsync(EvChargerControlCommand.StartCharging, "surplus available");
-
-        Assert.Equal([(CommandAddress, (ushort)EvChargerControlCommand.StartCharging)], client.Writes);
-    }
-
-    [Fact]
-    public async Task DryRun_PauseAsync_WritesNothingToHardware()
-    {
-        var client = new FakeModbusClient();
-        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Fast);
-        client.SetHolding(CurrentAddress, 2000);
-
-        await CreateDryRun(client).PauseAsync("no surplus");
-
-        Assert.Empty(client.Writes);
-    }
-
-    [Fact]
-    public async Task DryRun_ApplyAsync_WritesNothingToHardware()
-    {
-        var client = new FakeModbusClient();
-
-        await CreateDryRun(client).ApplyAsync(
-            current: new EvChargerSettings(EvChargerMode.Stop, 6),
-            target: new EvChargerSettings(EvChargerMode.Fast, 16),
-            "dry run");
-
-        Assert.Empty(client.Writes);
-    }
-
-    [Fact]
-    public async Task DryRun_ReadSettings_ReflectsPriorSimulatedApply()
-    {
-        var client = new FakeModbusClient();
-        client.SetHolding(ModeAddress, (ushort)EvChargerMode.Green);
         client.SetHolding(CurrentAddress, 600); // 6A
         var control = CreateDryRun(client);
 
-        var target = new EvChargerSettings(EvChargerMode.Fast, 16);
-        await control.ApplyAsync(await control.ReadSettingsAsync(), target, "dry run");
+        await control.SetCurrentAsync(activeAmps: 6, targetAmps: 16, "dry run");
 
-        // No hardware write, but the next read reflects the simulated state.
         Assert.Empty(client.Writes);
-        Assert.Equal(target, await control.ReadSettingsAsync());
+        // The next read reflects the simulated setpoint, while the mode is still read live.
+        Assert.Equal(new EvChargerSettings(EvChargerMode.Fast, 16), await control.ReadSettingsAsync());
     }
 }

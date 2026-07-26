@@ -19,22 +19,19 @@ public sealed record EnergyState(
     int? ChargeCurrentAmps = null)
 {
     /// <summary>
-    /// Current solar production minus what's currently going into charging (EV + battery).
-    /// Only the charging component of battery power counts here -- if the battery is
-    /// discharging, that doesn't add back into this figure, since discharging isn't "charging".
-    /// </summary>
-    public double AvailableSolarPowerWatts =>
-        SolarPowerWatts - EvChargerPowerWatts - Math.Max(BatteryPowerWatts, 0);
-
-    /// <summary>
     /// Household consumption excluding the EV charger, the battery, and PV -- the "Other Loads"
     /// residual shown in the SolaX Cloud app (positive Grid = importing, positive Battery = charging):
     /// <code>OtherLoads = PV + Grid - EV - Battery</code>
     /// <see cref="GridPowerWatts"/> comes from the grid METER (FeedinPower), the only register that
     /// sees the whole house — not the inverter's AC output, which cannot reveal household load.
     /// </summary>
-    public double OtherLoadsPowerWatts =>
-        SolarPowerWatts + GridPowerWatts - EvChargerPowerWatts - BatteryPowerWatts;
+    public double OtherLoadsPowerWatts
+    {
+        get
+        {
+            return SolarPowerWatts + GridPowerWatts - EvChargerPowerWatts - BatteryPowerWatts;
+        }
+    }
 
     /// <summary>
     /// The solar power available for EV charging: <b>sun production minus household consumption</b>,

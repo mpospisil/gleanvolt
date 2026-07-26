@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Solax.Core.Enums;
 using Solax.Core.Interfaces;
 using Solax.Core.Strategies;
 using Solax.Infrastructure;
@@ -8,6 +9,7 @@ using Solax.Infrastructure.Modbus;
 using Solax.Infrastructure.Solcast;
 using Solax.Worker;
 using Solax.Worker.Configuration;
+using Solax.Worker.HomeAssistant;
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
@@ -85,11 +87,17 @@ builder.Services.AddSingleton<IEvChargerControl>(services =>
         currentChangeThresholdAmps: options.CurrentChangeThresholdAmps);
 });
 
+builder.Services.AddSingleton(services =>
+{
+    var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return new ChargePowerConverter(options.NominalVoltage, options.Phases);
+});
+
 builder.Services.AddSingleton<IChargingController>(services =>
 {
     var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
     return new LiveSolarChargingController(
-        new ChargePowerConverter(options.NominalVoltage, options.Phases),
+        services.GetRequiredService<ChargePowerConverter>(),
         options.MinChargingCurrentAmps,
         options.MaxChargingCurrentAmps,
         options.CurrentStepAmps,
@@ -101,9 +109,30 @@ builder.Services.AddSingleton<IChargingController>(services =>
 builder.Services.AddSingleton(services =>
     new SurplusMovingAverage(services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
-builder.Services.AddSingleton<ChargingControlCoordinator>();
+builder.Services.AddSingleton(services =>
+{
+    var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return new ChargingControlCoordinator(
+        services.GetRequiredService<IChargingController>(),
+        services.GetRequiredService<IEvChargerControl>(),
+        services.GetRequiredService<SurplusMovingAverage>(),
+        pauseCurrentAmps: options.PauseCurrentAmps,
+        services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
+});
+
+// Runtime charge-control mode (Off/Solar/Force), seeded from config; changed at runtime (e.g. by HA).
+// The config Enabled flag is the boot default: enabled -> Solar, disabled -> Off.
+builder.Services.AddSingleton<IChargeControlModeSelector>(services => new ChargeControlModeSelector(
+    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled ? ChargeControlMode.Solar : ChargeControlMode.Off,
+    services.GetRequiredService<ILogger<ChargeControlModeSelector>>()));
+builder.Services.AddSingleton<ChargeControlStatusHolder>();
 
 builder.Services.AddHostedService<SolaxPollingService>();
+
+// Home Assistant integration over MQTT (issue #17). Disabled by default; broker credentials are
+// secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).
+builder.Services.Configure<HomeAssistantOptions>(builder.Configuration.GetSection(HomeAssistantOptions.SectionName));
+builder.Services.AddHostedService<HomeAssistantMqttWorker>();
 
 var host = builder.Build();
 host.Run();

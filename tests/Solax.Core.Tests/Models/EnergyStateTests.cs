@@ -179,37 +179,4 @@ public class EnergyStateTests
 
         Assert.Equal(EvChargerStatus.Charging, state.EvChargerStatus);
     }
-
-    [Fact]
-    public void AvailableSolarPowerWatts_IsSolarMinusEvAndBatteryCharging()
-    {
-        // 3000W solar, EV drawing 1400W, battery charging 500W: 3000 - 1400 - 500 = 1100W left.
-        var state = new EnergyState(
-            DateTimeOffset.UtcNow,
-            BatterySocPercent: 50,
-            BatteryPowerWatts: 500,
-            SolarPowerWatts: 3000,
-            GridPowerWatts: -1100,
-            EvChargerStatus: EvChargerStatus.Charging,
-            EvChargerPowerWatts: 1400);
-
-        Assert.Equal(1100, state.AvailableSolarPowerWatts);
-    }
-
-    [Fact]
-    public void AvailableSolarPowerWatts_BatteryDischargingDoesNotAddBack()
-    {
-        // No solar, EV drawing 1400W, battery discharging 500W to help cover it: discharging
-        // isn't "charging", so it shouldn't offset the result back toward zero.
-        var state = new EnergyState(
-            DateTimeOffset.UtcNow,
-            BatterySocPercent: 50,
-            BatteryPowerWatts: -500,
-            SolarPowerWatts: 0,
-            GridPowerWatts: 900,
-            EvChargerStatus: EvChargerStatus.Charging,
-            EvChargerPowerWatts: 1400);
-
-        Assert.Equal(-1400, state.AvailableSolarPowerWatts);
-    }
 }

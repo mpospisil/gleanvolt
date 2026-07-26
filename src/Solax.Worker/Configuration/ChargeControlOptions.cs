@@ -40,6 +40,13 @@ public sealed class ChargeControlOptions
     public int CurrentStepAmps { get; init; } = 1;
 
     /// <summary>
+    /// The current setpoint written to pause charging (the controller only changes the current, never
+    /// the use-mode). 0 A suspends the car like Green mode does — but the SolaX docs list a 6–32 A
+    /// range, so if your charger doesn't accept 0, set a sub-6 A value the car refuses instead.
+    /// </summary>
+    public int PauseCurrentAmps { get; init; }
+
+    /// <summary>
     /// How far back the solar surplus is averaged before it drives any decision. Raw PV is erratic,
     /// so decisions are made on this rolling average rather than the instantaneous value — a brief
     /// cloud then can't interrupt a long charging session.

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Solax.Core.Enums;
 using Solax.Core.Interfaces;
 using Solax.Core.Models;
+using Solax.Core.Strategies;
 using Solax.Worker.Configuration;
 
 namespace Solax.Worker;
@@ -11,7 +12,9 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
-    private readonly bool _chargeControlEnabled;
+    private readonly IChargeControlModeSelector _mode;
+    private readonly ChargeControlStatusHolder _statusHolder;
+    private readonly ChargePowerConverter _power;
     private readonly bool _chargeControlDryRun;
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
@@ -20,6 +23,9 @@ public sealed class SolaxPollingService : BackgroundService
         IEnergyStateReader energyStateReader,
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
+        IChargeControlModeSelector mode,
+        ChargeControlStatusHolder statusHolder,
+        ChargePowerConverter power,
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
         ILogger<SolaxPollingService> logger)
@@ -27,32 +33,28 @@ public sealed class SolaxPollingService : BackgroundService
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
-        _chargeControlEnabled = chargeControlOptions.Value.Enabled;
+        _mode = mode;
+        _statusHolder = statusHolder;
+        _power = power;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
         _logger = logger;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
     }
 
     // Shutdown runs with a fresh token (ExecuteAsync's is already cancelled), so the pause write can
-    // still reach the charger. Without this we'd leave our override on the device after stopping.
+    // still reach the charger. Without this we'd leave the charger drawing at our last setpoint.
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_chargeControlEnabled)
-        {
-            await _chargingControl.PauseOnShutdownAsync(cancellationToken);
-        }
-
+        await _chargingControl.PauseOnShutdownAsync(cancellationToken);
         await base.StopAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (_chargeControlEnabled)
-        {
-            _logger.LogInformation(
-                "Live-solar charge control is ENABLED ({Mode}).",
-                _chargeControlDryRun ? "DRY RUN — no writes to the charger" : "live — writing to the charger");
-        }
+        _logger.LogInformation(
+            "Charge control at startup: mode {Mode} ({Writes}). It can be changed at runtime.",
+            _mode.Mode,
+            _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -73,10 +75,34 @@ public sealed class SolaxPollingService : BackgroundService
 
                 LogSolarActualVsForecast(state);
 
-                if (_chargeControlEnabled)
+                var mode = _mode.Mode;
+                ChargeControlCycleResult result;
+                if (mode == ChargeControlMode.Solar)
                 {
-                    await _chargingControl.RunCycleAsync(state, stoppingToken);
+                    result = await _chargingControl.RunCycleAsync(state, stoppingToken);
                 }
+                else
+                {
+                    // Off: stop controlling and leave the charger's current setpoint exactly as it is.
+                    _chargingControl.ReleaseControl();
+                    result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
+                }
+
+                _statusHolder.Set(new ChargeControlStatus(
+                    Mode: mode,
+                    DryRun: _chargeControlDryRun,
+                    HoldingControl: result.HoldingControl,
+                    State: result.State,
+                    SurplusWatts: result.SurplusWatts,
+                    TargetCurrentAmps: result.TargetCurrentAmps,
+                    ActiveCurrentAmps: state.ChargeCurrentAmps,
+                    BatterySocPercent: state.BatterySocPercent,
+                    ChargerStatus: state.EvChargerStatus,
+                    CarConnected: state.EvChargerStatus.IsCarConnected(),
+                    SolarPowerWatts: state.SolarPowerWatts,
+                    EvChargerPowerWatts: state.EvChargerPowerWatts,
+                    EvChargingCurrentAmps: (int)Math.Round(_power.WattsToAmps(state.EvChargerPowerWatts)),
+                    Timestamp: state.Timestamp));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
