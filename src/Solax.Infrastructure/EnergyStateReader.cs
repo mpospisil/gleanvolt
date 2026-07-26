@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Solax.Core.Enums;
 using Solax.Core.Interfaces;
 using Solax.Core.Models;
@@ -10,13 +11,16 @@ public sealed class EnergyStateReader : IEnergyStateReader
 {
     private readonly IModbusClient _inverterClient;
     private readonly IModbusClient _evChargerClient;
+    private readonly ILogger<EnergyStateReader> _logger;
 
     public EnergyStateReader(
         [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverterClient,
-        [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient evChargerClient)
+        [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient evChargerClient,
+        ILogger<EnergyStateReader> logger)
     {
         _inverterClient = inverterClient;
         _evChargerClient = evChargerClient;
+        _logger = logger;
     }
 
     public async Task<EnergyState> ReadAsync(CancellationToken cancellationToken = default)
@@ -32,6 +36,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
         }
 
         var inverterBlock = await ReadInverterTelemetryBlockAsync(cancellationToken).ConfigureAwait(false);
+        LogGridRegisterCandidates(inverterBlock);
 
         var evStatus = await ReadAsync(_evChargerClient, EvChargerRegisterMap.RunMode, cancellationToken).ConfigureAwait(false);
         var evPower = await ReadAsync(_evChargerClient, EvChargerRegisterMap.ChargePowerTotal, cancellationToken).ConfigureAwait(false);
@@ -104,6 +109,33 @@ public sealed class EnergyStateReader : IEnergyStateReader
             throw new InvalidOperationException(
                 $"Failed to read inverter telemetry block starting at address {InverterRegisterMap.TelemetryBlockStart}.", ex);
         }
+    }
+
+    // Diagnostic: dumps every register that could plausibly be "the grid" so we can compare each one
+    // against the live figures in the SolaX Cloud app and confirm which reading is real. FeedinPower
+    // (0x46/0x47) is the grid METER we use for surplus; GridPowerR/S/T (0x6C/70/74) are the inverter's
+    // AC output per phase (not the meter). All come from the one telemetry block, so this costs no
+    // extra Modbus reads. Logs at Debug -- enable with Logging:LogLevel:Solax.Infrastructure=Debug.
+    private void LogGridRegisterCandidates(ushort[] block)
+    {
+        if (!_logger.IsEnabled(LogLevel.Debug))
+        {
+            return;
+        }
+
+        var feedinLow = FromBlock(block, InverterRegisterMap.FeedinPowerLow);
+        var feedinHigh = FromBlock(block, InverterRegisterMap.FeedinPowerHigh);
+        var feedinWatts = unchecked((int)(((uint)feedinHigh << 16) | feedinLow));
+
+        _logger.LogDebug(
+            "Grid registers: FeedinPower(0x46/47)={FeedinWatts}W (raw low={FeedinLow} high={FeedinHigh}, +=export) | "
+            + "inverter AC output GridPowerR(0x6C)={GridR}W S(0x70)={GridS}W T(0x74)={GridT}W",
+            feedinWatts,
+            feedinLow,
+            feedinHigh,
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerR)),
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerS)),
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerT)));
     }
 
     private static ushort FromBlock(ushort[] block, RegisterDescriptor register) => block[register.Address];
