@@ -87,11 +87,17 @@ builder.Services.AddSingleton<IEvChargerControl>(services =>
         currentChangeThresholdAmps: options.CurrentChangeThresholdAmps);
 });
 
+builder.Services.AddSingleton(services =>
+{
+    var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return new ChargePowerConverter(options.NominalVoltage, options.Phases);
+});
+
 builder.Services.AddSingleton<IChargingController>(services =>
 {
     var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
     return new LiveSolarChargingController(
-        new ChargePowerConverter(options.NominalVoltage, options.Phases),
+        services.GetRequiredService<ChargePowerConverter>(),
         options.MinChargingCurrentAmps,
         options.MaxChargingCurrentAmps,
         options.CurrentStepAmps,

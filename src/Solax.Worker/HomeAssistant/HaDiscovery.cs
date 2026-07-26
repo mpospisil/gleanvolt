@@ -64,14 +64,26 @@ public sealed class HaDiscovery
         });
 
         yield return Sensor("control_state", "Control state", template: "{{ value_json.state }}", icon: "mdi:state-machine");
+        yield return Sensor("charger_status", "Charger status", template: "{{ value_json.charger_status }}", icon: "mdi:ev-station");
+        yield return Sensor("solar_power", "Solar power", template: "{{ value_json.solar_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("surplus", "Solar surplus", template: "{{ value_json.surplus_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        yield return Sensor("ev_power", "EV charging power", template: "{{ value_json.ev_power_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        yield return Sensor("ev_current", "EV charging current", template: "{{ value_json.ev_current_a }}", unit: "A", deviceClass: "current", stateClass: "measurement");
         yield return Sensor("target_current", "Target charging current", template: "{{ value_json.target_a }}", unit: "A", deviceClass: "current");
         yield return Sensor("active_current", "Active charging current", template: "{{ value_json.active_a }}", unit: "A", deviceClass: "current");
         yield return Sensor("battery_soc", "Battery SOC", template: "{{ value_json.soc }}", unit: "%", deviceClass: "battery", stateClass: "measurement");
 
+        yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
+        {
+            ["name"] = "Car connected",
+            ["state_topic"] = StateTopic,
+            ["value_template"] = "{{ 'ON' if value_json.car_connected else 'OFF' }}",
+            ["device_class"] = "plug",
+        });
+
         yield return Config("binary_sensor", "holding_control", new Dictionary<string, object?>
         {
-            ["name"] = "Driving charger",
+            ["name"] = "Charging now",
             ["state_topic"] = StateTopic,
             ["value_template"] = "{{ 'ON' if value_json.holding else 'OFF' }}",
             ["icon"] = "mdi:transmission-tower",
@@ -85,7 +97,12 @@ public sealed class HaDiscovery
         {
             ["state"] = s.State.ToString(),
             ["mode"] = s.Mode.ToString(),
+            ["charger_status"] = s.ChargerStatus.ToString(),
+            ["car_connected"] = s.CarConnected,
+            ["solar_w"] = Math.Round(s.SolarPowerWatts),
             ["surplus_w"] = s.SurplusWatts is null ? null : Math.Round(s.SurplusWatts.Value),
+            ["ev_power_w"] = Math.Round(s.EvChargerPowerWatts),
+            ["ev_current_a"] = s.EvChargingCurrentAmps,
             ["target_a"] = s.TargetCurrentAmps,
             ["active_a"] = s.ActiveCurrentAmps,
             ["soc"] = Math.Round(s.BatterySocPercent),

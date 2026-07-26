@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Solax.Core.Enums;
 using Solax.Core.Interfaces;
 using Solax.Core.Models;
+using Solax.Core.Strategies;
 using Solax.Worker.Configuration;
 
 namespace Solax.Worker;
@@ -13,6 +14,7 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly ChargingControlCoordinator _chargingControl;
     private readonly IChargeControlModeSelector _mode;
     private readonly ChargeControlStatusHolder _statusHolder;
+    private readonly ChargePowerConverter _power;
     private readonly bool _chargeControlDryRun;
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
@@ -23,6 +25,7 @@ public sealed class SolaxPollingService : BackgroundService
         ChargingControlCoordinator chargingControl,
         IChargeControlModeSelector mode,
         ChargeControlStatusHolder statusHolder,
+        ChargePowerConverter power,
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
         ILogger<SolaxPollingService> logger)
@@ -32,6 +35,7 @@ public sealed class SolaxPollingService : BackgroundService
         _chargingControl = chargingControl;
         _mode = mode;
         _statusHolder = statusHolder;
+        _power = power;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
         _logger = logger;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
@@ -93,6 +97,11 @@ public sealed class SolaxPollingService : BackgroundService
                     TargetCurrentAmps: result.TargetCurrentAmps,
                     ActiveCurrentAmps: state.ChargeCurrentAmps,
                     BatterySocPercent: state.BatterySocPercent,
+                    ChargerStatus: state.EvChargerStatus,
+                    CarConnected: state.EvChargerStatus.IsCarConnected(),
+                    SolarPowerWatts: state.SolarPowerWatts,
+                    EvChargerPowerWatts: state.EvChargerPowerWatts,
+                    EvChargingCurrentAmps: (int)Math.Round(_power.WattsToAmps(state.EvChargerPowerWatts)),
                     Timestamp: state.Timestamp));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

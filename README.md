@@ -258,7 +258,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   - **Solar** — modulate the charging current from live surplus while the battery is full (and only while the charger's own use-mode is Fast); pause when there isn't enough sun.
 
   The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
-- **Control state**, **Solar surplus**, **Target/Active charging current**, **Battery SOC** sensors, and a **Driving charger** binary sensor.
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**.
+- binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 
 Disabled by default. Non-secret settings live in `appsettings.json`:

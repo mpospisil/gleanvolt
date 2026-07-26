@@ -21,7 +21,9 @@ public class HaDiscoveryTests
         double? surplus = 4180.7,
         int? target = 6,
         int? active = 16) =>
-        new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6, Timestamp: DateTimeOffset.UtcNow);
+        new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
+            ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
+            EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, Timestamp: DateTimeOffset.UtcNow);
 
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
@@ -50,6 +52,28 @@ public class HaDiscoveryTests
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
+    }
+
+    [Theory]
+    [InlineData("homeassistant/sensor/solax_controller/charger_status/config")]
+    [InlineData("homeassistant/sensor/solax_controller/solar_power/config")]
+    [InlineData("homeassistant/sensor/solax_controller/ev_power/config")]
+    [InlineData("homeassistant/sensor/solax_controller/ev_current/config")]
+    [InlineData("homeassistant/binary_sensor/solax_controller/car_connected/config")]
+    public void DiscoveryMessages_IncludeTheTelemetrySensors(string topic) =>
+        Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
+
+    [Fact]
+    public void StateJson_IncludesTheTelemetryFields()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+        var s = json.RootElement;
+
+        Assert.Equal("Charging", s.GetProperty("charger_status").GetString());
+        Assert.True(s.GetProperty("car_connected").GetBoolean());
+        Assert.Equal(7010, s.GetProperty("solar_w").GetDouble());
+        Assert.Equal(10785, s.GetProperty("ev_power_w").GetDouble());
+        Assert.Equal(16, s.GetProperty("ev_current_a").GetInt32());
     }
 
     [Fact]

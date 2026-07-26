@@ -14,6 +14,11 @@ namespace Solax.Core.Models;
 /// <param name="TargetCurrentAmps">The current it wants to charge at, or null when not charging.</param>
 /// <param name="ActiveCurrentAmps">The charger's active current setpoint as read back, or null if unknown.</param>
 /// <param name="BatterySocPercent">Home battery state of charge.</param>
+/// <param name="ChargerStatus">The charger's status (Available / Preparing / Charging / ChargePaused / ...).</param>
+/// <param name="CarConnected">Whether a vehicle is plugged into the charger.</param>
+/// <param name="SolarPowerWatts">Actual solar (PV) production.</param>
+/// <param name="EvChargerPowerWatts">Actual power the EV charger is drawing.</param>
+/// <param name="EvChargingCurrentAmps">Actual charging current, derived from the charger power (phase-aware).</param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
@@ -24,4 +29,9 @@ public sealed record ChargeControlStatus(
     int? TargetCurrentAmps,
     int? ActiveCurrentAmps,
     double BatterySocPercent,
+    EvChargerStatus ChargerStatus,
+    bool CarConnected,
+    double SolarPowerWatts,
+    double EvChargerPowerWatts,
+    int EvChargingCurrentAmps,
     DateTimeOffset Timestamp);
