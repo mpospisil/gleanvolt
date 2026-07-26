@@ -249,6 +249,83 @@ In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice
 
 > ⚠️ **This feature writes to your charger.** It writes only the charge-current setpoint (`ChargeCurrentSetpoint 0x628`) and reads the use-mode (`ChargerUseMode 0x60D`) as a precondition — both from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Verify against your charger before setting `Enabled: true`.** Disabled by default for exactly this reason.
 
+### Battery discharge hold (writes to the inverter)
+
+A switch that stops the home battery discharging, so charging the EV never drains it. PV covers what
+it can, the grid covers the rest, and the battery is left alone — but it can **still charge** from PV
+surplus, which is the whole point of using this rather than simply freezing the battery.
+
+It is deliberately orthogonal to charge control, not a third charge mode:
+
+- **Hold on + charge mode `Off`** — the charger runs at whatever current you set in Fast mode. PV
+  covers what it can, the grid tops up, the battery is untouched.
+- **Hold on + charge mode `Solar`** — the surplus loop runs unchanged, with a safety net underneath it
+  for the moments its estimate is briefly wrong.
+- **Hold on with no EV charging** — a general "preserve the battery" switch, e.g. ahead of an
+  expensive tariff period or a known outage.
+
+#### How it works
+
+The inverter decides where the EV's power comes from, not this controller — in Self Use mode it sees
+the EV as household load and discharges the battery to cover it, whatever charging current we set. So
+the hold doesn't touch the charger at all. It uses the inverter's **Modbus Power Control** command
+(holding register `0x7C`) to drive the inverter's grid-connection point to a commanded power target of
+`-min(house load, PV)`:
+
+- **PV covers the house** — push out the whole load. The house runs on sun, and the PV it doesn't need
+  has nowhere to go but the battery, so surplus charging is preserved.
+- **PV falls short** — push out all the PV there is. The inverter is already at its maximum, so the
+  shortfall can only come from the grid. The battery is never asked to contribute.
+
+> **This is not the SolaX "No Discharge" mode.** That option exists in the upstream Home Assistant
+> integration but never reaches the inverter — it is a client-side strategy, and the formula above is
+> what it actually sends. See [docs/DECISIONS.md](docs/DECISIONS.md).
+
+Because the target follows live house load and PV, it is recomputed every poll and reissued whenever
+it moves past `TargetChangeThresholdWatts`, plus a renewal at half of `Duration`. The command is *not*
+a stored setting — nothing is written to EEPROM, and it lapses on its own.
+
+**That expiry is the failsafe.** If the service stops, nothing renews the command and the inverter
+returns to normal operation within `Duration` (60 s by default). There is no shutdown hook and no
+cleanup path — the inverter provides the guarantee.
+
+Turning the switch off writes a release immediately; it never waits for the duration to run out.
+
+#### Persistence and reported state
+
+The hold does **not** survive a restart: the service comes back with the switch off (unless
+`HoldAtStartup` is set), and the inverter will already have resumed normal operation.
+
+The Home Assistant switch reports **what the controller last successfully wrote**, not a reading from
+the inverter — register `0x7C` reports the firmware version when read, so the command state cannot be
+read back. A failed write therefore shows up as the switch springing back to OFF rather than as an
+assumed success. As a cross-check, the controller logs a warning if the battery discharges while it
+believes the hold is armed.
+
+#### Configuration
+
+```jsonc
+"BatteryHold": {
+  "Enabled": false,                 // master switch — while off, inverter writes are impossible
+  "HoldAtStartup": false,           // boot value of the hold itself (for running without HA)
+  "DryRun": true,                   // decide and log, but write nothing
+  "Duration": "00:01:00",           // how long each command stays armed; also the failsafe window
+  "TargetChangeThresholdWatts": 100 // how far the target must move before reissuing
+}
+```
+
+`Enabled` is a true master switch, unlike `ChargeControl:Enabled`: while it is off no Home Assistant
+switch is published, the poll loop skips the feature, and the inverter's Modbus client is wrapped
+read-only so a write is structurally impossible rather than merely skipped.
+
+> ⚠️ **This is the only feature that writes to your inverter, and it is unverified.** The register
+> address, field layout and mode values come from the wills106 homeassistant-solax-modbus map, not
+> from a SolaX document, and upstream reports behaviour differing across firmware versions.
+> **Validate with `DryRun: true` first** — it logs the exact block it would write
+> (`[DRY RUN] would hold battery discharge: active power target -2000W for 60s (registers [...] at
+> 0x7C)`) without touching the inverter. Then confirm on your hardware that PV is not curtailed while
+> the command is active and that the battery still charges from surplus, before allowing real writes.
+
 ### Home Assistant (MQTT)
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
@@ -258,7 +335,10 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   - **Solar** — modulate the charging current from live surplus while the battery is full (and only while the charger's own use-mode is Fast); pause when there isn't enough sun.
 
   The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
-- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**.
+- a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
+  [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
+  why its state reflects the last successful write rather than a device read-back.
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, and **Battery hold target** (while the hold is enabled).
 - binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 

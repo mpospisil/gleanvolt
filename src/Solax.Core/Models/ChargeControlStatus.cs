@@ -19,6 +19,14 @@ namespace Solax.Core.Models;
 /// <param name="SolarPowerWatts">Actual solar (PV) production.</param>
 /// <param name="EvChargerPowerWatts">Actual power the EV charger is drawing.</param>
 /// <param name="EvChargingCurrentAmps">Actual charging current, derived from the charger power (phase-aware).</param>
+/// <param name="BatteryPowerWatts">Battery power: positive = charging, negative = discharging.</param>
+/// <param name="BatteryHoldEnabled">Whether the battery discharge hold feature is configured on at all.</param>
+/// <param name="BatteryHoldRequested">Whether the hold is switched on (the user's intent).</param>
+/// <param name="BatteryHoldActive">
+/// Whether a hold command is currently armed on the inverter. This is what we last wrote, not a
+/// device read-back — the command register cannot be read (see <see cref="Interfaces.IBatteryDischargeControl"/>).
+/// </param>
+/// <param name="BatteryHoldTargetWatts">The active-power target currently commanded, or null when not held.</param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
@@ -34,4 +42,9 @@ public sealed record ChargeControlStatus(
     double SolarPowerWatts,
     double EvChargerPowerWatts,
     int EvChargingCurrentAmps,
+    double BatteryPowerWatts,
+    bool BatteryHoldEnabled,
+    bool BatteryHoldRequested,
+    bool BatteryHoldActive,
+    double? BatteryHoldTargetWatts,
     DateTimeOffset Timestamp);

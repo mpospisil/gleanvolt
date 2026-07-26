@@ -36,4 +36,16 @@ public static class InverterRegisterMap
 
     public static readonly RegisterDescriptor GridPowerT =
         new((ushort)InverterRegister.GridPowerT, nameof(GridPowerT), "W");
+
+    // --- Control: Holding Registers (function codes 0x03/0x10), writable. ---
+    // Note the address space change: everything above is Input Registers. See
+    // InverterControlRegister for the "verify against your hardware" warning.
+
+    /// <summary>
+    /// Start of the Modbus Power Control block, written as one 13-register command (see
+    /// <see cref="PowerControlPayload"/>). Written, never read — the address reports the inverter's
+    /// ARM firmware version on read.
+    /// </summary>
+    public static readonly RegisterDescriptor PowerControlBlockStart =
+        new((ushort)InverterControlRegister.PowerControlBlockStart, nameof(PowerControlBlockStart), "");
 }

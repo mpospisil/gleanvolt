@@ -6,7 +6,7 @@ namespace Solax.Infrastructure.Tests;
 /// In-memory <see cref="IModbusClient"/> for tests: holding registers are backed by a dictionary,
 /// and every write is recorded so tests can assert exactly which registers were written.
 /// </summary>
-internal sealed class FakeModbusClient : IModbusClient
+internal class FakeModbusClient : IModbusClient
 {
     private readonly Dictionary<ushort, ushort> _holding = new();
 
@@ -43,7 +43,7 @@ internal sealed class FakeModbusClient : IModbusClient
         return Task.CompletedTask;
     }
 
-    public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default)
+    public virtual Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default)
     {
         for (var i = 0; i < values.Length; i++)
         {

@@ -13,9 +13,12 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
     private readonly IChargeControlModeSelector _mode;
+    private readonly IBatteryHoldSelector _batteryHold;
+    private readonly IBatteryDischargeControl _batteryDischargeControl;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ChargePowerConverter _power;
     private readonly bool _chargeControlDryRun;
+    private readonly BatteryHoldOptions _batteryHoldOptions;
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
 
@@ -24,19 +27,25 @@ public sealed class SolaxPollingService : BackgroundService
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
         IChargeControlModeSelector mode,
+        IBatteryHoldSelector batteryHold,
+        IBatteryDischargeControl batteryDischargeControl,
         ChargeControlStatusHolder statusHolder,
         ChargePowerConverter power,
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
+        IOptions<BatteryHoldOptions> batteryHoldOptions,
         ILogger<SolaxPollingService> logger)
     {
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
         _mode = mode;
+        _batteryHold = batteryHold;
+        _batteryDischargeControl = batteryDischargeControl;
         _statusHolder = statusHolder;
         _power = power;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
+        _batteryHoldOptions = batteryHoldOptions.Value;
         _logger = logger;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
     }
@@ -55,6 +64,13 @@ public sealed class SolaxPollingService : BackgroundService
             "Charge control at startup: mode {Mode} ({Writes}). It can be changed at runtime.",
             _mode.Mode,
             _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
+
+        _logger.LogInformation(
+            "Battery discharge hold at startup: {Enabled}{Detail}",
+            _batteryHoldOptions.Enabled ? "enabled" : "disabled (no inverter writes are possible)",
+            _batteryHoldOptions.Enabled
+                ? $", hold {(_batteryHold.Hold ? "on" : "off")} ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
+                : string.Empty);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -88,6 +104,8 @@ public sealed class SolaxPollingService : BackgroundService
                     result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
                 }
 
+                var hold = await ApplyBatteryHoldAsync(state, stoppingToken);
+
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
                     DryRun: _chargeControlDryRun,
@@ -102,6 +120,11 @@ public sealed class SolaxPollingService : BackgroundService
                     SolarPowerWatts: state.SolarPowerWatts,
                     EvChargerPowerWatts: state.EvChargerPowerWatts,
                     EvChargingCurrentAmps: (int)Math.Round(_power.WattsToAmps(state.EvChargerPowerWatts)),
+                    BatteryPowerWatts: state.BatteryPowerWatts,
+                    BatteryHoldEnabled: _batteryHoldOptions.Enabled,
+                    BatteryHoldRequested: _batteryHold.Hold,
+                    BatteryHoldActive: hold.Held,
+                    BatteryHoldTargetWatts: hold.ActivePowerTargetWatts,
                     Timestamp: state.Timestamp));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -124,6 +147,50 @@ public sealed class SolaxPollingService : BackgroundService
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// Reconciles the inverter with the battery-hold switch. The command is not a stored setting and
+    /// cannot be read back, so there is nothing to compare against the device — the control writes on
+    /// each transition, when the target has moved enough to matter, and to renew before the armed
+    /// command lapses. A failure here must not take the poll down: the hold is a preservation feature,
+    /// and losing it costs battery charge, not safety.
+    /// </summary>
+    private async Task<BatteryHoldState> ApplyBatteryHoldAsync(EnergyState state, CancellationToken cancellationToken)
+    {
+        if (!_batteryHoldOptions.Enabled)
+        {
+            return default;
+        }
+
+        var hold = _batteryHold.Hold;
+        var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
+
+        BatteryHoldState result;
+        try
+        {
+            result = await _batteryDischargeControl.ApplyAsync(hold, targetWatts, state.Timestamp, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to apply the battery discharge hold; will retry on next interval.");
+            return new BatteryHoldState(Held: false, null, null, Wrote: false);
+        }
+
+        // The one observable check available: the command register can't be read back, but the battery
+        // itself can. If it is discharging while we believe the hold is armed, the hold isn't working
+        // on this firmware — which is exactly what the verification phase needs to surface. Skipped in
+        // dry-run, where nothing was written and a discharging battery is the expected outcome.
+        if (result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < 0)
+        {
+            _logger.LogWarning(
+                "Battery discharge hold is armed (target {TargetWatts}W) but the battery is discharging at {BatteryPowerWatts}W. "
+                + "The power-control command may not be taking effect on this firmware.",
+                result.ActivePowerTargetWatts,
+                state.BatteryPowerWatts);
+        }
+
+        return result;
     }
 
     // Logs actual solar generation against what Solcast forecast for this moment, plus their
