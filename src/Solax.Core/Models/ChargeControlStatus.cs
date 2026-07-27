@@ -20,6 +20,7 @@ namespace Solax.Core.Models;
 /// <param name="EvChargerPowerWatts">Actual power the EV charger is drawing.</param>
 /// <param name="EvChargingCurrentAmps">Actual charging current, derived from the charger power (phase-aware).</param>
 /// <param name="BatteryPowerWatts">Battery power: positive = charging, negative = discharging.</param>
+/// <param name="GridPowerWatts">Grid meter power: positive = importing, negative = exporting.</param>
 /// <param name="BatteryHoldEnabled">Whether the battery discharge hold feature is configured on at all.</param>
 /// <param name="BatteryHoldRequested">Whether the hold is switched on (the user's intent).</param>
 /// <param name="BatteryHoldActive">
@@ -43,6 +44,7 @@ public sealed record ChargeControlStatus(
     double EvChargerPowerWatts,
     int EvChargingCurrentAmps,
     double BatteryPowerWatts,
+    double GridPowerWatts,
     bool BatteryHoldEnabled,
     bool BatteryHoldRequested,
     bool BatteryHoldActive,

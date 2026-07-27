@@ -125,6 +125,7 @@ public sealed class SolaxPollingService : BackgroundService
                     EvChargerPowerWatts: state.EvChargerPowerWatts,
                     EvChargingCurrentAmps: (int)Math.Round(_power.WattsToAmps(state.EvChargerPowerWatts)),
                     BatteryPowerWatts: state.BatteryPowerWatts,
+                    GridPowerWatts: state.GridPowerWatts,
                     BatteryHoldEnabled: _batteryHoldOptions.Enabled,
                     BatteryHoldRequested: _batteryHold.Hold,
                     BatteryHoldActive: hold.Held,

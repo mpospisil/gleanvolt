@@ -99,6 +99,7 @@ public sealed class HaDiscovery
         yield return Sensor("active_current", "Active charging current", template: "{{ value_json.active_a }}", unit: "A", deviceClass: "current");
         yield return Sensor("battery_soc", "Battery SOC", template: "{{ value_json.soc }}", unit: "%", deviceClass: "battery", stateClass: "measurement");
         yield return Sensor("battery_power", "Battery power", template: "{{ value_json.battery_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        yield return Sensor("grid_power", "Grid power", template: "{{ value_json.grid_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
 
         if (_batteryHoldEnabled)
         {
@@ -154,6 +155,9 @@ public sealed class HaDiscovery
             ["active_a"] = s.ActiveCurrentAmps,
             ["soc"] = Math.Round(s.BatterySocPercent),
             ["battery_w"] = Math.Round(s.BatteryPowerWatts),
+            // Positive = importing, negative = exporting (this project's convention; the SolaX meter
+            // register itself uses the opposite sign and is negated on read).
+            ["grid_w"] = Math.Round(s.GridPowerWatts),
             ["holding"] = s.HoldingControl,
             ["dry_run"] = s.DryRun,
             ["hold_target_w"] = s.BatteryHoldTargetWatts is null ? null : Math.Round(s.BatteryHoldTargetWatts.Value),

@@ -338,7 +338,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
-- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, and **Battery hold target** (while the hold is enabled).
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
 - binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 

@@ -30,6 +30,7 @@ public class HaDiscoveryTests
         new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
             ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
             EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, BatteryPowerWatts: -1250.2,
+            GridPowerWatts: 1601.4,
             BatteryHoldEnabled: true, BatteryHoldRequested: true, BatteryHoldActive: holdActive,
             BatteryHoldTargetWatts: holdTarget, Timestamp: DateTimeOffset.UtcNow);
 
@@ -68,6 +69,8 @@ public class HaDiscoveryTests
     [InlineData("homeassistant/sensor/solax_controller/ev_power/config")]
     [InlineData("homeassistant/sensor/solax_controller/ev_current/config")]
     [InlineData("homeassistant/binary_sensor/solax_controller/car_connected/config")]
+    [InlineData("homeassistant/sensor/solax_controller/grid_power/config")]
+    [InlineData("homeassistant/sensor/solax_controller/battery_power/config")]
     public void DiscoveryMessages_IncludeTheTelemetrySensors(string topic) =>
         Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
 
@@ -136,6 +139,14 @@ public class HaDiscoveryTests
 
         Assert.Equal(-1250, s.GetProperty("battery_w").GetDouble());
         Assert.Equal(-2450, s.GetProperty("hold_target_w").GetDouble());
+    }
+
+    [Fact]
+    public void StateJson_CarriesGridPower_PositiveWhenImporting()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+
+        Assert.Equal(1601, json.RootElement.GetProperty("grid_w").GetDouble());
     }
 
     [Fact]
