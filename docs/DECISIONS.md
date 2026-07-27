@@ -70,10 +70,42 @@ Consequences, deliberately accepted:
 | Battery Discharge Max Current = 0 | Rejected. Same EEPROM problem; also fights the inverter's own limits. |
 | Manual Mode → "Stop charge and discharge" | Rejected. Freezes the battery in *both* directions, so PV surplus exports instead of charging the battery. Remains the manual fallback if the Modbus route fails verification. |
 
-**Status: unverified against hardware.** Everything above is desk research against the upstream
-register map, not a measurement on this inverter. `BatteryHold:Enabled` is therefore off by default,
-`DryRun` defaults to `true`, and while the feature is disabled the inverter's Modbus client is
-wrapped read-only so an inverter write is structurally impossible. The observations issue #20 lists
-as Phase 0 — that `duration` is honoured, that PV is not curtailed during remote control, that the
-battery still charges from surplus while held, and how the undocumented `timeout` field behaves —
-still have to be made on the device, and this record should be updated with the results.
+### Verified on hardware, 2026-07-27
+
+First live write to the inverter. Conditions: dusk, PV ~360 W, SOC 87 %, no EV charging, house load
+~1.5–2.9 kW.
+
+**The mechanism works.** Arming the hold moved the house from battery to grid within one poll:
+
+| | Battery | Grid | Solar |
+|---|---|---|---|
+| Before the write | **−2846 W** (discharging) | 0 W | 366 W |
+| After the write | **−56 W** | **+1601 W** (importing) | 370 W |
+
+Confirmed by this run:
+
+- **`power_control = 1` with a computed `active_power` is accepted** and takes effect immediately —
+  no Modbus exception, no rejected block. The encoded payload
+  `[1,1,65170,65535,0,0,60,0,0,0,0,0,0]` at `0x7C` is correct as written.
+- **Renewal at half the duration works.** Renewals were issued at ~33 s and ~72 s with the hold
+  remaining continuously effective; no lapse or gap was observed between them.
+- **PV was not curtailed.** Solar held steady at 358–370 W across the whole run, before, during and
+  after arming. Weak evidence at 360 W in the evening — this needs repeating under strong midday sun
+  before the curtailment risk can be closed.
+
+**A working hold still leaves a residual 50–65 W trickle out of the battery.** This is inverter
+standby draw, not load being served — it persisted regardless of house load swinging between 143 W
+and 2877 W. Two consequences:
+
+- Issue #20's acceptance criterion "`BatteryPowerWatts` is never negative" is **not literally
+  achievable** on this hardware. The achievable guarantee is that the battery stops serving house
+  load, which is what the feature is actually for.
+- The "hold armed but battery discharging" warning originally triggered on any negative value, so it
+  fired every single poll and drowned out the signal it existed to give. It now uses a 150 W deadband.
+
+**Still to observe:** behaviour under strong PV (does the battery still charge from surplus while
+held, and is PV curtailed at full output), behaviour with the EV actually charging, and what the
+undocumented `timeout` field does relative to `duration`.
+
+`BatteryHold:Enabled` remains off by default and `DryRun` still defaults to `true`, since none of the
+above has been observed on any other firmware.

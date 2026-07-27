@@ -9,6 +9,10 @@ namespace Solax.Worker;
 
 public sealed class SolaxPollingService : BackgroundService
 {
+    // How much battery discharge to tolerate before treating an armed hold as ineffective. See the
+    // use site: a working hold still leaves a small standby trickle, so 0 is not the right line.
+    private const double ResidualDischargeWatts = 150;
+
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
@@ -181,7 +185,11 @@ public sealed class SolaxPollingService : BackgroundService
         // itself can. If it is discharging while we believe the hold is armed, the hold isn't working
         // on this firmware — which is exactly what the verification phase needs to surface. Skipped in
         // dry-run, where nothing was written and a discharging battery is the expected outcome.
-        if (result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < 0)
+        //
+        // The deadband matters: measured on this inverter, an armed hold leaves a residual 50-65W
+        // trickle out of the battery (inverter standby draw, not load being served). Warning on any
+        // negative value fires every poll and drowns out the signal it exists to give.
+        if (result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < -ResidualDischargeWatts)
         {
             _logger.LogWarning(
                 "Battery discharge hold is armed (target {TargetWatts}W) but the battery is discharging at {BatteryPowerWatts}W. "
