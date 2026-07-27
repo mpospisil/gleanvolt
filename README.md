@@ -6,7 +6,13 @@ The controller operates entirely within the local LAN via **Modbus TCP**, bypass
 
 ## Status
 
-🚧 Early development — not yet functional. This README describes the intended design and will evolve alongside the implementation.
+Working, and running against live hardware. Polling, Solcast forecasting, live-solar EV charge
+control, the battery discharge hold, and the Home Assistant integration are all implemented.
+
+The two features that **write** to hardware — `ChargeControl` (the EV charger) and `BatteryHold` (the
+inverter) — ship disabled by default, and `BatteryHold` additionally defaults to dry-run. Register
+addresses vary between SolaX generations and firmware, so verify them against your own device before
+enabling either.
 
 ## Why local?
 
@@ -16,12 +22,14 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - Polling and decision cycles run at LAN speed, not cloud round-trip speed.
 - No telemetry leaves the local network unless explicitly configured.
 
-## Key features (planned)
+## Key features
 
 - **Real-time polling** of PV generation, battery state of charge, grid import/export, and EV charger status over Modbus TCP.
 - **Surplus-aware EV charging** — automatically ramp EV charge current up/down based on available household energy surplus.
-- **Battery utilization optimization** — coordinate charge/discharge behavior with EV charging demand.
-- **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service / Docker container).
+- **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
+- **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
+- **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
+- **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
 
 ## Hardware targets
@@ -42,29 +50,35 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 The solution is organized to keep domain/control logic testable and free of hardware and hosting concerns:
 
 ```
-SolaxLocalController.sln
+SolaxLocalController.slnx
 ├── src/
 │   ├── Solax.Core/                 # Domain logic and hardware abstractions
-│   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig)
-│   │   ├── Enums/                  # Register addresses, Charger modes, Inverter states
-│   │   └── Interfaces/             # IModbusClient, IChargingStrategy
+│   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
+│   │   ├── Enums/                  # Register addresses, charger modes, inverter control values
+│   │   ├── Strategies/             # Pure decision logic (charging controller, discharge hold, smoothing)
+│   │   └── Interfaces/             # IModbusClient, IChargingController, IBatteryDischargeControl, ...
 │   │
 │   ├── Solax.Infrastructure/       # External communication
-│   │   ├── Modbus/                 # Concrete Modbus TCP client implementation
-│   │   └── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
+│   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
+│   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
+│   │   └── Solcast/                # Solar-forecast HTTP client
 │   │
 │   └── Solax.Worker/               # The executable host
 │       ├── Program.cs              # Dependency Injection setup
 │       ├── SolaxPollingService.cs  # The main background loop (IHostedService)
-│       └── Dockerfile              # Container definition targeting ARM architecture
-└── tests/
-    └── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
+│       ├── Configuration/          # Options classes bound from appsettings.json
+│       └── HomeAssistant/          # MQTT discovery and the HA worker
+├── tests/
+│   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
+│   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
+│   └── Solax.Worker.Tests/         # Coordinator, selector and HA discovery tests
+└── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md (see below)
 ```
 
 ### Layering rules
 
 - **Dependency direction is one-way:** `Solax.Worker` → `Solax.Infrastructure` → `Solax.Core`. `Solax.Core` must never reference `Solax.Infrastructure` or `Solax.Worker`.
-- **`Solax.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingStrategy`). This is what keeps control/decision logic unit-testable without real hardware.
+- **`Solax.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingController`, `IBatteryDischargeControl`). This is what keeps control/decision logic unit-testable without real hardware.
 - **All decision-making logic lives in `Solax.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Solax.Infrastructure` or `Solax.Worker`.
 - **`Solax.Infrastructure` only implements `Solax.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
 - **`Solax.Worker` is composition-only.** `Program.cs` wires up DI; `SolaxPollingService` orchestrates the poll/act loop by calling into `Solax.Core` abstractions — it should not contain control logic itself.
@@ -72,7 +86,23 @@ SolaxLocalController.sln
 
 ## Getting started
 
-> Implementation has not started yet. This section will be filled in with build, configuration, and run instructions once the initial service scaffold lands.
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- Network access to the SolaX inverter and EV charger with Modbus TCP enabled
+
+### Build and run
+
+```bash
+dotnet build SolaxLocalController.slnx
+dotnet test SolaxLocalController.slnx
+dotnet run --project src/Solax.Worker
+```
+
+Set your device addresses first (see [Configuration](#configuration)). On a first run nothing is
+written to either device: `ChargeControl:Enabled` and `BatteryHold:Enabled` are both `false`, so the
+service only polls and logs. That is the recommended way to confirm the telemetry looks right before
+enabling anything that writes.
 
 ## Workflow & Project Management
 You are authorized and expected to use the GitHub CLI (`gh`) to manage this project. 
@@ -83,26 +113,26 @@ When asked to manage tasks or submit code, use the following commands:
 - `gh pr create -t "<title>" -b "<body>"`: To submit your implemented code for review.
 Do not use `git push` directly to the main branch; always create a branch and use `gh pr create`.
 
-## Documentation & Implementation Notes
-You must maintain a living record of your implementation choices in `docs/IMPLEMENTATION_NOTES.md`.
-Whenever you complete a task or write a significant piece of logic (like the Modbus polling loop or MQTT discovery):
-1. Append a short entry to `IMPLEMENTATION_NOTES.md` detailing *what* you built, *why* you chose that approach, and any technical debt or edge cases (like SolaX hardware limitations).
-2. When using `gh pr create`, use these notes to generate a highly detailed Pull Request body. The PR description must explain the architecture decisions, not just list the changed files.
-
 ## Documentation Organization
 All project notes live in the `docs/` directory. You are responsible for keeping them updated:
-1. `ARCHITECTURE.md`: Update this ONLY when the fundamental structure, network topology, or data models change.
-2. `DECISIONS.md`: Append a new record here if we choose a new library (like MQTTnet) or establish a new core pattern.
-3. `IMPLEMENTATION_LOG.md`: Before submitting a Pull Request via `gh pr create`, you MUST add a reverse-chronological entry to the top of this file detailing the implementation specifics, hardware quirks encountered (e.g., Modbus limitations), and the files changed.
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Network access to the SolaX inverter and EV charger with Modbus TCP enabled
+1. `DECISIONS.md`: Append a record when we adopt a library or establish a core pattern — and when hardware verification contradicts a planned design, which is the more common case here. Include what was found, what was decided, and the consequences accepted.
+2. `IMPLEMENTATION_LOG.md`: Before submitting a Pull Request via `gh pr create`, you MUST add a reverse-chronological entry to the top of this file detailing the implementation specifics, hardware quirks encountered (e.g. Modbus limitations), and the files changed. Use this entry to generate a detailed PR body that explains the architecture decisions, not just the changed files.
 
 ## Configuration
 
-Configuration (device IP addresses, Modbus ports/unit IDs, polling intervals, charging strategy parameters) will be documented here once implemented.
+All settings live in `src/Solax.Worker/appsettings.json`; secrets are supplied out-of-band (see
+below). Device addresses and the poll cadence sit in the `Solax` section:
+
+```jsonc
+"Solax": {
+  "PollIntervalSeconds": 5,   // one poll/decide cycle per this many seconds
+  "Inverter":  { "Host": "192.168.2.6",  "Port": 502, "UnitId": 1 },
+  "EvCharger": { "Host": "192.168.2.10", "Port": 502, "UnitId": 1 }
+}
+```
+
+The feature sections — `Solcast`, `ChargeControl`, `BatteryHold` and `HomeAssistant` — are documented
+in the subsections that follow.
 
 ### Solcast solar forecast
 
@@ -142,7 +172,7 @@ If the API key or resource id is missing, the worker logs a warning and skips fo
 
 ### EV charge control (writes to the charger)
 
-When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. Once the conditions are met (battery full + enough surplus) it **starts a session** — including from an idle `Available`/`Stop` charger, which is exactly where its own reset leaves things — by setting Fast mode with the computed current and issuing a `Start Charging` command. The command is sent only on the transition into charging, not on every poll. It writes only values that differ from what's already on the device and logs every change.
+When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. It writes **only the charge-current setpoint** — it never changes the charger's use-mode and never sends a start/stop command, so you keep the charger in Fast mode and the controller modulates the current under it (see "Current-only control" below). It writes only values that differ from what's already on the device and logs every change.
 
 The current setpoint is always constrained to what the hardware accepts (**6–32 A**): the configured min/max are clamped into that range up-front, so the controller can never even target an illegal value, and the write path clamps again as a final guard.
 
@@ -181,13 +211,13 @@ These stack with the existing state hysteresis — the asymmetric start/stop thr
 You can watch all of it in the log; each control cycle prints the raw surplus, the average, the sample count, the charger's active setpoint, and the target:
 
 ```
-Charge control: Surplus=4180W Avg=3990W (12 samples) Setpoint=16A Target=17A Action=Charge. ...
+Charge control: Mode=Fast Surplus=4180W Avg=3990W (12 samples) Setpoint=16A Action=Charge Target=17A. Live surplus 3990W -> charge at 17A.
 ```
 
-and the telemetry line now carries the charger's active current:
+and the telemetry line carries the full energy picture plus the charger's active current:
 
 ```
-SOC=96% ... EvCharger=Charging EvMode=Fast EvCurrent=16A EvPower=3680W
+SOC=96% BatteryPower=-56W Solar=4180W Grid=-388W EvCharger=Charging EvMode=Fast EvCurrent=16A EvPower=3680W
 ```
 
 #### Current-only control: what it changes, and what it doesn't
@@ -299,8 +329,14 @@ The hold does **not** survive a restart: the service comes back with the switch 
 The Home Assistant switch reports **what the controller last successfully wrote**, not a reading from
 the inverter — register `0x7C` reports the firmware version when read, so the command state cannot be
 read back. A failed write therefore shows up as the switch springing back to OFF rather than as an
-assumed success. As a cross-check, the controller logs a warning if the battery discharges while it
-believes the hold is armed.
+assumed success. As a cross-check, the controller logs a warning if the battery discharges by more
+than 150 W while it believes the hold is armed.
+
+**A working hold still leaves a 50–65 W trickle out of the battery** — inverter standby draw, not
+load being served; measured here across house loads from 143 W to 2877 W. So the guarantee is that
+the battery stops *serving the house*, not that battery power reaches exactly zero. The 150 W
+deadband above exists for this reason: warning on any negative value fires every poll and drowns out
+the signal it is there to give.
 
 #### Configuration
 
@@ -318,13 +354,21 @@ believes the hold is armed.
 switch is published, the poll loop skips the feature, and the inverter's Modbus client is wrapped
 read-only so a write is structurally impossible rather than merely skipped.
 
-> ⚠️ **This is the only feature that writes to your inverter, and it is unverified.** The register
-> address, field layout and mode values come from the wills106 homeassistant-solax-modbus map, not
-> from a SolaX document, and upstream reports behaviour differing across firmware versions.
-> **Validate with `DryRun: true` first** — it logs the exact block it would write
-> (`[DRY RUN] would hold battery discharge: active power target -2000W for 60s (registers [...] at
-> 0x7C)`) without touching the inverter. Then confirm on your hardware that PV is not curtailed while
-> the command is active and that the battery still charges from surplus, before allowing real writes.
+> ⚠️ **This is the only feature that writes to your inverter.** The register address, field layout and
+> mode values come from the wills106 homeassistant-solax-modbus map, not from a SolaX document, and
+> upstream reports behaviour differing across firmware versions.
+>
+> It **has been verified on the reference hardware** (X3-HYB-G4 PRO, 2026-07-27): arming the hold
+> moved the house from 2846 W of battery discharge to 1601 W of grid import within one poll, renewal
+> held it continuously, and PV was not curtailed. Full measurements are in
+> [docs/DECISIONS.md](docs/DECISIONS.md). Two things remain unobserved: behaviour under strong midday
+> PV (does the battery still charge from surplus, and is PV curtailed at full output), and behaviour
+> with the EV actually charging.
+>
+> None of that transfers to a different inverter or firmware, so `Enabled` stays `false` and `DryRun`
+> stays `true` by default. **Validate with `DryRun: true` first** — it logs the exact block it would
+> write (`[DRY RUN] would hold battery discharge: active power target -2000W for 60s (registers [...]
+> at 0x7C)`) without touching the inverter.
 
 ### Home Assistant (MQTT)
 

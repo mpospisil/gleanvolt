@@ -129,7 +129,7 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
 });
 
-// Runtime charge-control mode (Off/Solar/Force), seeded from config; changed at runtime (e.g. by HA).
+// Runtime charge-control mode (Off/Solar), seeded from config; changed at runtime (e.g. by HA).
 // The config Enabled flag is the boot default: enabled -> Solar, disabled -> Off.
 builder.Services.AddSingleton<IChargeControlModeSelector>(services => new ChargeControlModeSelector(
     services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled ? ChargeControlMode.Solar : ChargeControlMode.Off,

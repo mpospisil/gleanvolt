@@ -4,6 +4,49 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-07-27 — Battery hold verified on hardware; discharge deadband; grid-power sensor (issue #20)
+
+Branch: `feature/20-battery-discharge-hold`
+
+Follow-up to the entry below, which shipped the hold unverified. It has now been exercised against
+the live inverter.
+
+### What was found
+
+The mechanism works. Arming the hold at dusk (PV ~360 W, SOC 87 %, no EV charging) moved the house
+off the battery within a single poll: battery **−2846 W → −56 W**, grid **0 W → +1601 W**, solar
+unchanged at ~370 W. Renewal at half the duration held it continuously with no observed lapse, and PV
+was not curtailed. Full measurements are in [DECISIONS.md](DECISIONS.md).
+
+### What changed
+
+- **A 150 W deadband on the "hold armed but battery discharging" warning**
+  (`SolaxPollingService.ResidualDischargeWatts`). A working hold still leaves a **50–65 W trickle**
+  out of the battery — inverter standby draw, not load being served; it persisted while house load
+  swung between 143 W and 2877 W. The warning originally fired on any negative value, so it fired
+  every poll and drowned out the signal it existed to give.
+- **Grid power exposed as a Home Assistant sensor** (`grid_w` in the state payload, `grid_power`
+  discovery config), so the hold can be observed from HA rather than only from the log — watching
+  import rise as battery discharge falls is the clearest evidence the hold is working.
+
+### Consequences
+
+- **Issue #20's "`BatteryPowerWatts` is never negative" acceptance criterion is not literally
+  achievable** on this hardware, because of the standby trickle. The achievable guarantee is that the
+  battery stops *serving house load*.
+- Defaults are unchanged: `Enabled: false`, `DryRun: true`. Verification on one inverter and firmware
+  says nothing about any other.
+
+### Still unobserved
+
+Behaviour under strong midday PV (does the battery still charge from surplus while held, and is PV
+curtailed at full output), behaviour with the EV actually charging, and what the undocumented
+`timeout` field does relative to `duration`.
+
+134 unit tests pass.
+
+---
+
 ## 2026-07-26 — Battery discharge hold (issue #20)
 
 Branch: `feature/20-battery-discharge-hold`
@@ -68,10 +111,12 @@ Two smaller ones worth noting here:
   than as an assumed success.
 - **Nothing verified on hardware yet.** The register map comes from the upstream integration, not a
   SolaX document, and issue #20's Phase 0 observations are still outstanding. Hence
-  `Enabled: false` + `DryRun: true` defaults.
+  `Enabled: false` + `DryRun: true` defaults. *(Superseded — see the 2026-07-27 entry above: the hold
+  was subsequently verified on the reference inverter. The defaults stand regardless.)*
 - **The compensating check for the missing read-back**: if the battery is discharging while we
   believe the hold is armed (and we are not in dry-run), the poll loop logs a warning. It is the only
-  observable signal that the command isn't taking effect on this firmware.
+  observable signal that the command isn't taking effect on this firmware. *(A 150 W deadband was
+  added on 2026-07-27; a working hold still trickles 50–65 W.)*
 - **Clock going backwards** (NTP step, telemetry timestamp jitter) is treated as "renewal due" rather
   than deferring renewal indefinitely.
 - A failed write is not recorded as armed, so the next poll retries instead of reporting a hold that
