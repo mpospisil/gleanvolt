@@ -8,22 +8,31 @@ namespace Solax.Worker.Tests;
 
 public class HaDiscoveryTests
 {
-    private static readonly HaDiscovery Discovery = new(new HomeAssistantOptions
+    private static readonly HomeAssistantOptions Options = new()
     {
         BaseTopic = "solax",
         DeviceId = "solax_controller",
         DiscoveryPrefix = "homeassistant",
-    });
+    };
+
+    private static readonly HaDiscovery Discovery = new(Options);
+
+    private static readonly HaDiscovery DiscoveryWithBatteryHold = new(Options, batteryHoldEnabled: true);
 
     private static ChargeControlStatus Status(
         ChargeControlMode mode = ChargeControlMode.Solar,
         ChargeControlState state = ChargeControlState.Charging,
         double? surplus = 4180.7,
         int? target = 6,
-        int? active = 16) =>
+        int? active = 16,
+        bool holdActive = true,
+        double? holdTarget = -2450.4) =>
         new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
             ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
-            EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, Timestamp: DateTimeOffset.UtcNow);
+            EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, BatteryPowerWatts: -1250.2,
+            GridPowerWatts: 1601.4,
+            BatteryHoldEnabled: true, BatteryHoldRequested: true, BatteryHoldActive: holdActive,
+            BatteryHoldTargetWatts: holdTarget, Timestamp: DateTimeOffset.UtcNow);
 
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
@@ -60,6 +69,8 @@ public class HaDiscoveryTests
     [InlineData("homeassistant/sensor/solax_controller/ev_power/config")]
     [InlineData("homeassistant/sensor/solax_controller/ev_current/config")]
     [InlineData("homeassistant/binary_sensor/solax_controller/car_connected/config")]
+    [InlineData("homeassistant/sensor/solax_controller/grid_power/config")]
+    [InlineData("homeassistant/sensor/solax_controller/battery_power/config")]
     public void DiscoveryMessages_IncludeTheTelemetrySensors(string topic) =>
         Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
 
@@ -77,11 +88,81 @@ public class HaDiscoveryTests
     }
 
     [Fact]
+    public void BatteryHoldTopics_FollowTheConfiguredPrefixes()
+    {
+        Assert.Equal("solax/solax_controller/battery_hold/set", Discovery.BatteryHoldCommandTopic);
+        Assert.Equal("solax/solax_controller/battery_hold/state", Discovery.BatteryHoldStateTopic);
+    }
+
+    [Fact]
+    public void DiscoveryMessages_PublishTheBatteryHoldSwitch_OnlyWhenTheFeatureIsEnabled()
+    {
+        const string switchTopic = "homeassistant/switch/solax_controller/battery_hold/config";
+
+        // Off: the feature is inert, so publishing a switch would offer a control that does nothing.
+        Assert.DoesNotContain(Discovery.DiscoveryMessages(), m => m.Topic == switchTopic);
+        Assert.Contains(switchTopic, Discovery.RetiredDiscoveryTopics());
+
+        var messages = DiscoveryWithBatteryHold.DiscoveryMessages().ToList();
+        var switchMsg = messages.Single(m => m.Topic == switchTopic);
+        using var json = JsonDocument.Parse(switchMsg.Payload);
+        var s = json.RootElement;
+
+        Assert.Equal("solax_controller_battery_hold", s.GetProperty("unique_id").GetString());
+        Assert.Equal(Discovery.BatteryHoldCommandTopic, s.GetProperty("command_topic").GetString());
+        Assert.Equal(Discovery.BatteryHoldStateTopic, s.GetProperty("state_topic").GetString());
+        Assert.Equal("ON", s.GetProperty("payload_on").GetString());
+        Assert.Equal("OFF", s.GetProperty("payload_off").GetString());
+
+        Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/battery_hold_target/config");
+        Assert.DoesNotContain(switchTopic, DiscoveryWithBatteryHold.RetiredDiscoveryTopics());
+    }
+
+    [Theory]
+    [InlineData("ON", true)]
+    [InlineData("off", false)]
+    public void TryParseSwitch_AcceptsThePayloads(string payload, bool expected)
+    {
+        Assert.True(HaDiscovery.TryParseSwitch(payload, out var on));
+        Assert.Equal(expected, on);
+    }
+
+    [Fact]
+    public void TryParseSwitch_RejectsUnknown() =>
+        Assert.False(HaDiscovery.TryParseSwitch("maybe", out _));
+
+    [Fact]
+    public void StateJson_CarriesTheBatteryHoldTargetAndPower()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+        var s = json.RootElement;
+
+        Assert.Equal(-1250, s.GetProperty("battery_w").GetDouble());
+        Assert.Equal(-2450, s.GetProperty("hold_target_w").GetDouble());
+    }
+
+    [Fact]
+    public void StateJson_CarriesGridPower_PositiveWhenImporting()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+
+        Assert.Equal(1601, json.RootElement.GetProperty("grid_w").GetDouble());
+    }
+
+    [Fact]
+    public void StateJson_OmitsTheHoldTargetWhenNotHeld()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status(holdActive: false, holdTarget: null)));
+
+        Assert.False(json.RootElement.TryGetProperty("hold_target_w", out _));
+    }
+
+    [Fact]
     public void DiscoveryMessages_NeverContainNullFields()
     {
         // Home Assistant rejects a whole config on any null field (e.g. "icon": null), which silently
         // drops the entity. So every payload must omit unset keys rather than send null.
-        foreach (var (topic, payload) in Discovery.DiscoveryMessages())
+        foreach (var (topic, payload) in DiscoveryWithBatteryHold.DiscoveryMessages())
         {
             using var json = JsonDocument.Parse(payload);
             foreach (var property in json.RootElement.EnumerateObject())

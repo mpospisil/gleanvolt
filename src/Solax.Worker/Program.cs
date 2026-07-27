@@ -25,23 +25,32 @@ builder.Services.AddSerilog(config => config
 
 builder.Services.Configure<SolaxOptions>(builder.Configuration.GetSection(SolaxOptions.SectionName));
 
-// Enforces the dry-run guarantee structurally: in dry-run the device clients physically cannot
-// write, so even a caller that forgot its own guard can never reach the hardware.
-static IModbusClient WriteProofInDryRun(IServiceProvider services, IModbusClient client) =>
-    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.DryRun
-        ? new ReadOnlyModbusClient(client, services.GetRequiredService<ILogger<ReadOnlyModbusClient>>())
-        : client;
+// Enforces the dry-run guarantee structurally: when a device may not be written to, its client
+// physically cannot write, so even a caller that forgot its own guard can never reach the hardware.
+static IModbusClient WriteProof(IServiceProvider services, IModbusClient client, bool writable) =>
+    writable
+        ? client
+        : new ReadOnlyModbusClient(client, services.GetRequiredService<ILogger<ReadOnlyModbusClient>>());
 
 builder.Services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (services, _) =>
 {
     var options = services.GetRequiredService<IOptions<SolaxOptions>>().Value;
-    return WriteProofInDryRun(services, new ModbusTcpClient(options.Inverter));
+
+    // The battery discharge hold is the only thing that ever writes to the inverter, so the client is
+    // writable only while that feature is both enabled and out of dry-run. With BatteryHold:Enabled
+    // false — the default — an inverter write is structurally impossible, not merely skipped.
+    var batteryHold = services.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+    return WriteProof(services, new ModbusTcpClient(options.Inverter), batteryHold.Enabled && !batteryHold.DryRun);
 });
 
 builder.Services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (services, _) =>
 {
     var options = services.GetRequiredService<IOptions<SolaxOptions>>().Value;
-    return WriteProofInDryRun(services, new ModbusTcpClient(options.EvCharger));
+
+    // Not gated on ChargeControl:Enabled: that is only the boot mode, and Home Assistant can select
+    // Solar at runtime on a service that started with it off.
+    var chargeControl = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return WriteProof(services, new ModbusTcpClient(options.EvCharger), !chargeControl.DryRun);
 });
 
 builder.Services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
@@ -120,12 +129,36 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
 });
 
-// Runtime charge-control mode (Off/Solar/Force), seeded from config; changed at runtime (e.g. by HA).
+// Runtime charge-control mode (Off/Solar), seeded from config; changed at runtime (e.g. by HA).
 // The config Enabled flag is the boot default: enabled -> Solar, disabled -> Off.
 builder.Services.AddSingleton<IChargeControlModeSelector>(services => new ChargeControlModeSelector(
     services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled ? ChargeControlMode.Solar : ChargeControlMode.Off,
     services.GetRequiredService<ILogger<ChargeControlModeSelector>>()));
 builder.Services.AddSingleton<ChargeControlStatusHolder>();
+
+// Battery discharge hold (issue #20) -- the only feature that writes to the INVERTER. Disabled by
+// default: the power-control block's addresses and field layout are taken from the upstream
+// integration's map, not a SolaX document, and must be verified against your firmware first.
+builder.Services.Configure<BatteryHoldOptions>(builder.Configuration.GetSection(BatteryHoldOptions.SectionName));
+
+builder.Services.AddSingleton<IBatteryHoldSelector>(services =>
+{
+    var options = services.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+    return new BatteryHoldSelector(
+        options.Enabled && options.HoldAtStartup,
+        services.GetRequiredService<ILogger<BatteryHoldSelector>>());
+});
+
+builder.Services.AddSingleton<IBatteryDischargeControl>(services =>
+{
+    var options = services.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+    return new BatteryDischargeControl(
+        services.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.Inverter),
+        services.GetRequiredService<ILogger<BatteryDischargeControl>>(),
+        dryRun: options.DryRun,
+        duration: options.Duration,
+        targetChangeThresholdWatts: options.TargetChangeThresholdWatts);
+});
 
 builder.Services.AddHostedService<SolaxPollingService>();
 

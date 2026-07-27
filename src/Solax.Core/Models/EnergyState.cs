@@ -34,6 +34,17 @@ public sealed record EnergyState(
     }
 
     /// <summary>
+    /// Everything the house is consuming, <b>including</b> the EV charger — the whole load the
+    /// inverter's grid-connection point has to serve (positive Grid = importing, positive Battery =
+    /// charging):
+    /// <code>HouseLoad = PV + Grid - Battery</code>
+    /// This is <see cref="OtherLoadsPowerWatts"/> plus the EV charger. The battery discharge hold
+    /// uses this one rather than the residual, precisely because the EV must be counted as load the
+    /// grid may cover.
+    /// </summary>
+    public double HouseLoadPowerWatts => SolarPowerWatts + GridPowerWatts - BatteryPowerWatts;
+
+    /// <summary>
     /// The solar power available for EV charging: <b>sun production minus household consumption</b>,
     /// where household consumption excludes both battery charging and EV charging
     /// (<see cref="OtherLoadsPowerWatts"/>).

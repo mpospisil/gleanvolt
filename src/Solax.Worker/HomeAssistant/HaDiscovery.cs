@@ -15,11 +15,17 @@ public sealed class HaDiscovery
     private static readonly JsonSerializerOptions Json = new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     private readonly HomeAssistantOptions _options;
+    private readonly bool _batteryHoldEnabled;
     private readonly IReadOnlyDictionary<string, object?> _device;
 
-    public HaDiscovery(HomeAssistantOptions options)
+    /// <param name="batteryHoldEnabled">
+    /// Whether <c>BatteryHold:Enabled</c> is on. When it is off the feature is inert, so the switch is
+    /// not published at all rather than published as a control that would do nothing.
+    /// </param>
+    public HaDiscovery(HomeAssistantOptions options, bool batteryHoldEnabled = false)
     {
         _options = options;
+        _batteryHoldEnabled = batteryHoldEnabled;
         _device = new Dictionary<string, object?>
         {
             ["identifiers"] = new[] { options.DeviceId },
@@ -33,14 +39,26 @@ public sealed class HaDiscovery
     public string StateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/state";
     public string ModeCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/set";
     public string ModeStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/state";
+    public string BatteryHoldCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/set";
+    public string BatteryHoldStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/state";
 
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
+    public const string PayloadOn = "ON";
+    public const string PayloadOff = "OFF";
 
     public string ModeState(ChargeControlMode mode) => mode.ToString();
 
     public static bool TryParseMode(string? payload, out ChargeControlMode mode) =>
         Enum.TryParse(payload, ignoreCase: true, out mode);
+
+    public static string SwitchState(bool on) => on ? PayloadOn : PayloadOff;
+
+    public static bool TryParseSwitch(string? payload, out bool on)
+    {
+        on = string.Equals(payload, PayloadOn, StringComparison.OrdinalIgnoreCase);
+        return on || string.Equals(payload, PayloadOff, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Discovery config topics that older versions published but are no longer used. Publish an empty
@@ -49,6 +67,14 @@ public sealed class HaDiscovery
     public IEnumerable<string> RetiredDiscoveryTopics()
     {
         yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/charge_control/config";
+
+        // Also retire the battery-hold entities while the feature is off, so turning it off actually
+        // removes the switch from HA rather than leaving a retained config behind that does nothing.
+        if (!_batteryHoldEnabled)
+        {
+            yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/battery_hold/config";
+            yield return $"{_options.DiscoveryPrefix}/sensor/{_options.DeviceId}/battery_hold_target/config";
+        }
     }
 
     /// <summary>The retained discovery configs. Publish each on connect so HA (re)creates the entities.</summary>
@@ -72,6 +98,28 @@ public sealed class HaDiscovery
         yield return Sensor("target_current", "Target charging current", template: "{{ value_json.target_a }}", unit: "A", deviceClass: "current");
         yield return Sensor("active_current", "Active charging current", template: "{{ value_json.active_a }}", unit: "A", deviceClass: "current");
         yield return Sensor("battery_soc", "Battery SOC", template: "{{ value_json.soc }}", unit: "%", deviceClass: "battery", stateClass: "measurement");
+        yield return Sensor("battery_power", "Battery power", template: "{{ value_json.battery_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        yield return Sensor("grid_power", "Grid power", template: "{{ value_json.grid_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+
+        if (_batteryHoldEnabled)
+        {
+            // The switch reports our own armed state, not a device read-back: the power-control block
+            // is write-only (reading it returns the firmware version). A failed write therefore shows
+            // up as the switch falling back to OFF, rather than as a success we assumed.
+            yield return Config("switch", "battery_hold", new Dictionary<string, object?>
+            {
+                ["name"] = "Battery discharge hold",
+                ["command_topic"] = BatteryHoldCommandTopic,
+                ["state_topic"] = BatteryHoldStateTopic,
+                ["payload_on"] = PayloadOn,
+                ["payload_off"] = PayloadOff,
+                ["icon"] = "mdi:battery-lock",
+            });
+
+            yield return Sensor(
+                "battery_hold_target", "Battery hold target", template: "{{ value_json.hold_target_w }}",
+                unit: "W", deviceClass: "power");
+        }
 
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
@@ -106,8 +154,13 @@ public sealed class HaDiscovery
             ["target_a"] = s.TargetCurrentAmps,
             ["active_a"] = s.ActiveCurrentAmps,
             ["soc"] = Math.Round(s.BatterySocPercent),
+            ["battery_w"] = Math.Round(s.BatteryPowerWatts),
+            // Positive = importing, negative = exporting (this project's convention; the SolaX meter
+            // register itself uses the opposite sign and is negated on read).
+            ["grid_w"] = Math.Round(s.GridPowerWatts),
             ["holding"] = s.HoldingControl,
             ["dry_run"] = s.DryRun,
+            ["hold_target_w"] = s.BatteryHoldTargetWatts is null ? null : Math.Round(s.BatteryHoldTargetWatts.Value),
         };
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so

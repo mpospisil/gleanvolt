@@ -17,19 +17,25 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly HomeAssistantOptions _options;
     private readonly HaDiscovery _discovery;
     private readonly IChargeControlModeSelector _mode;
+    private readonly IBatteryHoldSelector _batteryHold;
+    private readonly bool _batteryHoldEnabled;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ILogger<HomeAssistantMqttWorker> _logger;
     private IMqttClient? _client;
 
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
+        IOptions<BatteryHoldOptions> batteryHoldOptions,
         IChargeControlModeSelector mode,
+        IBatteryHoldSelector batteryHold,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger)
     {
         _options = options.Value;
-        _discovery = new HaDiscovery(_options);
+        _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
+        _discovery = new HaDiscovery(_options, _batteryHoldEnabled);
         _mode = mode;
+        _batteryHold = batteryHold;
         _statusHolder = statusHolder;
         _logger = logger;
     }
@@ -114,6 +120,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         await PublishAsync(_discovery.AvailabilityTopic, HaDiscovery.PayloadOnline, retain: true, cancellationToken).ConfigureAwait(false);
         await _client!.SubscribeAsync(_discovery.ModeCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (_batteryHoldEnabled)
+        {
+            await _client.SubscribeAsync(_discovery.BatteryHoldCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -127,6 +139,16 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         await PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, cancellationToken).ConfigureAwait(false);
 
         var status = _statusHolder.Current;
+
+        if (_batteryHoldEnabled)
+        {
+            // Report what is actually armed on the inverter (status.BatteryHoldActive), not what was
+            // asked for — a write that failed then shows in HA as the switch springing back to OFF.
+            // Before the first poll there is no status yet, so fall back to the requested state.
+            var held = status?.BatteryHoldActive ?? _batteryHold.Hold;
+            await PublishAsync(_discovery.BatteryHoldStateTopic, HaDiscovery.SwitchState(held), retain: true, cancellationToken).ConfigureAwait(false);
+        }
+
         if (status is not null)
         {
             await PublishAsync(_discovery.StateTopic, _discovery.StateJson(status), retain: true, cancellationToken).ConfigureAwait(false);
@@ -135,6 +157,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
     {
+        if (_batteryHoldEnabled && e.ApplicationMessage.Topic == _discovery.BatteryHoldCommandTopic)
+        {
+            return OnBatteryHoldCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+        }
+
         if (e.ApplicationMessage.Topic != _discovery.ModeCommandTopic)
         {
             return Task.CompletedTask;
@@ -153,6 +180,23 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // Reflect the current mode back immediately so the HA select settles.
         _ = PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
         return Task.CompletedTask;
+    }
+
+    private Task OnBatteryHoldCommandAsync(string? payload)
+    {
+        if (HaDiscovery.TryParseSwitch(payload, out var hold))
+        {
+            _batteryHold.Set(hold, "Home Assistant");
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown battery hold command '{Payload}'.", payload);
+        }
+
+        // Echo the requested state so the HA switch settles immediately; the next status publish
+        // replaces it with what is actually armed on the inverter.
+        return PublishAsync(
+            _discovery.BatteryHoldStateTopic, HaDiscovery.SwitchState(_batteryHold.Hold), retain: true, CancellationToken.None);
     }
 
     private async Task PublishAsync(string topic, string payload, bool retain, CancellationToken cancellationToken)
