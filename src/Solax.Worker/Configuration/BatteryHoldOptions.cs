@@ -11,19 +11,14 @@ public sealed class BatteryHoldOptions
     public const string SectionName = "BatteryHold";
 
     /// <summary>
-    /// Master switch for the feature, off by default. Unlike <see cref="ChargeControlOptions.Enabled"/>
-    /// this is <b>not</b> merely a boot default: while it is false the feature is entirely inert — no
-    /// Home Assistant switch is published, the poll loop skips it, and the inverter's Modbus client is
-    /// wrapped read-only so no inverter write is even possible. Use <see cref="HoldAtStartup"/> for
-    /// the boot value of the hold itself.
+    /// Master switch for the feature, off by default. While it is false the feature is entirely inert
+    /// — no Home Assistant switch is published, the poll loop skips it, and the inverter's Modbus
+    /// client is wrapped read-only so no inverter write is even possible.
+    ///
+    /// <para>It does not arm the hold: the hold itself always starts off, and only Home Assistant (or
+    /// the forecast mode's own floor guard) turns it on.</para>
     /// </summary>
     public bool Enabled { get; init; }
-
-    /// <summary>
-    /// The boot value of the hold, for running without Home Assistant. Off by default. A runtime
-    /// change from HA does not persist across restarts — the same contract as the charge-control mode.
-    /// </summary>
-    public bool HoldAtStartup { get; init; }
 
     /// <summary>
     /// When true (and <see cref="Enabled"/>), the hold is decided and logged — including the encoded

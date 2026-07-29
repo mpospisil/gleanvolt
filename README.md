@@ -107,9 +107,9 @@ dotnet run --project src/Solax.Worker
 ```
 
 Set your device addresses first (see [Configuration](#configuration)). On a first run nothing is
-written to either device: `ChargeControl:Enabled` and `BatteryHold:Enabled` are both `false`, so the
-service only polls and logs. That is the recommended way to confirm the telemetry looks right before
-enabling anything that writes.
+written to either device: the service always boots with the charge mode **Off** and the battery hold
+**off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
+recommended way to confirm the telemetry looks right before enabling anything that writes.
 
 ## Workflow & Project Management
 You are authorized and expected to use the GitHub CLI (`gh`) to manage this project. 
@@ -251,7 +251,6 @@ A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages 
 
 ```jsonc
 "ChargeControl": {
-  "Enabled": false,             // master switch — OFF by default (see warning)
   "DryRun": false,              // when Enabled: log intended writes but don't write (validation)
   "NominalVoltage": 230,
   "Phases": 3,                  // 1 = single-phase, 3 = three-phase (e.g. X3-HAC)
@@ -330,8 +329,11 @@ Turning the switch off writes a release immediately; it never waits for the dura
 
 #### Persistence and reported state
 
-The hold does **not** survive a restart: the service comes back with the switch off (unless
-`HoldAtStartup` is set), and the inverter will already have resumed normal operation.
+The hold does **not** survive a restart, and cannot be armed by configuration: the service always
+comes back with the switch **off**, so the battery charges and discharges normally until somebody asks
+otherwise. The inverter will already have resumed normal operation by then anyway, since the armed
+command expires after `Duration`. That is deliberate — the hold is a command with a lifetime, not a
+stored setting, so an unattended restart that re-armed it would silently keep the pack idle.
 
 The Home Assistant switch reports **what the controller last successfully wrote**, not a reading from
 the inverter — register `0x7C` reports the firmware version when read, so the command state cannot be
@@ -350,14 +352,13 @@ the signal it is there to give.
 ```jsonc
 "BatteryHold": {
   "Enabled": false,                 // master switch — while off, inverter writes are impossible
-  "HoldAtStartup": false,           // boot value of the hold itself (for running without HA)
   "DryRun": true,                   // decide and log, but write nothing
   "Duration": "00:01:00",           // how long each command stays armed; also the failsafe window
   "TargetChangeThresholdWatts": 100 // how far the target must move before reissuing
 }
 ```
 
-`Enabled` is a true master switch, unlike `ChargeControl:Enabled`: while it is off no Home Assistant
+`Enabled` is a true master switch: while it is off no Home Assistant
 switch is published, the poll loop skips the feature, and the inverter's Modbus client is wrapped
 read-only so a write is structurally impossible rather than merely skipped.
 
@@ -545,7 +546,9 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
     plan, so the car can start well before the battery is full. See
     [Forecast-driven charging](#forecast-driven-charging-the-forecasted-mode) below.
 
-  The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
+  **The service always starts in `Off`**, whatever is in the config, and nothing persists a mode
+  across restarts. After a crash, a power cut or a deploy the charger is therefore left exactly as its
+  owner set it, rather than being grabbed by whichever mode a config file happened to name.
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.

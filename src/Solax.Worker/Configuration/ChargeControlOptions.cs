@@ -10,13 +10,14 @@ public sealed class ChargeControlOptions
 {
     public const string SectionName = "ChargeControl";
 
-    /// <summary>Master on/off switch. Off by default (writes to hardware — verify registers first).</summary>
-    public bool Enabled { get; init; }
-
     /// <summary>
-    /// When true (and <see cref="Enabled"/>), the control loop runs and logs exactly what it would
-    /// write (mode and the encoded current-register value) but performs no Modbus writes. Use it to
-    /// validate the setpoints against your charger before letting it write for real.
+    /// When true, the control loop runs and logs exactly what it would write (mode and the encoded
+    /// current-register value) but performs no Modbus writes. Use it to validate the setpoints against
+    /// your charger before letting it write for real.
+    ///
+    /// <para>Note there is deliberately no boot-mode setting here: the service always starts in
+    /// <see cref="Solax.Core.Enums.ChargeControlMode.Off"/> and takes control only when asked, so a
+    /// restart never grabs the charger on its own.</para>
     /// </summary>
     public bool DryRun { get; init; }
 

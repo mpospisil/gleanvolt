@@ -4,6 +4,37 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-07-27 — Always boot in Off, with the battery free (issue #22 follow-up)
+
+Branch: `feature/22-forecasted-charging`
+
+The service used to seed its runtime state from configuration: `ChargeControl:Enabled` chose the boot
+charge mode (`true` → Solar) and `BatteryHold:HoldAtStartup` could arm the discharge hold at startup.
+Both are gone. The service now **always** starts with the charge mode `Off` and the hold `off`, and no
+configuration key can change that.
+
+### Why
+
+A restart happens for reasons nobody chose — a crash, a power cut, a deploy — and in each case the
+safe assumption is that the controller has no business acting until somebody asks it to. Seeding from
+config inverted that: a machine rebooting at 3am would take control of the charger and, if
+`HoldAtStartup` was set, immediately re-arm a hold that keeps the pack idle. The hold in particular is
+a *command with a lifetime*, not a stored setting, so re-arming it on boot conflicts with the failsafe
+that #20 was built around: stop renewing and the inverter returns to normal within `Duration`.
+
+### Changed
+
+- `Program.cs` seeds `ChargeControlModeSelector` with `Off` and `BatteryHoldSelector` with `false`,
+  unconditionally.
+- Removed `ChargeControl:Enabled` (it did nothing else) and `BatteryHold:HoldAtStartup`.
+  `BatteryHold:Enabled` stays — it is a real master switch that decides whether the inverter's Modbus
+  client is writable at all, and it supersedes the note in the #20 entry below about `HoldAtStartup`.
+- Startup log lines now say what the state is *and* that the hardware is untouched until asked.
+- README updated in four places; existing `.env` files carrying the removed keys are harmless (unbound
+  configuration keys are ignored), but they no longer do anything.
+
+---
+
 ## 2026-07-27 — Forecast-driven charge mode: `Forecasted` (issue #22)
 
 Branch: `feature/22-forecasted-charging`

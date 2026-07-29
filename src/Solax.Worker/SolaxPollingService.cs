@@ -76,7 +76,8 @@ public sealed class SolaxPollingService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "Charge control at startup: mode {Mode} ({Writes}). It can be changed at runtime.",
+            "Charge control at startup: mode {Mode} ({Writes}) — the charger is left as its owner set it "
+            + "until a mode is selected. It can be changed at runtime.",
             _mode.Mode,
             _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
@@ -84,7 +85,7 @@ public sealed class SolaxPollingService : BackgroundService
             "Battery discharge hold at startup: {Enabled}{Detail}",
             _batteryHoldOptions.Enabled ? "enabled" : "disabled (no inverter writes are possible)",
             _batteryHoldOptions.Enabled
-                ? $", hold {(_batteryHold.Hold ? "on" : "off")} ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
+                ? $", hold off — the battery charges and discharges normally until asked otherwise ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
                 : string.Empty);
 
         while (!stoppingToken.IsCancellationRequested)

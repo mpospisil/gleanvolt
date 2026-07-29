@@ -49,8 +49,8 @@ builder.Services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (s
 {
     var options = services.GetRequiredService<IOptions<SolaxOptions>>().Value;
 
-    // Not gated on ChargeControl:Enabled: that is only the boot mode, and Home Assistant can select
-    // Solar at runtime on a service that started with it off.
+    // Writable unless dry-run: the service always boots in Off, but Home Assistant can select a
+    // controlling mode at any time, so the client has to be ready for it.
     var chargeControl = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
     return WriteProof(services, new ModbusTcpClient(options.EvCharger), !chargeControl.DryRun);
 });
@@ -177,10 +177,13 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
 });
 
-// Runtime charge-control mode (Off/Solar), seeded from config; changed at runtime (e.g. by HA).
-// The config Enabled flag is the boot default: enabled -> Solar, disabled -> Off.
+// Runtime charge-control mode, changed at runtime (e.g. by HA). It is deliberately NOT seeded from
+// configuration: the service always starts in Off, holding no control over the charger, and only
+// takes it when somebody asks. A restart is then never a surprise — after a crash, a power cut or a
+// deploy the charger is left exactly as its owner set it, rather than being grabbed by whatever mode
+// happened to be in a config file.
 builder.Services.AddSingleton<IChargeControlModeSelector>(services => new ChargeControlModeSelector(
-    services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.Enabled ? ChargeControlMode.Solar : ChargeControlMode.Off,
+    ChargeControlMode.Off,
     services.GetRequiredService<ILogger<ChargeControlModeSelector>>()));
 builder.Services.AddSingleton<ChargeControlStatusHolder>();
 
@@ -189,13 +192,12 @@ builder.Services.AddSingleton<ChargeControlStatusHolder>();
 // integration's map, not a SolaX document, and must be verified against your firmware first.
 builder.Services.Configure<BatteryHoldOptions>(builder.Configuration.GetSection(BatteryHoldOptions.SectionName));
 
-builder.Services.AddSingleton<IBatteryHoldSelector>(services =>
-{
-    var options = services.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
-    return new BatteryHoldSelector(
-        options.Enabled && options.HoldAtStartup,
-        services.GetRequiredService<ILogger<BatteryHoldSelector>>());
-});
+// Same contract as the charge mode: the hold always starts OFF, so the battery is free to charge and
+// discharge normally until somebody asks otherwise. The hold is a command with a duration rather than
+// a stored setting, so an unattended restart that re-armed it would silently keep the pack idle.
+builder.Services.AddSingleton<IBatteryHoldSelector>(services => new BatteryHoldSelector(
+    initialHold: false,
+    services.GetRequiredService<ILogger<BatteryHoldSelector>>()));
 
 builder.Services.AddSingleton<IBatteryDischargeControl>(services =>
 {

@@ -4,8 +4,10 @@ namespace Solax.Worker;
 
 /// <summary>
 /// Thread-safe runtime battery-hold state (see <see cref="IBatteryHoldSelector"/>). Registered as a
-/// singleton, seeded from configuration. The configured value is only the boot default — a runtime
-/// change (e.g. from Home Assistant) does not persist across restarts, the same contract as
+/// singleton and always started OFF, so a restart leaves the battery free to charge and discharge
+/// until somebody asks for a hold. Configuration cannot arm it at boot: the hold is a command with a
+/// duration rather than a stored setting, so an unattended restart that re-armed it would silently
+/// keep the pack idle. A runtime change does not persist across restarts, the same contract as
 /// <see cref="ChargeControlModeSelector"/>.
 /// </summary>
 public sealed class BatteryHoldSelector : IBatteryHoldSelector
