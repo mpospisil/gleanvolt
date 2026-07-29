@@ -5,6 +5,21 @@ using Solax.Core.Models;
 
 namespace Solax.Infrastructure.Modbus;
 
+/// <summary>
+/// Modbus TCP client for one SolaX device. Owns the socket and, crucially, its <em>health</em>:
+/// every request is serialised, spaced, and — if it fails — followed by a full teardown of the
+/// connection.
+///
+/// <para><b>Why the teardown matters (issue #24).</b> A Modbus TCP response that arrives after its
+/// request has given up stays in the socket's receive buffer. The next request then reads <em>that</em>
+/// reply instead of its own, and every request afterwards is permanently one or more responses behind
+/// — NModbus rejects each one with "Response was not of expected transaction ID". The TCP connection
+/// stays perfectly healthy throughout, so a liveness check cannot see the problem: it is the stream
+/// that is poisoned, not the socket. Observed in the field as fifteen minutes of normal operation
+/// followed by 45 minutes of every single poll failing, recoverable only by restarting the process.
+/// So any failed exchange invalidates the connection, and the next call reconnects with a fresh
+/// stream and a fresh transaction counter.</para>
+/// </summary>
 public sealed class ModbusTcpClient : IModbusClient
 {
     // TcpClient.ConnectAsync has no built-in timeout: an unreachable or non-responding
@@ -13,17 +28,121 @@ public sealed class ModbusTcpClient : IModbusClient
     private static readonly TimeSpan IoTimeout = TimeSpan.FromSeconds(5);
 
     private readonly DeviceConfig _device;
+    private readonly TimeSpan _minRequestInterval;
+    private readonly TimeProvider _timeProvider;
+
+    // One request at a time per device. Reads are issued sequentially today, but a reconnect can now
+    // happen in the middle of a call, so the invariant is enforced rather than assumed -- two requests
+    // sharing a stream is another way to produce exactly the desync this class exists to avoid.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     private TcpClient? _tcpClient;
     private IModbusMaster? _master;
+    private long _lastRequestTicks;
 
-    public ModbusTcpClient(DeviceConfig device)
+    public ModbusTcpClient(DeviceConfig device, TimeProvider? timeProvider = null)
     {
         _device = device;
+        _minRequestInterval = device.MinRequestInterval;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public bool IsConnected => _tcpClient?.Connected ?? false;
 
+    /// <summary>
+    /// Opens the connection. Callers no longer need to call this — every operation connects on demand —
+    /// but it stays part of the interface so a caller can fail fast at startup if a device is
+    /// unreachable.
+    /// </summary>
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public Task<ushort[]> ReadHoldingRegistersAsync(
+        ushort startAddress,
+        ushort numberOfPoints,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(master => master.ReadHoldingRegistersAsync(_device.UnitId, startAddress, numberOfPoints), cancellationToken);
+
+    public Task<ushort[]> ReadInputRegistersAsync(
+        ushort startAddress,
+        ushort numberOfPoints,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(master => master.ReadInputRegistersAsync(_device.UnitId, startAddress, numberOfPoints), cancellationToken);
+
+    public Task WriteSingleRegisterAsync(
+        ushort address,
+        ushort value,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(master => master.WriteSingleRegisterAsync(_device.UnitId, address, value), cancellationToken);
+
+    public Task WriteMultipleRegistersAsync(
+        ushort startAddress,
+        ushort[] values,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(master => master.WriteMultipleRegistersAsync(_device.UnitId, startAddress, values), cancellationToken);
+
+    public ValueTask DisposeAsync()
+    {
+        Invalidate();
+        _gate.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private async Task<T> ExecuteAsync<T>(Func<IModbusMaster, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var master = await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
+            await ThrottleAsync(cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                return await operation(master).ConfigureAwait(false);
+            }
+            catch (Exception) when (InvalidateAndRethrow())
+            {
+                throw; // unreachable: the filter always returns false, having done its work.
+            }
+            finally
+            {
+                _lastRequestTicks = _timeProvider.GetTimestamp();
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private Task ExecuteAsync(Func<IModbusMaster, Task> operation, CancellationToken cancellationToken) =>
+        ExecuteAsync<object?>(async master =>
+        {
+            await operation(master).ConfigureAwait(false);
+            return null;
+        }, cancellationToken);
+
+    private async Task<IModbusMaster> EnsureConnectedAsync(CancellationToken cancellationToken)
+    {
+        if (_master is null || !IsConnected)
+        {
+            await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return _master!;
+    }
+
+    private async Task ConnectCoreAsync(CancellationToken cancellationToken)
     {
         using var timeoutCts = new CancellationTokenSource(ConnectTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -39,76 +158,54 @@ public sealed class ModbusTcpClient : IModbusClient
             throw new TimeoutException(
                 $"Timed out connecting to Modbus device at {_device.Host}:{_device.Port} after {ConnectTimeout}.");
         }
+        catch
+        {
+            tcpClient.Dispose();
+            throw;
+        }
 
         // Guards the NModbus read/write calls below, which don't accept a CancellationToken.
         tcpClient.ReceiveTimeout = (int)IoTimeout.TotalMilliseconds;
         tcpClient.SendTimeout = (int)IoTimeout.TotalMilliseconds;
 
-        _tcpClient?.Dispose();
+        Invalidate();
         _tcpClient = tcpClient;
         _master = new ModbusFactory().CreateMaster(tcpClient);
     }
 
-    public async Task<ushort[]> ReadHoldingRegistersAsync(
-        ushort startAddress,
-        ushort numberOfPoints,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Waits out the remainder of <see cref="DeviceConfig.MinRequestInterval"/> since the last request.
+    /// The SolaX protocol asks for a gap between consecutive instructions; without one the device
+    /// starts replying late, which is precisely how a stream ends up desynchronised.
+    /// </summary>
+    private async Task ThrottleAsync(CancellationToken cancellationToken)
     {
-        if (_master is null || !IsConnected)
+        if (_minRequestInterval <= TimeSpan.Zero || _lastRequestTicks == 0)
         {
-            throw new InvalidOperationException("Modbus client is not connected. Call ConnectAsync first.");
+            return;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        return await _master.ReadHoldingRegistersAsync(_device.UnitId, startAddress, numberOfPoints).ConfigureAwait(false);
-    }
-
-    public async Task<ushort[]> ReadInputRegistersAsync(
-        ushort startAddress,
-        ushort numberOfPoints,
-        CancellationToken cancellationToken = default)
-    {
-        if (_master is null || !IsConnected)
+        var elapsed = _timeProvider.GetElapsedTime(_lastRequestTicks);
+        var remaining = _minRequestInterval - elapsed;
+        if (remaining > TimeSpan.Zero)
         {
-            throw new InvalidOperationException("Modbus client is not connected. Call ConnectAsync first.");
+            await Task.Delay(remaining, _timeProvider, cancellationToken).ConfigureAwait(false);
         }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return await _master.ReadInputRegistersAsync(_device.UnitId, startAddress, numberOfPoints).ConfigureAwait(false);
     }
 
-    public async Task WriteSingleRegisterAsync(
-        ushort address,
-        ushort value,
-        CancellationToken cancellationToken = default)
+    // Used as an exception filter so the connection is dropped without swallowing or re-wrapping the
+    // original exception -- callers (and their logs) still see exactly what NModbus threw.
+    private bool InvalidateAndRethrow()
     {
-        if (_master is null || !IsConnected)
-        {
-            throw new InvalidOperationException("Modbus client is not connected. Call ConnectAsync first.");
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await _master.WriteSingleRegisterAsync(_device.UnitId, address, value).ConfigureAwait(false);
+        Invalidate();
+        return false;
     }
 
-    public async Task WriteMultipleRegistersAsync(
-        ushort startAddress,
-        ushort[] values,
-        CancellationToken cancellationToken = default)
-    {
-        if (_master is null || !IsConnected)
-        {
-            throw new InvalidOperationException("Modbus client is not connected. Call ConnectAsync first.");
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await _master.WriteMultipleRegistersAsync(_device.UnitId, startAddress, values).ConfigureAwait(false);
-    }
-
-    public ValueTask DisposeAsync()
+    private void Invalidate()
     {
         _master?.Dispose();
         _tcpClient?.Dispose();
-        return ValueTask.CompletedTask;
+        _master = null;
+        _tcpClient = null;
     }
 }
