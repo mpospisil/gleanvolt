@@ -3,12 +3,14 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using Solax.Core.Enums;
 using Solax.Core.Interfaces;
+using Solax.Core.Models;
 using Solax.Core.Strategies;
 using Solax.Infrastructure;
 using Solax.Infrastructure.Modbus;
 using Solax.Infrastructure.Solcast;
 using Solax.Worker;
 using Solax.Worker.Configuration;
+using Solax.Worker.Forecasting;
 using Solax.Worker.HomeAssistant;
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
@@ -115,14 +117,60 @@ builder.Services.AddSingleton<IChargingController>(services =>
         options.BatteryReleaseSocPercent);
 });
 
+// Forecast-driven charge control (issue #22): the Solcast forecast decides how much of today's sun
+// the car may have, so the home battery still reaches 100% by the evening deadline. Nested under the
+// ChargeControl section because it refines that feature rather than being a separate one.
+builder.Services.Configure<ForecastChargeOptions>(builder.Configuration.GetSection(ForecastChargeOptions.SectionName));
+
+// The day's targets and the SOC floor are settable from Home Assistant without a restart; everything
+// else in the forecast section is installation-level and read once.
+builder.Services.AddSingleton<IForecastRuntimeSettings, ForecastRuntimeSettings>();
+builder.Services.AddSingleton<DayPlanProvider>();
+
+builder.Services.AddSingleton<ForecastedChargingController>(services =>
+{
+    var chargeControl = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    var forecast = services.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+
+    return new ForecastedChargingController(
+        services.GetRequiredService<ChargePowerConverter>(),
+        // No usable forecast must never read as headroom: the mode degrades to the live-solar
+        // controller, i.e. exactly the behaviour that shipped before this one existed.
+        services.GetRequiredService<IChargingController>(),
+        new ForecastedChargingOptions(
+            MinChargingCurrentAmps: chargeControl.MinChargingCurrentAmps,
+            MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
+            CurrentStepAmps: chargeControl.CurrentStepAmps,
+            ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
+            EnableBatteryLoan: forecast.EnableBatteryLoan,
+            MaxLoanPowerWatts: forecast.MaxLoanPowerWatts,
+            MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts,
+            MaxDailyLoanWh: forecast.MaxDailyLoanKWh * 1000,
+            LoanSocMarginPercent: forecast.LoanSocMarginPercent,
+            MinRunTime: forecast.MinRunTime,
+            MinPauseTime: forecast.MinPauseTime,
+            FinalGuardBefore: forecast.FinalGuardBefore,
+            SessionEnergyTargetWh: forecast.SessionEnergyTargetKWh * 1000),
+        services.GetRequiredService<IForecastRuntimeSettings>());
+});
+
 builder.Services.AddSingleton(services =>
     new SurplusMovingAverage(services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
 builder.Services.AddSingleton(services =>
 {
     var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+
+    // One controller per mode. Off is absent on purpose: it is handled by the polling loop releasing
+    // control, not by a controller that decides to do nothing.
+    var controllers = new Dictionary<ChargeControlMode, IChargingController>
+    {
+        [ChargeControlMode.Solar] = services.GetRequiredService<IChargingController>(),
+        [ChargeControlMode.Forecasted] = services.GetRequiredService<ForecastedChargingController>(),
+    };
+
     return new ChargingControlCoordinator(
-        services.GetRequiredService<IChargingController>(),
+        controllers,
         services.GetRequiredService<IEvChargerControl>(),
         services.GetRequiredService<SurplusMovingAverage>(),
         pauseCurrentAmps: options.PauseCurrentAmps,

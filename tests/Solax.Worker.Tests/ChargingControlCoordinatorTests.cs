@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Solax.Core.Enums;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 using Solax.Core.Strategies;
 
@@ -16,7 +17,7 @@ public class ChargingControlCoordinatorTests
     public ChargingControlCoordinatorTests()
     {
         _coordinator = new ChargingControlCoordinator(
-            _controller,
+            new Dictionary<ChargeControlMode, IChargingController> { [ChargeControlMode.Solar] = _controller },
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
             pauseCurrentAmps: 0,
@@ -26,7 +27,8 @@ public class ChargingControlCoordinatorTests
     private static EnergyState State() =>
         new(Now, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, EvChargerStatus.Available, EvChargerPowerWatts: 0);
 
-    private Task<ChargeControlCycleResult> Cycle() => _coordinator.RunCycleAsync(State(), CancellationToken.None);
+    private Task<ChargeControlCycleResult> Cycle() =>
+        _coordinator.RunCycleAsync(State(), ChargeControlMode.Solar, plan: null, CancellationToken.None);
 
     [Fact]
     public async Task ChargeDecision_WritesTheTargetCurrent()
@@ -102,4 +104,88 @@ public class ChargingControlCoordinatorTests
         await _coordinator.PauseOnShutdownAsync(CancellationToken.None);
         Assert.Equal(0, _charger.LastTarget); // dropped to the pause current
     }
+
+    [Fact]
+    public async Task TheModeSelectsWhichControllerDecides()
+    {
+        var forecasted = new StubChargingController { NextDecision = new(ChargingControlAction.Charge, 10, "forecast") };
+        var coordinator = new ChargingControlCoordinator(
+            new Dictionary<ChargeControlMode, IChargingController>
+            {
+                [ChargeControlMode.Solar] = _controller,
+                [ChargeControlMode.Forecasted] = forecasted,
+            },
+            _charger,
+            new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            pauseCurrentAmps: 0,
+            NullLogger<ChargingControlCoordinator>.Instance);
+
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "solar");
+
+        await coordinator.RunCycleAsync(State(), ChargeControlMode.Forecasted, plan: null, CancellationToken.None);
+
+        var write = Assert.Single(_charger.CurrentWrites);
+        Assert.Equal(10, write.Target);
+    }
+
+    [Fact]
+    public async Task AnUnregisteredModeLeavesTheChargerAlone()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "solar");
+
+        var result = await _coordinator.RunCycleAsync(State(), ChargeControlMode.Forecasted, plan: null, CancellationToken.None);
+
+        Assert.Empty(_charger.CurrentWrites);
+        Assert.False(result.HoldingControl);
+    }
+
+    [Fact]
+    public async Task ALoanIsMeteredIntoTheDailyTotal()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "bridged", LoanPowerWatts: 1200);
+
+        // Two samples three minutes apart: the first sample's loan power counts for the gap that follows.
+        await _coordinator.RunCycleAsync(State(), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(State(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(60, _coordinator.LoanedTodayWh, 1);
+    }
+
+    [Fact]
+    public async Task SessionEnergyAccumulatesWhileTheCarStaysConnected()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(207, _coordinator.SessionEnergyWh, 0);
+    }
+
+    [Fact]
+    public async Task UnpluggingTheCarStartsTheSessionEnergyAfresh()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(State(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(0, _coordinator.SessionEnergyWh, 1);
+    }
+
+    private static EnergyState State(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Available, EvChargerPowerWatts: 0);
+
+    private static EnergyState Charging(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 4140);
 }
+

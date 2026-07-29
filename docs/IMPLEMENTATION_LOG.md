@@ -4,6 +4,80 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-07-27 — Forecast-driven charge mode: `Forecasted` (issue #22)
+
+Branch: `feature/22-forecasted-charging`
+
+A third charge mode alongside `Off` and `Solar`, selectable at runtime from the Home Assistant select.
+Where `Solar` waits for a 95 % battery and then follows the last three minutes of surplus, `Forecasted`
+plans the whole remaining day from the Solcast forecast so the car can start hours earlier while the
+home battery still reaches 100 % by a configured evening deadline.
+
+### What was built
+
+**`Solax.Core` (all pure, all unit-tested)**
+
+- `SolarDayPlanner` — the heart of it. Slices the remaining forecast (prorating the period the plan is
+  built inside), splits it into *shoulder* (surplus below the charger's minimum power) and *plateau*
+  (at or above it), books the battery's need backwards from the deadline, and reports what is left as
+  both an energy budget and a **deliverable** budget restricted to periods that clear the minimum
+  power. Also produces the SOC floor, the next viable charge window, the shortfall and the outlook.
+- `ForecastedChargingController` — decides the current from the plan. Hard stops (session ceiling,
+  final guard, SOC floor, no window) bypass the dwell timers; soft reasons respect them and hold the
+  session at 6 A rather than stopping inside `MinRunTime`. Grants the bounded battery loan. Delegates
+  to `LiveSolarChargingController` whenever the plan is unusable.
+- `ForecastAccuracyTracker` — accumulates today's actual against forecast energy per period, exposes
+  the clamped bias, hands each closed period to the caller once for logging, and withdraws trust after
+  a sustained breach.
+- `EnergyIntegrator`, `HouseBaselineEstimator`, `SolarDayPlan`, `DayOutlook`, `ForecastConfidence`,
+  `IForecastRuntimeSettings`, plus p10/p90 bands on `SolarForecastPeriod`.
+
+**`Solax.Infrastructure`** — Solcast now parses `pv_estimate10`/`pv_estimate90` (only the median was
+read before) and logs all three bands on refresh.
+
+**`Solax.Worker`** — `DayPlanProvider` (baseline + accuracy + plan + all four log lines + day roll),
+`ForecastRuntimeSettings` (the three HA-settable numbers), mode-keyed controller routing in
+`ChargingControlCoordinator`, session/loan energy tracking, automatic arming of the #20 discharge hold
+at the plan's SOC floor, daylight-only forecast refresh, and thirteen new HA sensors plus three number
+entities.
+
+### Things worth knowing
+
+- **The SOC floor had to be redefined mid-implementation.** Deriving it from the energy *booked* for
+  the battery made it equal the current SOC — a floor that forbids all discharge. It counts all
+  remaining surplus instead; see [DECISIONS.md](DECISIONS.md).
+- **`MaxLoanPowerWatts` defaults to 2500, not the 1500 the issue first proposed.** Bridging a typical
+  2–3 kW surplus up to the ~4.2 kW three-phase floor needs ~2.2 kW; a 1.5 kW cap could never reach it,
+  which would have made the loan silently useless.
+- **The dwell timers change what a "pause" means.** Inside `MinRunTime` a soft pause holds the charger
+  at 6 A instead of stopping. Five of the loan tests initially failed because of exactly this, which is
+  the behaviour working as intended.
+- **`ChargeControlStatus` and `ChargingControlInput` both grew.** The input gained defaulted
+  parameters (plan, dwell, session energy, loaned energy) so the live-solar controller and its tests
+  are untouched.
+- **Nothing is persisted.** A restart loses today's totals and resets the bias to 1.0; it re-converges
+  within a few forecast periods.
+
+### Not done / open
+
+- **Not verified against hardware.** No live day has run through this yet. `BatteryCapacityKWh` must
+  be set to the real pack before the plan means anything, and the accuracy tracker should be left
+  running read-only for a week (it works in every mode) to see whether p10 is systematically low for
+  this roof.
+- The undocumented interaction between an auto-armed hold and a manual one is resolved by OR-ing them
+  (manual always wins), but has not been exercised live.
+- Whether the pack curtails PV near 100 % SOC — the open question from #20 — still matters here: it
+  would affect the trajectory's final approach.
+
+### Files
+
+`src/Solax.Core/{Enums,Models,Interfaces,Strategies}/*` (11 new, 4 changed),
+`src/Solax.Infrastructure/Solcast/*` (2 changed),
+`src/Solax.Worker/{Forecasting/*,Configuration/*,HomeAssistant/*,Program.cs,SolaxPollingService.cs,ChargingControlCoordinator.cs,SolarForecastRefreshWorker.cs,appsettings.json}`,
+tests in all three test projects (48 new).
+
+---
+
 ## 2026-07-27 — Battery hold verified on hardware; discharge deadband; grid-power sensor (issue #20)
 
 Branch: `feature/20-battery-discharge-hold`

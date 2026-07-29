@@ -38,6 +38,13 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 |---|---|---|
 | Hybrid inverter | SolaX X3-HYB-G4 PRO | Modbus TCP |
 | EV charger | SolaX X1/X3-HAC | Modbus TCP |
+| Home battery | SolaX T-BAT H 2.5 modules + BMS (**10 kWh** nominal on the reference install) | via the inverter — no direct connection |
+
+The battery has no interface of its own: everything about it reaches us through the inverter's
+registers (SOC from `BatteryCapacity 0x1C`, power from `BatteryPowerCharge1 0x16`) and every command
+that affects it goes through the inverter's power-control block. Its **usable** capacity is the one
+site-specific number the forecast-driven mode cannot work without — see
+[`BatteryCapacityKWh`](#forecast-driven-charging-the-forecasted-mode).
 
 ## Tech stack
 
@@ -370,6 +377,163 @@ read-only so a write is structurally impossible rather than merely skipped.
 > write (`[DRY RUN] would hold battery discharge: active power target -2000W for 60s (registers [...]
 > at 0x7C)`) without touching the inverter.
 
+### Forecast-driven charging (the `Forecasted` mode)
+
+`Solar` waits for the home battery to be essentially full before the car gets anything. That costs
+real energy: on a good day the battery only fills around midday, so the car starts as production is
+already falling, and on three phases the charger's **6 A floor is ~4.2 kW** (no phase switching), so
+any surplus below that charges *nothing* and is exported once the battery is full.
+
+`Forecasted` replaces the fixed gate with a day plan built from the Solcast forecast, recomputed every
+poll. It keeps one promise: **the home battery reaches 100 % by the configured evening deadline.**
+Everything else follows from that.
+
+#### The shoulders belong to the battery; the plateau belongs to the car
+
+A kilowatt-hour at 08:00 is not interchangeable with one at 13:00, because the two consumers can't
+take the same power:
+
+| | Surplus below ~4.2 kW ("shoulder") | Surplus at or above it ("plateau") |
+|---|---|---|
+| Home battery | takes it — it accepts any power | takes it |
+| EV charger | **cannot charge at all** | can charge |
+
+So filling the battery from the plateau wastes the one scarce window, while filling it from the
+shoulders costs the car nothing. The plan splits the remaining forecast by power level, books the
+battery's need **backwards from the deadline** (the latest production first, so the afternoon shoulder
+and, only if needed, the plateau tail), and hands the car whatever is left at a usable power.
+
+```
+EvBudget      = RemainingPv − ExpectedHouse − BatteryToFull
+FeasibleEv    = the part of that arriving at ≥ the charger's minimum power, after the battery's booking
+SocFloor      = 100 − (remaining surplus × efficiency ÷ capacity) × 100,  clamped to MinBatterySocFloorPercent
+```
+
+The evening guarantee needs no scheduling code: as the day burns down, the remaining surplus falls, so
+`SocFloor` climbs toward 100 % and squeezes the car out of the late afternoon by itself. A
+`FinalGuardBefore` window (default 1 h) pauses the car outright as a backstop.
+
+#### The battery loan
+
+On three phases a 3 kW surplus charges nothing. If the forecast shows the day can repay it, the
+battery lends the difference — sized to reach **exactly** the 6 A floor, never more — turning
+would-be export into charge. It is bounded four ways:
+
+- never below the plan's SOC floor, nor below `MinBatterySocFloorPercent` (default 50 %);
+- `MaxLoanPowerWatts` (default 2500) caps the bridge and the discharge rate;
+- `MaxDailyLoanKWh` (default 4) caps a day's lending, reset at local midnight;
+- **no loan below `MinBridgeSurplusWatts`** (default 2000) and **none at all on a shortfall day** —
+  the loan tops up a genuine surplus, it never funds a session from the pack, which would pay a round
+  trip and a cycle on both batteries for nothing.
+
+With `BatteryHold:Enabled` on, the [battery discharge hold](#battery-discharge-hold-writes-to-the-inverter)
+is armed automatically once SOC reaches the floor, so an estimate error can't dig below it — the grid
+covers the gap instead of the pack. A manual hold from HA always wins.
+
+#### When the sun can't cover everything
+
+The priority order is fixed and not configurable:
+
+> **1. House load → 2. Battery to 100 % by the deadline → 3. EV.**
+
+The car absorbs the entire shortfall, and **no grid charging is ever initiated**. A partial charge
+does an EV pack no harm — an NMC pack is happier at mid SOC than topped up daily — but a shortfall
+discovered at dusk with a silently paused charger is unhelpful, so it is announced instead: a
+`Day outlook` of `Surplus | Tight | Shortfall | NoChargeToday`, a projected shortfall in kWh, and what
+the car can still expect today, all published to HA and logged as soon as the day can be judged.
+Tomorrow's forecast rides along in the same Solcast response, so a bad day comes with the context of
+whether waiting is worth it.
+
+#### Forecast versus reality
+
+A plan is only as good as the forecast under it, so the controller checks continuously:
+
+- **Realised bias** — `actual ÷ forecast` over elapsed daylight, clamped to `[0.5, 1.2]` and applied
+  to the remaining forecast. Asymmetric on purpose: under-production scales the rest of the day down
+  (raising the floor, throttling the car early — the conservative direction), while a sunny morning
+  can't talk the planner into over-committing the afternoon. It stays at 1.0 until `BiasMinPeriods`
+  daylight periods have closed.
+- **Per-period reconciliation** — one log line per closed 30-minute period.
+- **Trust guard** — if the bias leaves `[0.6, 1.4]` for `TrustBreachPeriods` consecutive periods, the
+  plan is abandoned for the day with a warning and the mode falls back to `Solar` behaviour. The same
+  fallback covers a missing or stale forecast: an absent forecast must never read as headroom.
+
+The plan is built on the **p10** band (`pv_estimate10`), not the median — planning a guarantee against
+a p50 forecast means missing it about half the time. The forecast refresh drops to **3 hours** and is
+skipped overnight (a fresh forecast can't change a decision made in the dark), which is ~5 calls a day
+against the free tier's 10.
+
+#### What it logs
+
+```
+Day outlook: Shortfall — Forecast=7.2kWh House=4.1kWh BattToFull=5.3kWh EvTarget=15.0kWh Short=17.2kWh …
+Day plan: Shoulder=3.4kWh Plateau=11.0kWh … EvBudget=10.5kWh Feasible=10.5kWh Window=12:30-15:50 SocFloor=62% Bias=0.94 (P10)
+Forecast check: Period=12:00-12:30 Forecast=3120Wh Actual=2890Wh Delta=-230Wh (-7%) … Bias=0.94
+Charge control: Mode=Forecasted … Action=Charge Target=6A Loan=1140W Session=8.4kWh LoanedToday=1.8kWh. …
+Day summary: ForecastToday=28.1kWh ActualToday=26.4kWh (-6%) BatterySoc@19:00=100% EvDelivered=14.2kWh …
+```
+
+The day plan logs at `Information` only when it actually changes (at a 5-second poll, anything else
+would bury the log) and at `Debug` otherwise; the outlook logs on transitions; the summary once, at
+the deadline.
+
+```jsonc
+"ChargeControl": {
+  // ... the live-solar settings above still apply; Forecasted reuses the same charger limits
+  "Forecast": {
+    "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
+    "BatteryCapacityKWh": 9.0,       // REQUIRED: USABLE capacity (see the warning below), not nameplate
+    "ChargeEfficiency": 0.95,
+    "BaselineHouseLoadWatts": 350,   // seed for the rolling house-load estimate
+    "ForecastConfidence": "P10",     // P10 | P50 | P90 — P10 is what makes the guarantee honest
+    "MinBatterySocFloorPercent": 50, // hard floor, whatever the forecast says
+    "DailyEvTargetKWh": 15,          // what the car should get; the shortfall is measured against it
+    "SessionEnergyTargetKWh": 0,     // per-session ceiling, 0 = unlimited (stands in for "charge to 80%")
+    "EnableBatteryLoan": true,
+    "MaxLoanPowerWatts": 2500,       // must be able to bridge a real surplus up to ~4.2 kW
+    "MinBridgeSurplusWatts": 2000,   // no loan below this — never fund a session from the pack
+    "MaxDailyLoanKWh": 4,
+    "LoanSocMarginPercent": 2,
+    "MinViableWindow": "00:30:00",   // shortest forecast window worth starting a session for
+    "MinRunTime": "00:10:00",        // dwell timers: no start/stop churn faster than these
+    "MinPauseTime": "00:15:00",
+    "FinalGuardBefore": "01:00:00",  // pause the car this long before the deadline if SOC < 100%
+    "StaleForecastAfter": "04:00:00",// older than this → fall back to Solar behaviour
+    "AutoArmBatteryHoldAtFloor": true,
+    "HoldReleaseMarginPercent": 2,
+    "BiasMinPeriods": 4,             // closed daylight periods before the bias is trusted
+    "BiasClampMin": 0.5,
+    "BiasClampMax": 1.2,
+    "TrustBandMin": 0.6,             // sustained breach → abandon the plan for the day
+    "TrustBandMax": 1.4,
+    "TrustBreachPeriods": 3
+  }
+}
+```
+
+> ⚠️ **`BatteryCapacityKWh` is the pack's *usable* capacity, not its nameplate.** It is the one value
+> with no safe default: the SOC floor, the battery's booking and the shortfall all scale off it, and a
+> wrong figure makes the plan wrong in a way nothing else catches.
+>
+> The reference install is a **SolaX T-BAT H 2.5** stack — 10 kWh nominal, so **9.0 kWh** usable at the
+> ~90 % depth of discharge these packs allow (confirm the exact figure against your datasheet). The
+> distinction matters because the inverter reports SOC across the range it will actually cycle: 0–100 %
+> spans the *usable* energy, not the nameplate.
+>
+> **If you must guess, guess high.** Both uses move in the safe direction when the figure is
+> overstated — the battery books more of the forecast, and the SOC floor sits higher. Understating it
+> is what risks missing the evening 100 %.
+>
+> You can measure it from the logs you are already producing. Over one uninterrupted climb with no
+> discharge in between (say 30 % → 90 %), integrate the logged `BatteryPower` over time and divide by
+> the SOC delta: `usable kWh = (∫ BatteryPower dt) / 0.60`. That also validates `ChargeEfficiency`,
+> since the integral is measured at the battery terminals.
+
+**Validate it read-only first.** The accuracy tracker runs in every mode, so leaving the service on
+`Off` or `Solar` for a week still fills the log with `Forecast check` and `Day summary` lines. That
+answers the two questions that decide the settings — is Solcast p10 systematically low for this roof,
+and does the shoulder/plateau split match the real curve — before anything acts on them.
+
 ### Home Assistant (MQTT)
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
@@ -377,12 +541,23 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - a **Charge mode** select — change the mode **at runtime**, no restart:
   - **Off** — the controller doesn't touch the charger; its current setpoint is left exactly as it is.
   - **Solar** — modulate the charging current from live surplus while the battery is full (and only while the charger's own use-mode is Fast); pause when there isn't enough sun.
+  - **Forecasted** — as Solar, but the fixed battery-full gate is replaced by a forecast-driven day
+    plan, so the car can start well before the battery is full. See
+    [Forecast-driven charging](#forecast-driven-charging-the-forecasted-mode) below.
 
   The config `ChargeControl:Enabled` is only the boot default (`true` → Solar, `false` → Off); a runtime change doesn't persist across restarts.
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
 - sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
+- forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
+  **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
+  **Projected shortfall**, **Required SOC floor**, **Forecast remaining today**,
+  **Tomorrow forecast**, **Forecast accuracy**, **Session energy**, **Battery loaned today** and
+  **Battery loan power**. `Day outlook` and `Projected shortfall` are what a "not enough sun for the
+  car today" notification automation keys off.
+- numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
+  unlimited) and **Minimum battery SOC** (%). Like the mode, changes don't persist across restarts.
 - binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 

@@ -23,6 +23,31 @@ public sealed class SolarForecast
     /// <summary>Total expected energy across all contained periods, in watt-hours.</summary>
     public double ExpectedEnergyWattHours => Periods.Sum(p => p.EnergyWattHours);
 
+    /// <summary>
+    /// Total expected energy at the given confidence band, in watt-hours. Periods whose provider
+    /// omitted that band fall back to the median, so a partial response can't read as darkness.
+    /// </summary>
+    public double EnergyWattHoursAt(Enums.ForecastConfidence confidence) =>
+        Periods.Sum(p => p.EnergyWattHoursAt(confidence));
+
+    /// <summary>
+    /// The start of the next period after <paramref name="after"/> whose median estimate exceeds
+    /// <paramref name="thresholdWatts"/> — i.e. when the sun next comes up far enough to be worth
+    /// refreshing for. Null when no such period is within the forecast horizon.
+    /// </summary>
+    public DateTimeOffset? NextPeriodStartAbove(DateTimeOffset after, double thresholdWatts)
+    {
+        foreach (var period in Periods.OrderBy(p => p.PeriodEnd))
+        {
+            if (period.PeriodEnd > after && period.EstimatedPowerWatts > thresholdWatts)
+            {
+                return period.PeriodStart > after ? period.PeriodStart : after;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>The highest expected power across all contained periods, in watts (0 when empty).</summary>
     public double PeakPowerWatts => Periods.Count == 0 ? 0 : Periods.Max(p => p.EstimatedPowerWatts);
 

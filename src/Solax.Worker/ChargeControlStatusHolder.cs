@@ -24,8 +24,13 @@ public sealed class ChargeControlStatusHolder
 }
 
 /// <summary>The outcome of one charge-control cycle, used to assemble a <see cref="ChargeControlStatus"/>.</summary>
+/// <param name="LoanPowerWatts">
+/// How much of the commanded charge the home battery is currently lending, bridging a sub-minimum
+/// surplus up to the charger's floor. Zero outside the forecast-driven mode.
+/// </param>
 public readonly record struct ChargeControlCycleResult(
     Solax.Core.Enums.ChargeControlState State,
     double? SurplusWatts,
     int? TargetCurrentAmps,
-    bool HoldingControl);
+    bool HoldingControl,
+    double LoanPowerWatts = 0);

@@ -13,16 +13,21 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
 {
     private readonly SolcastForecastService _forecastService;
     private readonly ILogger<SolarForecastRefreshWorker> _logger;
+    private readonly SolcastOptions _options;
     private readonly TimeSpan _refreshInterval;
+    private readonly TimeProvider _timeProvider;
 
     public SolarForecastRefreshWorker(
         SolcastForecastService forecastService,
         IOptions<SolcastOptions> options,
-        ILogger<SolarForecastRefreshWorker> logger)
+        ILogger<SolarForecastRefreshWorker> logger,
+        TimeProvider? timeProvider = null)
     {
         _forecastService = forecastService;
         _logger = logger;
+        _options = options.Value;
         _refreshInterval = options.Value.RefreshInterval;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,12 +42,50 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
 
             try
             {
-                await Task.Delay(_refreshInterval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(NextDelay(), stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// How long to wait before the next fetch. During daylight that is simply the configured interval;
+    /// overnight the loop sleeps until the sun is forecast to come back, because a fresh forecast can't
+    /// change any decision made in the dark but still spends an API call against the daily quota. The
+    /// night sleep is capped so a missing or wrong forecast can't strand the loop.
+    /// </summary>
+    private TimeSpan NextDelay()
+    {
+        var now = _timeProvider.GetUtcNow();
+        var expectedNow = _forecastService.ExpectedPowerWattsNow(now);
+
+        if (expectedNow is null || expectedNow > _options.DaylightThresholdWatts)
+        {
+            return _refreshInterval;
+        }
+
+        var nextDaylight = _forecastService.NextDaylightStart(now, _options.DaylightThresholdWatts);
+        if (nextDaylight is null || nextDaylight <= now)
+        {
+            return _refreshInterval;
+        }
+
+        var untilDaylight = nextDaylight.Value - now;
+        if (untilDaylight <= _refreshInterval)
+        {
+            return _refreshInterval;
+        }
+
+        var sleep = untilDaylight < _options.MaxNightSleep ? untilDaylight : _options.MaxNightSleep;
+        _logger.LogInformation(
+            "Sun is down (forecast {ExpectedWatts:F0}W); next forecast refresh in {SleepHours:F1}h, around first light at {NextDaylight:HH:mm}.",
+            expectedNow,
+            sleep.TotalHours,
+            nextDaylight.Value.LocalDateTime);
+
+        return sleep;
     }
 }

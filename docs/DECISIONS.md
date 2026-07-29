@@ -4,6 +4,77 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-07-27 — The forecast plans by power band, not by daily energy; the car absorbs any shortfall
+
+**Context.** Issue #22 adds a third charge mode, `Forecasted`, driven by the Solcast forecast, with
+one hard requirement: the home battery must be at 100 % by evening, while the car takes as much solar
+as it can and neither pack is degraded unnecessarily.
+
+**Decision 1 — plan in power bands, not in kilowatt-hours.** The obvious formulation,
+`EvBudget = forecast − house − battery`, is wrong on this hardware: it treats energy as fungible when
+the two consumers cannot accept the same power. The EV charger's floor is 6 A, which on three phases
+(and the X1/X3-HAC has no phase switching) is **~4.2 kW**; the home battery accepts anything down to a
+few hundred watts. So the day is split into *shoulder* production (below the floor — battery only) and
+*plateau* production (at or above it — the only time the car can charge), and the battery's need is
+booked against the shoulders first. Only what the shoulders cannot cover is claimed from the plateau.
+A budget expressed purely in energy would happily promise the car 3 kWh on a day whose surplus never
+once clears 4.2 kW.
+
+**Decision 2 — book the battery backwards from the deadline.** The booking walks the remaining
+forecast from `FullByTime` backwards, reserving the latest production first. That is what "100 % by
+evening, not by lunchtime" means, and it hands the car the *earliest* feasible plateau — when it is
+most likely to be plugged in, and when a forecast error still has the rest of the day to correct
+itself. Recomputed every poll, so a collapsing afternoon simply grows the reservation next cycle.
+
+**Decision 3 — the SOC floor counts all remaining surplus, not the booking.** An earlier draft derived
+the floor from the energy booked for the battery. That is degenerate: the booking is sized to the need
+*at the current SOC*, so the floor came out equal to the current SOC — "you may never discharge". The
+floor answers a different question ("how far may SOC fall and still recover by the deadline?"), and a
+deeper discharge simply grows a need the battery outranks the car to satisfy. It therefore counts
+every remaining watt of surplus, clamped by `MinBatterySocFloorPercent`.
+
+**Decision 4 — plan on p10, and measure the forecast against reality.** Planning a guarantee against
+the median means missing it about half the time, so the plan uses Solcast's `pv_estimate10`
+(`pv_estimate` was the only band parsed before). On top of that a realised bias (`actual ÷ forecast`
+for elapsed daylight) scales the remaining forecast, clamped asymmetrically to `[0.5, 1.2]`:
+under-production must be able to throttle the car, but a sunny morning must not be able to
+over-commit the afternoon. A sustained breach of `[0.6, 1.4]` abandons the plan for the day. The
+forecast refresh drops from 12 h to 3 h, skipped overnight — a 12-hour-old forecast cannot steer a
+deadline, and a fresh one at 02:00 cannot change any decision.
+
+**Decision 5 — the loan bridges a surplus; it never funds a session.** The battery may lend the
+difference between a real surplus and the 6 A floor, repaid later from sun that would otherwise be
+exported. It is refused below `MinBridgeSurplusWatts` (2 kW), on any shortfall day, once
+`MaxDailyLoanKWh` is spent, and near the floor. Lending 4.2 kW into no sun would be a battery-to-car
+transfer: a round trip and a cycle on both packs, buying nothing. Enforcement is not left to the
+arithmetic — at the floor the #20 discharge hold is armed automatically, so the grid covers an
+estimate error rather than the pack.
+
+**Decision 6 — on a shortfall the car gives way, and we report rather than act.** Priority is fixed:
+house → battery to 100 % → EV. Chosen deliberately over the alternatives (grid top-up to a daily
+minimum; letting the battery finish below 100 %) because the owner's requirement is the evening 100 %,
+and because grid-charging an EV is a decision worth making deliberately rather than automatically.
+**No code path initiates grid charging.** What the controller owes the owner instead is early warning:
+`Day outlook`, `Projected shortfall` and `EV energy expected today` are published as soon as the day
+can be judged, so the decision — drive less, charge elsewhere, plug in on a night tariff — stays with
+a person.
+
+Consequences, deliberately accepted:
+
+- **Two new stateful pieces in the worker** (`DayPlanProvider`, and the session/loan integrators in
+  `ChargingControlCoordinator`). Nothing is persisted, so a restart loses today's accumulated
+  energies and the bias resets to 1.0 — consistent with the rest of the service, and self-correcting
+  within a few forecast periods.
+- **The house baseline is a single rolling mean, not a per-hour profile.** A learned profile that
+  resets on every deploy would be worse than an honest average.
+- **The dwell timers can briefly import.** Holding a session at 6 A through a surplus dip for up to
+  `MinRunTime` may pull from the grid; the alternative is contactor cycling and vehicle wake cycles on
+  every passing cloud.
+- **`Forecasted` degrades to `Solar`, never to something more permissive.** Missing forecast, stale
+  forecast and broken trust all take the same path.
+
+---
+
 ## 2026-07-26 — Battery discharge hold uses computed Power Control, not a device "No Discharge" mode
 
 **Context.** Issue #20 asks for a switch that stops the home battery discharging, so an EV charges
