@@ -4,6 +4,52 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-07-29 — Modbus reconnect on failure (issue #24)
+
+Branch: `fix/24-modbus-reconnect`
+
+A three-hour run produced 43 successful polls and 564 transaction-ID errors. Bucketed by ten minutes
+it is not intermittent at all — it is a cliff:
+
+| bucket | ok | errors |
+|---|---|---|
+| 18:50 | 4 | 0 |
+| 19:00 | 39 | 10 |
+| 19:10 | **0** | 91 |
+| 19:20–20:00 | **0** | ~97 each |
+
+### Cause
+
+A late response left in the socket buffer puts the stream permanently one or more replies behind.
+NModbus's own retries cannot escape it, and nothing tears the connection down — `IsConnected` is true
+because the socket is fine. See [DECISIONS.md](DECISIONS.md).
+
+### What changed
+
+`ModbusTcpClient` rewritten around a single `ExecuteAsync` path: serialise on a `SemaphoreSlim`,
+connect on demand, wait out `DeviceConfig.MinRequestInterval`, run the operation, and — on any failure
+— invalidate the connection through an exception filter so the original exception still surfaces
+unchanged. `DeviceConfig` gained `MinRequestInterval` (250 ms default).
+
+### Things worth knowing
+
+- **NModbus retries a mismatched response by re-sending the request**, so corrupting a single reply is
+  self-healing and proves nothing. The tests had to model the *persistent* offset to reproduce the
+  field failure — that discovery is baked into `FakeModbusTcpServer.Persistent`.
+- **The tests need a real socket.** `FakeModbusTcpServer` implements enough MBAP framing for function
+  codes 3, 4, 6 and 16, plus deliberate transaction-id corruption.
+- **Verified as regression tests**: disabling only the invalidation makes 3 of the 9 fail; restoring it
+  makes all 9 pass.
+- **Not verified on hardware yet** — the fix wants an overnight run showing successful polls all the
+  way to the end of the log.
+
+### Files
+
+`src/Solax.Infrastructure/Modbus/ModbusTcpClient.cs`, `src/Solax.Core/Models/DeviceConfig.cs`,
+`tests/Solax.Infrastructure.Tests/{ModbusTcpClientTests,FakeModbusTcpServer}.cs`, docs.
+
+---
+
 ## 2026-07-27 — Battery hold verified on hardware; discharge deadband; grid-power sensor (issue #20)
 
 Branch: `feature/20-battery-discharge-hold`
