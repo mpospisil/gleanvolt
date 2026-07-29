@@ -4,6 +4,58 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-07-29 — A failed Modbus exchange invalidates the connection
+
+**Context.** Issue #24: after roughly fifteen minutes of normal operation the service began failing
+every single poll with `Response was not of expected transaction ID. Expected 2426, received 2424`,
+and never recovered — 45 further minutes produced zero successful polls. Earlier logs show the same
+failure in smaller doses going back a week.
+
+**What was found.** A Modbus TCP response that arrives after its request has given up stays in the
+socket's receive buffer. The next request reads *that* reply, and every request after it is
+permanently one or more responses behind. NModbus retries a mismatch by re-sending, which heals a
+one-off glitch — but not this, because every subsequent response is offset too, so the retries are
+exhausted and the read throws.
+
+The connection is not the problem. Throughout all of it the TCP socket is open and healthy, so
+`ModbusTcpClient.IsConnected` returns true and the callers' `if (!IsConnected) ConnectAsync()` guard
+never fires. The poll loop dutifully catches the exception, logs it, and retries on the same poisoned
+stream, forever. Only restarting the process cleared it.
+
+**Decision.** Any failed exchange invalidates the connection: the master and the `TcpClient` are
+disposed and nulled, so the next call reconnects with a fresh stream and a fresh transaction counter.
+This is done in an exception filter, so the original NModbus exception still reaches the caller and
+the logs unchanged.
+
+Three supporting changes:
+
+- **Connect on demand.** Operations no longer throw "not connected"; they connect if needed. The
+  callers' explicit guards still work but are no longer load-bearing.
+- **One request at a time,** via a `SemaphoreSlim`. Requests are sequential today, but a reconnect can
+  now happen mid-call, and two requests sharing a stream is another route to the same desync.
+- **A minimum gap between requests** (`DeviceConfig.MinRequestInterval`). The SolaX protocol documents
+  a second between instructions — a constraint noted in `InverterRegisterMap`'s own comment and then
+  honoured nowhere. The poll loop issues about five requests per five-second cycle, four of them to
+  the charger, which is where the failure was observed.
+
+**Why 250 ms and not the documented second.** A full second across four charger requests would consume
+most of a five-second poll. Recovery no longer depends on the spacing, so this value only affects how
+often the device is pushed into a state that needs recovering; it is per-device configuration, and
+raising it to `00:00:01` is the first thing to try if desyncs persist on other hardware.
+
+**Consequences.**
+
+- A transient glitch now costs one request instead of the process. The poll loop's existing
+  catch-log-retry becomes sufficient rather than futile.
+- Reconnection is invisible to callers, so a burst of failures shows up as a few warnings rather than
+  an outage — worth remembering when reading logs: absence of errors no longer proves the link was
+  never disturbed.
+- Testing this needed a real socket. `FakeModbusTcpServer` speaks just enough MBAP to answer reads and
+  writes and, on demand, to answer them with the wrong transaction id. Verified as a genuine
+  regression test: with the invalidation disabled, three of the nine tests fail.
+
+---
+
 ## 2026-07-27 — The forecast plans by power band, not by daily energy; the car absorbs any shortfall
 
 **Context.** Issue #22 adds a third charge mode, `Forecasted`, driven by the Solcast forecast, with
