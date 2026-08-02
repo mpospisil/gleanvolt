@@ -1,0 +1,95 @@
+# Production stack for the Raspberry Pi 3 B (issue #26).
+#
+# Deployed to /opt/solax on the Pi by deploy/deploy.sh; every relative path below therefore resolves
+# under /opt/solax. Values come from /opt/solax/.env (see .env.example) -- that file stays on the Pi
+# and is never committed.
+#
+#   ./deploy/deploy.sh                        # from a developer machine
+#   docker compose ps                         # on the Pi, in /opt/solax
+#
+# Every byte of state lives on a bind mount below. The containers themselves are disposable:
+# `docker compose down` and `docker rm -f` are safe, and an image upgrade or rollback loses nothing.
+
+name: solax
+
+services:
+  # The broker is deliberately NOT published to the LAN -- no `ports:` entry. Only the other two
+  # services reach it, over this compose network. Authentication is on regardless (mosquitto.conf),
+  # so a future decision to expose it doesn't silently open the control topics.
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: solax-mosquitto
+    restart: unless-stopped
+    volumes:
+      # Config is read-only to the broker; the password file is created out-of-band, see README.
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/data:/mosquitto/data
+    mem_limit: ${MOSQUITTO_MEM_LIMIT:-48m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  solax-controller:
+    image: ghcr.io/mpospisil/solax-controller:${IMAGE_TAG:-latest}
+    container_name: solax-controller
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      # ASP.NET Core's "__" convention maps onto appsettings.json sections, so anything in that file
+      # can be overridden here without rebuilding the image.
+      TZ: ${TZ:-Europe/Prague}
+      Solax__Inverter__Host: ${INVERTER_HOST:-192.168.2.6}
+      Solax__EvCharger__Host: ${EV_CHARGER_HOST:-192.168.2.10}
+
+      HomeAssistant__Enabled: "true"
+      HomeAssistant__BrokerHost: mosquitto     # compose-network name, not localhost
+      HomeAssistant__BrokerPort: "1883"
+      HomeAssistant__Username: ${MQTT_USERNAME:?set MQTT_USERNAME in .env}
+      HomeAssistant__Password: ${MQTT_PASSWORD:?set MQTT_PASSWORD in .env}
+
+      Solcast__ApiKey: ${SOLCAST_API_KEY:-}
+      Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
+
+      # The two features that write to hardware stay at their shipped defaults (disabled; BatteryHold
+      # additionally dry-run) unless explicitly overridden in .env. Deploying must not start writing
+      # to an inverter or charger -- verify the register addresses on your own device first.
+      ChargeControl__Enabled: ${CHARGE_CONTROL_ENABLED:-false}
+      BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
+      BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
+    volumes:
+      # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
+      - ./logs:/app/logs
+    mem_limit: ${CONTROLLER_MEM_LIMIT:-200m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: solax-homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+    ports:
+      - "8123:8123"
+    volumes:
+      # Holds .storage/ (account, entity registry, integration config) and the recorder database.
+      # This is the one directory whose loss cannot be recovered from git -- back it up.
+      - ./homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    # The binding constraint on a 1 GB Pi 3 B. HA is by far the hungriest of the three; raise this
+    # (and re-check `docker stats`) if it gets OOM-killed during startup, and see README.md for the
+    # recorder tuning that keeps it down. Bridge networking is enough -- HA only speaks MQTT here.
+    mem_limit: ${HA_MEM_LIMIT:-600m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -354,6 +354,70 @@ round can be interpreted.
 
 ---
 
+---
+
+## 2026-08-02 — Raspberry Pi deployment: three containers, arm64 image from CI (issue #26)
+
+Branch: `feature/26-raspberry-pi-docker-deploy`
+
+The controller only ran from a developer machine, which contradicts the project's premise: a service
+built to survive internet outages stopped when a laptop closed. This puts the whole system — the
+controller, Home Assistant, and an MQTT broker — on a Raspberry Pi 3 B as three Docker containers.
+
+### What changed
+
+| File | |
+|---|---|
+| `Dockerfile` | Two stages; cross-compiles rather than emulating, runtime stage has no `RUN` |
+| `.dockerignore` | Keeps `dev/`, `tests/`, and anything `*.env` out of the build context |
+| `.github/workflows/publish-image.yml` | Builds `linux/arm64`, pushes to GHCR as `latest` / `sha-` / semver |
+| `deploy/docker-compose.yml` | The three services, all state on bind mounts, per-service `mem_limit` |
+| `deploy/deploy.sh` | tar-over-ssh + `docker compose pull && up -d`; refuses to guess if the Pi isn't prepared |
+| `deploy/mosquitto/config/mosquitto.conf` | Authenticated broker, no host port, logs to stdout |
+| `deploy/homeassistant/config/*.yaml` | Seed config with recorder tuning for a 1 GB board and an SD card |
+| `deploy/.env.example` | Image tag, device addresses, MQTT + Solcast secrets, memory limits |
+| `deploy/README.md` | Pi preparation, first run, operations, backup/restore, troubleshooting |
+| `README.md`, `docs/DECISIONS.md` | Deployment section; the decision record for all of the above |
+
+No `src/` change was needed. The rationale for each choice is in [DECISIONS.md](DECISIONS.md).
+
+### Verified, not assumed
+
+- **The arm64 cross-build works and is fast.** `docker buildx build --platform linux/arm64` completes
+  in ~75 s from cold, with the `dotnet publish` step taking 3.5 s — proof it ran natively rather than
+  under emulation. No QEMU is installed in the workflow.
+- **The image runs as uid 1654 and writes where it should.** An amd64 build of the same Dockerfile
+  started, logged, and created `/app/logs/solax-20260802.log` owned by `app` — which is what makes the
+  bind mount over that path work once the host directory is chowned to 1654.
+- **Bridge networking reaches the Modbus devices.** The smoke-test container, with no special network
+  configuration, polled the live inverter and charger (`SOC=56% BatteryPower=-748W Solar=101W
+  EvCharger=Available`). This was the main open question about the container topology, and it means
+  host networking is not needed for either the controller or HA.
+- **The compose file's required-variable guards fire.** Without `MQTT_USERNAME`/`MQTT_PASSWORD`,
+  `docker compose config` exits 1 with `required variable MQTT_USERNAME is missing a value: set
+  MQTT_USERNAME in .env`, rather than starting a broker nothing can authenticate against.
+
+### Things worth knowing
+
+- **The runtime stage deliberately contains no `RUN`.** It looks like an odd constraint until you
+  notice that one `RUN mkdir` in an arm64 stage is enough to drag QEMU into the build. The logs
+  directory is created in the build stage instead and `COPY --chown` does the ownership.
+- **`mem_limit` is silently ignored on Raspberry Pi OS** until `cgroup_enable=memory cgroup_memory=1`
+  is added to `/boot/firmware/cmdline.txt`. Easy to miss, and the failure mode is the whole board
+  thrashing instead of one container being killed.
+- **`deploy/` mirrors `/opt/solax` path-for-path.** An earlier version rewrote paths with `tar
+  --transform` on the way over; making the two layouts identical deleted that cleverness.
+- **The deploy script does no first-time setup.** Creating and chowning directories needs `sudo`, and
+  a routine deploy should never be the thing that does it — so it checks, and prints the exact
+  commands if something is missing.
+- **HA's `.storage` is the one irreplaceable directory** (account, entity registry, MQTT integration).
+  `deploy/README.md` documents the backup and the restore.
+
+### Not done here
+
+Hardware verification: the 72-hour soak, the reboot and power-cut tests, and the measured memory
+headroom from issue #26's acceptance criteria all need the Pi itself.
+
 ## 2026-07-29 — Modbus reconnect on failure (issue #24)
 
 Branch: `fix/24-modbus-reconnect`

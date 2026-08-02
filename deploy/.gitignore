@@ -1,0 +1,18 @@
+# This directory is a source template, not a running stack -- the live state lives in /opt/solax on
+# the Pi. These entries exist so that accidentally running `docker compose up` from here (or copying
+# state back for inspection) cannot commit Home Assistant's database, secrets or broker persistence.
+.env
+logs/
+mosquitto/data/
+homeassistant/config/.storage/
+homeassistant/config/.cache/
+homeassistant/config/*.db
+homeassistant/config/*.db-*
+homeassistant/config/*.log
+homeassistant/config/*.log.*
+homeassistant/config/secrets.yaml
+homeassistant/config/.HA_VERSION
+homeassistant/config/blueprints/
+homeassistant/config/themes/
+homeassistant/config/tts/
+homeassistant/config/deps/

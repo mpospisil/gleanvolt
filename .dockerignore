@@ -1,0 +1,28 @@
+# Keep the build context to what the image actually needs: the solution file and src/.
+# Everything else is either irrelevant to the build or must never reach an image.
+
+# Secrets first -- nothing resembling an env file may enter the context.
+.env
+*.env
+!.env.example
+
+# Build output (and anything built for the host architecture, which would be the wrong one).
+**/bin/
+**/obj/
+artifacts/
+
+# Not part of the published worker.
+tests/
+dev/
+deploy/
+docs/
+.git/
+.github/
+.vscode/
+.claude/
+*.md
+!README.md
+LICENSE
+
+# Runtime state that only exists on a developer machine.
+logs/

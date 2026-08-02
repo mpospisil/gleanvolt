@@ -161,6 +161,60 @@ finished charge.
 
 ---
 
+## 2026-08-02 — The Pi runs containers it did not build, and holds no state inside them
+
+**Context.** Issue #26: move the service off a developer laptop onto a Raspberry Pi 3 B (Raspberry
+Pi OS Lite 64-bit) so it runs unattended. Three containers — the controller, Home Assistant, and an
+MQTT broker. The board has **1 GB of RAM, an SD card, and an arm64 CPU**, and all three constraints
+shaped the design.
+
+**Decision 1 — CI builds the image; the Pi only pulls.** A `dotnet restore` + `publish` on a 1 GB
+Pi 3 B takes tens of minutes and can be OOM-killed. GitHub Actions builds `linux/arm64` and pushes to
+GHCR; the Pi runs `docker compose pull`. `sha-<short>` tags make a rollback a one-line command.
+
+**Decision 2 — cross-compile, don't emulate.** The obvious way to build arm64 on an amd64 runner is
+QEMU, which works and is roughly ten times slower. Instead the SDK stage is pinned to the *builder's*
+architecture (`FROM --platform=$BUILDPLATFORM`) and targets the other one via `dotnet publish -a
+$TARGETARCH`, so the compiler runs natively and only the output is arm64. The runtime stage was then
+written with **no `RUN` instruction at all** — the logs directory is created in the build stage and
+`COPY --chown` sets ownership — so nothing arm64 ever executes at build time and the workflow needs
+no QEMU setup step. Measured: 75 s for a cold cross-build, of which the publish itself is 3.5 s.
+
+**Decision 3 — the Debian runtime image, not chiseled.** Chiseled is ~80 MB smaller, but it omits
+tzdata and a shell. Log timestamps and `SolarForecast.ForDate` are timezone-sensitive, and this is a
+headless box where the diagnostic path is `docker exec`. The disk saving is not worth either.
+
+**Decision 4 — no state inside any container.** Every container must be destroyable with
+`docker rm -f` and recreated with no loss; that is what makes upgrade and rollback routine rather
+than risky. All state is on **bind mounts under `/opt/solax`** — chosen over named volumes because
+the data is then visible to ordinary shell tools over SSH, without `docker volume inspect`
+indirection. The consequence accepted: bind mounts carry host uids, so the deploy documents chowning
+`logs/` to 1654 (the .NET image's non-root user) and `mosquitto/` to 1883.
+
+**Decision 5 — the production broker authenticates.** The dev stack's `allow_anonymous true` is not
+carried over. These topics include the charge-mode select and the battery-hold switch, so anonymous
+access is control of the inverter and charger. The broker also publishes **no host port** — only the
+compose network reaches it. No application change was needed: `HomeAssistantOptions` already had
+optional `Username`/`Password`, previously unused.
+
+**Consequences.**
+
+- **1 GB is the binding constraint, and Home Assistant is the risk.** Per-service `mem_limit`s
+  (600/200/48 MB) leave ~170 MB for the OS. They only take effect if cgroup memory accounting is
+  enabled in `cmdline.txt`, which Raspberry Pi OS ships **off** — an easy silent failure, so it is
+  step 2 of the setup. If HA cannot be made to fit, the fallback is moving it to another host; the
+  three services are independent precisely so that stays a compose edit.
+- **SD-card wear is the long-term failure mode.** Container logs are size-capped, the broker logs to
+  stdout rather than its own file, and the seeded HA `recorder` config uses `purge_keep_days: 3` with
+  `commit_interval: 30`.
+- **The controller is stateless, which costs one Solcast call per restart** — the forecast cache is
+  in-memory. Normal operation is unaffected, but a crash-restart loop burns the free-tier daily quota,
+  so restart counts are worth watching. Persisting the forecast is a possible follow-up.
+- **Deployment writes nothing to hardware.** `ChargeControl` and `BatteryHold` stay at their shipped
+  defaults; the compose file passes them explicitly so that is visible rather than implied.
+
+---
+
 ## 2026-07-29 — A failed Modbus exchange invalidates the connection
 
 **Context.** Issue #24: after roughly fifteen minutes of normal operation the service began failing
