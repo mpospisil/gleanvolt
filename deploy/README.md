@@ -31,17 +31,17 @@ command. From your **developer machine**:
 
 ```bash
 ssh-keygen -t ed25519 -C solax-deploy    # only if you don't already have a key
-ssh-copy-id marti@192.168.2.7            # asks for the Pi password once, and never again
-ssh marti@192.168.2.7 true               # must return silently, with no prompt
+ssh-copy-id martin@192.168.2.7           # asks for the Pi password once, and never again
+ssh martin@192.168.2.7 true              # must return silently, with no prompt
 ```
 
-The scripts default to the `marti@192.168.2.7` account. For a different user or host, either set
+The scripts default to the `martin@192.168.2.7` account. For a different user or host, either set
 `PI_HOST` (see the table under [Deploy](#deploy)) or give the Pi a `~/.ssh/config` entry:
 
 ```
 Host solax-pi
     HostName 192.168.2.7
-    User marti
+    User martin
 ```
 
 ...and then `PI_HOST=solax-pi ./deploy/deploy.sh`.
@@ -87,8 +87,8 @@ sudo chown -R 1654:1654 /opt/solax/logs         # the controller image's non-roo
 **6. Secrets.** From your developer machine:
 
 ```bash
-scp deploy/.env.example marti@192.168.2.7:/opt/solax/.env
-ssh marti@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
+scp deploy/.env.example martin@192.168.2.7:/opt/solax/.env
+ssh martin@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
 **7. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
@@ -137,7 +137,7 @@ guessing if the Pi isn't prepared, and it never copies `.env`.
 
 | Variable | Default | |
 |---|---|---|
-| `PI_HOST` | `marti@192.168.2.7` | ssh target |
+| `PI_HOST` | `martin@192.168.2.7` | ssh target |
 | `REMOTE_DIR` | `/opt/solax` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
@@ -156,7 +156,7 @@ README's warnings.
 ## Everyday operations
 
 ```bash
-ssh marti@192.168.2.7
+ssh martin@192.168.2.7
 cd /opt/solax
 
 docker compose ps                          # what's running
@@ -264,9 +264,9 @@ logged out and back in since being added.
 makes roughly eight connections, so this is unusable without a key:
 
 ```bash
-ssh-copy-id marti@192.168.2.7
+ssh-copy-id martin@192.168.2.7
 ```
 
-If the account isn't `marti`, pass your own: `PI_HOST=<user>@192.168.2.7 ./deploy/deploy.sh`.
+If the account isn't `martin`, pass your own: `PI_HOST=<user>@192.168.2.7 ./deploy/deploy.sh`.
 
 **Locked out over SSH.** <https://connect.raspberrypi.com/> gives you a shell without the LAN.
