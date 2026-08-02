@@ -7,14 +7,14 @@
 #
 #   ./deploy/deploy.sh                          # deploy whatever .env pins (default: latest)
 #   IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh    # deploy/roll back to a specific build
-#   PI_HOST=pi@192.168.2.7 ./deploy/deploy.sh   # non-default host
+#   PI_HOST=marti@192.168.2.7 ./deploy/deploy.sh    # non-default host or user
 #
 # First-time setup of the Pi is documented in deploy/README.md and is deliberately not automated
 # here -- it needs sudo, and a deploy should never be the thing that creates or chowns directories.
 
 set -euo pipefail
 
-PI_HOST="${PI_HOST:-pi@192.168.2.7}"
+PI_HOST="${PI_HOST:-marti@192.168.2.7}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/solax}"
 SSH_OPTS="${SSH_OPTS:-}"
 

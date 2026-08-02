@@ -25,7 +25,28 @@ The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to G
 
 ## Prepare the Pi (once)
 
-**1. Docker.**
+**1. Passwordless SSH.** `deploy.sh` opens about eight separate SSH connections — with password
+authentication you would be prompted for every one of them, and a deploy stops being a single
+command. From your **developer machine**:
+
+```bash
+ssh-keygen -t ed25519 -C solax-deploy    # only if you don't already have a key
+ssh-copy-id marti@192.168.2.7            # asks for the Pi password once, and never again
+ssh marti@192.168.2.7 true               # must return silently, with no prompt
+```
+
+The scripts default to the `marti@192.168.2.7` account. For a different user or host, either set
+`PI_HOST` (see the table under [Deploy](#deploy)) or give the Pi a `~/.ssh/config` entry:
+
+```
+Host solax-pi
+    HostName 192.168.2.7
+    User marti
+```
+
+...and then `PI_HOST=solax-pi ./deploy/deploy.sh`.
+
+**2. Docker.**
 
 ```bash
 curl -fsSL https://get.docker.com | sh
@@ -34,7 +55,7 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**2. Enable cgroup memory accounting.** Raspberry Pi OS ships with it off, and without it the
+**3. Enable cgroup memory accounting.** Raspberry Pi OS ships with it off, and without it the
 `mem_limit` settings in `docker-compose.yml` are silently ignored — which on a 1 GB board is the
 difference between one container being killed and the whole box thrashing. Append to the **single
 line** in `/boot/firmware/cmdline.txt`, then reboot:
@@ -45,7 +66,7 @@ cgroup_enable=memory cgroup_memory=1
 
 Verify after the reboot with `docker info | grep -i "memory limit"` — no warning means it worked.
 
-**3. Add swap.** 1 GB of RAM with no swap turns a transient spike into an OOM kill:
+**4. Add swap.** 1 GB of RAM with no swap turns a transient spike into an OOM kill:
 
 ```bash
 sudo dphys-swapfile swapoff
@@ -54,7 +75,7 @@ sudo dphys-swapfile setup && sudo dphys-swapfile swapon
 free -h
 ```
 
-**4. Directories.** The containers hold no state; everything lives here:
+**5. Directories.** The containers hold no state; everything lives here:
 
 ```bash
 sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs}
@@ -63,14 +84,14 @@ sudo chown -R 1883:1883 /opt/solax/mosquitto    # the eclipse-mosquitto uid
 sudo chown -R 1654:1654 /opt/solax/logs         # the controller image's non-root uid
 ```
 
-**5. Secrets.** From your developer machine:
+**6. Secrets.** From your developer machine:
 
 ```bash
-scp deploy/.env.example pi@192.168.2.7:/opt/solax/.env
-ssh pi@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
+scp deploy/.env.example marti@192.168.2.7:/opt/solax/.env
+ssh marti@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
-**6. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
+**7. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
 stack will work. The username has to match `MQTT_USERNAME` in `.env`:
 
 ```bash
@@ -79,13 +100,13 @@ docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config eclipse-mosquit
 sudo chown 1883:1883 /opt/solax/mosquitto/config/passwd
 ```
 
-**7. GHCR access.** Only needed if the package is private — a public package needs no login:
+**8. GHCR access.** Only needed if the package is private — a public package needs no login:
 
 ```bash
 echo '<github-pat-with-read:packages>' | docker login ghcr.io -u mpospisil --password-stdin
 ```
 
-**8. Check the devices are reachable** from the Pi, before blaming the container:
+**9. Check the devices are reachable** from the Pi, before blaming the container:
 
 ```bash
 nc -vz 192.168.2.6 502 && nc -vz 192.168.2.10 502
@@ -116,7 +137,7 @@ guessing if the Pi isn't prepared, and it never copies `.env`.
 
 | Variable | Default | |
 |---|---|---|
-| `PI_HOST` | `pi@192.168.2.7` | ssh target |
+| `PI_HOST` | `marti@192.168.2.7` | ssh target |
 | `REMOTE_DIR` | `/opt/solax` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
@@ -135,7 +156,7 @@ README's warnings.
 ## Everyday operations
 
 ```bash
-ssh pi@192.168.2.7
+ssh marti@192.168.2.7
 cd /opt/solax
 
 docker compose ps                          # what's running
@@ -238,5 +259,14 @@ Bridge networking routes through the host, so if the Pi can reach the inverter, 
 
 **`docker compose` says permission denied.** The ssh user isn't in the `docker` group yet, or hasn't
 logged out and back in since being added.
+
+**It asks for a password (repeatedly).** SSH key authentication isn't set up — step 1. `deploy.sh`
+makes roughly eight connections, so this is unusable without a key:
+
+```bash
+ssh-copy-id marti@192.168.2.7
+```
+
+If the account isn't `marti`, pass your own: `PI_HOST=<user>@192.168.2.7 ./deploy/deploy.sh`.
 
 **Locked out over SSH.** <https://connect.raspberrypi.com/> gives you a shell without the LAN.

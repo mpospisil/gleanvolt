@@ -202,7 +202,7 @@ optional `Username`/`Password`, previously unused.
 - **1 GB is the binding constraint, and Home Assistant is the risk.** Per-service `mem_limit`s
   (600/200/48 MB) leave ~170 MB for the OS. They only take effect if cgroup memory accounting is
   enabled in `cmdline.txt`, which Raspberry Pi OS ships **off** — an easy silent failure, so it is
-  step 2 of the setup. If HA cannot be made to fit, the fallback is moving it to another host; the
+  step 3 of the setup. If HA cannot be made to fit, the fallback is moving it to another host; the
   three services are independent precisely so that stays a compose edit.
 - **SD-card wear is the long-term failure mode.** Container logs are size-capped, the broker logs to
   stdout rather than its own file, and the seeded HA `recorder` config uses `purge_keep_days: 3` with
