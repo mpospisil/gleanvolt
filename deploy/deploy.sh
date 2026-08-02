@@ -40,6 +40,30 @@ EOF
     exit 1
 fi
 
+# The controller writes its log files to a bind mount over /app/logs. If the host directory isn't
+# writable by the image's non-root user, Serilog's file sink fails *silently*: the container runs,
+# `docker logs` looks healthy, and the log files never appear. Catch it here rather than in a month.
+if ! ssh_pi "sh -s '$REMOTE_DIR/logs'" <<'REMOTE_CHECK'; then
+    dir=$1
+    [ -d "$dir" ] || exit 1
+    # Writable by uid 1654 means: owned by it, or world-writable. The ssh user's own -w test would
+    # answer a different question entirely, since it is not the user that runs inside the container.
+    [ "$(stat -c %u "$dir")" = 1654 ] && exit 0
+    perms=$(stat -c %a "$dir")
+    case ${perms#${perms%?}} in 2|3|6|7) exit 0 ;; esac
+    exit 1
+REMOTE_CHECK
+    cat >&2 <<EOF
+error: $REMOTE_DIR/logs is missing, or not writable by the controller's uid (1654).
+
+The container would run and log to stdout, but its log files would go nowhere. On the Pi:
+
+    sudo mkdir -p $REMOTE_DIR/logs
+    sudo chown -R 1654:1654 $REMOTE_DIR/logs
+EOF
+    exit 1
+fi
+
 if ! ssh_pi "test -f '$REMOTE_DIR/.env'"; then
     cat >&2 <<EOF
 error: $REMOTE_DIR/.env is missing on $PI_HOST.

@@ -154,6 +154,36 @@ IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # a specific build
 Both preserve all state. So does `docker compose down`, and so does `docker rm -f` on any single
 container — that is the point of the layout below.
 
+## Where the logs go
+
+**Every log lands on the Pi's drive; nothing is written inside a container.** Verified with
+`docker diff`, which stays empty on all three services during normal operation.
+
+| Who | Written to | Retention |
+|---|---|---|
+| Controller (Serilog file sink) | `/opt/solax/logs/solax-<date>.log` — bind mount over `/app/logs` | 14 daily files (`retainedFileCountLimit`) |
+| Controller / broker / HA (stdout) | Docker's `json-file` logs, `/var/lib/docker/containers/...` on the Pi | capped at 3 × 10 MB per service (5 MB for the broker) |
+| Home Assistant | `/opt/solax/homeassistant/config/home-assistant.log` — bind mount over `/config` | HA rotates it itself |
+| Mosquitto | stdout only (`log_dest stdout`) — no second file on the card | as above |
+
+Check it after a deploy — a file should appear within one poll cycle:
+
+```bash
+ls -l /opt/solax/logs/
+```
+
+> **The one way this breaks is silent.** If `/opt/solax/logs` isn't writable by uid 1654 (the
+> image's non-root user — most easily caused by letting Docker auto-create the directory as root),
+> Serilog's file sink fails and *keeps running*: the container is healthy, `docker logs` looks
+> normal, and the log files simply never appear. Two things guard against it: `deploy.sh` refuses to
+> deploy if the directory's ownership is wrong, and the worker enables Serilog's `SelfLog` so the
+> failure shows up in `docker logs` as `RollingFileSink: the target file could not be opened or
+> created`. If you see that line, fix the ownership:
+>
+> ```bash
+> sudo chown -R 1654:1654 /opt/solax/logs
+> ```
+
 ## Where the data lives
 
 Nothing that matters is inside a container. Every path is a bind mount under `/opt/solax`:

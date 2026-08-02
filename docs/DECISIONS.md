@@ -207,6 +207,12 @@ optional `Username`/`Password`, previously unused.
 - **SD-card wear is the long-term failure mode.** Container logs are size-capped, the broker logs to
   stdout rather than its own file, and the seeded HA `recorder` config uses `purge_keep_days: 3` with
   `commit_interval: 30`.
+- **Serilog's `SelfLog` is now enabled** (`Program.cs`), the one `src/` change the deployment forced.
+  Verified: with a logs bind mount the non-root user cannot write, the file sink fails and the
+  process carries on — console logging normal, container healthy, `docker diff` empty, and the log
+  files silently never created. That is the exact failure a bind mount invites (Docker auto-creates a
+  missing mount source as root), so it must not be silent. `deploy.sh` also refuses to deploy when
+  the directory's ownership is wrong, catching it before the stack starts rather than a month later.
 - **The controller is stateless, which costs one Solcast call per restart** — the forecast cache is
   in-memory. Normal operation is unaffected, but a crash-restart loop burns the free-tier daily quota,
   so restart counts are worth watching. Persisting the forecast is a possible follow-up.

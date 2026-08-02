@@ -378,8 +378,9 @@ controller, Home Assistant, and an MQTT broker — on a Raspberry Pi 3 B as thre
 | `deploy/.env.example` | Image tag, device addresses, MQTT + Solcast secrets, memory limits |
 | `deploy/README.md` | Pi preparation, first run, operations, backup/restore, troubleshooting |
 | `README.md`, `docs/DECISIONS.md` | Deployment section; the decision record for all of the above |
+| `src/Solax.Worker/Program.cs` | Enable Serilog's `SelfLog` — the only `src/` change, see below |
 
-No `src/` change was needed. The rationale for each choice is in [DECISIONS.md](DECISIONS.md).
+The rationale for each choice is in [DECISIONS.md](DECISIONS.md).
 
 ### Verified, not assumed
 
@@ -393,6 +394,16 @@ No `src/` change was needed. The rationale for each choice is in [DECISIONS.md](
   configuration, polled the live inverter and charger (`SOC=56% BatteryPower=-748W Solar=101W
   EvCharger=Available`). This was the main open question about the container topology, and it means
   host networking is not needed for either the controller or HA.
+- **No log file is written inside any container.** With the logs bind mount in place, `docker diff`
+  on the running controller is **completely empty** and `solax-<date>.log` appears on the host owned
+  by 1654. HA logs to its own bind-mounted `/config`, and the broker only logs to stdout.
+- **The way that breaks is silent, and is now guarded twice.** Given a root-owned logs directory —
+  what Docker creates if the mount source is missing — the container runs happily, polls, reports
+  healthy, keeps `docker diff` empty, and writes **no log file anywhere**; Serilog's file sink fails
+  and the process never mentions it. Hence `Serilog.Debugging.SelfLog.Enable(Console.Error)` in
+  `Program.cs` (the failure now appears in `docker logs` as `RollingFileSink: the target file could
+  not be opened or created`) and an ownership pre-check in `deploy.sh`. Both verified against the
+  reproduction.
 - **The compose file's required-variable guards fire.** Without `MQTT_USERNAME`/`MQTT_PASSWORD`,
   `docker compose config` exits 1 with `required variable MQTT_USERNAME is missing a value: set
   MQTT_USERNAME in .env`, rather than starting a broker nothing can authenticate against.
