@@ -5,7 +5,7 @@ controller, Home Assistant, and an MQTT broker as three Docker containers on a *
 running Raspberry Pi OS Lite (64-bit).
 
 ```
-                 Raspberry Pi 3 B  (192.168.2.1, arm64)
+                 Raspberry Pi 3 B  (192.168.2.7, arm64)
     ┌───────────────────────────────────────────────────────────────┐
     │  compose project "solax"          (all state on bind mounts)  │
     │                                                               │
@@ -66,8 +66,8 @@ sudo chown -R 1654:1654 /opt/solax/logs         # the controller image's non-roo
 **5. Secrets.** From your developer machine:
 
 ```bash
-scp deploy/.env.example pi@192.168.2.1:/opt/solax/.env
-ssh pi@192.168.2.1 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
+scp deploy/.env.example pi@192.168.2.7:/opt/solax/.env
+ssh pi@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
 **6. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
@@ -116,13 +116,13 @@ guessing if the Pi isn't prepared, and it never copies `.env`.
 
 | Variable | Default | |
 |---|---|---|
-| `PI_HOST` | `pi@192.168.2.1` | ssh target |
+| `PI_HOST` | `pi@192.168.2.7` | ssh target |
 | `REMOTE_DIR` | `/opt/solax` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
 ## First run
 
-1. Open `http://192.168.2.1:8123` and complete Home Assistant onboarding (local account).
+1. Open `http://192.168.2.7:8123` and complete Home Assistant onboarding (local account).
 2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `mosquitto`, port `1883`, and
    **the username and password from `.env`** — unlike the dev stack, this broker is authenticated.
 3. The controller publishes MQTT discovery configs on connect; the SolaX device and its entities
@@ -135,7 +135,7 @@ README's warnings.
 ## Everyday operations
 
 ```bash
-ssh pi@192.168.2.1
+ssh pi@192.168.2.7
 cd /opt/solax
 
 docker compose ps                          # what's running
