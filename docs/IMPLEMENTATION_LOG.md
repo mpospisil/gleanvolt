@@ -4,6 +4,74 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-02 — Validation fixes after three days of observation (issue #22)
+
+Branch: `feature/22-forecasted-charging`
+
+Three days running in `Off` mode, ~34,000 polls. The service was stable — the #24 reconnect fix held
+(22 transaction-ID errors, every one followed by successful polls) — and the forecast tracker proved
+itself: Solcast p50 tracked reality within 5% all day, cumulative 50.0 kWh forecast against 51.1 kWh
+actual. **p10 runs 13–16% low on this roof**, which is the insurance premium `ForecastConfidence: P10`
+charges.
+
+Four defects fell out of the logs.
+
+### A. The house baseline ran away (the serious one)
+
+`HouseBaselineEstimator` was one EWMA with a ~1.4 h time constant. That is slow per minute and fast
+per day: it followed the diurnal curve, so by mid-afternoon it reported the afternoon peak and the
+planner projected that flat across every remaining hour. Measured: **264 W at 05:00 → 2124 W at 11:00
+→ 5406 W at 15:00**. The consequence, on a day whose forecast was accurate to 5%:
+
+- 05:00 — "Window 08:00–16:30, 33.6 kWh available for the car"
+- 12:00 — "No EV charging today", Plateau 0.0 kWh, window none, SOC floor 100%
+
+Replaced by `HouseLoadProfile`: 24 hour-of-day buckets, each a slow EWMA (~3 days per bucket), seeded
+from `BaselineHouseLoadWatts` until an hour has been observed. The planner now asks
+`IHouseLoadProfile.ExpectedWattsAt(instant)` per forecast slice instead of taking one figure for the
+whole day — which is the question it was always really asking.
+
+### B. `ForecastToday` in the day summary was nonsense
+
+`ForecastToday=6.6kWh ActualToday=52.7kWh (702%)`. Solcast returns only *future* periods, so by the
+19:00 deadline "today's forecast" holds nothing but the evening. Both figures now come from the
+accuracy tracker, which integrates them live period by period — the same numbers that were already
+correct in the `Forecast check` lines.
+
+### C. The day-plan line logged every poll
+
+13,475 Information lines a day, 5–8 MB of log. The change-detection signature carried the budget to
+0.1 kWh, which drifts continuously. Signature coarsened to whole kWh and whole percent, plus a
+five-minute floor between lines — bypassed when the outlook changes or the plan becomes
+usable/unusable, so the first real plan after startup is never held back. Measured after the fix: one
+line per 90 s smoke run instead of eighteen.
+
+### D. The outlook chattered
+
+`Shortfall → Tight → Shortfall → Tight` inside three minutes, because the Tight/Shortfall boundary is
+half the EV target and the day sat exactly on it. `Classify` now takes the previous outlook and
+applies `OutlookHysteresisFraction` (0.05), so leaving a state needs the margin and entering it does
+not.
+
+### Also
+
+- The forecast refresh now wakes 30 minutes *before* first light, so the day no longer starts on a
+  stale forecast and the live-solar fallback (observed as an `Unknown` plan from 02:45 to 04:45).
+- A once-daily `House profile:` line dumps the learned hourly shape, since that is the first thing to
+  read when a day's decisions look wrong.
+
+### Still open
+
+**What draws ~5 kW at midday on the reference site?** The battery is full by 10:00 every day, and from
+then on `OtherLoads` is ~91% of PV (r=0.69) against a 300 W night base and 47 kWh/day total. That
+shape — load that appears exactly when surplus does — suggests a PV-surplus diverter. If so it is
+self-fulfilling: the plan reads it as fixed house load, stands down, and leaves it the surplus it was
+measuring. **This affects `Solar` mode identically** (its surplus was ~440 W at midday), so it is not
+specific to the forecast strategy. Needs an answer from the site owner before the next measurement
+round can be interpreted.
+
+---
+
 ## 2026-07-29 — Modbus reconnect on failure (issue #24)
 
 Branch: `fix/24-modbus-reconnect`

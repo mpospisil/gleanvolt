@@ -1,4 +1,5 @@
 using Solax.Core.Enums;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 
 namespace Solax.Core.Strategies;
@@ -35,20 +36,27 @@ public static class SolarDayPlanner
     /// <param name="state">The live telemetry reading this plan is anchored to.</param>
     /// <param name="forecast">Today's forecast periods.</param>
     /// <param name="deadline">When the home battery is required to be at 100%.</param>
-    /// <param name="houseBaselineWatts">Expected household load excluding the EV, from the rolling estimate.</param>
+    /// <param name="houseLoad">Expected household load excluding the EV, per instant (see <see cref="IHouseLoadProfile"/>).</param>
     /// <param name="biasFactor">Realised forecast bias to scale the remaining forecast by (1.0 = trust it as-is).</param>
     /// <param name="evDeliveredTodayWh">How much the car has already had today, for the shortfall maths.</param>
+    /// <param name="previousOutlook">
+    /// The outlook reported last cycle. Used only for hysteresis around the classification
+    /// thresholds: without it the outlook flips between Tight and Shortfall on a rounding wobble --
+    /// three changes inside three minutes were observed in validation.
+    /// </param>
     /// <param name="options">Planning parameters.</param>
     public static SolarDayPlan Plan(
         EnergyState state,
         SolarForecast? forecast,
         DateTimeOffset deadline,
-        double houseBaselineWatts,
+        IHouseLoadProfile houseLoad,
         double biasFactor,
         double evDeliveredTodayWh,
-        SolarDayPlannerOptions options)
+        SolarDayPlannerOptions options,
+        DayOutlook previousOutlook = DayOutlook.Unknown)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(houseLoad);
         ArgumentNullException.ThrowIfNull(options);
 
         if (forecast is null || forecast.Periods.Count == 0)
@@ -65,7 +73,7 @@ public static class SolarDayPlanner
         var lastPeriodEnd = forecast.Periods.Max(p => p.PeriodEnd);
         var horizon = now < deadline ? deadline : lastPeriodEnd;
 
-        var slices = SliceForecast(forecast, now, horizon, houseBaselineWatts, biasFactor, options);
+        var slices = SliceForecast(forecast, now, horizon, houseLoad, biasFactor, options);
         var remainingPvWh = slices.Sum(s => s.PvWh);
         var expectedHouseWh = slices.Sum(s => s.HouseWh);
 
@@ -95,7 +103,7 @@ public static class SolarDayPlanner
         var evWantRemainingWh = Math.Max(0, options.DailyEvTargetWh - evDeliveredTodayWh);
         var shortfallWh = Math.Max(0, expectedHouseWh + batteryToFullWh + evWantRemainingWh - remainingPvWh);
         var evExpectedRemainingWh = window is null ? 0 : Math.Min(evWantRemainingWh, usableEvWh);
-        var outlook = Classify(evWantRemainingWh, evExpectedRemainingWh, window, options);
+        var outlook = Classify(evWantRemainingWh, evExpectedRemainingWh, window, previousOutlook, options);
 
         return new SolarDayPlan(
             RemainingPvWh: remainingPvWh,
@@ -139,7 +147,7 @@ public static class SolarDayPlanner
         SolarForecast forecast,
         DateTimeOffset now,
         DateTimeOffset horizon,
-        double houseBaselineWatts,
+        IHouseLoadProfile houseLoad,
         double biasFactor,
         SolarDayPlannerOptions options)
     {
@@ -156,7 +164,11 @@ public static class SolarDayPlanner
             }
 
             var pvWatts = Math.Max(0, period.PowerWatts(options.Confidence) * biasFactor);
-            var surplusWatts = pvWatts - houseBaselineWatts;
+
+            // Per slice, not one figure for the whole day: the house has a shape, and charging the car
+            // is decided by what the house will draw *then*, not by what it happens to draw now.
+            var houseWatts = Math.Max(0, houseLoad.ExpectedWattsAt(start));
+            var surplusWatts = pvWatts - houseWatts;
 
             slices.Add(new Slice
             {
@@ -165,7 +177,7 @@ public static class SolarDayPlanner
                 Hours = hours,
                 SurplusWatts = surplusWatts,
                 PvWh = pvWatts * hours,
-                HouseWh = houseBaselineWatts * hours,
+                HouseWh = houseWatts * hours,
                 SurplusWh = Math.Max(0, surplusWatts) * hours,
                 IsPlateau = surplusWatts >= options.MinChargePowerWatts,
             });
@@ -234,10 +246,14 @@ public static class SolarDayPlanner
         return RunIsViable() ? (runStart!.Value, runEnd) : null;
     }
 
+    // Classification with hysteresis: a threshold crossed by a rounding wobble must not flip the
+    // reported outlook, because the outlook is what notifications and dashboards key off. Leaving a
+    // state needs the margin; entering it does not.
     private static DayOutlook Classify(
         double evWantRemainingWh,
         double evExpectedRemainingWh,
         (DateTimeOffset Start, DateTimeOffset End)? window,
+        DayOutlook previous,
         SolarDayPlannerOptions options)
     {
         if (evWantRemainingWh <= NegligibleEnergyWh)
@@ -256,9 +272,16 @@ public static class SolarDayPlanner
             return DayOutlook.Surplus;
         }
 
-        return evExpectedRemainingWh >= evWantRemainingWh * options.TightOutlookFraction
-            ? DayOutlook.Tight
-            : DayOutlook.Shortfall;
+        var fraction = evExpectedRemainingWh / evWantRemainingWh;
+        var margin = Math.Max(0, options.OutlookHysteresisFraction);
+
+        // Sitting exactly on the boundary (the common case: half the target) is what chattered, so the
+        // threshold moves depending on which side we were on last cycle.
+        var threshold = previous == DayOutlook.Tight
+            ? options.TightOutlookFraction - margin
+            : options.TightOutlookFraction + margin;
+
+        return fraction >= threshold ? DayOutlook.Tight : DayOutlook.Shortfall;
     }
 
     private static string Describe(

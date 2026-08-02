@@ -17,6 +17,9 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
     private readonly TimeSpan _refreshInterval;
     private readonly TimeProvider _timeProvider;
 
+    /// <summary>How far ahead of first light to refresh, so the day starts on a fresh forecast.</summary>
+    private static readonly TimeSpan DaylightLeadTime = TimeSpan.FromMinutes(30);
+
     public SolarForecastRefreshWorker(
         SolcastForecastService forecastService,
         IOptions<SolcastOptions> options,
@@ -73,7 +76,10 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
             return _refreshInterval;
         }
 
-        var untilDaylight = nextDaylight.Value - now;
+        // Wake a little before first light rather than at it: the plan treats a forecast older than
+        // ChargeControl:Forecast:StaleForecastAfter as unusable, and arriving exactly at sunrise with a
+        // six-hour-old forecast means the first hour of the day runs on the live-solar fallback.
+        var untilDaylight = nextDaylight.Value - now - DaylightLeadTime;
         if (untilDaylight <= _refreshInterval)
         {
             return _refreshInterval;

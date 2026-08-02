@@ -8,7 +8,7 @@ using Solax.Worker.Configuration;
 namespace Solax.Worker.Forecasting;
 
 /// <summary>
-/// Owns everything about "how does today look": it feeds the rolling house baseline and the forecast
+/// Owns everything about "how does today look": it feeds the house-load profile and the forecast
 /// accuracy tracker from each telemetry reading, builds the <see cref="SolarDayPlan"/> for the
 /// forecast-driven charge mode, and does all the logging around it.
 ///
@@ -17,6 +17,9 @@ namespace Solax.Worker.Forecasting;
 /// </summary>
 public sealed class DayPlanProvider
 {
+    /// <summary>Floor on how often the day-plan line may be logged at Information. See <see cref="LogPlan"/>.</summary>
+    private static readonly TimeSpan MinimumPlanLogInterval = TimeSpan.FromMinutes(5);
+
     private readonly ISolarForecastService _forecast;
     private readonly ForecastChargeOptions _options;
     private readonly IForecastRuntimeSettings? _runtime;
@@ -25,7 +28,7 @@ public sealed class DayPlanProvider
     private readonly ILogger<DayPlanProvider> _logger;
     private readonly TimeProvider _timeProvider;
 
-    private readonly HouseBaselineEstimator _houseBaseline;
+    private readonly HouseLoadProfile _houseLoad;
     private readonly ForecastAccuracyTracker _accuracy;
     private readonly EnergyIntegrator _evDeliveredToday = new();
     private readonly EnergyIntegrator _exportedToday = new();
@@ -33,6 +36,8 @@ public sealed class DayPlanProvider
     private DateOnly _day;
     private DateTimeOffset? _firstSampleToday;
     private string? _lastPlanSignature;
+    private DateTimeOffset _lastPlanLoggedAt = DateTimeOffset.MinValue;
+    private bool _lastPlanUsable;
     private DayOutlook _lastOutlook = DayOutlook.Unknown;
     private bool _summaryLogged;
 
@@ -53,7 +58,7 @@ public sealed class DayPlanProvider
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
 
-        _houseBaseline = new HouseBaselineEstimator(_options.BaselineHouseLoadWatts);
+        _houseLoad = new HouseLoadProfile(_options.BaselineHouseLoadWatts);
         _accuracy = new ForecastAccuracyTracker(
             _options.BiasMinPeriods,
             _options.BiasClampMin,
@@ -66,8 +71,8 @@ public sealed class DayPlanProvider
     /// <summary>Energy delivered to the car so far today, in watt-hours.</summary>
     public double EvDeliveredTodayWh => _evDeliveredToday.EnergyWattHours;
 
-    /// <summary>The rolling household-load baseline the plan is built on, in watts.</summary>
-    public double HouseBaselineWatts => _houseBaseline.BaselineWatts;
+    /// <summary>The learned household-load profile the plan is built on.</summary>
+    public IHouseLoadProfile HouseLoad => _houseLoad;
 
     /// <summary>The realised forecast bias currently being applied to the remaining forecast.</summary>
     public double BiasFactor => _accuracy.BiasFactor;
@@ -85,7 +90,7 @@ public sealed class DayPlanProvider
         RollDayIfNeeded(DateOnly.FromDateTime(localNow.DateTime));
         _firstSampleToday ??= state.Timestamp;
 
-        _houseBaseline.Add(state.OtherLoadsPowerWatts);
+        _houseLoad.Add(state.Timestamp, state.OtherLoadsPowerWatts);
         _evDeliveredToday.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
         _exportedToday.Add(state.Timestamp, Math.Max(0, -state.GridPowerWatts));
 
@@ -140,10 +145,11 @@ public sealed class DayPlanProvider
             state,
             todaysForecast,
             deadline,
-            _houseBaseline.BaselineWatts,
+            _houseLoad,
             _accuracy.BiasFactor,
             _evDeliveredToday.EnergyWattHours,
-            plannerOptions);
+            plannerOptions,
+            _lastOutlook);
     }
 
     private void RollDayIfNeeded(DateOnly today)
@@ -159,6 +165,7 @@ public sealed class DayPlanProvider
         _exportedToday.Reset();
         _accuracy.Reset();
         _lastPlanSignature = null;
+        _lastPlanLoggedAt = DateTimeOffset.MinValue;
         _lastOutlook = DayOutlook.Unknown;
         _summaryLogged = false;
     }
@@ -193,13 +200,31 @@ public sealed class DayPlanProvider
     // The plan is recomputed every poll (every few seconds), so logging it unconditionally at
     // Information would bury everything else. It goes out at Information only when something a person
     // would care about actually changed; the unchanged case stays at Debug.
+    //
+    // Validation showed the first attempt at this failing badly -- 13,475 Information lines in a day,
+    // one per poll, because the signature carried the budget to 0.1 kWh and that drifts continuously.
+    // The signature is now deliberately coarse (whole kWh, whole percent, the window to the minute),
+    // and a minimum interval backstops it in case some other field turns out to be just as restless.
     private void LogPlan(SolarDayPlan plan)
     {
         var signature = string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{plan.Outlook}|{plan.FeasibleEvEnergyWh / 1000:F1}|{plan.RequiredSocFloorPercent:F0}|{plan.NextFeasibleWindow?.Start:HH:mm}-{plan.NextFeasibleWindow?.End:HH:mm}|{plan.IsUsable}");
+            $"{plan.Outlook}|{plan.FeasibleEvEnergyWh / 1000:F0}|{plan.RequiredSocFloorPercent:F0}|{plan.NextFeasibleWindow?.Start:HH:mm}-{plan.NextFeasibleWindow?.End:HH:mm}|{plan.IsUsable}");
 
-        var changed = signature != _lastPlanSignature;
+        // A material change -- the outlook moving, or the plan becoming usable/unusable -- always logs.
+        // The interval only damps the incremental drift, so the first real plan after startup, or after
+        // a forecast finally arrives, is never held back.
+        var material = plan.Outlook != _lastOutlook || plan.IsUsable != _lastPlanUsable;
+        _lastPlanUsable = plan.IsUsable;
+
+        var changed = signature != _lastPlanSignature
+            && (material || _timeProvider.GetUtcNow() - _lastPlanLoggedAt >= MinimumPlanLogInterval);
+
+        if (changed)
+        {
+            _lastPlanLoggedAt = _timeProvider.GetUtcNow();
+        }
+
         _lastPlanSignature = signature;
 
         if (plan.Outlook != _lastOutlook)
@@ -235,7 +260,7 @@ public sealed class DayPlanProvider
                 : "none",
             plan.RequiredSocFloorPercent,
             plan.BiasFactor,
-            _houseBaseline.BaselineWatts,
+            _houseLoad.DailyMeanWatts,
             _options.ForecastConfidence);
     }
 
@@ -257,7 +282,12 @@ public sealed class DayPlanProvider
             return;
         }
 
-        var forecastTodayWh = todaysForecast?.ExpectedEnergyWattHours ?? 0;
+        // Both figures come from the accuracy tracker, which integrates them live, period by period.
+        // The cached forecast cannot be used here: Solcast returns only *future* periods, so by the
+        // deadline "today's forecast" holds just the evening -- which is how the first version of this
+        // line came to report "ForecastToday=6.6kWh ActualToday=52.7kWh (702%)" on a day the forecast
+        // had in fact been accurate to within 3%.
+        var forecastTodayWh = _accuracy.ForecastEnergyWhToday;
         var actualTodayWh = _accuracy.ActualEnergyWhToday;
         var deltaFraction = forecastTodayWh > 1 ? (actualTodayWh - forecastTodayWh) / forecastTodayWh : (double?)null;
 
@@ -272,5 +302,14 @@ public sealed class DayPlanProvider
             _evDeliveredToday.EnergyWattHours / 1000,
             loanedTodayWh / 1000,
             _exportedToday.EnergyWattHours / 1000);
+
+        // The learned shape of the house, hour by hour. This is what the plan subtracts from the
+        // forecast before the car sees any of it, so when a day's decisions look wrong this is the
+        // first line to read.
+        _logger.LogInformation(
+            "House profile ({Learned}, mean {MeanWatts:F0}W): {Hourly}",
+            _houseLoad.IsFullyLearned ? "learned" : "still learning; unobserved hours use the configured seed",
+            _houseLoad.DailyMeanWatts,
+            string.Join(" ", _houseLoad.HourlyWatts.Select((w, h) => $"{h:00}:{w:F0}W")));
     }
 }

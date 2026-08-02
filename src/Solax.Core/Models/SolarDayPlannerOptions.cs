@@ -29,6 +29,11 @@ namespace Solax.Core.Models;
 /// The share of the EV target that separates a <see cref="DayOutlook.Tight"/> day from a
 /// <see cref="DayOutlook.Shortfall"/> one.
 /// </param>
+/// <param name="OutlookHysteresisFraction">
+/// How far past <paramref name="TightOutlookFraction"/> the estimate must move before the reported
+/// outlook changes. Without it a day sitting exactly on the boundary — the common case, since the
+/// boundary is half the target — flips back and forth on rounding alone.
+/// </param>
 public sealed record SolarDayPlannerOptions(
     double BatteryCapacityWh,
     double ChargeEfficiency,
@@ -39,4 +44,5 @@ public sealed record SolarDayPlannerOptions(
     double MinBatterySocFloorPercent,
     double DailyEvTargetWh,
     ForecastConfidence Confidence = ForecastConfidence.P10,
-    double TightOutlookFraction = 0.5);
+    double TightOutlookFraction = 0.5,
+    double OutlookHysteresisFraction = 0.05);

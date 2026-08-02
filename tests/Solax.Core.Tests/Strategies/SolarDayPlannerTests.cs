@@ -1,4 +1,5 @@
 using Solax.Core.Enums;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 using Solax.Core.Strategies;
 
@@ -9,6 +10,12 @@ public class SolarDayPlannerTests
     // 6A x 230V x 3 phases -- the three-phase floor the whole shoulder/plateau split turns on.
     private const double MinChargePowerWatts = 4140;
     private const double HouseBaselineWatts = 500;
+
+    // A flat profile keeps these tests about the planner; the shape itself is HouseLoadProfile's job.
+    private sealed class FlatHouseLoad(double watts) : IHouseLoadProfile
+    {
+        public double ExpectedWattsAt(DateTimeOffset instant) => watts;
+    }
     private const double CapacityWh = 10_000;
 
     private static readonly DateTimeOffset FirstPeriodEnd = new(2026, 7, 27, 9, 0, 0, TimeSpan.Zero);
@@ -55,7 +62,7 @@ public class SolarDayPlannerTests
             State(socPercent, now),
             forecast ?? Forecast(BellDay),
             deadline ?? Deadline,
-            HouseBaselineWatts,
+            new FlatHouseLoad(HouseBaselineWatts),
             biasFactor,
             evDeliveredTodayWh,
             options ?? Options());
@@ -160,7 +167,7 @@ public class SolarDayPlannerTests
     [Fact]
     public void AMissingForecastYieldsAnUnusablePlanRatherThanAnOptimisticOne()
     {
-        var plan = SolarDayPlanner.Plan(State(50), forecast: null, Deadline, HouseBaselineWatts, 1.0, 0, Options());
+        var plan = SolarDayPlanner.Plan(State(50), forecast: null, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, Options());
 
         Assert.False(plan.IsUsable);
         Assert.Equal(DayOutlook.Unknown, plan.Outlook);
@@ -226,4 +233,61 @@ public class SolarDayPlannerTests
         Assert.Null(plan.NextFeasibleWindow);
         Assert.Equal(DayOutlook.NoChargeToday, plan.Outlook);
     }
+
+    // A profile with a different load per hour, to show the plan uses the load expected *then*.
+    private sealed class ShapedHouseLoad(Func<int, double> wattsForHour) : IHouseLoadProfile
+    {
+        public double ExpectedWattsAt(DateTimeOffset instant) => wattsForHour(instant.UtcDateTime.Hour);
+    }
+
+    [Fact]
+    public void TheHouseLoadIsTakenPerPeriod_NotAsOneFigureForTheWholeDay()
+    {
+        // The morning is quiet and the afternoon is busy. A single trailing average sampled in the
+        // afternoon would price the whole remaining day at the afternoon's load and wipe out the
+        // budget; the profile prices each period at its own hour.
+        var forecast = Forecast([6000, 6000, 6000, 6000, 6000, 6000]);
+        var shaped = new ShapedHouseLoad(hour => hour >= 11 ? 5000 : 500);
+
+        var withShape = SolarDayPlanner.Plan(
+            State(96), forecast, Deadline, shaped, 1.0, 0, Options());
+        var withAfternoonEverywhere = SolarDayPlanner.Plan(
+            State(96), forecast, Deadline, new FlatHouseLoad(5000), 1.0, 0, Options());
+
+        Assert.True(
+            withShape.FeasibleEvEnergyWh > withAfternoonEverywhere.FeasibleEvEnergyWh,
+            "pricing the quiet morning at the busy afternoon's load throws away the car's window");
+        Assert.NotNull(withShape.NextFeasibleWindow);
+    }
+
+    [Fact]
+    public void TheOutlookDoesNotFlipOnARoundingWobbleAtTheThreshold()
+    {
+        // Exactly half the target is the boundary between Tight and Shortfall -- and the common case,
+        // which is why it chattered three times in three minutes in the field.
+        var forecast = Forecast([1000, 6000, 6000, 1000]);
+        var options = Options(dailyEvTargetWh: 11_000);
+
+        var fromTight = SolarDayPlanner.Plan(
+            State(96), forecast, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, options, DayOutlook.Tight);
+        var fromShortfall = SolarDayPlanner.Plan(
+            State(96), forecast, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, options, DayOutlook.Shortfall);
+
+        // Same inputs, different history: each side holds its ground rather than flipping.
+        Assert.Equal(DayOutlook.Tight, fromTight.Outlook);
+        Assert.Equal(DayOutlook.Shortfall, fromShortfall.Outlook);
+    }
+
+    [Fact]
+    public void AClearMoveAcrossTheThresholdStillChangesTheOutlook()
+    {
+        // Hysteresis must damp noise, not freeze the state: a genuinely good day reads Surplus even
+        // when the previous cycle said Shortfall.
+        var plan = SolarDayPlanner.Plan(
+            State(96), Forecast(BellDay), Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0,
+            Options(dailyEvTargetWh: 4000), DayOutlook.Shortfall);
+
+        Assert.Equal(DayOutlook.Surplus, plan.Outlook);
+    }
 }
+
