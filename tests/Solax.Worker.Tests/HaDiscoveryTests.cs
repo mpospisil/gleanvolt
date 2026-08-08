@@ -38,6 +38,31 @@ public class HaDiscoveryTests
             LoanedTodayWh: 1800, TomorrowForecastWh: 24500, Timestamp: DateTimeOffset.UtcNow);
 
     [Fact]
+    public void EveryEntityCarriesADescriptionAttribute()
+    {
+        // Home Assistant has no description or tooltip field -- hovering an entity shows its friendly
+        // name -- so the explanation rides along as an attribute, visible in the more-info dialog.
+        foreach (var (topic, payload) in DiscoveryWithBatteryHold.DiscoveryMessages())
+        {
+            using var json = JsonDocument.Parse(payload);
+            var config = json.RootElement;
+
+            Assert.Equal(Discovery.StateTopic, config.GetProperty("json_attributes_topic").GetString());
+
+            // The template is a constant, so it must itself parse as the JSON HA will set as attributes.
+            var template = config.GetProperty("json_attributes_template").GetString();
+            using var attributes = JsonDocument.Parse(template!);
+            var description = attributes.RootElement.GetProperty("description").GetString();
+
+            Assert.False(string.IsNullOrWhiteSpace(description), $"{topic} has an empty description");
+
+            // A description that only repeats the name is the problem this exists to fix.
+            Assert.NotEqual(config.GetProperty("name").GetString(), description);
+            Assert.DoesNotContain("{{", description);
+        }
+    }
+
+    [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
     {
         Assert.Equal("solax/solax_controller/availability", Discovery.AvailabilityTopic);

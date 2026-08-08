@@ -4,6 +4,42 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-08 — Home Assistant entities explain themselves
+
+The entities published to Home Assistant showed their name and nothing else: hovering one gives a
+tooltip identical to its title, which tells a reader nothing about what the number means or which way
+its sign runs.
+
+**Home Assistant has no description or tooltip field.** The frontend sets the hover text to the
+friendly name so a truncated name can still be read in full; there is no per-entity description in
+MQTT discovery, and adding one is
+[an open feature request](https://community.home-assistant.io/t/add-description-for-each-entity-which-shows-in-the-gui-when-you-hover-over-the-name/622053).
+So the tooltip cannot be changed except by changing the name. Two complementary changes:
+
+1. **Every entity now carries a one-line `description` attribute**, visible under Attributes in its
+   more-info dialog. The mechanism is `json_attributes_topic` pointed at the existing state topic, with
+   a `json_attributes_template` that is a **constant** — it contains no placeholders, so every state
+   message renders the same JSON. It is built with `JsonSerializer` rather than by hand so anything in
+   the text that would break the JSON is escaped; the only authoring rule is to avoid Jinja
+   delimiters, which a test enforces along with the description being present and not merely repeating
+   the name.
+2. **Five names gained a parenthetical**, because the name is the only thing a hover will ever show
+   and these are the values whose meaning cannot be guessed: `Grid power (+ import / - export)`,
+   `Battery power (+ charging / - discharging)`, `Solar surplus (PV minus house)`, and the confusable
+   current trio — `EV charging current (measured)`, `Target charging current (commanded)`,
+   `Active charging current (charger setpoint)`. The binary sensor named `Charging now` was actually
+   reporting `HoldingControl` — whether *we* are commanding a current, not whether the car is drawing
+   one — and is now `Controller charging the car`.
+
+Renaming is safe for existing installs: `entity_id` is assigned when an entity is first discovered and
+does not follow later name changes, so dashboards and automations keep working. A fresh install
+derives its entity ids from the new names.
+
+Files changed: `src/Solax.Worker/HomeAssistant/HaDiscovery.cs`,
+`tests/Solax.Worker.Tests/HaDiscoveryTests.cs`, `README.md`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-08 — Fast charge without the battery: the `FastNoBattery` mode (issue #28)
 
 A fourth charge mode, and the first one that turns *itself* off. While it is selected the battery
