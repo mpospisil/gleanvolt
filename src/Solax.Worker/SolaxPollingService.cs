@@ -4,6 +4,7 @@ using Solax.Core.Interfaces;
 using Solax.Core.Models;
 using Solax.Core.Strategies;
 using Solax.Worker.Configuration;
+using Solax.Worker.Forecasting;
 
 namespace Solax.Worker;
 
@@ -16,6 +17,7 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
+    private readonly DayPlanProvider _dayPlan;
     private readonly IChargeControlModeSelector _mode;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IBatteryDischargeControl _batteryDischargeControl;
@@ -23,13 +25,19 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly ChargePowerConverter _power;
     private readonly bool _chargeControlDryRun;
     private readonly BatteryHoldOptions _batteryHoldOptions;
+    private readonly ForecastChargeOptions _forecastOptions;
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
+
+    // Whether the forecast-driven mode has armed the hold itself, as opposed to the owner's switch.
+    // Kept here rather than in the selector so the manual switch stays exactly what the owner set.
+    private bool _autoHold;
 
     public SolaxPollingService(
         IEnergyStateReader energyStateReader,
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
+        DayPlanProvider dayPlan,
         IChargeControlModeSelector mode,
         IBatteryHoldSelector batteryHold,
         IBatteryDischargeControl batteryDischargeControl,
@@ -38,11 +46,13 @@ public sealed class SolaxPollingService : BackgroundService
         IOptions<SolaxOptions> options,
         IOptions<ChargeControlOptions> chargeControlOptions,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
+        IOptions<ForecastChargeOptions> forecastOptions,
         ILogger<SolaxPollingService> logger)
     {
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
+        _dayPlan = dayPlan;
         _mode = mode;
         _batteryHold = batteryHold;
         _batteryDischargeControl = batteryDischargeControl;
@@ -50,6 +60,7 @@ public sealed class SolaxPollingService : BackgroundService
         _power = power;
         _chargeControlDryRun = chargeControlOptions.Value.DryRun;
         _batteryHoldOptions = batteryHoldOptions.Value;
+        _forecastOptions = forecastOptions.Value;
         _logger = logger;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
     }
@@ -65,7 +76,8 @@ public sealed class SolaxPollingService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "Charge control at startup: mode {Mode} ({Writes}). It can be changed at runtime.",
+            "Charge control at startup: mode {Mode} ({Writes}) — the charger is left as its owner set it "
+            + "until a mode is selected. It can be changed at runtime.",
             _mode.Mode,
             _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
@@ -73,7 +85,7 @@ public sealed class SolaxPollingService : BackgroundService
             "Battery discharge hold at startup: {Enabled}{Detail}",
             _batteryHoldOptions.Enabled ? "enabled" : "disabled (no inverter writes are possible)",
             _batteryHoldOptions.Enabled
-                ? $", hold {(_batteryHold.Hold ? "on" : "off")} ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
+                ? $", hold off — the battery charges and discharges normally until asked otherwise ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
                 : string.Empty);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -95,11 +107,15 @@ public sealed class SolaxPollingService : BackgroundService
 
                 LogSolarActualVsForecast(state);
 
+                // Built in every mode: the forecast accuracy tracking and today's energy totals are
+                // worth having even when the plan isn't the thing driving the charger.
+                var plan = _dayPlan.Update(state, _chargingControl.LoanedTodayWh);
+
                 var mode = _mode.Mode;
                 ChargeControlCycleResult result;
-                if (mode == ChargeControlMode.Solar)
+                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted)
                 {
-                    result = await _chargingControl.RunCycleAsync(state, stoppingToken);
+                    result = await _chargingControl.RunCycleAsync(state, mode, plan, stoppingToken);
                 }
                 else
                 {
@@ -108,7 +124,7 @@ public sealed class SolaxPollingService : BackgroundService
                     result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
                 }
 
-                var hold = await ApplyBatteryHoldAsync(state, stoppingToken);
+                var hold = await ApplyBatteryHoldAsync(state, mode, plan, stoppingToken);
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -130,6 +146,11 @@ public sealed class SolaxPollingService : BackgroundService
                     BatteryHoldRequested: _batteryHold.Hold,
                     BatteryHoldActive: hold.Held,
                     BatteryHoldTargetWatts: hold.ActivePowerTargetWatts,
+                    Plan: mode == ChargeControlMode.Forecasted ? plan : null,
+                    LoanPowerWatts: result.LoanPowerWatts,
+                    SessionEnergyWh: _chargingControl.SessionEnergyWh,
+                    LoanedTodayWh: _chargingControl.LoanedTodayWh,
+                    TomorrowForecastWh: TomorrowForecastWattHours(state.Timestamp),
                     Timestamp: state.Timestamp));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -161,14 +182,18 @@ public sealed class SolaxPollingService : BackgroundService
     /// command lapses. A failure here must not take the poll down: the hold is a preservation feature,
     /// and losing it costs battery charge, not safety.
     /// </summary>
-    private async Task<BatteryHoldState> ApplyBatteryHoldAsync(EnergyState state, CancellationToken cancellationToken)
+    private async Task<BatteryHoldState> ApplyBatteryHoldAsync(
+        EnergyState state,
+        ChargeControlMode mode,
+        SolarDayPlan plan,
+        CancellationToken cancellationToken)
     {
         if (!_batteryHoldOptions.Enabled)
         {
             return default;
         }
 
-        var hold = _batteryHold.Hold;
+        var hold = _batteryHold.Hold || AutoHold(state, mode, plan);
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
         BatteryHoldState result;
@@ -200,6 +225,53 @@ public sealed class SolaxPollingService : BackgroundService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Whether the forecast-driven mode wants the discharge hold armed right now: it does once SOC has
+    /// reached the floor the plan requires for a 100% battery by the deadline, so an estimate error
+    /// cannot dig below it — the grid covers the gap instead of the pack. Released again only after SOC
+    /// has recovered a margin above the floor, so the hold doesn't chatter around the line.
+    ///
+    /// <para>Independent of the owner's manual switch, which is OR-ed with this and always wins: a hold
+    /// the owner asked for is never released by the plan.</para>
+    /// </summary>
+    private bool AutoHold(EnergyState state, ChargeControlMode mode, SolarDayPlan plan)
+    {
+        if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)
+        {
+            _autoHold = false;
+            return false;
+        }
+
+        var soc = state.BatterySocPercent;
+        var release = plan.RequiredSocFloorPercent + _forecastOptions.HoldReleaseMarginPercent;
+        var armed = _autoHold ? soc < release : soc <= plan.RequiredSocFloorPercent;
+
+        if (armed != _autoHold)
+        {
+            _logger.LogInformation(
+                "Battery discharge hold {Action} automatically: SOC {Soc:F0}% against the plan's {Floor:F0}% floor.",
+                armed ? "armed" : "released",
+                soc,
+                plan.RequiredSocFloorPercent);
+        }
+
+        _autoHold = armed;
+        return armed;
+    }
+
+    /// <summary>
+    /// Tomorrow's forecast production, purely so a shortfall today can be read with the context of
+    /// whether waiting a day is worth it. Free: it is in the same Solcast response as today's.
+    /// </summary>
+    private double? TomorrowForecastWattHours(DateTimeOffset now)
+    {
+        var localMidnight = TimeZoneInfo.ConvertTime(now, TimeZoneInfo.Local).Date.AddDays(1);
+        var start = new DateTimeOffset(localMidnight, TimeZoneInfo.Local.GetUtcOffset(localMidnight));
+
+        var forecast = _solarForecast.GetForecast(start, start.AddDays(1));
+        return forecast?.Periods.Count > 0 ? forecast.ExpectedEnergyWattHours : null;
     }
 
     // Logs actual solar generation against what Solcast forecast for this moment, plus their

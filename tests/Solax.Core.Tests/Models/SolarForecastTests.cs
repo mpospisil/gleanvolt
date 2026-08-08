@@ -1,3 +1,4 @@
+using Solax.Core.Enums;
 using Solax.Core.Models;
 
 namespace Solax.Core.Tests.Models;
@@ -123,4 +124,59 @@ public class SolarForecastTests
             new DateTimeOffset(2026, 7, 21, 12, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 7, 21, 11, 0, 0, TimeSpan.Zero)));
     }
+
+    [Fact]
+    public void ConfidenceBands_SelectTheRequestedEstimate()
+    {
+        var period = new SolarForecastPeriod(
+            new DateTimeOffset(2026, 7, 27, 12, 0, 0, TimeSpan.Zero), TimeSpan.FromMinutes(30),
+            EstimatedPowerWatts: 5000, EstimatedPowerWattsP10: 3000, EstimatedPowerWattsP90: 7000);
+
+        Assert.Equal(3000, period.PowerWatts(ForecastConfidence.P10));
+        Assert.Equal(5000, period.PowerWatts(ForecastConfidence.P50));
+        Assert.Equal(7000, period.PowerWatts(ForecastConfidence.P90));
+        Assert.Equal(1500, period.EnergyWattHoursAt(ForecastConfidence.P10));
+    }
+
+    [Fact]
+    public void AMissingBandFallsBackToTheMedian()
+    {
+        // A provider (or a partial response) without the percentile fields must not read as darkness --
+        // that would starve the car for the whole day.
+        var period = new SolarForecastPeriod(
+            new DateTimeOffset(2026, 7, 27, 12, 0, 0, TimeSpan.Zero), TimeSpan.FromMinutes(30), 5000);
+
+        Assert.Equal(5000, period.PowerWatts(ForecastConfidence.P10));
+        Assert.Equal(5000, period.PowerWatts(ForecastConfidence.P90));
+    }
+
+    [Fact]
+    public void EnergyAtAConfidenceBand_SumsThePeriods()
+    {
+        var forecast = new SolarForecast(
+            DateTimeOffset.UtcNow,
+            [
+                new SolarForecastPeriod(new DateTimeOffset(2026, 7, 27, 12, 0, 0, TimeSpan.Zero), TimeSpan.FromMinutes(30), 4000, 2000),
+                new SolarForecastPeriod(new DateTimeOffset(2026, 7, 27, 12, 30, 0, TimeSpan.Zero), TimeSpan.FromMinutes(30), 6000, 3000),
+            ]);
+
+        Assert.Equal(5000, forecast.ExpectedEnergyWattHours);
+        Assert.Equal(2500, forecast.EnergyWattHoursAt(ForecastConfidence.P10));
+    }
+
+    [Fact]
+    public void NextPeriodStartAbove_FindsFirstLight()
+    {
+        var dawn = new DateTimeOffset(2026, 7, 27, 5, 0, 0, TimeSpan.Zero);
+        var forecast = new SolarForecast(
+            dawn,
+            [
+                new SolarForecastPeriod(dawn.AddMinutes(30), TimeSpan.FromMinutes(30), 5),
+                new SolarForecastPeriod(dawn.AddMinutes(60), TimeSpan.FromMinutes(30), 400),
+            ]);
+
+        Assert.Equal(dawn.AddMinutes(30), forecast.NextPeriodStartAbove(dawn, thresholdWatts: 100));
+        Assert.Null(forecast.NextPeriodStartAbove(dawn, thresholdWatts: 10_000));
+    }
 }
+

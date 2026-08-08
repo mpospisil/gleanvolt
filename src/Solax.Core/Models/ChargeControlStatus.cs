@@ -28,6 +28,14 @@ namespace Solax.Core.Models;
 /// device read-back — the command register cannot be read (see <see cref="Interfaces.IBatteryDischargeControl"/>).
 /// </param>
 /// <param name="BatteryHoldTargetWatts">The active-power target currently commanded, or null when not held.</param>
+/// <param name="Plan">
+/// The forecast-driven day plan behind the decision, or null when the mode isn't using one. Carries
+/// the outlook, budgets, SOC floor and charge window reported to Home Assistant.
+/// </param>
+/// <param name="LoanPowerWatts">How much of the current charge the home battery is lending right now.</param>
+/// <param name="SessionEnergyWh">Energy delivered to the car in the current session.</param>
+/// <param name="LoanedTodayWh">Energy lent out of the home battery today.</param>
+/// <param name="TomorrowForecastWh">Tomorrow's forecast production, purely informational.</param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
@@ -49,4 +57,9 @@ public sealed record ChargeControlStatus(
     bool BatteryHoldRequested,
     bool BatteryHoldActive,
     double? BatteryHoldTargetWatts,
+    SolarDayPlan? Plan,
+    double LoanPowerWatts,
+    double SessionEnergyWh,
+    double LoanedTodayWh,
+    double? TomorrowForecastWh,
     DateTimeOffset Timestamp);

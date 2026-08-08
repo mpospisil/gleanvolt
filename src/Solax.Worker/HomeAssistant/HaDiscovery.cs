@@ -42,6 +42,17 @@ public sealed class HaDiscovery
     public string BatteryHoldCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/set";
     public string BatteryHoldStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/state";
 
+    /// <summary>Object ids of the settable numbers, so the worker can subscribe and publish generically.</summary>
+    public const string DailyEvTargetNumber = "daily_ev_target";
+    public const string SessionEnergyTargetNumber = "session_energy_target";
+    public const string MinBatterySocNumber = "min_battery_soc";
+
+    public static readonly IReadOnlyList<string> NumberObjectIds =
+        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber];
+
+    public string NumberCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
+    public string NumberStateTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/state";
+
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
     public const string PayloadOn = "ON";
@@ -121,6 +132,27 @@ public sealed class HaDiscovery
                 unit: "W", deviceClass: "power");
         }
 
+        // Forecast-driven mode (issue #22). Published unconditionally: the mode is selectable at
+        // runtime, so the entities have to exist before it is picked. They simply report nothing while
+        // another mode is active.
+        yield return Sensor("day_outlook", "Day outlook", template: "{{ value_json.outlook }}", icon: "mdi:weather-partly-cloudy");
+        yield return Sensor("plan_state", "Plan state", template: "{{ value_json.plan_reason }}", icon: "mdi:text-box-outline");
+        yield return Sensor("charge_window", "Charge window", template: "{{ value_json.window }}", icon: "mdi:clock-outline");
+        yield return Sensor("ev_budget", "EV energy budget", template: "{{ value_json.ev_budget_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("ev_expected_today", "EV energy expected today", template: "{{ value_json.ev_expected_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("shortfall", "Projected shortfall", template: "{{ value_json.shortfall_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("soc_floor", "Required SOC floor", template: "{{ value_json.soc_floor }}", unit: "%", icon: "mdi:battery-arrow-down");
+        yield return Sensor("forecast_remaining", "Forecast remaining today", template: "{{ value_json.forecast_remaining_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("tomorrow_forecast", "Tomorrow forecast", template: "{{ value_json.tomorrow_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("forecast_accuracy", "Forecast accuracy", template: "{{ value_json.bias_percent }}", unit: "%", icon: "mdi:chart-bell-curve");
+        yield return Sensor("session_energy", "Session energy", template: "{{ value_json.session_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("loaned_today", "Battery loaned today", template: "{{ value_json.loaned_kwh }}", unit: "kWh", deviceClass: "energy");
+        yield return Sensor("loan_power", "Battery loan power", template: "{{ value_json.loan_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+
+        yield return Number(DailyEvTargetNumber, "Daily EV target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:car-electric");
+        yield return Number(SessionEnergyTargetNumber, "Session energy target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:battery-charging-80");
+        yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
+
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
             ["name"] = "Car connected",
@@ -161,13 +193,51 @@ public sealed class HaDiscovery
             ["holding"] = s.HoldingControl,
             ["dry_run"] = s.DryRun,
             ["hold_target_w"] = s.BatteryHoldTargetWatts is null ? null : Math.Round(s.BatteryHoldTargetWatts.Value),
+            ["loan_w"] = Math.Round(s.LoanPowerWatts),
+            ["session_kwh"] = Math.Round(s.SessionEnergyWh / 1000, 2),
+            ["loaned_kwh"] = Math.Round(s.LoanedTodayWh / 1000, 2),
+            ["tomorrow_kwh"] = s.TomorrowForecastWh is null ? null : Math.Round(s.TomorrowForecastWh.Value / 1000, 1),
         };
+
+        // The plan block is present only in the forecast-driven mode; in the others the entities go
+        // unavailable rather than reporting stale numbers from a plan nothing is acting on.
+        if (s.Plan is { } plan)
+        {
+            payload["outlook"] = plan.Outlook.ToString();
+            payload["plan_reason"] = plan.Reason;
+            payload["window"] = plan.NextFeasibleWindow is { } window
+                ? $"{window.Start.LocalDateTime:HH:mm}-{window.End.LocalDateTime:HH:mm}"
+                : "none";
+            payload["ev_budget_kwh"] = Math.Round(plan.FeasibleEvEnergyWh / 1000, 1);
+            payload["ev_expected_kwh"] = Math.Round(plan.EvExpectedTodayWh / 1000, 1);
+            payload["shortfall_kwh"] = Math.Round(plan.ShortfallWh / 1000, 1);
+            payload["soc_floor"] = Math.Round(plan.RequiredSocFloorPercent);
+            payload["forecast_remaining_kwh"] = Math.Round(plan.RemainingPvWh / 1000, 1);
+            payload["bias_percent"] = Math.Round(plan.BiasFactor * 100);
+        }
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so
         // drop them explicitly to keep the payload clean.
         var present = payload.Where(kvp => kvp.Value is not null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         return JsonSerializer.Serialize(present, Json);
     }
+
+    // A settable number. Unlike the sensors it has its own state topic rather than reading the shared
+    // JSON payload, so Home Assistant's optimistic update and our echo agree on one value.
+    private (string Topic, string Payload) Number(
+        string objectId, string name, double min, double max, double step, string unit, string icon) =>
+        Config("number", objectId, new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["command_topic"] = NumberCommandTopic(objectId),
+            ["state_topic"] = NumberStateTopic(objectId),
+            ["min"] = min,
+            ["max"] = max,
+            ["step"] = step,
+            ["unit_of_measurement"] = unit,
+            ["mode"] = "box",
+            ["icon"] = icon,
+        });
 
     private (string, string) Sensor(string objectId, string name, string template, string? unit = null, string? deviceClass = null, string? stateClass = null, string? icon = null)
     {

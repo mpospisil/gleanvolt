@@ -58,6 +58,18 @@ public sealed class SolcastForecastService : ISolarForecastService
     }
 
     /// <summary>
+    /// When the sun next rises above <paramref name="thresholdWatts"/> according to the cached
+    /// forecast, or null if that can't be determined (no forecast yet, or none of the remaining
+    /// periods clear the threshold). Used to skip refreshes overnight, where a new forecast cannot
+    /// change any decision but still costs an API call against the daily quota.
+    /// </summary>
+    public DateTimeOffset? NextDaylightStart(DateTimeOffset after, double thresholdWatts) =>
+        _cached?.NextPeriodStartAbove(after, thresholdWatts);
+
+    /// <summary>Expected PV power right now per the cached forecast, or null when it can't say.</summary>
+    public double? ExpectedPowerWattsNow(DateTimeOffset instant) => _cached?.ExpectedPowerWattsAt(instant);
+
+    /// <summary>
     /// Fetches the latest forecast from Solcast and replaces the cache. On any failure the cache
     /// is left untouched and the error is logged -- callers keep serving the last good forecast.
     /// </summary>
@@ -86,7 +98,9 @@ public sealed class SolcastForecastService : ISolarForecastService
                 .Select(e => new SolarForecastPeriod(
                     e.PeriodEnd,
                     ParsePeriod(e.Period),
-                    EstimatedPowerWatts: e.PvEstimateKw * 1000.0))
+                    EstimatedPowerWatts: e.PvEstimateKw * 1000.0,
+                    EstimatedPowerWattsP10: e.PvEstimate10Kw * 1000.0,
+                    EstimatedPowerWattsP90: e.PvEstimate90Kw * 1000.0))
                 .OrderBy(p => p.PeriodEnd)
                 .ToList();
 
@@ -96,10 +110,13 @@ public sealed class SolcastForecastService : ISolarForecastService
             // logs the live actual-vs-forecast comparison, not this summary.
             var today = GetForecastForToday();
             _logger.LogInformation(
-                "Refreshed Solcast forecast: {PeriodCount} periods, PeakToday={PeakPowerWatts:F0}W, EnergyToday={EnergyWattHours:F0}Wh.",
+                "Refreshed Solcast forecast: {PeriodCount} periods, PeakToday={PeakPowerWatts:F0}W, "
+                + "EnergyToday={EnergyWattHours:F0}Wh (p10 {EnergyP10WattHours:F0}Wh, p90 {EnergyP90WattHours:F0}Wh).",
                 periods.Count,
                 today?.PeakPowerWatts ?? 0,
-                today?.ExpectedEnergyWattHours ?? 0);
+                today?.ExpectedEnergyWattHours ?? 0,
+                today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P10) ?? 0,
+                today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P90) ?? 0);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -115,8 +132,13 @@ public sealed class SolcastForecastService : ISolarForecastService
     private sealed record SolcastForecastResponse(
         [property: JsonPropertyName("forecasts")] IReadOnlyList<SolcastForecastEntry>? Forecasts);
 
+    // pv_estimate10/90 are the 10th/90th-percentile bands Solcast returns alongside the median. The
+    // day plan is built on the p10 band: planning an "the battery will be full by evening" guarantee
+    // against the median means missing it roughly half the time.
     private sealed record SolcastForecastEntry(
         [property: JsonPropertyName("pv_estimate")] double PvEstimateKw,
         [property: JsonPropertyName("period_end")] DateTimeOffset PeriodEnd,
-        [property: JsonPropertyName("period")] string? Period);
+        [property: JsonPropertyName("period")] string? Period,
+        [property: JsonPropertyName("pv_estimate10")] double? PvEstimate10Kw = null,
+        [property: JsonPropertyName("pv_estimate90")] double? PvEstimate90Kw = null);
 }

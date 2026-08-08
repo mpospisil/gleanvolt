@@ -26,13 +26,16 @@ public class HaDiscoveryTests
         int? target = 6,
         int? active = 16,
         bool holdActive = true,
-        double? holdTarget = -2450.4) =>
+        double? holdTarget = -2450.4,
+        SolarDayPlan? plan = null,
+        double loanWatts = 0) =>
         new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
             ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
             EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, BatteryPowerWatts: -1250.2,
             GridPowerWatts: 1601.4,
             BatteryHoldEnabled: true, BatteryHoldRequested: true, BatteryHoldActive: holdActive,
-            BatteryHoldTargetWatts: holdTarget, Timestamp: DateTimeOffset.UtcNow);
+            BatteryHoldTargetWatts: holdTarget, Plan: plan, LoanPowerWatts: loanWatts, SessionEnergyWh: 8400,
+            LoanedTodayWh: 1800, TomorrowForecastWh: 24500, Timestamp: DateTimeOffset.UtcNow);
 
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
@@ -56,7 +59,7 @@ public class HaDiscoveryTests
         Assert.Equal(Discovery.ModeCommandTopic, s.GetProperty("command_topic").GetString());
         Assert.Equal(Discovery.ModeStateTopic, s.GetProperty("state_topic").GetString());
         var options = s.GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToArray();
-        Assert.Equal(["Off", "Solar"], options);
+        Assert.Equal(["Off", "Solar", "Forecasted"], options);
 
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
@@ -220,4 +223,105 @@ public class HaDiscoveryTests
         Assert.False(json.RootElement.TryGetProperty("target_a", out _));
         Assert.Equal("Disabled", json.RootElement.GetProperty("state").GetString());
     }
+
+    private static SolarDayPlan TestPlan(DayOutlook outlook = DayOutlook.Tight) => new(
+        RemainingPvWh: 11_000,
+        ShoulderEnergyWh: 3400,
+        PlateauEnergyWh: 11_000,
+        PlateauClaimedByBatteryWh: 500,
+        ExpectedHouseWh: 2300,
+        BatteryToFullWh: 3900,
+        EvBudgetWh: 10_500,
+        FeasibleEvEnergyWh: 10_500,
+        // Local-kind instants: the payload renders the window in local time, so a UTC literal would
+        // make this test depend on the machine's timezone.
+        NextFeasibleWindow: (new DateTimeOffset(new DateTime(2026, 7, 27, 12, 30, 0, DateTimeKind.Local)), new DateTimeOffset(new DateTime(2026, 7, 27, 15, 50, 0, DateTimeKind.Local))),
+        RequiredSocFloorPercent: 62,
+        ShortfallWh: 4400,
+        EvExpectedTodayWh: 10_500,
+        EvTargetWh: 15_000,
+        Outlook: outlook,
+        BiasFactor: 0.94,
+        Deadline: new DateTimeOffset(2026, 7, 27, 19, 0, 0, TimeSpan.Zero),
+        ForecastAsOf: new DateTimeOffset(2026, 7, 27, 9, 0, 0, TimeSpan.Zero),
+        IsUsable: true,
+        Reason: "Tight day: 10.5kWh for the car");
+
+    [Theory]
+    [InlineData("homeassistant/sensor/solax_controller/day_outlook/config")]
+    [InlineData("homeassistant/sensor/solax_controller/plan_state/config")]
+    [InlineData("homeassistant/sensor/solax_controller/charge_window/config")]
+    [InlineData("homeassistant/sensor/solax_controller/ev_budget/config")]
+    [InlineData("homeassistant/sensor/solax_controller/ev_expected_today/config")]
+    [InlineData("homeassistant/sensor/solax_controller/shortfall/config")]
+    [InlineData("homeassistant/sensor/solax_controller/soc_floor/config")]
+    [InlineData("homeassistant/sensor/solax_controller/forecast_remaining/config")]
+    [InlineData("homeassistant/sensor/solax_controller/tomorrow_forecast/config")]
+    [InlineData("homeassistant/sensor/solax_controller/forecast_accuracy/config")]
+    [InlineData("homeassistant/sensor/solax_controller/session_energy/config")]
+    [InlineData("homeassistant/sensor/solax_controller/loaned_today/config")]
+    [InlineData("homeassistant/sensor/solax_controller/loan_power/config")]
+    public void DiscoveryMessages_IncludeTheForecastPlanSensors(string topic) =>
+        Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
+
+    [Theory]
+    [InlineData("daily_ev_target")]
+    [InlineData("session_energy_target")]
+    [InlineData("min_battery_soc")]
+    public void DiscoveryMessages_IncludeTheSettableNumbers(string objectId)
+    {
+        var message = Discovery.DiscoveryMessages()
+            .Single(m => m.Topic == $"homeassistant/number/solax_controller/{objectId}/config");
+
+        using var json = JsonDocument.Parse(message.Payload);
+        var s = json.RootElement;
+
+        Assert.Equal(Discovery.NumberCommandTopic(objectId), s.GetProperty("command_topic").GetString());
+        Assert.Equal(Discovery.NumberStateTopic(objectId), s.GetProperty("state_topic").GetString());
+        Assert.Equal($"solax_controller_{objectId}", s.GetProperty("unique_id").GetString());
+    }
+
+    [Fact]
+    public void NumberTopics_FollowTheConfiguredPrefixes()
+    {
+        Assert.Equal("solax/solax_controller/daily_ev_target/set", Discovery.NumberCommandTopic("daily_ev_target"));
+        Assert.Equal("solax/solax_controller/daily_ev_target/state", Discovery.NumberStateTopic("daily_ev_target"));
+    }
+
+    [Fact]
+    public void StateJson_CarriesThePlanWhenTheForecastModeIsDriving()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status(mode: ChargeControlMode.Forecasted, plan: TestPlan(), loanWatts: 1140)));
+        var s = json.RootElement;
+
+        Assert.Equal("Tight", s.GetProperty("outlook").GetString());
+        Assert.Equal("12:30-15:50", s.GetProperty("window").GetString());
+        Assert.Equal(10.5, s.GetProperty("ev_budget_kwh").GetDouble());
+        Assert.Equal(4.4, s.GetProperty("shortfall_kwh").GetDouble());
+        Assert.Equal(62, s.GetProperty("soc_floor").GetDouble());
+        Assert.Equal(11, s.GetProperty("forecast_remaining_kwh").GetDouble());
+        Assert.Equal(94, s.GetProperty("bias_percent").GetDouble());
+        Assert.Equal(1140, s.GetProperty("loan_w").GetDouble());
+        Assert.Equal(8.4, s.GetProperty("session_kwh").GetDouble());
+        Assert.Equal(1.8, s.GetProperty("loaned_kwh").GetDouble());
+        Assert.Equal(24.5, s.GetProperty("tomorrow_kwh").GetDouble());
+    }
+
+    [Fact]
+    public void StateJson_OmitsThePlanBlockInTheOtherModes()
+    {
+        // Reporting a stale plan nothing is acting on would be worse than reporting nothing.
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+
+        Assert.False(json.RootElement.TryGetProperty("outlook", out _));
+        Assert.False(json.RootElement.TryGetProperty("soc_floor", out _));
+    }
+
+    [Fact]
+    public void TryParseMode_AcceptsForecasted()
+    {
+        Assert.True(HaDiscovery.TryParseMode("forecasted", out var mode));
+        Assert.Equal(ChargeControlMode.Forecasted, mode);
+    }
 }
+

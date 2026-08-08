@@ -20,8 +20,24 @@ public sealed class SolcastOptions
     public string ResourceId { get; init; } = string.Empty;
 
     /// <summary>
-    /// How often the cached forecast is refreshed from Solcast. Defaults to 12 hours to stay well
-    /// within the free hobbyist tier's daily request quota.
+    /// How often the cached forecast is refreshed from Solcast <b>during daylight</b>. Three hours by
+    /// default: the forecast-driven charge strategy plans against a deadline, and a 12-hour-old
+    /// forecast cannot steer an afternoon. Refreshes are skipped overnight (see
+    /// <see cref="DaylightThresholdWatts"/>), so this works out at roughly five calls a day — inside
+    /// the free hobbyist tier's ten.
     /// </summary>
-    public TimeSpan RefreshInterval { get; init; } = TimeSpan.FromHours(12);
+    public TimeSpan RefreshInterval { get; init; } = TimeSpan.FromHours(3);
+
+    /// <summary>
+    /// Expected PV power above which the sun counts as "up" for refresh scheduling. Below it the
+    /// worker sleeps until the forecast's next daylight period instead of spending API calls on the
+    /// dark, where the forecast cannot change anything we do.
+    /// </summary>
+    public double DaylightThresholdWatts { get; init; } = 100;
+
+    /// <summary>
+    /// Longest the refresh loop will sleep through the night before fetching again regardless. Bounds
+    /// the damage if the cached forecast's daylight periods are missing or wrong.
+    /// </summary>
+    public TimeSpan MaxNightSleep { get; init; } = TimeSpan.FromHours(6);
 }

@@ -18,6 +18,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly HaDiscovery _discovery;
     private readonly IChargeControlModeSelector _mode;
     private readonly IBatteryHoldSelector _batteryHold;
+    private readonly IForecastRuntimeSettings _forecastSettings;
     private readonly bool _batteryHoldEnabled;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ILogger<HomeAssistantMqttWorker> _logger;
@@ -28,6 +29,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IOptions<BatteryHoldOptions> batteryHoldOptions,
         IChargeControlModeSelector mode,
         IBatteryHoldSelector batteryHold,
+        IForecastRuntimeSettings forecastSettings,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger)
     {
@@ -36,6 +38,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _discovery = new HaDiscovery(_options, _batteryHoldEnabled);
         _mode = mode;
         _batteryHold = batteryHold;
+        _forecastSettings = forecastSettings;
         _statusHolder = statusHolder;
         _logger = logger;
     }
@@ -126,6 +129,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.BatteryHoldCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        foreach (var objectId in HaDiscovery.NumberObjectIds)
+        {
+            await _client.SubscribeAsync(_discovery.NumberCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -149,10 +157,33 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await PublishAsync(_discovery.BatteryHoldStateTopic, HaDiscovery.SwitchState(held), retain: true, cancellationToken).ConfigureAwait(false);
         }
 
+        await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
+
         if (status is not null)
         {
             await PublishAsync(_discovery.StateTopic, _discovery.StateJson(status), retain: true, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // The numbers carry the values the controller is actually using, so an HA restart (or a second
+    // dashboard) sees the truth rather than whatever was last typed into a box.
+    private async Task PublishNumberStatesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var (objectId, value) in CurrentNumberValues())
+        {
+            await PublishAsync(
+                _discovery.NumberStateTopic(objectId),
+                value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                retain: true,
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private IEnumerable<(string ObjectId, double Value)> CurrentNumberValues()
+    {
+        yield return (HaDiscovery.DailyEvTargetNumber, _forecastSettings.DailyEvTargetWh / 1000);
+        yield return (HaDiscovery.SessionEnergyTargetNumber, _forecastSettings.SessionEnergyTargetWh / 1000);
+        yield return (HaDiscovery.MinBatterySocNumber, _forecastSettings.MinBatterySocFloorPercent);
     }
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
@@ -160,6 +191,14 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (_batteryHoldEnabled && e.ApplicationMessage.Topic == _discovery.BatteryHoldCommandTopic)
         {
             return OnBatteryHoldCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+        }
+
+        foreach (var objectId in HaDiscovery.NumberObjectIds)
+        {
+            if (e.ApplicationMessage.Topic == _discovery.NumberCommandTopic(objectId))
+            {
+                return OnNumberCommandAsync(objectId, e.ApplicationMessage.ConvertPayloadToString());
+            }
         }
 
         if (e.ApplicationMessage.Topic != _discovery.ModeCommandTopic)
@@ -197,6 +236,34 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // replaces it with what is actually armed on the inverter.
         return PublishAsync(
             _discovery.BatteryHoldStateTopic, HaDiscovery.SwitchState(_batteryHold.Hold), retain: true, CancellationToken.None);
+    }
+
+    private Task OnNumberCommandAsync(string objectId, string? payload)
+    {
+        if (!double.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            _logger.LogWarning("Ignoring unparseable value '{Payload}' for {ObjectId}.", payload, objectId);
+            return Task.CompletedTask;
+        }
+
+        switch (objectId)
+        {
+            case HaDiscovery.DailyEvTargetNumber:
+                _forecastSettings.SetDailyEvTargetWh(value * 1000, "Home Assistant");
+                break;
+            case HaDiscovery.SessionEnergyTargetNumber:
+                _forecastSettings.SetSessionEnergyTargetWh(value * 1000, "Home Assistant");
+                break;
+            case HaDiscovery.MinBatterySocNumber:
+                _forecastSettings.SetMinBatterySocFloorPercent(value, "Home Assistant");
+                break;
+            default:
+                return Task.CompletedTask;
+        }
+
+        // Echo back what was actually stored (the setters clamp), so a rejected value doesn't leave the
+        // HA box showing something the controller isn't using.
+        return PublishNumberStatesAsync(CancellationToken.None);
     }
 
     private async Task PublishAsync(string topic, string payload, bool retain, CancellationToken cancellationToken)

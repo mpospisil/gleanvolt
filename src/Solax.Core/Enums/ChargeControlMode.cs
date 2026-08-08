@@ -12,4 +12,14 @@ public enum ChargeControlMode
     /// use-mode is Fast.
     /// </summary>
     Solar,
+
+    /// <summary>
+    /// As <see cref="Solar"/>, but the fixed battery-full gate is replaced by a forecast-driven day
+    /// plan: the Solcast forecast decides how much of today's remaining sun the car may have, so the
+    /// home battery still reaches 100% by the configured evening deadline. Sub-minimum ("shoulder")
+    /// power is left to the house and battery, the midday plateau is released to the car, and the
+    /// battery may lend power briefly when the forecast can repay it. Falls back to
+    /// <see cref="Solar"/> behaviour whenever no usable forecast is available.
+    /// </summary>
+    Forecasted,
 }

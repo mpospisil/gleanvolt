@@ -5,8 +5,9 @@ namespace Solax.Worker;
 
 /// <summary>
 /// Thread-safe runtime charge-control mode (see <see cref="IChargeControlModeSelector"/>). Registered
-/// as a singleton, seeded from configuration. The configured value is only the boot default — a
-/// runtime change (e.g. from Home Assistant) does not persist across restarts.
+/// as a singleton and always started in <see cref="ChargeControlMode.Off"/>: the service takes no
+/// control of the charger until somebody asks, so a restart after a crash, a power cut or a deploy
+/// leaves the charger exactly as its owner set it. A runtime change does not persist across restarts.
 /// </summary>
 public sealed class ChargeControlModeSelector : IChargeControlModeSelector
 {
