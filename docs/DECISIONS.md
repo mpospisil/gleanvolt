@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-08 — Entity documentation is published as an attribute, because HA has no field for it
+
+**Context.** The Home Assistant entities carried names and nothing else, so a reader looking at
+`Grid power` or `Required SOC floor` had no way to learn what the number means or which direction its
+sign runs without opening this repository.
+
+**What was found.** Home Assistant has no description or tooltip field for an entity. The hover text
+is the friendly name — the frontend sets it so a truncated name can still be read in full — and MQTT
+discovery has no `description` key. Adding one has been requested and not implemented.
+
+**Decision.** Publish the explanation as an entity **attribute**: `json_attributes_topic` points at the
+state topic every entity already subscribes to, and `json_attributes_template` is a *constant* JSON
+document carrying a `description` key. It renders identically on every state message and shows up
+under Attributes in the more-info dialog. Where a value's meaning genuinely cannot be guessed — a sign
+convention, or the commanded/measured/read-back current trio — the disambiguation also goes in the
+**name**, since the name is the only thing a hover will ever show.
+
+**Consequences.**
+
+- The template is authored as text but must render valid JSON, so it is built with `JsonSerializer`
+  (escaping anything in the prose that would break it). Descriptions must not contain Jinja
+  delimiters; a test enforces that, along with every entity having a description that isn't just its
+  name repeated.
+- Attributes only appear once a state message has been received. The state topic is retained and
+  republished every `StatusInterval`, so this is not observable in practice.
+- Renaming entities does not move existing `entity_id`s — those are fixed at first discovery — so
+  dashboards and automations survive, while a fresh install derives ids from the new names.
+
+---
+
 ## 2026-08-08 — A mode may end itself, and "the car is finished" is decided on power
 
 **Context.** Issue #28, the `FastNoBattery` mode. It creates the most expensive state this controller

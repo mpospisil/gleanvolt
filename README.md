@@ -624,7 +624,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
-- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus (PV minus house)**, **EV charging power** and **EV charging current (measured)** (actual draw), **Target charging current (commanded)** and **Active charging current (charger setpoint)**, **Battery SOC**, **Battery power (+ charging / − discharging)**, **Grid power (+ import / − export)**, and **Battery hold target** (while the hold is enabled).
 - forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
   **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
   **Projected shortfall**, **Required SOC floor**, **Forecast remaining today**,
@@ -633,7 +633,14 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   car today" notification automation keys off.
 - numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
   unlimited) and **Minimum battery SOC** (%). Like the mode, changes don't persist across restarts.
-- binary sensors: **Car connected** and **Charging now**.
+- binary sensors: **Car connected** (a vehicle is plugged in) and **Controller charging the car** (we are
+  commanding a current — our own decision, not the car's actual draw).
+- **a one-line description on every entity**, explaining what the value means and, where it matters,
+  which sign is which. Home Assistant has no description or tooltip field — hovering an entity shows
+  its friendly name and nothing more — so the text is published as an entity **attribute**: open the
+  entity and expand **Attributes** in its more-info dialog. The few names that carry a parenthetical
+  (the sign conventions, commanded vs measured vs read-back current) do so precisely because the name
+  is the only thing a hover will ever show.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 
 Disabled by default. Non-secret settings live in `appsettings.json`:
