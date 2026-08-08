@@ -4,6 +4,90 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-08 — Five days of observation: #24 verified on hardware, forecast bias shape (issues #22, #24)
+
+Read-only run 2026-08-02 09:26 → 2026-08-06 18:40, ~46,000 polls, charge mode `Off` throughout.
+No code changes — this entry records what the run showed.
+
+### The #24 reconnect fix is verified on hardware
+
+The overnight run the #24 entry below asked for, four times over.
+
+| Day | Polls | Failures | Transaction-ID | Rate | Worst gap |
+|---|---|---|---|---|---|
+| Aug 3 | 12,329 | 57 | 41 | 0.46 % | 52 s |
+| Aug 4 | 11,995 | 92 | 76 | 0.76 % | 42 s |
+| Aug 5 | 12,116 | 96 | 80 | 0.79 % | 43 s |
+| Aug 6 (to 18:40) | 9,658 | 57 | 44 | 0.59 % | 43 s |
+
+**Nothing ever got stuck.** Zero gaps over 60 s between successful polls across four full days, and
+the failure-run distribution is almost entirely single polls:
+
+```
+Aug 3: {1 poll: 50, 2: 2, 3: 1}   Aug 5: {1 poll: 94, 2: 1}
+Aug 4: {1 poll: 90, 2: 1}         Aug 6: {1 poll: 55, 2: 1}
+```
+
+Worst case in four days was three consecutive failed polls. Compare the pre-fix cliff: 43 successes,
+564 errors, and zero successes for the last 50 minutes of the log. Traced end to end, one failure
+costs exactly one poll:
+
+```
+16:14:24 [WRN] Failed to poll — Response was not of expected transaction ID. Expected 905, received 904.
+16:14:31 [INF] SOC=99% BatteryPower=0W Solar=2093W ...
+```
+
+**But the underlying desync rate is climbing**: 0 (Jul 31) → 15 (Aug 1) → 41 → 76 → 80 → 44 per day.
+The fix absorbs it at one poll each, so nothing is broken, but it is *masking* a trend rather than
+addressing it. The cause is on the device or network side, not in this code. Worth its own issue if
+it keeps rising.
+
+### Forecast accuracy: totals are good, the intraday shape is not
+
+Note the `Solar: Actual/Forecast` log line compares against **P50** (`EstimatedPowerWatts`), while the
+planner uses **P10** — these numbers are median-vs-actual.
+
+Daily energy on the three clear days: **+8.3 %, +6.5 %, +4.2 %** actual over forecast. Aug 6 (cloudy,
+partial day) came in **−17.7 %**. Magnitudes are fine and err on the safe side.
+
+The shape does not hold up. Hourly actual/forecast on clear days:
+
+```
+hour    07     08     09     10     11     12     13     14     15     16
+Aug 3  0.67   0.88   0.99   1.07   1.06   1.06   1.19   1.10   1.29   1.14
+Aug 4  0.68   0.86   1.01   1.09   1.11   1.12   1.12   1.12   1.11   1.10
+Aug 5  0.68   0.84   0.97   1.06   1.10   1.14   1.12   1.12   1.09   1.18
+```
+
+**The 07:00 hour over-predicts by ~32 %, three days running, to within one percentage point** —
+forecast ~1500 W against ~1000 W delivered. Midday is the opposite, a steady 6–14 % under-prediction.
+A deficit that recurs at the same hour with the same magnitude on consecutive clear days is not
+weather; it looks like morning shading the Solcast site model doesn't know about, or a wrong
+azimuth/tilt in the site configuration.
+
+**The single scalar bias cannot represent this.** The tracker whipsaws within each day — 1.00 at
+start, down to 0.71–0.79 through the morning, back to 1.04–1.08 by evening — because no one number
+is simultaneously +12 % and −32 %. Whichever value it holds is wrong for half the day, and applying
+the evening value at 07:00 would make the over-prediction worse.
+
+This lands where `SolarDayPlanner` is most sensitive: 1000–1500 W at 07:00 sits on the
+shoulder/plateau boundary (surplus below vs above the charger's minimum power), so an optimistic
+morning forecast is exactly what would open a charge window that cannot be sustained.
+
+**Not yet a code change.** Check the Solcast site configuration first — azimuth, tilt, declared
+capacity, horizon/shading if the plan offers it. If the site model is wrong, correcting it at source
+beats compensating for it here. Only if the configuration is already right does per-period bias
+(instead of one daily scalar) become the fix, and three clear days is thin evidence for that.
+
+### Still not exercised
+
+Across every log to date the charge mode never left `Off`, the battery hold was never armed, and
+`ForecastedChargingController` has never run a cycle. The planner and accuracy tracker have been
+validated read-only; **no feature that writes to hardware has been observed in a live run.** Every
+outstanding verification item on #20 and #22 remains open for that reason.
+
+---
+
 ## 2026-08-02 — Validation fixes after three days of observation (issue #22)
 
 Branch: `feature/22-forecasted-charging`
@@ -109,7 +193,8 @@ unchanged. `DeviceConfig` gained `MinRequestInterval` (250 ms default).
 - **Verified as regression tests**: disabling only the invalidation makes 3 of the 9 fail; restoring it
   makes all 9 pass.
 - **Not verified on hardware yet** — the fix wants an overnight run showing successful polls all the
-  way to the end of the log.
+  way to the end of the log. *(Done — see the 2026-08-08 entry above: four full days, ~46,000 polls,
+  no gap over 60 s, worst failure run three polls.)*
 
 ### Files
 
