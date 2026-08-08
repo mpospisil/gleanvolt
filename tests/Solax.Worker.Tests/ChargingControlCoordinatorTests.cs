@@ -21,6 +21,7 @@ public class ChargingControlCoordinatorTests
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
             pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
             NullLogger<ChargingControlCoordinator>.Instance);
     }
 
@@ -118,6 +119,7 @@ public class ChargingControlCoordinatorTests
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
             pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
             NullLogger<ChargingControlCoordinator>.Instance);
 
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
@@ -180,6 +182,89 @@ public class ChargingControlCoordinatorTests
         Assert.Equal(0, _coordinator.SessionEnergyWh, 1);
     }
 
+    [Fact]
+    public async Task TheCarsOwnDrawIsTrackedForTheFastMode()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+
+        // Plugged in but not drawing yet: idle time accumulates, but "has drawn" stays false, which is
+        // what stops the fast mode calling a session finished before it has started.
+        await _coordinator.RunCycleAsync(Connected(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.False(_controller.LastInput!.EvDrewPower);
+        Assert.Equal(TimeSpan.FromMinutes(1), _controller.LastInput.EvIdleFor);
+
+        // Now it charges: the idle clock resets.
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(2)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.True(_controller.LastInput!.EvDrewPower);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput.EvIdleFor);
+
+        // And stops again: idle from the first sample that showed no draw, with the draw remembered.
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.True(_controller.LastInput!.EvDrewPower);
+        Assert.Equal(TimeSpan.FromMinutes(2), _controller.LastInput.EvIdleFor);
+    }
+
+    [Fact]
+    public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // SuspendedEv while still pulling 1kW (conditioning, balancing): waiting for the power alone
+        // would never call this finished. The idle clock runs from the first such sample.
+        await _coordinator.RunCycleAsync(WindingDown(Now.AddMinutes(2)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(WindingDown(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.True(_controller.LastInput!.EvDrewPower);
+        Assert.Equal(TimeSpan.FromMinutes(2), _controller.LastInput.EvIdleFor);
+    }
+
+    [Fact]
+    public async Task PluggingInAFreshCarForgetsTheLastOnesDraw()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(State(Now.AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None); // unplugged
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(2)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.False(_controller.LastInput!.EvDrewPower);
+    }
+
+    [Fact]
+    public async Task ReleaseControlForgetsTheCarsDrawToo()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        _coordinator.ReleaseControl();
+
+        // The same car is still plugged in, but a newly selected mode must not inherit the verdict that
+        // it has already charged -- it would end itself on the next idle poll.
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.False(_controller.LastInput!.EvDrewPower);
+    }
+
+    [Fact]
+    public async Task ACompletedSessionPausesTheChargerAndIsReportedUpwards()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _controller.NextDecision = new(
+            ChargingControlAction.Pause, null, "car finished", SessionComplete: true);
+
+        var result = await Cycle();
+
+        Assert.Equal(0, _charger.LastTarget); // pauseCurrentAmps -- not left armed at 16A
+        Assert.True(result.SessionComplete);
+    }
+
     private static EnergyState State(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Available, EvChargerPowerWatts: 0);
@@ -187,5 +272,15 @@ public class ChargingControlCoordinatorTests
     private static EnergyState Charging(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Charging, EvChargerPowerWatts: 4140);
+
+    // The car says it is done, but hasn't stopped drawing yet.
+    private static EnergyState WindingDown(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.SuspendedEv, EvChargerPowerWatts: 1000);
+
+    // Plugged in, drawing nothing.
+    private static EnergyState Connected(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Preparing, EvChargerPowerWatts: 0);
 }
 

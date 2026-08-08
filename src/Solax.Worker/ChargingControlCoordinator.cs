@@ -23,6 +23,7 @@ public sealed class ChargingControlCoordinator
     private readonly IEvChargerControl _chargerControl;
     private readonly SurplusMovingAverage _surplusAverage;
     private readonly int _pauseCurrentAmps;
+    private readonly double _idlePowerThresholdWatts;
     private readonly ILogger<ChargingControlCoordinator> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -39,11 +40,22 @@ public sealed class ChargingControlCoordinator
     private DateOnly _loanDay;
     private bool _carWasConnected;
 
+    // What the car itself is doing, as opposed to what we asked for: whether it has drawn power at all
+    // this session, and since when it has been drawing nothing. Together they are how the fast mode
+    // tells "finished charging" from "hasn't started yet" -- the two are identical on power alone.
+    private bool _evDrewPower;
+    private DateTimeOffset? _evIdleSince;
+
+    /// <param name="idlePowerThresholdWatts">
+    /// Below this draw the car counts as not charging. Well above a charger's standby reading and well
+    /// below its 6 A floor, so nothing in between is ambiguous.
+    /// </param>
     public ChargingControlCoordinator(
         IReadOnlyDictionary<ChargeControlMode, IChargingController> controllers,
         IEvChargerControl chargerControl,
         SurplusMovingAverage surplusAverage,
         int pauseCurrentAmps,
+        double idlePowerThresholdWatts,
         ILogger<ChargingControlCoordinator> logger,
         TimeProvider? timeProvider = null)
     {
@@ -51,6 +63,7 @@ public sealed class ChargingControlCoordinator
         _chargerControl = chargerControl;
         _surplusAverage = surplusAverage;
         _pauseCurrentAmps = Math.Clamp(pauseCurrentAmps, 0, EvChargerLimits.MaxCurrentAmps);
+        _idlePowerThresholdWatts = idlePowerThresholdWatts;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -95,7 +108,9 @@ public sealed class ChargingControlCoordinator
                 plan,
                 TimeInCurrentState(state.Timestamp),
                 _sessionEnergy.EnergyWattHours,
-                _loanedToday.EnergyWattHours));
+                _loanedToday.EnergyWattHours,
+                _evDrewPower,
+                EvIdleFor(state.Timestamp)));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -144,7 +159,7 @@ public sealed class ChargingControlCoordinator
             };
 
             return new ChargeControlCycleResult(
-                reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts);
+                reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts, decision.SessionComplete);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -166,6 +181,11 @@ public sealed class ChargingControlCoordinator
         _charging = false;
         _stateChangedAt = null;
         _surplusAverage.Reset();
+
+        // A mode that ended (including one that ended itself on a finished charge) must not hand its
+        // "the car has already charged" verdict to the next one selected on the same plugged-in car.
+        _evDrewPower = false;
+        _evIdleSince = null;
     }
 
     /// <summary>
@@ -200,10 +220,26 @@ public sealed class ChargingControlCoordinator
         if (connected && !_carWasConnected)
         {
             _sessionEnergy.Reset();
+            _evDrewPower = false;
+            _evIdleSince = null;
         }
 
         _carWasConnected = connected;
         _sessionEnergy.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
+
+        // The status is consulted alongside the power because a car can announce it is done while
+        // still drawing a trickle (conditioning, cell balancing); waiting for the power alone would
+        // then never call the session finished.
+        var drawing = state.EvChargerPowerWatts > _idlePowerThresholdWatts && !state.EvChargerStatus.IsChargeWindingDown();
+        if (drawing)
+        {
+            _evDrewPower = true;
+            _evIdleSince = null;
+        }
+        else
+        {
+            _evIdleSince ??= state.Timestamp;
+        }
 
         var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(state.Timestamp, _timeProvider.LocalTimeZone).DateTime);
         if (day != _loanDay)
@@ -212,6 +248,9 @@ public sealed class ChargingControlCoordinator
             _loanedToday.Reset();
         }
     }
+
+    private TimeSpan EvIdleFor(DateTimeOffset now) =>
+        _evIdleSince is { } since && now > since ? now - since : TimeSpan.Zero;
 
     private TimeSpan TimeInCurrentState(DateTimeOffset now) =>
         _stateChangedAt is { } since && now > since ? now - since : TimeSpan.Zero;

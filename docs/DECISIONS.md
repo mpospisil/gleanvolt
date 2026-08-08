@@ -4,6 +4,51 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-08 — A mode may end itself, and "the car is finished" is decided on power
+
+**Context.** Issue #28, the `FastNoBattery` mode. It creates the most expensive state this controller
+can ask for — maximum current, grid import, the home battery locked out of the house — for a goal that
+completes: the car reaches its own charge limit. Leaving that armed until somebody looks at Home
+Assistant is the obvious failure mode, so the mode has to be able to end itself.
+
+**Decision 1: a controller can say "this is over".** `ChargingControlDecision` gains
+`SessionComplete`, carried up through `ChargeControlCycleResult`, and the poll loop answers by writing
+the pause current and calling `IChargeControlModeSelector.Set(Off, …)`. The mode change is applied
+*before* the battery hold is reconciled in the same cycle, so the inverter release goes out on the
+same poll rather than the next one.
+
+This is the first time control flows from a strategy back into the mode selector. The alternative —
+a scheduler or timer outside the strategies — would have needed its own copy of "is the car still
+drawing", which is exactly what the strategy already sees. The selector's existing contract does the
+rest: `Set` logs and raises `Changed`, and the HA worker republishes the retained select state from
+`_mode.Mode` on its next status tick, so the mode flipping under the owner needs no new plumbing.
+
+**Decision 2: completion is a power judgement, corroborated by status.** The X1/X3-HAC's end-of-charge
+status is firmware-specific and **has not been observed here yet** — the mode ships before a full
+session has been logged through it. So the rule is built on the reading that cannot be misinterpreted:
+
+- idle = draw at or below `CompletionPowerThresholdWatts` (200 W), *or* status `SuspendedEv` /
+  `Finishing`, which is the car declaring itself done even while trickling for conditioning;
+- finished = idle continuously for `CompletionDwell` (2 min);
+- and only once the car has drawn power at least once this session, which is what separates "finished"
+  from "hasn't started".
+
+`ChargePaused` and `SuspendedEvse` are excluded on purpose: those are the *charger's* state, and our
+own pause write produces them. Including them would let the controller read its own pause back as a
+finished charge.
+
+**Consequences.**
+
+- The 200 W threshold sits in a wide gap — a charger's standby draw is tens of watts, its 6 A floor is
+  1.4 kW single-phase and 4.1 kW on three — so no realistic reading is ambiguous.
+- A car that pauses mid-session for longer than the dwell (thermal management, a utility signal) will
+  be read as finished and the mode will end. Acceptable: ending returns control to the owner rather
+  than doing anything to the car, and the owner reselects the mode.
+- **Still to verify on hardware:** what the charger actually reports as the car finishes. Log a full
+  completed session and, if the observed transitions contradict the rule above, amend it here.
+
+---
+
 ## 2026-07-29 — A failed Modbus exchange invalidates the connection
 
 **Context.** Issue #24: after roughly fifteen minutes of normal operation the service began failing

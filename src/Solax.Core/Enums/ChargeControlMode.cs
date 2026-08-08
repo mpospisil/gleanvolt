@@ -22,4 +22,14 @@ public enum ChargeControlMode
     /// <see cref="Solar"/> behaviour whenever no usable forecast is available.
     /// </summary>
     Forecasted,
+
+    /// <summary>
+    /// Charge the car as fast as the installation allows, and keep the home battery out of it: the
+    /// current setpoint is pinned at the configured maximum whatever the sun is doing (PV covers what
+    /// it can, the grid covers the rest) and the battery discharge hold is armed for as long as the
+    /// mode is selected. When the car stops drawing because it has reached its own charge limit, the
+    /// setpoint drops to the pause current and the mode returns itself to <see cref="Off"/>, which
+    /// releases the hold. Like the other modes it only acts while the charger's own use-mode is Fast.
+    /// </summary>
+    FastNoBattery,
 }

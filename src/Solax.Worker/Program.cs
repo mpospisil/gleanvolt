@@ -154,6 +154,15 @@ builder.Services.AddSingleton<ForecastedChargingController>(services =>
         services.GetRequiredService<IForecastRuntimeSettings>());
 });
 
+// Fast charge without the battery (issue #28): the maximum current the site allows, from PV and grid
+// together, with the discharge hold armed for as long as the mode is selected. It needs no forecast
+// and no surplus -- only the ceiling and how long a silent car counts as a finished one.
+builder.Services.AddSingleton(services =>
+{
+    var options = services.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+    return new FastChargingController(options.MaxChargingCurrentAmps, options.CompletionDwell);
+});
+
 builder.Services.AddSingleton(services =>
     new SurplusMovingAverage(services.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
@@ -167,6 +176,7 @@ builder.Services.AddSingleton(services =>
     {
         [ChargeControlMode.Solar] = services.GetRequiredService<IChargingController>(),
         [ChargeControlMode.Forecasted] = services.GetRequiredService<ForecastedChargingController>(),
+        [ChargeControlMode.FastNoBattery] = services.GetRequiredService<FastChargingController>(),
     };
 
     return new ChargingControlCoordinator(
@@ -174,6 +184,7 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<IEvChargerControl>(),
         services.GetRequiredService<SurplusMovingAverage>(),
         pauseCurrentAmps: options.PauseCurrentAmps,
+        idlePowerThresholdWatts: options.CompletionPowerThresholdWatts,
         services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
 });
 

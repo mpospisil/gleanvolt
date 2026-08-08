@@ -28,9 +28,14 @@ public sealed class ChargeControlStatusHolder
 /// How much of the commanded charge the home battery is currently lending, bridging a sub-minimum
 /// surplus up to the charger's floor. Zero outside the forecast-driven mode.
 /// </param>
+/// <param name="SessionComplete">
+/// The controller reported that the car has finished (or gone away) and the mode should end itself.
+/// Only the fast mode ever sets it; the poll loop answers by returning the mode to Off.
+/// </param>
 public readonly record struct ChargeControlCycleResult(
     Solax.Core.Enums.ChargeControlState State,
     double? SurplusWatts,
     int? TargetCurrentAmps,
     bool HoldingControl,
-    double LoanPowerWatts = 0);
+    double LoanPowerWatts = 0,
+    bool SessionComplete = false);
