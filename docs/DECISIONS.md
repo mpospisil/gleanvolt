@@ -4,7 +4,7 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
-## 2026-08-08 — Entity documentation is published as an attribute, because HA has no field for it
+## 2026-08-08 — The entity name carries its explanation, because in HA the name is the tooltip
 
 **Context.** The Home Assistant entities carried names and nothing else, so a reader looking at
 `Grid power` or `Required SOC floor` had no way to learn what the number means or which direction its
@@ -14,23 +14,30 @@ sign runs without opening this repository.
 is the friendly name — the frontend sets it so a truncated name can still be read in full — and MQTT
 discovery has no `description` key. Adding one has been requested and not implemented.
 
-**Decision.** Publish the explanation as an entity **attribute**: `json_attributes_topic` points at the
-state topic every entity already subscribes to, and `json_attributes_template` is a *constant* JSON
-document carrying a `description` key. It renders identically on every state message and shows up
-under Attributes in the more-info dialog. Where a value's meaning genuinely cannot be guessed — a sign
-convention, or the commanded/measured/read-back current trio — the disambiguation also goes in the
-**name**, since the name is the only thing a hover will ever show.
+**Decision.** The name carries the explanation, because the name is the tooltip. Every entity is
+named `Label — what it means`, e.g. `Grid power — positive while importing from the grid, negative
+while exporting`. HA truncates the label in a card and shows the whole sentence on hover, which is the
+only tooltip mechanism it has.
+
+The detail that will not fit on one line is published as an entity **attribute**: `json_attributes_topic`
+points at the state topic every entity already subscribes to, and `json_attributes_template` is a
+*constant* JSON document carrying a `description` key. It renders identically on every state message
+and shows up under Attributes in the more-info dialog.
 
 **Consequences.**
 
 - The template is authored as text but must render valid JSON, so it is built with `JsonSerializer`
   (escaping anything in the prose that would break it). Descriptions must not contain Jinja
-  delimiters; a test enforces that, along with every entity having a description that isn't just its
-  name repeated.
-- Attributes only appear once a state message has been received. The state topic is retained and
-  republished every `StatusInterval`, so this is not observable in practice.
-- Renaming entities does not move existing `entity_id`s — those are fixed at first discovery — so
-  dashboards and automations survive, while a fresh install derives ids from the new names.
+  delimiters; a test enforces that, along with every entity having both halves — a name in
+  `Label — meaning` form, and a description that isn't merely the name repeated.
+- Dashboard labels are long and truncate. That is the point: a short name would leave the hover text
+  saying nothing, which is the problem this record exists to solve.
+- Entity ids on a **fresh** install derive from the new names and will be long. Existing installs are
+  unaffected — `entity_id` is fixed at first discovery and does not follow later name changes, so
+  dashboards and automations survive a rename.
+- Attributes only appear once a state message has been received, and are cleared while the entity is
+  unavailable. The state topic is retained and republished every `StatusInterval`, so this is only
+  visible when the controller is not running at all.
 
 ---
 
