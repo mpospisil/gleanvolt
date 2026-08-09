@@ -27,6 +27,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Real-time polling** of PV generation, battery state of charge, grid import/export, and EV charger status over Modbus TCP.
 - **Surplus-aware EV charging** — automatically ramp EV charge current up/down based on available household energy surplus.
 - **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
+- **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
@@ -541,6 +542,66 @@ the deadline.
 answers the two questions that decide the settings — is Solcast p10 systematically low for this roof,
 and does the shoulder/plateau split match the real curve — before anything acts on them.
 
+### Fast charge without the battery (the `FastNoBattery` mode)
+
+The "I leave in an hour" button. Where `Solar` and `Forecasted` ration the car to what the sun can
+spare, this mode does the opposite: **charge as fast as the installation allows, and keep the home
+battery out of it.** While it is selected:
+
+1. The **battery discharge hold is armed automatically** — the pack never serves the car (see
+   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) for the mechanism).
+2. The charger is pinned at **`MaxChargingCurrentAmps`**, every cycle, whatever the sun, the SOC, the
+   forecast or the time of day. PV covers what it can and the **grid covers the rest**.
+3. When the car stops drawing because it reached **its own** charge limit, the setpoint drops to
+   `PauseCurrentAmps`, the mode returns itself to **`Off`**, and the hold it armed is released.
+
+Point 3 is what makes it safe to press. The state it creates is expensive — maximum current, grid
+import, battery locked — and it ends by itself instead of sitting armed until somebody notices.
+
+> ⚠️ **`MaxChargingCurrentAmps` is a supply limit in this mode, not a preference.** The other modes
+> only reach it when the sun is that generous; this one sits there for hours. On the reference install
+> 16 A × 230 V × 3 phases ≈ **11 kW** drawn continuously from PV and grid together. Set it to what
+> your supply and main breaker actually allow.
+
+#### When is the car "finished"?
+
+The charger reports the car's state, and what it reports at the end of a session is firmware-specific,
+so the rule leans on power and treats the status as a corroborating signal:
+
+- the car counts as **idle** while it draws no more than `CompletionPowerThresholdWatts` (200 W —
+  well above standby, well below the 6 A floor), **or** while the charger reports `SuspendedEv` or
+  `Finishing`, which is the car saying it is done even if it is still trickling;
+- the session is **finished** once it has been idle continuously for `CompletionDwell` (2 min);
+- but only if the car **has drawn power at least once** since it was plugged in. Without that, a car
+  still negotiating — or waiting on its own departure timer — would end the mode seconds after it was
+  selected;
+- **unplugging ends it immediately**, on the same path.
+
+`ChargePaused` and `SuspendedEvse` are deliberately *not* treated as "the car is done": those are the
+charger's own doing, which is exactly what our pause write produces.
+
+#### What it doesn't do
+
+- **It doesn't survive a restart.** Like every mode, the service comes back in `Off` — a service that
+  restarted mid-session and silently resumed drawing 11 kW from the grid is not a behaviour anyone
+  wants unattended. The charger keeps its last setpoint until a mode is selected; the inverter's hold
+  lapses within `BatteryHold:Duration`.
+- **It doesn't touch a hold you asked for yourself.** On completion it releases only the hold it
+  armed; the Home Assistant switch stays exactly as you set it.
+- **It doesn't change the charger's use-mode.** As with the other modes, the owner keeps the charger
+  in Fast and this only moves the current setpoint.
+
+With `BatteryHold:Enabled` false the mode still charges at maximum current, and logs a warning once on
+selection: it cannot keep the battery out of the charge, which is half of what it promises.
+
+```jsonc
+"ChargeControl": {
+  "MaxChargingCurrentAmps": 16,          // the ceiling this mode pins the charger at
+  "CompletionPowerThresholdWatts": 200,  // below this draw, the car counts as not charging
+  "CompletionDwell": "00:02:00"          // idle this long -> finished; pause and return to Off
+}
+```
+
 ### Home Assistant (MQTT)
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
@@ -551,6 +612,11 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   - **Forecasted** — as Solar, but the fixed battery-full gate is replaced by a forecast-driven day
     plan, so the car can start well before the battery is full. See
     [Forecast-driven charging](#forecast-driven-charging-the-forecasted-mode) below.
+  - **FastNoBattery** — charge at the maximum configured current from PV and grid together, with the
+    battery discharge hold armed automatically, and return to `Off` when the car is full. See
+    [Fast charge without the battery](#fast-charge-without-the-battery-the-fastnobattery-mode) below.
+    This is the one mode that switches *itself* off, so the select will change under you when the car
+    finishes.
 
   **The service always starts in `Off`**, whatever is in the config, and nothing persists a mode
   across restarts. After a crash, a power cut or a deploy the charger is therefore left exactly as its

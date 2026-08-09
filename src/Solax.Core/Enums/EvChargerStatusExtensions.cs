@@ -17,4 +17,17 @@ public static class EvChargerStatusExtensions
             or EvChargerStatus.Finishing => true,
         _ => false,
     };
+
+    /// <summary>
+    /// Whether the charger reports the session ending on the <em>car's</em> initiative rather than
+    /// still delivering: <see cref="EvChargerStatus.SuspendedEv"/> is the EV side stopping the draw
+    /// (typically its target SOC), <see cref="EvChargerStatus.Finishing"/> is the session closing.
+    ///
+    /// <para><see cref="EvChargerStatus.ChargePaused"/> and <see cref="EvChargerStatus.SuspendedEvse"/>
+    /// are deliberately excluded: those are the charger's own doing, which is what our pause write
+    /// produces — treating them as "the car is done" would let the controller mistake its own pause
+    /// for a finished charge.</para>
+    /// </summary>
+    public static bool IsChargeWindingDown(this EvChargerStatus status) =>
+        status is EvChargerStatus.SuspendedEv or EvChargerStatus.Finishing;
 }

@@ -24,6 +24,15 @@ namespace Solax.Core.Models;
 /// </param>
 /// <param name="SessionEnergyWh">Energy delivered to the car in the current session (since it was plugged in).</param>
 /// <param name="LoanedTodayWh">Energy lent out of the home battery to the car so far today.</param>
+/// <param name="EvDrewPower">
+/// Whether the car has drawn meaningful power at least once since it was plugged in. Distinguishes a
+/// car that has finished from one that has not started yet (still Preparing, or waiting on its own
+/// schedule) — the two look identical on power alone.
+/// </param>
+/// <param name="EvIdleFor">
+/// How long the charger has continuously reported no meaningful draw (or a car-initiated wind-down).
+/// Zero while the car is drawing. Only the fast mode acts on it, which is why both default away.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -32,7 +41,9 @@ public sealed record ChargingControlInput(
     SolarDayPlan? Plan = null,
     TimeSpan TimeInCurrentState = default,
     double SessionEnergyWh = 0,
-    double LoanedTodayWh = 0);
+    double LoanedTodayWh = 0,
+    bool EvDrewPower = false,
+    TimeSpan EvIdleFor = default);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
@@ -45,8 +56,15 @@ public sealed record ChargingControlInput(
 /// bridge that lets a sub-minimum surplus still reach the charger's 6 A floor. Zero unless the
 /// forecast-driven controller granted a loan; the orchestrator meters it against the daily cap.
 /// </param>
+/// <param name="SessionComplete">
+/// The controller's one way of saying "this is over": the car has finished (or has gone away) and
+/// there is nothing left to control. Accompanies a <see cref="ChargingControlAction.Pause"/> so the
+/// charger is left idle rather than armed at the last setpoint; the orchestrator then switches the
+/// mode back to <see cref="ChargeControlMode.Off"/>. Only the fast mode ever sets it.
+/// </param>
 public sealed record ChargingControlDecision(
     ChargingControlAction Action,
     int? ChargeCurrentAmps,
     string Reason,
-    double LoanPowerWatts = 0);
+    double LoanPowerWatts = 0,
+    bool SessionComplete = false);

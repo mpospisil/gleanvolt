@@ -47,7 +47,7 @@ public class HaDiscoveryTests
     }
 
     [Fact]
-    public void DiscoveryMessages_IncludeAModeSelectWithTheThreeOptions()
+    public void DiscoveryMessages_IncludeAModeSelectWithEveryMode()
     {
         var messages = Discovery.DiscoveryMessages().ToList();
 
@@ -59,7 +59,7 @@ public class HaDiscoveryTests
         Assert.Equal(Discovery.ModeCommandTopic, s.GetProperty("command_topic").GetString());
         Assert.Equal(Discovery.ModeStateTopic, s.GetProperty("state_topic").GetString());
         var options = s.GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToArray();
-        Assert.Equal(["Off", "Solar", "Forecasted"], options);
+        Assert.Equal(["Off", "Solar", "Forecasted", "FastNoBattery"], options);
 
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");

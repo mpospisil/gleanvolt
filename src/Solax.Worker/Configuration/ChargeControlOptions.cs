@@ -34,7 +34,12 @@ public sealed class ChargeControlOptions
     /// <summary>Minimum viable charging current (below which charging is paused).</summary>
     public int MinChargingCurrentAmps { get; init; } = 6;
 
-    /// <summary>Maximum charging current the charger accepts (setpoint is clamped to this).</summary>
+    /// <summary>
+    /// Maximum charging current the charger accepts (setpoint is clamped to this). Treat it as the
+    /// site's supply limit rather than a preference: the <c>FastNoBattery</c> mode pins the charger
+    /// here for as long as it runs, drawing whatever PV doesn't cover from the grid — 16 A on three
+    /// phases is ~11 kW.
+    /// </summary>
     public int MaxChargingCurrentAmps { get; init; } = 20;
 
     /// <summary>Granularity of the current setpoint the hardware accepts, in amps.</summary>
@@ -66,6 +71,20 @@ public sealed class ChargeControlOptions
     /// hovering near the minimum doesn't flap the charger on and off.
     /// </summary>
     public double ResumeHysteresisWatts { get; init; } = 200;
+
+    /// <summary>
+    /// FastNoBattery strategy only: the draw below which the car counts as not charging. Well above a
+    /// charger's standby reading and well below its 6 A floor (~1.4 kW single-phase), so nothing in
+    /// between is ambiguous.
+    /// </summary>
+    public double CompletionPowerThresholdWatts { get; init; } = 200;
+
+    /// <summary>
+    /// FastNoBattery strategy only: how long the car must draw nothing before the mode calls the
+    /// session finished, pauses the charger and returns itself to Off. Long enough to ride out a
+    /// momentary dip and the gap between our setpoint reaching the charger and the car acting on it.
+    /// </summary>
+    public TimeSpan CompletionDwell { get; init; } = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// LiveSolar strategy only: battery SOC (%) at or above which live-solar charging engages.

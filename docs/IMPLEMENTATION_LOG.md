@@ -4,6 +4,88 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-08 — Fast charge without the battery: the `FastNoBattery` mode (issue #28)
+
+A fourth charge mode, and the first one that turns *itself* off. While it is selected the battery
+discharge hold is armed automatically, the charger is pinned at `MaxChargingCurrentAmps` regardless of
+sun, SOC or forecast, and when the car reaches its own charge limit the setpoint drops to the pause
+current and the mode returns to `Off` — releasing the hold it armed.
+
+### The one contract change
+
+A controller could previously only say Charge / Pause / None. It now has a third thing to express, so
+`ChargingControlDecision` gained `SessionComplete` and `ChargingControlInput` gained the two facts a
+strategy needs to decide it: `EvDrewPower` and `EvIdleFor`. Both are defaulted, so the existing
+controllers and their tests were untouched. The reasoning behind the completion rule — power
+authoritative, `SuspendedEv`/`Finishing` corroborating, `ChargePaused` deliberately excluded because
+it is what our own pause write produces — is in [DECISIONS.md](DECISIONS.md).
+
+Cross-cycle state stays in `ChargingControlCoordinator`, next to the session-energy and loan tracking
+it already owned: since when the car has been drawing nothing, and whether it ever drew at all. Both
+reset on plug-in and on `ReleaseControl`, so a newly selected mode can't inherit the previous one's
+verdict that the car has already charged and end itself on its first idle poll.
+
+`FastChargingController` itself is the smallest strategy in the codebase — no smoothing, no
+hysteresis, no SOC gate, because none of those inputs can change a constant setpoint.
+
+### Ending the mode, in the right order
+
+In `SolaxPollingService` the completion is handled *between* the charge cycle and the hold
+reconciliation:
+
+```
+RunCycleAsync  -> Pause written, SessionComplete: true
+_mode.Set(Off) -> mode := Off for the rest of this iteration
+ApplyBatteryHoldAsync(mode: Off) -> release written on the same poll
+```
+
+Putting the mode change after the hold reconciliation would have left the inverter held for one extra
+poll. Home Assistant needs nothing new: `PublishStatusAsync` already republishes the select's retained
+state from `_mode.Mode` every status tick, so a controller-initiated change reaches the UI on its own.
+
+`AutoHold` was generalised from "the forecast mode at its SOC floor" to "whatever the selected mode
+wants", with `FastNoBattery` wanting it unconditionally, and now logs its automatic release as well as
+its arming. The owner's manual switch is still OR-ed on top and is never released by a mode.
+
+With `BatteryHold:Enabled` false the mode still charges and warns once on selection rather than
+refusing to run — a select option that silently does nothing would be the worse failure.
+
+### Hardware quirks and open verification
+
+- **Nothing new is written.** The mode uses the same two write paths that already existed: the
+  charger's current setpoint and the inverter's power-control command.
+- **`MaxChargingCurrentAmps` becomes a supply limit.** The solar modes only reach the ceiling when the
+  sun is that generous; this one sits at it for hours. On the reference install that is 16 A × 230 V ×
+  3 ≈ 11 kW drawn continuously from PV and grid. Documented in both the README and the options class.
+- **End-of-charge status is unverified.** No completed session has been logged through this controller
+  yet, which is why the rule leans on power rather than on the charger's status enum. First live
+  session should be logged end to end and the DECISIONS entry amended if the transitions differ.
+
+### Tests
+
+`FastChargingControllerTests` (13) covers the use-mode precondition, the clamped ceiling, indifference
+to SOC and surplus, and every branch of the completion rule. `FastNoBatteryModeTests` drives the real
+`SolaxPollingService` loop over a scripted telemetry sequence — a fake reader parks after the last
+scripted reading, so the assertions need no timing assumptions — and checks the hold is armed with no
+forecast at all, that a finished car pauses the charger, returns the mode to `Off` and releases the
+hold in the same cycle, and that a hold the owner asked for survives all of it.
+
+### Files changed
+
+- `src/Solax.Core/Enums/ChargeControlMode.cs`, `EvChargerStatusExtensions.cs` (`IsChargeWindingDown`)
+- `src/Solax.Core/Models/ChargingControlDecision.cs` (`SessionComplete`, `EvDrewPower`, `EvIdleFor`)
+- `src/Solax.Core/Strategies/FastChargingController.cs` (new)
+- `src/Solax.Worker/ChargingControlCoordinator.cs`, `ChargeControlStatusHolder.cs`,
+  `SolaxPollingService.cs`, `Program.cs`
+- `src/Solax.Worker/Configuration/ChargeControlOptions.cs`, `appsettings.json`
+- `tests/Solax.Core.Tests/Strategies/FastChargingControllerTests.cs` (new),
+  `tests/Solax.Core.Tests/Enums/EvChargerStatusExtensionsTests.cs`
+- `tests/Solax.Worker.Tests/FastNoBatteryModeTests.cs` (new),
+  `ChargingControlCoordinatorTests.cs`, `HaDiscoveryTests.cs`
+- `README.md`, `docs/DECISIONS.md`
+
+---
+
 ## 2026-08-08 — Five days of observation: #24 verified on hardware, forecast bias shape (issues #22, #24)
 
 Read-only run 2026-08-02 09:26 → 2026-08-06 18:40, ~46,000 polls, charge mode `Off` throughout.

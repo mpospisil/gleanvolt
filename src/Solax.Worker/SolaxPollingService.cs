@@ -29,9 +29,12 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly ILogger<SolaxPollingService> _logger;
     private readonly TimeSpan _pollInterval;
 
-    // Whether the forecast-driven mode has armed the hold itself, as opposed to the owner's switch.
-    // Kept here rather than in the selector so the manual switch stays exactly what the owner set.
+    // Whether a mode has armed the hold itself, as opposed to the owner's switch. Kept here rather
+    // than in the selector so the manual switch stays exactly what the owner set.
     private bool _autoHold;
+
+    // The mode the previous cycle ran under, so a selection can be noticed once instead of per poll.
+    private ChargeControlMode _lastMode = ChargeControlMode.Off;
 
     public SolaxPollingService(
         IEnergyStateReader energyStateReader,
@@ -112,8 +115,10 @@ public sealed class SolaxPollingService : BackgroundService
                 var plan = _dayPlan.Update(state, _chargingControl.LoanedTodayWh);
 
                 var mode = _mode.Mode;
+                WarnOnModeEntry(mode);
+
                 ChargeControlCycleResult result;
-                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted)
+                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery)
                 {
                     result = await _chargingControl.RunCycleAsync(state, mode, plan, stoppingToken);
                 }
@@ -122,6 +127,16 @@ public sealed class SolaxPollingService : BackgroundService
                     // Off: stop controlling and leave the charger's current setpoint exactly as it is.
                     _chargingControl.ReleaseControl();
                     result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
+                }
+
+                if (result.SessionComplete)
+                {
+                    // The controller has already had the pause current written. Ending the mode here --
+                    // before the hold is reconciled below -- means the release reaches the inverter in
+                    // this same cycle rather than a poll later.
+                    _mode.Set(ChargeControlMode.Off, $"{mode} (charging finished)");
+                    mode = ChargeControlMode.Off;
+                    result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
 
                 var hold = await ApplyBatteryHoldAsync(state, mode, plan, stoppingToken);
@@ -172,6 +187,30 @@ public sealed class SolaxPollingService : BackgroundService
             {
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// The one thing worth saying at the moment a mode is selected rather than every poll: the fast
+    /// mode's promise is that the pack stays out of the charge, and with the hold feature switched off
+    /// it cannot keep it. It still charges — a select option that silently did nothing would be worse —
+    /// but the inverter will serve the car from the battery, which is the opposite of the intent.
+    /// </summary>
+    private void WarnOnModeEntry(ChargeControlMode mode)
+    {
+        if (mode == _lastMode)
+        {
+            return;
+        }
+
+        _lastMode = mode;
+
+        if (mode == ChargeControlMode.FastNoBattery && !_batteryHoldOptions.Enabled)
+        {
+            _logger.LogWarning(
+                "{Mode} selected but BatteryHold:Enabled is false: charging at the maximum current anyway, "
+                + "with no way to stop the inverter discharging the home battery into the car.",
+                mode);
         }
     }
 
@@ -228,18 +267,38 @@ public sealed class SolaxPollingService : BackgroundService
     }
 
     /// <summary>
-    /// Whether the forecast-driven mode wants the discharge hold armed right now: it does once SOC has
-    /// reached the floor the plan requires for a 100% battery by the deadline, so an estimate error
-    /// cannot dig below it — the grid covers the gap instead of the pack. Released again only after SOC
-    /// has recovered a margin above the floor, so the hold doesn't chatter around the line.
+    /// Whether the selected mode wants the discharge hold armed right now, independently of the owner's
+    /// manual switch — which is OR-ed with this and always wins, so a hold the owner asked for is never
+    /// released by a mode.
     ///
-    /// <para>Independent of the owner's manual switch, which is OR-ed with this and always wins: a hold
-    /// the owner asked for is never released by the plan.</para>
+    /// <para><see cref="ChargeControlMode.FastNoBattery"/> wants it unconditionally: keeping the pack out
+    /// of the fastest charge the site can deliver is the mode's entire reason for existing.</para>
+    ///
+    /// <para><see cref="ChargeControlMode.Forecasted"/> wants it once SOC has reached the floor the plan
+    /// requires for a 100% battery by the deadline, so an estimate error cannot dig below it — the grid
+    /// covers the gap instead of the pack. Released again only after SOC has recovered a margin above the
+    /// floor, so the hold doesn't chatter around the line.</para>
     /// </summary>
     private bool AutoHold(EnergyState state, ChargeControlMode mode, SolarDayPlan plan)
     {
+        if (mode == ChargeControlMode.FastNoBattery)
+        {
+            if (!_autoHold)
+            {
+                _logger.LogInformation("Battery discharge hold armed automatically for the {Mode} mode.", mode);
+                _autoHold = true;
+            }
+
+            return true;
+        }
+
         if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)
         {
+            if (_autoHold)
+            {
+                _logger.LogInformation("Battery discharge hold released automatically: mode is now {Mode}.", mode);
+            }
+
             _autoHold = false;
             return false;
         }
