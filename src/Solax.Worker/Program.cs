@@ -20,6 +20,11 @@ using Solax.Worker.Sessions;
 // the VS Code debugger -- without living in any committed file. Real env vars still take priority.
 DotEnv.Load(Directory.GetCurrentDirectory());
 
+// Serilog swallows failures inside its own sinks. That silence is dangerous in the container: if the
+// bind-mounted logs directory isn't writable by the image's non-root user, the console keeps logging
+// normally and the log files simply never appear -- verified, and invisible without this line.
+Serilog.Debugging.SelfLog.Enable(Console.Error);
+
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();

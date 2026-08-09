@@ -83,6 +83,9 @@ SolaxLocalController.slnx
 │   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
 │   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
 │   └── Solax.Worker.Tests/         # Coordinator, selector and HA discovery tests
+├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
+├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
+├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
 └── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md (see below)
 ```
 
@@ -114,6 +117,28 @@ Set your device addresses first (see [Configuration](#configuration)). On a firs
 written to either device: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
+
+## Deployment
+
+For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspberry Pi OS Lite,
+64-bit) as three Docker containers — the controller, Home Assistant, and an MQTT broker:
+
+```bash
+./deploy/deploy.sh
+```
+
+The Pi never builds anything: CI cross-compiles a `linux/arm64` image and pushes it to GHCR
+(`ghcr.io/mpospisil/solax-controller`), and the Pi pulls it. All state lives on bind mounts under
+`/opt/solax` — including the charging-session database (`data/sessions.db`) and the log files — so
+the containers are disposable: upgrades, rollbacks and `docker compose down` lose nothing. The broker
+requires authentication and is not published to the LAN.
+
+Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
+only when you select a mode in Home Assistant, and the battery hold stays disabled and dry-run until
+you turn it on deliberately.
+
+Full instructions — preparing the Pi, memory and SD-card tuning for a 1 GB board, backup/restore,
+and troubleshooting — are in **[deploy/README.md](deploy/README.md)**.
 
 ## Workflow & Project Management
 You are authorized and expected to use the GitHub CLI (`gh`) to manage this project. 

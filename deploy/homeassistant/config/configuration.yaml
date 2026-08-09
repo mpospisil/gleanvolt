@@ -1,0 +1,31 @@
+# Seed Home Assistant configuration for the Pi deployment (issue #26).
+#
+# This directory mirrors the Pi's. deploy.sh installs these files into
+# /opt/solax/homeassistant/config/ ONLY IF they do not already exist, so edits made on the Pi (and
+# the files HA rewrites itself) are never overwritten by a deploy.
+#
+# Tuned for a 1 GB Pi 3 B with an SD card: this instance exists to show the SolaX entities, not to
+# be a general-purpose smart home. Two things it fights -- memory, and write wear on the card.
+
+default_config:
+
+# No `frontend: themes:` include here, unlike HA's own generated default -- it needs a themes/
+# directory to exist and buys nothing on a dashboard nobody themes.
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+recorder:
+  # The SQLite database is the stack's heaviest continuous writer. Three days is enough to see a
+  # charging session in context; the long-term statistics HA derives from it are kept regardless.
+  purge_keep_days: 3
+  # Batch writes instead of committing every state change -- fewer, larger writes to the SD card.
+  commit_interval: 30
+  exclude:
+    domains:
+      - automation
+      - updater
+    entity_globs:
+      - sensor.sun*
+      - sensor.time*
+      - sensor.date*
