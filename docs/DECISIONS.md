@@ -216,8 +216,9 @@ optional `Username`/`Password`, previously unused.
 - **The controller is stateless, which costs one Solcast call per restart** — the forecast cache is
   in-memory. Normal operation is unaffected, but a crash-restart loop burns the free-tier daily quota,
   so restart counts are worth watching. Persisting the forecast is a possible follow-up.
-- **Deployment writes nothing to hardware.** `ChargeControl` and `BatteryHold` stay at their shipped
-  defaults; the compose file passes them explicitly so that is visible rather than implied.
+- **Deployment writes nothing to hardware.** Charge control boots in mode `Off` and takes control
+  only when Home Assistant selects a mode; `BatteryHold` stays disabled and dry-run. The compose file
+  passes those settings explicitly so the safety posture is visible rather than implied.
 
 ---
 

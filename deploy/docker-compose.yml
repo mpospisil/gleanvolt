@@ -53,10 +53,11 @@ services:
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
-      # The two features that write to hardware stay at their shipped defaults (disabled; BatteryHold
-      # additionally dry-run) unless explicitly overridden in .env. Deploying must not start writing
-      # to an inverter or charger -- verify the register addresses on your own device first.
-      ChargeControl__Enabled: ${CHARGE_CONTROL_ENABLED:-false}
+      # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
+      # that: the service always boots in mode Off and takes control only when Home Assistant selects
+      # a mode. The battery hold does, and stays disabled and dry-run unless overridden in .env.
+      # Verify the register addresses on your own device before enabling either.
+      ChargeControl__DryRun: ${CHARGE_CONTROL_DRY_RUN:-false}
       BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
       BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
     volumes:

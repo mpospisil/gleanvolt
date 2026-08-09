@@ -132,8 +132,9 @@ The Pi never builds anything: CI cross-compiles a `linux/arm64` image and pushes
 `/opt/solax`, so the containers are disposable — upgrades, rollbacks and `docker compose down` lose
 nothing. The broker requires authentication and is not published to the LAN.
 
-Deploying does **not** enable the features that write to hardware; they stay at their shipped
-defaults until you turn them on deliberately.
+Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
+only when you select a mode in Home Assistant, and the battery hold stays disabled and dry-run until
+you turn it on deliberately.
 
 Full instructions — preparing the Pi, memory and SD-card tuning for a 1 GB board, backup/restore,
 and troubleshooting — are in **[deploy/README.md](deploy/README.md)**.

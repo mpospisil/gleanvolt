@@ -149,8 +149,9 @@ guessing if the Pi isn't prepared, and it never copies `.env`.
 3. The controller publishes MQTT discovery configs on connect; the SolaX device and its entities
    appear by themselves.
 
-`ChargeControl` and `BatteryHold` are still disabled — deploying writes nothing to your hardware.
-Enable them in `.env` only after verifying the register addresses on your own device, per the root
+Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
+only once you select a mode in Home Assistant, and `BatteryHold` is disabled and dry-run. Change
+either in `.env` only after verifying the register addresses on your own device, per the root
 README's warnings.
 
 ## Everyday operations
