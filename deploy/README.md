@@ -132,9 +132,15 @@ free -h
 ```bash
 sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
 sudo chown -R "$USER" /opt/solax
-sudo chown -R 1883:1883 /opt/solax/mosquitto        # the eclipse-mosquitto uid
+sudo chown -R 1883:1883 /opt/solax/mosquitto/data         # the broker writes here
 sudo chown -R 1654:1654 /opt/solax/logs /opt/solax/data   # the controller image's non-root uid
 ```
+
+**Do not chown `mosquitto/config` to 1883.** Only `mosquitto/data` belongs to the broker. The config
+directory is written by `deploy.sh` (that is where `mosquitto.conf` lands) and only *read* by the
+broker, whose compose mount is read-only — so handing it to uid 1883 locks the deploy out of it and
+fails with `tar: mosquitto/config/mosquitto.conf: Cannot open: Permission denied`. The one file in
+there that does belong to 1883 is `passwd`, chowned in step 7.
 
 `data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
 the database, so that **directory** — not just the file — has to be writable by uid 1654.

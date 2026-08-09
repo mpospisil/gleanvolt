@@ -86,6 +86,29 @@ EOF
     fi
 done
 
+# The deploy writes mosquitto.conf into this directory, so the ssh user has to own it. The broker
+# never writes there -- its compose mount is read-only -- so uid 1883 only needs to read. Only
+# mosquitto/data has to belong to the broker. A `chown -R 1883 mosquitto/` (which earlier setup
+# instructions told people to do) locks the deploy out of its own config directory.
+if ! ssh_pi "test -w '$REMOTE_DIR/mosquitto/config'"; then
+    say "Taking ownership of $REMOTE_DIR/mosquitto/config"
+    # Not recursive, deliberately: passwd must stay owned by 1883, which is the only uid allowed to
+    # read it. Chowning it to the ssh user would leave the broker unable to authenticate anyone.
+    if ! ssh_pi "uid=\$(id -u); gid=\$(id -g); docker run --rm -v '$REMOTE_DIR/mosquitto:/target' alpine \
+            sh -c \"mkdir -p /target/config && chown \$uid:\$gid /target/config && chmod 755 /target/config\""; then
+        cat >&2 <<EOF
+error: $REMOTE_DIR/mosquitto/config is not writable by $PI_HOST's login user, and could not be fixed.
+
+The deploy writes mosquitto.conf there; the broker only reads it. On the Pi:
+
+    sudo chown "\$USER" $REMOTE_DIR/mosquitto/config    # the directory only, not its contents
+    sudo chmod 755 $REMOTE_DIR/mosquitto/config
+    sudo chown 1883:1883 $REMOTE_DIR/mosquitto/config/passwd
+EOF
+        exit 1
+    fi
+fi
+
 if ! ssh_pi "test -f '$REMOTE_DIR/.env'"; then
     cat >&2 <<EOF
 error: $REMOTE_DIR/.env is missing on $PI_HOST.
