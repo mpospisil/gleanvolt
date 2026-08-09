@@ -87,6 +87,13 @@ sudo chown -R 1654:1654 /opt/solax/logs /opt/solax/data   # the controller image
 `data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
 the database, so that **directory** — not just the file — has to be writable by uid 1654.
 
+`logs/` and `data/` are the two the *application* writes to, and `deploy.sh` creates them itself (and
+hands them to uid 1654) if they are missing or wrongly owned — which is what makes a release that
+adds one, as `data/` did, deploy onto an existing Pi without manual work. It does that through a
+throwaway `alpine` container, because the SSH user cannot chown to another uid but the Docker daemon
+can; the image is pulled once, on the first deploy that needs it. Listing them above is still worth
+doing on a fresh Pi, so the whole tree exists before anything runs.
+
 **6. Secrets.** From your developer machine:
 
 ```bash
@@ -135,8 +142,9 @@ From a developer machine, with the repo checked out:
 ```
 
 It copies `docker-compose.yml` and `mosquitto.conf` to `/opt/solax`, seeds Home Assistant's config
-files only if they don't already exist, then pulls and restarts. It refuses to run rather than
-guessing if the Pi isn't prepared, and it never copies `.env`.
+files only if they don't already exist, then pulls and restarts. It creates `logs/` and `data/` and
+hands them to uid 1654 if they are missing or wrongly owned; for anything else it refuses to run
+rather than guess. It never copies `.env`.
 
 | Variable | Default | |
 |---|---|---|
@@ -201,7 +209,7 @@ ls -l /opt/solax/logs/
 > image's non-root user — most easily caused by letting Docker auto-create the directory as root),
 > Serilog's file sink fails and *keeps running*: the container is healthy, `docker logs` looks
 > normal, and the log files simply never appear. Two things guard against it: `deploy.sh` refuses to
-> deploy if the directory's ownership is wrong, and the worker enables Serilog's `SelfLog` so the
+> creates it (and fixes its ownership) before deploying, and the worker enables Serilog's `SelfLog` so the
 > failure shows up in `docker logs` as `RollingFileSink: the target file could not be opened or
 > created`. If you see that line, fix the ownership:
 >
@@ -279,7 +287,13 @@ being readable by uid 1883.
 ```
 
 That is `/opt/solax/data` not being writable by uid 1654. Everything else keeps running, which is why
-it is easy to miss:
+it is easy to miss. Re-running the deploy repairs the ownership on its own:
+
+```bash
+./deploy/deploy.sh
+```
+
+Or, on the Pi directly:
 
 ```bash
 sudo chown -R 1654:1654 /opt/solax/data && docker compose restart solax-controller

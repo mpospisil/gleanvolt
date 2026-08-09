@@ -211,8 +211,9 @@ optional `Username`/`Password`, previously unused.
   Verified: with a logs bind mount the non-root user cannot write, the file sink fails and the
   process carries on — console logging normal, container healthy, `docker diff` empty, and the log
   files silently never created. That is the exact failure a bind mount invites (Docker auto-creates a
-  missing mount source as root), so it must not be silent. `deploy.sh` also refuses to deploy when
-  the directory's ownership is wrong, catching it before the stack starts rather than a month later.
+  missing mount source as root), so it must not be silent. `deploy.sh` also creates the directory and
+  hands it to uid 1654 when it is missing or wrongly owned, fixing it before the stack starts rather
+  than a month later.
 - **The controller is stateless, which costs one Solcast call per restart** — the forecast cache is
   in-memory. Normal operation is unaffected, but a crash-restart loop burns the free-tier daily quota,
   so restart counts are worth watching. Persisting the forecast is a possible follow-up.
@@ -223,8 +224,8 @@ optional `Username`/`Password`, previously unused.
   resolves against the content root, so `data/sessions.db` lands in `/app/data` and is mounted from
   `/opt/solax/data`. Two consequences specific to SQLite: the *directory* must be writable by uid 1654
   because the `-wal` and `-shm` files live beside the database, and a backup stops the controller
-  first, since WAL makes a hot copy unlikely to tear rather than unable to. The ownership pre-check in
-  `deploy.sh` now covers `data/` as well as `logs/` — without a mount the app happily writes into the
+  first, since WAL makes a hot copy unlikely to tear rather than unable to. `deploy.sh` prepares `data/`
+  as it does `logs/` — without a mount the app happily writes into the
   container and the history dies with it, which is the one loss here that cannot be undone by
   re-polling.
 

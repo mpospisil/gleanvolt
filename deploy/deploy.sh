@@ -9,8 +9,10 @@
 #   IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh         # deploy/roll back to a specific build
 #   PI_HOST=martin@192.168.2.7 ./deploy/deploy.sh    # non-default host or user
 #
-# First-time setup of the Pi is documented in deploy/README.md and is deliberately not automated
-# here -- it needs sudo, and a deploy should never be the thing that creates or chowns directories.
+# Preparing the Pi itself -- Docker, cgroups, swap, secrets, broker credentials -- is documented in
+# deploy/README.md and deliberately not automated here: it needs sudo and it needs decisions. The two
+# directories the app writes to are the exception. They are deterministic, a new release can add one
+# (data/ did), and getting them wrong is silent, so this script creates them itself.
 
 set -euo pipefail
 
@@ -53,7 +55,7 @@ for subdir in logs data; do
         data) consequence="no charging session would ever be recorded" ;;
     esac
 
-    if ! ssh_pi "sh -s '$REMOTE_DIR/$subdir'" <<'REMOTE_CHECK'; then
+    if ssh_pi "sh -s '$REMOTE_DIR/$subdir'" <<'REMOTE_CHECK'; then
     dir=$1
     [ -d "$dir" ] || exit 1
     # Writable by uid 1654 means: owned by it, or world-writable. The ssh user's own -w test would
@@ -63,10 +65,19 @@ for subdir in logs data; do
     case ${perms#${perms%?}} in 2|3|6|7) exit 0 ;; esac
     exit 1
 REMOTE_CHECK
-        cat >&2 <<EOF
-error: $REMOTE_DIR/$subdir is missing, or not writable by the controller's uid (1654).
+        continue
+    fi
 
-The container would start anyway, and $consequence. On the Pi:
+    # Create it, and hand it to uid 1654. The ssh user cannot chown to another uid -- but the Docker
+    # daemon is root, and Docker is already a hard requirement here, so a throwaway container does
+    # what sudo would. Idempotent: this runs only when the check above said something was wrong.
+    say "Preparing $REMOTE_DIR/$subdir (owned by uid 1654)"
+    if ! ssh_pi "docker run --rm -v '$REMOTE_DIR:/target' alpine \
+            sh -c 'mkdir -p /target/$subdir && chown -R 1654:1654 /target/$subdir'"; then
+        cat >&2 <<EOF
+error: could not prepare $REMOTE_DIR/$subdir, and the controller needs it: $consequence.
+
+Create it by hand on the Pi:
 
     sudo mkdir -p $REMOTE_DIR/$subdir
     sudo chown -R 1654:1654 $REMOTE_DIR/$subdir

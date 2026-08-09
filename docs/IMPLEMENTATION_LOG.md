@@ -391,7 +391,7 @@ Two things main changed underneath this branch, neither of which git could flag:
   nothing — and the deployment's safety claim rested on it. Replaced with `ChargeControl__DryRun`.
 - **The SQLite session store needs a bind mount**, exactly as the #32 record predicted. `data/` is now
   mounted from `/opt/solax/data`, created in the image's build stage beside `logs/`, and covered by
-  the same ownership pre-check — extended to a loop over both directories. SQLite makes it stricter
+  the same ownership handling — extended to a loop over both directories. SQLite makes it stricter
   than logs: `-wal` and `-shm` live beside the database, so the directory itself must be writable by
   uid 1654, and the documented backup stops the controller rather than copying a live database.
 
@@ -415,7 +415,7 @@ Two things main changed underneath this branch, neither of which git could flag:
   healthy, keeps `docker diff` empty, and writes **no log file anywhere**; Serilog's file sink fails
   and the process never mentions it. Hence `Serilog.Debugging.SelfLog.Enable(Console.Error)` in
   `Program.cs` (the failure now appears in `docker logs` as `RollingFileSink: the target file could
-  not be opened or created`) and an ownership pre-check in `deploy.sh`. Both verified against the
+  not be opened or created`) and directory preparation in `deploy.sh`. Both verified against the
   reproduction.
 - **The compose file's required-variable guards fire.** Without `MQTT_USERNAME`/`MQTT_PASSWORD`,
   `docker compose config` exits 1 with `required variable MQTT_USERNAME is missing a value: set
