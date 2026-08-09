@@ -4,6 +4,71 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-09 — Short entity names again; the explanations moved to the README
+
+The previous entry named every entity `Label — what it means`, because HA's hover text is the friendly
+name and there is no tooltip field. Seen in HA, that was the wrong trade: every card row was a
+truncated sentence and the entity list stopped being scannable — a name that is really a paragraph
+confuses more than it explains.
+
+So the entity names are back to the short originals (`Grid power`, `Charging now`, `Required SOC
+floor`, …), the `description` attribute and the `Describe` helper are gone from `HaDiscovery`, and the
+two tests that enforced them are gone with them — `HaDiscovery.cs` and `HaDiscoveryTests.cs` are byte
+for byte what they were before the change.
+
+The explanations themselves were not lost. They are now a table in the README under *Home Assistant
+(MQTT) → **What each entity means*** — one row per entity with its unit and meaning, split into the
+always-present entities and the ones only the `Forecasted` mode populates. It keeps the detail that
+was in the attributes: the enum states of `Control state`, `Charger status` and `Day outlook`, both
+sign conventions, that the surplus is a smoothed 3-minute average, that `Active charging current` is a
+read-back to compare against the target, that a working discharge hold still leaves a ~60 W trickle,
+and that `Charging now` reports our own command rather than the car's draw.
+
+Files changed: `src/Solax.Worker/HomeAssistant/HaDiscovery.cs`,
+`tests/Solax.Worker.Tests/HaDiscoveryTests.cs`, `README.md`, `docs/DECISIONS.md`.
+
+---
+
+## 2026-08-08 — Home Assistant entities explain themselves
+
+The entities published to Home Assistant showed their name and nothing else: hovering one gives a
+tooltip identical to its title, which tells a reader nothing about what the number means or which way
+its sign runs.
+
+**Home Assistant has no description or tooltip field.** The frontend sets the hover text to the
+friendly name so a truncated name can still be read in full; there is no per-entity description in
+MQTT discovery, and adding one is
+[an open feature request](https://community.home-assistant.io/t/add-description-for-each-entity-which-shows-in-the-gui-when-you-hover-over-the-name/622053).
+The tooltip therefore cannot be changed except by changing the name — so that is what changed:
+
+1. **Every entity is now named `Label — what it means`.** `Grid power` became `Grid power — positive
+   while importing from the grid, negative while exporting`. HA truncates the label in a card and
+   reveals the whole sentence on hover, which is the only tooltip mechanism it has. The label comes
+   first so a truncated row is still scannable.
+2. **The detail that will not fit on one line is an attribute.** `json_attributes_topic` points at the
+   existing state topic and `json_attributes_template` is a **constant** — no placeholders, so every
+   state message renders the same JSON. It is built with `JsonSerializer` rather than by hand so
+   anything in the prose that would break the JSON is escaped; the only authoring rule is to avoid
+   Jinja delimiters. It shows under Attributes in the more-info dialog and covers the enum states, the
+   sign conventions, and the traps: the surplus is a smoothed 3-minute average, the active current is a
+   read-back, a working discharge hold still leaves a ~60 W trickle.
+
+A test enforces both halves — the name must be in `Label — meaning` form with a label short enough to
+survive truncation, and the description must be present, valid JSON and not merely the name repeated —
+so a new entity cannot be added without an explanation.
+
+The binary sensor named `Charging now` was also a misnomer: it reports `HoldingControl`, whether *we*
+are commanding a current rather than whether the car is drawing one. It now says so.
+
+Renaming is safe for existing installs: `entity_id` is assigned when an entity is first discovered and
+does not follow later name changes, so dashboards and automations keep working. A fresh install
+derives its entity ids from the new names.
+
+Files changed: `src/Solax.Worker/HomeAssistant/HaDiscovery.cs`,
+`tests/Solax.Worker.Tests/HaDiscoveryTests.cs`, `README.md`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-08 — Fast charge without the battery: the `FastNoBattery` mode (issue #28)
 
 A fourth charge mode, and the first one that turns *itself* off. While it is selected the battery

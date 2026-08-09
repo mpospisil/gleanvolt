@@ -4,6 +4,73 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-09 — Entity names stay short; the explanation lives in the README
+
+**Context.** Supersedes the record below, which put each entity's explanation into its friendly name
+so that HA's hover text would say something. In use that was worse than the problem: every dashboard
+row read as a truncated sentence, the entity list became hard to scan, and a name that is really a
+paragraph is confusing rather than informative.
+
+**Decision.** Entities keep their original short names — `Grid power`, `Charging now`, `Required SOC
+floor` — and the `description` attribute is dropped with them. What each entity means, including the
+sign conventions and the traps, is documented once in the README, under
+*Home Assistant (MQTT) → What each entity means*.
+
+**Consequences.**
+
+- Hovering an entity in HA still tells a reader nothing beyond its name. Accepted: a short label that
+  scans is worth more on a dashboard than a tooltip, and the explanation is one link away.
+- One place to keep current. A new entity is documented by adding a row to that table; nothing in the
+  discovery payload duplicates it, so the two cannot drift.
+- The tests that enforced a `Label — meaning` name and a description attribute are gone, since there
+  is nothing in the payload left to enforce.
+- Names returned to what earlier installs already published, so `entity_id`s, dashboards and
+  automations are unaffected either way — `entity_id` is fixed at first discovery and does not follow
+  renames.
+
+---
+
+## 2026-08-08 — The entity name carries its explanation, because in HA the name is the tooltip
+
+> **Superseded on 2026-08-09** by the record above: the long names were confusing in practice, and the
+> explanations moved to the README. The finding about HA having no description or tooltip field still
+> holds.
+
+**Context.** The Home Assistant entities carried names and nothing else, so a reader looking at
+`Grid power` or `Required SOC floor` had no way to learn what the number means or which direction its
+sign runs without opening this repository.
+
+**What was found.** Home Assistant has no description or tooltip field for an entity. The hover text
+is the friendly name — the frontend sets it so a truncated name can still be read in full — and MQTT
+discovery has no `description` key. Adding one has been requested and not implemented.
+
+**Decision.** The name carries the explanation, because the name is the tooltip. Every entity is
+named `Label — what it means`, e.g. `Grid power — positive while importing from the grid, negative
+while exporting`. HA truncates the label in a card and shows the whole sentence on hover, which is the
+only tooltip mechanism it has.
+
+The detail that will not fit on one line is published as an entity **attribute**: `json_attributes_topic`
+points at the state topic every entity already subscribes to, and `json_attributes_template` is a
+*constant* JSON document carrying a `description` key. It renders identically on every state message
+and shows up under Attributes in the more-info dialog.
+
+**Consequences.**
+
+- The template is authored as text but must render valid JSON, so it is built with `JsonSerializer`
+  (escaping anything in the prose that would break it). Descriptions must not contain Jinja
+  delimiters; a test enforces that, along with every entity having both halves — a name in
+  `Label — meaning` form, and a description that isn't merely the name repeated.
+- Dashboard labels are long and truncate. That is the point: a short name would leave the hover text
+  saying nothing, which is the problem this record exists to solve.
+- Entity ids on a **fresh** install derive from the new names and will be long. Existing installs are
+  unaffected — `entity_id` is fixed at first discovery and does not follow later name changes, so
+  dashboards and automations survive a rename.
+- Attributes only appear once a state message has been received, and are cleared while the entity is
+  unavailable. The state topic is retained and republished every `StatusInterval`, so this is only
+  visible when the controller is not running at all.
+
+---
+
 ## 2026-08-08 — A mode may end itself, and "the car is finished" is decided on power
 
 **Context.** Issue #28, the `FastNoBattery` mode. It creates the most expensive state this controller
