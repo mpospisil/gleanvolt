@@ -4,6 +4,57 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-09 — Charging sessions are recorded to a local store
+
+Issue #32. Every controlled charging session is now written to a SQLite file: when it started and
+finished, which strategy drove it, how the delivered energy split between solar, grid and the home
+battery, and a sampled trace of the whole thing.
+
+**Where it plugs in.** `ChargeControlStatusHolder` already raised `Updated` with a full status snapshot
+on every poll, and that record already carried nearly everything needed. So recording is a *subscriber*
+— `SessionRecordingWorker`, alongside `HomeAssistantMqttWorker` — and `SolaxPollingService` is
+untouched apart from one added field. The handler does nothing but drop the snapshot into a bounded
+channel; attribution, tracking and SQLite all happen on the worker's own loop, so a slow SD card costs
+latency there and nowhere else.
+
+**The new logic is two pure classes in `Solax.Core`.** `ChargingSourceAttribution` splits the charger's
+draw across solar, grid and battery — surplus PV first, then the pack, then the grid as the residual,
+with the invariant that the three always add back up to the measured draw. `ChargingSessionTracker` is
+the state machine: it opens a session when a controlling mode is driving a connected car, integrates
+every poll into five `EnergyIntegrator` totals, stores a sample every 30 s *and* on every change, and
+closes on unplug / mode-off / the car finishing / shutdown. A mode switched mid-session records an
+event rather than splitting the session.
+
+**Four charging figures per sample, not one.** Measured power, the actual current derived from it, the
+charger's setpoint read back, and the current we commanded. The gaps are the point: target ≠ active
+means our write didn't land, active ≠ actual means the car itself is the limiter. Nothing in the system
+could tell those apart after the fact before this.
+
+**`ChargeControlStatus.SessionCompleted` was added** because the information is otherwise destroyed:
+the poll loop sets the mode back to `Off` when the fast mode ends itself, after which "the car filled
+up" and "somebody selected Off" look identical downstream.
+
+**Two things the tests caught.** `ChargingSessionDocument` originally had a convenience second
+constructor, which makes it undeserializable by `System.Text.Json` — it would have failed in whatever
+consumes the published object rather than here; it is a static `Create` now. And the day plan's
+`NextFeasibleWindow` is a value tuple, whose members are fields, so it vanishes silently under a
+default serializer configuration — `IncludeFields` is on, with a test that asserts the window survives
+the round trip.
+
+**Not done here:** the `data/` bind mount and its uid chown belong to `deploy/docker-compose.yml`, which
+lives on the unmerged #26 branch. Recording works locally without it; in the container it needs that
+mount or the history dies with the container.
+
+Files added: `src/Solax.Core/Models/ChargingSession*.cs`, `ChargingSourceSplit.cs`,
+`src/Solax.Core/Enums/ChargingSession*.cs`, `src/Solax.Core/Interfaces/IChargingSessionStore.cs`,
+`src/Solax.Core/Strategies/ChargingSourceAttribution.cs`, `ChargingSessionTracker.cs`,
+`src/Solax.Infrastructure/Sessions/*`, `src/Solax.Worker/Sessions/SessionRecordingWorker.cs`,
+`src/Solax.Worker/Configuration/SessionStoreOptions.cs`, and tests for all of it.
+Files changed: `ChargeControlStatus.cs`, `SolaxPollingService.cs`, `Program.cs`, `appsettings.json`,
+`Solax.Infrastructure.csproj`, `README.md`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-09 — Short entity names again; the explanations moved to the README
 
 The previous entry named every entity `Label — what it means`, because HA's hover text is the friendly

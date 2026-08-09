@@ -4,6 +4,51 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-09 — Charging sessions are stored in SQLite, and published as immutable documents
+
+**Context.** Everything the controller knew was live: a log line that scrolls past and a Home Assistant
+entity overwritten on the next poll. Nothing survived a restart, so the question the forecast-driven
+mode exists to answer — did the plan hold, and where did the car's energy actually come from? — had no
+data behind it. Issue #32.
+
+**Decision — SQLite (`Microsoft.Data.Sqlite`) as the local store.** The questions worth asking of this
+data are queries ("sessions in July", "solar share by mode"), which rules out flat JSONL; and it runs
+on a Raspberry Pi 3 B already giving 600 MB to Home Assistant, which rules out a second server process.
+One file is also one artefact to back up. WAL journalling with `synchronous=NORMAL`, batched commits,
+and a sample cadence coarser than the poll interval, because the binding constraint on that device is
+SD-card write amplification rather than size.
+
+`SQLitePCLRaw.bundle_e_sqlite3` is pinned to 2.1.12 as a direct reference: the version
+`Microsoft.Data.Sqlite` 10.0.10 pulls in transitively (2.1.11) carries GHSA-2m69-gcr7-jv3q.
+
+**Decision — the published document is not the table schema.** A closed session is immutable, so it can
+be rendered as one self-contained `ChargingSessionDocument` (header + samples + events) carrying an
+explicit `schemaVersion`. Local tables will churn as features are added; that document must not,
+because it is what a future upload writes to object storage and what a web app reads. Ids are
+locally-generated UUIDv7 — globally unique without a server, and time-ordered so they sort as object
+keys.
+
+**Decision — per-source energy is an attribution, not a measurement.** No meter says which electron
+went where. `ChargingSourceAttribution` fixes the rule (surplus PV first, then the battery, then the
+grid as residual) and guarantees the three shares sum to the measured draw. The measured battery share
+stays separate from the loan the forecast mode *commanded*.
+
+**Consequences.**
+
+- The store is on by default, unlike every other feature that needed a flag. Those flags exist because
+  those features write to hardware; this one only observes.
+- Recording is a subscriber to `ChargeControlStatusHolder.Updated`, like the HA worker — the poll loop
+  gains no dependency on a disk, and a store failure cannot stall a Modbus cycle.
+- `ChargeControlStatus` gained one field, `SessionCompleted`. By the time a status is published the
+  loop has already returned the mode to `Off`, so without it "the car finished" and "somebody switched
+  it off" are indistinguishable to any later reader.
+- Every sample carries the running totals, which is what lets a session interrupted by a power cut be
+  closed at its last sample rather than discarded.
+- The container needs a `data/` bind mount, chowned to the image's uid — the same trap the logs
+  directory hit. That change belongs to the deploy branch (#26), which is not yet merged.
+
+---
+
 ## 2026-08-09 — Entity names stay short; the explanation lives in the README
 
 **Context.** Supersedes the record below, which put each entity's explanation into its friendly name

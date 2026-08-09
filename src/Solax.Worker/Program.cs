@@ -7,11 +7,13 @@ using Solax.Core.Models;
 using Solax.Core.Strategies;
 using Solax.Infrastructure;
 using Solax.Infrastructure.Modbus;
+using Solax.Infrastructure.Sessions;
 using Solax.Infrastructure.Solcast;
 using Solax.Worker;
 using Solax.Worker.Configuration;
 using Solax.Worker.Forecasting;
 using Solax.Worker.HomeAssistant;
+using Solax.Worker.Sessions;
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
@@ -222,6 +224,28 @@ builder.Services.AddSingleton<IBatteryDischargeControl>(services =>
 });
 
 builder.Services.AddHostedService<SolaxPollingService>();
+
+// Charging session store (issue #32). Observes only -- it subscribes to the same status snapshots the
+// Home Assistant worker consumes and writes them to a local SQLite file, so it touches no register and
+// no device. On by default for that reason; a failure to open the store disables recording for the run
+// and leaves everything else running.
+builder.Services.Configure<SessionStoreOptions>(builder.Configuration.GetSection(SessionStoreOptions.SectionName));
+
+builder.Services.AddSingleton<IChargingSessionStore>(services =>
+{
+    var options = services.GetRequiredService<IOptions<SessionStoreOptions>>().Value;
+    var environment = services.GetRequiredService<IHostEnvironment>();
+
+    // Resolved against the content root so a relative path means the same thing however the service
+    // was started -- `dotnet run`, the debugger, or the container's working directory.
+    var path = Path.IsPathRooted(options.Path)
+        ? options.Path
+        : Path.Combine(environment.ContentRootPath, options.Path);
+
+    return new SqliteChargingSessionStore(path, services.GetRequiredService<ILogger<SqliteChargingSessionStore>>());
+});
+
+builder.Services.AddHostedService<SessionRecordingWorker>();
 
 // Home Assistant integration over MQTT (issue #17). Disabled by default; broker credentials are
 // secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).

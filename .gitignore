@@ -429,3 +429,9 @@ FodyWeavers.xsd
 *.msp
 
 .fake
+# Charging session store (issue #32). The database is a runtime artefact and, in a real install, the
+# only history that exists -- it belongs on a backed-up bind mount, never in the repository.
+src/Solax.Worker/data/
+*.db
+*.db-wal
+*.db-shm
