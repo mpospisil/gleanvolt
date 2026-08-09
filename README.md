@@ -30,6 +30,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
+- **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
 
@@ -69,13 +70,15 @@ SolaxLocalController.slnx
 │   ├── Solax.Infrastructure/       # External communication
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
 │   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
+│   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   └── Solcast/                # Solar-forecast HTTP client
 │   │
 │   └── Solax.Worker/               # The executable host
 │       ├── Program.cs              # Dependency Injection setup
 │       ├── SolaxPollingService.cs  # The main background loop (IHostedService)
 │       ├── Configuration/          # Options classes bound from appsettings.json
-│       └── HomeAssistant/          # MQTT discovery and the HA worker
+│       ├── HomeAssistant/          # MQTT discovery and the HA worker
+│       └── Sessions/               # Charging-session recording worker
 ├── tests/
 │   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
 │   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
@@ -139,8 +142,8 @@ below). Device addresses and the poll cadence sit in the `Solax` section:
 }
 ```
 
-The feature sections — `Solcast`, `ChargeControl`, `BatteryHold` and `HomeAssistant` — are documented
-in the subsections that follow.
+The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
+are documented in the subsections that follow.
 
 ### Solcast solar forecast
 
@@ -712,6 +715,100 @@ A ready-to-run broker + Home Assistant for local development lives in [`dev/home
 ```bash
 docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
 ```
+
+### Charging session history (the `SessionStore` section)
+
+Everything above is *live*: the log line scrolls past and the Home Assistant entity is overwritten on
+the next poll. This section is what survives — every controlled charging session is recorded to a local
+SQLite file, so "how did last Tuesday's `Forecasted` session actually go, and did the plan hold?"
+becomes a question with an answer.
+
+It **only ever observes.** It reads no register the poll loop wasn't already reading and writes to no
+device, so unlike `ChargeControl` and `BatteryHold` it is **on by default**.
+
+```jsonc
+"SessionStore": {
+  "Enabled": true,
+  "Path": "data/sessions.db",         // relative to the content root
+  "SampleInterval": "00:00:30",       // how often a row is stored; changes force one anyway
+  "FlushInterval": "00:01:00",        // how long rows may sit in memory before being committed
+  "RetentionDays": 365,               // closed sessions older than this are pruned at startup
+  "RecordUncontrolledSessions": false // also record a plugged-in car no mode is driving
+}
+```
+
+#### What a session is
+
+A session **opens** when a controlling mode (`Solar`, `Forecasted`, `FastNoBattery`) is driving a
+connected car, and **closes** when that stops being true — the mode returns to `Off`, the controller
+ends itself because the car is full, the car is unplugged, or the service stops.
+
+Switching mode mid-session does **not** start a new one. "Forecasted all afternoon, then
+`FastNoBattery` at 17:00" is one story about one car, and it is recorded as one session with a
+`ModeChanged` event in it.
+
+Note this is a *different* span from the one `Session energy` reports in Home Assistant, which counts
+from the moment the car was plugged in whether or not anything is controlling it.
+
+#### What is recorded
+
+| | |
+|---|---|
+| **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, and the forecast day plan as it stood at the start |
+| **Totals** | energy delivered, split into **from solar / from grid / from battery**, plus what the forecast mode *commanded* the battery to lend |
+| **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, and the running totals |
+| **Events** | mode changed, charging started/paused, setpoint changed, hold armed/released, plan fell out of trust, session ended — each with the controller's own reason string |
+
+#### The four charging figures, and why they are kept apart
+
+| Field | What it is |
+|---|---|
+| `EvChargerPowerWatts` | **Measured** power the charger is drawing — the ground truth, and the basis of every energy total |
+| `EvChargingCurrentAmps` | The **actual** current, derived phase-aware from that power |
+| `ActiveCurrentAmps` | The charger's setpoint **read back from the device** (null where the register isn't readable) |
+| `TargetCurrentAmps` | What the controller **decided** to command |
+
+The gaps are the diagnostic. **Target ≠ active** means the write didn't land, or was suppressed by
+`CurrentChangeThresholdAmps`. **Active ≠ actual** means the *car* is the limiter — its charge curve,
+its taper near full, its on-board charger ceiling — which is what separates "the strategy
+under-delivered" from "the car wouldn't take more".
+
+#### How the energy is attributed to a source
+
+Nothing measures which electron went where; power at the busbar is fungible. The split is an
+*attribution* with a fixed, documented rule (`ChargingSourceAttribution`), and its one hard guarantee
+is that the three shares always add back up to the measured draw:
+
+1. PV serves the rest of the house first; the car may take up to the **surplus** that is left — the
+   same definition the `Solar` and `Forecasted` modes decide on, so the recorded solar share is
+   measured against exactly what the controller was aiming at.
+2. Draw beyond the surplus is credited to the **battery**, up to what it is actually discharging —
+   battery before grid, because that is the inverter's own priority.
+3. Whatever is still unaccounted for is **grid** import.
+
+Measured `FromBatteryWh` is kept separate from the commanded `LoanedWh` on purpose: they answer
+different questions, and the gap between them is worth being able to see.
+
+#### Operational notes
+
+- **Back up `data/sessions.db`.** It is the only history that exists; nothing reconstructs it.
+- **Sampling is coarser than polling on purpose.** Every poll still feeds the running energy totals —
+  only the stored rows are thinned, so a four-hour session is a few hundred rows rather than ~2,900,
+  and no transition is blurred because any change forces a sample.
+- **A crash leaves nothing dangling.** A session still open at the next startup is closed at its last
+  recorded sample and marked `Interrupted`, which is why every sample carries the running totals.
+- **Failure is contained.** If the file can't be opened — a read-only mount, a bad permission —
+  recording is disabled for the run with an error in the log, and polling, charge control and the Home
+  Assistant integration carry on untouched.
+- **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
+
+#### Getting the data out
+
+A closed session is immutable, which makes it safe to publish as one self-contained document —
+`ChargingSessionDocument`, carrying a `schemaVersion`, the header, every sample and every event. That
+shape is deliberately independent of the database's own tables, so uploading sessions to cloud object
+storage (one object per session) and reading them from a web app can be added later without migrating
+anything. The `sessions.synced_at` column is reserved for exactly that.
 
 ## License
 

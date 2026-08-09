@@ -37,6 +37,13 @@ namespace Solax.Core.Models;
 /// <param name="LoanedTodayWh">Energy lent out of the home battery today.</param>
 /// <param name="TomorrowForecastWh">Tomorrow's forecast production, purely informational.</param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
+/// <param name="SessionCompleted">
+/// This cycle the controller reported the car had finished and the mode ended itself (only
+/// <see cref="ChargeControlMode.FastNoBattery"/> does). True for the single status that carries the
+/// transition, and the only way a later reader can tell "the car filled up" from "somebody selected
+/// Off" — by the time <see cref="Mode"/> reads <see cref="ChargeControlMode.Off"/> the two look
+/// identical. Not published to Home Assistant.
+/// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
     bool DryRun,
@@ -62,4 +69,5 @@ public sealed record ChargeControlStatus(
     double SessionEnergyWh,
     double LoanedTodayWh,
     double? TomorrowForecastWh,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    bool SessionCompleted = false);

@@ -166,7 +166,11 @@ public sealed class SolaxPollingService : BackgroundService
                     SessionEnergyWh: _chargingControl.SessionEnergyWh,
                     LoanedTodayWh: _chargingControl.LoanedTodayWh,
                     TomorrowForecastWh: TomorrowForecastWattHours(state.Timestamp),
-                    Timestamp: state.Timestamp));
+                    Timestamp: state.Timestamp,
+                    // Carried out of the loop because it is unrecoverable afterwards: the mode has
+                    // already been returned to Off above, so nothing downstream could otherwise tell
+                    // "the car finished" from "somebody switched it off".
+                    SessionCompleted: result.SessionComplete));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
