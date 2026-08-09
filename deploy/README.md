@@ -57,14 +57,41 @@ docker compose version                 # v2 plugin, included by the script above
 
 **3. Enable cgroup memory accounting.** Raspberry Pi OS ships with it off, and without it the
 `mem_limit` settings in `docker-compose.yml` are silently ignored — which on a 1 GB board is the
-difference between one container being killed and the whole box thrashing. Append to the **single
-line** in `/boot/firmware/cmdline.txt`, then reboot:
+difference between one container being killed and the whole box thrashing.
 
-```
-cgroup_enable=memory cgroup_memory=1
+`cmdline.txt` is **one single line**, and the parameters go at the end of it — a second line is
+ignored, which is the most common way this silently doesn't work. This appends safely and is
+idempotent:
+
+```bash
+grep -q cgroup_enable=memory /boot/firmware/cmdline.txt \
+  || sudo sed -i '1 s/$/ cgroup_enable=memory cgroup_memory=1/' /boot/firmware/cmdline.txt
+sudo reboot
 ```
 
-Verify after the reboot with `docker info | grep -i "memory limit"` — no warning means it worked.
+On Bullseye and older the file is `/boot/cmdline.txt` instead — `/boot/firmware/` is Bookworm's
+layout.
+
+After the reboot, check what the kernel actually booted with, which is the authoritative answer
+(`cmdline.txt` only says what *should* have been passed):
+
+```bash
+cat /proc/cmdline | tr ' ' '\n' | grep cgroup   # expect cgroup_enable=memory and cgroup_memory=1
+docker info 2>&1 | grep -i "memory limit"       # note 2>&1: these warnings go to stderr
+```
+
+The `2>&1` matters. Docker prints those warnings to stderr, so a plain `docker info | grep ...` lets
+them bypass the pipe and reach your terminal anyway — they look like grep output but aren't, and the
+command appears to "fail" even after the fix has worked.
+
+> **`WARNING: No swap limit support` is expected — ignore it.** Swap accounting is a separate
+> facility, it costs memory to enable, and nothing in this stack asks for it: the compose file sets
+> `mem_limit` and never `memswap_limit`. Only `WARNING: No memory limit support` matters, and it
+> should be gone once `/proc/cmdline` shows the two parameters above.
+
+If `/proc/cmdline` still lacks them after a reboot, the edit landed somewhere the boot process
+doesn't read. Check that `wc -l /boot/firmware/cmdline.txt` reports `1`, and that
+`ls /boot/firmware/cmdline.txt /boot/cmdline.txt` confirms which file this OS actually boots from.
 
 **4. Add swap.** 1 GB of RAM with no swap turns a transient spike into an OOM kill:
 
