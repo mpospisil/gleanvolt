@@ -624,7 +624,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
-- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus (PV minus house)**, **EV charging power** and **EV charging current (measured)** (actual draw), **Target charging current (commanded)** and **Active charging current (charger setpoint)**, **Battery SOC**, **Battery power (+ charging / − discharging)**, **Grid power (+ import / − export)**, and **Battery hold target** (while the hold is enabled).
+- sensors: **Control state**, **Charger status**, **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target charging current** and **Active charging current** (decided vs. read back), **Battery SOC**, **Battery power**, **Grid power**, and **Battery hold target** (while the hold is enabled).
 - forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
   **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
   **Projected shortfall**, **Required SOC floor**, **Forecast remaining today**,
@@ -635,12 +635,21 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   unlimited) and **Minimum battery SOC** (%). Like the mode, changes don't persist across restarts.
 - binary sensors: **Car connected** (a vehicle is plugged in) and **Controller charging the car** (we are
   commanding a current — our own decision, not the car's actual draw).
-- **a one-line description on every entity**, explaining what the value means and, where it matters,
-  which sign is which. Home Assistant has no description or tooltip field — hovering an entity shows
-  its friendly name and nothing more — so the text is published as an entity **attribute**: open the
-  entity and expand **Attributes** in its more-info dialog. The few names that carry a parenthetical
-  (the sign conventions, commanded vs measured vs read-back current) do so precisely because the name
-  is the only thing a hover will ever show.
+
+**Every entity explains itself, in both places Home Assistant allows.**
+
+HA has no description or tooltip field: the hover text *is* the friendly name, set so a label
+truncated in a card can still be read in full. So each entity is named **`Label — what it means`** —
+`Grid power — positive while importing from the grid, negative while exporting`. Cards show the label
+and trail off; hovering reveals the sentence. That is the only mechanism HA offers for a tooltip, and
+it is why the names read long in the list above (which shows only the label part).
+
+The detail that won't fit on one line rides along as a **`description` attribute** — open an entity
+and expand **Attributes** in its more-info dialog. It covers the states an enum can take, the sign
+conventions, and the traps: that the surplus is a smoothed 3-minute average, that the active current
+is a read-back rather than a command, that a working discharge hold still leaves a ~60 W trickle.
+
+A test enforces both halves, so a new entity cannot be added without an explanation.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 
 Disabled by default. Non-secret settings live in `appsettings.json`:

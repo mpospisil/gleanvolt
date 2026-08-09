@@ -14,22 +14,26 @@ its sign runs.
 friendly name so a truncated name can still be read in full; there is no per-entity description in
 MQTT discovery, and adding one is
 [an open feature request](https://community.home-assistant.io/t/add-description-for-each-entity-which-shows-in-the-gui-when-you-hover-over-the-name/622053).
-So the tooltip cannot be changed except by changing the name. Two complementary changes:
+The tooltip therefore cannot be changed except by changing the name — so that is what changed:
 
-1. **Every entity now carries a one-line `description` attribute**, visible under Attributes in its
-   more-info dialog. The mechanism is `json_attributes_topic` pointed at the existing state topic, with
-   a `json_attributes_template` that is a **constant** — it contains no placeholders, so every state
-   message renders the same JSON. It is built with `JsonSerializer` rather than by hand so anything in
-   the text that would break the JSON is escaped; the only authoring rule is to avoid Jinja
-   delimiters, which a test enforces along with the description being present and not merely repeating
-   the name.
-2. **Five names gained a parenthetical**, because the name is the only thing a hover will ever show
-   and these are the values whose meaning cannot be guessed: `Grid power (+ import / - export)`,
-   `Battery power (+ charging / - discharging)`, `Solar surplus (PV minus house)`, and the confusable
-   current trio — `EV charging current (measured)`, `Target charging current (commanded)`,
-   `Active charging current (charger setpoint)`. The binary sensor named `Charging now` was actually
-   reporting `HoldingControl` — whether *we* are commanding a current, not whether the car is drawing
-   one — and is now `Controller charging the car`.
+1. **Every entity is now named `Label — what it means`.** `Grid power` became `Grid power — positive
+   while importing from the grid, negative while exporting`. HA truncates the label in a card and
+   reveals the whole sentence on hover, which is the only tooltip mechanism it has. The label comes
+   first so a truncated row is still scannable.
+2. **The detail that will not fit on one line is an attribute.** `json_attributes_topic` points at the
+   existing state topic and `json_attributes_template` is a **constant** — no placeholders, so every
+   state message renders the same JSON. It is built with `JsonSerializer` rather than by hand so
+   anything in the prose that would break the JSON is escaped; the only authoring rule is to avoid
+   Jinja delimiters. It shows under Attributes in the more-info dialog and covers the enum states, the
+   sign conventions, and the traps: the surplus is a smoothed 3-minute average, the active current is a
+   read-back, a working discharge hold still leaves a ~60 W trickle.
+
+A test enforces both halves — the name must be in `Label — meaning` form with a label short enough to
+survive truncation, and the description must be present, valid JSON and not merely the name repeated —
+so a new entity cannot be added without an explanation.
+
+The binary sensor named `Charging now` was also a misnomer: it reports `HoldingControl`, whether *we*
+are commanding a current rather than whether the car is drawing one. It now says so.
 
 Renaming is safe for existing installs: `entity_id` is assigned when an entity is first discovered and
 does not follow later name changes, so dashboards and automations keep working. A fresh install
