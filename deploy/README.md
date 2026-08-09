@@ -154,12 +154,41 @@ ssh martin@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
 **7. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
-stack will work. The username has to match `MQTT_USERNAME` in `.env`:
+stack will work. The username has to match `MQTT_USERNAME` **and** the password has to match
+`MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD` beside it is a stack that
+comes up looking healthy while the controller is refused on every connect.
+
+`-c` **creates** the file and refuses to overwrite one that exists, reporting the bare errno
+`Error: Unable to open file ... for writing. File exists.` — which reads like a permissions problem
+and isn't. So create with `-c` the first time and update without it afterwards:
 
 ```bash
+# first time (no passwd file yet)
 docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
     mosquitto_passwd -c -b /mosquitto/config/passwd solax '<password>'
+
+# changing the password later, or adding another user -- note: no -c
+docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
+    mosquitto_passwd -b /mosquitto/config/passwd solax '<password>'
+
 sudo chown 1883:1883 /opt/solax/mosquitto/config/passwd
+sudo chmod 600 /opt/solax/mosquitto/config/passwd
+```
+
+`mosquitto_passwd` warns that the file's owner is not root and that "future versions will refuse to
+load" it. Ignore it here: the broker runs as uid 1883 and has to be able to read the file, and the
+compose mount is read-only so the image's entrypoint cannot chown it back.
+
+**Check the credentials actually work** before blaming the controller. This starts a throwaway broker
+against the real password file, so it is valid even before `deploy.sh` has copied `mosquitto.conf`:
+
+```bash
+docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config:ro eclipse-mosquitto:2 sh -c '
+  printf "listener 1883\nallow_anonymous false\npassword_file /mosquitto/config/passwd\n" > /tmp/t.conf
+  mosquitto -c /tmp/t.conf -d && sleep 2
+  mosquitto_pub -h 127.0.0.1 -u solax -P "<password>" -t solax/authtest -m ok && echo ACCEPTED
+  mosquitto_pub -h 127.0.0.1 -t solax/authtest -m no 2>/dev/null && echo "ANONYMOUS ACCEPTED -- wrong" || echo "anonymous rejected -- correct"
+'
 ```
 
 **8. GHCR access.** Only needed if the package is private — a public package needs no login:
