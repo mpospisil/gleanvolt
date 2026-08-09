@@ -4,6 +4,31 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-09 — Short entity names again; the explanations moved to the README
+
+The previous entry named every entity `Label — what it means`, because HA's hover text is the friendly
+name and there is no tooltip field. Seen in HA, that was the wrong trade: every card row was a
+truncated sentence and the entity list stopped being scannable — a name that is really a paragraph
+confuses more than it explains.
+
+So the entity names are back to the short originals (`Grid power`, `Charging now`, `Required SOC
+floor`, …), the `description` attribute and the `Describe` helper are gone from `HaDiscovery`, and the
+two tests that enforced them are gone with them — `HaDiscovery.cs` and `HaDiscoveryTests.cs` are byte
+for byte what they were before the change.
+
+The explanations themselves were not lost. They are now a table in the README under *Home Assistant
+(MQTT) → **What each entity means*** — one row per entity with its unit and meaning, split into the
+always-present entities and the ones only the `Forecasted` mode populates. It keeps the detail that
+was in the attributes: the enum states of `Control state`, `Charger status` and `Day outlook`, both
+sign conventions, that the surplus is a smoothed 3-minute average, that `Active charging current` is a
+read-back to compare against the target, that a working discharge hold still leaves a ~60 W trickle,
+and that `Charging now` reports our own command rather than the car's draw.
+
+Files changed: `src/Solax.Worker/HomeAssistant/HaDiscovery.cs`,
+`tests/Solax.Worker.Tests/HaDiscoveryTests.cs`, `README.md`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-08 — Home Assistant entities explain themselves
 
 The entities published to Home Assistant showed their name and nothing else: hovering one gives a

@@ -624,7 +624,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
-- sensors: **Control state**, **Charger status**, **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target charging current** and **Active charging current** (decided vs. read back), **Battery SOC**, **Battery power**, **Grid power**, and **Battery hold target** (while the hold is enabled).
+- sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
 - forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
   **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
   **Projected shortfall**, **Required SOC floor**, **Forecast remaining today**,
@@ -633,24 +633,57 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   car today" notification automation keys off.
 - numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
   unlimited) and **Minimum battery SOC** (%). Like the mode, changes don't persist across restarts.
-- binary sensors: **Car connected** (a vehicle is plugged in) and **Controller charging the car** (we are
-  commanding a current — our own decision, not the car's actual draw).
-
-**Every entity explains itself, in both places Home Assistant allows.**
-
-HA has no description or tooltip field: the hover text *is* the friendly name, set so a label
-truncated in a card can still be read in full. So each entity is named **`Label — what it means`** —
-`Grid power — positive while importing from the grid, negative while exporting`. Cards show the label
-and trail off; hovering reveals the sentence. That is the only mechanism HA offers for a tooltip, and
-it is why the names read long in the list above (which shows only the label part).
-
-The detail that won't fit on one line rides along as a **`description` attribute** — open an entity
-and expand **Attributes** in its more-info dialog. It covers the states an enum can take, the sign
-conventions, and the traps: that the surplus is a smoothed 3-minute average, that the active current
-is a read-back rather than a command, that a working discharge hold still leaves a ~60 W trickle.
-
-A test enforces both halves, so a new entity cannot be added without an explanation.
+- binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
+
+#### What each entity means
+
+Entity names are kept short so a dashboard card stays readable — and Home Assistant has nowhere to put
+a longer explanation anyway: hovering an entity shows its friendly name, and MQTT discovery has no
+description or tooltip field. The meanings live here instead.
+
+| Entity | Unit | What it means |
+| --- | --- | --- |
+| **Charge mode** | select | Which strategy drives the charger: `Off`, `Solar`, `Forecasted` or `FastNoBattery` (see the list above). Always starts at `Off` after a restart. |
+| **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` arms it automatically; a mode never turns it off for you. |
+| **Daily EV target** | kWh | How much energy the car should get on a normal day. The forecast plan measures its projected shortfall against this. Doesn't persist across restarts. |
+| **Session energy target** | kWh | Stop charging once this much has gone into the car in one session (since it was plugged in). `0` means no limit. Doesn't persist across restarts. |
+| **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
+| **Control state** | — | What charge control is doing right now. `Disabled`: no mode selected, the charger is the owner's. `Idle`: a mode is selected but not acting, most often because the charger's use-mode isn't Fast. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
+| **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
+| **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |
+| **Solar surplus** | W | PV left after household consumption, counting neither battery charging nor EV charging as house load — the power the car can take without importing or discharging. This is the **smoothed 3-minute average** the solar modes decide on, not the instantaneous value, so a passing cloud can't interrupt a session. Blank when the selected mode doesn't decide on surplus. |
+| **EV charging power** | W | What the charger reports the car actually drawing right now — not a setpoint. |
+| **EV charging current** | A | Charging current derived from the charger's measured power, phase-aware: what the car really takes. A car may draw less than the setpoint allows, never more. |
+| **Target charging current** | A | The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging — paused, idle, or in `Off`. |
+| **Active charging current** | A | The charger's setpoint **read back** from the hardware: what it was actually left at. Compare it with the target — if they disagree for more than a poll or two, a write isn't landing (or the controller is in dry run). |
+| **Battery SOC** | % | Home battery state of charge as the inverter reports it. 0–100% spans the capacity the pack will actually cycle — its usable energy, not its nameplate. |
+| **Battery power** | W | Positive while the battery charges, negative while it discharges. With the discharge hold armed this should sit at or above roughly −60 W: a working hold still leaves a small standby trickle, but the pack is no longer serving the house. |
+| **Grid power** | W | Positive while importing from the grid, negative while exporting. This is the opposite of the sign the SolaX register uses; it's negated on read so positive always means power flowing into the house. |
+| **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. Blank when no hold is armed. |
+| **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
+| **Charging now** | on/off | `ON` while *the controller* is commanding a charging current, as opposed to having paused or never taken control. This is our own decision, not the car's behaviour — a car can be plugged in and idle while this is `ON`. See **EV charging power** for what's actually flowing. |
+
+The rest are populated only while the **Forecasted** mode is driving; in the other modes they report
+nothing rather than stale numbers from a plan nobody is acting on.
+
+| Entity | Unit | What it means |
+| --- | --- | --- |
+| **Day outlook** | — | How the rest of today looks for the car. `Surplus`: the day covers the house, the battery to 100% and the whole EV target. `Tight`: the car gets something, but less than its target. `Shortfall`: substantially less — the battery keeps priority. `NoChargeToday`: no window in which the car could charge at all. `Unknown`: no usable forecast. |
+| **Plan state** | — | One line on why the day plan says what it says — the same explanation the log carries. |
+| **Charge window** | — | The next stretch of today in which the surplus is forecast to clear the charger's minimum power for long enough to be worth starting. `none` when today offers no such window. |
+| **EV energy budget** | kWh | How much of today's remaining sun the car may have: what's left once the house and a 100% battery by evening are served, then restricted to the periods where the surplus actually clears the charger's minimum power. The restriction matters because the car can't sip a budget slowly. |
+| **EV energy expected today** | kWh | What the car can realistically receive in total today, including what it has already taken. |
+| **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full battery plus the daily EV target. Above zero means the car won't get everything it wanted; the battery keeps priority regardless. |
+| **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what arms the discharge hold automatically. |
+| **Forecast remaining today** | kWh | Forecast PV still to come today, at the configured confidence band and already scaled by **Forecast accuracy**. |
+| **Tomorrow forecast** | kWh | Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out. |
+| **Forecast accuracy** | % | Actual production against forecast so far today. 100% is on the nose, above means the roof is beating the forecast. The rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted, so the mode falls back to live-solar behaviour. |
+| **Session energy** | kWh | Energy delivered to the car since it was plugged in. Starts afresh when it's unplugged. |
+| **Battery loaned today** | kWh | Energy the home battery has lent the car today so that a surplus below the charger's floor could still reach it. The loan is repaid from sun that would otherwise have been exported. Resets at local midnight. |
+| **Battery loan power** | W | How much of what the car is drawing right now is being covered by the home battery rather than by live sun. Zero outside the `Forecasted` mode. |
+
+#### Configuration
 
 Disabled by default. Non-secret settings live in `appsettings.json`:
 

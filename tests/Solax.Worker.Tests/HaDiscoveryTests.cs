@@ -38,53 +38,6 @@ public class HaDiscoveryTests
             LoanedTodayWh: 1800, TomorrowForecastWh: 24500, Timestamp: DateTimeOffset.UtcNow);
 
     [Fact]
-    public void EveryEntityNameExplainsItself()
-    {
-        // Home Assistant's hover text IS the friendly name -- there is no tooltip field -- so the name
-        // has to carry the explanation, in the form "Label — what it means". HA truncates the label in
-        // a card and shows the whole sentence on hover, which is the only way to get one.
-        foreach (var (topic, payload) in DiscoveryWithBatteryHold.DiscoveryMessages())
-        {
-            using var json = JsonDocument.Parse(payload);
-            var name = json.RootElement.GetProperty("name").GetString()!;
-
-            Assert.True(
-                name.Contains('—'),
-                $"{topic} is named '{name}': it must read 'Label — what it means', because the name is the tooltip.");
-
-            // The label has to survive truncation in a card, and the clause has to say something.
-            var parts = name.Split('—', 2);
-            Assert.InRange(parts[0].Trim().Length, 1, 30);
-            Assert.True(parts[1].Trim().Length >= 20, $"{topic} explains itself too briefly: '{name}'");
-        }
-    }
-
-    [Fact]
-    public void EveryEntityCarriesADescriptionAttribute()
-    {
-        // The name is one line; the attribute is where the detail that would not fit goes. It shows up
-        // under Attributes in the entity's more-info dialog.
-        foreach (var (topic, payload) in DiscoveryWithBatteryHold.DiscoveryMessages())
-        {
-            using var json = JsonDocument.Parse(payload);
-            var config = json.RootElement;
-
-            Assert.Equal(Discovery.StateTopic, config.GetProperty("json_attributes_topic").GetString());
-
-            // The template is a constant, so it must itself parse as the JSON HA will set as attributes.
-            var template = config.GetProperty("json_attributes_template").GetString();
-            using var attributes = JsonDocument.Parse(template!);
-            var description = attributes.RootElement.GetProperty("description").GetString();
-
-            Assert.False(string.IsNullOrWhiteSpace(description), $"{topic} has an empty description");
-
-            // A description that only repeats the name is the problem this exists to fix.
-            Assert.NotEqual(config.GetProperty("name").GetString(), description);
-            Assert.DoesNotContain("{{", description);
-        }
-    }
-
-    [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
     {
         Assert.Equal("solax/solax_controller/availability", Discovery.AvailabilityTopic);

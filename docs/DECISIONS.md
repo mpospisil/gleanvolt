@@ -4,7 +4,37 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-09 — Entity names stay short; the explanation lives in the README
+
+**Context.** Supersedes the record below, which put each entity's explanation into its friendly name
+so that HA's hover text would say something. In use that was worse than the problem: every dashboard
+row read as a truncated sentence, the entity list became hard to scan, and a name that is really a
+paragraph is confusing rather than informative.
+
+**Decision.** Entities keep their original short names — `Grid power`, `Charging now`, `Required SOC
+floor` — and the `description` attribute is dropped with them. What each entity means, including the
+sign conventions and the traps, is documented once in the README, under
+*Home Assistant (MQTT) → What each entity means*.
+
+**Consequences.**
+
+- Hovering an entity in HA still tells a reader nothing beyond its name. Accepted: a short label that
+  scans is worth more on a dashboard than a tooltip, and the explanation is one link away.
+- One place to keep current. A new entity is documented by adding a row to that table; nothing in the
+  discovery payload duplicates it, so the two cannot drift.
+- The tests that enforced a `Label — meaning` name and a description attribute are gone, since there
+  is nothing in the payload left to enforce.
+- Names returned to what earlier installs already published, so `entity_id`s, dashboards and
+  automations are unaffected either way — `entity_id` is fixed at first discovery and does not follow
+  renames.
+
+---
+
 ## 2026-08-08 — The entity name carries its explanation, because in HA the name is the tooltip
+
+> **Superseded on 2026-08-09** by the record above: the long names were confusing in practice, and the
+> explanations moved to the README. The finding about HA having no description or tooltip field still
+> holds.
 
 **Context.** The Home Assistant entities carried names and nothing else, so a reader looking at
 `Grid power` or `Required SOC floor` had no way to learn what the number means or which direction its
