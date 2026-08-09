@@ -78,11 +78,14 @@ free -h
 **5. Directories.** The containers hold no state; everything lives here:
 
 ```bash
-sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs}
+sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
 sudo chown -R "$USER" /opt/solax
-sudo chown -R 1883:1883 /opt/solax/mosquitto    # the eclipse-mosquitto uid
-sudo chown -R 1654:1654 /opt/solax/logs         # the controller image's non-root uid
+sudo chown -R 1883:1883 /opt/solax/mosquitto        # the eclipse-mosquitto uid
+sudo chown -R 1654:1654 /opt/solax/logs /opt/solax/data   # the controller image's non-root uid
 ```
+
+`data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
+the database, so that **directory** — not just the file — has to be writable by uid 1654.
 
 **6. Secrets.** From your developer machine:
 
@@ -205,6 +208,10 @@ ls -l /opt/solax/logs/
 > ```bash
 > sudo chown -R 1654:1654 /opt/solax/logs
 > ```
+>
+> `/opt/solax/data` has the same requirement and the same `deploy.sh` guard. It fails less quietly —
+> the session worker logs an error and then records nothing for the rest of the run — but the result
+> is the same: a stack that looks healthy while quietly keeping no history.
 
 ## Where the data lives
 
@@ -213,25 +220,34 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | Host path | In the container | What it is | Back up? |
 |---|---|---|---|
 | `/opt/solax/.env` | (environment) | secrets, `chmod 600` | yes |
+| `/opt/solax/data` | `/app/data` | `sessions.db` — the charging-session history | **critical** |
 | `/opt/solax/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
 | `/opt/solax/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
 | `/opt/solax/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |
 | `/opt/solax/logs` | `/app/logs` | controller log files | no |
 | `/opt/solax/docker-compose.yml` | — | redeployed from git | no |
 
-**Back up** — `homeassistant/config/.storage` is the irreplaceable part; losing it means redoing
-onboarding, the account, and the MQTT integration:
+**Back up** — two directories are irreplaceable, for different reasons. `homeassistant/config/.storage`
+costs you onboarding, the account and the MQTT integration; `data/sessions.db` is charging history
+that **cannot be regenerated** — telemetry can be re-polled, a session that already happened cannot be
+re-lived. Stop the stack first so SQLite isn't mid-write:
 
 ```bash
-sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/solax .env homeassistant/config mosquitto/config
+cd /opt/solax && docker compose stop solax-controller
+sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/solax .env data homeassistant/config mosquitto/config
+docker compose start solax-controller
 ```
+
+Backing it up hot mostly works — WAL journalling makes a torn copy unlikely rather than impossible —
+but a stopped writer makes it certain, and the gap costs one poll cycle.
 
 **Restore** onto a prepared Pi:
 
 ```bash
 cd /opt/solax && docker compose down
-sudo tar xzf solax-backup-2026-08-02.tar.gz -C /opt/solax
+sudo tar xzf solax-backup-2026-08-09.tar.gz -C /opt/solax
 sudo chown -R 1883:1883 /opt/solax/mosquitto
+sudo chown -R 1654:1654 /opt/solax/data          # tar restores the archive's ownership
 docker compose up -d
 ```
 
@@ -254,6 +270,20 @@ independent, so that's a compose edit, not a redesign.
 **Nothing connects to the broker.** `docker compose logs mosquitto` shows the rejected connections.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
 being readable by uid 1883.
+
+**No charging sessions are being recorded.** Look for this at startup:
+
+```
+[ERR] Could not open the charging session store; sessions will not be recorded this run.
+      SQLite Error 14: 'unable to open database file'
+```
+
+That is `/opt/solax/data` not being writable by uid 1654. Everything else keeps running, which is why
+it is easy to miss:
+
+```bash
+sudo chown -R 1654:1654 /opt/solax/data && docker compose restart solax-controller
+```
 
 **The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 8).
 Bridge networking routes through the host, so if the Pi can reach the inverter, the container can.

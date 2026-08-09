@@ -32,10 +32,13 @@ RUN dotnet publish src/Solax.Worker/Solax.Worker.csproj \
         --no-restore \
         --self-contained false \
         -o /app \
-    # Serilog's file sink writes here (appsettings.json: "logs/solax-.log", relative to WORKDIR).
-    # Created now, in the natively-executing stage, so the runtime stage needs no RUN of its own.
-    # The deploy stack bind-mounts a host directory over it -- see deploy/docker-compose.yml.
-    && mkdir -p /app/logs
+    # The two directories the app writes to, both relative to WORKDIR: Serilog's file sink
+    # ("logs/solax-.log") and the charging-session SQLite store ("data/sessions.db"). Created now, in
+    # the natively-executing stage, so the runtime stage needs no RUN of its own. The deploy stack
+    # bind-mounts host directories over both -- see deploy/docker-compose.yml. Without those mounts
+    # the app still starts and writes here, into the container, and loses it all on the next
+    # `docker rm`; the session history is the part that cannot be regenerated.
+    && mkdir -p /app/logs /app/data
 
 # Debian-based runtime rather than a chiseled variant: it carries tzdata and ICU (log timestamps and
 # SolarForecast.ForDate are timezone-sensitive) and keeps a shell for diagnosing a headless Pi.

@@ -382,6 +382,19 @@ controller, Home Assistant, and an MQTT broker — on a Raspberry Pi 3 B as thre
 
 The rationale for each choice is in [DECISIONS.md](DECISIONS.md).
 
+### Rebased onto the session store (#32)
+
+Two things main changed underneath this branch, neither of which git could flag:
+
+- **`ChargeControl:Enabled` no longer exists.** The service boots in mode `Off` and takes control only
+  when Home Assistant selects a mode, so the compose file was passing a setting that silently did
+  nothing — and the deployment's safety claim rested on it. Replaced with `ChargeControl__DryRun`.
+- **The SQLite session store needs a bind mount**, exactly as the #32 record predicted. `data/` is now
+  mounted from `/opt/solax/data`, created in the image's build stage beside `logs/`, and covered by
+  the same ownership pre-check — extended to a loop over both directories. SQLite makes it stricter
+  than logs: `-wal` and `-shm` live beside the database, so the directory itself must be writable by
+  uid 1654, and the documented backup stops the controller rather than copying a live database.
+
 ### Verified, not assumed
 
 - **The arm64 cross-build works and is fast.** `docker buildx build --platform linux/arm64` completes

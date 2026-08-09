@@ -40,10 +40,20 @@ EOF
     exit 1
 fi
 
-# The controller writes its log files to a bind mount over /app/logs. If the host directory isn't
-# writable by the image's non-root user, Serilog's file sink fails *silently*: the container runs,
-# `docker logs` looks healthy, and the log files never appear. Catch it here rather than in a month.
-if ! ssh_pi "sh -s '$REMOTE_DIR/logs'" <<'REMOTE_CHECK'; then
+# The controller writes to two bind mounts, and both fail badly if the host directory isn't writable
+# by the image's non-root user: Serilog's file sink fails *silently* (the container runs, `docker
+# logs` looks healthy, and the log files never appear), and the session store logs an error and then
+# records nothing for the whole run. Catch both here rather than in a month.
+#
+# SQLite puts its -wal and -shm next to the database, so for data/ it really is the directory that
+# has to be writable, not just the file.
+for subdir in logs data; do
+    case $subdir in
+        logs) consequence="its log files would go nowhere" ;;
+        data) consequence="no charging session would ever be recorded" ;;
+    esac
+
+    if ! ssh_pi "sh -s '$REMOTE_DIR/$subdir'" <<'REMOTE_CHECK'; then
     dir=$1
     [ -d "$dir" ] || exit 1
     # Writable by uid 1654 means: owned by it, or world-writable. The ssh user's own -w test would
@@ -53,16 +63,17 @@ if ! ssh_pi "sh -s '$REMOTE_DIR/logs'" <<'REMOTE_CHECK'; then
     case ${perms#${perms%?}} in 2|3|6|7) exit 0 ;; esac
     exit 1
 REMOTE_CHECK
-    cat >&2 <<EOF
-error: $REMOTE_DIR/logs is missing, or not writable by the controller's uid (1654).
+        cat >&2 <<EOF
+error: $REMOTE_DIR/$subdir is missing, or not writable by the controller's uid (1654).
 
-The container would run and log to stdout, but its log files would go nowhere. On the Pi:
+The container would start anyway, and $consequence. On the Pi:
 
-    sudo mkdir -p $REMOTE_DIR/logs
-    sudo chown -R 1654:1654 $REMOTE_DIR/logs
+    sudo mkdir -p $REMOTE_DIR/$subdir
+    sudo chown -R 1654:1654 $REMOTE_DIR/$subdir
 EOF
-    exit 1
-fi
+        exit 1
+    fi
+done
 
 if ! ssh_pi "test -f '$REMOTE_DIR/.env'"; then
     cat >&2 <<EOF

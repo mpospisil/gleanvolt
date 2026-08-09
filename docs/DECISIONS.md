@@ -219,6 +219,14 @@ optional `Username`/`Password`, previously unused.
 - **Deployment writes nothing to hardware.** Charge control boots in mode `Off` and takes control
   only when Home Assistant selects a mode; `BatteryHold` stays disabled and dry-run. The compose file
   passes those settings explicitly so the safety posture is visible rather than implied.
+- **The session store (#32) gets the `data/` bind mount its own record asked for.** `SessionStore:Path`
+  resolves against the content root, so `data/sessions.db` lands in `/app/data` and is mounted from
+  `/opt/solax/data`. Two consequences specific to SQLite: the *directory* must be writable by uid 1654
+  because the `-wal` and `-shm` files live beside the database, and a backup stops the controller
+  first, since WAL makes a hot copy unlikely to tear rather than unable to. The ownership pre-check in
+  `deploy.sh` now covers `data/` as well as `logs/` — without a mount the app happily writes into the
+  container and the history dies with it, which is the one loss here that cannot be undone by
+  re-polling.
 
 ---
 

@@ -129,8 +129,9 @@ For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspbe
 
 The Pi never builds anything: CI cross-compiles a `linux/arm64` image and pushes it to GHCR
 (`ghcr.io/mpospisil/solax-controller`), and the Pi pulls it. All state lives on bind mounts under
-`/opt/solax`, so the containers are disposable — upgrades, rollbacks and `docker compose down` lose
-nothing. The broker requires authentication and is not published to the LAN.
+`/opt/solax` — including the charging-session database (`data/sessions.db`) and the log files — so
+the containers are disposable: upgrades, rollbacks and `docker compose down` lose nothing. The broker
+requires authentication and is not published to the LAN.
 
 Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
 only when you select a mode in Home Assistant, and the battery hold stays disabled and dry-run until

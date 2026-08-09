@@ -3,6 +3,7 @@
 # state back for inspection) cannot commit Home Assistant's database, secrets or broker persistence.
 .env
 logs/
+data/
 mosquitto/data/
 homeassistant/config/.storage/
 homeassistant/config/.cache/

@@ -63,6 +63,12 @@ services:
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs
+      # The charging-session SQLite store (SessionStore:Path, "data/sessions.db" under the content
+      # root). The only irreplaceable thing this service produces -- telemetry can be re-polled, a
+      # recorded session cannot be re-lived -- so it must outlive the container. SQLite writes its
+      # -wal and -shm alongside the file, so the *directory* has to be writable by uid 1654, not
+      # just the database.
+      - ./data:/app/data
     mem_limit: ${CONTROLLER_MEM_LIMIT:-200m}
     logging:
       driver: json-file
