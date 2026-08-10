@@ -19,6 +19,12 @@ ARG DOTNET_VERSION=10.0
 ARG WINDOWS_VERSION=ltsc2022
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
+
+# As in the Linux Dockerfile: defaults match Directory.Build.props so a plain build is labelled a
+# local one, and CI passes the release version and commit. See src/Solax.Worker/BuildInfo.cs.
+ARG VERSION=0.0.0-dev
+ARG SOURCE_REVISION=
+
 WORKDIR C:\source
 
 # Same layer split as the Linux build: project files first, so the restore layer survives a source
@@ -35,6 +41,8 @@ RUN dotnet publish src\Solax.Worker\Solax.Worker.csproj `
         -c Release `
         --no-restore `
         --self-contained false `
+        -p:Version=%VERSION% `
+        -p:SourceRevisionId=%SOURCE_REVISION% `
         -o C:\app `
     # The two directories the app writes to, matching the Linux image: Serilog's file sink and the
     # charging-session SQLite store. cmd's mkdir creates intermediate directories, so no -p.

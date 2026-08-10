@@ -262,7 +262,15 @@ docker compose ps                          # what's running
 docker compose logs -f solax-controller    # follow the poll loop
 docker compose restart solax-controller
 docker stats --no-stream                   # memory headroom -- the number that matters here
+
+# which build is actually running -- version and the commit it came from
+docker compose logs solax-controller | grep "starting\."
 ```
+
+That last line is worth knowing before debugging anything. The worker logs its own version and
+commit at startup (`SolaX Local Controller 1.0.0 (31bf347) starting.`), so a log file is traceable to
+a build without matching it against image digests. Home Assistant shows the same string as the
+device's software version. `0.0.0-dev` with no commit means somebody deployed a local build.
 
 Upgrade to the latest build, or roll back to a known-good one:
 

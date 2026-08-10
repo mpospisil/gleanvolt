@@ -32,6 +32,9 @@ public sealed class HaDiscovery
             ["name"] = options.DeviceName,
             ["manufacturer"] = "solax-controller",
             ["model"] = "Live-solar charge control",
+            // Shown on the device page in HA, so "which build is on the Pi?" is answerable without
+            // an ssh session. Device metadata, not an entity -- it adds no row to any dashboard.
+            ["sw_version"] = BuildInfo.Describe(),
         };
     }
 

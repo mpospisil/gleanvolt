@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-10 — The git tag is the version; the build carries it, and says so
+
+**Context.** Nothing running could say what it was. The image tag knew, but the process did not, so a
+log file or a `docker logs` dump was untraceable to a build — and with three platforms now behind one
+manifest list, "which one is on the Pi" had become a fair question with no answer from inside.
+
+**Decision — one source of truth, and it is the git tag.** `Directory.Build.props` carries
+`0.0.0-dev`, a deliberate placeholder. CI passes `-p:Version=<tag without the leading v>` when
+building from a `v*` tag, so the number compiled into the binary and the number the image is tagged
+with come from the same place and cannot drift. Storing a real version in the repo and bumping it by
+hand was the alternative; it adds a commit per release whose only job is to agree with a tag.
+
+**Decision — the commit travels with the version.** `-p:SourceRevisionId=<sha>` makes the SDK emit
+`AssemblyInformationalVersion` as `1.0.0+<sha>`, which `BuildInfo` splits back apart. A version alone
+is not enough: several builds share `0.0.0-dev`, and during a release the same version may be built
+more than once.
+
+**Consequences.**
+
+- A build that did not come from a tag reports `0.0.0-dev` rather than claiming a number it does not
+  have. Unstamped and un-versioned is the honest state for a local build, and it is visible at a
+  glance in a log.
+- The version is logged as the first line at startup and published as Home Assistant's `sw_version`.
+  The latter is device metadata, so it adds no entity and no row to the README's entity table.
+- The image tag string (`main`, `release-1.3`) and the assembly version are now computed separately
+  in the workflow. They have different legal alphabets — no assembly version can be called `main` —
+  and conflating them was the trap worth avoiding here.
+
+---
+
 ## 2026-08-10 — One image name, three platforms, and a timezone that no longer comes from the OS
 
 **Context.** The image was built for `linux/arm64` alone, because the Pi was the only target. Wanting
