@@ -41,7 +41,26 @@ at `Dockerfile.windows` for the OS it cannot build, and gives both `--platform` 
 still says CI builds `linux/arm64`; that file is append-only and the `2026-08-10` record supersedes
 it, so it stays as written.
 
-Files changed: `deploy/README.md`, `deploy/.env.example`, `deploy/deploy.sh`, `Dockerfile`.
+**A second pass checked the documentation against the code rather than against itself.** Three things
+came out clean and are worth recording as checked, since "still accurate" is invisible otherwise:
+
+- All 32 entities in the README's entity table map to an object id in `HaDiscovery` — 24 sensors,
+  three numbers, the select, the switch, `battery_hold_target` and the two binary sensors. Nothing
+  documented is gone; nothing published is undocumented.
+- Every configuration default quoted in the README matches `appsettings.json`. The one apparent
+  mismatch, `MaxChargingCurrentAmps` (class default 20, README 16), is not one: the README documents
+  the shipped settings file, which sets 16 for the reference three-phase ID.4, and 20 is only the
+  fallback when the key is absent.
+- Every config key, mode, enum member and charger status named in the docs exists in `src/`.
+
+The one real finding was self-inflicted, from the timezone work earlier today: `appsettings.json` had
+gained a `"//TimeZone"` pseudo-comment key. It was the only such construct in the file — nothing else
+in it carries a comment — and being a real JSON key it bound a junk config entry at
+`Controller://TimeZone`. Removed. The explanation belongs where this project already puts it: the XML
+doc on `ControllerOptions` and the README's Configuration section, both of which already had it.
+
+Files changed: `deploy/README.md`, `deploy/.env.example`, `deploy/deploy.sh`, `Dockerfile`,
+`src/Solax.Worker/appsettings.json`.
 
 ---
 
