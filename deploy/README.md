@@ -301,6 +301,17 @@ The suffixed tags exist for pinning and for answering "which one did it actually
 you want the bare name. `docker buildx imagetools inspect ghcr.io/mpospisil/solax-controller:latest`
 lists every platform behind a tag.
 
+**If `latest` looks stale, check the publish workflow.** The bare tags are only created once *all*
+platforms of that build exist, so one failed platform holds back the whole release — deliberately,
+since a `latest` that silently lost a platform is worse. The Windows job is the fragile one, because
+GitHub's Windows runners intermittently start without a Docker daemon
+([actions/runner-images#13729](https://github.com/actions/runner-images/issues/13729)). The
+single-platform tags are pushed regardless, so the Pi is never actually blocked:
+
+```bash
+IMAGE_TAG=sha-abc1234-linux-arm64 ./deploy/deploy.sh
+```
+
 ### Running on Windows
 
 The Nano Server image runs the same worker, with one difference that will bite silently if it is
