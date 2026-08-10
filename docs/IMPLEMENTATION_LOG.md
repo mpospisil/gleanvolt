@@ -4,6 +4,74 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-10 — Three platforms under one image name, and a timezone that is now configuration
+
+Issue #35. The image was `linux/arm64` only. It is now `linux/arm64`, `linux/amd64` and Windows Nano
+Server ltsc2022, all published under the one name `ghcr.io/mpospisil/solax-controller` as a
+multi-platform manifest list — so `:1.0.0` pulls the arm64 image on the Pi and the amd64 image on an
+x64 host, and `deploy.sh` needed no change at all.
+
+**Naming was the part with an actual choice in it.** Three separate packages
+(`…-linux-arm64`, `…-nanoserver`) would have meant three things to keep in version step and would
+have discarded the platform selection Docker already does. One manifest list keeps a single name;
+single-platform tags (`:1.0.0-linux-arm64`) still exist underneath it for pinning and for answering
+"which one did it actually pull". `docker buildx imagetools inspect` lists what is behind a tag.
+
+**The publish workflow went from one job to four:** `version` (one version string everything else
+derives from), `linux` as a two-arch matrix, `windows`, and `manifest` folding the three
+single-platform tags into every public name. The split is not cosmetic — the manifest job is what
+keeps `:latest` pointing at the previous release until *all three* platforms of the new one exist, so
+a half-finished matrix can never publish a partially-platformed release. Per-arch `scope=` on the
+GHA cache was needed too; without it the two matrix legs evict each other.
+
+**Windows needs its own Dockerfile, not a `--platform`.** A Dockerfile builds for one OS and a
+Windows runtime stage can only be assembled on a Windows daemon, hence `Dockerfile.windows` on a
+`windows-2022` runner with plain `docker build` — buildx has no usable Windows driver. ltsc2022 over
+ltsc2025 because an ltsc2022 container runs on Server 2022 *and* 2025 hosts while ltsc2025 requires a
+2025 host; Nano Server over Server Core for ~300 MB against ~2 GB. Note the `escape=` directive at
+the top of that file: the default escape character is a backslash, which is also the path separator.
+
+**The quirk this turned up is not a Modbus one for once.** `.NET` on Windows ignores the `TZ`
+environment variable entirely — it reads the OS setting. The `TZ` line in `deploy/docker-compose.yml`
+would therefore have done nothing, the container would have run in UTC, and since the forecast day
+boundary, the daily loan-budget reset and the zone id recorded on every charging session all came
+from `TimeZoneInfo.Local`, evening sessions would have been filed under the following day. Silently:
+nothing logs a timezone. That is a data-correctness bug that only surfaces days later as charging
+decisions nobody can explain.
+
+So the zone became configuration. `Controller:TimeZone` resolves through `ZonedTimeProvider`, which
+overrides `LocalTimeZone` on the `TimeProvider` the services already take and delegates the clock
+untouched to `TimeProvider.System`. Routing it through the existing abstraction rather than adding a
+second notion of "local" means all six call sites were fixed by one DI registration — except
+`SolaxPollingService`, which was reaching for `TimeZoneInfo.Local` statically and now takes a
+`TimeProvider` like everything else.
+
+An unresolvable id throws at startup rather than falling back to UTC, because a quiet fallback is
+precisely the failure this setting exists to prevent. Empty remains the default, so Linux behaviour
+is untouched.
+
+**Nano Server has no ICU**, which has one consequence worth knowing before deploying there: .NET
+falls back to Windows NLS, so culture-aware formatting still works, but the IANA→Windows timezone
+mapping does not — it is an ICU feature. `Controller__TimeZone` must be a Windows id there
+(`Central Europe Standard Time`), not `Europe/Prague`. The same appsettings value is therefore not
+portable between the Linux and Windows images. The worker logs a warning at startup if it finds
+itself on Windows with the zone unset.
+
+**Verified:** 319 tests pass. The `linux/amd64` image builds and starts; a bad zone id fails fast at
+`ZonedTimeProvider.Resolve`. **Not verified:** the Windows build — there is no Windows daemon on the
+development machine, so `Dockerfile.windows` and the `windows` job get their first real exercise on
+the next push to `main`.
+
+Also folded in from the branching discussion that prompted this work: `ci.yml` and the publish
+workflow now trigger on `release/**` as well as `main`, so a release branch is gated and publishable.
+
+Files added: `Dockerfile.windows`, `src/Solax.Worker/Configuration/ControllerOptions.cs`,
+`ZonedTimeProvider.cs`, `tests/Solax.Worker.Tests/ZonedTimeProviderTests.cs`.
+Files changed: `.github/workflows/publish-image.yml`, `ci.yml`, `src/Solax.Worker/Program.cs`,
+`SolaxPollingService.cs`, `appsettings.json`, `README.md`, `deploy/README.md`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-09 — Charging sessions are recorded to a local store
 
 Issue #32. Every controlled charging session is now written to a SQLite file: when it started and
