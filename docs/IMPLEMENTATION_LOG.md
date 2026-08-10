@@ -4,6 +4,52 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-10 — A running build can finally say which build it is
+
+Until now nothing inside the running system knew its own version. The image tag knew; the process
+did not. So a log file, or a `docker logs` dump pasted into an issue, could not be tied to a build —
+and with three platforms behind one manifest list since #35, "which one is actually on the Pi"
+had become a real question with no answer short of `docker inspect` on the device.
+
+**The git tag is the source of truth.** `Directory.Build.props` holds `0.0.0-dev` as a deliberate
+placeholder; CI passes `-p:Version=<tag minus the leading v>` on a `v*` build, so the number in the
+binary and the number on the image come from the same place and cannot drift. The alternative — a
+real version committed in the repo and bumped by hand — adds a commit per release whose only purpose
+is to agree with a tag that already exists.
+
+**The commit rides along.** `-p:SourceRevisionId=<sha>` makes the SDK emit
+`AssemblyInformationalVersion` as `1.0.0+<sha>`, which `BuildInfo` splits apart again. The version
+alone would not have been enough: every non-release build shares `0.0.0-dev`, and a release version
+may be built more than once.
+
+**The trap worth recording.** The image tag and the assembly version cannot be the same string. The
+workflow's existing `version` output is what the *image* is called and is `main` on a branch push or
+`release-1.3` on a release branch — neither is a legal assembly version. So the `version` job gained
+a second output computed separately: the tag without its `v` on a release, the placeholder otherwise.
+Passing the image tag straight through would have failed the build on every push to `main`.
+
+Both Dockerfiles take `VERSION` and `SOURCE_REVISION` build args defaulting to the same placeholder,
+so a plain `docker build` is honestly labelled a local build rather than silently inheriting whatever
+CI last used.
+
+**Verified end to end, not just unit-tested.** Built `linux/amd64` with
+`--build-arg VERSION=1.2.3 --build-arg SOURCE_REVISION=$(git rev-parse HEAD)`, ran it, and the first
+log line was `SolaX Local Controller 1.2.3 (31bf347) starting.` — the short sha matching the actual
+commit. That is the part that could have silently produced an empty version, since it depends on the
+SDK's attribute generation rather than on any code in this repo. 323 tests pass, 4 new.
+
+Also surfaced in Home Assistant as the device's `sw_version`, so the running build is visible on the
+device page without an ssh session. Device metadata, not an entity — it adds no row to the README's
+entity table and nothing to any dashboard.
+
+Files added: `Directory.Build.props`, `src/Solax.Worker/BuildInfo.cs`,
+`tests/Solax.Worker.Tests/BuildInfoTests.cs`.
+Files changed: `Dockerfile`, `Dockerfile.windows`, `.github/workflows/publish-image.yml`,
+`src/Solax.Worker/Program.cs`, `HomeAssistant/HaDiscovery.cs`, `README.md`, `deploy/README.md`,
+`docs/DECISIONS.md`.
+
+---
+
 ## 2026-08-10 — The Windows publish job waits for a Docker daemon instead of assuming one
 
 Follow-up to #35, whose first run on `main` failed in the `windows` job after 12 seconds:

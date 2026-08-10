@@ -15,6 +15,13 @@ ARG DOTNET_VERSION=10.0
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 ARG TARGETARCH
+
+# What the built worker will report at startup and to Home Assistant. Defaults match
+# Directory.Build.props, so a plain `docker build` is honestly labelled as a local build; CI passes
+# the release version and the commit. See src/Solax.Worker/BuildInfo.cs.
+ARG VERSION=0.0.0-dev
+ARG SOURCE_REVISION=
+
 WORKDIR /source
 
 # Restore against the project files alone, so the slow restore layer stays cached until a dependency
@@ -31,6 +38,8 @@ RUN dotnet publish src/Solax.Worker/Solax.Worker.csproj \
         -c Release \
         --no-restore \
         --self-contained false \
+        -p:Version="$VERSION" \
+        -p:SourceRevisionId="$SOURCE_REVISION" \
         -o /app \
     # The two directories the app writes to, both relative to WORKDIR: Serilog's file sink
     # ("logs/solax-.log") and the charging-session SQLite store ("data/sessions.db"). Created now, in

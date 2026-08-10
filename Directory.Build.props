@@ -1,0 +1,20 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      A placeholder, deliberately. The git tag is the source of truth for a release version: CI
+      passes -p:Version=<tag without the leading v> when building from a v* tag, and the resulting
+      number is what the image is tagged with too, so the two can never drift. A local or
+      branch build keeps this value and is therefore self-evidently not a release.
+    -->
+    <Version>0.0.0-dev</Version>
+
+    <!--
+      Set by CI to the commit being built. The SDK appends it to AssemblyInformationalVersion as
+      "+<sha>", which is what makes a running container traceable to a commit rather than only to a
+      version number that several builds may share.
+    -->
+    <SourceRevisionId Condition="'$(SourceRevisionId)' == ''"></SourceRevisionId>
+  </PropertyGroup>
+
+</Project>

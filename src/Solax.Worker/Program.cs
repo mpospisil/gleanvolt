@@ -269,6 +269,12 @@ builder.Services.AddHostedService<HomeAssistantMqttWorker>();
 
 var host = builder.Build();
 
+// First line in the log, before anything can go wrong: a log file or a `docker logs` dump is
+// otherwise untraceable to the build that produced it. "0.0.0-dev" with no commit means a local
+// build rather than anything CI published.
+host.Services.GetRequiredService<ILogger<Program>>().LogInformation(
+    "SolaX Local Controller {Version} starting.", BuildInfo.Describe());
+
 // An unset zone means "ask the OS", which is right on Linux -- the container's TZ sets it. On
 // Windows it is a trap: .NET ignores TZ there, so the container runs in UTC and every session is
 // recorded against the wrong day, with nothing in the logs to say so. Say so.
