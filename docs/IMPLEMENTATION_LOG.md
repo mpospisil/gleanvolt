@@ -4,6 +4,53 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-11 — The Windows entry in the manifest list had no build number
+
+Found by inspecting the images the pipeline actually published rather than by reading the workflow.
+The multi-platform index was correct in every visible way — `linux/amd64`, `linux/arm64` and
+`windows/amd64` all present, every tag resolving, the amd64 image running and reporting the right
+commit — but the Windows entry read:
+
+```json
+"platform": { "architecture": "amd64", "os": "windows" }
+```
+
+No `os.version`. `docker buildx imagetools create` drops it when it composes an index from tags, and
+that field is how a Windows host picks an image it can actually run. With one Windows entry the
+practical harm is small; with two — the `ltsc2022` + `ltsc2025` option considered when this was
+designed — there would be nothing left in the index to tell them apart.
+
+**`docker manifest` replaces `imagetools create` in the manifest job**, purely because it can set the
+field: `manifest create`, then `manifest annotate --os-version`, then `manifest push`. The cost is a
+push per public tag instead of one for all of them, which at this number of tags is not worth
+optimising away.
+
+**The build number is read off the built image, not hardcoded.** The Windows job now runs
+`docker inspect --format '{{.OsVersion}}'` and exports it as a job output. A literal per ltsc release
+would go stale on every base-image patch, and a stale value here would be worse than the missing
+field it replaces — it would assert a specific host compatibility that is not true.
+
+**The real lesson is that a green run proved nothing.** This defect shipped in the first release and
+survived a second, because everything the workflow checked was fine. So the manifest job now ends by
+asserting what it just published: every required platform present, and the Windows entry carrying a
+non-empty `os.version`. `.github/scripts/verify-manifest.py` is a file rather than a heredoc — the
+first attempt embedded it in the YAML and its unindented lines silently broke the block scalar, which
+is its own small argument for not writing programs inside workflow files.
+
+**Verified before pushing:** the script was run against the currently-published manifest, where it
+correctly fails with exit 1 on the missing `os.version`; and against three fixtures covering a good
+index, a Windows entry without the field, and a missing architecture. The good fixture also confirms
+attestation manifests (`unknown/unknown`) are skipped rather than counted as platforms.
+
+**Not verified:** the `docker manifest annotate` path itself, which needs a Windows image built on a
+Windows runner. The next push to `main` exercises it — and unlike the daemon fix, this one cannot
+pass silently, because the verify step fails the build if the annotation did not take.
+
+Files added: `.github/scripts/verify-manifest.py`.
+Files changed: `.github/workflows/publish-image.yml`.
+
+---
+
 ## 2026-08-10 — The deploy path said `IMAGE_TAG=v1.0.0`, which would not have worked
 
 An audit of the Raspberry Pi deployment files against the naming introduced in #35, prompted by the
