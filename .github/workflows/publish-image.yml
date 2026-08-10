@@ -1,11 +1,25 @@
 name: Publish image
 
-# Builds the linux/arm64 controller image and pushes it to GHCR, so the Raspberry Pi only ever
-# pulls (issue #26). ci.yml remains the quality gate -- this workflow packages what already passed.
+# Builds the controller image for every supported platform and pushes it to GHCR, so a target only
+# ever pulls. ci.yml remains the quality gate -- this workflow packages what already passed.
+#
+# Three platforms, two operating systems, one package. The Linux images cross-compile on Linux
+# runners; the Windows image can only be assembled on a Windows daemon, so it gets its own job and
+# its own Dockerfile. A final job folds all three into a single multi-platform manifest list, which
+# is what makes `docker pull ghcr.io/mpospisil/solax-controller:1.0.0` resolve to the right image on
+# a Raspberry Pi, an x64 server and a Windows host alike.
+#
+# Naming (see deploy/README.md):
+#   :latest                      manifest list, main only
+#   :1.0.0  :1.0  :1             manifest list, from a v* tag
+#   :sha-abc1234                 manifest list, every build
+#   :<version>-linux-arm64       single platform, for pinning
+#   :<version>-linux-amd64
+#   :<version>-nanoserver-ltsc2022
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
     tags: ['v*']
   workflow_dispatch:
 
@@ -14,12 +28,35 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  # One source of truth for the version string. Both build jobs derive their platform-suffixed tags
+  # from it and the manifest job reuses it to find them, so a rerun can never mix two versions.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Derive version
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
+
+  linux:
+    needs: version
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
       packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
 
     steps:
       - name: Checkout
@@ -28,7 +65,7 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
         # No setup-qemu-action: the Dockerfile cross-compiles and its runtime stage has no RUN,
-        # so no arm64 binary is executed during the build.
+        # so no foreign-architecture binary is executed during the build.
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -42,18 +79,130 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Every tag this job pushes names one platform. The bare names (:latest, :1.0.0) belong to
+          # the manifest list and are created only by the manifest job, once all platforms exist --
+          # publishing them here would briefly point :latest at a single-architecture image.
+          flavor: |
+            latest=false
+            suffix=-linux-${{ matrix.arch }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-
             type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/${{ matrix.arch }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=linux-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=linux-${{ matrix.arch }}
+
+  windows:
+    needs: version
+    # Pinned to 2022, not windows-latest: the container's Windows build must not drift past the
+    # hosts that run it. An ltsc2022 image runs on Server 2022 and Server 2025 hosts; an ltsc2025
+    # image would require a 2025 host. See docs/DECISIONS.md.
+    runs-on: windows-2022
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      WINDOWS_VERSION: ltsc2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Plain docker build rather than build-push-action/buildx: buildx has no usable Windows
+      # driver, and the Windows daemon on this runner builds Windows containers natively.
+      - name: Build
+        shell: pwsh
+        run: |
+          $image = "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}".ToLower()
+          $tag = "${image}:${{ needs.version.outputs.version }}-nanoserver-${{ env.WINDOWS_VERSION }}"
+          docker build -f Dockerfile.windows `
+            --build-arg WINDOWS_VERSION=${{ env.WINDOWS_VERSION }} `
+            -t $tag .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Push
+        shell: pwsh
+        run: |
+          docker push $env:TAG
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  # Folds the three single-platform tags into one manifest list per public tag. Until this runs,
+  # :latest and :1.0.0 still point at the previous release -- so a half-finished matrix never
+  # publishes a partially-platformed release.
+  manifest:
+    needs: [version, linux, windows]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive the public tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
+
+      - name: Create the manifest list
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          image=$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+
+          # -t per public name, then the three platform tags as sources: one call, one push.
+          targets=()
+          while read -r tag; do
+            if [ -n "$tag" ]; then
+              targets+=(-t "$tag")
+            fi
+          done <<< "$TAGS"
+
+          docker buildx imagetools create "${targets[@]}" \
+            "${image}:${VERSION}-linux-amd64" \
+            "${image}:${VERSION}-linux-arm64" \
+            "${image}:${VERSION}-nanoserver-ltsc2022"
+        # REGISTRY and IMAGE_NAME come from the workflow env.
+
+      - name: Show what was published
+        run: |
+          docker buildx imagetools inspect \
+            "$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${{ needs.version.outputs.version }}"

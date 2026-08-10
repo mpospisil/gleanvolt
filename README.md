@@ -127,8 +127,12 @@ For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspbe
 ./deploy/deploy.sh
 ```
 
-The Pi never builds anything: CI cross-compiles a `linux/arm64` image and pushes it to GHCR
-(`ghcr.io/mpospisil/solax-controller`), and the Pi pulls it. All state lives on bind mounts under
+The Pi never builds anything: CI builds the image and pushes it to GHCR
+(`ghcr.io/mpospisil/solax-controller`), and the Pi pulls it. That one name is a multi-platform
+manifest list covering **`linux/arm64`** (the Pi), **`linux/amd64`** (an x64 Linux host) and
+**Windows Nano Server ltsc2022**, so the same tag pulls the right image everywhere; Windows needs
+`Controller:TimeZone` set, for the reason given under [Configuration](#configuration). All state
+lives on bind mounts under
 `/opt/solax` — including the charging-session database (`data/sessions.db`) and the log files — so
 the containers are disposable: upgrades, rollbacks and `docker compose down` lose nothing. The broker
 requires authentication and is not published to the LAN.
@@ -166,6 +170,22 @@ below). Device addresses and the poll cadence sit in the `Solax` section:
   "EvCharger": { "Host": "192.168.2.10", "Port": 502, "UnitId": 1 }
 }
 ```
+
+The `Controller` section holds the settings that belong to no single feature:
+
+```jsonc
+"Controller": {
+  "TimeZone": ""   // "" = ask the OS; an IANA or Windows zone id overrides it
+}
+```
+
+`TimeZone` is the zone every *local* decision is made in: the forecast day boundary, the daily loan
+budget reset, and the zone id recorded on each charging session. Leave it empty on Linux, where the
+`TZ` environment variable already sets it — that is what the deploy stack does. **Set it explicitly
+on Windows**, where .NET ignores `TZ` and the process would otherwise run in UTC; on the Nano Server
+image it must be a Windows id (`Central Europe Standard Time`), because resolving IANA ids needs ICU
+and Nano Server has none. An id that cannot be resolved stops the worker at startup rather than
+quietly reverting to UTC.
 
 The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
 are documented in the subsections that follow.

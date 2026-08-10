@@ -34,6 +34,15 @@ builder.Services.AddSerilog(config => config
 
 builder.Services.Configure<SolaxOptions>(builder.Configuration.GetSection(SolaxOptions.SectionName));
 
+// The zone every "local" decision is made in. Registered as the app's TimeProvider rather than read
+// at each call site, so the services that already take one need no change and there is exactly one
+// answer to "what day is it here". Resolved eagerly: an unknown id must stop the host at startup,
+// not surface days later as a day boundary in the wrong place. See ControllerOptions.TimeZone for
+// why Windows containers cannot rely on TZ the way the Linux ones do.
+builder.Services.Configure<ControllerOptions>(builder.Configuration.GetSection(ControllerOptions.SectionName));
+builder.Services.AddSingleton(ZonedTimeProvider.Resolve(
+    builder.Configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)]));
+
 // Enforces the dry-run guarantee structurally: when a device may not be written to, its client
 // physically cannot write, so even a caller that forgot its own guard can never reach the hardware.
 static IModbusClient WriteProof(IServiceProvider services, IModbusClient client, bool writable) =>
@@ -192,7 +201,8 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<SurplusMovingAverage>(),
         pauseCurrentAmps: options.PauseCurrentAmps,
         idlePowerThresholdWatts: options.CompletionPowerThresholdWatts,
-        services.GetRequiredService<ILogger<ChargingControlCoordinator>>());
+        services.GetRequiredService<ILogger<ChargingControlCoordinator>>(),
+        services.GetRequiredService<TimeProvider>());
 });
 
 // Runtime charge-control mode, changed at runtime (e.g. by HA). It is deliberately NOT seeded from
@@ -258,4 +268,18 @@ builder.Services.Configure<HomeAssistantOptions>(builder.Configuration.GetSectio
 builder.Services.AddHostedService<HomeAssistantMqttWorker>();
 
 var host = builder.Build();
+
+// An unset zone means "ask the OS", which is right on Linux -- the container's TZ sets it. On
+// Windows it is a trap: .NET ignores TZ there, so the container runs in UTC and every session is
+// recorded against the wrong day, with nothing in the logs to say so. Say so.
+if (OperatingSystem.IsWindows()
+    && string.IsNullOrWhiteSpace(host.Services.GetRequiredService<IOptions<ControllerOptions>>().Value.TimeZone))
+{
+    host.Services.GetRequiredService<ILogger<Program>>().LogWarning(
+        "Controller:TimeZone is not set and this is Windows, where .NET ignores the TZ environment "
+        + "variable. Local time is {Zone}. Set Controller__TimeZone to a Windows id (e.g. "
+        + "\"Central Europe Standard Time\") or the day boundary and recorded sessions will be wrong.",
+        TimeZoneInfo.Local.Id);
+}
+
 host.Run();

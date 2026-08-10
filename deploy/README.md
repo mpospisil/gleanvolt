@@ -268,11 +268,54 @@ Upgrade to the latest build, or roll back to a known-good one:
 
 ```bash
 ./deploy/deploy.sh                              # latest from main
+IMAGE_TAG=v1.0.0 ./deploy/deploy.sh             # a released version
 IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # a specific build
 ```
 
 Both preserve all state. So does `docker compose down`, and so does `docker rm -f` on any single
 container — that is the point of the layout below.
+
+Deploy from a checked-out tag rather than your working branch. `deploy.sh` copies the **local**
+`deploy/` tree to the Pi, so the compose file and the image otherwise come from two different places:
+
+```bash
+git switch --detach v1.0.0 && IMAGE_TAG=v1.0.0 ./deploy/deploy.sh
+```
+
+## Which image you get
+
+Everything publishes to one package, `ghcr.io/mpospisil/solax-controller`, as a multi-platform
+manifest list. The Pi pulls arm64 and an x64 host pulls amd64 from the *same* tag — there is nothing
+platform-specific to configure, and `IMAGE_TAG` never needs a suffix.
+
+| Tag | What it is |
+|---|---|
+| `latest` | newest build of `main` — the default in `.env` |
+| `1.0.0`, `1.0`, `1` | a released version, from a `v*` git tag |
+| `sha-abc1234` | one specific build, immutable |
+| `1.0.0-linux-arm64` | that release, Raspberry Pi only |
+| `1.0.0-linux-amd64` | that release, x64 Linux only |
+| `1.0.0-nanoserver-ltsc2022` | that release, Windows Nano Server only |
+
+The suffixed tags exist for pinning and for answering "which one did it actually pull"; day to day
+you want the bare name. `docker buildx imagetools inspect ghcr.io/mpospisil/solax-controller:latest`
+lists every platform behind a tag.
+
+### Running on Windows
+
+The Nano Server image runs the same worker, with one difference that will bite silently if it is
+missed: **.NET on Windows ignores the `TZ` environment variable.** The `TZ` line in
+`docker-compose.yml` does nothing there, the container runs in UTC, and every recorded charging
+session is filed against the wrong day. Set the zone explicitly instead, as a **Windows** id —
+Nano Server ships no ICU, so IANA ids like `Europe/Prague` cannot be resolved on it:
+
+```powershell
+docker run -e Controller__TimeZone="Central Europe Standard Time" `
+  ghcr.io/mpospisil/solax-controller:latest
+```
+
+The worker logs a warning at startup if it finds itself on Windows with the zone unset. On Linux the
+setting stays empty and `TZ` keeps working exactly as before.
 
 ## Where the logs go
 

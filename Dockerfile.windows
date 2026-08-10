@@ -1,0 +1,61 @@
+# escape=`
+#
+# Windows Nano Server image for the SolaX Local Controller worker.
+#
+# Separate from the Linux Dockerfile rather than merged into it: a Dockerfile builds for one OS, and
+# a Windows runtime stage can only be assembled on a Windows daemon. The CI workflow therefore runs
+# this on a windows-2022 runner and folds the result into the same manifest list as the Linux images
+# (see .github/workflows/publish-image.yml).
+#
+#   docker build -f Dockerfile.windows -t solax-controller:nanoserver .
+#
+# ltsc2022 rather than ltsc2025: an ltsc2022 container runs on both Windows Server 2022 and 2025
+# hosts, whereas ltsc2025 requires a 2025 host. See docs/DECISIONS.md.
+#
+# The escape directive above matters -- the default escape character is a backslash, which is also
+# the Windows path separator.
+
+ARG DOTNET_VERSION=10.0
+ARG WINDOWS_VERSION=ltsc2022
+
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
+WORKDIR C:\source
+
+# Same layer split as the Linux build: project files first, so the restore layer survives a source
+# edit. No -a argument here -- Windows containers are amd64 only, so there is nothing to select and
+# nothing to cross-compile.
+COPY SolaxLocalController.slnx ./
+COPY src/Solax.Core/Solax.Core.csproj src/Solax.Core/
+COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
+COPY src/Solax.Worker/Solax.Worker.csproj src/Solax.Worker/
+RUN dotnet restore src\Solax.Worker\Solax.Worker.csproj
+
+COPY src/ src/
+RUN dotnet publish src\Solax.Worker\Solax.Worker.csproj `
+        -c Release `
+        --no-restore `
+        --self-contained false `
+        -o C:\app `
+    # The two directories the app writes to, matching the Linux image: Serilog's file sink and the
+    # charging-session SQLite store. cmd's mkdir creates intermediate directories, so no -p.
+    && mkdir C:\app\logs C:\app\data
+
+FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS runtime
+
+WORKDIR C:\app
+COPY --from=build C:\app .
+
+# No diagnostic IPC socket, for the same reason as the Linux image: nothing attaches a profiler.
+ENV DOTNET_EnableDiagnostics=0
+
+# Nano Server ships no ICU, so .NET falls back to Windows NLS. Culture-aware formatting still works,
+# but the IANA-to-Windows timezone mapping does not -- it is an ICU feature. Configure the zone with
+# a WINDOWS id here ("Central Europe Standard Time"), not the IANA id the Linux deploy uses:
+#
+#   docker run -e Controller__TimeZone="Central Europe Standard Time" ...
+#
+# Leaving it unset is not the same as on Linux. .NET on Windows ignores the TZ environment variable
+# entirely, so an unconfigured container runs in UTC and stamps every recorded charging session with
+# the wrong day. The worker logs a warning at startup when it detects exactly that.
+
+ENTRYPOINT ["dotnet", "Solax.Worker.dll"]

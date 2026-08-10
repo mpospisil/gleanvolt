@@ -4,6 +4,53 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-10 — One image name, three platforms, and a timezone that no longer comes from the OS
+
+**Context.** The image was built for `linux/arm64` alone, because the Pi was the only target. Wanting
+to run the controller on an x64 box and on a Windows host turns one build into three, and raises the
+question the single-platform world never had to answer: what is any of them *called*.
+
+**Decision — one package, one manifest list.** All three platforms publish under
+`ghcr.io/mpospisil/solax-controller`. `:1.0.0` is a manifest list, so the same string pulls the arm64
+image on the Pi, the amd64 image on a server and the Nano Server image on Windows, with no per-host
+knowledge anywhere. Separate packages per platform were the alternative; they would have meant three
+things to keep in version step and would have thrown away the platform selection Docker does for
+free. Single-platform tags (`:1.0.0-linux-arm64`) still exist alongside, for pinning and for
+debugging "which one did it actually pull".
+
+**Decision — Windows means Nano Server ltsc2022, built in its own job.** A Dockerfile builds for one
+OS and a Windows runtime stage needs a Windows daemon, so `Dockerfile.windows` is a second file built
+on a `windows-2022` runner rather than a `--platform` on the existing one. ltsc2022 over ltsc2025
+because an ltsc2022 container runs on both Server 2022 and Server 2025 hosts, while ltsc2025 demands
+a 2025 host — the newer base buys nothing here and costs reach. Nano Server over Server Core for
+~300 MB against ~2 GB, accepting that Nano Server ships no ICU.
+
+**Decision — the local timezone is configuration, not an ambient property of the host.** This is what
+the Windows image forced. The controller's day boundary, the daily loan reset and the zone id stamped
+on every recorded session all came from `TimeZoneInfo.Local`, which on Linux is set by the container's
+`TZ`. **.NET on Windows ignores `TZ` entirely.** A Windows container would therefore have run in UTC
+whatever `docker-compose.yml` said, and silently filed evening sessions under the following day —
+visible only as inexplicably bad charging decisions days later. `Controller:TimeZone` now names the
+zone, resolved through a `ZonedTimeProvider` that overrides `LocalTimeZone` on the `TimeProvider` the
+services already inject, so there is exactly one answer to "what day is it here".
+
+**Consequences.**
+
+- An unresolvable zone id is fatal at startup. Falling back to UTC is the failure mode the setting
+  exists to prevent, so it must not be the failure mode of the setting itself.
+- Empty stays the default and keeps today's behaviour. Linux deployments are unaffected; `TZ` in
+  `deploy/docker-compose.yml` still does the job.
+- On Nano Server the value must be a **Windows** zone id (`Central Europe Standard Time`), not IANA.
+  Mapping IANA to Windows is an ICU feature and Nano Server has no ICU. The worker logs a warning at
+  startup when it is running on Windows with the zone unset.
+- `SolaxPollingService` reached for `TimeZoneInfo.Local` directly; it takes a `TimeProvider` now, like
+  everything else that needed the zone.
+- The publish workflow grew from one job to four (version, linux × 2 arches, windows, manifest). The
+  manifest job is what keeps `:latest` pointing at the previous release until every platform of the
+  new one exists.
+
+---
+
 ## 2026-08-09 — Charging sessions are stored in SQLite, and published as immutable documents
 
 **Context.** Everything the controller knew was live: a log line that scrolls past and a Home Assistant

@@ -27,6 +27,7 @@ public sealed class SolaxPollingService : BackgroundService
     private readonly BatteryHoldOptions _batteryHoldOptions;
     private readonly ForecastChargeOptions _forecastOptions;
     private readonly ILogger<SolaxPollingService> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _pollInterval;
 
     // Whether a mode has armed the hold itself, as opposed to the owner's switch. Kept here rather
@@ -50,7 +51,8 @@ public sealed class SolaxPollingService : BackgroundService
         IOptions<ChargeControlOptions> chargeControlOptions,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
         IOptions<ForecastChargeOptions> forecastOptions,
-        ILogger<SolaxPollingService> logger)
+        ILogger<SolaxPollingService> logger,
+        TimeProvider? timeProvider = null)
     {
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
@@ -65,6 +67,7 @@ public sealed class SolaxPollingService : BackgroundService
         _batteryHoldOptions = batteryHoldOptions.Value;
         _forecastOptions = forecastOptions.Value;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
     }
 
@@ -330,8 +333,9 @@ public sealed class SolaxPollingService : BackgroundService
     /// </summary>
     private double? TomorrowForecastWattHours(DateTimeOffset now)
     {
-        var localMidnight = TimeZoneInfo.ConvertTime(now, TimeZoneInfo.Local).Date.AddDays(1);
-        var start = new DateTimeOffset(localMidnight, TimeZoneInfo.Local.GetUtcOffset(localMidnight));
+        var zone = _timeProvider.LocalTimeZone;
+        var localMidnight = TimeZoneInfo.ConvertTime(now, zone).Date.AddDays(1);
+        var start = new DateTimeOffset(localMidnight, zone.GetUtcOffset(localMidnight));
 
         var forecast = _solarForecast.GetForecast(start, start.AddDays(1));
         return forecast?.Periods.Count > 0 ? forecast.ExpectedEnergyWattHours : null;
