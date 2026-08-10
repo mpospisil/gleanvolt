@@ -6,8 +6,13 @@
 # copies secrets: /opt/solax/.env is created once, by hand, on the Pi.
 #
 #   ./deploy/deploy.sh                               # deploy whatever .env pins (default: latest)
+#   IMAGE_TAG=1.0.0 ./deploy/deploy.sh               # a released version -- no "v", see below
 #   IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh         # deploy/roll back to a specific build
 #   PI_HOST=martin@192.168.2.7 ./deploy/deploy.sh    # non-default host or user
+#
+# IMAGE_TAG names an IMAGE tag, not a git tag: releases are cut as git tag v1.0.0 and published as
+# image 1.0.0, because the publish workflow strips the prefix. The image is a multi-platform
+# manifest list, so the tag never needs an architecture in it either.
 #
 # Preparing the Pi itself -- Docker, cgroups, swap, secrets, broker credentials -- is documented in
 # deploy/README.md and deliberately not automated here: it needs sudo and it needs decisions. The two

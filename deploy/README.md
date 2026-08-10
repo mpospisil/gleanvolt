@@ -276,9 +276,13 @@ Upgrade to the latest build, or roll back to a known-good one:
 
 ```bash
 ./deploy/deploy.sh                              # latest from main
-IMAGE_TAG=v1.0.0 ./deploy/deploy.sh             # a released version
+IMAGE_TAG=1.0.0 ./deploy/deploy.sh              # a released version -- no "v"
 IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # a specific build
 ```
+
+**The image tag has no `v`, though the git tag does.** Releases are cut as git tag `v1.0.0`, and the
+publish workflow strips the prefix, so the image is `…/solax-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
+does not exist and the pull fails with `manifest unknown`.
 
 Both preserve all state. So does `docker compose down`, and so does `docker rm -f` on any single
 container — that is the point of the layout below.
@@ -287,8 +291,11 @@ Deploy from a checked-out tag rather than your working branch. `deploy.sh` copie
 `deploy/` tree to the Pi, so the compose file and the image otherwise come from two different places:
 
 ```bash
-git switch --detach v1.0.0 && IMAGE_TAG=v1.0.0 ./deploy/deploy.sh
+git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy.sh
 ```
+
+Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, `1.0.0` is the
+**image** tag you pull.
 
 ## Which image you get
 

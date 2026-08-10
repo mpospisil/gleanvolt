@@ -1,15 +1,20 @@
 # syntax=docker/dockerfile:1
 #
-# Container image for the SolaX Local Controller worker (issue #26).
+# Linux container image for the SolaX Local Controller worker (issues #26, #35). Builds both Linux
+# architectures from this one file; Windows Nano Server needs its own, because a Dockerfile targets
+# one OS -- see Dockerfile.windows.
 #
 # Cross-compiled, not emulated: the SDK stage is pinned to the *builder's* architecture with
 # $BUILDPLATFORM and targets the requested one via `dotnet publish -a $TARGETARCH`, so an amd64 CI
 # runner produces an arm64 image at native speed. The runtime stage contains no RUN instruction, so
-# nothing arm64 ever has to execute at build time and QEMU is not needed at all.
+# no foreign-architecture binary ever executes at build time and QEMU is not needed at all.
 #
-#   docker build --platform linux/arm64 -t solax-controller .
+#   docker build --platform linux/arm64 -t solax-controller .   # the Pi
+#   docker build --platform linux/amd64 -t solax-controller .   # an x64 host
 #
-# See docs/DECISIONS.md for why this and not an on-device build.
+# CI publishes both under one name as a multi-platform manifest list, so a deploy names a tag and
+# never an architecture (deploy/README.md). See docs/DECISIONS.md for why this and not an on-device
+# build.
 
 ARG DOTNET_VERSION=10.0
 

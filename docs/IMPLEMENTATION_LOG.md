@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-10 — The deploy path said `IMAGE_TAG=v1.0.0`, which would not have worked
+
+An audit of the Raspberry Pi deployment files against the naming introduced in #35, prompted by the
+question of whether they had kept up. Mostly they had. One thing had not, and it was the kind that
+only fails at the moment you need it.
+
+**`deploy/README.md` documented `IMAGE_TAG=v1.0.0` for deploying a release.** No such image exists.
+Releases are cut as git tag `v1.0.0`, and `docker/metadata-action`'s `type=semver,pattern={{version}}`
+strips the prefix, so the published image is `…/solax-controller:1.0.0`. The documented command would
+have failed on the Pi with `manifest unknown` — during a rollback, which is exactly when nobody wants
+to debug a tag string. The same file's own tag table two paragraphs later listed `1.0.0` correctly,
+so the document contradicted itself; verified the stripping behaviour against the action's docs
+rather than trusting either version of the file.
+
+Both occurrences fixed, and the distinction is now stated where it can be tripped over: `v1.0.0` is
+the git tag you check out, `1.0.0` is the image tag you pull. The one command that legitimately
+contains both now says so inline.
+
+**`deploy/.env.example` still described the pre-#35 world** — only `latest` and `sha-<short>`, no
+released versions, no hint that the tag is platform-independent now. It is the file an operator
+actually edits on the Pi, so it is the one place the scheme most needs to be right. It now lists all
+three forms, carries the same no-`v` warning, and mentions the single-platform escape hatch for when
+one platform holds up a release.
+
+**`deploy/deploy.sh`'s usage header** gained the release form and a note that `IMAGE_TAG` names an
+image tag rather than a git tag.
+
+**The Linux `Dockerfile` header still read as the arm64 Dockerfile** — accurate about its mechanism,
+but written when arm64 was the only target. It now says it builds both Linux architectures, points
+at `Dockerfile.windows` for the OS it cannot build, and gives both `--platform` examples.
+
+**Checked and correct, no change needed:** `deploy/docker-compose.yml`'s
+`image: …/solax-controller:${IMAGE_TAG:-latest}` works unchanged with every new tag form and needs no
+`platform:` key, because a manifest list resolves per host. The older `2026-08-02` decision record
+still says CI builds `linux/arm64`; that file is append-only and the `2026-08-10` record supersedes
+it, so it stays as written.
+
+Files changed: `deploy/README.md`, `deploy/.env.example`, `deploy/deploy.sh`, `Dockerfile`.
+
+---
+
 ## 2026-08-10 — A running build can finally say which build it is
 
 Until now nothing inside the running system knew its own version. The image tag knew; the process
