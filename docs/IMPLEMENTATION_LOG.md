@@ -4,6 +4,49 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-10 — The Windows publish job waits for a Docker daemon instead of assuming one
+
+Follow-up to #35, whose first run on `main` failed in the `windows` job after 12 seconds:
+
+```
+failed to connect to the docker API at npipe:////./pipe/docker_engine;
+check if the path is correct and if the daemon is running:
+open //./pipe/docker_engine: The system cannot find the file specified.
+```
+
+Nothing to do with `Dockerfile.windows`, which was never reached. GitHub's Windows runners
+intermittently start with the Docker service still stopped — an open upstream regression,
+[actions/runner-images#13729](https://github.com/actions/runner-images/issues/13729), affecting
+windows-2022 and 2025 on both standard and larger runners since February. The `Log in to GHCR` step
+passed right before it because `docker login` talks to the registry, not the daemon, which is why the
+failure looked like a build problem rather than an environment one.
+
+The job now starts the service if it is stopped and polls the API until it answers, up to three
+minutes, before doing anything else. It also asserts the daemon is in **Windows** container mode:
+otherwise a Linux-mode daemon fails much later, deep in the build, complaining about the base image's
+OS rather than about the runner.
+
+**One line in that step is load-bearing and looks like noise:** `$PSNativeCommandUseErrorActionPreference = $false`.
+pwsh 7.4+ turns a non-zero native exit code into a *terminating* error when
+`$ErrorActionPreference` is `Stop`, so the probing `docker version` would have thrown on its first
+failed attempt — the exact attempt the retry loop exists to survive. The retry would have been
+decorative without it.
+
+Also added `timeout-minutes: 60` to the job. Windows base images are large and this runner caches
+them inconsistently, and the default job timeout is six hours.
+
+**The failure did expose a real design consequence**, so it is now documented rather than discovered
+twice: because the manifest job needs every platform, one flaky Windows runner holds back `:latest`
+for the Pi as well. That is the intended trade-off — a `:latest` that quietly lost a platform is
+worse — but the single-platform tags are pushed regardless, so the escape hatch
+(`IMAGE_TAG=sha-abc1234-linux-arm64`) is in `deploy/README.md` now. The failed run confirmed it: both
+Linux jobs went green and pushed `main-linux-arm64` and `sha-afef9d3-linux-arm64` before the Windows
+job failed.
+
+Files changed: `.github/workflows/publish-image.yml`, `deploy/README.md`.
+
+---
+
 ## 2026-08-10 — Three platforms under one image name, and a timezone that is now configuration
 
 Issue #35. The image was `linux/arm64` only. It is now `linux/arm64`, `linux/amd64` and Windows Nano

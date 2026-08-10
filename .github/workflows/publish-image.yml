@@ -108,6 +108,10 @@ jobs:
     # image would require a 2025 host. See docs/DECISIONS.md.
     runs-on: windows-2022
 
+    # Windows base images are large and this runner caches them inconsistently, so the job is slow by
+    # nature -- but not hours slow. Fail rather than sit on a stalled pull until the 6-hour default.
+    timeout-minutes: 60
+
     permissions:
       contents: read
       packages: write
@@ -119,6 +123,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The runner does not reliably have a Docker daemon by the time the job starts: the service is
+      # intermittently still stopped, and `docker build` then fails on the named pipe with "The
+      # system cannot find the file specified". Upstream regression, open since 2026-02 and not
+      # specific to this repo -- actions/runner-images#13729. Start it and wait rather than let a
+      # runner's mood fail the release.
+      - name: Ensure the Docker daemon is up
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Required, not decorative: pwsh 7.4+ turns a non-zero native exit code into a terminating
+          # error when ErrorActionPreference is Stop, so the probing `docker version` below would
+          # throw on its first failed attempt -- exactly the attempt the retry loop exists for.
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $svc = Get-Service -Name docker -ErrorAction SilentlyContinue
+          if ($null -eq $svc) {
+            throw "This runner has no 'docker' service, which means it cannot build Windows images at all."
+          }
+          if ($svc.Status -ne 'Running') {
+            Write-Host "Docker service is '$($svc.Status)'; starting it."
+            Start-Service -Name docker
+          }
+
+          # Started is not the same as listening -- poll the API rather than sleeping a guessed amount.
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline) {
+            $os = docker version --format '{{.Server.Os}}' 2>$null
+            if ($LASTEXITCODE -eq 0 -and $os) {
+              # A daemon in Linux-container mode would fail later, deep inside the build, with an
+              # error about the base image's OS. Say so here instead.
+              if ($os -ne 'windows') {
+                throw "The Docker daemon is in '$os' container mode; Dockerfile.windows needs Windows containers."
+              }
+              Write-Host "Docker daemon is up, in Windows container mode."
+              exit 0
+            }
+            Start-Sleep -Seconds 5
+          }
+          throw "The Docker daemon did not accept connections within 3 minutes."
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -126,8 +170,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Plain docker build rather than build-push-action/buildx: buildx has no usable Windows
-      # driver, and the Windows daemon on this runner builds Windows containers natively.
+      # Plain docker build rather than build-push-action/buildx: buildx has no usable Windows driver.
       - name: Build
         shell: pwsh
         run: |
