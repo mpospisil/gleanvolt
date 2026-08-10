@@ -134,6 +134,11 @@ jobs:
       contents: read
       packages: write
 
+    # The exact Windows build the image was made from, e.g. 10.0.20348.2402. The manifest job needs
+    # it and cannot read it back from the registry index -- see the annotate step there for why.
+    outputs:
+      os_version: ${{ steps.build.outputs.os_version }}
+
     env:
       WINDOWS_VERSION: ltsc2022
 
@@ -190,6 +195,7 @@ jobs:
 
       # Plain docker build rather than build-push-action/buildx: buildx has no usable Windows driver.
       - name: Build
+        id: build
         shell: pwsh
         run: |
           $image = "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}".ToLower()
@@ -201,6 +207,16 @@ jobs:
             -t $tag .
           if ($LASTEXITCODE -ne 0) { exit 1 }
           "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          # Read the Windows build number off the image we just made, rather than hardcoding one per
+          # ltsc release: it changes with every base-image patch, and a stale literal here would be
+          # worse than the missing field it exists to fix.
+          $osVersion = docker inspect $tag --format '{{.OsVersion}}'
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($osVersion)) {
+            throw "Could not read OsVersion from $tag; the manifest would be published without it again."
+          }
+          Write-Host "Windows image os.version is $osVersion"
+          "os_version=$osVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Push
         shell: pwsh
@@ -220,6 +236,10 @@ jobs:
       packages: write
 
     steps:
+      # Only for .github/scripts/verify-manifest.py -- nothing here is built from source.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -243,29 +263,52 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=sha-
 
-      - name: Create the manifest list
+      # `docker buildx imagetools create` drops os.version from the Windows entry when it composes an
+      # index from tags, leaving {"os":"windows","architecture":"amd64"} with no build number. That
+      # field is how a Windows host picks an image it can actually run, and with a second Windows
+      # version in the list there would be nothing left to tell the two apart. `docker manifest` is
+      # used instead purely because it can annotate the field; it costs one push per public tag
+      # rather than one for all of them, which at this number of tags is not worth optimising.
+      - name: Create the manifest lists
         env:
           VERSION: ${{ needs.version.outputs.version }}
           TAGS: ${{ steps.meta.outputs.tags }}
+          WIN_OS_VERSION: ${{ needs.windows.outputs.os_version }}
         run: |
           set -euo pipefail
           image=$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
 
-          # -t per public name, then the three platform tags as sources: one call, one push.
-          targets=()
-          while read -r tag; do
-            if [ -n "$tag" ]; then
-              targets+=(-t "$tag")
-            fi
-          done <<< "$TAGS"
+          if [ -z "$WIN_OS_VERSION" ]; then
+            echo "The windows job reported no os.version; refusing to publish an index without it." >&2
+            exit 1
+          fi
 
-          docker buildx imagetools create "${targets[@]}" \
-            "${image}:${VERSION}-linux-amd64" \
-            "${image}:${VERSION}-linux-arm64" \
-            "${image}:${VERSION}-nanoserver-ltsc2022"
+          amd64="${image}:${VERSION}-linux-amd64"
+          arm64="${image}:${VERSION}-linux-arm64"
+          windows="${image}:${VERSION}-nanoserver-ltsc2022"
+
+          while read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "::group::$tag"
+            docker manifest create "$tag" "$amd64" "$arm64" "$windows"
+            # The Linux entries carry correct platforms already; only the Windows one is short a field.
+            docker manifest annotate "$tag" "$windows" \
+              --os windows --arch amd64 --os-version "$WIN_OS_VERSION"
+            docker manifest push "$tag"
+            echo "::endgroup::"
+          done <<< "$TAGS"
         # REGISTRY and IMAGE_NAME come from the workflow env.
 
-      - name: Show what was published
+      # Fails the build if the field is missing again -- the defect this job exists to fix is
+      # invisible in a green run otherwise, which is how it survived the first release unnoticed.
+      - name: Verify every platform, and that Windows carries its build number
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          docker buildx imagetools inspect \
-            "$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${{ needs.version.outputs.version }}"
+          set -euo pipefail
+          image=$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+
+          docker buildx imagetools inspect "${image}:${VERSION}"
+
+          docker buildx imagetools inspect "${image}:${VERSION}" --raw \
+            | python3 .github/scripts/verify-manifest.py
