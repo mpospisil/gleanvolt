@@ -118,6 +118,12 @@ jobs:
             SOURCE_REVISION=${{ github.sha }}
           cache-from: type=gha,scope=linux-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=linux-${{ matrix.arch }}
+          # BuildKit's default provenance attestation turns even a single-platform push into a
+          # 2-entry OCI index (image + attestation manifest). The manifest job's `docker manifest
+          # create` then rejects the per-arch tag outright: "is a manifest list", and specifying a
+          # manifest list as a source is not supported. Off, so each per-arch tag stays a plain
+          # single-platform image.
+          provenance: false
 
   windows:
     needs: version
