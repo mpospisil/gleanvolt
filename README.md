@@ -1,5 +1,8 @@
 # SolaX Local Controller
 
+[![CI](https://github.com/mpospisil/solax-controller/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mpospisil/solax-controller/actions/workflows/ci.yml?query=branch%3Amain)
+[![Publish image](https://github.com/mpospisil/solax-controller/actions/workflows/publish-image.yml/badge.svg?branch=main)](https://github.com/mpospisil/solax-controller/actions/workflows/publish-image.yml?query=branch%3Amain)
+
 A standalone, locally hosted background service for managing and monitoring a **SolaX X3-HYB-G4 PRO** hybrid inverter and a **SolaX X1/X3-HAC** EV charger.
 
 The controller operates entirely within the local LAN via **Modbus TCP**, bypassing cloud dependencies to ensure continuous operation, instantaneous polling, and strict local data ownership. It polls real-time data (PV generation, battery SOC, grid power flow) and applies automated decision-making logic to optimize EV charging and battery utilization based on household energy surpluses.
