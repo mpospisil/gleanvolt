@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
 using Solax.Core.Interfaces;
+using Solax.Core.Models;
 using Solax.Worker.Configuration;
 
 namespace Solax.Worker.HomeAssistant;

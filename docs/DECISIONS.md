@@ -4,6 +4,63 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-13 — The web UI is a Blazor library the worker hosts, and the host is a web server only when asked
+
+**Context.** Home Assistant is the only control surface, and on the reference Pi 3 B+ it is also the
+binding constraint: HA alone accounts for 600 MB of the 848 MB the stack reserves out of 905 MB. A
+self-hosted UI (issue #44) lets the controller run useful on that hardware. It is explicitly *not* a
+replacement for the MQTT integration — both surfaces stay first-class, and all four combinations of
+the two must run.
+
+**Decision — a second adapter over the existing seam, not a second architecture.** The UI consumes
+exactly what the MQTT worker consumes: `ChargeControlStatusHolder` for state, and the Core selector
+interfaces for commands. No control logic moved, and nothing in `Solax.Core` changed semantically.
+The one refactor is that the holder moved from `Solax.Worker` to `Solax.Core`, because a second
+consumer in a second assembly cannot depend on the host. It is a plain object with an event, so
+Core's "no framework dependencies" rule is untouched.
+
+**Blazor with interactive server rendering, in a Razor Class Library (`src/Solax.Web`) that
+`Solax.Worker` hosts.** Three choices, each with an alternative that was rejected:
+
+- **Server-side, not WebAssembly.** The components run beside the services they read, so a page
+  subscribes to `ChargeControlStatusHolder.Updated` directly and each completed poll pushes down the
+  circuit. WebAssembly would need a REST API this project needs for nothing else, plus a first-load
+  download onto a LAN appliance. With one or two browsers, the circuit's overhead is noise.
+- **Interactive, not static SSR.** A dashboard that shows a live system has to update itself; a
+  page that only tells the truth at F5 is worse than no page.
+- **A library the worker hosts, not an executable of its own.** One process, one container, one
+  entry point. Making `Solax.Web` the executable would churn both Dockerfiles, the CI publish
+  matrix and the test projects for no benefit.
+
+**Consequences accepted.**
+
+- **The runtime image is now `dotnet/aspnet`, not `dotnet/runtime`** — roughly 25 MB more image on
+  every platform, including for people who never switch the UI on. Unavoidable: the framework
+  reference is a property of the build, not of the configuration, and the process will not start
+  without the framework it was compiled against.
+- **Disabled has to mean no socket, and that took code.** Kestrel binds its default address when no
+  endpoint is configured, so an ASP.NET host with nothing mapped would still open a port the operator
+  never asked for. With `Web:Enabled` false the host registers `NoListenServer` in Kestrel's place,
+  which starts nothing and accepts nothing; the process is then indistinguishable from the headless
+  worker it was before. Verified with `ss -ltnp`: no listening socket in the process at all.
+- **The host project contains no `.razor` file, and the SDK infers Blazor support from exactly
+  that.** Without `RequiresAspNetWebAssets=true` in `Solax.Worker.csproj`, `_framework/blazor.web.js`
+  is never published: pages prerender correctly, no circuit is ever opened, and the only evidence is
+  a 404 in the browser's console. It cost an hour to find, and it is the sort of thing that would
+  otherwise be rediscovered on the Pi.
+- **Static assets must be asked for explicitly** (`builder.WebHost.UseStaticWebAssets()`). Outside
+  the Development environment, assets that live in build output rather than a `wwwroot` folder are
+  served as an empty HTTP 200 — the page renders and silently never updates. Free in a published
+  app, where the manifest it reads is absent.
+- **`Solax.Web` takes a `FrameworkReference` on `Microsoft.AspNetCore.App`** rather than the
+  `Microsoft.AspNetCore.Components.Web` package the RCL template offers. These components only ever
+  run server-side, so WebAssembly compatibility buys nothing and a duplicated assembly costs.
+- **The UI ships off by default** (`Web:Enabled: false`), like the Home Assistant integration.
+  Authentication is a later phase of #44, and an unauthenticated control surface must not appear on
+  a LAN because somebody upgraded.
+
+---
+
 ## 2026-08-12 — The Pi boots from an SD card because it cannot boot from the disk it runs on
 
 **Context.** The deploy host's USB SSD — an OCZ Vector 180 — began returning unrecoverable read

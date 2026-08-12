@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    The shared framework rather than the Microsoft.AspNetCore.Components.Web package the RCL template
+    offers: these components only ever run server-side, inside the worker, so there is nothing to gain
+    from staying WebAssembly-compatible and a duplicate copy of the assembly to avoid.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Solax.Core\Solax.Core.csproj" />
+  </ItemGroup>
+
+</Project>

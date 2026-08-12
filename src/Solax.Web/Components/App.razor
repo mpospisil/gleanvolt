@@ -1,0 +1,23 @@
+@*
+    The root component: the HTML document every page is rendered into.
+
+    Interactivity is declared once, here, rather than page by page. Every component in this library
+    therefore runs in interactive server mode -- prerendered as HTML on the first request, then kept
+    live over the circuit -- which is what lets a page push a new poll to the browser instead of
+    waiting for a refresh.
+*@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="_content/Solax.Web/css/site.css" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
