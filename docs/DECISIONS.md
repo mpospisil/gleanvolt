@@ -48,6 +48,10 @@ Core's "no framework dependencies" rule is untouched.
   is never published: pages prerender correctly, no circuit is ever opened, and the only evidence is
   a 404 in the browser's console. It cost an hour to find, and it is the sort of thing that would
   otherwise be rediscovered on the Pi.
+- **Static assets must be asked for explicitly** (`builder.WebHost.UseStaticWebAssets()`). Outside
+  the Development environment, assets that live in build output rather than a `wwwroot` folder are
+  served as an empty HTTP 200 — the page renders and silently never updates. Free in a published
+  app, where the manifest it reads is absent.
 - **`Solax.Web` takes a `FrameworkReference` on `Microsoft.AspNetCore.App`** rather than the
   `Microsoft.AspNetCore.Components.Web` package the RCL template offers. These components only ever
   run server-side, so WebAssembly compatibility buys nothing and a duplicated assembly costs.

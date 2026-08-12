@@ -55,6 +55,25 @@ The fix is one property in `Solax.Worker.csproj`, `RequiresAspNetWebAssets=true`
 knob the SDK exposes for this case. Recorded in `docs/DECISIONS.md` because it is invisible in code
 review and would otherwise be rediscovered on the Pi.
 
+### The second quirk, found by actually opening the page
+
+The first one has a sibling, and it is worse because the first fix hid it. With
+`RequiresAspNetWebAssets` in place the script is published and `GET /_framework/blazor.web.js`
+answers **200 — with an empty body**. Not a 404, not a log line, not a console error: the page
+renders perfectly, and then never updates, because the script that would have opened the circuit
+arrived zero bytes long.
+
+The cause is that assets living in build output rather than in a `wwwroot` folder — the library's
+stylesheet and Blazor's own script — are only wired into the file provider automatically in the
+**Development** environment. `dotnet run` outside it (no `DOTNET_ENVIRONMENT`, i.e. Production from
+source) has no `wwwroot` to fall back on and serves nothing, successfully. `builder.WebHost
+.UseStaticWebAssets()` asks for them explicitly; in a published app the manifest it reads does not
+exist and the call does nothing, so it is free.
+
+Worth recording how it was missed: the first verification pass checked HTTP **status codes**, and
+all three assets returned 200. A status code is not content. The checks below now compare
+`%{size_download}` against the file on disk.
+
 `Solax.Web` also takes a `FrameworkReference` on `Microsoft.AspNetCore.App` instead of the
 `Microsoft.AspNetCore.Components.Web` package the RCL template offers: these components only ever run
 server-side, so WebAssembly compatibility buys nothing and a duplicate assembly costs.
@@ -83,9 +102,14 @@ means the poll loop has stopped while the web host is fine.
   namespace.
 - **The seam test can fail.** `Follows_the_holder_instead_of_sampling_it_once` was re-run with the
   subscription commented out and does fail — a live-update test that passes either way is worthless.
-- **Enabled, from source:** `/health` 200, the library's stylesheet 200, `blazor.web.js` 200, and
-  `POST /_blazor/negotiate` 200 offering WebSockets, so the circuit is genuinely there. `ss -ltnp`
-  shows one socket, on the configured port, and nothing on 5000 or 8080.
+- **Enabled, from source:** `blazor.web.js` and the library's stylesheet serve their full 200,645
+  and 1,539 bytes (byte counts, not status codes — see above), and `POST /_blazor/negotiate` answers
+  200 offering WebSockets. `ss -ltnp` shows one socket, on the configured port, and nothing else.
+- **Driven in a real browser**, headless Chrome over CDP: the page renders styled, `Blazor` is
+  defined, no console errors, and the "last poll" line advances — `00:27:27` to `00:27:40` on one
+  page that was never reloaded. That is the seam working end to end: Modbus poll, holder, event,
+  circuit, DOM. Checked in all three run modes (published output, Development, Production from
+  source), because only the first two worked before `UseStaticWebAssets`.
 - **Disabled:** `ss -ltnp` shows **no** listening socket in the process, while the poll loop keeps
   logging telemetry normally.
 - **Published output, not just `dotnet run`:** static web assets resolve differently once published,

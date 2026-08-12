@@ -288,6 +288,14 @@ if (web.Enabled)
     // addresses, so an inherited ASPNETCORE_URLS cannot quietly move the UI somewhere else.
     builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenAnyIP(web.Port));
 
+    // Assets that live in build output rather than in a wwwroot folder -- Solax.Web's stylesheet and
+    // Blazor's own script -- are only wired up automatically in the Development environment. Anywhere
+    // else, running from `dotnet run` without publishing serves every one of them as an empty
+    // 200: no 404, no log line, and a page that renders correctly and then never updates, because
+    // blazor.web.js arrived zero bytes long. Asking for them explicitly costs nothing in a published
+    // app, where the manifest this reads does not exist and the call does nothing.
+    builder.WebHost.UseStaticWebAssets();
+
     // Interactive server rendering: the components run here, beside the services they read, and the
     // browser holds a thin circuit. That is what lets a page update itself as each poll lands
     // without a REST API in between -- WebAssembly would need one, and this project needs it for
