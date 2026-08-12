@@ -4,6 +4,50 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-12 — The deploy guide described a Pi that no longer exists
+
+Documentation only; no code changed. `deploy/README.md` was written against a Pi 3 B rooted on a
+single USB SATA SSD running Bookworm. The host is now a Pi 3 **B+** on Trixie with a split boot, and
+two of the nine preparation steps had become wrong rather than merely stale.
+
+**Step 4 fails outright on Trixie.** It ran `dphys-swapfile swapoff`, and Raspberry Pi OS 13 does not
+ship that package — the step dies with `command not found` before doing anything. The premise was
+also false: the image already has swap. `/proc/swaps` shows `/dev/zram0`, ~905 MB, priority 100 —
+zstd-compressed swap in RAM, with writeback to `/var/swap` through
+`rpi-setup-loop@var-swap.service`. That `/var/swap` file is not a leftover to clean up; it is zram's
+backing store, which is why `swapon --show` lists only the zram device. The step now verifies swap
+instead of building it, and the optional disk swapfile it offers is explicitly gated on not being
+SD-rooted.
+
+**Step 3 edits a device the document never mentioned.** The cgroup instructions write
+`/boot/firmware/cmdline.txt`, which on this host is the **SD card**, not the disk the OS runs from.
+The M.2 still carries its own boot partition from the original image; editing that one is completely
+silent. A new *Storage layout* section states the arrangement up front and step 3 links to it.
+
+**Hardware quirk that forced the layout.** The Pi 3 boot ROM supports only USB Bulk-Only Transport
+and gives the device roughly two seconds to enumerate. A Crucial P1 NVMe behind a Realtek RTL9210
+bridge does not answer in time, so the board will not boot from it even with a byte-perfect image —
+verified with a freshly flashed card whose `cmdline.txt` named a PARTUUID that existed at the time.
+The Linux kernel drives the same adapter fine, so the SD boots and hands root to the NVMe. Recorded
+in `docs/DECISIONS.md`.
+
+**Also corrected:** the board is a Raspberry Pi 3 Model B+ Rev 1.3, not a Pi 3 B, in the prose and
+the diagram. The distinction matters beyond pedantry — USB-boot OTP is set at the factory on a B+ and
+must be burned by hand on a B, so the two boards fail to boot from USB for entirely different
+reasons.
+
+**Verified on the live host before writing any of it:** `/proc/swaps` and the `zram`/`rpi-setup-loop`
+units; `findmnt` confirming `/` on `/dev/sda2` and `/boot/firmware` on `/dev/mmcblk0p1`;
+`/proc/device-tree/model`; and that `cmdline.txt`, `fstab` and the on-disk PARTUUIDs all agree after
+the first-boot resize renumbered them.
+
+**Not verified:** whether `program_usb_timeout=1` or a powered hub would make the RTL9210 bootable.
+Both are mentioned as untested options rather than recommendations.
+
+**Files changed:** `deploy/README.md`, `docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
+
+---
+
 ## 2026-08-11 — The Windows entry in the manifest list had no build number
 
 Found by inspecting the images the pipeline actually published rather than by reading the workflow.
