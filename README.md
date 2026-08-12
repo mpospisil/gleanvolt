@@ -33,6 +33,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
+- **Self-hosted web UI** (optional, and being built in phases — see [issue #44](https://github.com/mpospisil/solax-controller/issues/44)) — a Blazor dashboard served by the controller itself, so the system can run on hardware too small for Home Assistant. Both surfaces are first-class: run either, both, or neither.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
@@ -56,6 +57,7 @@ site-specific number the forecast-driven mode cannot work without — see
 - [.NET 10](https://dotnet.microsoft.com/) — target framework
 - Hosted as a [.NET Worker Service](https://learn.microsoft.com/dotnet/core/extensions/workers) (background service)
 - Modbus TCP client for inverter/charger communication
+- [Blazor](https://learn.microsoft.com/aspnet/core/blazor/) (interactive server rendering) for the optional self-hosted UI
 
 ## Project structure
 
@@ -76,15 +78,22 @@ SolaxLocalController.slnx
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   └── Solcast/                # Solar-forecast HTTP client
 │   │
+│   ├── Solax.Web/                  # The optional self-hosted UI (a Blazor component library)
+│   │   ├── Components/             # Pages, layout and the root document
+│   │   ├── wwwroot/                # Stylesheet and other assets, served from the library
+│   │   └── WebOptions.cs           # The "Web" configuration section
+│   │
 │   └── Solax.Worker/               # The executable host
 │       ├── Program.cs              # Dependency Injection setup
 │       ├── SolaxPollingService.cs  # The main background loop (IHostedService)
+│       ├── NoListenServer.cs       # The "server" used when the UI is switched off
 │       ├── Configuration/          # Options classes bound from appsettings.json
 │       ├── HomeAssistant/          # MQTT discovery and the HA worker
 │       └── Sessions/               # Charging-session recording worker
 ├── tests/
 │   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
 │   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
+│   ├── Solax.Web.Tests/            # Component rendering (bUnit) and options binding
 │   └── Solax.Worker.Tests/         # Coordinator, selector and HA discovery tests
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
@@ -99,6 +108,7 @@ SolaxLocalController.slnx
 - **All decision-making logic lives in `Solax.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Solax.Infrastructure` or `Solax.Worker`.
 - **`Solax.Infrastructure` only implements `Solax.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
 - **`Solax.Worker` is composition-only.** `Program.cs` wires up DI; `SolaxPollingService` orchestrates the poll/act loop by calling into `Solax.Core` abstractions — it should not contain control logic itself.
+- **`Solax.Web` references `Solax.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Solax.Worker` hosts it; the dependency never runs the other way.
 - **`Solax.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
 ## Getting started
@@ -768,6 +778,42 @@ A ready-to-run broker + Home Assistant for local development lives in [`dev/home
 ```bash
 docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
 ```
+
+### Self-hosted web UI (the `Web` section)
+
+The controller can serve its own UI, as an alternative to Home Assistant or alongside it. It exists
+because on the reference Raspberry Pi 3 B+ Home Assistant is the binding constraint — it alone
+reserves 600 MB of the board's 905 MB — and because a controller that can be looked at without a
+second application is simpler to reason about. The two surfaces are independent adapters over the
+same internal state, so all four combinations run: UI only, MQTT only, both, neither.
+
+**What is built so far.** [Issue #44](https://github.com/mpospisil/solax-controller/issues/44) lands
+in phases, and this is phase 0 — the plumbing. One page is served, `/health`, showing the running
+build, the configured time zone, and the time of the last completed poll. It is genuinely useful as
+a liveness check (the timestamp updates itself as each poll lands, so a page that sits still means
+the poll loop has stopped while the web host has not), but the dashboard, the controls and
+authentication are still to come.
+
+```jsonc
+"Web": {
+  "Enabled": false,   // master switch; while false the process binds no socket at all
+  "Port": 8080        // listens on every interface, plain HTTP
+}
+```
+
+- **Off by default**, like the Home Assistant integration. Turning it on is a deliberate act:
+  `Web:Enabled=true`, or `Web__Enabled=true` in the environment.
+- **Disabled means nothing is listening** — not "listening but empty". An ASP.NET host would
+  otherwise fall back to a default port; this one installs a server that binds nothing, so with the
+  UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket.
+- **There is no authentication yet** — it is a phase of its own, and it lands before any control
+  that writes to hardware. Until then, treat the port as trusted-LAN only and do not forward it.
+- **Plain HTTP**, deliberately: this is a LAN appliance, and terminating TLS in front of it (or not)
+  is the operator's decision rather than the controller's.
+
+The published container image is now based on `dotnet/aspnet` rather than `dotnet/runtime` — about
+25 MB more, on every platform, whether or not the UI is enabled. The framework reference is fixed at
+build time, so there is no variant that avoids it.
 
 ### Charging session history (the `SessionStore` section)
 

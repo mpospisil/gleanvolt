@@ -34,6 +34,7 @@ WORKDIR /source
 COPY SolaxLocalController.slnx ./
 COPY src/Solax.Core/Solax.Core.csproj                 src/Solax.Core/
 COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
+COPY src/Solax.Web/Solax.Web.csproj                   src/Solax.Web/
 COPY src/Solax.Worker/Solax.Worker.csproj             src/Solax.Worker/
 RUN dotnet restore src/Solax.Worker/Solax.Worker.csproj -a "$TARGETARCH"
 
@@ -54,9 +55,15 @@ RUN dotnet publish src/Solax.Worker/Solax.Worker.csproj \
     # `docker rm`; the session history is the part that cannot be regenerated.
     && mkdir -p /app/logs /app/data
 
-# Debian-based runtime rather than a chiseled variant: it carries tzdata and ICU (log timestamps and
+# The ASP.NET runtime rather than the plain one: the worker hosts the self-hosted UI (issue #44), so
+# its assemblies bind the Microsoft.AspNetCore.App shared framework and the process will not start
+# without it -- including when Web:Enabled is false, because the framework reference is a property of
+# the build, not of the configuration. It costs roughly 25 MB of image over dotnet/runtime and no
+# measurable memory while nothing is listening.
+#
+# Debian-based rather than a chiseled variant: it carries tzdata and ICU (log timestamps and
 # SolarForecast.ForDate are timezone-sensitive) and keeps a shell for diagnosing a headless Pi.
-FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION} AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
 
 # The non-root user shipped in the .NET base images. Declared explicitly rather than relying on the
 # inherited $APP_UID, because the host directory bind-mounted over /app/logs must be chowned to this

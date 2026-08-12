@@ -4,6 +4,107 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-13 — The controller can serve its own UI, and is still a headless worker when it doesn't
+
+Phase 0 of [#44](https://github.com/mpospisil/solax-controller/issues/44) ([#45](https://github.com/mpospisil/solax-controller/issues/45)):
+scaffolding only. Nothing a user would call a feature ships here — one diagnostic page does — but the
+seam the remaining six phases hang off is now proven end to end.
+
+### What moved, and why only this
+
+`ChargeControlStatusHolder` moved from `Solax.Worker` to `Solax.Core.Models`. Its own doc comment
+always said it existed "so the reporting layer can publish it without being coupled to the polling
+loop", with Home Assistant named as an example rather than the only consumer; the second consumer has
+now arrived, in an assembly that must not depend on the host. It is a plain object with an event, so
+Core's no-framework-dependencies rule needed no exception.
+
+`ChargeControlCycleResult` shared that file and did **not** move: it is how the poll loop talks to
+itself, has no consumer outside `Solax.Worker`, and belongs where it is. It now has its own file.
+
+No control logic moved. Nothing in `Solax.Core` changed semantically.
+
+### The host is a web host that is usually not a web server
+
+`Solax.Worker` switched to `Microsoft.NET.Sdk.Web` and `WebApplication.CreateBuilder`. Every existing
+`AddHostedService` registration is untouched, and the poll loop, MQTT worker and session recorder are
+unaware any of this happened.
+
+The interesting half is the off switch. **An ASP.NET host with no endpoints mapped still listens** —
+Kestrel falls back to its default address when nothing configures an endpoint, which on a LAN
+appliance means a port the operator never asked for and cannot find in any config file. So with
+`Web:Enabled` false the host registers `NoListenServer` in Kestrel's place: it starts nothing, binds
+nothing and accepts nothing. Registration order does the work — Kestrel registers itself with
+`TryAdd` during `CreateBuilder`, and the last `IServer` registration is the one resolved.
+
+When the UI *is* enabled, the port comes from `Web:Port` via `ConfigureKestrel(...ListenAnyIP(port))`
+rather than `ASPNETCORE_URLS`. A code-backed endpoint outranks the hosting addresses, so an inherited
+environment variable cannot quietly move the UI somewhere else.
+
+### The quirk that cost the most time
+
+`_framework/blazor.web.js` 404s, and everything else looks fine.
+
+Pages prerender correctly, the markup is right, the CSS loads, and the browser shows a static page
+that never updates — with the only evidence being a failed request in the developer console. The
+cause is in the SDK: `Microsoft.NET.Sdk.Web.ProjectSystem.targets` infers Blazor support from the
+host project *containing `.razor` content items*, and this host deliberately contains none — every
+component lives in `Solax.Web`. Without that inference the `Microsoft.AspNetCore.App.Internal.Assets`
+package is never referenced and the script is never published.
+
+The fix is one property in `Solax.Worker.csproj`, `RequiresAspNetWebAssets=true`, which is exactly the
+knob the SDK exposes for this case. Recorded in `docs/DECISIONS.md` because it is invisible in code
+review and would otherwise be rediscovered on the Pi.
+
+`Solax.Web` also takes a `FrameworkReference` on `Microsoft.AspNetCore.App` instead of the
+`Microsoft.AspNetCore.Components.Web` package the RCL template offers: these components only ever run
+server-side, so WebAssembly compatibility buys nothing and a duplicate assembly costs.
+
+### The image had to change with the code
+
+Both Dockerfiles now build on `dotnet/aspnet` rather than `dotnet/runtime`, and both copy the new
+project file in the restore layer. This is not deferrable to the phase that adds compose profiles:
+the framework reference is a property of the build, so a `dotnet/runtime` image would fail to start
+the moment this merges, `Web:Enabled` or not. It costs roughly 25 MB of image on every platform.
+
+### What the one page does
+
+`/health` reports the running build, the configured time zone and the last completed poll. Every
+value on it comes from the host's container — `WebBuildInfo` handed over by the composition root, the
+zoned `TimeProvider`, and the status holder itself — which is the point: it proves DI reaches a
+component in another assembly and that the component sees the same live objects the MQTT worker does.
+
+It subscribes to `ChargeControlStatusHolder.Updated` rather than sampling it, so the timestamp
+advances on its own as each poll lands. That makes it a real liveness check: a page that sits still
+means the poll loop has stopped while the web host is fine.
+
+### Verification performed
+
+- **335 tests pass**, 12 of them new. The existing projects were not touched beyond the holder's
+  namespace.
+- **The seam test can fail.** `Follows_the_holder_instead_of_sampling_it_once` was re-run with the
+  subscription commented out and does fail — a live-update test that passes either way is worthless.
+- **Enabled, from source:** `/health` 200, the library's stylesheet 200, `blazor.web.js` 200, and
+  `POST /_blazor/negotiate` 200 offering WebSockets, so the circuit is genuinely there. `ss -ltnp`
+  shows one socket, on the configured port, and nothing on 5000 or 8080.
+- **Disabled:** `ss -ltnp` shows **no** listening socket in the process, while the poll loop keeps
+  logging telemetry normally.
+- **Published output, not just `dotnet run`:** static web assets resolve differently once published,
+  so the same three URLs were re-checked against `dotnet publish` output. All 200.
+- The `Timestamp` shown is formatted in the app's zone, not the machine's — the test asserts a Prague
+  wall-clock time against a UTC status, which is the mistake it exists to catch.
+
+**Not verified:** anything on the Pi. No container was built or run, so the aspnet base image, the
+arm64 build and the real memory cost of a live circuit are all still on paper. Phase 6 owns the
+compose profiles and the deploy documentation; nothing in the deploy stack changes yet, because the
+UI is off by default.
+
+**Files changed:** `src/Solax.Core/Models/ChargeControlStatusHolder.cs` (moved),
+`src/Solax.Worker/ChargeControlCycleResult.cs` (extracted), `src/Solax.Worker/Program.cs`,
+`src/Solax.Worker/NoListenServer.cs`, `src/Solax.Worker/Solax.Worker.csproj`,
+`src/Solax.Worker/appsettings.json`, `src/Solax.Worker/HomeAssistant/HomeAssistantMqttWorker.cs`,
+the new `src/Solax.Web/` project, the new `tests/Solax.Web.Tests/` project,
+`SolaxLocalController.slnx`, `Dockerfile`, `Dockerfile.windows`, `README.md`, `docs/DECISIONS.md`.
+
 ## 2026-08-12 — The deploy guide described a Pi that no longer exists
 
 Documentation only; no code changed. `deploy/README.md` was written against a Pi 3 B rooted on a

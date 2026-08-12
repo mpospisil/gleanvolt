@@ -1,0 +1,83 @@
+@page "/health"
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject WebBuildInfo Build
+@inject TimeProvider Time
+
+@*
+    The whole of phase 0's user interface. It exists to prove the two things no unit test can: that a
+    component in this assembly is reached by the host's dependency injection, and that it sees the
+    same live objects the polling loop and the MQTT worker do.
+
+    Everything on the page comes out of that container -- the build version, the app's configured
+    time zone, and the status holder the poll loop writes to. Because the page subscribes to the
+    holder's Updated event rather than reading it once, each completed poll pushes a new value down
+    the circuit: the timestamp below advances on its own, and a page that sits still is telling you
+    the poll loop has stopped while the web host is fine.
+*@
+
+<PageTitle>Health — SolaX Local Controller</PageTitle>
+
+<h1>Health</h1>
+
+<dl class="facts">
+    <dt>Build</dt>
+    <dd>@Build.Version</dd>
+
+    <dt>Time zone</dt>
+    <dd>@Time.LocalTimeZone.Id</dd>
+
+    <dt>Last poll</dt>
+    @if (_status is null)
+    {
+        <dd class="muted">no poll has completed yet</dd>
+    }
+    else
+    {
+        <dd>
+            @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm:ss")
+            <span class="muted">(@Age(_status.Timestamp) ago)</span>
+        </dd>
+    }
+
+    <dt>Charge mode</dt>
+    <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+</dl>
+
+@code {
+    private ChargeControlStatus? _status;
+
+    protected override void OnInitialized()
+    {
+        // Seeded before subscribing, so a browser that arrives between two polls still sees the last
+        // one rather than an empty page until the next.
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+    }
+
+    // Raised on the polling loop's thread. InvokeAsync hops onto the renderer's synchronisation
+    // context, which is what makes touching component state here safe.
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // The holder is a singleton and outlives every circuit, so an unsubscribed component would be
+    // kept alive by its own event handler for as long as the process runs.
+    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+
+    // Clamped at zero: a clock stepped backwards by NTP must not read as a poll from the future.
+    private string Age(DateTimeOffset timestamp)
+    {
+        var age = Time.GetUtcNow() - timestamp;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        return age.TotalSeconds < 90
+            ? $"{age.TotalSeconds:F0} s"
+            : $"{age.TotalMinutes:F0} min";
+    }
+}

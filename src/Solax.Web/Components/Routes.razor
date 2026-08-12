@@ -1,0 +1,14 @@
+@*
+    Routes are discovered in this assembly, not the host's: the pages live in Solax.Web and the
+    worker only hosts them.
+*@
+<Router AppAssembly="typeof(Routes).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(MainLayout)">
+            <p>No such page. This build serves <a href="health">/health</a>.</p>
+        </LayoutView>
+    </NotFound>
+</Router>

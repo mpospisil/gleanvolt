@@ -1,15 +1,21 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Solax.Worker-efc97a0e-92f9-4b99-a0bc-18e89f72a904</UserSecretsId>
+
+    <!--
+      Ship Blazor's client script (_framework/blazor.web.js). The Web SDK normally infers this from
+      the project containing .razor files, and this one deliberately contains none; every component
+      lives in Solax.Web. Without it the pages render once and then stay dead: the script 404s, no
+      circuit is ever opened, and nothing says so beyond a failed request in the browser console.
+    -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
@@ -20,5 +26,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Solax.Core\Solax.Core.csproj" />
     <ProjectReference Include="..\Solax.Infrastructure\Solax.Infrastructure.csproj" />
+    <ProjectReference Include="..\Solax.Web\Solax.Web.csproj" />
   </ItemGroup>
 </Project>

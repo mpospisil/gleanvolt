@@ -33,6 +33,7 @@ WORKDIR C:\source
 COPY SolaxLocalController.slnx ./
 COPY src/Solax.Core/Solax.Core.csproj src/Solax.Core/
 COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
+COPY src/Solax.Web/Solax.Web.csproj src/Solax.Web/
 COPY src/Solax.Worker/Solax.Worker.csproj src/Solax.Worker/
 RUN dotnet restore src\Solax.Worker\Solax.Worker.csproj
 
@@ -48,7 +49,9 @@ RUN dotnet publish src\Solax.Worker\Solax.Worker.csproj `
     # charging-session SQLite store. cmd's mkdir creates intermediate directories, so no -p.
     && mkdir C:\app\logs C:\app\data
 
-FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS runtime
+# The ASP.NET runtime, for the same reason as the Linux image: the worker hosts the web UI and binds
+# the Microsoft.AspNetCore.App shared framework whether or not that UI is switched on.
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS runtime
 
 WORKDIR C:\app
 COPY --from=build C:\app .
