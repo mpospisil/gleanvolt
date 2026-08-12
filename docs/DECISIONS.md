@@ -4,6 +4,55 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-12 — The Pi boots from an SD card because it cannot boot from the disk it runs on
+
+**Context.** The deploy host's USB SSD — an OCZ Vector 180 — began returning unrecoverable read
+errors. The failure was not subtle once located, but it presented as three unrelated symptoms over
+half an hour: `dpkg` refusing to read its own status file, a cached `.deb` failing to decompress, and
+Docker aborting a Home Assistant image layer with `failed to register layer: corrupt stream`. Each
+looked like a software fault. All three were `critical medium error` on new sectors each time. The
+drive was replaced with a Crucial P1 1 TB NVMe in a Realtek RTL9210 USB enclosure.
+
+**Hardware contradicted the plan: the Pi 3 will not boot that enclosure.** The image was correct —
+right `bcm2710-rpi-3-b-plus.dtb`, right `kernel8.img`, `cmdline.txt` naming a PARTUUID that existed,
+partition type `0xc`. It still would not boot. The Pi 3 boot ROM speaks only USB Bulk-Only Transport
+and allows roughly two seconds for enumeration; an NVMe behind a USB bridge does not answer in time.
+The previous SATA SSD did, which is why USB boot had always worked before and its failure now looked
+like a configuration mistake rather than a hardware limit.
+
+**Decision — split the boot.** `/boot/firmware` is a 512 MB FAT32 partition on an SD card; `/` is the
+M.2. The boot ROM reads the SD, which it has always been able to do, and `cmdline.txt` hands root
+straight to the NVMe, which the Linux USB stack drives without complaint. The alternatives were worse:
+burning `program_usb_timeout=1` is a permanent OTP write that might not have helped, and going back
+to an SD-rooted Pi puts every Docker layer and the session database on the component most likely to
+fail.
+
+**Consequences accepted.**
+
+- The boot device is now a single SD card with no redundancy. It holds 76 MB of firmware and kernel
+  and is written only by kernel updates, so the wear profile that kills SD-rooted Pis does not apply
+  — but losing it means the machine does not start, however healthy the NVMe is.
+- `/etc/fstab` must point `/boot/firmware` at the **SD's** PARTUUID. The M.2 keeps its own orphaned
+  boot partition from the original image, and pointing at that one is silent: updates land somewhere
+  never booted, and the failure surfaces weeks later at an upgrade. A first-boot resize also rewrites
+  every PARTUUID on the M.2 — the firstboot script repairs `cmdline.txt` and the root line itself,
+  and never the `/boot/firmware` line.
+- Anyone editing `cmdline.txt` per the cgroup step is editing the SD card. That is correct, and it is
+  not obvious.
+
+**Not established:** whether the RTL9210 would boot with a longer ROM timeout or on a powered hub.
+Neither was tried, because the split boot removed the reason to care. Power draw remains the open
+risk — an NVMe in a bus-powered enclosure can brown out a Pi 3 under load.
+
+**Trixie made the swap step obsolete at the same time.** Raspberry Pi OS 13 does not ship
+`dphys-swapfile`, so the documented commands fail outright. The image configures zram instead —
+zstd-compressed swap in RAM at priority 100, with writeback to `/var/swap` on disk — which is better
+than the swapfile it replaces for this workload. The deploy guide now verifies swap rather than
+creating it, and offers a low-priority disk swapfile only as an optional overflow tier, and only
+because root is no longer on an SD card.
+
+---
+
 ## 2026-08-10 — The git tag is the version; the build carries it, and says so
 
 **Context.** Nothing running could say what it was. The image tag knew, but the process did not, so a
