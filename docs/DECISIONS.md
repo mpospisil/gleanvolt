@@ -4,6 +4,71 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-13 — Home Assistant and the broker become compose profiles, and the controller stops depending on either
+
+**Context.** Issue #51, the last phase of #44. The web UI (phases 0–5) made Home Assistant optional
+in principle — the controller can be fully driven from its own dashboard — but `docker-compose.yml`
+still started all three containers unconditionally, and `MQTT_USERNAME`/`MQTT_PASSWORD` were
+required with no default. A Pi that only wanted the controller and its UI still paid for, and had to
+configure, a broker and a copy of Home Assistant it never used.
+
+**Decision — `mosquitto` and `homeassistant` carry compose `profiles:`; `solax-controller` does
+not.** A service outside the active profile set simply isn't created, which is what makes
+`docker compose up -d` with no `COMPOSE_PROFILES` start the controller alone. `COMPOSE_PROFILES` is
+docker compose's own environment variable, read automatically from `.env` beside the compose file —
+so no change to `deploy.sh`'s invocations was needed, only to what `.env` says.
+
+**Decision — soft dependencies, not hard ones.** `solax-controller`'s (and `homeassistant`'s)
+`depends_on: mosquitto` gained `required: false`. Without it, compose refuses to start a service that
+depends on one whose profile isn't active at all — the opposite of "optional". The controller's own
+tolerance for an unreachable broker (`HomeAssistantMqttWorker` already retries and logs) was already
+there; this only stops compose itself from getting in the way before that code ever runs.
+
+**Decision — `HomeAssistant:Enabled` gets its own switch, separate from whether the broker
+container exists.** `HOMEASSISTANT_ENABLED` (default `false`) drives it, distinct from
+`COMPOSE_PROFILES`. Tying the app setting directly to "is the `mosquitto` profile active" was
+rejected: compose has no way to expose "which profiles are active" as a value inside another
+service's environment, so the two would have needed to agree by convention regardless — making them
+two explicit settings is more honest than one setting pretending to control both.
+
+**Decision — the UI's port is published from a second compose file, not a `ports:` entry in the
+base one.** `Web:Enabled=false` was built (phase 0) to guarantee no listening socket **inside** the
+container, verified with `ss -ltnp`. An unconditional `ports:` mapping would have reintroduced
+exactly that hole one layer up: Docker's port-publish proxy binds the **host** port regardless of
+whether anything inside is listening, which is a real, checkable difference from "no socket at all"
+that the original guarantee was written to rule out. `docker-compose.web.yml` carries the mapping
+instead, merged in only via `.env`'s `COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml` — a
+second file over a conditional line, because compose has no syntax for "this one attribute, only if
+this variable is truthy" within a single service block.
+
+**Consequences.**
+
+- **A pre-existing deployment must update its `.env` to keep running Home Assistant and the broker
+  after upgrading to this release.** Without `COMPOSE_PROFILES=mosquitto,homeassistant` and
+  `HOMEASSISTANT_ENABLED=true`, the next `docker compose up -d` starts the controller alone and stops
+  the other two. Flagged prominently in `.env.example` and `deploy/README.md`, the same way the `TZ`
+  and timezone-fail-fast changes were before it — accepted because the alternative, defaulting the
+  profiles *on*, would have made a controller-only Pi need to opt back *out*, which is the wrong
+  default for what #51 exists to enable.
+- **`MQTT_USERNAME`/`MQTT_PASSWORD` are no longer hard-required** (`${VAR:?message}` became
+  `${VAR:-}`) — a controller-only `.env` no longer needs credentials for a broker it never starts.
+  Home Assistant's own MQTT integration setup is unaffected; nothing there reads these two.
+- **`deploy.sh`'s broker-password-file check is now conditional**, grepping `.env` for `mosquitto` in
+  `COMPOSE_PROFILES` before demanding a file that a controller-only deployment has no reason to have
+  created. The Home Assistant config seed step stays unconditional — it only touches files on disk,
+  costs nothing when unused, and means turning the profile on later needs no extra step.
+- **The reference footprint drops from 848 MB to roughly 200–250 MB of the Pi 3 B+'s 905** with
+  Home Assistant and the broker off — the number [issue #44](https://github.com/mpospisil/solax-controller/issues/44)
+  projected at the start of this work, now the documented, deployable default for anyone who wants
+  it. See `deploy/README.md`'s "Running without Home Assistant" for the full table.
+- **Both Dockerfiles already published from `dotnet/aspnet`, not `dotnet/runtime`**, and already
+  reasoned about "Web:Enabled=false must mean no socket" — both landed with the UI itself in an
+  earlier phase (see the record below). This phase only adds `EXPOSE 8080` (documentation; it opens
+  nothing by itself) and extends that same reasoning from the container's network namespace to the
+  Docker host's.
+
+---
+
 ## 2026-08-13 — The web UI is a Blazor library the worker hosts, and the host is a web server only when asked
 
 **Context.** Home Assistant is the only control surface, and on the reference Pi 3 B+ it is also the

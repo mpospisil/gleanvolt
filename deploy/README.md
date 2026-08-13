@@ -1,20 +1,28 @@
 # Deploying to a Raspberry Pi
 
 The production stack for [issue #26](https://github.com/mpospisil/solax-controller/issues/26): the
-controller, Home Assistant, and an MQTT broker as three Docker containers on a **Raspberry Pi 3
-Model B+** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
+containers on a **Raspberry Pi 3 Model B+** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+
+Home Assistant and the broker are **opt-in** (issue #51): a fresh Pi can run the controller and its
+own UI alone, at roughly a third of the memory the full stack needs. See
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only) for the
+combinations and their budgets; everything below still applies to whichever of them you choose.
 
 ```
               Raspberry Pi 3 Model B+  (192.168.2.7, arm64)
-    ┌───────────────────────────────────────────────────────────────┐
-    │  compose project "solax"          (all state on bind mounts)  │
-    │                                                               │
-    │   solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant│
-    │          │                   (no host port)          │ :8123  │
-    └──────────┼──────────────────────────────────────────┼─────────┘
-               ▼ Modbus TCP                               ▼
-    inverter 192.168.2.6:502                        LAN browsers
-    charger  192.168.2.10:502
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ compose project "solax"        (all state on bind mounts)          │
+    │                                                                    │
+    │ solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
+    │      │             (opt-in profile,     opt-in profile,            │
+    │      │              no host port)          LAN :8123)              │
+    │      └── LAN :8080, only while Web:Enabled                         │
+    └────────────────────────────────────────────────────────────────────┘
+         │ Modbus TCP
+         ▼
+  inverter 192.168.2.6:502
+  charger  192.168.2.10:502
 ```
 
 The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to GHCR; the Pi pulls it.
@@ -54,6 +62,45 @@ root on fast, durable storage on a board whose boot ROM predates the idea.
 > **Not the dev stack.** `dev/homeassistant/` is a separate, anonymous-broker environment for
 > developing against `dotnet run`. Don't point one at the other; running both at once against the
 > same inverter is confusing at best.
+
+## Running without Home Assistant (controller + web UI only)
+
+Home Assistant and the broker are two more Docker containers competing for the same 1 GB, and on
+the reference Pi 3 B+ Home Assistant alone is the binding constraint. If you don't need it — the
+controller's own [self-hosted UI](../README.md#self-hosted-web-ui-the-web-section) already shows
+telemetry, drives every control, and browses charging-session history and the forecast plan — leave
+both off and get most of the board back.
+
+| Deployment | `COMPOSE_PROFILES` | Containers running | `mem_limit` total | of 905 MB |
+|---|---|---|---|---|
+| Controller only | *(unset)* | `solax-controller` | 200 MB | 22% |
+| Controller + web UI | *(unset)*, `Web:Enabled=true` | `solax-controller` | 200 MB | 22% |
+| Controller + Home Assistant | `mosquitto,homeassistant` | all three | 848 MB | 94% |
+| Everything | `mosquitto,homeassistant`, `Web:Enabled=true` | all three | 848 MB | 94% |
+
+The web UI adds no container and no separate `mem_limit` of its own — it runs inside
+`solax-controller`, the same process either way — so turning it on doesn't change the ceiling in
+this table, only what's reachable at `:8080`. Home Assistant and the broker are the only lines that
+move the number, which is exactly why they're the two gated by `COMPOSE_PROFILES`.
+
+**To run controller-plus-UI only:** in `/opt/solax/.env` (see [.env.example](.env.example)), leave
+`COMPOSE_PROFILES` unset and set:
+
+```
+WEB_ENABLED=true
+COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
+WEB_PASSWORD_HASH=<generate with the image, see .env.example>
+```
+
+Then, in [Prepare the Pi](#prepare-the-pi-once) below, step 7 (broker credentials) doesn't apply —
+`deploy.sh` only checks for a password file when `COMPOSE_PROFILES` names `mosquitto` — and neither
+does the Home Assistant onboarding under [First run](#first-run). You can still create
+`mosquitto/config`, `mosquitto/data` and `homeassistant/config` in step 5 if you might turn either on
+later, or skip them for now; `deploy.sh` never assumes they exist except when their profile is active.
+
+**To add Home Assistant and the broker later** (or from the start): set
+`COMPOSE_PROFILES=mosquitto,homeassistant` and `HOMEASSISTANT_ENABLED=true` in `.env` as well, and
+follow every step below, including the broker credentials in step 7.
 
 ## Prepare the Pi (once)
 
@@ -187,7 +234,10 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 > NVMe (see *Storage layout* above). Leave `vm.swappiness` at its default 60 so the disk tier is a
 > safety net rather than a first resort.
 
-**5. Directories.** The containers hold no state; everything lives here:
+**5. Directories.** The containers hold no state; everything lives here. `logs/` and `data/` are
+needed by every deployment; `mosquitto/` and `homeassistant/` only if you're using those profiles
+(see [Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only)) —
+skip those two and their `chown` if you're not, `deploy.sh` doesn't require them to pre-exist:
 
 ```bash
 sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
@@ -219,10 +269,12 @@ scp deploy/.env.example martin@192.168.2.7:/opt/solax/.env
 ssh martin@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
-**7. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
-stack will work. The username has to match `MQTT_USERNAME` **and** the password has to match
-`MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD` beside it is a stack that
-comes up looking healthy while the controller is refused on every connect.
+**7. Broker credentials.** *Only if `COMPOSE_PROFILES` includes `mosquitto` — skip this entirely for
+a controller-only or controller-plus-UI deployment; `deploy.sh` itself skips the check below when it
+doesn't find `mosquitto` in `.env`'s `COMPOSE_PROFILES`.* The broker refuses anonymous connections,
+so this must exist before the stack will work. The username has to match `MQTT_USERNAME` **and** the
+password has to match `MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD`
+beside it is a stack that comes up looking healthy while the controller is refused on every connect.
 
 `-c` **creates** the file and refuses to overwrite one that exists, reporting the bare errno
 `Error: Unable to open file ... for writing. File exists.` — which reads like a permissions problem
@@ -276,6 +328,7 @@ This directory mirrors `/opt/solax` on the Pi, so what you edit here is what lan
 ```
 deploy/
 ├── docker-compose.yml              → /opt/solax/docker-compose.yml
+├── docker-compose.web.yml          → /opt/solax/docker-compose.web.yml (published UI port; opt-in via .env)
 ├── mosquitto/config/mosquitto.conf → /opt/solax/mosquitto/config/    (overwritten each deploy)
 ├── homeassistant/config/*.yaml     → /opt/solax/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/solax/.env
@@ -288,10 +341,12 @@ From a developer machine, with the repo checked out:
 ./deploy/deploy.sh
 ```
 
-It copies `docker-compose.yml` and `mosquitto.conf` to `/opt/solax`, seeds Home Assistant's config
-files only if they don't already exist, then pulls and restarts. It creates `logs/` and `data/` and
-hands them to uid 1654 if they are missing or wrongly owned; for anything else it refuses to run
-rather than guess. It never copies `.env`.
+It copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` to `/opt/solax`, seeds
+Home Assistant's config files only if they don't already exist, then pulls and restarts. It creates
+`logs/` and `data/` and hands them to uid 1654 if they are missing or wrongly owned; for anything
+else it refuses to run rather than guess. It never copies `.env` — which is also what decides
+whether `docker-compose.web.yml` and Home Assistant/the broker actually run; see
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only).
 
 | Variable | Default | |
 |---|---|---|
@@ -301,6 +356,14 @@ rather than guess. It never copies `.env`.
 
 ## First run
 
+**If `Web:Enabled=true`:** open `http://192.168.2.7:8080`, sign in with the password behind
+`WEB_PASSWORD_HASH`, and the dashboard, the controls, session history and the forecast plan are all
+there — see the root README's
+[Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
+does.
+
+**If Home Assistant is enabled** (`COMPOSE_PROFILES` includes `homeassistant`):
+
 1. Open `http://192.168.2.7:8123` and complete Home Assistant onboarding (local account).
 2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `mosquitto`, port `1883`, and
    **the username and password from `.env`** — unlike the dev stack, this broker is authenticated.
@@ -308,9 +371,9 @@ rather than guess. It never copies `.env`.
    appear by themselves.
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
-only once you select a mode in Home Assistant, and `BatteryHold` is disabled and dry-run. Change
-either in `.env` only after verifying the register addresses on your own device, per the root
-README's warnings.
+only once you select a mode — Home Assistant or the web UI, whichever is enabled — and
+`BatteryHold` is disabled and dry-run. Change either in `.env` only after verifying the register
+addresses on your own device, per the root README's warnings.
 
 ## Everyday operations
 
@@ -494,6 +557,19 @@ independent, so that's a compose edit, not a redesign.
 **Nothing connects to the broker.** `docker compose logs mosquitto` shows the rejected connections.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
 being readable by uid 1883.
+
+**Can't reach the web UI at `:8080`.** Two independent switches both have to be on, and it's usually
+one of them:
+
+```bash
+docker compose logs solax-controller | grep -i "web ui"
+```
+
+`Web UI enabled; listening on port 8080` means `Web:Enabled` is true and the *process* is listening
+— if the browser still can't connect, the port isn't published: check `.env`'s `COMPOSE_FILE`
+includes `docker-compose.web.yml` (`docker compose config` on the Pi shows whether it actually got
+picked up). No such log line at all means `WEB_ENABLED` itself is unset or `false` in `.env`. See
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only).
 
 **No charging sessions are being recorded.** Look for this at startup:
 

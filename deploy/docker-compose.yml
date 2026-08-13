@@ -1,4 +1,5 @@
-# Production stack for the Raspberry Pi 3 B (issue #26).
+# Production stack for the Raspberry Pi 3 B (issue #26). Home Assistant and MQTT are opt-in
+# (issue #51) -- the controller and its self-hosted UI run on their own.
 #
 # Deployed to /opt/solax on the Pi by deploy/deploy.sh; every relative path below therefore resolves
 # under /opt/solax. Values come from /opt/solax/.env (see .env.example) -- that file stays on the Pi
@@ -9,6 +10,12 @@
 #
 # Every byte of state lives on a bind mount below. The containers themselves are disposable:
 # `docker compose down` and `docker rm -f` are safe, and an image upgrade or rollback loses nothing.
+#
+# Home Assistant and mosquitto carry `profiles:` and start only when requested -- via `.env`'s
+# COMPOSE_PROFILES (what deploy.sh uses) or `docker compose --profile ... up -d`. solax-controller
+# never depends on either being present: HomeAssistant:Enabled is its own switch
+# (HOMEASSISTANT_ENABLED below), off by default, so a controller-only run neither starts nor waits on
+# a broker that was never asked for. See deploy/README.md's "Running without Home Assistant".
 
 name: solax
 
@@ -20,6 +27,7 @@ services:
     image: eclipse-mosquitto:2
     container_name: solax-mosquitto
     restart: unless-stopped
+    profiles: ["mosquitto"]
     volumes:
       # Config is read-only to the broker; the password file is created out-of-band, see README.
       - ./mosquitto/config:/mosquitto/config:ro
@@ -35,8 +43,14 @@ services:
     image: ghcr.io/mpospisil/solax-controller:${IMAGE_TAG:-latest}
     container_name: solax-controller
     restart: unless-stopped
+    # Soft dependency, not a hard one: HomeAssistant:Enabled (below) is what actually decides whether
+    # the controller speaks MQTT at all, and a controller-only deployment carries no `mosquitto`
+    # service to depend on in the first place. `required: false` starts this before mosquitto if the
+    # `mosquitto` profile isn't active, rather than refusing to come up over an undefined dependency.
     depends_on:
-      - mosquitto
+      mosquitto:
+        condition: service_started
+        required: false
     environment:
       # ASP.NET Core's "__" convention maps onto appsettings.json sections, so anything in that file
       # can be overridden here without rebuilding the image.
@@ -44,29 +58,34 @@ services:
       Solax__Inverter__Host: ${INVERTER_HOST:-192.168.2.6}
       Solax__EvCharger__Host: ${EV_CHARGER_HOST:-192.168.2.10}
 
-      HomeAssistant__Enabled: "true"
+      # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
+      # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
+      # together under one heading rather than as independent-looking settings.
+      HomeAssistant__Enabled: ${HOMEASSISTANT_ENABLED:-false}
       HomeAssistant__BrokerHost: mosquitto     # compose-network name, not localhost
       HomeAssistant__BrokerPort: "1883"
-      HomeAssistant__Username: ${MQTT_USERNAME:?set MQTT_USERNAME in .env}
-      HomeAssistant__Password: ${MQTT_PASSWORD:?set MQTT_PASSWORD in .env}
+      HomeAssistant__Username: ${MQTT_USERNAME:-}
+      HomeAssistant__Password: ${MQTT_PASSWORD:-}
 
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
-      # that: the service always boots in mode Off and takes control only when Home Assistant selects
-      # a mode. The battery hold does, and stays disabled and dry-run unless overridden in .env.
-      # Verify the register addresses on your own device before enabling either.
+      # that: the service always boots in mode Off and takes control only when a mode is selected
+      # (Home Assistant or the web UI). The battery hold does, and stays disabled and dry-run unless
+      # overridden in .env. Verify the register addresses on your own device before enabling either.
       ChargeControl__DryRun: ${CHARGE_CONTROL_DRY_RUN:-false}
       BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
       BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
-    ports:
-      # The self-hosted web UI. appsettings.json ships Web:Enabled=true with
-      # Web:RequireAuthentication=false while issue #44 is in progress, so this port serves the
-      # dashboard *and* the controls that write to the inverter and charger with no login -- publish
-      # it only onto a LAN where that is acceptable. WEB_PORT=127.0.0.1:8080 in .env keeps it
-      # reachable from the Pi itself only; Web__Enabled=false switches the UI off altogether.
-      - "${WEB_PORT:-8080}:8080"
+
+      # The self-hosted UI (issue #44), off by default like Home Assistant. Enabling it also needs
+      # the port published -- see .env.example and docker-compose.web.yml, kept as a separate file
+      # rather than an unconditional `ports:` entry here so "Web:Enabled is false" keeps meaning "no
+      # listening socket at all", including at the Docker host, not just inside the container.
+      Web__Enabled: ${WEB_ENABLED:-false}
+      Web__Port: ${WEB_PORT:-8080}
+      Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-true}
+      Web__PasswordHash: ${WEB_PASSWORD_HASH:-}
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs
@@ -87,8 +106,11 @@ services:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: solax-homeassistant
     restart: unless-stopped
+    profiles: ["homeassistant"]
     depends_on:
-      - mosquitto
+      mosquitto:
+        condition: service_started
+        required: false
     environment:
       TZ: ${TZ:-Europe/Prague}
     ports:

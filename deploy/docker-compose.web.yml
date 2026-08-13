@@ -1,0 +1,15 @@
+# Optional override: publish the self-hosted UI's port to the LAN. Not folded into
+# docker-compose.yml so that Web:Enabled=false keeps meaning "no listening socket at all" --
+# including at the Docker host, not merely inside the container -- exactly as it does today without
+# this file. Add it only once Web:Enabled is actually true (see .env.example):
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
+#
+# in .env, or `docker compose -f docker-compose.yml -f docker-compose.web.yml up -d` by hand.
+# deploy.sh copies this file alongside docker-compose.yml on every deploy either way, so switching it
+# on or off is purely a `.env` edit -- never a change to what's deployed from git.
+
+services:
+  solax-controller:
+    ports:
+      - "${WEB_PORT:-8080}:${WEB_PORT:-8080}"

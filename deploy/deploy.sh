@@ -128,17 +128,27 @@ fi
 
 # tar over ssh rather than rsync: one less thing that has to be installed on a Lite image. This
 # directory mirrors $REMOTE_DIR exactly, so the paths need no rewriting on the way over.
+# docker-compose.web.yml travels unconditionally too, even for a controller-only Pi: whether it's
+# actually used is purely a COMPOSE_FILE line in .env (see .env.example), never a difference in what
+# git deployed.
 say "Copying stack files"
-tar -C "$script_dir" -cf - docker-compose.yml mosquitto/config/mosquitto.conf \
+tar -C "$script_dir" -cf - docker-compose.yml docker-compose.web.yml mosquitto/config/mosquitto.conf \
     | ssh_pi "tar -C '$REMOTE_DIR' -xf - --no-same-owner"
 
 # Seeded once, never on top of edits made on the Pi. HA rewrites these files itself in normal use.
+# Harmless to seed even when the homeassistant profile is never turned on -- it's a handful of files
+# on disk, and doing it unconditionally means turning the profile on later needs no extra step.
 say "Seeding Home Assistant config (only files that do not exist yet)"
 tar -C "$script_dir" -cf - homeassistant/config \
     | ssh_pi "tar -C '$REMOTE_DIR' -xf - --no-same-owner --skip-old-files"
 
-if ! ssh_pi "test -f '$REMOTE_DIR/mosquitto/config/passwd'"; then
-    cat >&2 <<EOF
+# Only enforced when the mosquitto profile is actually requested (COMPOSE_PROFILES in .env, see
+# .env.example) -- a controller-only Pi has no broker to authenticate against and no reason to carry
+# this check. docker compose itself will simply not start a service whose profile isn't active, so
+# grepping .env here is this script's only way to know which stack the operator actually wants.
+if ssh_pi "grep -qE '^COMPOSE_PROFILES=.*\bmosquitto\b' '$REMOTE_DIR/.env' 2>/dev/null"; then
+    if ! ssh_pi "test -f '$REMOTE_DIR/mosquitto/config/passwd'"; then
+        cat >&2 <<EOF
 
 error: the broker has no password file, and it refuses anonymous connections -- nothing would
 connect. Create it once, on the Pi (username must match MQTT_USERNAME in .env):
@@ -147,7 +157,8 @@ connect. Create it once, on the Pi (username must match MQTT_USERNAME in .env):
         mosquitto_passwd -c -b /mosquitto/config/passwd solax '<password>'
     sudo chown 1883:1883 $REMOTE_DIR/mosquitto/config/passwd
 EOF
-    exit 1
+        exit 1
+    fi
 fi
 
 say "Pulling images${IMAGE_TAG:+ (IMAGE_TAG=$IMAGE_TAG)}"
@@ -159,10 +170,20 @@ ssh_pi "cd '$REMOTE_DIR' && ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose 
 say "Status"
 ssh_pi "cd '$REMOTE_DIR' && docker compose ps"
 
+next="    ssh $PI_HOST 'cd $REMOTE_DIR && docker compose logs -f solax-controller'"
+if ssh_pi "grep -qE '^COMPOSE_PROFILES=.*\bhomeassistant\b' '$REMOTE_DIR/.env' 2>/dev/null"; then
+    next="$next
+    Home Assistant: http://${PI_HOST#*@}:8123"
+fi
+if ssh_pi "grep -qE '^WEB_ENABLED=true' '$REMOTE_DIR/.env' 2>/dev/null"; then
+    web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2-)
+    next="$next
+    Web UI: http://${PI_HOST#*@}:${web_port:-8080}"
+fi
+
 cat <<EOF
 
 Deployed. Next:
 
-    ssh $PI_HOST 'cd $REMOTE_DIR && docker compose logs -f solax-controller'
-    Home Assistant: http://${PI_HOST#*@}:8123
+$next
 EOF
