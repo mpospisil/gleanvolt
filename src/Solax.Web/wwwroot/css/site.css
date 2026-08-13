@@ -245,3 +245,118 @@ h1 {
     margin-top: 0.4rem;
     line-height: 1.35;
 }
+
+.range-control {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.range-control label {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.sessions {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.sessions th,
+.sessions td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+}
+
+.sessions th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.sessions tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.sessions a {
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.sessions a:hover {
+    color: var(--accent);
+}
+
+.split {
+    margin: 1.5rem 0;
+}
+
+.split-bar {
+    display: flex;
+    height: 1.25rem;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--line);
+}
+
+.split-bar .solar {
+    background: #f5b400;
+}
+
+.split-bar .grid {
+    background: #6b7280;
+}
+
+.split-bar .battery {
+    background: var(--accent);
+}
+
+.split-legend {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    padding: 0;
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+}
+
+.swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 2px;
+    margin-right: 0.35rem;
+}
+
+.swatch.solar {
+    background: #f5b400;
+}
+
+.swatch.grid {
+    background: #6b7280;
+}
+
+.swatch.battery {
+    background: var(--accent);
+}
+
+.chart-section {
+    margin-top: 1.5rem;
+}
+
+.chart {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem;
+    height: 280px;
+}

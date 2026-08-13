@@ -16,10 +16,15 @@
     <base href="/" />
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="_content/Solax.Web/css/site.css" />
+    <link rel="stylesheet" href="_content/Solax.Web/lib/uplot/uPlot.min.css" />
     <HeadOutlet />
 </head>
 <body>
     <Routes />
     <script src="_framework/blazor.web.js"></script>
+    <!-- Vendored, not a CDN reference (issue #44): the session charts have to keep rendering during
+         an internet outage. See wwwroot/lib/uplot/VENDORED.md. -->
+    <script src="_content/Solax.Web/lib/uplot/uPlot.iife.min.js"></script>
+    <script src="_content/Solax.Web/js/charts.js"></script>
 </body>
 </html>

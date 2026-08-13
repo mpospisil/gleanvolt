@@ -855,6 +855,21 @@ than silently serving an unprotected UI — the same reasoning as the timezone f
 deployment that is deliberately open on a trusted LAN, but is not the default for a reason: the UI is
 the surface phase 3 gives write access to the inverter and EV charger.
 
+#### Browsing charging session history
+
+Phase 4 adds `/sessions`: a list of recorded sessions (date, duration, driving strategy, energy
+delivered, solar share), each linking to a detail page with the per-source energy split and a
+battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
+nothing here reaches past the interface into SQLite — and degrades to "isn't available right now"
+rather than an error page when `SessionStore:Enabled` is off or the file can't be opened. See
+[Charging session history](#charging-session-history-the-sessionstore-section) below for what is
+actually recorded.
+
+The chart uses [uPlot](https://github.com/leeoniya/uPlot) (MIT licensed), vendored into
+`Solax.Web/wwwroot/lib/` rather than fetched from a CDN — issue #44's decision, so the history stays
+readable during an internet outage, which is exactly when a locally controlled system is most worth
+looking at.
+
 The published container image is now based on `dotnet/aspnet` rather than `dotnet/runtime` — about
 25 MB more, on every platform, whether or not the UI is enabled. The framework reference is fixed at
 build time, so there is no variant that avoids it.
@@ -950,8 +965,9 @@ different questions, and the gap between them is worth being able to see.
 A closed session is immutable, which makes it safe to publish as one self-contained document —
 `ChargingSessionDocument`, carrying a `schemaVersion`, the header, every sample and every event. That
 shape is deliberately independent of the database's own tables, so uploading sessions to cloud object
-storage (one object per session) and reading them from a web app can be added later without migrating
-anything. The `sessions.synced_at` column is reserved for exactly that.
+storage (one object per session) can be added later without migrating anything. The
+`sessions.synced_at` column is reserved for exactly that. Reading them from a web app is already
+built — see [Browsing charging session history](#browsing-charging-session-history) above.
 
 ## License
 

@@ -135,3 +135,129 @@ internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
         Sets.Add((nameof(MinBatterySocFloorPercent), MinBatterySocFloorPercent, source));
     }
 }
+
+/// <summary>
+/// A minimal stand-in for <see cref="Solax.Infrastructure.Sessions.SqliteChargingSessionStore"/>
+/// (which lives in Solax.Infrastructure and pulls in SQLite, neither appropriate for a Blazor
+/// component test): an in-memory list queried the same way the real store is, plus a way to make it
+/// fail like an unopened or disabled store would.
+/// </summary>
+internal sealed class FakeChargingSessionStore : IChargingSessionStore
+{
+    public List<ChargingSession> Sessions { get; } = [];
+
+    public Dictionary<Guid, ChargingSessionDocument> Documents { get; } = [];
+
+    /// <summary>Makes every query throw, the way browsing does when SessionStore:Enabled is false.</summary>
+    public bool Unavailable { get; set; }
+
+    public Task<int> InitializeAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+
+    public Task StartSessionAsync(ChargingSession session, CancellationToken cancellationToken)
+    {
+        Sessions.Add(session);
+        return Task.CompletedTask;
+    }
+
+    public Task AppendAsync(
+        IReadOnlyList<ChargingSessionSample> samples,
+        IReadOnlyList<ChargingSessionEvent> events,
+        CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task CompleteSessionAsync(ChargingSession session, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<ChargingSession>> GetSessionsAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ThrowIfUnavailable();
+
+        IReadOnlyList<ChargingSession> result = Sessions
+            .Where(s => s.StartedAt >= from && s.StartedAt < to)
+            .OrderByDescending(s => s.StartedAt)
+            .ToList();
+
+        return Task.FromResult(result);
+    }
+
+    public Task<ChargingSessionDocument?> ExportAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        ThrowIfUnavailable();
+
+        return Task.FromResult(Documents.GetValueOrDefault(sessionId));
+    }
+
+    public Task<int> PruneAsync(TimeSpan retention, CancellationToken cancellationToken) => Task.FromResult(0);
+
+    private void ThrowIfUnavailable()
+    {
+        if (Unavailable)
+        {
+            throw new InvalidOperationException("The session store is unavailable (test double).");
+        }
+    }
+}
+
+/// <summary>Plausible <see cref="ChargingSession"/>/<see cref="ChargingSessionSample"/> values for tests.</summary>
+internal static class TestSessions
+{
+    public static ChargingSession Sample(
+        DateTimeOffset startedAt,
+        DateTimeOffset? endedAt = null,
+        ChargeControlMode startMode = ChargeControlMode.Solar,
+        ChargeControlMode? endMode = null,
+        double energyDeliveredWh = 5_000,
+        double fromSolarWh = 3_000,
+        double fromGridWh = 1_500,
+        double fromBatteryWh = 500,
+        double loanedWh = 0) =>
+        new(
+            Id: Guid.NewGuid(),
+            StartedAt: startedAt,
+            EndedAt: endedAt,
+            TimeZoneId: "Europe/Prague",
+            StartMode: startMode,
+            EndMode: endMode ?? startMode,
+            EndReason: endedAt is null ? null : ChargingSessionEndReason.ModeOff,
+            StartBatterySocPercent: 60,
+            EndBatterySocPercent: endedAt is null ? null : 75,
+            EnergyDeliveredWh: energyDeliveredWh,
+            FromSolarWh: fromSolarWh,
+            FromGridWh: fromGridWh,
+            FromBatteryWh: fromBatteryWh,
+            LoanedWh: loanedWh,
+            PeakChargingPowerWatts: 3_000,
+            StartPlan: null,
+            ForecastRemainingAtStartWh: null,
+            Controlled: true);
+
+    public static ChargingSessionSample Sample(Guid sessionId, DateTimeOffset timestamp, double batterySocPercent) =>
+        new(
+            SessionId: sessionId,
+            Timestamp: timestamp,
+            Mode: ChargeControlMode.Solar,
+            State: ChargeControlState.Charging,
+            ChargerStatus: EvChargerStatus.Charging,
+            BatterySocPercent: batterySocPercent,
+            SolarPowerWatts: 2_000,
+            GridPowerWatts: 0,
+            BatteryPowerWatts: 0,
+            EvChargerPowerWatts: 2_000,
+            EvChargingCurrentAmps: 8,
+            ActiveCurrentAmps: 8,
+            TargetCurrentAmps: 8,
+            FromSolarWatts: 2_000,
+            FromGridWatts: 0,
+            FromBatteryWatts: 0,
+            EnergyDeliveredWh: 0,
+            FromSolarWh: 0,
+            FromGridWh: 0,
+            FromBatteryWh: 0,
+            LoanedWh: 0,
+            SurplusWatts: 2_000,
+            LoanPowerWatts: 0,
+            BatteryHoldActive: false,
+            ForecastPowerWatts: null,
+            PlanRemainingPvWh: null,
+            PlanFeasibleEvEnergyWh: null,
+            PlanRequiredSocFloorPercent: null);
+}
