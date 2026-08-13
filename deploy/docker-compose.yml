@@ -60,6 +60,13 @@ services:
       ChargeControl__DryRun: ${CHARGE_CONTROL_DRY_RUN:-false}
       BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
       BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
+    ports:
+      # The self-hosted web UI. appsettings.json ships Web:Enabled=true with
+      # Web:RequireAuthentication=false while issue #44 is in progress, so this port serves the
+      # dashboard *and* the controls that write to the inverter and charger with no login -- publish
+      # it only onto a LAN where that is acceptable. WEB_PORT=127.0.0.1:8080 in .env keeps it
+      # reachable from the Pi itself only; Web__Enabled=false switches the UI off altogether.
+      - "${WEB_PORT:-8080}:8080"
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs

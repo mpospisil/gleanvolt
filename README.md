@@ -824,15 +824,21 @@ to it. Like the MQTT entities, the whole page shows an explicit empty state whil
 
 ```jsonc
 "Web": {
-  "Enabled": false,             // master switch; while false the process binds no socket at all
-  "Port": 8080,                 // listens on every interface, plain HTTP
-  "RequireAuthentication": true // false only for a deliberately open, trusted-LAN deployment
-  // "PasswordHash": ""         // secret -- see below, never set it here
+  "Enabled": true,               // master switch; while false the process binds no socket at all
+  "Port": 8080,                  // listens on every interface, plain HTTP
+  "RequireAuthentication": false // TEMPORARY -- see the warning below; true is the intended value
+  // "PasswordHash": ""          // secret -- see below, never set it here
 }
 ```
 
-- **Off by default**, like the Home Assistant integration. Turning it on is a deliberate act:
-  `Web:Enabled=true`, or `Web__Enabled=true` in the environment.
+> ⚠️ **The shipped defaults are currently insecure, on purpose and temporarily.** While issue #44 is
+> still in progress the UI is enabled with `RequireAuthentication` **off**, so anyone who can reach
+> port 8080 gets the dashboard *and* the phase-3 controls that write to the inverter and EV charger,
+> with no login. Do not deploy these defaults anywhere untrusted — set `Web__RequireAuthentication=true`
+> (with a `Web__PasswordHash`) or `Web__Enabled=false` in the environment first.
+
+- **On by default** while the UI is being built out. Switching it off is `Web:Enabled=false`, or
+  `Web__Enabled=false` in the environment; the process then binds no socket at all.
 - **Disabled means nothing is listening** — not "listening but empty". An ASP.NET host would
   otherwise fall back to a default port; this one installs a server that binds nothing, so with the
   UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket.
@@ -841,7 +847,9 @@ to it. Like the MQTT entities, the whole page shows an explicit empty state whil
 
 #### Authentication
 
-`Web:RequireAuthentication` defaults to **true**: every page — including the read-only dashboard —
+`Web:RequireAuthentication` is **temporarily shipped as `false`** (see the warning above); the
+intended and documented value is **true**, and everything below describes what happens when it is.
+With it on, every page — including the read-only dashboard —
 redirects an anonymous visitor to a login form, and the login itself is checked against
 `Web:PasswordHash`, a single shared password hashed with ASP.NET Core's `PasswordHasher`. There is no
 per-user account: one password gates the whole UI, matching a LAN appliance with one or two operators
