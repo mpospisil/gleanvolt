@@ -1,4 +1,5 @@
 using Solax.Core.Enums;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 
 namespace Solax.Web.Tests;
@@ -51,4 +52,86 @@ internal static class Statuses
             LoanedTodayWh: 0,
             TomorrowForecastWh: null,
             Timestamp: timestamp);
+}
+
+/// <summary>
+/// A minimal stand-in for <see cref="ChargeControlModeSelector"/> (which lives in Solax.Worker and
+/// so isn't reachable from here): records every <see cref="Set"/> call and raises
+/// <see cref="Changed"/> exactly like the real thing, which is what the dashboard's mode select
+/// depends on to notice a mode changing underneath it (e.g. FastNoBattery ending its own session).
+/// </summary>
+internal sealed class FakeChargeControlModeSelector(ChargeControlMode initialMode = ChargeControlMode.Off)
+    : IChargeControlModeSelector
+{
+    public ChargeControlMode Mode { get; private set; } = initialMode;
+
+    public List<(ChargeControlMode Mode, string Source)> Sets { get; } = [];
+
+    public event Action<ChargeControlMode>? Changed;
+
+    public void Set(ChargeControlMode mode, string source)
+    {
+        Sets.Add((mode, source));
+
+        if (Mode == mode)
+        {
+            return;
+        }
+
+        Mode = mode;
+        Changed?.Invoke(mode);
+    }
+}
+
+/// <summary>A minimal stand-in for <see cref="BatteryHoldSelector"/>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
+internal sealed class FakeBatteryHoldSelector(bool initialHold = false) : IBatteryHoldSelector
+{
+    public bool Hold { get; private set; } = initialHold;
+
+    public List<(bool Hold, string Source)> Sets { get; } = [];
+
+    public event Action<bool>? Changed;
+
+    public void Set(bool hold, string source)
+    {
+        Sets.Add((hold, source));
+
+        if (Hold == hold)
+        {
+            return;
+        }
+
+        Hold = hold;
+        Changed?.Invoke(hold);
+    }
+}
+
+/// <summary>A minimal stand-in for <see cref="ForecastRuntimeSettings"/>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
+internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
+{
+    public double DailyEvTargetWh { get; private set; } = 15_000;
+
+    public double SessionEnergyTargetWh { get; private set; }
+
+    public double MinBatterySocFloorPercent { get; private set; } = 50;
+
+    public List<(string Setting, double Value, string Source)> Sets { get; } = [];
+
+    public void SetDailyEvTargetWh(double wattHours, string source)
+    {
+        DailyEvTargetWh = Math.Max(0, wattHours);
+        Sets.Add((nameof(DailyEvTargetWh), DailyEvTargetWh, source));
+    }
+
+    public void SetSessionEnergyTargetWh(double wattHours, string source)
+    {
+        SessionEnergyTargetWh = Math.Max(0, wattHours);
+        Sets.Add((nameof(SessionEnergyTargetWh), SessionEnergyTargetWh, source));
+    }
+
+    public void SetMinBatterySocFloorPercent(double percent, string source)
+    {
+        MinBatterySocFloorPercent = Math.Clamp(percent, 0, 100);
+        Sets.Add((nameof(MinBatterySocFloorPercent), MinBatterySocFloorPercent, source));
+    }
 }
