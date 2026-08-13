@@ -289,5 +289,69 @@ public class SolarDayPlannerTests
 
         Assert.Equal(DayOutlook.Surplus, plan.Outlook);
     }
+
+    // The web UI's plan timeline (issue #50) is built from SolarDayPlan.Timeline rather than a
+    // second pass over the forecast, so its correctness is the planner's to guarantee.
+    [Fact]
+    public void TheTimelineHasOnePointPerForecastPeriod()
+    {
+        var plan = Plan(socPercent: 96);
+
+        Assert.Equal(BellDay.Length, plan.Timeline.Count);
+    }
+
+    [Fact]
+    public void TheTimelineIsChronological()
+    {
+        var plan = Plan(socPercent: 96);
+
+        Assert.Equal(plan.Timeline.OrderBy(p => p.Start), plan.Timeline);
+    }
+
+    [Fact]
+    public void TheTimelineCarriesEachPeriodsSurplusAndWhetherItClearsThePlateau()
+    {
+        var plan = Plan(socPercent: 96);
+
+        // Same 1000W/6000W bell shape as SplitsTheDayIntoShoulderAndPlateauEnergy, read back per point
+        // instead of summed: 500W shoulder surplus, 5500W plateau surplus, split at the 4140W floor.
+        Assert.All(plan.Timeline.Take(2), p => Assert.False(p.IsPlateau));
+        Assert.All(plan.Timeline.Take(2), p => Assert.Equal(500, p.SurplusWatts, 1));
+
+        Assert.All(plan.Timeline.Skip(2).Take(3), p => Assert.True(p.IsPlateau));
+        Assert.All(plan.Timeline.Skip(2).Take(3), p => Assert.Equal(5500, p.SurplusWatts, 1));
+    }
+
+    [Fact]
+    public void TheFirstTimelinePointsFloorMatchesThePlansOwnFloor()
+    {
+        // Plan.RequiredSocFloorPercent is "the floor if now were now"; Timeline[0].RequiredSocFloorPercent
+        // is "the floor if now were the first slice's start" -- the same quantity, since nothing lies
+        // between them when the plan is built exactly at a period boundary.
+        var plan = Plan(socPercent: 70);
+
+        Assert.Equal(plan.RequiredSocFloorPercent, plan.Timeline[0].RequiredSocFloorPercent, 3);
+    }
+
+    [Fact]
+    public void TheRequiredFloorRisesTowardsTheEndOfTheDayAlongTheTimeline()
+    {
+        // Less surplus lies ahead of a later point, so the pack has less room to recover from --
+        // exactly what squeezes the car out of the late afternoon, now visible period by period rather
+        // than only as the single current-moment figure.
+        var plan = Plan(socPercent: 70);
+
+        Assert.True(
+            plan.Timeline[^1].RequiredSocFloorPercent >= plan.Timeline[0].RequiredSocFloorPercent,
+            "the floor at the last period should be no lower than at the first");
+    }
+
+    [Fact]
+    public void TheTimelineIsEmptyWhenThePlanIsUnusable()
+    {
+        var plan = SolarDayPlan.Unavailable(Deadline, "no forecast fetched yet");
+
+        Assert.Empty(plan.Timeline);
+    }
 }
 

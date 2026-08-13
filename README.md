@@ -810,6 +810,18 @@ the mode back to `Off` on its own once the car finishes (the select follows it),
 switch shows the last command that was actually written to the inverter, not what was requested — a
 write that fails to take shows the switch springing back on its own.
 
+Phase 5 adds `/forecast`: the `Forecasted` mode's day plan as one coherent view instead of the dozen
+loosely related entities Home Assistant renders it as. The same eleven figures — day outlook, plan
+state, charge window, EV energy budget, EV energy expected today, projected shortfall, required SOC
+floor, forecast remaining today, tomorrow's forecast, forecast accuracy, battery loaned today — each
+with an explanation next to it, plus a timeline chart plotting forecast surplus against the charge
+window, with the required-SOC-floor projection overlaid on a second axis. The chart's data is
+computed once, in `Solax.Core`, by the same `SolarDayPlanner` that builds the plan itself — the floor
+projection is the identical formula the live figure uses, evaluated at every remaining forecast
+period instead of only the current instant — so the picture can never disagree with the numbers next
+to it. Like the MQTT entities, the whole page shows an explicit empty state while any mode other than
+`Forecasted` is driving, rather than the last stale plan.
+
 ```jsonc
 "Web": {
   "Enabled": false,             // master switch; while false the process binds no socket at all

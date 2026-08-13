@@ -407,5 +407,6 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         Deadline: Noon.AddHours(7),
         ForecastAsOf: Noon.AddHours(-1),
         IsUsable: true,
-        Reason: "Plenty of sun left today.");
+        Reason: "Plenty of sun left today.",
+        Timeline: []);
 }

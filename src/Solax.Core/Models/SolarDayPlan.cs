@@ -61,6 +61,11 @@ namespace Solax.Core.Models;
 /// must fall back to live-solar behaviour rather than trusting the numbers in this record.
 /// </param>
 /// <param name="Reason">A short human-readable summary for logging and Home Assistant.</param>
+/// <param name="Timeline">
+/// Today's remaining forecast, one <see cref="SolarDayPlanTimelinePoint"/> per sliced period,
+/// chronological. Exists for the web UI's plan timeline (issue #50) — nothing in charge control
+/// reads it. Empty when the plan isn't usable.
+/// </param>
 public sealed record SolarDayPlan(
     double RemainingPvWh,
     double ShoulderEnergyWh,
@@ -80,7 +85,8 @@ public sealed record SolarDayPlan(
     DateTimeOffset Deadline,
     DateTimeOffset? ForecastAsOf,
     bool IsUsable,
-    string Reason)
+    string Reason,
+    IReadOnlyList<SolarDayPlanTimelinePoint> Timeline)
 {
     /// <summary>Whether the day cannot cover the house, the battery and the car's target together.</summary>
     public bool HasShortfall => ShortfallWh > 0;
@@ -108,6 +114,7 @@ public sealed record SolarDayPlan(
         BiasFactor: 1,
         Deadline: deadline,
         ForecastAsOf: null,
+        Timeline: [],
         IsUsable: false,
         Reason: reason);
 }

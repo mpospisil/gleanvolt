@@ -124,7 +124,35 @@ public static class SolarDayPlanner
             Deadline: deadline,
             ForecastAsOf: forecast.RetrievedAt,
             IsUsable: true,
-            Reason: Describe(outlook, usableEvWh, shortfallWh, socFloor, window));
+            Reason: Describe(outlook, usableEvWh, shortfallWh, socFloor, window),
+            Timeline: BuildTimeline(slices, options));
+    }
+
+    /// <summary>
+    /// One <see cref="SolarDayPlanTimelinePoint"/> per slice, each carrying what the required SOC
+    /// floor would be if that slice's start were "now" — <see cref="RequiredSocFloor"/>, the same
+    /// formula the live plan uses, evaluated at every point instead of only the current one. Built
+    /// back-to-front because each point needs the surplus of every slice from it to the end, which is
+    /// exactly the running total a reverse pass accumulates for free.
+    /// </summary>
+    private static List<SolarDayPlanTimelinePoint> BuildTimeline(List<Slice> slices, SolarDayPlannerOptions options)
+    {
+        var timeline = new List<SolarDayPlanTimelinePoint>(slices.Count);
+        var suffixSurplusWh = 0.0;
+
+        for (var i = slices.Count - 1; i >= 0; i--)
+        {
+            suffixSurplusWh += slices[i].SurplusWh;
+            timeline.Add(new SolarDayPlanTimelinePoint(
+                slices[i].Start,
+                slices[i].End,
+                slices[i].SurplusWatts,
+                slices[i].IsPlateau,
+                RequiredSocFloor(suffixSurplusWh, options)));
+        }
+
+        timeline.Reverse();
+        return timeline;
     }
 
     /// <summary>

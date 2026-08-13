@@ -245,7 +245,8 @@ public class HaDiscoveryTests
         Deadline: new DateTimeOffset(2026, 7, 27, 19, 0, 0, TimeSpan.Zero),
         ForecastAsOf: new DateTimeOffset(2026, 7, 27, 9, 0, 0, TimeSpan.Zero),
         IsUsable: true,
-        Reason: "Tight day: 10.5kWh for the car");
+        Reason: "Tight day: 10.5kWh for the car",
+        Timeline: []);
 
     [Theory]
     [InlineData("homeassistant/sensor/solax_controller/day_outlook/config")]

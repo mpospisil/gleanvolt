@@ -261,3 +261,43 @@ internal static class TestSessions
             PlanFeasibleEvEnergyWh: null,
             PlanRequiredSocFloorPercent: null);
 }
+
+/// <summary>Plausible <see cref="SolarDayPlan"/> values for tests, standing in for <see cref="Strategies.SolarDayPlanner"/>'s output.</summary>
+internal static class TestPlans
+{
+    public static SolarDayPlan Usable(
+        DateTimeOffset now,
+        DayOutlook outlook = DayOutlook.Tight,
+        (DateTimeOffset Start, DateTimeOffset End)? window = null,
+        IReadOnlyList<SolarDayPlanTimelinePoint>? timeline = null) => new(
+            RemainingPvWh: 9_000,
+            ShoulderEnergyWh: 2_000,
+            PlateauEnergyWh: 7_000,
+            PlateauClaimedByBatteryWh: 500,
+            ExpectedHouseWh: 1_500,
+            BatteryToFullWh: 2_500,
+            EvBudgetWh: 5_000,
+            FeasibleEvEnergyWh: 4_500,
+            NextFeasibleWindow: window ?? (now.AddHours(1), now.AddHours(3)),
+            RequiredSocFloorPercent: 62,
+            ShortfallWh: 1_000,
+            EvExpectedTodayWh: 6_000,
+            EvTargetWh: 15_000,
+            Outlook: outlook,
+            BiasFactor: 0.97,
+            Deadline: now.AddHours(6),
+            ForecastAsOf: now.AddHours(-1),
+            IsUsable: true,
+            Reason: "Tight day: 4.5kWh for the car, window 1h from now, SOC floor 62%.",
+            Timeline: timeline ?? DefaultTimeline(now));
+
+    public static SolarDayPlan Unavailable(DateTimeOffset now) =>
+        SolarDayPlan.Unavailable(now.AddHours(6), "no forecast fetched yet");
+
+    private static IReadOnlyList<SolarDayPlanTimelinePoint> DefaultTimeline(DateTimeOffset now) =>
+    [
+        new(now, now.AddMinutes(30), 500, false, 70),
+        new(now.AddMinutes(30), now.AddHours(1), 5_500, true, 65),
+        new(now.AddHours(1), now.AddHours(1.5), 5_500, true, 62),
+    ];
+}
