@@ -1,21 +1,24 @@
 # Production stack for the Raspberry Pi 3 B (issue #26). Home Assistant and MQTT are opt-in
 # (issue #51) -- the controller and its self-hosted UI run on their own.
 #
-# Deployed to /opt/solax on the Pi by deploy/deploy.sh; every relative path below therefore resolves
-# under /opt/solax. Values come from /opt/solax/.env (see .env.example) -- that file stays on the Pi
-# and is never committed.
+# Deployed to /opt/solax on the Pi by deploy/deploy.sh or deploy/deploy-controller-only.sh; every
+# relative path below therefore resolves under /opt/solax. Values come from /opt/solax/.env (see
+# .env.example) -- that file stays on the Pi and is never committed.
 #
-#   ./deploy/deploy.sh                        # from a developer machine
+#   ./deploy/deploy.sh                        # full stack, from a developer machine
+#   ./deploy/deploy-controller-only.sh        # controller only, from a developer machine
 #   docker compose ps                         # on the Pi, in /opt/solax
 #
 # Every byte of state lives on a bind mount below. The containers themselves are disposable:
 # `docker compose down` and `docker rm -f` are safe, and an image upgrade or rollback loses nothing.
 #
-# Home Assistant and mosquitto carry `profiles:` and start only when requested -- via `.env`'s
-# COMPOSE_PROFILES (what deploy.sh uses) or `docker compose --profile ... up -d`. solax-controller
-# never depends on either being present: HomeAssistant:Enabled is its own switch
-# (HOMEASSISTANT_ENABLED below), off by default, so a controller-only run neither starts nor waits on
-# a broker that was never asked for. See deploy/README.md's "Running without Home Assistant".
+# Home Assistant and mosquitto carry `profiles:` and start only when requested -- both deploy scripts
+# set COMPOSE_PROFILES explicitly for their own invocations (see deploy/_lib.sh), overriding whatever
+# is in .env; running `docker compose` directly on the Pi instead falls back to .env's own
+# COMPOSE_PROFILES, or `docker compose --profile ... up -d`. solax-controller never depends on either
+# being present: HomeAssistant:Enabled is its own switch (HOMEASSISTANT_ENABLED below), off by
+# default, so a controller-only run neither starts nor waits on a broker that was never asked for. See
+# deploy/README.md's "Running without Home Assistant".
 
 name: solax
 

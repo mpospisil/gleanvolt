@@ -14,9 +14,20 @@ configure, a broker and a copy of Home Assistant it never used.
 
 **Decision — `mosquitto` and `homeassistant` carry compose `profiles:`; `solax-controller` does
 not.** A service outside the active profile set simply isn't created, which is what makes
-`docker compose up -d` with no `COMPOSE_PROFILES` start the controller alone. `COMPOSE_PROFILES` is
-docker compose's own environment variable, read automatically from `.env` beside the compose file —
-so no change to `deploy.sh`'s invocations was needed, only to what `.env` says.
+`docker compose up -d` with no active profiles start the controller alone. `COMPOSE_PROFILES` is
+docker compose's own environment variable, and it can come from `.env` beside the compose file — but
+see the next decision for why that isn't where this repo sets it.
+
+**Decision — which profiles are active is chosen by which deploy script runs, not by `.env`.**
+`deploy/deploy.sh` (full stack) and `deploy/deploy-controller-only.sh` (controller alone) each set
+`COMPOSE_PROFILES` explicitly for their own `docker compose pull`/`up`/`ps` invocations, overriding
+whatever the value already sitting in `.env` on the Pi happens to be. The first design put
+`COMPOSE_PROFILES=mosquitto,homeassistant` in `.env.example` instead and left both containers to a
+single `deploy.sh`; rejected once written down, because it made the deployed stack a function of a
+line in a file that nothing forces to match reality — run `deploy.sh` once with the full-stack line
+in `.env`, delete the line without redeploying, and the containers happily keep running against a
+`.env` that now claims they shouldn't exist. Two scripts make the choice a command someone actually
+runs, not a value that can go stale next to it.
 
 **Decision — soft dependencies, not hard ones.** `solax-controller`'s (and `homeassistant`'s)
 `depends_on: mosquitto` gained `required: false`. Without it, compose refuses to start a service that
@@ -43,20 +54,20 @@ this variable is truthy" within a single service block.
 
 **Consequences.**
 
-- **A pre-existing deployment must update its `.env` to keep running Home Assistant and the broker
-  after upgrading to this release.** Without `COMPOSE_PROFILES=mosquitto,homeassistant` and
-  `HOMEASSISTANT_ENABLED=true`, the next `docker compose up -d` starts the controller alone and stops
-  the other two. Flagged prominently in `.env.example` and `deploy/README.md`, the same way the `TZ`
-  and timezone-fail-fast changes were before it — accepted because the alternative, defaulting the
-  profiles *on*, would have made a controller-only Pi need to opt back *out*, which is the wrong
-  default for what #51 exists to enable.
+- **A pre-existing deployment must add `HOMEASSISTANT_ENABLED=true` to `.env` to keep publishing MQTT
+  discovery after upgrading to this release** — it was already running `deploy.sh`, so the containers
+  themselves need nothing (`deploy.sh` still means the full stack, unconditionally), but
+  `HomeAssistant:Enabled` was previously hardcoded `true` in `docker-compose.yml` and is now this new,
+  off-by-default environment variable. Flagged prominently in `.env.example` and `deploy/README.md`,
+  the same way the `TZ` and timezone-fail-fast changes were before it.
 - **`MQTT_USERNAME`/`MQTT_PASSWORD` are no longer hard-required** (`${VAR:?message}` became
   `${VAR:-}`) — a controller-only `.env` no longer needs credentials for a broker it never starts.
   Home Assistant's own MQTT integration setup is unaffected; nothing there reads these two.
-- **`deploy.sh`'s broker-password-file check is now conditional**, grepping `.env` for `mosquitto` in
-  `COMPOSE_PROFILES` before demanding a file that a controller-only deployment has no reason to have
-  created. The Home Assistant config seed step stays unconditional — it only touches files on disk,
-  costs nothing when unused, and means turning the profile on later needs no extra step.
+- **The broker-password-file check moved into `deploy.sh` unconditionally, and out of
+  `deploy-controller-only.sh` entirely** — each script only checks for what it might actually need,
+  rather than one script grepping `.env` to guess. The Home Assistant config seed step stays
+  unconditional on both — it only touches files on disk, costs nothing when unused, and means
+  switching from `deploy-controller-only.sh` to `deploy.sh` later needs no extra step.
 - **The reference footprint drops from 848 MB to roughly 200–250 MB of the Pi 3 B+'s 905** with
   Home Assistant and the broker off — the number [issue #44](https://github.com/mpospisil/solax-controller/issues/44)
   projected at the start of this work, now the documented, deployable default for anyone who wants

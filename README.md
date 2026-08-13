@@ -134,10 +134,13 @@ recommended way to confirm the telemetry looks right before enabling anything th
 ## Deployment
 
 For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspberry Pi OS Lite,
-64-bit) as three Docker containers — the controller, Home Assistant, and an MQTT broker:
+64-bit) as Docker containers. Home Assistant and the MQTT broker are optional (see
+[Self-hosted web UI](#self-hosted-web-ui-the-web-section) below); which stack you get is a choice of
+deploy script:
 
 ```bash
-./deploy/deploy.sh
+./deploy/deploy.sh                    # controller + Home Assistant + broker
+./deploy/deploy-controller-only.sh    # controller alone (with its own web UI, if enabled)
 ```
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
@@ -151,7 +154,8 @@ the containers are disposable: upgrades, rollbacks and `docker compose down` los
 requires authentication and is not published to the LAN.
 
 Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
-only when you select a mode in Home Assistant, and the battery hold stays disabled and dry-run until
+only when you select a mode — Home Assistant or the web UI, whichever is enabled — and the battery
+hold stays disabled and dry-run until
 you turn it on deliberately.
 
 Full instructions — preparing the Pi, memory and SD-card tuning for a 1 GB board, backup/restore,
