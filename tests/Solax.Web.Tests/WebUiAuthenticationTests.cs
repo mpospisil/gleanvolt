@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 using Solax.Web.Auth;
 
@@ -33,6 +34,12 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         builder.Services.AddSingleton(new WebBuildInfo("test"));
         builder.Services.AddSingleton(new ChargeControlStatusHolder());
         builder.Services.AddSingleton(TimeProvider.System);
+        // Phase 3 (#48): the dashboard now also injects these to drive the runtime controls. Fakes
+        // are enough here -- this suite is about the auth pipeline, not control behaviour, which
+        // DashboardPageTests already covers.
+        builder.Services.AddSingleton<IChargeControlModeSelector>(new FakeChargeControlModeSelector());
+        builder.Services.AddSingleton<IBatteryHoldSelector>(new FakeBatteryHoldSelector());
+        builder.Services.AddSingleton<IForecastRuntimeSettings>(new FakeForecastRuntimeSettings());
         builder.Services.AddSolaxWebUi(web);
 
         _app = builder.Build();

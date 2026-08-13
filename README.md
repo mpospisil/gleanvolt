@@ -794,9 +794,21 @@ lands, so a page that sits still means the poll loop has stopped while the web h
 Phase 1 adds `/`, a read-only telemetry dashboard: charge mode, control state, charger status, car
 connected, solar power and surplus, battery SOC and power, grid power, EV charging power and current,
 and target/active current — each with its meaning inline, since MQTT discovery has nowhere to put one
-(see [What each entity means](#what-each-entity-means) above; the wording is the same). No control
-affordance appears anywhere on it. Phase 2 adds authentication, gating every page behind a single
-shared password before phase 3 gives the UI anything that can write to hardware.
+(see [What each entity means](#what-each-entity-means) above; the wording is the same). Phase 2 adds
+authentication, gating every page behind a single shared password before phase 3 gives the UI
+anything that can write to hardware.
+
+Phase 3 adds the same controls Home Assistant has, on the same page: the **charge mode** select
+(`Off` / `Solar` / `Forecasted` / `FastNoBattery`), the **battery discharge hold** switch — shown
+only while `BatteryHold:Enabled` is on — and the runtime numbers (**daily EV target**, **session
+energy target**, **minimum battery SOC**). They drive the exact same Core interfaces the MQTT worker
+uses (`IChargeControlModeSelector`, `IBatteryHoldSelector`, `IForecastRuntimeSettings`), so there is
+no second control path and the two surfaces cannot disagree about what the charger is doing — the
+last one to write wins, visible on the other within a poll interval. The same semantics apply here as
+on the MQTT side: nothing set from this page persists across a restart, `FastNoBattery` can switch
+the mode back to `Off` on its own once the car finishes (the select follows it), and the battery-hold
+switch shows the last command that was actually written to the inverter, not what was requested — a
+write that fails to take shows the switch springing back on its own.
 
 ```jsonc
 "Web": {
