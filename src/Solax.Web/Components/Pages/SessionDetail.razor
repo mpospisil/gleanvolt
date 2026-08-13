@@ -112,6 +112,11 @@ else
     private bool _error;
     private bool _chartRendered;
 
+    // See Forecast.razor for the reasoning: _chartRendered is reset per navigation to force a
+    // redraw, so DisposeAsync needs its own "has JS ever been given a chart here" flag. Without it,
+    // disposal during the static prerender pass issues interop that is not allowed yet and throws.
+    private bool _chartCreated;
+
     protected override async Task OnParametersSetAsync()
     {
         _chartRendered = false;
@@ -144,11 +149,18 @@ else
         var timestamps = _document.Samples.Select(s => s.Timestamp.ToUnixTimeSeconds()).ToArray();
         var soc = _document.Samples.Select(s => s.BatterySocPercent).ToArray();
 
+        _chartCreated = true;
+
         await JS.InvokeVoidAsync("solaxCharts.renderSocChart", "soc-chart", timestamps, soc);
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (!_chartCreated)
+        {
+            return;
+        }
+
         try
         {
             await JS.InvokeVoidAsync("solaxCharts.dispose", "soc-chart");

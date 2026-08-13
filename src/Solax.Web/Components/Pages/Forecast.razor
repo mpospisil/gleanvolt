@@ -80,6 +80,13 @@ else
     private ChargeControlStatus? _status;
     private bool _chartRendered;
 
+    // Deliberately not _chartRendered: that one is reset on every status update to force a redraw,
+    // so it cannot answer the question DisposeAsync actually has -- "is there a uPlot instance in
+    // the JS map to tear down?". Once true it stays true, and while it is false there is nothing to
+    // dispose *and* no interop is permitted: during the static prerender pass OnAfterRenderAsync
+    // never runs, and a JS call from disposal there throws InvalidOperationException.
+    private bool _chartCreated;
+
     protected override void OnInitialized()
     {
         _status = StatusHolder.Current;
@@ -113,6 +120,10 @@ else
         var windowStart = plan.NextFeasibleWindow?.Start.ToUnixTimeSeconds();
         var windowEnd = plan.NextFeasibleWindow?.End.ToUnixTimeSeconds();
 
+        // Set before the call, not after: if the interop is cut off mid-flight the chart may already
+        // exist on the other side, and disposing one that isn't there is a no-op anyway.
+        _chartCreated = true;
+
         await JS.InvokeVoidAsync(
             "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd);
     }
@@ -120,6 +131,11 @@ else
     public async ValueTask DisposeAsync()
     {
         StatusHolder.Updated -= OnStatusUpdated;
+
+        if (!_chartCreated)
+        {
+            return;
+        }
 
         try
         {
