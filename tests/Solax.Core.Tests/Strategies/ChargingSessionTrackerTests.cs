@@ -391,5 +391,6 @@ public class ChargingSessionTrackerTests
         Deadline: Noon.AddHours(7),
         ForecastAsOf: Noon.AddHours(-1),
         IsUsable: isUsable,
-        Reason: "Plenty of sun left today.");
+        Reason: "Plenty of sun left today.",
+        Timeline: []);
 }

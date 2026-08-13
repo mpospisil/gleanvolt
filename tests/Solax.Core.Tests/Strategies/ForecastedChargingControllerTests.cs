@@ -67,7 +67,8 @@ public class ForecastedChargingControllerTests
             Deadline: Deadline,
             ForecastAsOf: Now.AddHours(-1),
             IsUsable: usable,
-            Reason: "test plan");
+            Reason: "test plan",
+            Timeline: []);
 
     private static ChargingControlInput Input(
         double surplusWatts,
