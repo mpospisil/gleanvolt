@@ -69,4 +69,8 @@ ENV DOTNET_EnableDiagnostics=0
 # entirely, so an unconfigured container runs in UTC and stamps every recorded charging session with
 # the wrong day. The worker logs a warning at startup when it detects exactly that.
 
+# Documentation only, as on the Linux image: opens no port by itself, and the UI binds nothing while
+# Web:Enabled is false. See Dockerfile.
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "Solax.Worker.dll"]

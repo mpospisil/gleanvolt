@@ -33,7 +33,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
-- **Self-hosted web UI** (optional, and being built in phases — see [issue #44](https://github.com/mpospisil/solax-controller/issues/44)) — a Blazor dashboard served by the controller itself, so the system can run on hardware too small for Home Assistant. Both surfaces are first-class: run either, both, or neither.
+- **Self-hosted web UI** (optional — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller on a Raspberry Pi 3 B+ with neither Home Assistant nor a broker, at roughly a third of the memory the full stack needs.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
@@ -134,10 +134,13 @@ recommended way to confirm the telemetry looks right before enabling anything th
 ## Deployment
 
 For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspberry Pi OS Lite,
-64-bit) as three Docker containers — the controller, Home Assistant, and an MQTT broker:
+64-bit) as Docker containers. Home Assistant and the MQTT broker are optional (see
+[Self-hosted web UI](#self-hosted-web-ui-the-web-section) below); which stack you get is a choice of
+deploy script:
 
 ```bash
-./deploy/deploy.sh
+./deploy/deploy.sh                    # controller + Home Assistant + broker
+./deploy/deploy-controller-only.sh    # controller alone (with its own web UI, if enabled)
 ```
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
@@ -151,7 +154,8 @@ the containers are disposable: upgrades, rollbacks and `docker compose down` los
 requires authentication and is not published to the LAN.
 
 Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
-only when you select a mode in Home Assistant, and the battery hold stays disabled and dry-run until
+only when you select a mode — Home Assistant or the web UI, whichever is enabled — and the battery
+hold stays disabled and dry-run until
 you turn it on deliberately.
 
 Full instructions — preparing the Pi, memory and SD-card tuning for a 1 GB board, backup/restore,
@@ -866,6 +870,18 @@ than silently serving an unprotected UI — the same reasoning as the timezone f
 `Web:RequireAuthentication=false` is supported (a clear warning is logged at startup) for a
 deployment that is deliberately open on a trusted LAN, but is not the default for a reason: the UI is
 the surface phase 3 gives write access to the inverter and EV charger.
+
+#### Deployment
+
+The compose stack in [`deploy/`](deploy/) treats the UI the same way it treats Home Assistant: off
+by default, and turning it on is one `.env` edit away from a fresh Pi — see
+[deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
+for the exact settings and the memory budget of running the controller and its UI **without** Home
+Assistant or an MQTT broker at all (roughly 200 MB of the reference Pi 3 B+'s 905, against 848 MB for
+the full stack). The port is published from a separate compose file
+(`docker-compose.web.yml`), not folded into the base one unconditionally, so that
+`Web:Enabled=false` keeps meaning no listening socket **at the Docker host**, not merely inside the
+container.
 
 #### Browsing charging session history
 

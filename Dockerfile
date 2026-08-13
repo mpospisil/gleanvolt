@@ -77,4 +77,10 @@ USER ${APP_UID}
 # No diagnostic IPC socket: nothing here attaches a profiler, and it is one less writable path.
 ENV DOTNET_EnableDiagnostics=0
 
+# Documentation only -- EXPOSE opens no port by itself, and most of the time none is open: the UI
+# binds nothing at all while Web:Enabled is false (see NoListenServer). The number is the default
+# from WebOptions.Port; a deployment that changes Web:Port must publish that port instead, not this
+# line (see deploy/docker-compose.yml).
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "Solax.Worker.dll"]

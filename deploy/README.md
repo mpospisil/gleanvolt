@@ -1,20 +1,28 @@
 # Deploying to a Raspberry Pi
 
 The production stack for [issue #26](https://github.com/mpospisil/solax-controller/issues/26): the
-controller, Home Assistant, and an MQTT broker as three Docker containers on a **Raspberry Pi 3
-Model B+** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
+containers on a **Raspberry Pi 3 Model B+** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+
+Home Assistant and the broker are **opt-in** (issue #51): a fresh Pi can run the controller and its
+own UI alone, at roughly a third of the memory the full stack needs. See
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only) for the
+combinations and their budgets; everything below still applies to whichever of them you choose.
 
 ```
               Raspberry Pi 3 Model B+  (192.168.2.7, arm64)
-    ┌───────────────────────────────────────────────────────────────┐
-    │  compose project "solax"          (all state on bind mounts)  │
-    │                                                               │
-    │   solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant│
-    │          │                   (no host port)          │ :8123  │
-    └──────────┼──────────────────────────────────────────┼─────────┘
-               ▼ Modbus TCP                               ▼
-    inverter 192.168.2.6:502                        LAN browsers
-    charger  192.168.2.10:502
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ compose project "solax"        (all state on bind mounts)          │
+    │                                                                    │
+    │ solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
+    │      │             (opt-in profile,     opt-in profile,            │
+    │      │              no host port)          LAN :8123)              │
+    │      └── LAN :8080, only while Web:Enabled                         │
+    └────────────────────────────────────────────────────────────────────┘
+         │ Modbus TCP
+         ▼
+  inverter 192.168.2.6:502
+  charger  192.168.2.10:502
 ```
 
 The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to GHCR; the Pi pulls it.
@@ -55,11 +63,53 @@ root on fast, durable storage on a board whose boot ROM predates the idea.
 > developing against `dotnet run`. Don't point one at the other; running both at once against the
 > same inverter is confusing at best.
 
+## Running without Home Assistant (controller + web UI only)
+
+Home Assistant and the broker are two more Docker containers competing for the same 1 GB, and on
+the reference Pi 3 B+ Home Assistant alone is the binding constraint. If you don't need it — the
+controller's own [self-hosted UI](../README.md#self-hosted-web-ui-the-web-section) already shows
+telemetry, drives every control, and browses charging-session history and the forecast plan — leave
+both off and get most of the board back.
+
+| Deployment | Deploy script | Containers running | `mem_limit` total | of 905 MB |
+|---|---|---|---|---|
+| Controller only | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% |
+| Controller + web UI | `deploy-controller-only.sh`, `Web:Enabled=true` | `solax-controller` | 200 MB | 22% |
+| Controller + Home Assistant | `deploy.sh` | all three | 848 MB | 94% |
+| Everything | `deploy.sh`, `Web:Enabled=true` | all three | 848 MB | 94% |
+
+The web UI adds no container and no separate `mem_limit` of its own — it runs inside
+`solax-controller`, the same process either way — so turning it on doesn't change the ceiling in
+this table, only what's reachable at `:8080`. Home Assistant and the broker are the only lines that
+move the number, which is exactly why which one runs is a choice of *script*, not a `.env` setting:
+`docker-compose.yml`'s `mosquitto`/`homeassistant` services still carry `profiles:`, but
+`deploy.sh` and `deploy-controller-only.sh` set `COMPOSE_PROFILES` explicitly when they run
+`docker compose`, overriding whatever happens to already be in `.env` — so the choice can't go stale.
+
+**To run controller-plus-UI only:** in `/opt/solax/.env` (see [.env.example](.env.example)), set:
+
+```
+WEB_ENABLED=true
+COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
+WEB_PASSWORD_HASH=<generate with the image, see .env.example>
+```
+
+and deploy with `./deploy/deploy-controller-only.sh` instead of `./deploy/deploy.sh`. Then, in
+[Prepare the Pi](#prepare-the-pi-once) below, step 7 (broker credentials) doesn't apply —
+`deploy-controller-only.sh` never checks for a password file — and neither does the Home Assistant
+onboarding under [First run](#first-run). You can still create `mosquitto/config`, `mosquitto/data`
+and `homeassistant/config` in step 5 if you might switch to `deploy.sh` later, or skip them for now;
+neither script assumes they exist except when it actually needs them.
+
+**To add Home Assistant and the broker later** (or from the start): set
+`HOMEASSISTANT_ENABLED=true` in `.env`, follow every step below including the broker credentials in
+step 7, and deploy with `./deploy/deploy.sh` instead.
+
 ## Prepare the Pi (once)
 
-**1. Passwordless SSH.** `deploy.sh` opens about eight separate SSH connections — with password
-authentication you would be prompted for every one of them, and a deploy stops being a single
-command. From your **developer machine**:
+**1. Passwordless SSH.** Either deploy script opens close to a dozen separate SSH connections — with
+password authentication you would be prompted for every one of them, and a deploy stops being a
+single command. From your **developer machine**:
 
 ```bash
 ssh-keygen -t ed25519 -C solax-deploy    # only if you don't already have a key
@@ -187,7 +237,11 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 > NVMe (see *Storage layout* above). Leave `vm.swappiness` at its default 60 so the disk tier is a
 > safety net rather than a first resort.
 
-**5. Directories.** The containers hold no state; everything lives here:
+**5. Directories.** The containers hold no state; everything lives here. `logs/` and `data/` are
+needed by every deployment; `mosquitto/` and `homeassistant/` only if you're deploying with
+`deploy.sh` rather than `deploy-controller-only.sh` (see
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only)) — skip
+those two and their `chown` if you're not, neither script requires them to pre-exist:
 
 ```bash
 sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
@@ -197,20 +251,21 @@ sudo chown -R 1654:1654 /opt/solax/logs /opt/solax/data   # the controller image
 ```
 
 **Do not chown `mosquitto/config` to 1883.** Only `mosquitto/data` belongs to the broker. The config
-directory is written by `deploy.sh` (that is where `mosquitto.conf` lands) and only *read* by the
-broker, whose compose mount is read-only — so handing it to uid 1883 locks the deploy out of it and
-fails with `tar: mosquitto/config/mosquitto.conf: Cannot open: Permission denied`. The one file in
-there that does belong to 1883 is `passwd`, chowned in step 7.
+directory is written by the deploy script (that is where `mosquitto.conf` lands, from either script —
+see [`deploy/_lib.sh`](_lib.sh)) and only *read* by the broker, whose compose mount is read-only — so
+handing it to uid 1883 locks the deploy out of it and fails with `tar: mosquitto/config/mosquitto.conf:
+Cannot open: Permission denied`. The one file in there that does belong to 1883 is `passwd`, chowned
+in step 7.
 
 `data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
 the database, so that **directory** — not just the file — has to be writable by uid 1654.
 
-`logs/` and `data/` are the two the *application* writes to, and `deploy.sh` creates them itself (and
-hands them to uid 1654) if they are missing or wrongly owned — which is what makes a release that
-adds one, as `data/` did, deploy onto an existing Pi without manual work. It does that through a
-throwaway `alpine` container, because the SSH user cannot chown to another uid but the Docker daemon
-can; the image is pulled once, on the first deploy that needs it. Listing them above is still worth
-doing on a fresh Pi, so the whole tree exists before anything runs.
+`logs/` and `data/` are the two the *application* writes to, and both deploy scripts create them
+themselves (and hand them to uid 1654) if they are missing or wrongly owned — which is what makes a
+release that adds one, as `data/` did, deploy onto an existing Pi without manual work. They do that
+through a throwaway `alpine` container, because the SSH user cannot chown to another uid but the
+Docker daemon can; the image is pulled once, on the first deploy that needs it. Listing them above is
+still worth doing on a fresh Pi, so the whole tree exists before anything runs.
 
 **6. Secrets.** From your developer machine:
 
@@ -219,10 +274,12 @@ scp deploy/.env.example martin@192.168.2.7:/opt/solax/.env
 ssh martin@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
 ```
 
-**7. Broker credentials.** The broker refuses anonymous connections, so this must exist before the
-stack will work. The username has to match `MQTT_USERNAME` **and** the password has to match
-`MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD` beside it is a stack that
-comes up looking healthy while the controller is refused on every connect.
+**7. Broker credentials.** *Only if you're deploying with `deploy.sh` (the full stack) — skip this
+entirely for a controller-only or controller-plus-UI deployment via `deploy-controller-only.sh`, which
+never checks for a password file.* The broker refuses anonymous connections,
+so this must exist before the stack will work. The username has to match `MQTT_USERNAME` **and** the
+password has to match `MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD`
+beside it is a stack that comes up looking healthy while the controller is refused on every connect.
 
 `-c` **creates** the file and refuses to overwrite one that exists, reporting the bare errno
 `Error: Unable to open file ... for writing. File exists.` — which reads like a permissions problem
@@ -276,22 +333,32 @@ This directory mirrors `/opt/solax` on the Pi, so what you edit here is what lan
 ```
 deploy/
 ├── docker-compose.yml              → /opt/solax/docker-compose.yml
+├── docker-compose.web.yml          → /opt/solax/docker-compose.web.yml (published UI port; opt-in via .env)
 ├── mosquitto/config/mosquitto.conf → /opt/solax/mosquitto/config/    (overwritten each deploy)
 ├── homeassistant/config/*.yaml     → /opt/solax/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/solax/.env
-└── deploy.sh
+├── deploy.sh                       # full stack: controller, mosquitto, Home Assistant
+├── deploy-controller-only.sh       # controller alone (+ web UI, if enabled)
+└── _lib.sh                         # shared by both scripts above; not run directly
 ```
 
-From a developer machine, with the repo checked out:
+From a developer machine, with the repo checked out, pick the script for the stack you want (see
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only) for the
+tradeoff):
 
 ```bash
-./deploy/deploy.sh
+./deploy/deploy.sh                    # full stack
+./deploy/deploy-controller-only.sh    # controller only
 ```
 
-It copies `docker-compose.yml` and `mosquitto.conf` to `/opt/solax`, seeds Home Assistant's config
-files only if they don't already exist, then pulls and restarts. It creates `logs/` and `data/` and
-hands them to uid 1654 if they are missing or wrongly owned; for anything else it refuses to run
-rather than guess. It never copies `.env`.
+Either copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` to `/opt/solax`,
+seeds Home Assistant's config files only if they don't already exist, then pulls and restarts —
+setting `COMPOSE_PROFILES` itself for that restart (`mosquitto,homeassistant` or empty), which is
+what actually decides whether the other two containers run, regardless of what's already in `.env`
+on the Pi. Both create `logs/` and `data/` and hand them to uid 1654 if they are missing or wrongly
+owned; for anything else they refuse to run rather than guess. Neither copies `.env` — which still
+decides whether `docker-compose.web.yml` (the UI's published port) and `HomeAssistant:Enabled`
+actually take effect.
 
 | Variable | Default | |
 |---|---|---|
@@ -299,7 +366,17 @@ rather than guess. It never copies `.env`.
 | `REMOTE_DIR` | `/opt/solax` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
+All three work identically on either script.
+
 ## First run
+
+**If `Web:Enabled=true`:** open `http://192.168.2.7:8080`, sign in with the password behind
+`WEB_PASSWORD_HASH`, and the dashboard, the controls, session history and the forecast plan are all
+there — see the root README's
+[Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
+does.
+
+**If you deployed with `deploy.sh`** (the full stack, Home Assistant included):
 
 1. Open `http://192.168.2.7:8123` and complete Home Assistant onboarding (local account).
 2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `mosquitto`, port `1883`, and
@@ -308,9 +385,9 @@ rather than guess. It never copies `.env`.
    appear by themselves.
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
-only once you select a mode in Home Assistant, and `BatteryHold` is disabled and dry-run. Change
-either in `.env` only after verifying the register addresses on your own device, per the root
-README's warnings.
+only once you select a mode — Home Assistant or the web UI, whichever is enabled — and
+`BatteryHold` is disabled and dry-run. Change either in `.env` only after verifying the register
+addresses on your own device, per the root README's warnings.
 
 ## Everyday operations
 
@@ -332,7 +409,8 @@ commit at startup (`SolaX Local Controller 1.0.0 (31bf347) starting.`), so a log
 a build without matching it against image digests. Home Assistant shows the same string as the
 device's software version. `0.0.0-dev` with no commit means somebody deployed a local build.
 
-Upgrade to the latest build, or roll back to a known-good one:
+Upgrade to the latest build, or roll back to a known-good one, using whichever script matches the
+stack already running (both take `IMAGE_TAG` identically):
 
 ```bash
 ./deploy/deploy.sh                              # latest from main
@@ -347,7 +425,7 @@ does not exist and the pull fails with `manifest unknown`.
 Both preserve all state. So does `docker compose down`, and so does `docker rm -f` on any single
 container — that is the point of the layout below.
 
-Deploy from a checked-out tag rather than your working branch. `deploy.sh` copies the **local**
+Deploy from a checked-out tag rather than your working branch. Either script copies the **local**
 `deploy/` tree to the Pi, so the compose file and the image otherwise come from two different places:
 
 ```bash
@@ -424,8 +502,8 @@ ls -l /opt/solax/logs/
 > **The one way this breaks is silent.** If `/opt/solax/logs` isn't writable by uid 1654 (the
 > image's non-root user — most easily caused by letting Docker auto-create the directory as root),
 > Serilog's file sink fails and *keeps running*: the container is healthy, `docker logs` looks
-> normal, and the log files simply never appear. Two things guard against it: `deploy.sh` refuses to
-> creates it (and fixes its ownership) before deploying, and the worker enables Serilog's `SelfLog` so the
+> normal, and the log files simply never appear. Two things guard against it: both deploy scripts
+> create it (and fix its ownership) before deploying, and the worker enables Serilog's `SelfLog` so the
 > failure shows up in `docker logs` as `RollingFileSink: the target file could not be opened or
 > created`. If you see that line, fix the ownership:
 >
@@ -433,7 +511,7 @@ ls -l /opt/solax/logs/
 > sudo chown -R 1654:1654 /opt/solax/logs
 > ```
 >
-> `/opt/solax/data` has the same requirement and the same `deploy.sh` guard. It fails less quietly —
+> `/opt/solax/data` has the same requirement and the same guard from either script. It fails less quietly —
 > the session worker logs an error and then records nothing for the rest of the run — but the result
 > is the same: a stack that looks healthy while quietly keeping no history.
 
@@ -495,6 +573,19 @@ independent, so that's a compose edit, not a redesign.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
 being readable by uid 1883.
 
+**Can't reach the web UI at `:8080`.** Two independent switches both have to be on, and it's usually
+one of them:
+
+```bash
+docker compose logs solax-controller | grep -i "web ui"
+```
+
+`Web UI enabled; listening on port 8080` means `Web:Enabled` is true and the *process* is listening
+— if the browser still can't connect, the port isn't published: check `.env`'s `COMPOSE_FILE`
+includes `docker-compose.web.yml` (`docker compose config` on the Pi shows whether it actually got
+picked up). No such log line at all means `WEB_ENABLED` itself is unset or `false` in `.env`. See
+[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only).
+
 **No charging sessions are being recorded.** Look for this at startup:
 
 ```
@@ -503,10 +594,10 @@ being readable by uid 1883.
 ```
 
 That is `/opt/solax/data` not being writable by uid 1654. Everything else keeps running, which is why
-it is easy to miss. Re-running the deploy repairs the ownership on its own:
+it is easy to miss. Re-running whichever deploy script you used repairs the ownership on its own:
 
 ```bash
-./deploy/deploy.sh
+./deploy/deploy.sh                    # or deploy-controller-only.sh
 ```
 
 Or, on the Pi directly:
@@ -521,8 +612,8 @@ Bridge networking routes through the host, so if the Pi can reach the inverter, 
 **`docker compose` says permission denied.** The ssh user isn't in the `docker` group yet, or hasn't
 logged out and back in since being added.
 
-**It asks for a password (repeatedly).** SSH key authentication isn't set up — step 1. `deploy.sh`
-makes roughly eight connections, so this is unusable without a key:
+**It asks for a password (repeatedly).** SSH key authentication isn't set up — step 1. Either script
+makes close to a dozen connections, so this is unusable without a key:
 
 ```bash
 ssh-copy-id martin@192.168.2.7
