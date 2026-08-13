@@ -11,12 +11,23 @@ using Solax.Infrastructure.Modbus;
 using Solax.Infrastructure.Sessions;
 using Solax.Infrastructure.Solcast;
 using Solax.Web;
+using Solax.Web.Auth;
 using Solax.Web.Components;
 using Solax.Worker;
 using Solax.Worker.Configuration;
 using Solax.Worker.Forecasting;
 using Solax.Worker.HomeAssistant;
 using Solax.Worker.Sessions;
+
+// A tiny offline tool rather than a whole second entry point: the password is a secret that must
+// never live in appsettings.json, and this is the only way to produce the hash that belongs in
+// Web__PasswordHash instead. Takes precedence over everything below -- no configuration, no
+// listening socket, just the hash on stdout.
+if (args is ["hash-password", var plainPassword])
+{
+    Console.WriteLine(WebPasswordHasher.Hash(plainPassword));
+    return;
+}
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
@@ -282,6 +293,12 @@ builder.Services.Configure<WebOptions>(builder.Configuration.GetSection(WebOptio
 
 var web = builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions();
 
+// Failing loudly beats silently serving an unprotected UI -- same reasoning as the timezone
+// fail-fast below. The UI is about to gain controls that write to a real inverter and EV charger
+// (issue #48), and an unauthenticated port that can reach them is not acceptable even on a trusted
+// LAN, so a missing hash must stop the host rather than degrade to "no login required".
+web.ValidateAuthenticationConfig();
+
 if (web.Enabled)
 {
     // The port has exactly one source: the Web section. A code-backed endpoint outranks the hosting
@@ -296,15 +313,14 @@ if (web.Enabled)
     // app, where the manifest this reads does not exist and the call does nothing.
     builder.WebHost.UseStaticWebAssets();
 
-    // Interactive server rendering: the components run here, beside the services they read, and the
-    // browser holds a thin circuit. That is what lets a page update itself as each poll lands
-    // without a REST API in between -- WebAssembly would need one, and this project needs it for
-    // nothing else.
-    builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-
     // What the UI displays as "this build". The host owns the answer -- the version is stamped on
     // this assembly -- and hands it over, rather than Solax.Web guessing from its own attributes.
     builder.Services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
+
+    // Everything else -- Razor components, cookie authentication, the RequireAuthentication toggle,
+    // login/logout -- is host-independent and lives in Solax.Web so it can be exercised by a test
+    // host too (issues #46, #47).
+    builder.Services.AddSolaxWebUi(web);
 }
 else
 {
@@ -319,11 +335,11 @@ var host = builder.Build();
 
 if (web.Enabled)
 {
-    // Static assets come from Solax.Web's wwwroot, served at /_content/Solax.Web/... Antiforgery is
-    // a hard requirement of MapRazorComponents, not an optional hardening step.
+    // Static assets come from Solax.Web's wwwroot, served at /_content/Solax.Web/... Reads the
+    // manifest UseStaticWebAssets() above wires up, which is why this stays here rather than moving
+    // into WebUiHost with everything else -- a test host has no such manifest.
     host.MapStaticAssets();
-    host.UseAntiforgery();
-    host.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+    host.MapSolaxWebUi(web);
 }
 
 // First line in the log, before anything can go wrong: a log file or a `docker logs` dump is

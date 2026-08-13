@@ -1,0 +1,16 @@
+@* One telemetry value, with its meaning inline: MQTT discovery has nowhere to put an explanation,
+   this page does, and README's "what each entity means" table is what Hint is drawn from. *@
+<div class="stat">
+    <div class="label">@Label</div>
+    <div class="value">@Value</div>
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <div class="hint">@Hint</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Hint { get; set; }
+}

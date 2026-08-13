@@ -43,6 +43,40 @@ public class WebOptionsTests
     }
 
     [Fact]
+    public void Requires_authentication_by_default()
+    {
+        // The UI is about to gain controls that write to a real inverter and EV charger (issue #48);
+        // an unauthenticated port has to be an opt-out, not the default.
+        var options = Bind(("Web:Enabled", "true"));
+
+        Assert.True(options.RequireAuthentication);
+    }
+
+    [Fact]
+    public void Can_turn_authentication_off_explicitly()
+    {
+        var options = Bind(("Web:Enabled", "true"), ("Web:RequireAuthentication", "false"));
+
+        Assert.False(options.RequireAuthentication);
+    }
+
+    [Fact]
+    public void Has_no_password_hash_configured_by_default()
+    {
+        var options = Bind(("Web:Enabled", "true"));
+
+        Assert.Equal("", options.PasswordHash);
+    }
+
+    [Fact]
+    public void Takes_the_password_hash_from_configuration()
+    {
+        var options = Bind(("Web:Enabled", "true"), ("Web:PasswordHash", "AQAAAAIAAYagAAAAE..."));
+
+        Assert.Equal("AQAAAAIAAYagAAAAE...", options.PasswordHash);
+    }
+
+    [Fact]
     public void Binds_from_the_double_underscore_environment_form_the_deploy_stack_uses()
     {
         // How the container is actually configured: compose sets Web__Enabled / Web__Port, never a

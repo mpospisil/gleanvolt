@@ -1,4 +1,6 @@
 @page "/health"
+@attribute [Authorize]
+@rendermode InteractiveServer
 @implements IDisposable
 @inject ChargeControlStatusHolder StatusHolder
 @inject WebBuildInfo Build
