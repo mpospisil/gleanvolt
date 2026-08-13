@@ -1,0 +1,91 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject TimeProvider Time
+
+@*
+    Phase 1 (#46): a read-only view of live telemetry. No control affordance appears anywhere on
+    this page -- not even the charge mode, which is display-only here even though Home Assistant
+    lets it be changed; that lands in phase 3 (#48), gated behind authentication landing first in
+    phase 2 (#47).
+
+    Follows StatusHolder.Updated exactly like the health page: seeded from Current before
+    subscribing, so a browser that arrives between two polls sees the last one rather than nothing,
+    then pushed a new value down the circuit on every completed poll.
+*@
+
+<PageTitle>Dashboard — SolaX Local Controller</PageTitle>
+
+<h1>Dashboard</h1>
+
+@if (_status is null)
+{
+    <p class="muted">No poll has completed yet.</p>
+}
+else
+{
+    <p class="muted">
+        Updated @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+    </p>
+
+    <section class="stat-grid">
+        <Stat Label="Charge mode" Value="@_status.Mode.ToString()"
+              Hint="Which strategy is driving the charger. Always starts at Off after a restart." />
+        <Stat Label="Control state" Value="@_status.State.ToString()"
+              Hint="What charge control is doing right now: Disabled (no mode selected), Idle (selected but not acting), Charging, or Paused." />
+        <Stat Label="Charger status" Value="@_status.ChargerStatus.ToString()"
+              Hint="The charger's own reported state, straight from its register." />
+        <Stat Label="Car connected" Value="@(_status.CarConnected ? "Yes" : "No")"
+              Hint="Whether a vehicle is plugged in. Says nothing about whether it is drawing power." />
+
+        <Stat Label="Solar power" Value="@Watts(_status.SolarPowerWatts)"
+              Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
+        <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
+              Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
+        <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"
+              Hint="Home battery state of charge as the inverter reports it." />
+        <Stat Label="Battery power" Value="@Watts(_status.BatteryPowerWatts)"
+              Hint="Positive while the battery charges, negative while it discharges." />
+        <Stat Label="Grid power" Value="@Watts(_status.GridPowerWatts)"
+              Hint="Positive while importing from the grid, negative while exporting." />
+
+        <Stat Label="EV charging power" Value="@Watts(_status.EvChargerPowerWatts)"
+              Hint="What the charger reports the car actually drawing right now -- not a setpoint." />
+        <Stat Label="EV charging current" Value="@Amps(_status.EvChargingCurrentAmps)"
+              Hint="Charging current derived from the charger's measured power: what the car really takes." />
+        <Stat Label="Target current" Value="@Amps(_status.TargetCurrentAmps)"
+              Hint="The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging." />
+        <Stat Label="Active current" Value="@Amps(_status.ActiveCurrentAmps)"
+              Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
+    </section>
+}
+
+@code {
+    private ChargeControlStatus? _status;
+
+    protected override void OnInitialized()
+    {
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+    }
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+
+    private static string Watts(double watts) => $"{watts:F0} W";
+
+    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
+
+    private static string Percent(double percent) => $"{percent:F0}%";
+
+    private static string Amps(int amps) => $"{amps} A";
+
+    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+}

@@ -788,16 +788,22 @@ second application is simpler to reason about. The two surfaces are independent 
 same internal state, so all four combinations run: UI only, MQTT only, both, neither.
 
 **What is built so far.** [Issue #44](https://github.com/mpospisil/solax-controller/issues/44) lands
-in phases, and this is phase 0 — the plumbing. One page is served, `/health`, showing the running
-build, the configured time zone, and the time of the last completed poll. It is genuinely useful as
-a liveness check (the timestamp updates itself as each poll lands, so a page that sits still means
-the poll loop has stopped while the web host has not), but the dashboard, the controls and
-authentication are still to come.
+in phases. Phase 0 is the plumbing: `/health` shows the running build, the configured time zone, and
+the time of the last completed poll — a liveness check (the timestamp updates itself as each poll
+lands, so a page that sits still means the poll loop has stopped while the web host is fine).
+Phase 1 adds `/`, a read-only telemetry dashboard: charge mode, control state, charger status, car
+connected, solar power and surplus, battery SOC and power, grid power, EV charging power and current,
+and target/active current — each with its meaning inline, since MQTT discovery has nowhere to put one
+(see [What each entity means](#what-each-entity-means) above; the wording is the same). No control
+affordance appears anywhere on it. Phase 2 adds authentication, gating every page behind a single
+shared password before phase 3 gives the UI anything that can write to hardware.
 
 ```jsonc
 "Web": {
-  "Enabled": false,   // master switch; while false the process binds no socket at all
-  "Port": 8080        // listens on every interface, plain HTTP
+  "Enabled": false,             // master switch; while false the process binds no socket at all
+  "Port": 8080,                 // listens on every interface, plain HTTP
+  "RequireAuthentication": true // false only for a deliberately open, trusted-LAN deployment
+  // "PasswordHash": ""         // secret -- see below, never set it here
 }
 ```
 
@@ -806,10 +812,36 @@ authentication are still to come.
 - **Disabled means nothing is listening** — not "listening but empty". An ASP.NET host would
   otherwise fall back to a default port; this one installs a server that binds nothing, so with the
   UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket.
-- **There is no authentication yet** — it is a phase of its own, and it lands before any control
-  that writes to hardware. Until then, treat the port as trusted-LAN only and do not forward it.
 - **Plain HTTP**, deliberately: this is a LAN appliance, and terminating TLS in front of it (or not)
   is the operator's decision rather than the controller's.
+
+#### Authentication
+
+`Web:RequireAuthentication` defaults to **true**: every page — including the read-only dashboard —
+redirects an anonymous visitor to a login form, and the login itself is checked against
+`Web:PasswordHash`, a single shared password hashed with ASP.NET Core's `PasswordHasher`. There is no
+per-user account: one password gates the whole UI, matching a LAN appliance with one or two operators
+rather than a multi-tenant system.
+
+The hash is a secret and must never live in `appsettings.json` — supply it via `.env` / an
+environment variable, exactly like the MQTT broker credentials:
+
+```
+Web__PasswordHash=<hash>
+```
+
+Generate one with the worker binary itself (no configuration or listening socket involved — it
+prints the hash and exits):
+
+```bash
+dotnet Solax.Worker.dll hash-password '<your password>'
+```
+
+**If `RequireAuthentication` is true and no hash is configured, the host refuses to start** rather
+than silently serving an unprotected UI — the same reasoning as the timezone fail-fast. Setting
+`Web:RequireAuthentication=false` is supported (a clear warning is logged at startup) for a
+deployment that is deliberately open on a trusted LAN, but is not the default for a reason: the UI is
+the surface phase 3 gives write access to the inverter and EV charger.
 
 The published container image is now based on `dotnet/aspnet` rather than `dotnet/runtime` — about
 25 MB more, on every platform, whether or not the UI is enabled. The framework reference is fixed at

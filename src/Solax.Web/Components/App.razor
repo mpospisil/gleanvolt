@@ -1,10 +1,12 @@
 @*
     The root component: the HTML document every page is rendered into.
 
-    Interactivity is declared once, here, rather than page by page. Every component in this library
-    therefore runs in interactive server mode -- prerendered as HTML on the first request, then kept
-    live over the circuit -- which is what lets a page push a new poll to the browser instead of
-    waiting for a refresh.
+    Interactivity is declared per page rather than once here (phase 0 declared it globally on
+    <Routes>; phase 2's login page is what forces the change). The login page has to run as static
+    server-side rendering, not an interactive circuit: HttpContext.SignInAsync writes a Set-Cookie
+    header on the HTTP response, and once a circuit is live that response has already been sent --
+    there is nothing left to write the cookie onto. Pages that push live updates (the dashboard, the
+    health page) opt into @rendermode="InteractiveServer" individually instead.
 *@
 <!DOCTYPE html>
 <html lang="en">
@@ -14,10 +16,10 @@
     <base href="/" />
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="_content/Solax.Web/css/site.css" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet />
 </head>
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes />
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>
