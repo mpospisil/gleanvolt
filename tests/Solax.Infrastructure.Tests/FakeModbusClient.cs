@@ -16,7 +16,7 @@ internal class FakeModbusClient : IModbusClient
 
     public void SetHolding(ushort address, ushort value) => _holding[address] = value;
 
-    public Task ConnectAsync(CancellationToken cancellationToken = default)
+    public virtual Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         IsConnected = true;
         return Task.CompletedTask;
