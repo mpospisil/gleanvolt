@@ -9,9 +9,19 @@ namespace Solax.Infrastructure;
 
 public sealed class EnergyStateReader : IEnergyStateReader
 {
+    // A RunMode value outside the register's real 0-13 range, which EvChargerStatusMapping turns into
+    // EvChargerStatus.Unknown -- exactly what the UI and Home Assistant already show for a charger
+    // whose state can't be determined. Reusing it means "the charger is unreachable" needs no new
+    // field on EnergyState, and therefore no new entity anywhere downstream.
+    private const ushort UnreachableStatusRaw = ushort.MaxValue;
+
     private readonly IModbusClient _inverterClient;
     private readonly IModbusClient _evChargerClient;
     private readonly ILogger<EnergyStateReader> _logger;
+
+    // Whether the last poll reached the charger. Only used to keep the log to one line per outage
+    // rather than one per poll; this service is a singleton, so it survives between polls.
+    private bool _evChargerReachable = true;
 
     public EnergyStateReader(
         [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverterClient,
@@ -30,18 +40,10 @@ public sealed class EnergyStateReader : IEnergyStateReader
             await _inverterClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        if (!_evChargerClient.IsConnected)
-        {
-            await _evChargerClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
-        }
-
         var inverterBlock = await ReadInverterTelemetryBlockAsync(cancellationToken).ConfigureAwait(false);
         LogGridRegisterCandidates(inverterBlock);
 
-        var evStatus = await ReadAsync(_evChargerClient, EvChargerRegisterMap.RunMode, cancellationToken).ConfigureAwait(false);
-        var evPower = await ReadAsync(_evChargerClient, EvChargerRegisterMap.ChargePowerTotal, cancellationToken).ConfigureAwait(false);
-        var evChargeMode = await TryReadChargeModeAsync(cancellationToken).ConfigureAwait(false);
-        var evChargeCurrent = await TryReadChargeCurrentAsync(cancellationToken).ConfigureAwait(false);
+        var evCharger = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
 
         return EnergyState.FromRawRegisters(
             DateTimeOffset.UtcNow,
@@ -51,9 +53,59 @@ public sealed class EnergyStateReader : IEnergyStateReader
             pvPowerDc2Raw: FromBlock(inverterBlock, InverterRegisterMap.Powerdc2),
             feedinPowerLowRaw: FromBlock(inverterBlock, InverterRegisterMap.FeedinPowerLow),
             feedinPowerHighRaw: FromBlock(inverterBlock, InverterRegisterMap.FeedinPowerHigh),
-            evChargerStatusRaw: evStatus,
-            evChargerPowerRaw: evPower) with { ChargeMode = evChargeMode, ChargeCurrentAmps = evChargeCurrent };
+            evChargerStatusRaw: evCharger.StatusRaw,
+            evChargerPowerRaw: evCharger.PowerRaw)
+            with
+        { ChargeMode = evCharger.Mode, ChargeCurrentAmps = evCharger.CurrentAmps };
     }
+
+    // The charger is optional in a way the inverter is not: it can be switched off, moved to another
+    // address by DHCP, or simply absent from the installation -- and none of that should cost us the
+    // inverter telemetry that was just read successfully. So everything charger-shaped is
+    // best-effort, the connect included. That connect is what the per-register Try* helpers below
+    // could never guard: they only run once a connection exists, and an absent charger fails earlier
+    // than that.
+    private async Task<EvChargerReading> ReadEvChargerAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!_evChargerClient.IsConnected)
+            {
+                await _evChargerClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var statusRaw = await ReadAsync(_evChargerClient, EvChargerRegisterMap.RunMode, cancellationToken).ConfigureAwait(false);
+            var powerRaw = await ReadAsync(_evChargerClient, EvChargerRegisterMap.ChargePowerTotal, cancellationToken).ConfigureAwait(false);
+            var mode = await TryReadChargeModeAsync(cancellationToken).ConfigureAwait(false);
+            var currentAmps = await TryReadChargeCurrentAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!_evChargerReachable)
+            {
+                _evChargerReachable = true;
+                _logger.LogInformation("EV charger is reachable again; its telemetry is live.");
+            }
+
+            return new EvChargerReading(statusRaw, powerRaw, mode, currentAmps);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // One line per outage, not one per poll: this runs on the polling interval, and a charger
+            // that is switched off stays switched off for hours. The recovery above closes the pair,
+            // so the log says when it went and when it came back.
+            if (_evChargerReachable)
+            {
+                _evChargerReachable = false;
+                _logger.LogWarning(
+                    ex,
+                    "EV charger is unreachable; reporting it as {Status} and continuing with inverter telemetry.",
+                    EvChargerStatus.Unknown);
+            }
+
+            return new EvChargerReading(UnreachableStatusRaw, PowerRaw: 0, Mode: null, CurrentAmps: null);
+        }
+    }
+
+    private readonly record struct EvChargerReading(ushort StatusRaw, ushort PowerRaw, EvChargerMode? Mode, int? CurrentAmps);
 
     // Reads the charger's active current setpoint (a holding register, 0.01A scale). Best-effort for
     // the same reason as the mode: a failed read must not fail the whole telemetry poll.

@@ -182,7 +182,12 @@ EOF
     # The UI is on unless .env explicitly turns it off, so the test is for the opt-out, not the
     # opt-in: a fresh .env says nothing about the web UI at all and must still get this line.
     if ! ssh_pi "grep -qE '^WEB_ENABLED=false' '$REMOTE_DIR/.env' 2>/dev/null"; then
-        web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2-)
+        # `|| true` because no WEB_PORT line is the normal case -- it is commented out in
+        # .env.example, so the default port applies and grep exits 1. Under `set -e` that status
+        # would propagate out of the assignment and kill the script *after* a completely successful
+        # deploy, reporting failure and swallowing the summary below. The `if !` above guards the
+        # same hazard on the line before; this one needs it just as much.
+        web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2- || true)
         next="$next
     Web UI: http://${PI_HOST#*@}:${web_port:-8090}"
     fi
