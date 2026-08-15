@@ -33,7 +33,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
-- **Self-hosted web UI** (optional — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller on a Raspberry Pi 3 B+ with neither Home Assistant nor a broker, at roughly a third of the memory the full stack needs.
+- **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8080`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller on a Raspberry Pi 3 B+ with neither Home Assistant nor a broker, at roughly a third of the memory the full stack needs.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
@@ -140,7 +140,7 @@ deploy script:
 
 ```bash
 ./deploy/deploy.sh                    # controller + Home Assistant + broker
-./deploy/deploy-controller-only.sh    # controller alone (with its own web UI, if enabled)
+./deploy/deploy-controller-only.sh    # controller alone, with its own web UI on :8080
 ```
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
@@ -799,8 +799,9 @@ Phase 1 adds `/`, a read-only telemetry dashboard: charge mode, control state, c
 connected, solar power and surplus, battery SOC and power, grid power, EV charging power and current,
 and target/active current — each with its meaning inline, since MQTT discovery has nowhere to put one
 (see [What each entity means](#what-each-entity-means) above; the wording is the same). Phase 2 adds
-authentication, gating every page behind a single shared password before phase 3 gives the UI
-anything that can write to hardware.
+optional authentication — a single shared password that gates every page once one is configured, see
+[Authentication](#authentication) — landing before phase 3 gives the UI anything that can write to
+hardware.
 
 Phase 3 adds the same controls Home Assistant has, on the same page: the **charge mode** select
 (`Off` / `Solar` / `Forecasted` / `FastNoBattery`), the **battery discharge hold** switch — shown
@@ -828,28 +829,41 @@ to it. Like the MQTT entities, the whole page shows an explicit empty state whil
 
 ```jsonc
 "Web": {
-  "Enabled": false,             // master switch; while false the process binds no socket at all
-  "Port": 8080,                 // listens on every interface, plain HTTP
-  "RequireAuthentication": true // false only for a deliberately open, trusted-LAN deployment
-  // "PasswordHash": ""         // secret -- see below, never set it here
+  "Enabled": true,      // master switch; while false the process binds no socket at all
+  "Port": 8080          // listens on every interface, plain HTTP
+  // "RequireAuthentication"  // unset -- follow the password; see below, rarely worth setting
+  // "PasswordHash": ""       // secret -- see below, never set it here
 }
 ```
 
-- **Off by default**, like the Home Assistant integration. Turning it on is a deliberate act:
-  `Web:Enabled=true`, or `Web__Enabled=true` in the environment.
-- **Disabled means nothing is listening** — not "listening but empty". An ASP.NET host would
-  otherwise fall back to a default port; this one installs a server that binds nothing, so with the
-  UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket.
+- **On by default, and needs no configuration.** Start the controller — from `dotnet run`, from the
+  image, from the compose stack — and the UI is at `http://<host>:8080`. This is the surface a fresh
+  install is operated through, and unlike the Home Assistant integration it needs no broker, no
+  credentials and no onboarding to be useful, so there is nothing to gain by making it opt-in.
+- **No login until you configure one.** See [Authentication](#authentication) below: it is an
+  advanced option, off out of the box, and turning it on is a single setting.
+- **`Web:Enabled=false` means nothing is listening** — not "listening but empty". An ASP.NET host
+  would otherwise fall back to a default port; this one installs a server that binds nothing, so with
+  the UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket
+  inside the container. (In the compose stack the *host* port stays published either way — see
+  [Deployment](#deployment) — so connections are refused rather than never accepted.)
 - **Plain HTTP**, deliberately: this is a LAN appliance, and terminating TLS in front of it (or not)
   is the operator's decision rather than the controller's.
 
 #### Authentication
 
-`Web:RequireAuthentication` defaults to **true**: every page — including the read-only dashboard —
-redirects an anonymous visitor to a login form, and the login itself is checked against
-`Web:PasswordHash`, a single shared password hashed with ASP.NET Core's `PasswordHasher`. There is no
-per-user account: one password gates the whole UI, matching a LAN appliance with one or two operators
-rather than a multi-tenant system.
+**There is no login by default.** The UI serves every page to anyone who can reach the port. That is
+the right default for a LAN appliance — it is what makes the thing work the moment it starts, with no
+secret to generate first — and the wrong one if that LAN has guests on it, or if the port is reachable
+from anywhere beyond it. Which of those you have is something only you know, so it is a setting rather
+than an assumption.
+
+Turning the login on is **one setting**: configure `Web:PasswordHash` and every page — including the
+read-only dashboard — starts redirecting anonymous visitors to a login form. There is no second
+switch to remember, and therefore no way to set a password and have it quietly not enforced. There is
+also no per-user account: one shared password gates the whole UI, hashed with ASP.NET Core's
+`PasswordHasher`, matching a LAN appliance with one or two operators rather than a multi-tenant
+system.
 
 The hash is a secret and must never live in `appsettings.json` — supply it via `.env` / an
 environment variable, exactly like the MQTT broker credentials:
@@ -858,30 +872,42 @@ environment variable, exactly like the MQTT broker credentials:
 Web__PasswordHash=<hash>
 ```
 
-Generate one with the worker binary itself (no configuration or listening socket involved — it
-prints the hash and exits):
+Generate one with the worker binary itself, or with the image, without configuring anything (it
+prints the hash and exits — no listening socket involved):
 
 ```bash
 dotnet Solax.Worker.dll hash-password '<your password>'
+docker run --rm ghcr.io/mpospisil/solax-controller:latest hash-password '<your password>'
 ```
 
-**If `RequireAuthentication` is true and no hash is configured, the host refuses to start** rather
-than silently serving an unprotected UI — the same reasoning as the timezone fail-fast. Setting
-`Web:RequireAuthentication=false` is supported (a clear warning is logged at startup) for a
-deployment that is deliberately open on a trusted LAN, but is not the default for a reason: the UI is
-the surface phase 3 gives write access to the inverter and EV charger.
+`Web:RequireAuthentication` overrides that inference in either direction and is rarely worth setting:
+
+| `RequireAuthentication` | `PasswordHash` | Result |
+|---|---|---|
+| unset (default) | not set | UI served openly; a warning is logged at every startup |
+| unset (default) | set | login required — **the normal way to protect the UI** |
+| `true` | set | login required; identical to the row above |
+| `true` | not set | **host refuses to start** — nobody could ever sign in |
+| `false` | either | UI served openly even with a password configured; warning logged |
+
+The one refusal is the combination that cannot be honoured: a login demanded with nothing to check it
+against would leave the UI permanently unreachable, and a host that stops says so immediately where a
+running one looks like a broken page. Everything else starts.
 
 #### Deployment
 
-The compose stack in [`deploy/`](deploy/) treats the UI the same way it treats Home Assistant: off
-by default, and turning it on is one `.env` edit away from a fresh Pi — see
+The compose stack in [`deploy/`](deploy/) needs **nothing in `.env`** for the UI: `docker-compose.yml`
+publishes port 8080 and leaves `Web__Enabled` at its default, so a fresh Pi ends a deploy at a working
+`http://<pi>:8080`. See
 [deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
-for the exact settings and the memory budget of running the controller and its UI **without** Home
-Assistant or an MQTT broker at all (roughly 200 MB of the reference Pi 3 B+'s 905, against 848 MB for
-the full stack). The port is published from a separate compose file
-(`docker-compose.web.yml`), not folded into the base one unconditionally, so that
-`Web:Enabled=false` keeps meaning no listening socket **at the Docker host**, not merely inside the
-container.
+for the memory budget of running the controller and its UI **without** Home Assistant or an MQTT
+broker at all (roughly 200 MB of the reference Pi 3 B+'s 905, against 848 MB for the full stack).
+
+The host port is published unconditionally, which is the one thing to understand about
+`WEB_ENABLED=false` there: the port stays bound on the Pi, but nothing inside the container listens,
+so connections are refused. Earlier releases published it from a separate `docker-compose.web.yml`
+that had to be merged via `COMPOSE_FILE`; that second step is gone, and the file is kept only so an
+existing `COMPOSE_FILE` line doesn't break — merging it is now a no-op.
 
 #### Browsing charging session history
 

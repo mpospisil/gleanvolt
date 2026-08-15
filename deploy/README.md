@@ -17,7 +17,7 @@ combinations and their budgets; everything below still applies to whichever of t
     │ solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
     │      │             (opt-in profile,     opt-in profile,            │
     │      │              no host port)          LAN :8123)              │
-    │      └── LAN :8080, only while Web:Enabled                         │
+    │      └── LAN :8080, the web UI -- on by default                    │
     └────────────────────────────────────────────────────────────────────┘
          │ Modbus TCP
          ▼
@@ -73,28 +73,24 @@ both off and get most of the board back.
 
 | Deployment | Deploy script | Containers running | `mem_limit` total | of 905 MB |
 |---|---|---|---|---|
-| Controller only | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% |
-| Controller + web UI | `deploy-controller-only.sh`, `Web:Enabled=true` | `solax-controller` | 200 MB | 22% |
-| Controller + Home Assistant | `deploy.sh` | all three | 848 MB | 94% |
-| Everything | `deploy.sh`, `Web:Enabled=true` | all three | 848 MB | 94% |
+| Controller + web UI | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% |
+| Controller alone, no UI | `deploy-controller-only.sh`, `WEB_ENABLED=false` | `solax-controller` | 200 MB | 22% |
+| Everything | `deploy.sh` | all three | 848 MB | 94% |
+| Full stack, no web UI | `deploy.sh`, `WEB_ENABLED=false` | all three | 848 MB | 94% |
 
 The web UI adds no container and no separate `mem_limit` of its own — it runs inside
-`solax-controller`, the same process either way — so turning it on doesn't change the ceiling in
+`solax-controller`, the same process either way — so turning it *off* doesn't change the ceiling in
 this table, only what's reachable at `:8080`. Home Assistant and the broker are the only lines that
 move the number, which is exactly why which one runs is a choice of *script*, not a `.env` setting:
 `docker-compose.yml`'s `mosquitto`/`homeassistant` services still carry `profiles:`, but
 `deploy.sh` and `deploy-controller-only.sh` set `COMPOSE_PROFILES` explicitly when they run
 `docker compose`, overriding whatever happens to already be in `.env` — so the choice can't go stale.
 
-**To run controller-plus-UI only:** in `/opt/solax/.env` (see [.env.example](.env.example)), set:
-
-```
-WEB_ENABLED=true
-COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
-WEB_PASSWORD_HASH=<generate with the image, see .env.example>
-```
-
-and deploy with `./deploy/deploy-controller-only.sh` instead of `./deploy/deploy.sh`. Then, in
+**To run controller-plus-UI only:** deploy with `./deploy/deploy-controller-only.sh` instead of
+`./deploy/deploy.sh`, and set nothing at all in `/opt/solax/.env` beyond the site addresses every
+deployment needs. The web UI is on by default and its port is published by `docker-compose.yml`, so
+the deploy ends at a working `http://192.168.2.7:8080` with no login. Adding a password is a
+[later, optional step](#putting-a-password-on-the-web-ui-optional). Then, in
 [Prepare the Pi](#prepare-the-pi-once) below, step 7 (broker credentials) doesn't apply —
 `deploy-controller-only.sh` never checks for a password file — and neither does the Home Assistant
 onboarding under [First run](#first-run). You can still create `mosquitto/config`, `mosquitto/data`
@@ -104,6 +100,53 @@ neither script assumes they exist except when it actually needs them.
 **To add Home Assistant and the broker later** (or from the start): set
 `HOMEASSISTANT_ENABLED=true` in `.env`, follow every step below including the broker credentials in
 step 7, and deploy with `./deploy/deploy.sh` instead.
+
+## Putting a password on the web UI (optional)
+
+Out of the box the UI has **no login**: anyone who can reach `:8080` gets the dashboard and every
+control on it, including the charge mode and the battery hold. On a household LAN that is usually
+what you want, and it is what lets a fresh deploy work with nothing configured. It is the wrong
+default if the LAN has guests on it, if the Pi's port is forwarded, or if you would simply rather it
+asked.
+
+Adding one is a single `.env` line. Generate the hash — this runs the image with no configuration and
+no listening socket; it prints the hash and exits — then put the **hash**, never the password, in
+`.env`:
+
+```bash
+docker run --rm ghcr.io/mpospisil/solax-controller:latest hash-password '<your password>'
+```
+
+```
+WEB_PASSWORD_HASH=AQAAAAIAAYagAAAAE...
+```
+
+Redeploy (or `docker compose up -d` on the Pi) and every page redirects to a login form. There is no
+second switch: the presence of a hash is what turns the login on, so a configured password can't end
+up unenforced. One shared password gates the whole UI — there are no per-user accounts.
+
+To take it off again, remove the line and redeploy. `WEB_REQUIRE_AUTHENTICATION` exists to override
+the inference in either direction and is rarely worth setting; the root README's
+[Authentication](../README.md#authentication) section has the full table, including the one
+combination that refuses to start (`WEB_REQUIRE_AUTHENTICATION=true` with no hash — nobody could sign
+in).
+
+### Upgrading a Pi deployed before the UI was on by default
+
+Earlier releases had the UI off, required `WEB_ENABLED=true`, and published its port only if `.env`
+merged a second compose file. Deploying this release onto such a Pi works, but two lines in `.env`
+are now stale and one of them is actively harmful:
+
+- **`COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml`** — delete it. `docker-compose.yml`
+  publishes the port itself; the second file is kept only so this line doesn't break the deploy
+  outright, and merging it does nothing.
+- **`WEB_ENABLED=true`** — harmless, now the default. Delete it or leave it.
+- **`WEB_REQUIRE_AUTHENTICATION=true`** — if you had this *and* a `WEB_PASSWORD_HASH`, nothing
+  changes and you can delete the line: the hash alone requires the login. If you had it **without** a
+  hash, the container refused to start before this release too, so it can't be the state you're
+  running.
+
+An `.env` from before the web UI existed at all needs nothing: no `WEB_*` line means UI on, no login.
 
 ## Prepare the Pi (once)
 
@@ -338,7 +381,7 @@ deploy/
 ├── homeassistant/config/*.yaml     → /opt/solax/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/solax/.env
 ├── deploy.sh                       # full stack: controller, mosquitto, Home Assistant
-├── deploy-controller-only.sh       # controller alone (+ web UI, if enabled)
+├── deploy-controller-only.sh       # controller alone, with its web UI on :8080
 └── _lib.sh                         # shared by both scripts above; not run directly
 ```
 
@@ -370,11 +413,12 @@ All three work identically on either script.
 
 ## First run
 
-**If `Web:Enabled=true`:** open `http://192.168.2.7:8080`, sign in with the password behind
-`WEB_PASSWORD_HASH`, and the dashboard, the controls, session history and the forecast plan are all
-there — see the root README's
+**The web UI** is at `http://192.168.2.7:8080` — no login unless you configured one (see
+[Putting a password on the web UI](#putting-a-password-on-the-web-ui-optional)). The dashboard, the
+controls, session history and the forecast plan are all there; see the root README's
 [Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
-does.
+does. This is true of either deploy script — the UI runs inside `solax-controller` itself, so Home
+Assistant's presence or absence changes nothing about it.
 
 **If you deployed with `deploy.sh`** (the full stack, Home Assistant included):
 
@@ -573,18 +617,24 @@ independent, so that's a compose edit, not a redesign.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
 being readable by uid 1883.
 
-**Can't reach the web UI at `:8080`.** Two independent switches both have to be on, and it's usually
-one of them:
+**Can't reach the web UI at `:8080`.** Nothing has to be configured for it to work, so this is a
+fault rather than a missing setting. Start with what the container says about itself:
 
 ```bash
 docker compose logs solax-controller | grep -i "web ui"
 ```
 
-`Web UI enabled; listening on port 8080` means `Web:Enabled` is true and the *process* is listening
-— if the browser still can't connect, the port isn't published: check `.env`'s `COMPOSE_FILE`
-includes `docker-compose.web.yml` (`docker compose config` on the Pi shows whether it actually got
-picked up). No such log line at all means `WEB_ENABLED` itself is unset or `false` in `.env`. See
-[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only).
+`Web UI enabled; listening on port 8080, login not required` means the *process* is listening. If the
+browser still can't connect, check the port is actually published — `docker compose ps` should show
+`0.0.0.0:8080->8080/tcp`, and a bare `8080/tcp` means it isn't. That is the symptom of an `.env` left
+over from an older release: a `COMPOSE_FILE=` line that no longer matches the files on the Pi
+overrides the base compose file rather than adding to it. Delete the `COMPOSE_FILE` line — it is
+obsolete, `docker-compose.yml` publishes the port itself now — and redeploy.
+
+No `Web UI enabled` line at all means `WEB_ENABLED=false` is set in `.env`. A startup failure instead
+means `WEB_REQUIRE_AUTHENTICATION=true` was set with no `WEB_PASSWORD_HASH`; the log says so
+explicitly, and the fix is to set a hash or drop the line (see
+[Putting a password on the web UI](#putting-a-password-on-the-web-ui-optional)).
 
 **No charging sessions are being recorded.** Look for this at startup:
 

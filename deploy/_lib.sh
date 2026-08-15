@@ -179,7 +179,9 @@ EOF
     Home Assistant: http://${PI_HOST#*@}:8123"
             ;;
     esac
-    if ssh_pi "grep -qE '^WEB_ENABLED=true' '$REMOTE_DIR/.env' 2>/dev/null"; then
+    # The UI is on unless .env explicitly turns it off, so the test is for the opt-out, not the
+    # opt-in: a fresh .env says nothing about the web UI at all and must still get this line.
+    if ! ssh_pi "grep -qE '^WEB_ENABLED=false' '$REMOTE_DIR/.env' 2>/dev/null"; then
         web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2-)
         next="$next
     Web UI: http://${PI_HOST#*@}:${web_port:-8080}"

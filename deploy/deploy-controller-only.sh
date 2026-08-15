@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# Deploy just the controller -- and its own web UI, if WEB_ENABLED=true in .env -- to the Raspberry
-# Pi: no Home Assistant, no MQTT broker (issue #51). For the full stack, use deploy/deploy.sh
-# instead.
+# Deploy just the controller, with its own web UI on port 8080, to the Raspberry Pi: no Home
+# Assistant, no MQTT broker (issue #51). For the full stack, use deploy/deploy.sh instead.
+#
+# The web UI needs nothing in .env -- it is on by default and docker-compose.yml publishes its port.
+# WEB_ENABLED=false turns it off; WEB_PASSWORD_HASH puts a login in front of it.
 #
 #   ./deploy/deploy-controller-only.sh                               # deploy IMAGE_TAG (default: latest)
 #   IMAGE_TAG=1.0.0 ./deploy/deploy-controller-only.sh               # a released version -- no "v"

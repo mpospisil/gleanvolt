@@ -288,15 +288,15 @@ builder.Services.AddHostedService<HomeAssistantMqttWorker>();
 // The self-hosted web UI (issue #44). It is a second adapter over the same seam the MQTT worker
 // uses -- it reads ChargeControlStatusHolder and the Core selector interfaces, and owns no control
 // logic of its own -- so the two surfaces are independent: either, both, or neither may run.
-// Off by default, like the Home Assistant integration.
+// On by default, unlike the Home Assistant integration: this is the surface a fresh install is
+// operated through, and it needs no broker, no credentials and no onboarding to be useful.
 builder.Services.Configure<WebOptions>(builder.Configuration.GetSection(WebOptions.SectionName));
 
 var web = builder.Configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions();
 
-// Failing loudly beats silently serving an unprotected UI -- same reasoning as the timezone
-// fail-fast below. The UI is about to gain controls that write to a real inverter and EV charger
-// (issue #48), and an unauthenticated port that can reach them is not acceptable even on a trusted
-// LAN, so a missing hash must stop the host rather than degrade to "no login required".
+// Only catches the unsatisfiable combination -- a login demanded with no password to check against,
+// which would lock everyone out permanently. Whether a login is required at all is decided by
+// whether a password was configured; see WebOptions.RequireAuthentication.
 web.ValidateAuthenticationConfig();
 
 if (web.Enabled)
@@ -355,7 +355,9 @@ host.Services.GetRequiredService<ILogger<Program>>().LogInformation(
 if (web.Enabled)
 {
     host.Services.GetRequiredService<ILogger<Program>>().LogInformation(
-        "Web UI enabled; listening on port {Port} (all interfaces, plain HTTP).", web.Port);
+        "Web UI enabled; listening on port {Port} (all interfaces, plain HTTP), login {LoginState}.",
+        web.Port,
+        web.AuthenticationRequired ? "required" : "not required");
 }
 
 // An unset zone means "ask the OS", which is right on Linux -- the container's TZ sets it. On

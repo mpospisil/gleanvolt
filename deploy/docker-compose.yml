@@ -81,14 +81,25 @@ services:
       BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
       BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
 
-      # The self-hosted UI (issue #44), off by default like Home Assistant. Enabling it also needs
-      # the port published -- see .env.example and docker-compose.web.yml, kept as a separate file
-      # rather than an unconditional `ports:` entry here so "Web:Enabled is false" keeps meaning "no
-      # listening socket at all", including at the Docker host, not just inside the container.
-      Web__Enabled: ${WEB_ENABLED:-false}
+      # The self-hosted UI (issue #44). On by default, and published below without anything in .env
+      # having to say so: a fresh deploy must produce a working UI, not a container that needs two
+      # more settings before it shows anything.
+      #
+      # Web__RequireAuthentication is deliberately NOT passed through as a default. Unset means
+      # "follow the password": WEB_PASSWORD_HASH turns the login on, and no hash means an open UI on
+      # the LAN. Setting WEB_REQUIRE_AUTHENTICATION=true without a hash is refused at startup --
+      # nobody could sign in -- which is the one case worth failing loudly over.
+      Web__Enabled: ${WEB_ENABLED:-true}
       Web__Port: ${WEB_PORT:-8080}
-      Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-true}
+      Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-}
       Web__PasswordHash: ${WEB_PASSWORD_HASH:-}
+    ports:
+      # Published unconditionally, which is why WEB_ENABLED=false is worth understanding: the port is
+      # still bound on the host, but nothing inside the container listens on it (Program.cs replaces
+      # the server outright), so connections are refused rather than served. Before this file
+      # published anything, turning the UI on also meant merging docker-compose.web.yml via
+      # COMPOSE_FILE -- a second, easily-forgotten step whose only symptom was an unreachable UI.
+      - "${WEB_PORT:-8080}:${WEB_PORT:-8080}"
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs

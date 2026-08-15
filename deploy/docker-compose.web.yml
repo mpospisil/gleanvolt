@@ -1,13 +1,15 @@
-# Optional override: publish the self-hosted UI's port to the LAN. Not folded into
-# docker-compose.yml so that Web:Enabled=false keeps meaning "no listening socket at all" --
-# including at the Docker host, not merely inside the container -- exactly as it does today without
-# this file. Add it only once Web:Enabled is actually true (see .env.example):
+# Redundant since the UI became on-by-default: docker-compose.yml publishes the port itself, so
+# nothing has to merge this file any more. It is kept, and still copied to the Pi on every deploy,
+# for one reason only -- a Pi whose .env carries
 #
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
 #
-# in .env, or `docker compose -f docker-compose.yml -f docker-compose.web.yml up -d` by hand.
-# deploy.sh copies this file alongside docker-compose.yml on every deploy either way, so switching it
-# on or off is purely a `.env` edit -- never a change to what's deployed from git.
+# from an earlier release would fail every `docker compose` command with "no such file" if it
+# vanished. Merging it changes nothing: the mapping below is the same one docker-compose.yml already
+# declares, and Compose collapses the two into one published port.
+#
+# Nothing new should reference it. Delete the COMPOSE_FILE line from .env when convenient and this
+# file stops being loaded at all.
 
 services:
   solax-controller:
