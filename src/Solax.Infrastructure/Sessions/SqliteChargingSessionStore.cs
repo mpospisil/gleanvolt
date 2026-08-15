@@ -390,7 +390,18 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
         }
     }
 
-    public void Dispose() => _writeLock.Dispose();
+    public void Dispose()
+    {
+        _writeLock.Dispose();
+
+        // Pooling keeps the native handle to the file open behind the scenes even after every
+        // SqliteConnection using it has been disposed. Unix lets you delete a file out from under an
+        // open handle; Windows does not, so a caller that deletes the database right after disposing
+        // the store (as the test suite does) would otherwise get "file in use". Clearing the pool
+        // here releases it deterministically instead of waiting on finalization.
+        using var connection = new SqliteConnection(_connectionString);
+        SqliteConnection.ClearPool(connection);
+    }
 
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {

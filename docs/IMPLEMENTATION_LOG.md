@@ -4,6 +4,53 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-14 — The repo builds and tests clean on a non-English Windows machine
+
+No control logic changed, and nothing here alters production behaviour on the Pi. Three unrelated
+things made the repo hostile to a Windows development machine, and two of them could not reproduce on
+Linux or in CI by construction — which is the reason they are worth a log entry rather than just a
+commit message.
+
+### Number formatting inherited the OS locale
+
+`Solax.Web` renders kWh, watts and percentages, and nothing pinned a culture, so formatting followed
+whatever the host OS ran under. On a cs-CZ machine the decimal separator is a comma: the dashboard
+showed `6,00 kWh`, and every bUnit assertion written against `6.00` failed. The figures are units,
+not localized prose — there is no translation story for this dashboard — so the target is invariant
+culture rather than a configured one.
+
+The fix is a `[ModuleInitializer]` in `Solax.Web/CultureConfiguration.cs` setting
+`CultureInfo.DefaultThreadCurrentCulture` and `DefaultThreadCurrentUICulture` to invariant.
+Deliberately **not** in the entry point: `Solax.Web` is loaded by two hosts — `Solax.Worker` in
+production and `Solax.Web.Tests` under bUnit — and an initializer in `Program.cs` would never run for
+the test host, leaving exactly the assertions that caught this still broken. That placement is what
+CA2255 warns about, so the suppression carries that reasoning inline.
+
+### SQLite held the database file open past `Dispose`
+
+`Microsoft.Data.Sqlite` pools connections, and the pool keeps the native file handle open after every
+`SqliteConnection` using it has been disposed. Unix lets you delete a file out from under an open
+handle; Windows refuses. So a test that disposed the store and then deleted its database — which is
+what the suite does between cases — failed with "file in use" on Windows and passed everywhere else.
+
+`SqliteChargingSessionStore.Dispose` now calls `SqliteConnection.ClearPool`, releasing the handle
+deterministically instead of at finalization. Production impact is nil: the store lives for the
+lifetime of the process and the pool dies with it. This is a test-cleanup fix that happens to belong
+in the production type, because the pool is the production type's to release.
+
+### The web UI could not be reached in local development
+
+`Web:Enabled` is `false` and `Web:RequireAuthentication` is `true` in the shipped `appsettings.json`,
+which is the right production posture and the wrong one for a developer who just wants to look at the
+page: it means no listening socket at all, and then a password hash requirement on top.
+
+Rather than weaken the shipped defaults, the overrides go in `appsettings.Development.json`
+(`Web:Enabled` true, `Web:RequireAuthentication` false) so they apply only under the Development
+environment. That file was previously not loaded when debugging at all — `.vscode/launch.json` set
+`DOTNET_ROOT` but never `DOTNET_ENVIRONMENT`, so F5 ran as Production. Setting it there is what makes
+the override reachable, and brings the debugger in line with `dotnet run`, which already gets
+Development from `Properties/launchSettings.json`.
+
 ## 2026-08-13 — The controller can serve its own UI, and is still a headless worker when it doesn't
 
 Phase 0 of [#44](https://github.com/mpospisil/solax-controller/issues/44) ([#45](https://github.com/mpospisil/solax-controller/issues/45)):

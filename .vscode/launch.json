@@ -12,7 +12,8 @@
             "console": "internalConsole",
             "stopAtEntry": false,
             "env": {
-                "DOTNET_ROOT": "${env:HOME}/.dotnet"
+                "DOTNET_ROOT": "${env:HOME}/.dotnet",
+                "DOTNET_ENVIRONMENT": "Development"
             },
             "logging": {
                 "engineLogging": false
