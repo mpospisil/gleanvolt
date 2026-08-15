@@ -133,8 +133,9 @@ recommended way to confirm the telemetry looks right before enabling anything th
 
 ## Deployment
 
-For unattended operation the whole system runs on a **Raspberry Pi 3 B** (Raspberry Pi OS Lite,
-64-bit) as Docker containers. Home Assistant and the MQTT broker are optional (see
+For unattended operation the whole system runs on a **Raspberry Pi 5** (Raspberry Pi OS Lite,
+64-bit) as Docker containers — a **Pi 3 B+** runs it too, and is what the memory limits are sized
+for. Home Assistant and the MQTT broker are optional (see
 [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below); which stack you get is a choice of
 deploy script:
 
@@ -158,7 +159,7 @@ only when you select a mode — Home Assistant or the web UI, whichever is enabl
 hold stays disabled and dry-run until
 you turn it on deliberately.
 
-Full instructions — preparing the Pi, memory and SD-card tuning for a 1 GB board, backup/restore,
+Full instructions — preparing the Pi, storage and memory tuning for either board, backup/restore,
 and troubleshooting — are in **[deploy/README.md](deploy/README.md)**.
 
 ## Workflow & Project Management
@@ -786,8 +787,9 @@ docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax
 ### Self-hosted web UI (the `Web` section)
 
 The controller can serve its own UI, as an alternative to Home Assistant or alongside it. It exists
-because on the reference Raspberry Pi 3 B+ Home Assistant is the binding constraint — it alone
-reserves 600 MB of the board's 905 MB — and because a controller that can be looked at without a
+because on a 1 GB Raspberry Pi 3 B+ Home Assistant is the binding constraint — it alone reserves
+600 MB of the board's 905 MB, which a 4 GB Pi 5 no longer feels — and because a controller that can
+be looked at without a
 second application is simpler to reason about. The two surfaces are independent adapters over the
 same internal state, so all four combinations run: UI only, MQTT only, both, neither.
 
@@ -901,7 +903,8 @@ publishes port 8090 and leaves `Web__Enabled` at its default, so a fresh Pi ends
 `http://<pi>:8090`. See
 [deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
 for the memory budget of running the controller and its UI **without** Home Assistant or an MQTT
-broker at all (roughly 200 MB of the reference Pi 3 B+'s 905, against 848 MB for the full stack).
+broker at all (roughly 200 MB against 848 MB for the full stack — 22% of a Pi 3 B+'s 905 MB, or 5%
+of a Pi 5's 4 GB).
 
 The host port is published unconditionally, which is the one thing to understand about
 `WEB_ENABLED=false` there: the port stays bound on the Pi, but nothing inside the container listens,

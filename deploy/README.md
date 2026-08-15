@@ -2,7 +2,11 @@
 
 The production stack for [issue #26](https://github.com/mpospisil/solax-controller/issues/26): the
 controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
-containers on a **Raspberry Pi 3 Model B+** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+containers on a **Raspberry Pi 5 (4 GB)** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+
+The **Raspberry Pi 3 Model B+ (1 GB)** was the original reference board and still runs the whole
+stack — the `mem_limit` values in `docker-compose.yml` are sized for it, not for the Pi 5. Where the
+two boards genuinely differ, this file says so; everything unmarked applies to both.
 
 Home Assistant and the broker are **opt-in** (issue #51): a fresh Pi can run the controller and its
 own UI alone, at roughly a third of the memory the full stack needs. See
@@ -10,7 +14,7 @@ own UI alone, at roughly a third of the memory the full stack needs. See
 combinations and their budgets; everything below still applies to whichever of them you choose.
 
 ```
-              Raspberry Pi 3 Model B+  (192.168.2.7, arm64)
+                Raspberry Pi 5  (192.168.2.7, arm64)
     ┌────────────────────────────────────────────────────────────────────┐
     │ compose project "solax"        (all state on bind mounts)          │
     │                                                                    │
@@ -29,7 +33,21 @@ The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to G
 
 ### Storage layout
 
-The reference install has a **split boot**, and it is not optional on this hardware:
+Both reference installs put root on an **M.2 NVMe in a USB enclosure** (a Realtek RTL9210 bridge).
+How the board *reaches* it is the one place the two differ, and the difference is not cosmetic.
+
+**On the Pi 5, one device does everything:**
+
+```
+  M.2 NVMe  /dev/sda1  →  /boot/firmware   512MB FAT32, ~66MB used
+            /dev/sda2  →  /                the whole OS, Docker, /opt/solax
+```
+
+The Pi 5's bootloader boots USB mass storage properly, so there is no SD card in the machine and
+nothing below needs a second thought about which partition it is editing. `BOOT_ORDER` in the EEPROM
+decides the order it tries; `rpi-eeprom-config` prints it.
+
+**On the Pi 3 B+, the boot must be split, and it is not optional on that hardware:**
 
 ```
   SD card   /dev/mmcblk0p1  →  /boot/firmware   512MB FAT32, ~76MB used
@@ -38,12 +56,11 @@ The reference install has a **split boot**, and it is not optional on this hardw
 ```
 
 The Pi 3 boot ROM only speaks USB Bulk-Only Transport and allows the device roughly **two seconds**
-to enumerate. An NVMe behind a USB bridge — the reference install uses a Realtek RTL9210 — does not
-answer in time, so the board will not boot from it however correct the image is. The Linux kernel
-drives the same adapter without complaint once it is running. So the SD card boots, and `cmdline.txt`
-hands root straight to the M.2.
+to enumerate. An NVMe behind a USB bridge does not answer in time, so the board will not boot from it
+however correct the image is. The Linux kernel drives the same adapter without complaint once it is
+running. So the SD card boots, and `cmdline.txt` hands root straight to the M.2.
 
-Two consequences that bite if you forget them:
+Two consequences that bite on a Pi 3 if you forget them — and that simply do not exist on the Pi 5:
 
 - **`/boot/firmware` is the SD card.** Every instruction below that edits `cmdline.txt` — the cgroup
   step in particular — is editing the SD, which is correct, because that is the partition the board
@@ -56,8 +73,9 @@ Two consequences that bite if you forget them:
   repairs `cmdline.txt` and the root line in `fstab` itself, but it has no idea about the
   `/boot/firmware` line.
 
-None of this applies if you root the Pi on the SD card in the usual way. It is the price of putting
-root on fast, durable storage on a board whose boot ROM predates the idea.
+Neither applies if you root the Pi on the SD card in the usual way. The split boot is the price of
+putting root on fast, durable storage on a board whose boot ROM predates the idea — a price the Pi 5
+no longer charges.
 
 > **Not the dev stack.** `dev/homeassistant/` is a separate, anonymous-broker environment for
 > developing against `dotnet run`. Don't point one at the other; running both at once against the
@@ -65,18 +83,28 @@ root on fast, durable storage on a board whose boot ROM predates the idea.
 
 ## Running without Home Assistant (controller + web UI only)
 
-Home Assistant and the broker are two more Docker containers competing for the same 1 GB, and on
-the reference Pi 3 B+ Home Assistant alone is the binding constraint. If you don't need it — the
-controller's own [self-hosted UI](../README.md#self-hosted-web-ui-the-web-section) already shows
-telemetry, drives every control, and browses charging-session history and the forecast plan — leave
-both off and get most of the board back.
+Home Assistant and the broker are two more Docker containers, and on the 1 GB Pi 3 B+ Home Assistant
+alone is the binding constraint. If you don't need it — the controller's own
+[self-hosted UI](../README.md#self-hosted-web-ui-the-web-section) already shows telemetry, drives
+every control, and browses charging-session history and the forecast plan — leave both off and get
+most of the board back.
 
-| Deployment | Deploy script | Containers running | `mem_limit` total | of 905 MB |
-|---|---|---|---|---|
-| Controller + web UI | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% |
-| Controller alone, no UI | `deploy-controller-only.sh`, `WEB_ENABLED=false` | `solax-controller` | 200 MB | 22% |
-| Everything | `deploy.sh` | all three | 848 MB | 94% |
-| Full stack, no web UI | `deploy.sh`, `WEB_ENABLED=false` | all three | 848 MB | 94% |
+The `mem_limit` totals are a property of the compose file, not of the board; what changes between the
+two is how much of the machine they claim.
+
+| Deployment | Deploy script | Containers running | `mem_limit` total | of a Pi 3's 905 MB | of a Pi 5's 4 GB |
+|---|---|---|---|---|---|
+| Controller + web UI | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% | 5% |
+| Controller alone, no UI | `deploy-controller-only.sh`, `WEB_ENABLED=false` | `solax-controller` | 200 MB | 22% | 5% |
+| Everything | `deploy.sh` | all three | 848 MB | 94% | 21% |
+| Full stack, no web UI | `deploy.sh`, `WEB_ENABLED=false` | all three | 848 MB | 94% | 21% |
+
+**On a Pi 5 this is a choice about tidiness, not survival.** 94% of a Pi 3 is a board with nothing
+left over; 21% of a Pi 5 is not. The limits are still worth enforcing there — they turn a leaking
+container into one restart instead of a machine-wide problem, and they are what makes `docker stats`
+per-container numbers meaningful — but the reason to skip Home Assistant on a Pi 5 is that you don't
+want it, not that you can't afford it. Home Assistant does use its allowance: roughly 485 MB of its
+600 MB ceiling in steady state on the reference install.
 
 The web UI adds no container and no separate `mem_limit` of its own — it runs inside
 `solax-controller`, the same process either way — so turning it *off* doesn't change the ceiling in
@@ -180,10 +208,23 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**3. Enable cgroup memory accounting.** On a split-boot Pi this edits the **SD card** — see
-[Storage layout](#storage-layout). Raspberry Pi OS ships with it off, and without it the
-`mem_limit` settings in `docker-compose.yml` are silently ignored — which on a 1 GB board is the
-difference between one container being killed and the whole box thrashing.
+**3. Enable cgroup memory accounting.** Required on the Pi 5 as much as on the Pi 3 — the board's
+memory has nothing to do with it. On a split-boot Pi 3 this edits the **SD card**; on a Pi 5 there is
+only one device to edit. See [Storage layout](#storage-layout).
+
+Without it the `mem_limit` settings in `docker-compose.yml` are silently ignored: `docker run
+--memory=…` answers `WARNING: Your kernel does not support memory limit capabilities … Limitation
+discarded`, `docker inspect` records `Memory=0`, and `docker stats` reports `0B / 0B` for every
+container forever. On a 1 GB board that is the difference between one container being killed and the
+whole box thrashing. On a 4 GB board it is milder but not harmless — you lose per-container memory
+figures exactly when you need them, and a leak escalates to the kernel OOM killer picking a victim
+by its own heuristic instead of the guilty container hitting its own ceiling.
+
+**The parameters are not merely absent — the firmware actively disables the controller.** A fresh
+`cmdline.txt` says nothing about cgroups, yet `/proc/cmdline` contains `cgroup_disable=memory`,
+because the Raspberry Pi firmware prepends it. What you add to `cmdline.txt` lands *after* the
+firmware's copy on the kernel command line, and the later parameter wins — which is why appending is
+enough and there is nothing to delete.
 
 `cmdline.txt` is **one single line**, and the parameters go at the end of it. The bootloader reads
 only the first line, so appending them as a second line — the obvious thing to do in an editor —
@@ -207,8 +248,13 @@ cat  /boot/firmware/cmdline.txt       # check it before rebooting
 sudo reboot
 ```
 
-Check the file before rebooting: a mangled `cmdline.txt` means a Pi that doesn't boot, and fixing
-that needs the SD card in another machine. `cmdline.txt.bak` is the way back.
+Check the file before rebooting: a mangled `cmdline.txt` means a Pi that doesn't boot, and fixing it
+means putting the boot medium in another machine — the SD card on a Pi 3, the M.2 and its enclosure
+on a Pi 5. `cmdline.txt.bak` is the way back.
+
+A fresh Raspberry Pi OS image may also leave `cmdline.txt` with **no trailing newline**, so `wc -l`
+prints `0` rather than `1` before you start. That is not the second-line fault this step guards
+against, and the snippet above fixes it in passing: `printf "%s\n"` writes the newline back.
 
 > Do **not** guard this with `grep -q cgroup_enable=memory cmdline.txt`. That matches the parameters
 > sitting uselessly on line 2, so the guard concludes there is nothing to do in exactly the case that
@@ -250,9 +296,13 @@ spike into an OOM kill, so this step used to build a `dphys-swapfile`. Raspberry
 because the image now configures swap itself, and configures it better:
 
 ```bash
-cat /proc/swaps      # expect /dev/zram0, ~905MB, priority 100
+cat /proc/swaps      # expect /dev/zram0 at priority 100: ~905MB on a Pi 3, ~2GB on a Pi 5
 free -h
 ```
+
+zram sizes itself to the board, so the number differs and neither is wrong. `swapon` and `zramctl`
+live in `/usr/sbin`, which a non-interactive `ssh pi 'swapon --show'` does not have on its `PATH` —
+`cat /proc/swaps` answers the same question from anywhere.
 
 What you get out of the box is **zram**: a compressed block device in RAM (zstd), used as swap at
 priority 100, with **writeback to `/var/swap`** on disk for pages too cold to be worth keeping
@@ -263,11 +313,11 @@ compressed in memory. `rpi-setup-loop@var-swap.service` puts that file on a loop
 This is strictly better than the old swapfile for this workload: compressing a page costs far less
 than writing it out, and there is still a disk tier behind it. **Nothing to do here.**
 
-> **Optional, and only on a disk-rooted Pi.** zram lives in RAM, so it competes for the resource
-> that is already scarce: compression buys roughly 2–3× on typical data but cannot manufacture
-> capacity, and the compose limits total 848 MB (600 + 200 + 48) on a 905 MB board. A plain swapfile
-> on the root disk, at a *lower* priority than zram, is a cheap overflow tier that only catches what
-> zram cannot hold:
+> **Optional, on a disk-rooted Pi 3. Skip it on a Pi 5.** zram lives in RAM, so it competes for the
+> resource that is already scarce: compression buys roughly 2–3× on typical data but cannot
+> manufacture capacity, and the compose limits total 848 MB (600 + 200 + 48) on a 905 MB board. A
+> plain swapfile on the root disk, at a *lower* priority than zram, is a cheap overflow tier that
+> only catches what zram cannot hold:
 >
 > ```bash
 > sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
@@ -279,6 +329,12 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 > one component most likely to fail. It is only reasonable because the reference install roots on an
 > NVMe (see *Storage layout* above). Leave `vm.swappiness` at its default 60 so the disk tier is a
 > safety net rather than a first resort.
+>
+> **On a 4 GB Pi 5 the whole argument collapses**: 848 MB of limits against 4 GB is not a scarce
+> resource, zram is 2 GB there rather than 905 MB, and it already has `/var/swap` on the NVMe behind
+> it. Adding a third tier below two that never fill is work for nothing. Enforced `mem_limit` values
+> (step 3) are the better answer to the same worry, because they stop a leak at the container instead
+> of absorbing it.
 
 **5. Directories.** The containers hold no state; everything lives here. `logs/` and `data/` are
 needed by every deployment; `mosquitto/` and `homeassistant/` only if you're deploying with
