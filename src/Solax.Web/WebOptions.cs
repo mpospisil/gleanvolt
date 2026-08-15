@@ -20,7 +20,7 @@ public sealed class WebOptions
     public bool Enabled { get; init; } = true;
 
     /// <summary>The TCP port the UI listens on, on every interface. Plain HTTP; this is a LAN appliance.</summary>
-    public int Port { get; init; } = 8080;
+    public int Port { get; init; } = 8090;
 
     /// <summary>
     /// Whether every page requires a signed-in session. Three-valued on purpose:

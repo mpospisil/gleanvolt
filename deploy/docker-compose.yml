@@ -90,7 +90,7 @@ services:
       # the LAN. Setting WEB_REQUIRE_AUTHENTICATION=true without a hash is refused at startup --
       # nobody could sign in -- which is the one case worth failing loudly over.
       Web__Enabled: ${WEB_ENABLED:-true}
-      Web__Port: ${WEB_PORT:-8080}
+      Web__Port: ${WEB_PORT:-8090}
       Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-}
       Web__PasswordHash: ${WEB_PASSWORD_HASH:-}
     ports:
@@ -99,7 +99,7 @@ services:
       # the server outright), so connections are refused rather than served. Before this file
       # published anything, turning the UI on also meant merging docker-compose.web.yml via
       # COMPOSE_FILE -- a second, easily-forgotten step whose only symptom was an unreachable UI.
-      - "${WEB_PORT:-8080}:${WEB_PORT:-8080}"
+      - "${WEB_PORT:-8090}:${WEB_PORT:-8090}"
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs
