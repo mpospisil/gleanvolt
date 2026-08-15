@@ -19,10 +19,8 @@ public static class InverterRegisterMap
     public static readonly RegisterDescriptor BatteryPowerCharge1 =
         new((ushort)InverterRegister.BatteryPowerCharge1, nameof(BatteryPowerCharge1), "W");
 
-    /// <summary>Battery state of charge. Raw units are tenths of a percent -- see
-    /// <see cref="InverterRegister.BatterySoc"/> for why this register and not the documented one.</summary>
-    public static readonly RegisterDescriptor BatterySoc =
-        new((ushort)InverterRegister.BatterySoc, nameof(BatterySoc), "0.1%");
+    public static readonly RegisterDescriptor BatteryCapacity =
+        new((ushort)InverterRegister.BatteryCapacity, nameof(BatteryCapacity), "%");
 
     public static readonly RegisterDescriptor FeedinPowerLow =
         new((ushort)InverterRegister.FeedinPowerLow, nameof(FeedinPowerLow), "W");
