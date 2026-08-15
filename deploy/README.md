@@ -2,19 +2,15 @@
 
 The production stack for [issue #26](https://github.com/mpospisil/solax-controller/issues/26): the
 controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
-containers on a **Raspberry Pi 5 (4 GB)** running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
+containers on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
 
-The **Raspberry Pi 3 Model B+ (1 GB)** was the original reference board and still runs the whole
-stack — the `mem_limit` values in `docker-compose.yml` are sized for it, not for the Pi 5. Where the
-two boards genuinely differ, this file says so; everything unmarked applies to both.
-
-Home Assistant and the broker are **opt-in** (issue #51): a fresh Pi can run the controller and its
-own UI alone, at roughly a third of the memory the full stack needs. See
-[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only) for the
-combinations and their budgets; everything below still applies to whichever of them you choose.
+**There are two ways to deploy this, and how much RAM your Pi has decides which one you want.** Home
+Assistant is the expensive part by a wide margin; the controller and its own web UI are not. Start at
+[Choose your deployment](#choose-your-deployment) — it is one table, and it tells you which of the
+steps further down apply to you.
 
 ```
-                Raspberry Pi 5  (192.168.2.7, arm64)
+                  Raspberry Pi  (192.168.2.7, arm64)
     ┌────────────────────────────────────────────────────────────────────┐
     │ compose project "solax"        (all state on bind mounts)          │
     │                                                                    │
@@ -31,103 +27,141 @@ combinations and their budgets; everything below still applies to whichever of t
 
 The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to GHCR; the Pi pulls it.
 
-### Storage layout
-
-Both reference installs put root on an **M.2 NVMe in a USB enclosure** (a Realtek RTL9210 bridge).
-How the board *reaches* it is the one place the two differ, and the difference is not cosmetic.
-
-**On the Pi 5, one device does everything:**
-
-```
-  M.2 NVMe  /dev/sda1  →  /boot/firmware   512MB FAT32, ~66MB used
-            /dev/sda2  →  /                the whole OS, Docker, /opt/solax
-```
-
-The Pi 5's bootloader boots USB mass storage properly, so there is no SD card in the machine and
-nothing below needs a second thought about which partition it is editing. `BOOT_ORDER` in the EEPROM
-decides the order it tries; `rpi-eeprom-config` prints it.
-
-**On the Pi 3 B+, the boot must be split, and it is not optional on that hardware:**
-
-```
-  SD card   /dev/mmcblk0p1  →  /boot/firmware   512MB FAT32, ~76MB used
-  M.2 NVMe  /dev/sda2       →  /                the whole OS, Docker, /opt/solax
-            (USB enclosure)
-```
-
-The Pi 3 boot ROM only speaks USB Bulk-Only Transport and allows the device roughly **two seconds**
-to enumerate. An NVMe behind a USB bridge does not answer in time, so the board will not boot from it
-however correct the image is. The Linux kernel drives the same adapter without complaint once it is
-running. So the SD card boots, and `cmdline.txt` hands root straight to the M.2.
-
-Two consequences that bite on a Pi 3 if you forget them — and that simply do not exist on the Pi 5:
-
-- **`/boot/firmware` is the SD card.** Every instruction below that edits `cmdline.txt` — the cgroup
-  step in particular — is editing the SD, which is correct, because that is the partition the board
-  actually boots. The M.2 keeps its own boot partition from the original image; editing *that* one
-  changes nothing at all, silently.
-- **`/etc/fstab` must point `/boot/firmware` at the SD's PARTUUID**, not at the M.2's leftover boot
-  partition. Get this wrong and kernel updates land somewhere that is never booted, and the machine
-  breaks at some upgrade weeks later rather than at the moment of the mistake. Note that a first-boot
-  resize rewrites the MBR signature and therefore every PARTUUID on the M.2: the firstboot script
-  repairs `cmdline.txt` and the root line in `fstab` itself, but it has no idea about the
-  `/boot/firmware` line.
-
-Neither applies if you root the Pi on the SD card in the usual way. The split boot is the price of
-putting root on fast, durable storage on a board whose boot ROM predates the idea — a price the Pi 5
-no longer charges.
-
 > **Not the dev stack.** `dev/homeassistant/` is a separate, anonymous-broker environment for
 > developing against `dotnet run`. Don't point one at the other; running both at once against the
 > same inverter is confusing at best.
 
-## Running without Home Assistant (controller + web UI only)
+## Choose your deployment
 
-Home Assistant and the broker are two more Docker containers, and on the 1 GB Pi 3 B+ Home Assistant
-alone is the binding constraint. If you don't need it — the controller's own
-[self-hosted UI](../README.md#self-hosted-web-ui-the-web-section) already shows telemetry, drives
-every control, and browses charging-session history and the forecast plan — leave both off and get
-most of the board back.
+Both workflows give you full control of the inverter and charger. They differ in whether Home
+Assistant is part of it — and Home Assistant is what sets the hardware bar.
 
-The `mem_limit` totals are a property of the compose file, not of the board; what changes between the
-two is how much of the machine they claim.
+| | **A — Full stack** | **B — Controller only** |
+|---|---|---|
+| **RAM required** | **2 GB minimum, 4 GB recommended** | **1 GB is enough** |
+| **Disk** | 16 GB minimum, 32 GB recommended | 8 GB |
+| Containers | controller, broker, Home Assistant | controller |
+| `mem_limit` total | 848 MB | 200 MB |
+| Deploy script | `deploy.sh` | `deploy-controller-only.sh` |
+| Control surfaces | Home Assistant `:8123` **and** web UI `:8090` | web UI `:8090` |
+| Required in `.env` | site addresses, `HOMEASSISTANT_ENABLED`, MQTT credentials | site addresses only |
+| Extra setup steps | broker password file, Home Assistant onboarding | none |
 
-| Deployment | Deploy script | Containers running | `mem_limit` total | of a Pi 3's 905 MB | of a Pi 5's 4 GB |
-|---|---|---|---|---|---|
-| Controller + web UI | `deploy-controller-only.sh` | `solax-controller` | 200 MB | 22% | 5% |
-| Controller alone, no UI | `deploy-controller-only.sh`, `WEB_ENABLED=false` | `solax-controller` | 200 MB | 22% | 5% |
-| Everything | `deploy.sh` | all three | 848 MB | 94% | 21% |
-| Full stack, no web UI | `deploy.sh`, `WEB_ENABLED=false` | all three | 848 MB | 94% | 21% |
+**RAM is the deciding factor, and Home Assistant is why.** It reserves 600 MB of the 848 MB the full
+stack claims, and it genuinely uses most of that — around 485 MB in steady state, not a theoretical
+ceiling. The controller with its UI is a single .NET process using roughly 70 MB against its 200 MB
+limit, and the broker sits under 5 MB.
 
-**On a Pi 5 this is a choice about tidiness, not survival.** 94% of a Pi 3 is a board with nothing
-left over; 21% of a Pi 5 is not. The limits are still worth enforcing there — they turn a leaking
-container into one restart instead of a machine-wide problem, and they are what makes `docker stats`
-per-container numbers meaningful — but the reason to skip Home Assistant on a Pi 5 is that you don't
-want it, not that you can't afford it. Home Assistant does use its allowance: roughly 485 MB of its
-600 MB ceiling in steady state on the reference install.
+So on a **1 GB board the full stack commits 94% of the machine** before the OS and page cache get a
+look in. It runs — that was the original reference install — but there is no headroom, and a board
+with no headroom is one that swaps under load. Two gigabytes makes it comfortable; four makes it a
+non-issue. If your Pi has 1 GB, **choose workflow B** rather than trying to squeeze Home Assistant
+in beside it.
 
-The web UI adds no container and no separate `mem_limit` of its own — it runs inside
-`solax-controller`, the same process either way — so turning it *off* doesn't change the ceiling in
-this table, only what's reachable at `:8090`. Home Assistant and the broker are the only lines that
-move the number, which is exactly why which one runs is a choice of *script*, not a `.env` setting:
-`docker-compose.yml`'s `mosquitto`/`homeassistant` services still carry `profiles:`, but
-`deploy.sh` and `deploy-controller-only.sh` set `COMPOSE_PROFILES` explicitly when they run
-`docker compose`, overriding whatever happens to already be in `.env` — so the choice can't go stale.
+Disk follows the same split: the Home Assistant image alone is about 3.4 GB, against roughly 375 MB
+for the controller.
 
-**To run controller-plus-UI only:** deploy with `./deploy/deploy-controller-only.sh` instead of
-`./deploy/deploy.sh`, and set nothing at all in `/opt/solax/.env` beyond the site addresses every
-deployment needs. The web UI is on by default and its port is published by `docker-compose.yml`, so
-the deploy ends at a working `http://192.168.2.7:8090` with no login. Adding a password is a
-[later, optional step](#putting-a-password-on-the-web-ui-optional). Then, in
-[Prepare the Pi](#prepare-the-pi-once) below, step 7 (broker credentials) doesn't apply —
-`deploy-controller-only.sh` never checks for a password file — and neither does the Home Assistant
-onboarding under [First run](#first-run). You can still create `mosquitto/config`, `mosquitto/data`
-and `homeassistant/config` in step 5 if you might switch to `deploy.sh` later, or skip them for now;
-neither script assumes they exist except when it actually needs them.
+> The web UI is **not** a separate container and has no `mem_limit` of its own — it runs inside the
+> controller process either way. Turning it off with `WEB_ENABLED=false` frees no memory worth
+> counting; it only closes the port. Home Assistant and the broker are the only things that move the
+> numbers above.
 
-**To add Home Assistant and the broker later** (or from the start): set
-`HOMEASSISTANT_ENABLED=true` in `.env`, follow every step below including the broker credentials in
-step 7, and deploy with `./deploy/deploy.sh` instead.
+### Workflow A — full stack, with Home Assistant
+
+For a Pi with **2 GB of RAM or more**. Choose this if you already run Home Assistant, or want the
+inverter and charger to sit alongside the rest of your home automation.
+
+Required in `/opt/solax/.env`:
+
+```bash
+TZ=Europe/Prague               # your timezone
+INVERTER_HOST=192.168.2.6      # your inverter's address
+EV_CHARGER_HOST=192.168.2.10   # your charger's address
+
+HOMEASSISTANT_ENABLED=true     # the controller's own switch to publish MQTT
+MQTT_USERNAME=solax            # must match the broker's password file
+MQTT_PASSWORD=<your password>  # must match the broker's password file
+```
+
+Then work through **every** step in [Prepare the Pi](#prepare-the-pi-once), including step 7
+(broker credentials) — the broker refuses anonymous connections, so a missing or mismatched password
+file is a stack that comes up looking healthy while the controller is refused on every connect.
+Deploy with `./deploy/deploy.sh`, then complete Home Assistant's onboarding at `:8123` as described
+under [First run](#first-run).
+
+### Workflow B — controller and its web UI only
+
+For a Pi with **1 GB of RAM**, or any board where you simply don't want Home Assistant. The
+controller's own [web UI](../README.md#self-hosted-web-ui-the-web-section) shows live telemetry,
+drives every control Home Assistant would, and browses charging-session history and the forecast
+plan — so this is a smaller deployment, not a lesser one.
+
+Required in `/opt/solax/.env` — this is the whole list:
+
+```bash
+TZ=Europe/Prague               # your timezone
+INVERTER_HOST=192.168.2.6      # your inverter's address
+EV_CHARGER_HOST=192.168.2.10   # your charger's address
+```
+
+Nothing about the web UI needs setting: it is on by default, on port 8090, and `docker-compose.yml`
+publishes that port, so the deploy ends at a working `http://192.168.2.7:8090` with no login. Adding
+a password is a [later, optional step](#putting-a-password-on-the-web-ui-optional).
+
+Deploy with `./deploy/deploy-controller-only.sh`. In [Prepare the Pi](#prepare-the-pi-once), **skip
+step 7** — this script never looks for a broker password file — and skip the Home Assistant
+onboarding under [First run](#first-run). In step 5 you can create the `mosquitto/` and
+`homeassistant/` directories anyway in case you switch later, or leave them out; neither script
+requires them to exist until it actually needs them.
+
+### Switching between the two
+
+Which containers run is decided by **which script you run**, not by a setting that can go stale.
+`docker-compose.yml` gives `mosquitto` and `homeassistant` a `profiles:` key, and both scripts set
+`COMPOSE_PROFILES` explicitly for their own `docker compose` invocations, overriding whatever
+happens to be sitting in `.env` on the Pi.
+
+To move from B to A: set `HOMEASSISTANT_ENABLED=true`, add the MQTT credentials, create the broker
+password file (step 7), and run `./deploy/deploy.sh`. To go the other way, just run
+`./deploy/deploy-controller-only.sh` — the extra containers are removed and your data is untouched.
+
+## Storage and the boot medium
+
+Nothing here depends on a particular disk. Two things matter: having the space, and whether your
+board can boot the medium you want to run from.
+
+**Space.** Workflow A needs about 16 GB to be comfortable, mostly because the Home Assistant image is
+around 3.4 GB; workflow B is happy with 8 GB. Both grow slowly afterwards — the charging-session
+database and the log files are the only things that accumulate, and both are small.
+
+**An SD card works, and USB-attached storage lasts longer.** The controller writes continuously: log
+files, and a SQLite database with its write-ahead log. SD cards tolerate that poorly over years, so
+if this is meant to run unattended, putting root on an SSD in a USB enclosure is the single upgrade
+that most reduces the odds of a mystery failure eighteen months in. It is not required.
+
+**Not every Pi can boot from USB, and that is worth checking before you buy anything.** Recent boards
+boot USB mass storage directly, and then there is nothing to think about: one device holds both
+`/boot/firmware` and `/`. Older boards may not boot from USB at all, or may fail with particular
+USB-to-SATA/NVMe bridges — their boot ROM allows the device only a brief window to respond, which
+some adapters miss, even though the Linux kernel drives the very same adapter without complaint once
+it is running.
+
+On a board like that, use a **split boot**: the SD card holds `/boot/firmware`, and `cmdline.txt`
+hands root to the USB disk. That works well, at the cost of two things it is easy to get wrong:
+
+- **`/boot/firmware` is then on the SD card.** Every instruction below that edits `cmdline.txt` — the
+  cgroup step in particular — is editing the SD card, which is correct, because that is the partition
+  the board actually boots. The USB disk usually keeps its own boot partition from whatever image was
+  written to it; editing *that* one changes nothing at all, silently.
+- **`/etc/fstab` must point `/boot/firmware` at the SD card's PARTUUID**, not at the USB disk's
+  leftover boot partition. Get this wrong and kernel updates land somewhere that is never booted, so
+  the machine breaks at some upgrade weeks later rather than at the moment of the mistake. Note that
+  a first-boot filesystem resize rewrites the partition table signature and therefore every PARTUUID
+  on the disk: the firstboot script repairs `cmdline.txt` and the root line in `fstab` by itself, but
+  it knows nothing about the `/boot/firmware` line.
+
+Neither applies if you boot and root on the SD card in the usual way, or on a board that boots USB
+directly.
 
 ## Putting a password on the web UI (optional)
 
@@ -208,9 +242,9 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**3. Enable cgroup memory accounting.** Required on the Pi 5 as much as on the Pi 3 — the board's
-memory has nothing to do with it. On a split-boot Pi 3 this edits the **SD card**; on a Pi 5 there is
-only one device to edit. See [Storage layout](#storage-layout).
+**3. Enable cgroup memory accounting.** Required on every board and in both workflows — how much
+memory the Pi has has nothing to do with it. On a [split boot](#storage-and-the-boot-medium) this
+edits the **SD card**; otherwise there is only one device to edit.
 
 Without it the `mem_limit` settings in `docker-compose.yml` are silently ignored: `docker run
 --memory=…` answers `WARNING: Your kernel does not support memory limit capabilities … Limitation
@@ -249,8 +283,8 @@ sudo reboot
 ```
 
 Check the file before rebooting: a mangled `cmdline.txt` means a Pi that doesn't boot, and fixing it
-means putting the boot medium in another machine — the SD card on a Pi 3, the M.2 and its enclosure
-on a Pi 5. `cmdline.txt.bak` is the way back.
+means putting the boot medium — whichever one holds `/boot/firmware` — into another machine.
+`cmdline.txt.bak` is the way back.
 
 A fresh Raspberry Pi OS image may also leave `cmdline.txt` with **no trailing newline**, so `wc -l`
 prints `0` rather than `1` before you start. That is not the second-line fault this step guards
@@ -296,13 +330,14 @@ spike into an OOM kill, so this step used to build a `dphys-swapfile`. Raspberry
 because the image now configures swap itself, and configures it better:
 
 ```bash
-cat /proc/swaps      # expect /dev/zram0 at priority 100: ~905MB on a Pi 3, ~2GB on a Pi 5
+cat /proc/swaps      # expect /dev/zram0 at priority 100, sized to about half your RAM
 free -h
 ```
 
-zram sizes itself to the board, so the number differs and neither is wrong. `swapon` and `zramctl`
-live in `/usr/sbin`, which a non-interactive `ssh pi 'swapon --show'` does not have on its `PATH` —
-`cat /proc/swaps` answers the same question from anywhere.
+zram sizes itself to the board — roughly 905 MB on a 1 GB Pi, 2 GB on a 4 GB one — so the number
+differs and neither is wrong. `swapon` and `zramctl` live in `/usr/sbin`, which a non-interactive
+`ssh pi 'swapon --show'` does not have on its `PATH`; `cat /proc/swaps` answers the same question
+from anywhere.
 
 What you get out of the box is **zram**: a compressed block device in RAM (zstd), used as swap at
 priority 100, with **writeback to `/var/swap`** on disk for pages too cold to be worth keeping
@@ -313,11 +348,11 @@ compressed in memory. `rpi-setup-loop@var-swap.service` puts that file on a loop
 This is strictly better than the old swapfile for this workload: compressing a page costs far less
 than writing it out, and there is still a disk tier behind it. **Nothing to do here.**
 
-> **Optional, on a disk-rooted Pi 3. Skip it on a Pi 5.** zram lives in RAM, so it competes for the
-> resource that is already scarce: compression buys roughly 2–3× on typical data but cannot
-> manufacture capacity, and the compose limits total 848 MB (600 + 200 + 48) on a 905 MB board. A
-> plain swapfile on the root disk, at a *lower* priority than zram, is a cheap overflow tier that
-> only catches what zram cannot hold:
+> **Optional, and only on a 1 GB board running workflow A.** zram lives in RAM, so it competes for
+> the resource that is already scarce: compression buys roughly 2–3× on typical data but cannot
+> manufacture capacity, and the full stack's limits total 848 MB (600 + 200 + 48) against about
+> 905 MB usable. A plain swapfile on the root disk, at a *lower* priority than zram, is a cheap
+> overflow tier that only catches what zram cannot hold:
 >
 > ```bash
 > sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
@@ -326,21 +361,21 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 > ```
 >
 > Do **not** do this if root is on an SD card — that is a write-amplification machine pointed at the
-> one component most likely to fail. It is only reasonable because the reference install roots on an
-> NVMe (see *Storage layout* above). Leave `vm.swappiness` at its default 60 so the disk tier is a
-> safety net rather than a first resort.
+> one component most likely to fail. It is only reasonable with root on an SSD (see
+> [Storage and the boot medium](#storage-and-the-boot-medium)). Leave `vm.swappiness` at its default
+> 60 so the disk tier is a safety net rather than a first resort.
 >
-> **On a 4 GB Pi 5 the whole argument collapses**: 848 MB of limits against 4 GB is not a scarce
-> resource, zram is 2 GB there rather than 905 MB, and it already has `/var/swap` on the NVMe behind
-> it. Adding a third tier below two that never fill is work for nothing. Enforced `mem_limit` values
-> (step 3) are the better answer to the same worry, because they stop a leak at the container instead
-> of absorbing it.
+> **On 2 GB or more the whole argument collapses**, and on workflow B it never applied: 848 MB of
+> limits against 4 GB is not a scarce resource, zram scales up with the board, and it already has
+> `/var/swap` behind it. Adding a third tier below two that never fill is work for nothing. Enforced
+> `mem_limit` values (step 3) are the better answer to the same worry, because they stop a leak at
+> the container instead of absorbing it.
 
 **5. Directories.** The containers hold no state; everything lives here. `logs/` and `data/` are
 needed by every deployment; `mosquitto/` and `homeassistant/` only if you're deploying with
-`deploy.sh` rather than `deploy-controller-only.sh` (see
-[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only)) — skip
-those two and their `chown` if you're not, neither script requires them to pre-exist:
+`deploy.sh` rather than `deploy-controller-only.sh` (workflow A — see
+[Choose your deployment](#choose-your-deployment)) — skip those two and their `chown` if you're not;
+neither script requires them to pre-exist:
 
 ```bash
 sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
@@ -441,9 +476,8 @@ deploy/
 └── _lib.sh                         # shared by both scripts above; not run directly
 ```
 
-From a developer machine, with the repo checked out, pick the script for the stack you want (see
-[Running without Home Assistant](#running-without-home-assistant-controller--web-ui-only) for the
-tradeoff):
+From a developer machine, with the repo checked out, pick the script for the workflow you chose in
+[Choose your deployment](#choose-your-deployment):
 
 ```bash
 ./deploy/deploy.sh                    # full stack
