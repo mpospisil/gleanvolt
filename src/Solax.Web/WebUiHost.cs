@@ -21,21 +21,24 @@ namespace Solax.Web;
 public static class WebUiHost
 {
     /// <summary>
-    /// Fails fast rather than starting with an unprotected UI: the UI can reach hardware once its
-    /// control phase lands, and an unauthenticated port able to do that is not acceptable even on a
-    /// trusted LAN. Call before <c>Build()</c> — same reasoning, and same place in the pipeline, as
-    /// the timezone fail-fast in Program.cs.
+    /// Fails fast on the one authentication setting that cannot be honoured: a login explicitly
+    /// demanded with no password to check against. Nobody could sign in, so every page would be
+    /// permanently unreachable — a stopped host says that immediately, where a running one would
+    /// look like a broken UI.
+    ///
+    /// <para>Leaving <c>Web:RequireAuthentication</c> unset is not this case: it means "follow the
+    /// password", and no password simply means no login. Call before <c>Build()</c> — same place in
+    /// the pipeline as the timezone fail-fast in Program.cs.</para>
     /// </summary>
     public static void ValidateAuthenticationConfig(this WebOptions web)
     {
-        if (web.Enabled && web.RequireAuthentication && string.IsNullOrWhiteSpace(web.PasswordHash))
+        if (web.Enabled && web.RequireAuthentication == true && string.IsNullOrWhiteSpace(web.PasswordHash))
         {
             throw new InvalidOperationException(
-                "Web:RequireAuthentication is true but Web:PasswordHash is not set. Generate a hash "
-                + "with 'dotnet Solax.Worker.dll hash-password <password>' and set it via "
-                + "Web__PasswordHash (never in appsettings.json), or set "
-                + "Web:RequireAuthentication=false to run without a login (not recommended once the "
-                + "UI can control the charger).");
+                "Web:RequireAuthentication is true but Web:PasswordHash is not set, so nobody could "
+                + "ever sign in. Generate a hash with 'dotnet Solax.Worker.dll hash-password "
+                + "<password>' and set it via Web__PasswordHash (never in appsettings.json), or "
+                + "leave Web:RequireAuthentication unset to run the UI without a login.");
         }
     }
 
@@ -70,9 +73,9 @@ public static class WebUiHost
         services.AddAuthorization(options =>
         {
             // [Authorize] with no policy name resolves to DefaultPolicy: this one toggle is what
-            // makes Web:RequireAuthentication optional rather than merely documented as such. The
-            // login page carries [AllowAnonymous], which wins regardless of what this is set to.
-            options.DefaultPolicy = web.RequireAuthentication
+            // makes the login optional rather than merely documented as such. The login page carries
+            // [AllowAnonymous], which wins regardless of what this is set to.
+            options.DefaultPolicy = web.AuthenticationRequired
                 ? new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build()
                 : new AuthorizationPolicyBuilder().RequireAssertion(_ => true).Build();
 
@@ -108,11 +111,15 @@ public static class WebUiHost
             context.Response.Redirect("/login");
         });
 
-        if (!web.RequireAuthentication)
+        // Said out loud on every start, not only when someone opted out: an open control surface is
+        // exactly the sort of thing an operator should be able to establish from a log file after
+        // the fact, and the default being open is what makes that worth logging rather than assuming.
+        if (!web.AuthenticationRequired)
         {
             app.Logger.LogWarning(
-                "Web:RequireAuthentication is false: every page is reachable with no login. Do not "
-                + "expose this port beyond a trusted LAN.");
+                "Web UI has no login: every page is reachable by anyone who can reach the port. "
+                + "Keep it to a trusted LAN, or set Web__PasswordHash to require a sign-in "
+                + "(hash-password generates one).");
         }
     }
 }

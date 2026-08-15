@@ -3,8 +3,10 @@ using Microsoft.Extensions.Configuration;
 namespace Solax.Web.Tests;
 
 /// <summary>
-/// The UI is optional by construction, and these are the two facts that make it so: an absent
-/// <c>Web</c> section leaves it off, and turning it on does not also require choosing a port.
+/// The UI works with no configuration at all, and these are the facts that make it so: an absent
+/// <c>Web</c> section still yields an enabled UI on a known port, and no login is demanded until a
+/// password is actually configured. Every one of these is reachable from a deployment that never
+/// writes a <c>Web</c> setting.
 /// </summary>
 public class WebOptionsTests
 {
@@ -18,9 +20,20 @@ public class WebOptionsTests
     }
 
     [Fact]
-    public void Is_off_when_nothing_is_configured()
+    public void Is_on_when_nothing_is_configured()
     {
+        // The whole point of the default: a deployment that says nothing about the web UI still gets
+        // one. Home Assistant is the surface that stays opt-in, because it needs a broker and
+        // credentials before it can do anything at all.
         var options = Bind();
+
+        Assert.True(options.Enabled);
+    }
+
+    [Fact]
+    public void Can_be_turned_off_explicitly()
+    {
+        var options = Bind(("Web:Enabled", "false"));
 
         Assert.False(options.Enabled);
     }
@@ -28,9 +41,8 @@ public class WebOptionsTests
     [Fact]
     public void Defaults_to_port_8080()
     {
-        var options = Bind(("Web:Enabled", "true"));
+        var options = Bind();
 
-        Assert.True(options.Enabled);
         Assert.Equal(8080, options.Port);
     }
 
@@ -43,37 +55,79 @@ public class WebOptionsTests
     }
 
     [Fact]
-    public void Requires_authentication_by_default()
+    public void Requires_no_login_by_default()
     {
-        // The UI is about to gain controls that write to a real inverter and EV charger (issue #48);
-        // an unauthenticated port has to be an opt-out, not the default.
-        var options = Bind(("Web:Enabled", "true"));
+        // Setting a password is the advanced option, so its absence cannot be an error -- an
+        // unconfigured UI has to serve pages rather than demand a sign-in nobody can satisfy.
+        var options = Bind();
 
-        Assert.True(options.RequireAuthentication);
+        Assert.False(options.AuthenticationRequired);
     }
 
     [Fact]
-    public void Can_turn_authentication_off_explicitly()
+    public void Requires_a_login_as_soon_as_a_password_hash_is_configured()
     {
-        var options = Bind(("Web:Enabled", "true"), ("Web:RequireAuthentication", "false"));
+        // The inference that makes the password a single setting rather than a pair: no separate
+        // switch to remember, so a configured password can never be silently unenforced.
+        var options = Bind(("Web:PasswordHash", "AQAAAAIAAYagAAAAE..."));
 
-        Assert.False(options.RequireAuthentication);
+        Assert.True(options.AuthenticationRequired);
+        Assert.Equal("AQAAAAIAAYagAAAAE...", options.PasswordHash);
+    }
+
+    [Fact]
+    public void Treats_a_whitespace_only_password_hash_as_no_password()
+    {
+        // An env var that ended up empty is the realistic version of this -- WEB_PASSWORD_HASH= in
+        // .env, or the compose default. It must not flip the login on and lock everybody out.
+        var options = Bind(("Web:PasswordHash", "   "));
+
+        Assert.False(options.AuthenticationRequired);
+    }
+
+    [Fact]
+    public void Lets_an_explicit_setting_override_the_inference_in_both_directions()
+    {
+        var forcedOn = Bind(("Web:RequireAuthentication", "true"), ("Web:PasswordHash", "hash"));
+        var forcedOff = Bind(("Web:RequireAuthentication", "false"), ("Web:PasswordHash", "hash"));
+
+        Assert.True(forcedOn.AuthenticationRequired);
+        Assert.False(forcedOff.AuthenticationRequired);
+    }
+
+    [Fact]
+    public void Treats_an_empty_RequireAuthentication_as_unset()
+    {
+        // docker-compose.yml passes Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-},
+        // which reaches the container as an empty string rather than as an absent variable. If that
+        // bound to false instead of null it would defeat the inference for every containerised
+        // deployment -- a configured password would stop being enforced.
+        var options = Bind(("Web:RequireAuthentication", ""), ("Web:PasswordHash", "hash"));
+
+        Assert.Null(options.RequireAuthentication);
+        Assert.True(options.AuthenticationRequired);
+    }
+
+    [Fact]
+    public void Requires_no_login_when_the_section_exists_but_says_nothing_about_authentication()
+    {
+        // The shape appsettings.json actually ships: a Web section that exists, with Enabled and
+        // Port in it and no authentication keys at all. Distinct from Bind() with no section --
+        // there the binder returns null and never touches the object -- so this is the case that
+        // decides what a real deployment does, and the one worth pinning.
+        var options = Bind(("Web:Enabled", "true"), ("Web:Port", "8080"));
+
+        Assert.Null(options.RequireAuthentication);
+        Assert.Equal("", options.PasswordHash);
+        Assert.False(options.AuthenticationRequired);
     }
 
     [Fact]
     public void Has_no_password_hash_configured_by_default()
     {
-        var options = Bind(("Web:Enabled", "true"));
+        var options = Bind();
 
         Assert.Equal("", options.PasswordHash);
-    }
-
-    [Fact]
-    public void Takes_the_password_hash_from_configuration()
-    {
-        var options = Bind(("Web:Enabled", "true"), ("Web:PasswordHash", "AQAAAAIAAYagAAAAE..."));
-
-        Assert.Equal("AQAAAAIAAYagAAAAE...", options.PasswordHash);
     }
 
     [Fact]

@@ -196,4 +196,30 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
     }
+
+    [Fact]
+    public async Task Serves_the_dashboard_with_no_authentication_configured_at_all()
+    {
+        // The out-of-the-box deployment, through the real pipeline: no password, no
+        // RequireAuthentication, nothing. WebOptionsTests asserts the inference; this asserts that
+        // the pipeline built from it actually serves a page rather than redirecting to /login.
+        var client = await StartAsync(new WebOptions { Enabled = true });
+
+        var dashboard = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
+    }
+
+    [Fact]
+    public async Task Requires_a_login_when_only_a_password_hash_is_configured()
+    {
+        // The advanced path, and the half of the inference that matters for security: setting the
+        // hash alone -- with RequireAuthentication left unset -- has to actually turn anyone away.
+        var client = await StartAsync(new WebOptions { Enabled = true, PasswordHash = WebPasswordHasher.Hash(Password) });
+
+        var dashboard = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, dashboard.StatusCode);
+        Assert.Contains("/login", dashboard.Headers.Location?.OriginalString ?? "");
+    }
 }
