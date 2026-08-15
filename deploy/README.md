@@ -523,6 +523,143 @@ only once you select a mode — Home Assistant or the web UI, whichever is enabl
 `BatteryHold` is disabled and dry-run. Change either in `.env` only after verifying the register
 addresses on your own device, per the root README's warnings.
 
+## Updating a running deployment
+
+**Updating is the same command as deploying.** Run the script again from your developer machine;
+there is no separate update path, nothing to uninstall, and no step you perform on the Pi.
+
+```bash
+./deploy/deploy.sh                    # workflow A
+./deploy/deploy-controller-only.sh    # workflow B
+```
+
+Use the script matching the workflow that is *already running*. Running the other one is how you
+[switch between them](#switching-between-the-two) — which will add or remove containers, and is not
+what you want if you only meant to pick up a new build.
+
+### What the script does, in order
+
+1. Checks `/opt/solax` exists and `.env` is there — it refuses rather than guessing.
+2. Copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` from your **local**
+   `deploy/` directory, overwriting the Pi's copies.
+3. Seeds Home Assistant's config files only if they don't already exist.
+4. `docker compose pull` — every image in the active profiles.
+5. `docker compose up -d --remove-orphans` — recreates only what actually changed.
+6. Prints the container status and the URLs.
+
+Step 5 is why an update is usually near-instant and mostly invisible: Compose compares each
+container against the image and configuration it should have, and leaves alone the ones that already
+match. A run that changes nothing prints `Container solax-controller Running` and touches nothing. A
+run with a new image prints `Recreate` for that one container and leaves the others up.
+
+### What survives an update
+
+Everything that is state, because none of it lives inside a container:
+
+| | |
+|---|---|
+| `/opt/solax/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
+| `data/sessions.db` | charging-session history, with its SQLite WAL |
+| `logs/` | the controller's own log files |
+| `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
+| `mosquitto/config/passwd` | broker credentials, created by hand |
+
+`docker compose down` and even `docker rm -f` on any single container are equally safe, for the same
+reason. What *is* overwritten every deploy is `mosquitto.conf` and the compose files — so edit those
+in the repo, not on the Pi, or your change disappears at the next update.
+
+### Updating the controller also updates Home Assistant and the broker
+
+Step 4 pulls **every** image in the active profiles, not just the controller. On workflow A that
+means `ghcr.io/home-assistant/home-assistant:stable` and `eclipse-mosquitto:2` move to whatever those
+tags point at now. That is usually what you want, but it means "I updated the controller" can also
+mean "Home Assistant jumped a version" — worth knowing before you go looking for what changed.
+
+To move only the controller, do that one step on the Pi instead:
+
+```bash
+ssh martin@192.168.2.7 'cd /opt/solax && docker compose pull solax-controller && docker compose up -d solax-controller'
+```
+
+That skips copying any updated compose files, so use it for a plain image bump, not after changing
+`deploy/`.
+
+### The controller restarts, so charge control returns to Off
+
+An update recreates the container, and the worker always boots in charge mode **Off** with the
+battery hold disabled — by design, so that a deployment never inherits control it wasn't given. If a
+mode was active when you updated, **it is not active afterwards**; the charger is left exactly as it
+was and waits for you to select a mode again in Home Assistant or the web UI.
+
+Nothing is written to your hardware during the update itself, and a charging session in progress is
+not lost: on a clean stop the recorder closes it with reason `ServiceStopped` and persists it, so it
+appears in the history as a completed session. Charging after the restart is recorded as a *new*
+session, so updating mid-session splits it in two. If the container is killed rather than stopped
+cleanly, the next startup recovers the session as interrupted instead.
+
+### Check what you are actually running
+
+Before and after, from your machine:
+
+```bash
+ssh martin@192.168.2.7 'cd /opt/solax && docker compose logs solax-controller | grep "starting\."'
+```
+
+The worker logs its version and the commit it was built from — `SolaX Local Controller 1.0.0
+(31bf347) starting.` — so you can confirm the new build is live rather than trusting that the pull
+did something. Home Assistant shows the same string as the device's software version. `0.0.0-dev`
+with no commit means somebody deployed a local build.
+
+### Pinning a version, and rolling back
+
+`IMAGE_TAG` selects the build, and works identically on both scripts:
+
+```bash
+./deploy/deploy.sh                              # latest from main
+IMAGE_TAG=1.0.0 ./deploy/deploy.sh              # a released version -- no "v"
+IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # one specific build, immutable
+```
+
+A rollback is just an update pointed at an older tag; `sha-` tags are immutable, which makes them the
+reliable thing to roll back *to*. Setting `IMAGE_TAG` in `/opt/solax/.env` pins it for every future
+deploy that doesn't override it on the command line.
+
+**The image tag has no `v`, though the git tag does.** Releases are cut as git tag `v1.0.0`, and the
+publish workflow strips the prefix, so the image is `…/solax-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
+does not exist and the pull fails with `manifest unknown`.
+
+**Deploy from a checked-out tag, not your working branch.** Either script copies the *local*
+`deploy/` tree to the Pi, so otherwise the compose file and the image come from two different points
+in history:
+
+```bash
+git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy.sh
+```
+
+Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, `1.0.0` is the
+**image** tag you pull.
+
+### Changing settings rather than code
+
+`.env` is never copied by the deploy scripts, so a settings change is a two-step job:
+
+```bash
+ssh martin@192.168.2.7 'nano /opt/solax/.env'
+ssh martin@192.168.2.7 'cd /opt/solax && docker compose up -d'
+```
+
+`docker compose up -d` recreates only the containers whose environment actually changed. Re-running
+the deploy script works too and is the better choice if you also changed anything in `deploy/`.
+
+### If an update goes wrong
+
+The scripts stop at the first failure rather than pressing on, and every step before the pull is
+either a check or an idempotent repair — creating `logs/` and `data/` with the right owner, or fixing
+`mosquitto/config` ownership. Re-running after fixing whatever it complained about is safe.
+
+If a new build misbehaves, roll back to the previous tag with the same command. The database, logs
+and configuration are all still there, because the container was never where they lived.
+
 ## Everyday operations
 
 ```bash
@@ -543,31 +680,8 @@ commit at startup (`SolaX Local Controller 1.0.0 (31bf347) starting.`), so a log
 a build without matching it against image digests. Home Assistant shows the same string as the
 device's software version. `0.0.0-dev` with no commit means somebody deployed a local build.
 
-Upgrade to the latest build, or roll back to a known-good one, using whichever script matches the
-stack already running (both take `IMAGE_TAG` identically):
-
-```bash
-./deploy/deploy.sh                              # latest from main
-IMAGE_TAG=1.0.0 ./deploy/deploy.sh              # a released version -- no "v"
-IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # a specific build
-```
-
-**The image tag has no `v`, though the git tag does.** Releases are cut as git tag `v1.0.0`, and the
-publish workflow strips the prefix, so the image is `…/solax-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
-does not exist and the pull fails with `manifest unknown`.
-
-Both preserve all state. So does `docker compose down`, and so does `docker rm -f` on any single
-container — that is the point of the layout below.
-
-Deploy from a checked-out tag rather than your working branch. Either script copies the **local**
-`deploy/` tree to the Pi, so the compose file and the image otherwise come from two different places:
-
-```bash
-git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy.sh
-```
-
-Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, `1.0.0` is the
-**image** tag you pull.
+See [Updating a running deployment](#updating-a-running-deployment) for upgrades, rollbacks and
+pinning.
 
 ## Which image you get
 

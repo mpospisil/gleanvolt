@@ -171,6 +171,23 @@ only when you select a mode — Home Assistant or the web UI, whichever is enabl
 hold stays disabled and dry-run until
 you turn it on deliberately.
 
+**Updating a Pi that is already running is the same command.** From the developer machine, re-run
+the script for the workflow already deployed:
+
+```bash
+./deploy/deploy.sh                              # newest build of main
+IMAGE_TAG=1.0.0 ./deploy/deploy.sh              # a released version -- note: no "v"
+IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # one specific build; also how you roll back
+```
+
+It copies the compose files, pulls, and recreates only the containers that actually changed. All
+state survives — `.env` is never even copied, and the session database, logs and Home Assistant's
+configuration live on bind mounts under `/opt/solax` rather than inside any container. Two things
+worth knowing: the pull covers *every* image in the stack, so on workflow A Home Assistant moves
+with it, and the controller restarts into charge mode `Off`, so an active mode has to be selected
+again afterwards. Full detail, including settings-only changes and rollbacks, is under
+[Updating a running deployment](deploy/README.md#updating-a-running-deployment).
+
 Full instructions — choosing between the two workflows, preparing the Pi, storage, backup/restore
 and troubleshooting — are in **[deploy/README.md](deploy/README.md)**.
 
