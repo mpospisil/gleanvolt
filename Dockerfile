@@ -81,6 +81,6 @@ ENV DOTNET_EnableDiagnostics=0
 # binds nothing at all while Web:Enabled is false (see NoListenServer). The number is the default
 # from WebOptions.Port; a deployment that changes Web:Port must publish that port instead, not this
 # line (see deploy/docker-compose.yml).
-EXPOSE 8080
+EXPOSE 8090
 
 ENTRYPOINT ["dotnet", "Solax.Worker.dll"]

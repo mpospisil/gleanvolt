@@ -33,7 +33,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
-- **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8080`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller on a Raspberry Pi 3 B+ with neither Home Assistant nor a broker, at roughly a third of the memory the full stack needs.
+- **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller on a Raspberry Pi 3 B+ with neither Home Assistant nor a broker, at roughly a third of the memory the full stack needs.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
 - **Local data ownership** — no cloud dependency for core operation.
@@ -140,7 +140,7 @@ deploy script:
 
 ```bash
 ./deploy/deploy.sh                    # controller + Home Assistant + broker
-./deploy/deploy-controller-only.sh    # controller alone, with its own web UI on :8080
+./deploy/deploy-controller-only.sh    # controller alone, with its own web UI on :8090
 ```
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
@@ -830,14 +830,14 @@ to it. Like the MQTT entities, the whole page shows an explicit empty state whil
 ```jsonc
 "Web": {
   "Enabled": true,      // master switch; while false the process binds no socket at all
-  "Port": 8080          // listens on every interface, plain HTTP
+  "Port": 8090          // listens on every interface, plain HTTP
   // "RequireAuthentication"  // unset -- follow the password; see below, rarely worth setting
   // "PasswordHash": ""       // secret -- see below, never set it here
 }
 ```
 
 - **On by default, and needs no configuration.** Start the controller — from `dotnet run`, from the
-  image, from the compose stack — and the UI is at `http://<host>:8080`. This is the surface a fresh
+  image, from the compose stack — and the UI is at `http://<host>:8090`. This is the surface a fresh
   install is operated through, and unlike the Home Assistant integration it needs no broker, no
   credentials and no onboarding to be useful, so there is nothing to gain by making it opt-in.
 - **No login until you configure one.** See [Authentication](#authentication) below: it is an
@@ -897,8 +897,8 @@ running one looks like a broken page. Everything else starts.
 #### Deployment
 
 The compose stack in [`deploy/`](deploy/) needs **nothing in `.env`** for the UI: `docker-compose.yml`
-publishes port 8080 and leaves `Web__Enabled` at its default, so a fresh Pi ends a deploy at a working
-`http://<pi>:8080`. See
+publishes port 8090 and leaves `Web__Enabled` at its default, so a fresh Pi ends a deploy at a working
+`http://<pi>:8090`. See
 [deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
 for the memory budget of running the controller and its UI **without** Home Assistant or an MQTT
 broker at all (roughly 200 MB of the reference Pi 3 B+'s 905, against 848 MB for the full stack).

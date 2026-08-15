@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Deploy just the controller, with its own web UI on port 8080, to the Raspberry Pi: no Home
+# Deploy just the controller, with its own web UI on port 8090, to the Raspberry Pi: no Home
 # Assistant, no MQTT broker (issue #51). For the full stack, use deploy/deploy.sh instead.
 #
 # The web UI needs nothing in .env -- it is on by default and docker-compose.yml publishes its port.

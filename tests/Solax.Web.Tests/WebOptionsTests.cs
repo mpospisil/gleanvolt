@@ -39,11 +39,11 @@ public class WebOptionsTests
     }
 
     [Fact]
-    public void Defaults_to_port_8080()
+    public void Defaults_to_port_8090()
     {
         var options = Bind();
 
-        Assert.Equal(8080, options.Port);
+        Assert.Equal(8090, options.Port);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class WebOptionsTests
         // Port in it and no authentication keys at all. Distinct from Bind() with no section --
         // there the binder returns null and never touches the object -- so this is the case that
         // decides what a real deployment does, and the one worth pinning.
-        var options = Bind(("Web:Enabled", "true"), ("Web:Port", "8080"));
+        var options = Bind(("Web:Enabled", "true"), ("Web:Port", "8090"));
 
         Assert.Null(options.RequireAuthentication);
         Assert.Equal("", options.PasswordHash);

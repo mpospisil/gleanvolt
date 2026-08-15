@@ -184,7 +184,7 @@ EOF
     if ! ssh_pi "grep -qE '^WEB_ENABLED=false' '$REMOTE_DIR/.env' 2>/dev/null"; then
         web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2-)
         next="$next
-    Web UI: http://${PI_HOST#*@}:${web_port:-8080}"
+    Web UI: http://${PI_HOST#*@}:${web_port:-8090}"
     fi
 
     cat <<EOF

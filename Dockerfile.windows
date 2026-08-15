@@ -71,6 +71,6 @@ ENV DOTNET_EnableDiagnostics=0
 
 # Documentation only, as on the Linux image: opens no port by itself, and the UI binds nothing while
 # Web:Enabled is false. See Dockerfile.
-EXPOSE 8080
+EXPOSE 8090
 
 ENTRYPOINT ["dotnet", "Solax.Worker.dll"]

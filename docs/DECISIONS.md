@@ -4,6 +4,29 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-15 — The web UI's default port moves from 8080 to 8090
+
+**Context.** 8080 is the most contended port on a general-purpose Linux box. The reference Pi turned
+out to have Kodi installed, whose HTTP remote-control interface defaults to 8080 as well; a Pi that
+also ran a proxy, a dev server, or any of the many appliances that assume 8080 would collide the same
+way. The failure is unpleasant to diagnose because it depends on boot ordering: whichever process
+binds first wins, and the loser reports only that the port was unavailable.
+
+**Decision — the default is 8090, in one place, and everything else follows it.** `WebOptions.Port`
+is the single source of truth; `appsettings.json` ships the same number, `docker-compose.yml`
+defaults `WEB_PORT` to it for both the published port and `Web__Port`, and both Dockerfiles' `EXPOSE`
+lines document it. 8090 is not special beyond being far less contended — the point is that the
+out-of-the-box experience should not require choosing a port, and 8080 could no longer deliver that.
+
+**This changes the URL of an existing deployment.** A Pi that never set `WEB_PORT` moves from
+`:8080` to `:8090` on the next deploy, because the default it was relying on changed underneath it.
+Anyone who wants the old URL sets `WEB_PORT=8080` in `.env` explicitly, which is exactly the knob
+that already existed for moving the port; nothing else needs to change. Note that `WEB_PORT` moves
+the host *and* container port together, so the container's internal port changes too — nothing binds
+8080 anywhere afterwards unless it is asked to.
+
+---
+
 ## 2026-08-13 — Home Assistant and the broker become compose profiles, and the controller stops depending on either
 
 **Context.** Issue #51, the last phase of #44. The web UI (phases 0–5) made Home Assistant optional
