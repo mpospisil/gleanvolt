@@ -47,7 +47,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 | Home battery | SolaX T-BAT H 2.5 modules + BMS (**10 kWh** nominal on the reference install) | via the inverter — no direct connection |
 
 The battery has no interface of its own: everything about it reaches us through the inverter's
-registers (SOC from `BatteryCapacity 0x1C`, power from `BatteryPowerCharge1 0x16`) and every command
+registers (SOC from `BatterySoc 0x25`, in tenths of a percent; power from `BatteryPowerCharge1 0x16`) and every command
 that affects it goes through the inverter's power-control block. Its **usable** capacity is the one
 site-specific number the forecast-driven mode cannot work without — see
 [`BatteryCapacityKWh`](#forecast-driven-charging-the-forecasted-mode).
