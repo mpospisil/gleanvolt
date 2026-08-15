@@ -12,7 +12,7 @@ public class EnergyStateTests
 
         var state = EnergyState.FromRawRegisters(
             timestamp,
-            batterySocRaw: 42,
+            batterySocRaw: 804,
             batteryPowerRaw: 0,
             pvPowerDc1Raw: 0,
             pvPowerDc2Raw: 0,
@@ -21,7 +21,8 @@ public class EnergyStateTests
             evChargerStatusRaw: 0,
             evChargerPowerRaw: 0);
 
-        Assert.Equal(42, state.BatterySocPercent);
+        // Tenths of a percent: 804 raw is 80.4%, the value the inverter's own display shows.
+        Assert.Equal(80.4, state.BatterySocPercent, precision: 6);
         Assert.Equal(timestamp, state.Timestamp);
     }
 

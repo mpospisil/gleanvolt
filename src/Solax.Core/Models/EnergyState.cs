@@ -62,6 +62,7 @@ public sealed record EnergyState(
     // is the sum of both MPPT trackers (matches the "Solar" figure in the SolaX Cloud app).
     public static EnergyState FromRawRegisters(
         DateTimeOffset timestamp,
+        // Tenths of a percent, as the inverter reports it -- see InverterRegister.BatterySoc.
         ushort batterySocRaw,
         ushort batteryPowerRaw,
         ushort pvPowerDc1Raw,
@@ -75,7 +76,7 @@ public sealed record EnergyState(
 
         return new EnergyState(
             timestamp,
-            batterySocRaw,
+            batterySocRaw / 10.0,
             unchecked((short)batteryPowerRaw),
             pvPowerDc1Raw + pvPowerDc2Raw,
             -feedinPowerWatts, // meter reports positive = export; this model uses positive = import
