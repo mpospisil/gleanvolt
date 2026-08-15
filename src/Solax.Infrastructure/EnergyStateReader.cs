@@ -47,7 +47,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
 
         return EnergyState.FromRawRegisters(
             DateTimeOffset.UtcNow,
-            batterySocRaw: FromBlock(inverterBlock, InverterRegisterMap.BatterySoc),
+            batterySocRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryCapacity),
             batteryPowerRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryPowerCharge1),
             pvPowerDc1Raw: FromBlock(inverterBlock, InverterRegisterMap.Powerdc1),
             pvPowerDc2Raw: FromBlock(inverterBlock, InverterRegisterMap.Powerdc2),

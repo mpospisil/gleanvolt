@@ -19,13 +19,13 @@ public class EnergyStateReaderTests
     public async Task Reports_inverter_telemetry_when_the_charger_cannot_be_connected()
     {
         var inverter = new FakeModbusClient();
-        inverter.SetHolding(InverterRegisterMap.BatterySoc.Address, 472);   // tenths of a percent
+        inverter.SetHolding(InverterRegisterMap.BatteryCapacity.Address, 47);
         inverter.SetHolding(InverterRegisterMap.Powerdc1.Address, 1200);
 
         var state = await Reader(inverter, new UnreachableModbusClient()).ReadAsync();
 
         // The inverter half survives intact -- the regression this guard exists for.
-        Assert.Equal(47.2, state.BatterySocPercent, precision: 6);
+        Assert.Equal(47, state.BatterySocPercent);
         Assert.Equal(1200, state.SolarPowerWatts);
     }
 
