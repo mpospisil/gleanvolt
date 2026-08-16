@@ -1,0 +1,100 @@
+name: Publish packages
+
+# Publishes the four libraries to nuget.org from a v* tag, so a consumer can build on the controller
+# without vendoring it. The executable is not among them -- Solax.Worker is the thing that runs the
+# packages, not one of them.
+#
+# The same tag drives this, the image tags and the compiled assembly version (see publish-image.yml
+# and Directory.Build.props), so a package, an image and a commit are the same release by
+# construction rather than by convention.
+#
+#   Solax.Core            domain models, strategies, interfaces
+#   Solax.Infrastructure  Modbus, register maps, SQLite sessions, Solcast
+#   Solax.Web             the Blazor dashboard, as a Razor class library
+#   Solax.Hosting         AddSolaxController() -- the composition root
+
+on:
+  push:
+    tags: ['v*']
+  # For proving a change to this workflow without cutting a release: it packs and uploads the
+  # artifacts, and pushes nothing.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The git tag without its leading v on a release; the Directory.Build.props placeholder
+      # otherwise, which nuget.org would reject as a duplicate of nothing anyone can install. Same
+      # derivation as publish-image.yml, deliberately.
+      - name: Derive the package version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: |
+          dotnet build SolaxLocalController.slnx --configuration Release \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -p:SourceRevisionId=${{ github.sha }}
+
+      # ci.yml is the quality gate for a branch, but a package is not a container image: a bad tag
+      # on nuget.org can be unlisted and never replaced. One more test run before something
+      # permanent is cheap.
+      - name: Test
+        run: dotnet test SolaxLocalController.slnx --no-build --configuration Release
+
+      # Each project by name rather than the solution: packing the solution warns about the one
+      # project that is deliberately not packable, and an explicit list is the clearer statement of
+      # what this repo publishes.
+      - name: Pack
+        run: |
+          set -euo pipefail
+          for project in Solax.Core Solax.Infrastructure Solax.Web Solax.Hosting; do
+            dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
+              -p:Version=${{ steps.version.outputs.version }} \
+              -p:SourceRevisionId=${{ github.sha }} \
+              --output artifacts
+          done
+          ls -l artifacts
+
+      - name: Upload the packages as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*
+
+      # Only from a tag, and only with a key configured. --skip-duplicate so that re-running a
+      # partially failed job finishes the release instead of failing on the packages that already
+      # went up.
+      - name: Push to nuget.org
+        if: github.ref_type == 'tag'
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "NUGET_API_KEY is not configured; refusing to publish a release silently." >&2
+            exit 1
+          fi
+          dotnet nuget push "artifacts/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${NUGET_API_KEY}" \
+            --skip-duplicate

@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Solax.Worker-efc97a0e-92f9-4b99-a0bc-18e89f72a904</UserSecretsId>
 
+    <!-- The executable. The libraries behind it are the packages; this is the thing that runs them. -->
+    <IsPackable>false</IsPackable>
+
     <!--
       Ship Blazor's client script (_framework/blazor.web.js). The Web SDK normally infers this from
       the project containing .razor files, and this one deliberately contains none; every component
@@ -16,16 +19,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
+  <!--
+    One reference, deliberately: everything this host needs comes through Solax.Hosting, including
+    Solax.Web and its static assets. Referencing Core or Infrastructure directly would let host code
+    reach past the composition root again, which is the thing this project no longer does.
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\Solax.Core\Solax.Core.csproj" />
-    <ProjectReference Include="..\Solax.Infrastructure\Solax.Infrastructure.csproj" />
-    <ProjectReference Include="..\Solax.Web\Solax.Web.csproj" />
+    <ProjectReference Include="..\Solax.Hosting\Solax.Hosting.csproj" />
   </ItemGroup>
 </Project>

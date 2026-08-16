@@ -17,4 +17,35 @@
     <SourceRevisionId Condition="'$(SourceRevisionId)' == ''"></SourceRevisionId>
   </PropertyGroup>
 
+  <!--
+    Package metadata shared by every packable project. Nothing is packable unless it opts in: the
+    default here is off, and the four libraries turn it on individually. That way a new project (a
+    test project especially) cannot start publishing itself to nuget.org by existing.
+
+    The package version is the Version above, so a package, the image tag and the git tag are all
+    the same number by construction.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <Authors>Martin Pospisil</Authors>
+
+    <!--
+      The file rather than a PackageLicenseExpression: the terms then live inside the artifact
+      instead of in a field beside it, and the package says whatever the repository's LICENSE says
+      without this line having to be kept in step with it.
+    -->
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/mpospisil/solax-controller</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mpospisil/solax-controller.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>solax;modbus;solar;inverter;battery;ev-charger;home-assistant</PackageTags>
+
+    <!-- Debugging a package should not mean cloning the repo first. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
 </Project>
+

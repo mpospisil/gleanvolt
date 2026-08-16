@@ -21,7 +21,7 @@ ARG WINDOWS_VERSION=ltsc2022
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
 
 # As in the Linux Dockerfile: defaults match Directory.Build.props so a plain build is labelled a
-# local one, and CI passes the release version and commit. See src/Solax.Worker/BuildInfo.cs.
+# local one, and CI passes the release version and commit. See src/Solax.Hosting/BuildInfo.cs.
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=
 
@@ -34,6 +34,7 @@ COPY SolaxLocalController.slnx ./
 COPY src/Solax.Core/Solax.Core.csproj src/Solax.Core/
 COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
 COPY src/Solax.Web/Solax.Web.csproj src/Solax.Web/
+COPY src/Solax.Hosting/Solax.Hosting.csproj src/Solax.Hosting/
 COPY src/Solax.Worker/Solax.Worker.csproj src/Solax.Worker/
 RUN dotnet restore src\Solax.Worker\Solax.Worker.csproj
 
