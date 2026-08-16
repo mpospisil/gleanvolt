@@ -1,0 +1,215 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject IChargeControlModeSelector Mode
+@inject IBatteryHoldSelector BatteryHold
+@inject IForecastRuntimeSettings ForecastSettings
+@inject TimeProvider Time
+
+@*
+    Phase 1 (#46) is the telemetry stat-grid below; phase 3 (#48) adds the controls section, gated
+    by the [Authorize] attribute phase 2 (#47) put on every page. Both drive the same Core
+    interfaces the MQTT worker uses -- IChargeControlModeSelector, IBatteryHoldSelector,
+    IForecastRuntimeSettings -- so there is no separate control path and no way for this page to
+    disagree with Home Assistant about what the charger is doing.
+
+    Follows StatusHolder.Updated exactly like the health page: seeded from Current before
+    subscribing, so a browser that arrives between two polls sees the last one rather than nothing,
+    then pushed a new value down the circuit on every completed poll. The mode select and the
+    battery-hold switch subscribe the same way to their own selectors' Changed events, because
+    either can move without this page's help: FastNoBattery switches itself off when the car
+    finishes, and Home Assistant can change either at any time.
+*@
+
+<PageTitle>Dashboard — Gleanvolt</PageTitle>
+
+<h1>Dashboard</h1>
+
+@if (_status is null)
+{
+    <p class="muted">No poll has completed yet.</p>
+}
+else
+{
+    <p class="muted">
+        Updated @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+    </p>
+
+    <section class="stat-grid">
+        <Stat Label="Charge mode" Value="@_status.Mode.ToString()"
+              Hint="Which strategy is driving the charger. Always starts at Off after a restart." />
+        <Stat Label="Control state" Value="@_status.State.ToString()"
+              Hint="What charge control is doing right now: Disabled (no mode selected), Idle (selected but not acting), Charging, or Paused." />
+        <Stat Label="Charger status" Value="@_status.ChargerStatus.ToString()"
+              Hint="The charger's own reported state, straight from its register." />
+        <Stat Label="Car connected" Value="@(_status.CarConnected ? "Yes" : "No")"
+              Hint="Whether a vehicle is plugged in. Says nothing about whether it is drawing power." />
+
+        <Stat Label="Solar power" Value="@Watts(_status.SolarPowerWatts)"
+              Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
+        <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
+              Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
+        <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"
+              Hint="Home battery state of charge as the inverter reports it." />
+        <Stat Label="Battery power" Value="@Watts(_status.BatteryPowerWatts)"
+              Hint="Positive while the battery charges, negative while it discharges." />
+        <Stat Label="Grid power" Value="@Watts(_status.GridPowerWatts)"
+              Hint="Positive while importing from the grid, negative while exporting." />
+
+        <Stat Label="EV charging power" Value="@Watts(_status.EvChargerPowerWatts)"
+              Hint="What the charger reports the car actually drawing right now -- not a setpoint." />
+        <Stat Label="EV charging current" Value="@Amps(_status.EvChargingCurrentAmps)"
+              Hint="Charging current derived from the charger's measured power: what the car really takes." />
+        <Stat Label="Target current" Value="@Amps(_status.TargetCurrentAmps)"
+              Hint="The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging." />
+        <Stat Label="Active current" Value="@Amps(_status.ActiveCurrentAmps)"
+              Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
+    </section>
+}
+
+<section class="controls">
+    <h2>Controls</h2>
+
+    <div class="control">
+        <label for="mode">Charge mode</label>
+        <select id="mode" @bind="_selectedMode" @bind:after="OnModeSelected">
+            @foreach (var mode in Enum.GetValues<ChargeControlMode>())
+            {
+                <option value="@mode">@mode</option>
+            }
+        </select>
+        <span class="hint">
+            Which strategy drives the charger. Always starts at Off after a restart; FastNoBattery
+            returns itself to Off once the car finishes.
+        </span>
+    </div>
+
+    @if (_status?.BatteryHoldEnabled == true)
+    {
+        <div class="control">
+            <label>
+                <input type="checkbox" @bind="_batteryHoldDisplay" @bind:after="OnBatteryHoldSelected" />
+                Battery discharge hold
+            </label>
+            <span class="hint">
+                Stops the home battery serving household load, so the car charges from PV and grid
+                while the battery can still charge from surplus. Shows the last command written
+                successfully, not a device read-back -- a failed write shows this switching back off
+                on its own.
+            </span>
+        </div>
+    }
+
+    <div class="control">
+        <label for="daily-ev-target">Daily EV target (kWh)</label>
+        <input id="daily-ev-target" type="number" step="0.1" min="0"
+               @bind="_dailyEvTargetKWh" @bind:event="onchange" @bind:after="OnDailyEvTargetSelected" />
+        <span class="hint">
+            How much energy the car should get on a normal day. Doesn't persist across restarts.
+        </span>
+    </div>
+
+    <div class="control">
+        <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
+        <input id="session-energy-target" type="number" step="0.1" min="0"
+               @bind="_sessionEnergyTargetKWh" @bind:event="onchange" @bind:after="OnSessionEnergyTargetSelected" />
+        <span class="hint">
+            Stop charging once this much has gone into the car in one session. 0 means no limit.
+            Doesn't persist across restarts.
+        </span>
+    </div>
+
+    <div class="control">
+        <label for="min-battery-soc">Minimum battery SOC (%)</label>
+        <input id="min-battery-soc" type="number" step="1" min="0" max="100"
+               @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
+        <span class="hint">
+            The hard floor the forecast plan may never take the home battery below. Doesn't persist
+            across restarts.
+        </span>
+    </div>
+</section>
+
+@code {
+    private ChargeControlStatus? _status;
+    private ChargeControlMode _selectedMode;
+    private bool _batteryHoldDisplay;
+    private double _dailyEvTargetKWh;
+    private double _sessionEnergyTargetKWh;
+    private double _minBatterySocPercent;
+
+    protected override void OnInitialized()
+    {
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+
+        _selectedMode = Mode.Mode;
+        Mode.Changed += OnModeChangedElsewhere;
+
+        _batteryHoldDisplay = _status?.BatteryHoldActive ?? BatteryHold.Hold;
+
+        RefreshRuntimeNumbers();
+    }
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+
+        // The device truth, not the request: a hold that failed to write shows up here as the
+        // switch springing back off, exactly like the MQTT worker's equivalent status publish.
+        _batteryHoldDisplay = status.BatteryHoldActive;
+
+        // The values the controller is actually using, in case Home Assistant (or another browser)
+        // changed one since this page loaded -- the same reason the MQTT worker republishes them on
+        // every status cycle.
+        RefreshRuntimeNumbers();
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Raised on the polling loop's thread whenever the mode changes for any reason, including
+    // FastNoBattery ending its own session -- not only when this page asked for it.
+    private void OnModeChangedElsewhere(ChargeControlMode mode)
+    {
+        _selectedMode = mode;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        StatusHolder.Updated -= OnStatusUpdated;
+        Mode.Changed -= OnModeChangedElsewhere;
+    }
+
+    private void OnModeSelected() => Mode.Set(_selectedMode, "Web UI");
+
+    private void OnBatteryHoldSelected() => BatteryHold.Set(_batteryHoldDisplay, "Web UI");
+
+    private void OnDailyEvTargetSelected() =>
+        ForecastSettings.SetDailyEvTargetWh(_dailyEvTargetKWh * 1000, "Web UI");
+
+    private void OnSessionEnergyTargetSelected() =>
+        ForecastSettings.SetSessionEnergyTargetWh(_sessionEnergyTargetKWh * 1000, "Web UI");
+
+    private void OnMinBatterySocSelected() =>
+        ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
+
+    private void RefreshRuntimeNumbers()
+    {
+        _dailyEvTargetKWh = Math.Round(ForecastSettings.DailyEvTargetWh / 1000, 1);
+        _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
+        _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+    }
+
+    private static string Watts(double watts) => $"{watts:F0} W";
+
+    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
+
+    private static string Percent(double percent) => $"{percent:F0}%";
+
+    private static string Amps(int amps) => $"{amps} A";
+
+    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+}

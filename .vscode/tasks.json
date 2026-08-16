@@ -5,7 +5,7 @@
             "label": "build",
             "type": "shell",
             "command": "dotnet",
-            "args": ["build", "${workspaceFolder}/SolaxLocalController.slnx"],
+            "args": ["build", "${workspaceFolder}/Gleanvolt.slnx"],
             "group": { "kind": "build", "isDefault": true },
             "problemMatcher": "$msCompile",
             "options": {
@@ -19,7 +19,7 @@
             "label": "test",
             "type": "shell",
             "command": "dotnet",
-            "args": ["test", "${workspaceFolder}/SolaxLocalController.slnx"],
+            "args": ["test", "${workspaceFolder}/Gleanvolt.slnx"],
             "group": { "kind": "test", "isDefault": true },
             "problemMatcher": "$msCompile",
             "options": {
@@ -33,7 +33,7 @@
             "label": "run-worker",
             "type": "shell",
             "command": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/src/Solax.Worker/Solax.Worker.csproj"],
+            "args": ["run", "--project", "${workspaceFolder}/src/Gleanvolt.Worker/Gleanvolt.Worker.csproj"],
             "problemMatcher": "$msCompile",
             "options": {
                 "env": {

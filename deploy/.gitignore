@@ -1,4 +1,4 @@
-# This directory is a source template, not a running stack -- the live state lives in /opt/solax on
+# This directory is a source template, not a running stack -- the live state lives in /opt/gleanvolt on
 # the Pi. These entries exist so that accidentally running `docker compose up` from here (or copying
 # state back for inspection) cannot commit Home Assistant's database, secrets or broker persistence.
 .env

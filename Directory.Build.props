@@ -35,8 +35,8 @@
       without this line having to be kept in step with it.
     -->
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <PackageProjectUrl>https://github.com/mpospisil/solax-controller</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mpospisil/solax-controller.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/mpospisil/gleanvolt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mpospisil/gleanvolt.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>solax;modbus;solar;inverter;battery;ev-charger;home-assistant</PackageTags>

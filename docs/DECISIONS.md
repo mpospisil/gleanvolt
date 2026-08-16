@@ -4,6 +4,46 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-16 — The product is Gleanvolt; the vendor is still SolaX
+
+**Context.** "SolaX Local Controller" put someone else's trademark in the project's name, its
+repository URL and the image everyone pulls. That is tolerable for a hobby project and not tolerable
+for anything sold, and it also mislabels the roadmap: the control logic is vendor-agnostic, and the
+intention is to support other inverter makes.
+
+**Decision — rename the product, not the vendor.** The split is the useful part of this change:
+
+| Renamed (product identity) | Kept (vendor identity) |
+|---|---|
+| Assemblies and namespaces `Solax.*` → `Gleanvolt.*` | The `Solax:` configuration section and `SolaxOptions` |
+| `AddSolaxController()` → `AddGleanvolt()`, `UseSolaxController()` → `UseGleanvolt()` | `SOLAX_*` variables in `.env` |
+| `SolaxPollingService` → `PollingService` | `Gleanvolt.Infrastructure/RegisterMaps/*` |
+| The solution, the image, the repository, the UI title, the HA display name | `InverterRegister`, `InverterControlRegister`, `EvChargerRegister` |
+| Container names and `/opt/solax` → `/opt/gleanvolt` | Every mention of SolaX hardware in prose |
+
+`Solax:Inverter:Host` configures a **SolaX inverter**, and when a second make is supported it will
+get its own section beside it rather than inheriting this one. Renaming it to `Gleanvolt:` would have
+been a breaking change to every deployment that also made the eventual multi-vendor layout worse.
+
+**Decision — Home Assistant keeps its identity.** `DeviceId` stays `solax_controller` and `BaseTopic`
+stays `solax`; only `DeviceName` becomes "Gleanvolt". Those two strings are the primary key of every
+entity Home Assistant has created: changing them renames every entity, orphans all recorded history,
+and breaks every dashboard and automation built on them — for a cosmetic gain, since the display name
+is the only part a user sees. The retained discovery topics would also need clearing from the broker
+or the old device would linger as a ghost. This is a change worth making once, at a major version,
+with a migration path — not as a side effect of a rename.
+
+**Decision — the repository was renamed in place, not recreated.** GitHub redirects the old URL
+permanently (verified: 301), so every existing clone, link and bookmark keeps working, and the issues
+and pull requests that carry most of this project's design rationale stay attached. Deleting the old
+repository would have broken all of that permanently while revoking nothing. `publish-image.yml`
+derives the image from `${{ github.repository }}`, so the image name followed the rename by itself.
+
+**The historical logs were left alone.** `DECISIONS.md` and `IMPLEMENTATION_LOG.md` are append-only
+and describe the tree as it was at the time; rewriting them to say "Gleanvolt" would make them
+describe a repository that never existed. The old repository URLs in them still resolve through
+GitHub's redirect.
+
 ## 2026-08-16 — Noncommercial from here on, and the terms ship inside the artifact
 
 **Context.** The intent is that the controller stays free for the people it was written for — someone
@@ -54,6 +94,7 @@ with nothing behind it.
 **What it does not buy.** Nothing here detects anything. A container on someone's LAN reports home
 never, and there is no key to check. These terms are a basis for invoicing an organisation that cares
 about compliance; they are not a control, and should not be mistaken for one.
+
 ## 2026-08-16 — The composition root is a library; the executable is only a host
 
 **Context.** `Program.cs` had grown to 399 lines, and the only way to run the controller was to run

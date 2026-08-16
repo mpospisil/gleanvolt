@@ -1,13 +1,13 @@
 # escape=`
 #
-# Windows Nano Server image for the SolaX Local Controller worker.
+# Windows Nano Server image for the Gleanvolt worker.
 #
 # Separate from the Linux Dockerfile rather than merged into it: a Dockerfile builds for one OS, and
 # a Windows runtime stage can only be assembled on a Windows daemon. The CI workflow therefore runs
 # this on a windows-2022 runner and folds the result into the same manifest list as the Linux images
 # (see .github/workflows/publish-image.yml).
 #
-#   docker build -f Dockerfile.windows -t solax-controller:nanoserver .
+#   docker build -f Dockerfile.windows -t gleanvolt-controller:nanoserver .
 #
 # ltsc2022 rather than ltsc2025: an ltsc2022 container runs on both Windows Server 2022 and 2025
 # hosts, whereas ltsc2025 requires a 2025 host. See docs/DECISIONS.md.
@@ -21,7 +21,7 @@ ARG WINDOWS_VERSION=ltsc2022
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
 
 # As in the Linux Dockerfile: defaults match Directory.Build.props so a plain build is labelled a
-# local one, and CI passes the release version and commit. See src/Solax.Hosting/BuildInfo.cs.
+# local one, and CI passes the release version and commit. See src/Gleanvolt.Hosting/BuildInfo.cs.
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=
 
@@ -30,16 +30,16 @@ WORKDIR C:\source
 # Same layer split as the Linux build: project files first, so the restore layer survives a source
 # edit. No -a argument here -- Windows containers are amd64 only, so there is nothing to select and
 # nothing to cross-compile.
-COPY SolaxLocalController.slnx ./
-COPY src/Solax.Core/Solax.Core.csproj src/Solax.Core/
-COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
-COPY src/Solax.Web/Solax.Web.csproj src/Solax.Web/
-COPY src/Solax.Hosting/Solax.Hosting.csproj src/Solax.Hosting/
-COPY src/Solax.Worker/Solax.Worker.csproj src/Solax.Worker/
-RUN dotnet restore src\Solax.Worker\Solax.Worker.csproj
+COPY Gleanvolt.slnx ./
+COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj src/Gleanvolt.Core/
+COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
+COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj src/Gleanvolt.Web/
+COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj src/Gleanvolt.Hosting/
+COPY src/Gleanvolt.Worker/Gleanvolt.Worker.csproj src/Gleanvolt.Worker/
+RUN dotnet restore src\Gleanvolt.Worker\Gleanvolt.Worker.csproj
 
 COPY src/ src/
-RUN dotnet publish src\Solax.Worker\Solax.Worker.csproj `
+RUN dotnet publish src\Gleanvolt.Worker\Gleanvolt.Worker.csproj `
         -c Release `
         --no-restore `
         --self-contained false `
@@ -82,4 +82,4 @@ ENV DOTNET_EnableDiagnostics=0
 # Web:Enabled is false. See Dockerfile.
 EXPOSE 8090
 
-ENTRYPOINT ["dotnet", "Solax.Worker.dll"]
+ENTRYPOINT ["dotnet", "Gleanvolt.Worker.dll"]

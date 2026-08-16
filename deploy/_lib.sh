@@ -5,12 +5,12 @@
 # scripts source this file and then call deploy_stack with the profiles they want.
 #
 # Copies the committed stack files to the Pi, then pulls the image from GHCR and restarts. It never
-# copies secrets: /opt/solax/.env is created once, by hand, on the Pi.
+# copies secrets: /opt/gleanvolt/.env is created once, by hand, on the Pi.
 
 set -euo pipefail
 
 PI_HOST="${PI_HOST:-martin@192.168.2.7}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/solax}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/gleanvolt}"
 SSH_OPTS="${SSH_OPTS:-}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -172,7 +172,7 @@ EOF
     say "Status"
     ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' docker compose ps"
 
-    next="    ssh $PI_HOST 'cd $REMOTE_DIR && docker compose logs -f solax-controller'"
+    next="    ssh $PI_HOST 'cd $REMOTE_DIR && docker compose logs -f gleanvolt-controller'"
     case ",$profiles," in
         *,homeassistant,*)
             next="$next

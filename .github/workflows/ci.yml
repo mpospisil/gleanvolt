@@ -20,10 +20,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore SolaxLocalController.slnx
+        run: dotnet restore Gleanvolt.slnx
 
       - name: Build
-        run: dotnet build SolaxLocalController.slnx --no-restore --configuration Release
+        run: dotnet build Gleanvolt.slnx --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test SolaxLocalController.slnx --no-build --configuration Release
+        run: dotnet test Gleanvolt.slnx --no-build --configuration Release

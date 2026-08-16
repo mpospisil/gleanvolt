@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Linux container image for the SolaX Local Controller worker (issues #26, #35). Builds both Linux
+# Linux container image for the Gleanvolt worker (issues #26, #35). Builds both Linux
 # architectures from this one file; Windows Nano Server needs its own, because a Dockerfile targets
 # one OS -- see Dockerfile.windows.
 #
@@ -9,8 +9,8 @@
 # runner produces an arm64 image at native speed. The runtime stage contains no RUN instruction, so
 # no foreign-architecture binary ever executes at build time and QEMU is not needed at all.
 #
-#   docker build --platform linux/arm64 -t solax-controller .   # the Pi
-#   docker build --platform linux/amd64 -t solax-controller .   # an x64 host
+#   docker build --platform linux/arm64 -t gleanvolt-controller .   # the Pi
+#   docker build --platform linux/amd64 -t gleanvolt-controller .   # an x64 host
 #
 # CI publishes both under one name as a multi-platform manifest list, so a deploy names a tag and
 # never an architecture (deploy/README.md). See docs/DECISIONS.md for why this and not an on-device
@@ -23,7 +23,7 @@ ARG TARGETARCH
 
 # What the built worker will report at startup and to Home Assistant. Defaults match
 # Directory.Build.props, so a plain `docker build` is honestly labelled as a local build; CI passes
-# the release version and the commit. See src/Solax.Hosting/BuildInfo.cs.
+# the release version and the commit. See src/Gleanvolt.Hosting/BuildInfo.cs.
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=
 
@@ -31,16 +31,16 @@ WORKDIR /source
 
 # Restore against the project files alone, so the slow restore layer stays cached until a dependency
 # actually changes -- not on every source edit.
-COPY SolaxLocalController.slnx ./
-COPY src/Solax.Core/Solax.Core.csproj                     src/Solax.Core/
-COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
-COPY src/Solax.Web/Solax.Web.csproj                       src/Solax.Web/
-COPY src/Solax.Hosting/Solax.Hosting.csproj               src/Solax.Hosting/
-COPY src/Solax.Worker/Solax.Worker.csproj                 src/Solax.Worker/
-RUN dotnet restore src/Solax.Worker/Solax.Worker.csproj -a "$TARGETARCH"
+COPY Gleanvolt.slnx ./
+COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj                     src/Gleanvolt.Core/
+COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
+COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj                       src/Gleanvolt.Web/
+COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj               src/Gleanvolt.Hosting/
+COPY src/Gleanvolt.Worker/Gleanvolt.Worker.csproj                 src/Gleanvolt.Worker/
+RUN dotnet restore src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -a "$TARGETARCH"
 
 COPY src/ src/
-RUN dotnet publish src/Solax.Worker/Solax.Worker.csproj \
+RUN dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj \
         -a "$TARGETARCH" \
         -c Release \
         --no-restore \
@@ -49,7 +49,7 @@ RUN dotnet publish src/Solax.Worker/Solax.Worker.csproj \
         -p:SourceRevisionId="$SOURCE_REVISION" \
         -o /app \
     # The two directories the app writes to, both relative to WORKDIR: Serilog's file sink
-    # ("logs/solax-.log") and the charging-session SQLite store ("data/sessions.db"). Created now, in
+    # ("logs/gleanvolt-.log") and the charging-session SQLite store ("data/sessions.db"). Created now, in
     # the natively-executing stage, so the runtime stage needs no RUN of its own. The deploy stack
     # bind-mounts host directories over both -- see deploy/docker-compose.yml. Without those mounts
     # the app still starts and writes here, into the container, and loses it all on the next
@@ -98,4 +98,4 @@ ENV DOTNET_EnableDiagnostics=0
 # line (see deploy/docker-compose.yml).
 EXPOSE 8090
 
-ENTRYPOINT ["dotnet", "Solax.Worker.dll"]
+ENTRYPOINT ["dotnet", "Gleanvolt.Worker.dll"]
