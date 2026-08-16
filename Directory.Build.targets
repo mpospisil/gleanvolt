@@ -23,6 +23,8 @@
       repository root travels with it, and so that renaming or adding one needs no edit here.
     -->
     <None Include="$(MSBuildThisFileDirectory)LICENSE*" Pack="true" PackagePath="\" Visible="false" />
+    <!-- Attribution the dependencies' own licences require, carried into the package with them. -->
+    <None Include="$(MSBuildThisFileDirectory)THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>
