@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Gleanvolt.Worker-efc97a0e-92f9-4b99-a0bc-18e89f72a904</UserSecretsId>
+
+    <!-- The executable. The libraries behind it are the packages; this is the thing that runs them. -->
+    <IsPackable>false</IsPackable>
+
+    <!--
+      Ship Blazor's client script (_framework/blazor.web.js). The Web SDK normally infers this from
+      the project containing .razor files, and this one deliberately contains none; every component
+      lives in Gleanvolt.Web. Without it the pages render once and then stay dead: the script 404s, no
+      circuit is ever opened, and nothing says so beyond a failed request in the browser console.
+    -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <!--
+    One reference, deliberately: everything this host needs comes through Gleanvolt.Hosting, including
+    Gleanvolt.Web and its static assets. Referencing Core or Infrastructure directly would let host code
+    reach past the composition root again, which is the thing this project no longer does.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
+  </ItemGroup>
+</Project>

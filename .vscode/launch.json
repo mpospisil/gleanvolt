@@ -2,13 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Solax.Worker",
+            "name": "Gleanvolt.Worker",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Solax.Worker/bin/Debug/net10.0/Solax.Worker.dll",
+            "program": "${workspaceFolder}/src/Gleanvolt.Worker/bin/Debug/net10.0/Gleanvolt.Worker.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/Solax.Worker",
+            "cwd": "${workspaceFolder}/src/Gleanvolt.Worker",
             "console": "internalConsole",
             "stopAtEntry": false,
             "env": {

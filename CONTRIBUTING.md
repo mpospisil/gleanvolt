@@ -21,13 +21,13 @@ keep your copyright either way.
 
 - **Read [`docs/DECISIONS.md`](docs/DECISIONS.md) first** if you are changing anything structural. It
   records why things are the way they are, and several of the answers are non-obvious.
-- **Respect the layering.** `Solax.Worker` → `Solax.Hosting` → `Solax.Infrastructure` → `Solax.Core`,
-  one way only. Decision logic lives in `Solax.Core`, expressed against interfaces, so it stays
+- **Respect the layering.** `Gleanvolt.Worker` → `Gleanvolt.Hosting` → `Gleanvolt.Infrastructure` → `Gleanvolt.Core`,
+  one way only. Decision logic lives in `Gleanvolt.Core`, expressed against interfaces, so it stays
   testable with no hardware. The rules are listed in the README.
 - **Comments explain *why*, not *what*.** The existing ones are dense on purpose: most of them record
   a fact about the hardware, a failure that was actually observed, or an alternative that was tried
   and rejected. Match that, and prefer adding the reason to restating the code.
-- **Tests come with the change.** `dotnet test SolaxLocalController.slnx` must pass. Control logic is
+- **Tests come with the change.** `dotnet test Gleanvolt.slnx` must pass. Control logic is
   tested against mocked `IModbusClient`, never a live device.
 
 ## Anything that writes to hardware

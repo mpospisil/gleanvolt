@@ -1,7 +1,7 @@
 # Local Home Assistant + MQTT dev stack
 
 A self-contained environment for developing and testing the Home Assistant integration
-([issue #17](https://github.com/mpospisil/solax-controller/issues/17)) — an MQTT broker
+([issue #17](https://github.com/mpospisil/gleanvolt/issues/17)) — an MQTT broker
 (Mosquitto) and a real Home Assistant instance in Docker. The controller runs on the host and
 talks to the broker; HA auto-discovers its entities.
 

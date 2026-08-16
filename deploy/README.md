@@ -1,6 +1,6 @@
 # Deploying to a Raspberry Pi
 
-The production stack for [issue #26](https://github.com/mpospisil/solax-controller/issues/26): the
+The production stack for [issue #26](https://github.com/mpospisil/gleanvolt/issues/26): the
 controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
 containers on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
 
@@ -14,7 +14,7 @@ steps further down apply to you.
     ┌────────────────────────────────────────────────────────────────────┐
     │ compose project "solax"        (all state on bind mounts)          │
     │                                                                    │
-    │ solax-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
+    │ gleanvolt-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
     │      │             (opt-in profile,     opt-in profile,            │
     │      │              no host port)          LAN :8123)              │
     │      └── LAN :8090, the web UI -- on by default                    │
@@ -71,7 +71,7 @@ for the controller.
 For a Pi with **2 GB of RAM or more**. Choose this if you already run Home Assistant, or want the
 inverter and charger to sit alongside the rest of your home automation.
 
-Required in `/opt/solax/.env`:
+Required in `/opt/gleanvolt/.env`:
 
 ```bash
 TZ=Europe/Prague               # your timezone
@@ -96,7 +96,7 @@ controller's own [web UI](../README.md#self-hosted-web-ui-the-web-section) shows
 drives every control Home Assistant would, and browses charging-session history and the forecast
 plan — so this is a smaller deployment, not a lesser one.
 
-Required in `/opt/solax/.env` — this is the whole list:
+Required in `/opt/gleanvolt/.env` — this is the whole list:
 
 ```bash
 TZ=Europe/Prague               # your timezone
@@ -176,7 +176,7 @@ no listening socket; it prints the hash and exits — then put the **hash**, nev
 `.env`:
 
 ```bash
-docker run --rm ghcr.io/mpospisil/solax-controller:latest hash-password '<your password>'
+docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password>'
 ```
 
 ```
@@ -192,6 +192,35 @@ the inference in either direction and is rarely worth setting; the root README's
 [Authentication](../README.md#authentication) section has the full table, including the one
 combination that refuses to start (`WEB_REQUIRE_AUTHENTICATION=true` with no hash — nobody could sign
 in).
+
+### Upgrading a Pi deployed before the rename to Gleanvolt
+
+The project was called "SolaX Local Controller" and deployed to `/opt/solax`. Three things move with
+the name, and the deploy script cannot do the first one for you because it is the directory the
+script itself deploys into:
+
+```bash
+# On the Pi, once. Stop first so nothing is writing while the directory moves.
+cd /opt/solax && docker compose down
+sudo mv /opt/solax /opt/gleanvolt
+```
+
+Then deploy normally. What changed:
+
+- **`/opt/solax` → `/opt/gleanvolt`.** The move above carries `.env`, the session database, the logs
+  and Home Assistant's configuration with it, so nothing is lost. If you would rather not move it,
+  set `REMOTE_DIR=/opt/solax` when running the deploy script instead.
+- **Container names** are now `gleanvolt-controller`, `gleanvolt-mosquitto`, `gleanvolt-homeassistant`.
+  Compose removes the old containers and creates new ones; all state lives in bind mounts, so this
+  costs nothing but the restart.
+- **The image is now `ghcr.io/mpospisil/gleanvolt`.** The old `solax-controller` package still exists
+  and still runs, but receives no further updates.
+
+**Home Assistant is deliberately unaffected.** The MQTT device id (`solax_controller`) and base topic
+(`solax`) are unchanged, so every entity id, all recorded history, your dashboards and your
+automations keep working. Only the device's display name changes, to "Gleanvolt". Renaming the
+topics would rename every entity, and that is not worth doing outside a major version with a
+migration path.
 
 ### Upgrading a Pi deployed before the UI was on by default
 
@@ -378,10 +407,10 @@ needed by every deployment; `mosquitto/` and `homeassistant/` only if you're dep
 neither script requires them to pre-exist:
 
 ```bash
-sudo mkdir -p /opt/solax/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
-sudo chown -R "$USER" /opt/solax
-sudo chown -R 1883:1883 /opt/solax/mosquitto/data         # the broker writes here
-sudo chown -R 1654:1654 /opt/solax/logs /opt/solax/data   # the controller image's non-root uid
+sudo mkdir -p /opt/gleanvolt/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
+sudo chown -R "$USER" /opt/gleanvolt
+sudo chown -R 1883:1883 /opt/gleanvolt/mosquitto/data         # the broker writes here
+sudo chown -R 1654:1654 /opt/gleanvolt/logs /opt/gleanvolt/data   # the controller image's non-root uid
 ```
 
 **Do not chown `mosquitto/config` to 1883.** Only `mosquitto/data` belongs to the broker. The config
@@ -404,8 +433,8 @@ still worth doing on a fresh Pi, so the whole tree exists before anything runs.
 **6. Secrets.** From your developer machine:
 
 ```bash
-scp deploy/.env.example martin@192.168.2.7:/opt/solax/.env
-ssh martin@192.168.2.7 'chmod 600 /opt/solax/.env && nano /opt/solax/.env'
+scp deploy/.env.example martin@192.168.2.7:/opt/gleanvolt/.env
+ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env && nano /opt/gleanvolt/.env'
 ```
 
 **7. Broker credentials.** *Only if you're deploying with `deploy.sh` (the full stack) — skip this
@@ -421,15 +450,15 @@ and isn't. So create with `-c` the first time and update without it afterwards:
 
 ```bash
 # first time (no passwd file yet)
-docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
+docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
     mosquitto_passwd -c -b /mosquitto/config/passwd solax '<password>'
 
 # changing the password later, or adding another user -- note: no -c
-docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
+docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
     mosquitto_passwd -b /mosquitto/config/passwd solax '<password>'
 
-sudo chown 1883:1883 /opt/solax/mosquitto/config/passwd
-sudo chmod 600 /opt/solax/mosquitto/config/passwd
+sudo chown 1883:1883 /opt/gleanvolt/mosquitto/config/passwd
+sudo chmod 600 /opt/gleanvolt/mosquitto/config/passwd
 ```
 
 `mosquitto_passwd` warns that the file's owner is not root and that "future versions will refuse to
@@ -440,7 +469,7 @@ compose mount is read-only so the image's entrypoint cannot chown it back.
 against the real password file, so it is valid even before `deploy.sh` has copied `mosquitto.conf`:
 
 ```bash
-docker run --rm -v /opt/solax/mosquitto/config:/mosquitto/config:ro eclipse-mosquitto:2 sh -c '
+docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config:ro eclipse-mosquitto:2 sh -c '
   printf "listener 1883\nallow_anonymous false\npassword_file /mosquitto/config/passwd\n" > /tmp/t.conf
   mosquitto -c /tmp/t.conf -d && sleep 2
   mosquitto_pub -h 127.0.0.1 -u solax -P "<password>" -t solax/authtest -m ok && echo ACCEPTED
@@ -462,15 +491,15 @@ nc -vz 192.168.2.10 502 && nc -vz 192.168.2.6 502
 
 ## Deploy
 
-This directory mirrors `/opt/solax` on the Pi, so what you edit here is what lands there:
+This directory mirrors `/opt/gleanvolt` on the Pi, so what you edit here is what lands there:
 
 ```
 deploy/
-├── docker-compose.yml              → /opt/solax/docker-compose.yml
-├── docker-compose.web.yml          → /opt/solax/docker-compose.web.yml (published UI port; opt-in via .env)
-├── mosquitto/config/mosquitto.conf → /opt/solax/mosquitto/config/    (overwritten each deploy)
-├── homeassistant/config/*.yaml     → /opt/solax/homeassistant/config/ (seeded once, never overwritten)
-├── .env.example                    → copied by hand, once, as /opt/solax/.env
+├── docker-compose.yml              → /opt/gleanvolt/docker-compose.yml
+├── docker-compose.web.yml          → /opt/gleanvolt/docker-compose.web.yml (published UI port; opt-in via .env)
+├── mosquitto/config/mosquitto.conf → /opt/gleanvolt/mosquitto/config/    (overwritten each deploy)
+├── homeassistant/config/*.yaml     → /opt/gleanvolt/homeassistant/config/ (seeded once, never overwritten)
+├── .env.example                    → copied by hand, once, as /opt/gleanvolt/.env
 ├── deploy.sh                       # full stack: controller, mosquitto, Home Assistant
 ├── deploy-controller-only.sh       # controller alone, with its web UI on :8090
 └── _lib.sh                         # shared by both scripts above; not run directly
@@ -484,7 +513,7 @@ From a developer machine, with the repo checked out, pick the script for the wor
 ./deploy/deploy-controller-only.sh    # controller only
 ```
 
-Either copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` to `/opt/solax`,
+Either copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` to `/opt/gleanvolt`,
 seeds Home Assistant's config files only if they don't already exist, then pulls and restarts —
 setting `COMPOSE_PROFILES` itself for that restart (`mosquitto,homeassistant` or empty), which is
 what actually decides whether the other two containers run, regardless of what's already in `.env`
@@ -496,7 +525,7 @@ actually take effect.
 | Variable | Default | |
 |---|---|---|
 | `PI_HOST` | `martin@192.168.2.7` | ssh target |
-| `REMOTE_DIR` | `/opt/solax` | stack location on the Pi |
+| `REMOTE_DIR` | `/opt/gleanvolt` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
 All three work identically on either script.
@@ -507,7 +536,7 @@ All three work identically on either script.
 [Putting a password on the web UI](#putting-a-password-on-the-web-ui-optional)). The dashboard, the
 controls, session history and the forecast plan are all there; see the root README's
 [Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
-does. This is true of either deploy script — the UI runs inside `solax-controller` itself, so Home
+does. This is true of either deploy script — the UI runs inside `gleanvolt-controller` itself, so Home
 Assistant's presence or absence changes nothing about it.
 
 **If you deployed with `deploy.sh`** (the full stack, Home Assistant included):
@@ -539,7 +568,7 @@ what you want if you only meant to pick up a new build.
 
 ### What the script does, in order
 
-1. Checks `/opt/solax` exists and `.env` is there — it refuses rather than guessing.
+1. Checks `/opt/gleanvolt` exists and `.env` is there — it refuses rather than guessing.
 2. Copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` from your **local**
    `deploy/` directory, overwriting the Pi's copies.
 3. Seeds Home Assistant's config files only if they don't already exist.
@@ -549,7 +578,7 @@ what you want if you only meant to pick up a new build.
 
 Step 5 is why an update is usually near-instant and mostly invisible: Compose compares each
 container against the image and configuration it should have, and leaves alone the ones that already
-match. A run that changes nothing prints `Container solax-controller Running` and touches nothing. A
+match. A run that changes nothing prints `Container gleanvolt-controller Running` and touches nothing. A
 run with a new image prints `Recreate` for that one container and leaves the others up.
 
 ### What survives an update
@@ -558,7 +587,7 @@ Everything that is state, because none of it lives inside a container:
 
 | | |
 |---|---|
-| `/opt/solax/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
+| `/opt/gleanvolt/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
 | `data/sessions.db` | charging-session history, with its SQLite WAL |
 | `logs/` | the controller's own log files |
 | `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
@@ -578,7 +607,7 @@ mean "Home Assistant jumped a version" — worth knowing before you go looking f
 To move only the controller, do that one step on the Pi instead:
 
 ```bash
-ssh martin@192.168.2.7 'cd /opt/solax && docker compose pull solax-controller && docker compose up -d solax-controller'
+ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose pull gleanvolt-controller && docker compose up -d gleanvolt-controller'
 ```
 
 That skips copying any updated compose files, so use it for a plain image bump, not after changing
@@ -602,10 +631,10 @@ cleanly, the next startup recovers the session as interrupted instead.
 Before and after, from your machine:
 
 ```bash
-ssh martin@192.168.2.7 'cd /opt/solax && docker compose logs solax-controller | grep "starting\."'
+ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose logs gleanvolt-controller | grep "starting\."'
 ```
 
-The worker logs its version and the commit it was built from — `SolaX Local Controller 1.0.0
+The worker logs its version and the commit it was built from — `Gleanvolt 1.0.0
 (31bf347) starting.` — so you can confirm the new build is live rather than trusting that the pull
 did something. Home Assistant shows the same string as the device's software version. `0.0.0-dev`
 with no commit means somebody deployed a local build.
@@ -621,11 +650,11 @@ IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # one specific build, immutable
 ```
 
 A rollback is just an update pointed at an older tag; `sha-` tags are immutable, which makes them the
-reliable thing to roll back *to*. Setting `IMAGE_TAG` in `/opt/solax/.env` pins it for every future
+reliable thing to roll back *to*. Setting `IMAGE_TAG` in `/opt/gleanvolt/.env` pins it for every future
 deploy that doesn't override it on the command line.
 
 **The image tag has no `v`, though the git tag does.** Releases are cut as git tag `v1.0.0`, and the
-publish workflow strips the prefix, so the image is `…/solax-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
+publish workflow strips the prefix, so the image is `…/gleanvolt-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
 does not exist and the pull fails with `manifest unknown`.
 
 **Deploy from a checked-out tag, not your working branch.** Either script copies the *local*
@@ -644,8 +673,8 @@ Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, 
 `.env` is never copied by the deploy scripts, so a settings change is a two-step job:
 
 ```bash
-ssh martin@192.168.2.7 'nano /opt/solax/.env'
-ssh martin@192.168.2.7 'cd /opt/solax && docker compose up -d'
+ssh martin@192.168.2.7 'nano /opt/gleanvolt/.env'
+ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose up -d'
 ```
 
 `docker compose up -d` recreates only the containers whose environment actually changed. Re-running
@@ -670,7 +699,7 @@ Ask the service to stop; don't kill it. There are three ways, and they do the sa
 |---|---|
 | The web UI | **Health** page → **Stop service**, then confirm |
 | Home Assistant | the device's **Stop service** button (in the device's *Configuration* section) |
-| A shell on the Pi | `docker compose stop solax-controller` |
+| A shell on the Pi | `docker compose stop gleanvolt-controller` |
 
 All three run the host's graceful shutdown: the charger's setpoint is returned to the pause current,
 the open charging session is closed and written as `ServiceStopped` rather than left to be recovered
@@ -689,11 +718,11 @@ back on its own — that is the point of it — so starting it again means a she
 
 ```bash
 ssh martin@192.168.2.7
-cd /opt/solax
+cd /opt/gleanvolt
 
-docker compose start solax-controller      # start the container that is already there
+docker compose start gleanvolt-controller      # start the container that is already there
 docker compose ps                          # confirm: State should be "running"
-docker compose logs -f solax-controller    # watch it come up
+docker compose logs -f gleanvolt-controller    # watch it come up
 ```
 
 `docker compose up -d` works too, and is what a deploy runs anyway — so a deploy also starts a
@@ -731,20 +760,20 @@ Two things keep that from turning into a killed process:
 Every run that ends properly says so on its last line, whichever way it ended:
 
 ```
-SolaX Local Controller stopped cleanly at the request of Web UI. Exiting with code 0: it will
+Gleanvolt stopped cleanly at the request of Web UI. Exiting with code 0: it will
 NOT be restarted, and stays down until it is started again.
 
-SolaX Local Controller stopped cleanly after a termination signal. Exiting with code 143:
+Gleanvolt stopped cleanly after a termination signal. Exiting with code 143:
 where a restart policy is watching, it will be started again.
 ```
 
 **A log that ends without one of those lines is a run that died** — killed, OOM-ed, or the power went.
 That is worth knowing on this Pi in particular: the journal is RAM-only, so after a reboot the
-controller's own log file in `/opt/solax/logs` is the only surviving account of what happened.
+controller's own log file in `/opt/gleanvolt/logs` is the only surviving account of what happened.
 
 ```bash
 # how the last few runs ended
-grep -h -E "starting\.|stopped cleanly" /opt/solax/logs/solax-*.log | tail
+grep -h -E "starting\.|stopped cleanly" /opt/gleanvolt/logs/solax-*.log | tail
 ```
 
 ### Why it stays stopped, and why a reboot doesn't
@@ -768,21 +797,21 @@ that the Stop button then means "restart in about a second".
 
 ```bash
 ssh martin@192.168.2.7
-cd /opt/solax
+cd /opt/gleanvolt
 
 docker compose ps                          # what's running
-docker compose logs -f solax-controller    # follow the poll loop
-docker compose restart solax-controller    # comes back by itself; see "Stopping and starting"
-docker compose stop solax-controller       # stays down until you start it
-docker compose start solax-controller
+docker compose logs -f gleanvolt-controller    # follow the poll loop
+docker compose restart gleanvolt-controller    # comes back by itself; see "Stopping and starting"
+docker compose stop gleanvolt-controller       # stays down until you start it
+docker compose start gleanvolt-controller
 docker stats --no-stream                   # memory headroom -- the number that matters here
 
 # which build is actually running -- version and the commit it came from
-docker compose logs solax-controller | grep "starting\."
+docker compose logs gleanvolt-controller | grep "starting\."
 ```
 
 That last line is worth knowing before debugging anything. The worker logs its own version and
-commit at startup (`SolaX Local Controller 1.0.0 (31bf347) starting.`), so a log file is traceable to
+commit at startup (`Gleanvolt 1.0.0 (31bf347) starting.`), so a log file is traceable to
 a build without matching it against image digests. Home Assistant shows the same string as the
 device's software version. `0.0.0-dev` with no commit means somebody deployed a local build.
 
@@ -791,7 +820,7 @@ pinning.
 
 ## Which image you get
 
-Everything publishes to one package, `ghcr.io/mpospisil/solax-controller`, as a multi-platform
+Everything publishes to one package, `ghcr.io/mpospisil/gleanvolt`, as a multi-platform
 manifest list. The Pi pulls arm64 and an x64 host pulls amd64 from the *same* tag — there is nothing
 platform-specific to configure, and `IMAGE_TAG` never needs a suffix.
 
@@ -805,7 +834,7 @@ platform-specific to configure, and `IMAGE_TAG` never needs a suffix.
 | `1.0.0-nanoserver-ltsc2022` | that release, Windows Nano Server only |
 
 The suffixed tags exist for pinning and for answering "which one did it actually pull"; day to day
-you want the bare name. `docker buildx imagetools inspect ghcr.io/mpospisil/solax-controller:latest`
+you want the bare name. `docker buildx imagetools inspect ghcr.io/mpospisil/gleanvolt:latest`
 lists every platform behind a tag.
 
 **If `latest` looks stale, check the publish workflow.** The bare tags are only created once *all*
@@ -829,7 +858,7 @@ Nano Server ships no ICU, so IANA ids like `Europe/Prague` cannot be resolved on
 
 ```powershell
 docker run -e Controller__TimeZone="Central Europe Standard Time" `
-  ghcr.io/mpospisil/solax-controller:latest
+  ghcr.io/mpospisil/gleanvolt:latest
 ```
 
 The worker logs a warning at startup if it finds itself on Windows with the zone unset. On Linux the
@@ -842,18 +871,18 @@ setting stays empty and `TZ` keeps working exactly as before.
 
 | Who | Written to | Retention |
 |---|---|---|
-| Controller (Serilog file sink) | `/opt/solax/logs/solax-<date>.log` — bind mount over `/app/logs` | 14 daily files (`retainedFileCountLimit`) |
+| Controller (Serilog file sink) | `/opt/gleanvolt/logs/solax-<date>.log` — bind mount over `/app/logs` | 14 daily files (`retainedFileCountLimit`) |
 | Controller / broker / HA (stdout) | Docker's `json-file` logs, `/var/lib/docker/containers/...` on the Pi | capped at 3 × 10 MB per service (5 MB for the broker) |
-| Home Assistant | `/opt/solax/homeassistant/config/home-assistant.log` — bind mount over `/config` | HA rotates it itself |
+| Home Assistant | `/opt/gleanvolt/homeassistant/config/home-assistant.log` — bind mount over `/config` | HA rotates it itself |
 | Mosquitto | stdout only (`log_dest stdout`) — no second file on the card | as above |
 
 Check it after a deploy — a file should appear within one poll cycle:
 
 ```bash
-ls -l /opt/solax/logs/
+ls -l /opt/gleanvolt/logs/
 ```
 
-> **The one way this breaks is silent.** If `/opt/solax/logs` isn't writable by uid 1654 (the
+> **The one way this breaks is silent.** If `/opt/gleanvolt/logs` isn't writable by uid 1654 (the
 > image's non-root user — most easily caused by letting Docker auto-create the directory as root),
 > Serilog's file sink fails and *keeps running*: the container is healthy, `docker logs` looks
 > normal, and the log files simply never appear. Two things guard against it: both deploy scripts
@@ -862,26 +891,26 @@ ls -l /opt/solax/logs/
 > created`. If you see that line, fix the ownership:
 >
 > ```bash
-> sudo chown -R 1654:1654 /opt/solax/logs
+> sudo chown -R 1654:1654 /opt/gleanvolt/logs
 > ```
 >
-> `/opt/solax/data` has the same requirement and the same guard from either script. It fails less quietly —
+> `/opt/gleanvolt/data` has the same requirement and the same guard from either script. It fails less quietly —
 > the session worker logs an error and then records nothing for the rest of the run — but the result
 > is the same: a stack that looks healthy while quietly keeping no history.
 
 ## Where the data lives
 
-Nothing that matters is inside a container. Every path is a bind mount under `/opt/solax`:
+Nothing that matters is inside a container. Every path is a bind mount under `/opt/gleanvolt`:
 
 | Host path | In the container | What it is | Back up? |
 |---|---|---|---|
-| `/opt/solax/.env` | (environment) | secrets, `chmod 600` | yes |
-| `/opt/solax/data` | `/app/data` | `sessions.db` — the charging-session history | **critical** |
-| `/opt/solax/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
-| `/opt/solax/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
-| `/opt/solax/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |
-| `/opt/solax/logs` | `/app/logs` | controller log files | no |
-| `/opt/solax/docker-compose.yml` | — | redeployed from git | no |
+| `/opt/gleanvolt/.env` | (environment) | secrets, `chmod 600` | yes |
+| `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — the charging-session history | **critical** |
+| `/opt/gleanvolt/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
+| `/opt/gleanvolt/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
+| `/opt/gleanvolt/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |
+| `/opt/gleanvolt/logs` | `/app/logs` | controller log files | no |
+| `/opt/gleanvolt/docker-compose.yml` | — | redeployed from git | no |
 
 **Back up** — two directories are irreplaceable, for different reasons. `homeassistant/config/.storage`
 costs you onboarding, the account and the MQTT integration; `data/sessions.db` is charging history
@@ -889,9 +918,9 @@ that **cannot be regenerated** — telemetry can be re-polled, a session that al
 re-lived. Stop the stack first so SQLite isn't mid-write:
 
 ```bash
-cd /opt/solax && docker compose stop solax-controller
-sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/solax .env data homeassistant/config mosquitto/config
-docker compose start solax-controller
+cd /opt/gleanvolt && docker compose stop gleanvolt-controller
+sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/gleanvolt .env data homeassistant/config mosquitto/config
+docker compose start gleanvolt-controller
 ```
 
 Backing it up hot mostly works — WAL journalling makes a torn copy unlikely rather than impossible —
@@ -900,10 +929,10 @@ but a stopped writer makes it certain, and the gap costs one poll cycle.
 **Restore** onto a prepared Pi:
 
 ```bash
-cd /opt/solax && docker compose down
-sudo tar xzf solax-backup-2026-08-09.tar.gz -C /opt/solax
-sudo chown -R 1883:1883 /opt/solax/mosquitto
-sudo chown -R 1654:1654 /opt/solax/data          # tar restores the archive's ownership
+cd /opt/gleanvolt && docker compose down
+sudo tar xzf solax-backup-2026-08-09.tar.gz -C /opt/gleanvolt
+sudo chown -R 1883:1883 /opt/gleanvolt/mosquitto
+sudo chown -R 1654:1654 /opt/gleanvolt/data          # tar restores the archive's ownership
 docker compose up -d
 ```
 
@@ -919,7 +948,7 @@ an abrupt stop, suspect memory: `dmesg -T | grep -i oom`.
 
 **Home Assistant is killed during startup.** It's the hungriest of the three. Raise `HA_MEM_LIMIT`
 in `.env`, confirm swap is on, and trim the recorder further in
-`/opt/solax/homeassistant/config/configuration.yaml`. If it can't be made to fit alongside the other
+`/opt/gleanvolt/homeassistant/config/configuration.yaml`. If it can't be made to fit alongside the other
 two, the intended fallback is to move Home Assistant to another host — the three services are
 independent, so that's a compose edit, not a redesign.
 
@@ -931,7 +960,7 @@ being readable by uid 1883.
 fault rather than a missing setting. Start with what the container says about itself:
 
 ```bash
-docker compose logs solax-controller | grep -i "web ui"
+docker compose logs gleanvolt-controller | grep -i "web ui"
 ```
 
 `Web UI enabled; listening on port 8090, login not required` means the *process* is listening. If the
@@ -953,7 +982,7 @@ explicitly, and the fix is to set a hash or drop the line (see
       SQLite Error 14: 'unable to open database file'
 ```
 
-That is `/opt/solax/data` not being writable by uid 1654. Everything else keeps running, which is why
+That is `/opt/gleanvolt/data` not being writable by uid 1654. Everything else keeps running, which is why
 it is easy to miss. Re-running whichever deploy script you used repairs the ownership on its own:
 
 ```bash
@@ -963,7 +992,7 @@ it is easy to miss. Re-running whichever deploy script you used repairs the owne
 Or, on the Pi directly:
 
 ```bash
-sudo chown -R 1654:1654 /opt/solax/data && docker compose restart solax-controller
+sudo chown -R 1654:1654 /opt/gleanvolt/data && docker compose restart gleanvolt-controller
 ```
 
 **The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 8).

@@ -1,17 +1,17 @@
 name: Publish packages
 
 # Publishes the four libraries to nuget.org from a v* tag, so a consumer can build on the controller
-# without vendoring it. The executable is not among them -- Solax.Worker is the thing that runs the
+# without vendoring it. The executable is not among them -- Gleanvolt.Worker is the thing that runs the
 # packages, not one of them.
 #
 # The same tag drives this, the image tags and the compiled assembly version (see publish-image.yml
 # and Directory.Build.props), so a package, an image and a commit are the same release by
 # construction rather than by convention.
 #
-#   Solax.Core            domain models, strategies, interfaces
-#   Solax.Infrastructure  Modbus, register maps, SQLite sessions, Solcast
-#   Solax.Web             the Blazor dashboard, as a Razor class library
-#   Solax.Hosting         AddSolaxController() -- the composition root
+#   Gleanvolt.Core            domain models, strategies, interfaces
+#   Gleanvolt.Infrastructure  Modbus, register maps, SQLite sessions, Solcast
+#   Gleanvolt.Web             the Blazor dashboard, as a Razor class library
+#   Gleanvolt.Hosting         AddGleanvolt() -- the composition root
 
 on:
   push:
@@ -51,7 +51,7 @@ jobs:
 
       - name: Build
         run: |
-          dotnet build SolaxLocalController.slnx --configuration Release \
+          dotnet build Gleanvolt.slnx --configuration Release \
             -p:Version=${{ steps.version.outputs.version }} \
             -p:SourceRevisionId=${{ github.sha }}
 
@@ -59,7 +59,7 @@ jobs:
       # on nuget.org can be unlisted and never replaced. One more test run before something
       # permanent is cheap.
       - name: Test
-        run: dotnet test SolaxLocalController.slnx --no-build --configuration Release
+        run: dotnet test Gleanvolt.slnx --no-build --configuration Release
 
       # Each project by name rather than the solution: packing the solution warns about the one
       # project that is deliberately not packable, and an explicit list is the clearer statement of
@@ -67,7 +67,7 @@ jobs:
       - name: Pack
         run: |
           set -euo pipefail
-          for project in Solax.Core Solax.Infrastructure Solax.Web Solax.Hosting; do
+          for project in Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Web Gleanvolt.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:Version=${{ steps.version.outputs.version }} \
               -p:SourceRevisionId=${{ github.sha }} \

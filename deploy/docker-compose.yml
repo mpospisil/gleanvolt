@@ -1,13 +1,13 @@
 # Production stack for the Raspberry Pi 3 B (issue #26). Home Assistant and MQTT are opt-in
 # (issue #51) -- the controller and its self-hosted UI run on their own.
 #
-# Deployed to /opt/solax on the Pi by deploy/deploy.sh or deploy/deploy-controller-only.sh; every
-# relative path below therefore resolves under /opt/solax. Values come from /opt/solax/.env (see
+# Deployed to /opt/gleanvolt on the Pi by deploy/deploy.sh or deploy/deploy-controller-only.sh; every
+# relative path below therefore resolves under /opt/gleanvolt. Values come from /opt/gleanvolt/.env (see
 # .env.example) -- that file stays on the Pi and is never committed.
 #
 #   ./deploy/deploy.sh                        # full stack, from a developer machine
 #   ./deploy/deploy-controller-only.sh        # controller only, from a developer machine
-#   docker compose ps                         # on the Pi, in /opt/solax
+#   docker compose ps                         # on the Pi, in /opt/gleanvolt
 #
 # Every byte of state lives on a bind mount below. The containers themselves are disposable:
 # `docker compose down` and `docker rm -f` are safe, and an image upgrade or rollback loses nothing.
@@ -15,7 +15,7 @@
 # Home Assistant and mosquitto carry `profiles:` and start only when requested -- both deploy scripts
 # set COMPOSE_PROFILES explicitly for their own invocations (see deploy/_lib.sh), overriding whatever
 # is in .env; running `docker compose` directly on the Pi instead falls back to .env's own
-# COMPOSE_PROFILES, or `docker compose --profile ... up -d`. solax-controller never depends on either
+# COMPOSE_PROFILES, or `docker compose --profile ... up -d`. gleanvolt-controller never depends on either
 # being present: HomeAssistant:Enabled is its own switch (HOMEASSISTANT_ENABLED below), off by
 # default, so a controller-only run neither starts nor waits on a broker that was never asked for. See
 # deploy/README.md's "Running without Home Assistant".
@@ -28,7 +28,7 @@ services:
   # so a future decision to expose it doesn't silently open the control topics.
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: solax-mosquitto
+    container_name: gleanvolt-mosquitto
     restart: unless-stopped
     profiles: ["mosquitto"]
     volumes:
@@ -42,16 +42,16 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  solax-controller:
-    image: ghcr.io/mpospisil/solax-controller:${IMAGE_TAG:-latest}
-    container_name: solax-controller
+  gleanvolt-controller:
+    image: ghcr.io/mpospisil/gleanvolt:${IMAGE_TAG:-latest}
+    container_name: gleanvolt-controller
     # `on-failure`, not `unless-stopped`, so that "Stop service" in the web UI (or the Home Assistant
     # button) actually stops it: the container must stay down until somebody starts it again, and a
     # policy that restarts on any exit would bring it straight back a second later.
     #
     # The exit code carries the difference, which is why the app sets one deliberately (HostShutdown):
     #
-    #   0    an operator asked for the stop -> stays down until `docker compose start solax-controller`
+    #   0    an operator asked for the stop -> stays down until `docker compose start gleanvolt-controller`
     #   143  SIGTERM: a Pi reboot, a Docker daemon restart, `docker compose restart` -> comes back
     #   any other non-zero / killed  a crash or a power cut -> comes back
     #
@@ -140,7 +140,7 @@ services:
 
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
-    container_name: solax-homeassistant
+    container_name: gleanvolt-homeassistant
     restart: unless-stopped
     profiles: ["homeassistant"]
     depends_on:

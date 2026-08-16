@@ -4,6 +4,44 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-16 — Renamed to Gleanvolt
+
+A rename, not a refactor: no behaviour, configuration or feature change. See DECISIONS.md for why the
+vendor name stays where it does.
+
+### What moved
+
+Five projects and four test projects, `Solax.*` → `Gleanvolt.*`, with namespaces to match.
+`SolaxLocalController.slnx` → `Gleanvolt.slnx`. `SolaxControllerHostingExtensions` →
+`GleanvoltHostingExtensions`, and its two public entry points to `AddGleanvolt()` / `UseGleanvolt()`.
+`SolaxPollingService` → `PollingService`, since it is the application's main loop rather than a vendor
+adapter. The Razor class library's static assets move with the assembly, so the UI now serves
+`_content/Gleanvolt.Web/...`.
+
+Infrastructure: image `ghcr.io/mpospisil/gleanvolt`, containers `gleanvolt-*`, deploy directory
+`/opt/gleanvolt`, log files `gleanvolt-.log`. The repository was renamed in place; the image name
+follows it automatically because the workflow reads `${{ github.repository }}`.
+
+### What deliberately did not move
+
+`SolaxOptions`, the `Solax:` configuration section, the `SOLAX_*` environment variables, the register
+maps and the vendor register enums. Those describe SolaX hardware, not this product, and a second
+vendor will sit beside them rather than replace them.
+
+Home Assistant's `DeviceId` and `BaseTopic` are unchanged, so no entity is renamed and no history is
+orphaned; only the display name becomes "Gleanvolt". `HaDiscoveryTests` needed no edit at all, which
+is the clearest confirmation the seam held.
+
+### Verification
+
+434 tests pass. `dotnet pack` produces `Gleanvolt.*` packages carrying the licence files. The Linux
+image builds, starts, logs `Gleanvolt 0.0.0-dev starting.`, and serves `blazor.web.js` plus every
+`_content/Gleanvolt.Web/` asset at full size — the RCL asset path was the most likely thing to break
+silently, because a wrong path there returns an empty 200 rather than a 404.
+
+Files: everything except `docs/DECISIONS.md` and `docs/IMPLEMENTATION_LOG.md`, which are append-only
+records of how the tree was at the time.
+
 ## 2026-08-16 — Solax.Hosting: the composition root leaves the executable (#66)
 
 A pure refactor — no behaviour, configuration or feature change. `Program.cs` was 399 lines of DI and

@@ -1,0 +1,179 @@
+@page "/sessions/{Id:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IChargingSessionStore Store
+@inject TimeProvider Time
+@inject IJSRuntime JS
+
+@*
+    Phase 4 (#49). The per-source split and the SOC-over-time chart the issue asks for. The chart is
+    the vendored uPlot (issue #44's decision) via JS interop -- see wwwroot/js/charts.js -- so it
+    keeps rendering with no internet connection, which is exactly when a locally controlled system is
+    most worth looking at.
+*@
+
+<PageTitle>Session — Gleanvolt</PageTitle>
+
+<p><a href="/sessions">← All sessions</a></p>
+
+@if (_error)
+{
+    <p class="muted">Charging session history isn't available right now.</p>
+}
+else if (!_loaded)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_document is null)
+{
+    <p class="muted">No such session.</p>
+}
+else
+{
+    var session = _document.Session;
+
+    <h1>Session</h1>
+
+    <dl class="facts">
+        <dt>Started</dt>
+        <dd>@Local(session.StartedAt)</dd>
+
+        <dt>Ended</dt>
+        <dd>@(session.EndedAt is { } ended ? Local(ended) : "in progress")</dd>
+
+        <dt>Duration</dt>
+        <dd>@SessionFormatting.FormatDuration(session.Duration(Time.GetUtcNow()))</dd>
+
+        <dt>Strategy</dt>
+        <dd>@session.FormatStrategy()</dd>
+
+        @if (session.EndReason is { } reason)
+        {
+            <dt>End reason</dt>
+            <dd>@reason</dd>
+        }
+
+        <dt>Battery SOC</dt>
+        <dd>@(session.StartBatterySocPercent.ToString("F0"))% → @(session.EndBatterySocPercent is { } endSoc ? $"{endSoc:F0}%" : "—")</dd>
+
+        <dt>Peak charging power</dt>
+        <dd>@(session.PeakChargingPowerWatts.ToString("F0")) W</dd>
+    </dl>
+
+    <section class="split">
+        <h2>Energy source split</h2>
+        <p class="muted">
+            @((session.EnergyDeliveredWh / 1000).ToString("F2")) kWh delivered
+            @if (session.LoanedWh > 0)
+            {
+                @: — of which @((session.LoanedWh / 1000).ToString("F2")) kWh was loaned from the battery
+            }
+        </p>
+
+        @if (session.EnergyDeliveredWh > 0)
+        {
+            <div class="split-bar">
+                <span class="solar" style="width:@Share(session.FromSolarWh, session.EnergyDeliveredWh)"></span>
+                <span class="grid" style="width:@Share(session.FromGridWh, session.EnergyDeliveredWh)"></span>
+                <span class="battery" style="width:@Share(session.FromBatteryWh, session.EnergyDeliveredWh)"></span>
+            </div>
+            <ul class="split-legend">
+                <li><span class="swatch solar"></span>Solar: @((session.FromSolarWh / 1000).ToString("F2")) kWh</li>
+                <li><span class="swatch grid"></span>Grid: @((session.FromGridWh / 1000).ToString("F2")) kWh</li>
+                <li><span class="swatch battery"></span>Battery: @((session.FromBatteryWh / 1000).ToString("F2")) kWh</li>
+            </ul>
+        }
+        else
+        {
+            <p class="muted">No energy was delivered.</p>
+        }
+    </section>
+
+    <section class="chart-section">
+        <h2>Battery SOC over time</h2>
+        @if (_document.Samples.Count == 0)
+        {
+            <p class="muted">No samples were recorded for this session.</p>
+        }
+        else
+        {
+            <div id="soc-chart" class="chart"></div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private ChargingSessionDocument? _document;
+    private bool _loaded;
+    private bool _error;
+    private bool _chartRendered;
+
+    // See Forecast.razor for the reasoning: _chartRendered is reset per navigation to force a
+    // redraw, so DisposeAsync needs its own "has JS ever been given a chart here" flag. Without it,
+    // disposal during the static prerender pass issues interop that is not allowed yet and throws.
+    private bool _chartCreated;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _chartRendered = false;
+        _loaded = false;
+        _error = false;
+        try
+        {
+            _document = await Store.ExportAsync(Id, CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            _document = null;
+            _error = true;
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartRendered || _document is not { Samples.Count: > 0 })
+        {
+            return;
+        }
+
+        _chartRendered = true;
+
+        var timestamps = _document.Samples.Select(s => s.Timestamp.ToUnixTimeSeconds()).ToArray();
+        var soc = _document.Samples.Select(s => s.BatterySocPercent).ToArray();
+
+        _chartCreated = true;
+
+        await JS.InvokeVoidAsync("solaxCharts.renderSocChart", "soc-chart", timestamps, soc);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_chartCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "soc-chart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is already gone (e.g. the browser tab closed) -- nothing left to clean up.
+        }
+    }
+
+    private string Local(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+
+    private static string Share(double value, double total) =>
+        $"{(total > 0 ? value / total * 100 : 0):F1}%";
+}

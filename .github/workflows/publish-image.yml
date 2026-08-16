@@ -6,7 +6,7 @@ name: Publish image
 # Three platforms, two operating systems, one package. The Linux images cross-compile on Linux
 # runners; the Windows image can only be assembled on a Windows daemon, so it gets its own job and
 # its own Dockerfile. A final job folds all three into a single multi-platform manifest list, which
-# is what makes `docker pull ghcr.io/mpospisil/solax-controller:1.0.0` resolve to the right image on
+# is what makes `docker pull ghcr.io/mpospisil/gleanvolt:1.0.0` resolve to the right image on
 # a Raspberry Pi, an x64 server and a Windows host alike.
 #
 # Naming (see deploy/README.md):

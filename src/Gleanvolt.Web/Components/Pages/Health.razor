@@ -1,0 +1,146 @@
+@page "/health"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject WebBuildInfo Build
+@inject TimeProvider Time
+@inject IServiceShutdown Shutdown
+
+@*
+    The whole of phase 0's user interface. It exists to prove the two things no unit test can: that a
+    component in this assembly is reached by the host's dependency injection, and that it sees the
+    same live objects the polling loop and the MQTT worker do.
+
+    Everything on the page comes out of that container -- the build version, the app's configured
+    time zone, and the status holder the poll loop writes to. Because the page subscribes to the
+    holder's Updated event rather than reading it once, each completed poll pushes a new value down
+    the circuit: the timestamp below advances on its own, and a page that sits still is telling you
+    the poll loop has stopped while the web host is fine.
+*@
+
+<PageTitle>Health — Gleanvolt</PageTitle>
+
+<h1>Health</h1>
+
+<dl class="facts">
+    <dt>Build</dt>
+    <dd>@Build.Version</dd>
+
+    <dt>Time zone</dt>
+    <dd>@Time.LocalTimeZone.Id</dd>
+
+    <dt>Last poll</dt>
+    @if (_status is null)
+    {
+        <dd class="muted">no poll has completed yet</dd>
+    }
+    else
+    {
+        <dd>
+            @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm:ss")
+            <span class="muted">(@Age(_status.Timestamp) ago)</span>
+        </dd>
+    }
+
+    <dt>Charge mode</dt>
+    <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+</dl>
+
+@*
+    Stopping the service belongs on this page rather than the dashboard: it is not a charging
+    decision, it is the process itself, alongside the build and the poll it reports on.
+
+    Two clicks, not one. The stop is graceful and loses nothing -- that is the whole reason it exists
+    -- but it is one-way from here: the page it is on goes down with the service, so starting it
+    again means an ssh session on the Pi. A confirmation is the cheapest way to make sure the click
+    was meant, and the text spells out what "stopped" costs.
+*@
+<section class="controls">
+    <h2>Service</h2>
+
+    <div class="control">
+        @if (_stopping)
+        {
+            <p class="stopping">
+                Stopping. The charger is being paused and the open session closed; this page will stop
+                responding in a few seconds.
+            </p>
+            <span class="hint">
+                Start it again on the Pi with <code>docker compose start gleanvolt-controller</code> in
+                <code>/opt/gleanvolt</code>. Nothing restarts it by itself — that is what makes this a stop
+                rather than a restart.
+            </span>
+        }
+        else if (_confirming)
+        {
+            <label>Stop the service?</label>
+            <button type="button" class="danger" @onclick="ConfirmStop">Yes, stop it</button>
+            <button type="button" class="secondary" @onclick="() => _confirming = false">Cancel</button>
+            <span class="hint">
+                Charging stops, this UI and the Home Assistant integration go offline, and the
+                controller stays down until it is started again from a shell on the Pi.
+            </span>
+        }
+        else
+        {
+            <label>Stop the service</label>
+            <button type="button" class="danger" @onclick="() => _confirming = true">Stop service</button>
+            <span class="hint">
+                The safe way to take the controller down: the charger is returned to its pause current,
+                the open charging session is closed and written, and the session store is flushed —
+                none of which happens if the process is killed instead. It does not come back on its
+                own.
+            </span>
+        }
+    </div>
+</section>
+
+@code {
+    private ChargeControlStatus? _status;
+    private bool _confirming;
+    private bool _stopping;
+
+    // The request returns immediately -- the host stops on its own thread -- so this render, and the
+    // "stopping" message, actually reach the browser before the circuit goes away.
+    private void ConfirmStop()
+    {
+        _confirming = false;
+        _stopping = true;
+        Shutdown.RequestStop("Web UI");
+    }
+
+    protected override void OnInitialized()
+    {
+        // Seeded before subscribing, so a browser that arrives between two polls still sees the last
+        // one rather than an empty page until the next.
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+    }
+
+    // Raised on the polling loop's thread. InvokeAsync hops onto the renderer's synchronisation
+    // context, which is what makes touching component state here safe.
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // The holder is a singleton and outlives every circuit, so an unsubscribed component would be
+    // kept alive by its own event handler for as long as the process runs.
+    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+
+    // Clamped at zero: a clock stepped backwards by NTP must not read as a poll from the future.
+    private string Age(DateTimeOffset timestamp)
+    {
+        var age = Time.GetUtcNow() - timestamp;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        return age.TotalSeconds < 90
+            ? $"{age.TotalSeconds:F0} s"
+            : $"{age.TotalMinutes:F0} min";
+    }
+}

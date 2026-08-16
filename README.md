@@ -1,7 +1,7 @@
-# SolaX Local Controller
+# Gleanvolt
 
-[![CI](https://github.com/mpospisil/solax-controller/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mpospisil/solax-controller/actions/workflows/ci.yml?query=branch%3Amain)
-[![Publish image](https://github.com/mpospisil/solax-controller/actions/workflows/publish-image.yml/badge.svg?branch=main)](https://github.com/mpospisil/solax-controller/actions/workflows/publish-image.yml?query=branch%3Amain)
+[![CI](https://github.com/mpospisil/gleanvolt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mpospisil/gleanvolt/actions/workflows/ci.yml?query=branch%3Amain)
+[![Publish image](https://github.com/mpospisil/gleanvolt/actions/workflows/publish-image.yml/badge.svg?branch=main)](https://github.com/mpospisil/gleanvolt/actions/workflows/publish-image.yml?query=branch%3Amain)
 
 A standalone, locally hosted background service for managing and monitoring a **SolaX X3-HYB-G4 PRO** hybrid inverter and a **SolaX X1/X3-HAC** EV charger.
 
@@ -64,43 +64,43 @@ site-specific number the forecast-driven mode cannot work without — see
 The solution is organized to keep domain/control logic testable and free of hardware and hosting concerns:
 
 ```
-SolaxLocalController.slnx
+Gleanvolt.slnx
 ├── src/
-│   ├── Solax.Core/                 # Domain logic and hardware abstractions
+│   ├── Gleanvolt.Core/                 # Domain logic and hardware abstractions
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
 │   │   ├── Enums/                  # Register addresses, charger modes, inverter control values
 │   │   ├── Strategies/             # Pure decision logic (charging controller, discharge hold, smoothing)
 │   │   └── Interfaces/             # IModbusClient, IChargingController, IBatteryDischargeControl, ...
 │   │
-│   ├── Solax.Infrastructure/       # External communication
+│   ├── Gleanvolt.Infrastructure/       # External communication
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
 │   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   └── Solcast/                # Solar-forecast HTTP client
 │   │
-│   ├── Solax.Web/                  # The optional self-hosted UI (a Blazor component library)
+│   ├── Gleanvolt.Web/                  # The optional self-hosted UI (a Blazor component library)
 │   │   ├── Components/             # Pages, layout and the root document
 │   │   ├── wwwroot/                # Stylesheet and other assets, served from the library
 │   │   └── WebOptions.cs           # The "Web" configuration section
 │   │
-│   ├── Solax.Hosting/              # The composition root — everything the controller is
-│   │   ├── SolaxControllerHostingExtensions.cs  # AddSolaxController() / UseSolaxController()
-│   │   ├── SolaxPollingService.cs  # The main background loop (IHostedService)
+│   ├── Gleanvolt.Hosting/              # The composition root — everything the controller is
+│   │   ├── GleanvoltHostingExtensions.cs  # AddGleanvolt() / UseGleanvolt()
+│   │   ├── PollingService.cs  # The main background loop (IHostedService)
 │   │   ├── NoListenServer.cs       # The "server" used when the UI is switched off
 │   │   ├── Configuration/          # Options classes bound from appsettings.json
 │   │   ├── Forecasting/            # The day plan and its runtime settings
 │   │   ├── HomeAssistant/          # MQTT discovery and the HA worker
 │   │   └── Sessions/               # Charging-session recording worker
 │   │
-│   └── Solax.Worker/               # The executable host, and nothing else
-│       ├── Program.cs              # .env, Serilog, AddSolaxController(), the exit code
+│   └── Gleanvolt.Worker/               # The executable host, and nothing else
+│       ├── Program.cs              # .env, Serilog, AddGleanvolt(), the exit code
 │       ├── DotEnv.cs               # Secrets from an untracked .env, before configuration is built
 │       └── appsettings.json        # The shipped defaults
 ├── tests/
-│   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
-│   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
-│   ├── Solax.Web.Tests/            # Component rendering (bUnit) and options binding
-│   └── Solax.Hosting.Tests/        # Coordinator, selector and HA discovery tests
+│   ├── Gleanvolt.Core.Tests/           # Unit tests for the control logic (mocking hardware)
+│   ├── Gleanvolt.Infrastructure.Tests/ # Register encoding and write-path tests
+│   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
+│   └── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
@@ -109,29 +109,29 @@ SolaxLocalController.slnx
 
 ### Layering rules
 
-- **Dependency direction is one-way:** `Solax.Worker` → `Solax.Hosting` → `Solax.Infrastructure` → `Solax.Core`. `Solax.Core` must never reference anything above it.
-- **`Solax.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingController`, `IBatteryDischargeControl`). This is what keeps control/decision logic unit-testable without real hardware.
-- **All decision-making logic lives in `Solax.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Solax.Infrastructure`, `Solax.Hosting` or `Solax.Worker`.
-- **`Solax.Infrastructure` only implements `Solax.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
-- **`Solax.Hosting` is composition-only.** `AddSolaxController()` wires up DI; `SolaxPollingService` orchestrates the poll/act loop by calling into `Solax.Core` abstractions — it should not contain control logic itself.
-- **`Solax.Worker` is a host and nothing else.** The `.env` load, the logging configuration and the exit code. Anything it grows that a second host would also need belongs in `Solax.Hosting` instead — which is why it references that assembly alone and cannot reach `Solax.Core` directly.
-- **`Solax.Web` references `Solax.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Solax.Hosting` hosts it; the dependency never runs the other way.
-- **`Solax.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
+- **Dependency direction is one-way:** `Gleanvolt.Worker` → `Gleanvolt.Hosting` → `Gleanvolt.Infrastructure` → `Gleanvolt.Core`. `Gleanvolt.Core` must never reference anything above it.
+- **`Gleanvolt.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingController`, `IBatteryDischargeControl`). This is what keeps control/decision logic unit-testable without real hardware.
+- **All decision-making logic lives in `Gleanvolt.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Gleanvolt.Infrastructure`, `Gleanvolt.Hosting` or `Gleanvolt.Worker`.
+- **`Gleanvolt.Infrastructure` only implements `Gleanvolt.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
+- **`Gleanvolt.Hosting` is composition-only.** `AddGleanvolt()` wires up DI; `PollingService` orchestrates the poll/act loop by calling into `Gleanvolt.Core` abstractions — it should not contain control logic itself.
+- **`Gleanvolt.Worker` is a host and nothing else.** The `.env` load, the logging configuration and the exit code. Anything it grows that a second host would also need belongs in `Gleanvolt.Hosting` instead — which is why it references that assembly alone and cannot reach `Gleanvolt.Core` directly.
+- **`Gleanvolt.Web` references `Gleanvolt.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Gleanvolt.Hosting` hosts it; the dependency never runs the other way.
+- **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
 ### The libraries as packages
 
-The four libraries are published to nuget.org from each `v*` tag ([`publish-packages.yml`](.github/workflows/publish-packages.yml)), so a different host can run the controller without vendoring it. `Solax.Worker` is not among them: it is the thing that runs the packages, not one of them.
+The four libraries are published to nuget.org from each `v*` tag ([`publish-packages.yml`](.github/workflows/publish-packages.yml)), so a different host can run the controller without vendoring it. `Gleanvolt.Worker` is not among them: it is the thing that runs the packages, not one of them.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.AddSolaxController();          // polling, control, sessions, Home Assistant, the web UI
+builder.AddGleanvolt();          // polling, control, sessions, Home Assistant, the web UI
 
 var app = builder.Build();
-app.UseSolaxController();              // the UI's endpoints, when it is enabled
+app.UseGleanvolt();              // the UI's endpoints, when it is enabled
 app.Run();
 ```
 
-`AddSolaxController` also has an `IServiceCollection` overload taking an `IConfiguration`, for a host that is not built on `WebApplicationBuilder`.
+`AddGleanvolt` also has an `IServiceCollection` overload taking an `IConfiguration`, for a host that is not built on `WebApplicationBuilder`.
 
 ## Getting started
 
@@ -143,9 +143,9 @@ app.Run();
 ### Build and run
 
 ```bash
-dotnet build SolaxLocalController.slnx
-dotnet test SolaxLocalController.slnx
-dotnet run --project src/Solax.Worker
+dotnet build Gleanvolt.slnx
+dotnet test Gleanvolt.slnx
+dotnet run --project src/Gleanvolt.Worker
 ```
 
 Set your device addresses first (see [Configuration](#configuration)). On a first run nothing is
@@ -179,12 +179,12 @@ shows telemetry, charging-session history and the forecast plan. Switching later
 running the other script.
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
-(`ghcr.io/mpospisil/solax-controller`), and the Pi pulls it. That one name is a multi-platform
+(`ghcr.io/mpospisil/gleanvolt`), and the Pi pulls it. That one name is a multi-platform
 manifest list covering **`linux/arm64`** (the Pi), **`linux/amd64`** (an x64 Linux host) and
 **Windows Nano Server ltsc2022**, so the same tag pulls the right image everywhere; Windows needs
 `Controller:TimeZone` set, for the reason given under [Configuration](#configuration). All state
 lives on bind mounts under
-`/opt/solax` — including the charging-session database (`data/sessions.db`) and the log files — so
+`/opt/gleanvolt` — including the charging-session database (`data/sessions.db`) and the log files — so
 the containers are disposable: upgrades, rollbacks and `docker compose down` lose nothing. The broker
 requires authentication and is not published to the LAN.
 
@@ -204,7 +204,7 @@ IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # one specific build; also how y
 
 It copies the compose files, pulls, and recreates only the containers that actually changed. All
 state survives — `.env` is never even copied, and the session database, logs and Home Assistant's
-configuration live on bind mounts under `/opt/solax` rather than inside any container. Two things
+configuration live on bind mounts under `/opt/gleanvolt` rather than inside any container. Two things
 worth knowing: the pull covers *every* image in the stack, so on workflow A Home Assistant moves
 with it, and the controller restarts into charge mode `Off`, so an active mode has to be selected
 again afterwards. Full detail, including settings-only changes and rollbacks, is under
@@ -229,7 +229,7 @@ All project notes live in the `docs/` directory. You are responsible for keeping
 
 ## Configuration
 
-All settings live in `src/Solax.Worker/appsettings.json`; secrets are supplied out-of-band (see
+All settings live in `src/Gleanvolt.Worker/appsettings.json`; secrets are supplied out-of-band (see
 below). Device addresses and the poll cadence sit in the `Solax` section:
 
 ```jsonc
@@ -286,10 +286,10 @@ The **API key is a secret and must not be committed**. Provide it out-of-band, u
   export Solcast__ApiKey="<your-api-key>"
   ```
 
-- **.NET user-secrets** — the `Solax.Worker` project has a `UserSecretsId`, so this works in Development too:
+- **.NET user-secrets** — the `Gleanvolt.Worker` project has a `UserSecretsId`, so this works in Development too:
 
   ```bash
-  cd src/Solax.Worker
+  cd src/Gleanvolt.Worker
   dotnet user-secrets set "Solcast:ApiKey" "<your-api-key>"
   ```
 
@@ -785,7 +785,7 @@ description or tooltip field. The meanings live here instead.
 | **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. Blank when no hold is armed. |
 | **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
 | **Charging now** | on/off | `ON` while *the controller* is commanding a charging current, as opposed to having paused or never taken control. This is our own decision, not the car's behaviour — a car can be plugged in and idle while this is `ON`. See **EV charging power** for what's actually flowing. |
-| **Stop service** | button | Shuts the controller down gracefully: the charger is returned to its pause current, the open session is closed and written, and the store is flushed — none of which happens if the process is killed. **One-way from here.** The service is what speaks MQTT, so this device goes unavailable and nothing in Home Assistant can start it again; that needs a shell on the Pi (`docker compose start solax-controller`). Lives in the device's *Configuration* section rather than on the dashboard card, and only an exact `PRESS` on its topic triggers it. See [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller). |
+| **Stop service** | button | Shuts the controller down gracefully: the charger is returned to its pause current, the open session is closed and written, and the store is flushed — none of which happens if the process is killed. **One-way from here.** The service is what speaks MQTT, so this device goes unavailable and nothing in Home Assistant can start it again; that needs a shell on the Pi (`docker compose start gleanvolt-controller`). Lives in the device's *Configuration* section rather than on the dashboard card, and only an exact `PRESS` on its topic triggers it. See [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller). |
 
 The rest are populated only while the **Forecasted** mode is driving; in the other modes they report
 nothing rather than stale numbers from a plan nobody is acting on.
@@ -818,7 +818,7 @@ Disabled by default. Non-secret settings live in `appsettings.json`:
   "DiscoveryPrefix": "homeassistant", // HA's discovery prefix
   "BaseTopic": "solax",
   "DeviceId": "solax_controller",
-  "DeviceName": "SolaX Local Controller",
+  "DeviceName": "Gleanvolt",
   "StatusInterval": "00:00:15"
 }
 ```
@@ -845,7 +845,7 @@ looked at without a
 second application is simpler to reason about. The two surfaces are independent adapters over the
 same internal state, so all four combinations run: UI only, MQTT only, both, neither.
 
-**What is built so far.** [Issue #44](https://github.com/mpospisil/solax-controller/issues/44) lands
+**What is built so far.** [Issue #44](https://github.com/mpospisil/gleanvolt/issues/44) lands
 in phases. Phase 0 is the plumbing: `/health` shows the running build, the configured time zone, and
 the time of the last completed poll — a liveness check (the timestamp updates itself as each poll
 lands, so a page that sits still means the poll loop has stopped while the web host is fine).
@@ -875,7 +875,7 @@ state, charge window, EV energy budget, EV energy expected today, projected shor
 floor, forecast remaining today, tomorrow's forecast, forecast accuracy, battery loaned today — each
 with an explanation next to it, plus a timeline chart plotting forecast surplus against the charge
 window, with the required-SOC-floor projection overlaid on a second axis. The chart's data is
-computed once, in `Solax.Core`, by the same `SolarDayPlanner` that builds the plan itself — the floor
+computed once, in `Gleanvolt.Core`, by the same `SolarDayPlanner` that builds the plan itself — the floor
 projection is the identical formula the live figure uses, evaluated at every remaining forecast
 period instead of only the current instant — so the picture can never disagree with the numbers next
 to it. Like the MQTT entities, the whole page shows an explicit empty state while any mode other than
@@ -886,7 +886,7 @@ shuts the whole controller down gracefully — the charger returned to its pause
 charging session closed and written, the session store flushed, Modbus and MQTT closed — rather than
 leaving it to be killed, which revokes nothing and leaves the car drawing at the last current we
 wrote. It takes two clicks, because it is one-way from the browser: the UI goes down with the
-service, and only a shell on the Pi (`docker compose start solax-controller`) brings it back. See
+service, and only a shell on the Pi (`docker compose start gleanvolt-controller`) brings it back. See
 [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller) for the
 exit-code contract that keeps it stopped without also breaking restart-after-reboot. Note that the
 button is as reachable as the rest of the UI: with no password configured, anyone on the LAN can stop
@@ -941,8 +941,8 @@ Generate one with the worker binary itself, or with the image, without configuri
 prints the hash and exits — no listening socket involved):
 
 ```bash
-dotnet Solax.Worker.dll hash-password '<your password>'
-docker run --rm ghcr.io/mpospisil/solax-controller:latest hash-password '<your password>'
+dotnet Gleanvolt.Worker.dll hash-password '<your password>'
+docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password>'
 ```
 
 `Web:RequireAuthentication` overrides that inference in either direction and is rarely worth setting:
@@ -986,7 +986,7 @@ rather than an error page when `SessionStore:Enabled` is off or the file can't b
 actually recorded.
 
 The chart uses [uPlot](https://github.com/leeoniya/uPlot) (MIT licensed), vendored into
-`Solax.Web/wwwroot/lib/` rather than fetched from a CDN — issue #44's decision, so the history stays
+`Gleanvolt.Web/wwwroot/lib/` rather than fetched from a CDN — issue #44's decision, so the history stays
 readable during an internet outage, which is exactly when a locally controlled system is most worth
 looking at.
 
@@ -1099,7 +1099,7 @@ institutions. No registration, no key, no telemetry — clone it, build it, run 
 
 **Commercial use requires a separate licence** from the copyright holder. If you install, operate or
 resell this for clients, bundle it with hardware, or run it as part of a business, please
-[open an issue](https://github.com/mpospisil/solax-controller/issues) or email m.pospisil76@gmail.com
+[open an issue](https://github.com/mpospisil/gleanvolt/issues) or email m.pospisil76@gmail.com
 — it is usually a short conversation.
 
 This applies to the published container images too: they carry the licence at `/app/LICENSE` and the

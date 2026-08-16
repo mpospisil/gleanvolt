@@ -1,6 +1,6 @@
 # Third-party notices
 
-The SolaX Local Controller is distributed with, and builds on, the components listed below. **They
+The Gleanvolt is distributed with, and builds on, the components listed below. **They
 are not covered by this project's licence** — each keeps its own, and nothing in `LICENSE` restricts,
 replaces or reinterprets any of them. This file exists to satisfy the attribution those licences
 require, in the source tree, in the container images and in the NuGet packages alike.
@@ -35,7 +35,7 @@ package.
 | [SQLitePCLRaw.provider.e_sqlite3](https://github.com/ericsink/SQLitePCL.raw) | 2.1.12 | Apache-2.0 | 2014-2024 SourceGear, LLC |
 
 uPlot is vendored rather than restored — the files and their own `LICENSE` live in
-`src/Solax.Web/wwwroot/lib/uplot/`, and `VENDORED.md` there records why and how to upgrade it.
+`src/Gleanvolt.Web/wwwroot/lib/uplot/`, and `VENDORED.md` there records why and how to upgrade it.
 
 ## The .NET platform and the container base images
 

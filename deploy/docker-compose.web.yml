@@ -12,6 +12,6 @@
 # file stops being loaded at all.
 
 services:
-  solax-controller:
+  gleanvolt-controller:
     ports:
       - "${WEB_PORT:-8090}:${WEB_PORT:-8090}"
