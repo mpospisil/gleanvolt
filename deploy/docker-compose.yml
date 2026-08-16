@@ -58,8 +58,8 @@ services:
       # ASP.NET Core's "__" convention maps onto appsettings.json sections, so anything in that file
       # can be overridden here without rebuilding the image.
       TZ: ${TZ:-Europe/Prague}
-      Solax__Inverter__Host: ${INVERTER_HOST:-192.168.2.6}
-      Solax__EvCharger__Host: ${EV_CHARGER_HOST:-192.168.2.10}
+      Solax__Inverter__Host: ${INVERTER_HOST:-192.168.2.10}
+      Solax__EvCharger__Host: ${EV_CHARGER_HOST:-192.168.2.6}
 
       # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them

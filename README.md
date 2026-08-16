@@ -213,8 +213,8 @@ below). Device addresses and the poll cadence sit in the `Solax` section:
 ```jsonc
 "Solax": {
   "PollIntervalSeconds": 5,   // one poll/decide cycle per this many seconds
-  "Inverter":  { "Host": "192.168.2.6",  "Port": 502, "UnitId": 1 },
-  "EvCharger": { "Host": "192.168.2.10", "Port": 502, "UnitId": 1 }
+  "Inverter":  { "Host": "192.168.2.10",  "Port": 502, "UnitId": 1 },
+  "EvCharger": { "Host": "192.168.2.6", "Port": 502, "UnitId": 1 }
 }
 ```
 
