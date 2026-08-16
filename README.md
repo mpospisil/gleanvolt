@@ -120,7 +120,9 @@ Gleanvolt.slnx
 
 ### The libraries as packages
 
-The four libraries are published to nuget.org from each `v*` tag ([`publish-packages.yml`](.github/workflows/publish-packages.yml)), so a different host can run the controller without vendoring it. `Gleanvolt.Worker` is not among them: it is the thing that runs the packages, not one of them.
+Each `v*` tag produces a [GitHub Release](https://github.com/mpospisil/gleanvolt/releases) carrying self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the four libraries as `.nupkg` files ([`release.yml`](.github/workflows/release.yml)). `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
+
+The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);

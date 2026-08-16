@@ -37,6 +37,32 @@ package.
 uPlot is vendored rather than restored — the files and their own `LICENSE` live in
 `src/Gleanvolt.Web/wwwroot/lib/uplot/`, and `VENDORED.md` there records why and how to upgrade it.
 
+## Derived material: the Modbus register maps
+
+Not a dependency — nothing from this project is linked, packaged or shipped — but material was taken
+from it, so it is attributed here on the same terms.
+
+| Source | Licence | Copyright |
+|---|---|---|
+| [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus) | Apache-2.0 | Copyright 2025 William Swann |
+
+Register addresses, the Power Control block's field order and widths, and several enumerated control
+values were read from that integration's plugin maps (`plugin_solax.py`,
+`plugin_solax_ev_charger.py`) rather than from a SolaX document, because no such document is publicly
+available. The affected files say so individually and in more detail:
+
+- `Gleanvolt.Core/Enums/InverterControlRegister.cs`
+- `Gleanvolt.Core/Enums/InverterPowerControlMode.cs`
+- `Gleanvolt.Core/Enums/InverterPowerControlSetType.cs`
+- `Gleanvolt.Core/Enums/EvChargerRegister.cs`, `EvChargerMode.cs`
+- `Gleanvolt.Infrastructure/RegisterMaps/PowerControlPayload.cs`
+
+Individual register addresses are facts about hardware and not themselves copyrightable, and the
+implementation here is independent — different language, different architecture, different control
+logic. The attribution is given regardless: assembling and verifying a map like this against real
+firmware is the substantial work, the upstream project's licence costs nothing to honour, and the EU
+database right protects that kind of investment independently of copyright.
+
 ## The .NET platform and the container base images
 
 The published images are built `FROM mcr.microsoft.com/dotnet/aspnet`. They therefore contain:
@@ -74,8 +100,9 @@ SOFTWARE.
 
 ## Apache License 2.0
 
-Applies to the Apache-2.0-licensed components above. The `NOTICE` requirement of section 4(d) is
-satisfied by the copyright lines in the table.
+Applies to the Apache-2.0-licensed components above and to the derived register-map material. The
+`NOTICE` requirement of section 4(d) is satisfied by the copyright lines in those tables; neither
+this project nor the upstream integration ships a `NOTICE` file.
 
 ```
 

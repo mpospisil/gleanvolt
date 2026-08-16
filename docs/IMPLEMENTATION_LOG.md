@@ -4,6 +4,49 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-16 — Third-party notices gain the register-map source; releases stop assuming a feed
+
+Two follow-ups, neither of which changes any behaviour.
+
+### The register maps are attributed
+
+`THIRD-PARTY-NOTICES.md` covered every NuGet dependency but not the one piece of *derived* material in
+the tree: register addresses, the Power Control block's field layout and several enumerated control
+values were read from [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus)
+(Apache-2.0, Copyright 2025 William Swann), because no SolaX document describing them is public. The
+individual files have always said so; the notices file now does too, under its own heading, since it
+is not a dependency and does not belong in the components table.
+
+Individual addresses are facts about hardware and the implementation here is independent. The
+attribution is given anyway: honouring the upstream licence costs nothing, and the EU database right
+protects the investment in assembling and verifying a map like that independently of copyright.
+
+### Releases produce artifacts, not feed pushes
+
+`publish-packages.yml` became `release.yml`, and the `dotnet nuget push` step is gone along with its
+`NUGET_API_KEY` requirement. A `v*` tag now produces a GitHub Release carrying:
+
+- **Self-contained builds** for `win-x64`, `linux-x64` and `linux-arm64`. Self-contained means the
+  runtime ships inside, so a Windows user who has never heard of .NET can unzip and run it — the gap
+  the container images cannot fill. Each zip also carries `LICENSE`, `LICENSE-MIT`,
+  `THIRD-PARTY-NOTICES.md` and the README, because a downloaded zip is the artifact least likely to be
+  traced back to the repository.
+- **The four `.nupkg` files**, attached rather than pushed. Packing stays because it is a cheap check
+  that the package metadata is coherent, and because it produces the artifact if a feed is ever
+  wanted. A consumer takes this repository as a submodule instead: no feed, no credentials, and the
+  submodule commit pins the version exactly.
+
+Trimming is off deliberately — the configuration binder and options types resolve reflectively, and a
+trimmed build fails at startup rather than at compile time.
+
+### Verification
+
+All three runtime identifiers publish cleanly with the correct native SQLite (`e_sqlite3.dll` on
+Windows, `libe_sqlite3.so` on arm64) and the Blazor static assets present. The `linux-x64` build was
+then run directly from its publish directory: it logs `Gleanvolt 0.0.0-dev (ea806e3) starting.`, binds
+its port and serves `blazor.web.js` at 200,645 bytes and the stylesheet at full size — static web
+assets in a self-contained publish being exactly the thing that fails silently.
+
 ## 2026-08-16 — Renamed to Gleanvolt
 
 A rename, not a refactor: no behaviour, configuration or feature change. See DECISIONS.md for why the
