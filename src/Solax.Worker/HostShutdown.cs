@@ -34,6 +34,9 @@ public sealed class HostShutdown : IServiceShutdown
     // returns. Only ever set to true, but it crosses threads, so it is not a plain bool.
     private volatile bool _stopRequested;
 
+    // Who asked, kept for the closing log line. Same threading story as the flag above.
+    private volatile string? _stopSource;
+
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger)
     {
         _lifetime = lifetime;
@@ -49,6 +52,43 @@ public sealed class HostShutdown : IServiceShutdown
     /// <summary>The exit code this run should return: 0 for a requested stop, otherwise "terminated".</summary>
     public int ExitCode => _stopRequested ? 0 : TerminatedExitCode;
 
+    /// <summary>
+    /// Arms the line that says the process stopped on purpose. Call once, before the host starts.
+    ///
+    /// <para><b>Why it needs saying at all.</b> Nothing else marks the end of a run: a graceful stop
+    /// simply leaves the log ending after the last poll, which is indistinguishable from the process
+    /// dying mid-cycle. On the Pi that distinction is not academic — the journal is RAM-only, so this
+    /// file is the only evidence that survives a reboot, and the box does stop abruptly on its own.
+    /// A run whose log ends <i>without</i> this line ended badly; that is the whole point of it.</para>
+    ///
+    /// <para>Hooked to <c>ApplicationStopped</c> rather than written after <c>Run()</c> returns,
+    /// because by then the service provider — and with it Serilog and its file sink — has been
+    /// disposed, and the line would be swallowed silently.</para>
+    /// </summary>
+    public void LogWhenStopped() => _lifetime.ApplicationStopped.Register(LogStopped);
+
+    private void LogStopped()
+    {
+        if (_stopRequested)
+        {
+            _logger.LogInformation(
+                "SolaX Local Controller stopped cleanly at the request of {Source}. Exiting with code "
+                + "{ExitCode}: it will NOT be restarted, and stays down until it is started again.",
+                _stopSource,
+                ExitCode);
+
+            return;
+        }
+
+        // A reboot, `docker compose restart|stop`, a Docker daemon shutdown, or Ctrl+C in a terminal.
+        // The shutdown itself was still graceful -- the charger was released and the session closed --
+        // and the exit code is what gets it started again where a restart policy is watching.
+        _logger.LogInformation(
+            "SolaX Local Controller stopped cleanly after a termination signal. Exiting with code "
+            + "{ExitCode}: where a restart policy is watching, it will be started again.",
+            ExitCode);
+    }
+
     public void RequestStop(string source)
     {
         // Warning rather than Information: on a headless Pi the log file is the only place that can
@@ -59,6 +99,7 @@ public sealed class HostShutdown : IServiceShutdown
             + "'docker compose start solax-controller' on the Pi.",
             source);
 
+        _stopSource = source;
         _stopRequested = true;
 
         // Non-blocking by design: it signals ApplicationStopping and returns, so the caller's own

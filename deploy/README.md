@@ -705,6 +705,27 @@ the battery hold disabled, like any other restart.
 > future version may replace the stop with a standby mode that keeps the UI up so a **Start** button
 > has somewhere to live.
 
+### Reading it back from the log
+
+Every run that ends properly says so on its last line, whichever way it ended:
+
+```
+SolaX Local Controller stopped cleanly at the request of Web UI. Exiting with code 0: it will
+NOT be restarted, and stays down until it is started again.
+
+SolaX Local Controller stopped cleanly after a termination signal. Exiting with code 143:
+where a restart policy is watching, it will be started again.
+```
+
+**A log that ends without one of those lines is a run that died** — killed, OOM-ed, or the power went.
+That is worth knowing on this Pi in particular: the journal is RAM-only, so after a reboot the
+controller's own log file in `/opt/solax/logs` is the only surviving account of what happened.
+
+```bash
+# how the last few runs ended
+grep -h -E "starting\.|stopped cleanly" /opt/solax/logs/solax-*.log | tail
+```
+
 ### Why it stays stopped, and why a reboot doesn't
 
 `docker-compose.yml` runs the controller under `restart: on-failure`, and the worker chooses its exit

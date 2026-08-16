@@ -42,6 +42,21 @@ case is worth the extra machinery on this particular box. `stop_grace_period: 30
 shutdown pause can spend three 5-second Modbus timeouts against a charger that stopped answering, and
 Docker's default 10s would SIGKILL through it.
 
+### The log now marks the end of a run
+
+Caught by using the feature on a real run: the stop worked, but the log just *ended* after the last
+poll line — nothing said the process had stopped rather than died. `HostShutdown.LogWhenStopped()`
+hooks `ApplicationStopped` (not after `Run()`, where Serilog has already gone down with the service
+provider) and writes one of two lines, naming the requester and the exit code:
+
+```
+SolaX Local Controller stopped cleanly at the request of Web UI. Exiting with code 0: ...
+SolaX Local Controller stopped cleanly after a termination signal. Exiting with code 143: ...
+```
+
+A log ending without either is a run that died. On the Pi that is the only evidence there is — the
+journal is RAM-only, and the box hard-stops on its own.
+
 ### Two things the tests would not have caught
 
 **Resolving from `host.Services` after `host.Run()` aborts the process.** `Run()` disposes the service

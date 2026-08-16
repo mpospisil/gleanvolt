@@ -386,6 +386,10 @@ if (OperatingSystem.IsWindows()
 // point in the file, means the process aborts instead of exiting with the code below.
 var shutdown = host.Services.GetRequiredService<HostShutdown>();
 
+// The counterpart to the "starting" line above: a run that ends without its closing line ended badly.
+// Armed here, before Run(), because it hooks ApplicationStopped -- see LogWhenStopped().
+shutdown.LogWhenStopped();
+
 host.Run();
 
 // How this run ended, said in the only language a container restart policy understands. 0 means an

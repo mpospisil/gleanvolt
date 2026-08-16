@@ -44,6 +44,15 @@ stays stopped regardless of the code.
 charger that has stopped answering it can spend three 5-second timeouts; Docker's default 10-second
 grace would SIGKILL the container part-way through the one thing a graceful stop exists to do.
 
+**Decision — a run that ends properly says so, on its last line.** Until now a graceful stop left the
+log simply ending after the last poll, which is indistinguishable from the process dying mid-cycle.
+The closing line names which of the two cases it was, who asked for it, and the exit code the restart
+policy will read — so the *absence* of the line is now itself the diagnosis. This matters more here
+than it would elsewhere: the Pi's journal is RAM-only and the box hard-stops on its own, so the
+controller's log file is the only account of a run that survives the reboot. The line is written from
+`ApplicationStopped` rather than after `Run()` returns, because by then the service provider — and
+with it Serilog and its file sink — has been disposed and the write would be swallowed in silence.
+
 **Consequences accepted.** Stopping from the UI or Home Assistant is one-way from those surfaces: the
 service *is* both of them, so starting it again needs `docker compose start solax-controller` on the
 Pi. That is documented next to the stop rather than designed around. A standby mode — the process

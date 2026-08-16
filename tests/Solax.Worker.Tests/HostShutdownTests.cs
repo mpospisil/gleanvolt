@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Solax.Worker.Tests;
@@ -59,16 +60,87 @@ public class HostShutdownTests
         Assert.Equal(2, _lifetime.StopCalls);
     }
 
+    // The closing line. A run's log ending without one is how an operator tells a deliberate stop from
+    // the box dying mid-cycle -- on the Pi the file log is the only evidence that survives a reboot --
+    // so what it says, and that it is written at all, is the point rather than a formatting detail.
+
+    [Fact]
+    public void Says_who_asked_and_that_it_stays_down()
+    {
+        var log = new CapturingLogger();
+        var shutdown = new HostShutdown(_lifetime, log);
+        shutdown.LogWhenStopped();
+
+        shutdown.RequestStop("Web UI");
+        _lifetime.NotifyStopped();
+
+        var line = Assert.Single(log.Messages, m => m.Contains("stopped cleanly"));
+        Assert.Contains("Web UI", line);
+        Assert.Contains("NOT be restarted", line);
+        Assert.Contains("code 0", line);
+    }
+
+    [Fact]
+    public void Says_a_terminated_run_will_come_back()
+    {
+        var log = new CapturingLogger();
+        var shutdown = new HostShutdown(_lifetime, log);
+        shutdown.LogWhenStopped();
+
+        // No RequestStop: a SIGTERM from a reboot, a daemon restart, or Ctrl+C.
+        _lifetime.NotifyStopped();
+
+        var line = Assert.Single(log.Messages, m => m.Contains("stopped cleanly"));
+        Assert.Contains("termination signal", line);
+        Assert.Contains($"code {HostShutdown.TerminatedExitCode}", line);
+    }
+
+    [Fact]
+    public void Writes_nothing_until_the_host_has_actually_stopped()
+    {
+        var log = new CapturingLogger();
+        var shutdown = new HostShutdown(_lifetime, log);
+        shutdown.LogWhenStopped();
+
+        shutdown.RequestStop("Home Assistant");
+
+        // The stop was only requested; the hosted services are still shutting down. Claiming it
+        // stopped here would put the line in front of the last thing the poll loop logs.
+        Assert.DoesNotContain(log.Messages, m => m.Contains("stopped cleanly"));
+    }
+
     private sealed class FakeHostApplicationLifetime : IHostApplicationLifetime
     {
+        private readonly CancellationTokenSource _stopped = new();
+
         public int StopCalls { get; private set; }
 
         public CancellationToken ApplicationStarted => CancellationToken.None;
 
         public CancellationToken ApplicationStopping => CancellationToken.None;
 
-        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public CancellationToken ApplicationStopped => _stopped.Token;
 
         public void StopApplication() => StopCalls++;
+
+        /// <summary>What the host itself does once every hosted service has stopped.</summary>
+        public void NotifyStopped() => _stopped.Cancel();
+    }
+
+    private sealed class CapturingLogger : ILogger<HostShutdown>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
     }
 }
