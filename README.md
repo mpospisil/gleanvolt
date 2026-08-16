@@ -83,18 +83,24 @@ SolaxLocalController.slnx
 │   │   ├── wwwroot/                # Stylesheet and other assets, served from the library
 │   │   └── WebOptions.cs           # The "Web" configuration section
 │   │
-│   └── Solax.Worker/               # The executable host
-│       ├── Program.cs              # Dependency Injection setup
-│       ├── SolaxPollingService.cs  # The main background loop (IHostedService)
-│       ├── NoListenServer.cs       # The "server" used when the UI is switched off
-│       ├── Configuration/          # Options classes bound from appsettings.json
-│       ├── HomeAssistant/          # MQTT discovery and the HA worker
-│       └── Sessions/               # Charging-session recording worker
+│   ├── Solax.Hosting/              # The composition root — everything the controller is
+│   │   ├── SolaxControllerHostingExtensions.cs  # AddSolaxController() / UseSolaxController()
+│   │   ├── SolaxPollingService.cs  # The main background loop (IHostedService)
+│   │   ├── NoListenServer.cs       # The "server" used when the UI is switched off
+│   │   ├── Configuration/          # Options classes bound from appsettings.json
+│   │   ├── Forecasting/            # The day plan and its runtime settings
+│   │   ├── HomeAssistant/          # MQTT discovery and the HA worker
+│   │   └── Sessions/               # Charging-session recording worker
+│   │
+│   └── Solax.Worker/               # The executable host, and nothing else
+│       ├── Program.cs              # .env, Serilog, AddSolaxController(), the exit code
+│       ├── DotEnv.cs               # Secrets from an untracked .env, before configuration is built
+│       └── appsettings.json        # The shipped defaults
 ├── tests/
 │   ├── Solax.Core.Tests/           # Unit tests for the control logic (mocking hardware)
 │   ├── Solax.Infrastructure.Tests/ # Register encoding and write-path tests
 │   ├── Solax.Web.Tests/            # Component rendering (bUnit) and options binding
-│   └── Solax.Worker.Tests/         # Coordinator, selector and HA discovery tests
+│   └── Solax.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
@@ -103,13 +109,29 @@ SolaxLocalController.slnx
 
 ### Layering rules
 
-- **Dependency direction is one-way:** `Solax.Worker` → `Solax.Infrastructure` → `Solax.Core`. `Solax.Core` must never reference `Solax.Infrastructure` or `Solax.Worker`.
+- **Dependency direction is one-way:** `Solax.Worker` → `Solax.Hosting` → `Solax.Infrastructure` → `Solax.Core`. `Solax.Core` must never reference anything above it.
 - **`Solax.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingController`, `IBatteryDischargeControl`). This is what keeps control/decision logic unit-testable without real hardware.
-- **All decision-making logic lives in `Solax.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Solax.Infrastructure` or `Solax.Worker`.
+- **All decision-making logic lives in `Solax.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Solax.Infrastructure`, `Solax.Hosting` or `Solax.Worker`.
 - **`Solax.Infrastructure` only implements `Solax.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
-- **`Solax.Worker` is composition-only.** `Program.cs` wires up DI; `SolaxPollingService` orchestrates the poll/act loop by calling into `Solax.Core` abstractions — it should not contain control logic itself.
-- **`Solax.Web` references `Solax.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Solax.Worker` hosts it; the dependency never runs the other way.
+- **`Solax.Hosting` is composition-only.** `AddSolaxController()` wires up DI; `SolaxPollingService` orchestrates the poll/act loop by calling into `Solax.Core` abstractions — it should not contain control logic itself.
+- **`Solax.Worker` is a host and nothing else.** The `.env` load, the logging configuration and the exit code. Anything it grows that a second host would also need belongs in `Solax.Hosting` instead — which is why it references that assembly alone and cannot reach `Solax.Core` directly.
+- **`Solax.Web` references `Solax.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Solax.Hosting` hosts it; the dependency never runs the other way.
 - **`Solax.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
+
+### The libraries as packages
+
+The four libraries are published to nuget.org from each `v*` tag ([`publish-packages.yml`](.github/workflows/publish-packages.yml)), so a different host can run the controller without vendoring it. `Solax.Worker` is not among them: it is the thing that runs the packages, not one of them.
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.AddSolaxController();          // polling, control, sessions, Home Assistant, the web UI
+
+var app = builder.Build();
+app.UseSolaxController();              // the UI's endpoints, when it is enabled
+app.Run();
+```
+
+`AddSolaxController` also has an `IServiceCollection` overload taking an `IConfiguration`, for a host that is not built on `WebApplicationBuilder`.
 
 ## Getting started
 

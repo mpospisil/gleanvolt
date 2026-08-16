@@ -4,6 +4,67 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-16 — Solax.Hosting: the composition root leaves the executable (#66)
+
+A pure refactor — no behaviour, configuration or feature change. `Program.cs` was 399 lines of DI and
+the stack could only be consumed by running `Solax.Worker`, even though only two files in that project
+were host-specific.
+
+### What moved
+
+`src/Solax.Hosting/` is a new class library between `Solax.Infrastructure` and `Solax.Worker`. It
+took 22 files unchanged apart from their namespace: `SolaxPollingService`, `ChargingControlCoordinator`,
+`ChargeControlCycleResult`, `ChargeControlModeSelector`, `BatteryHoldSelector`,
+`SolarForecastRefreshWorker`, `HostShutdown`, `NoListenServer`, `BuildInfo`, and the `Configuration/`,
+`Forecasting/`, `HomeAssistant/` and `Sessions/` folders whole. `tests/Solax.Worker.Tests` became
+`tests/Solax.Hosting.Tests` with it — every type it covers moved, and the tests themselves needed only
+the namespace.
+
+`SolaxControllerHostingExtensions` is the one new file: `AddSolaxController()` carries every
+registration from `Program.cs`, comments and all, since the comments explaining *why* a registration
+is shaped the way it is are the most valuable part of what moved.
+
+### What stayed
+
+`Solax.Worker` is now `Program.cs`, `DotEnv.cs` and `appsettings.json`: the `.env` load, Serilog's
+configuration and `SelfLog`, the `hash-password` tool, the startup log lines, the Windows timezone
+warning and the exit code. ~95 lines. It references `Solax.Hosting` and nothing else, so nothing in
+the host can reach past the composition root.
+
+### Three things that needed more than a move
+
+- **The implicit usings.** The moved code was written against the Web SDK's; a plain class library
+  supplies only the `System` ones. Re-declared as `<Using />` items in the `.csproj` rather than as 22
+  files of `using` directives.
+- **The Kestrel port.** `builder.WebHost.ConfigureKestrel(...)` became
+  `services.Configure<KestrelServerOptions>(...)` — the same registration, but callable without a
+  builder, which is what lets a non-web host use `AddSolaxController` too.
+- **`UseStaticWebAssets()`.** The only thing that cannot be a registration, so it is the entire body
+  of the `WebApplicationBuilder` overload.
+
+### Packaging
+
+`Directory.Build.props` gained the shared package metadata with `IsPackable` defaulting to `false`;
+the four libraries opt in, `Solax.Worker` stays out. `Directory.Build.targets` is new, and holds the
+parts conditioned on `IsPackable` (the README and the licence text in the package, XML docs with
+CS1591 silenced) because `.props` is imported before a project sets that property. The licence goes in
+as `PackageLicenseFile` rather than an SPDX expression, so the terms travel inside the artifact and
+the package says whatever `LICENSE` says without a second place to keep in step. `.github/workflows/publish-packages.yml`
+packs and pushes on a `v*` tag using the same version derivation as the image workflow; it needs a
+`NUGET_API_KEY` secret and fails loudly rather than silently if one is missing.
+
+### Verification
+
+434 tests pass unchanged. `dotnet pack` produces the four packages and their symbol packages. Run
+against the live install: the UI comes up on 8090 and serves `blazor.web.js` (200,645 bytes) and every
+`_content/Solax.Web/` asset, and with `Web__Enabled=false` nothing listens on 8090 and no "Web UI
+enabled" line appears — the two properties the split was most likely to break.
+
+Files added: `src/Solax.Hosting/*`, `Directory.Build.targets`,
+`.github/workflows/publish-packages.yml`.
+Files changed: `src/Solax.Worker/{Program.cs,Solax.Worker.csproj}`, `Directory.Build.props`,
+`SolaxLocalController.slnx`, `Dockerfile`, `Dockerfile.windows`, `README.md`, `docs/DECISIONS.md`.
+
 ## 2026-08-16 — The service can be stopped from the UI and from Home Assistant, and stays stopped
 
 Killing the controller was the only way to take it down, and the cost of that is one specific thing:
