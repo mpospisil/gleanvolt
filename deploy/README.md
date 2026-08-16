@@ -705,6 +705,27 @@ the battery hold disabled, like any other restart.
 > future version may replace the stop with a standby mode that keeps the UI up so a **Start** button
 > has somewhere to live.
 
+### How long a stop takes
+
+Usually a second or two. It can be much longer, and the reason is always the same: a Modbus read
+already in flight when the stop arrives cannot notice it until it times out, and a device that has
+gone quiet costs 5 seconds per unanswered exchange. A stop measured on a live system with nothing
+charging took **19 seconds**, entirely because the EV charger went silent for one poll.
+
+Two things keep that from turning into a killed process:
+
+- `stop_grace_period: 60s` in `docker-compose.yml` — how long Docker waits before SIGKILL.
+- A 10-second deadline on the charger-release itself. If the charger isn't answering, the service
+  gives up and says so rather than spending the whole grace period on it:
+
+  ```
+  [WRN] Gave up pausing the charger on shutdown after 00:00:10 — it is not answering. It may
+        still be charging under our last setpoint until something else changes it.
+  ```
+
+  **That line means a car may still be drawing.** The charger keeps the last current it was given, so
+  check it at the charger or in its own app.
+
 ### Reading it back from the log
 
 Every run that ends properly says so on its last line, whichever way it ended:

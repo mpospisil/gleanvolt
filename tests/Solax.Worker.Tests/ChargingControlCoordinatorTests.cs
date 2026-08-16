@@ -106,6 +106,72 @@ public class ChargingControlCoordinatorTests
         Assert.Equal(0, _charger.LastTarget); // dropped to the pause current
     }
 
+    /// <summary>
+    /// A charger that has stopped answering must not be able to hold the shutdown open. Unbounded,
+    /// this waits on Modbus timeouts until the container's stop grace period runs out and Docker
+    /// SIGKILLs the process — part-way through this very write, with a car still drawing. Giving up on
+    /// a deadline is worse for the car and better for everything else, so it is what we do.
+    /// </summary>
+    [Fact]
+    public async Task PauseOnShutdown_GivesUpOnAChargerThatStopsAnswering()
+    {
+        var charger = new FlakyEvChargerControl();
+        var coordinator = new ChargingControlCoordinator(
+            new Dictionary<ChargeControlMode, IChargingController> { [ChargeControlMode.Solar] = _controller },
+            charger,
+            new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
+            NullLogger<ChargingControlCoordinator>.Instance,
+            shutdownPauseTimeout: TimeSpan.FromMilliseconds(50));
+
+        // Take control while the charger is healthy, so the shutdown has something to release.
+        _controller.NextDecision = new(ChargingControlAction.Charge, 10, "charge");
+        await coordinator.RunCycleAsync(State(), ChargeControlMode.Solar, plan: null, CancellationToken.None);
+
+        charger.Answering = false;
+
+        // The assertion is that this returns at all. WaitAsync rather than a bare await: a regression
+        // here hangs the test run instead of failing it, which is the least useful way to find out.
+        await coordinator.PauseOnShutdownAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(charger.PauseWasAttempted); // gave up, rather than never having tried
+    }
+
+    /// <summary>A charger that answers until it doesn't — then hangs, the way a silent Modbus device does.</summary>
+    private sealed class FlakyEvChargerControl : IEvChargerControl
+    {
+        private EvChargerSettings _settings = new(EvChargerMode.Fast, 16);
+
+        public bool Answering { get; set; } = true;
+
+        public bool PauseWasAttempted { get; private set; }
+
+        public async Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default)
+        {
+            if (Answering)
+            {
+                return _settings;
+            }
+
+            // What a read against a silent device does, minus the five-second wait.
+            PauseWasAttempted = true;
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            return _settings;
+        }
+
+        public async Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
+        {
+            if (!Answering)
+            {
+                PauseWasAttempted = true;
+                await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            }
+
+            _settings = _settings with { ChargeCurrentAmps = targetAmps };
+        }
+    }
+
     [Fact]
     public async Task TheModeSelectsWhichControllerDecides()
     {

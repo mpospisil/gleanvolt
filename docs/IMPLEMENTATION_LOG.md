@@ -38,9 +38,11 @@ records that the stop was asked for.
 controller therefore moves to `restart: on-failure` and chooses its exit code: `0` for a requested
 stop (stays down), `HostShutdown.TerminatedExitCode` = 143 for a SIGTERM (reboot, daemon restart —
 comes back), non-zero for a crash or a power cut (comes back). See DECISIONS.md for why the reboot
-case is worth the extra machinery on this particular box. `stop_grace_period: 30s` goes with it: the
-shutdown pause can spend three 5-second Modbus timeouts against a charger that stopped answering, and
-Docker's default 10s would SIGKILL through it.
+case is worth the extra machinery on this particular box.
+
+`stop_grace_period: 60s` goes with it, and the shutdown pause is separately bounded to 10s
+(`ChargingControlCoordinator.DefaultShutdownPauseTimeout`). Both numbers come from measuring a real
+stop rather than guessing — see "What a real stop measured" below.
 
 ### The log now marks the end of a run
 
@@ -56,6 +58,24 @@ SolaX Local Controller stopped cleanly after a termination signal. Exiting with 
 
 A log ending without either is a run that died. On the Pi that is the only evidence there is — the
 journal is RAM-only, and the box hard-stops on its own.
+
+### What a real stop measured
+
+Stopping the service from the web UI on a live system took **19.3 seconds**, and two more poll cycles
+ran after the request. The log explains it without instrumentation: a poll that started at 09:53:37.8
+did not finish until 09:53:58.5 — 20.7 seconds — and returned `EvMode=n/a EvCurrent=n/a`, the
+absent-charger path. Each unanswered read costs the 5-second Modbus connect/IO timeout, and a read
+already in flight cannot observe the shutdown's cancellation until it returns.
+
+Nothing was wrong with the stop itself, but two numbers were wrong:
+
+- **`stop_grace_period` 30s → 60s.** 19s of it went on a shutdown with *nothing charging*.
+- **The pause now has its own 10s deadline.** This is the case that actually bites: with a session
+  active, `PauseOnShutdownAsync` does a read *and* a write against that same silent charger, so the
+  budget can run out mid-write — SIGKILL, car still drawing. It now gives up on a stated deadline and
+  logs "Gave up pausing the charger on shutdown after 00:00:10 — it is not answering", which is at
+  least actionable. Covered by a test that would hang rather than fail if the bound regressed, so it
+  uses `WaitAsync`.
 
 ### Two things the tests would not have caught
 
@@ -84,7 +104,7 @@ stop topic rejected with the service still running, `PRESS` accepted → gracefu
 | `src/Solax.Worker/HomeAssistant/HomeAssistantMqttWorker.cs` | subscribe and handle the press |
 | `src/Solax.Web/Components/Pages/Health.razor` | the Service section |
 | `src/Solax.Web/wwwroot/css/site.css` | `.danger` / `.secondary` buttons, `.stopping` |
-| `deploy/docker-compose.yml` | `restart: on-failure`, `stop_grace_period: 30s` |
+| `deploy/docker-compose.yml` | `restart: on-failure`, `stop_grace_period: 60s` |
 | `README.md`, `deploy/README.md`, `docs/DECISIONS.md` | the entity row, the stop/start runbook, the record |
 | `tests/…` | `HostShutdownTests`, button + payload cases in `HaDiscoveryTests`, the confirm flow in `HealthPageTests` |
 

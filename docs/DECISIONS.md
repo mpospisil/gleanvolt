@@ -40,9 +40,20 @@ property we are not willing to trade for a Stop button. Verified against Docker 
 exiting 0 under `on-failure` stays exited, one exiting 143 is restarted, and a `docker compose stop`
 stays stopped regardless of the code.
 
-`stop_grace_period: 30s` goes in alongside it. The shutdown pause is a Modbus write, and against a
-charger that has stopped answering it can spend three 5-second timeouts; Docker's default 10-second
-grace would SIGKILL the container part-way through the one thing a graceful stop exists to do.
+**Decision — the shutdown pause has a deadline, and the grace period has headroom.** Docker's default
+10-second grace would SIGKILL the container part-way through the one thing a graceful stop exists to
+do. Measuring a real stop showed why the number has to be generous: it took **19 seconds** with
+nothing charging, because a Modbus read already in flight when the stop arrives cannot observe the
+cancellation until it times out, and an EV charger that has gone quiet costs 5 seconds per unanswered
+exchange. `stop_grace_period` is therefore 60s.
+
+That alone would not be enough, because the failure it guards against is the one that matters most:
+had a session been active, `PauseOnShutdownAsync` would then have done its own read-then-write against
+that same silent charger, and a shutdown that spends its whole budget waiting gets killed *during the
+pause write*, with a car still drawing. So the pause is bounded independently
+(`ChargingControlCoordinator.DefaultShutdownPauseTimeout`, 10s): a charger that answers needs well
+under a second, and one that doesn't is not going to start. Giving up on a stated deadline and saying
+so in the log leaves the operator a fact to act on; waiting forever leaves them a SIGKILL.
 
 **Decision — a run that ends properly says so, on its last line.** Until now a graceful stop left the
 log simply ending after the last poll, which is indistinguishable from the process dying mid-cycle.
