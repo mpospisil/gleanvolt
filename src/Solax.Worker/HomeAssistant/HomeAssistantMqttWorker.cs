@@ -20,6 +20,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IChargeControlModeSelector _mode;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IForecastRuntimeSettings _forecastSettings;
+    private readonly IServiceShutdown _shutdown;
     private readonly bool _batteryHoldEnabled;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ILogger<HomeAssistantMqttWorker> _logger;
@@ -31,6 +32,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IChargeControlModeSelector mode,
         IBatteryHoldSelector batteryHold,
         IForecastRuntimeSettings forecastSettings,
+        IServiceShutdown shutdown,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger)
     {
@@ -40,6 +42,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _mode = mode;
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
+        _shutdown = shutdown;
         _statusHolder = statusHolder;
         _logger = logger;
     }
@@ -135,6 +138,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.NumberCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
+
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -189,6 +194,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
     {
+        if (e.ApplicationMessage.Topic == _discovery.StopServiceCommandTopic)
+        {
+            return OnStopServiceCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+        }
+
         if (_batteryHoldEnabled && e.ApplicationMessage.Topic == _discovery.BatteryHoldCommandTopic)
         {
             return OnBatteryHoldCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
@@ -219,6 +229,28 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         // Reflect the current mode back immediately so the HA select settles.
         _ = PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    // The one command with no echo and no state topic: a button has no state, and by the time Home
+    // Assistant could read one this worker is on its way down. The acknowledgement the dashboard
+    // actually sees is the availability topic going "offline" as the loop below exits, which
+    // MarkOfflineAndDisconnectAsync publishes on the way out.
+    //
+    // Nothing is published from here on purpose -- the shutdown this starts disposes the client, and
+    // racing a publish against that would only produce a logged failure in the last second of the run.
+    private Task OnStopServiceCommandAsync(string? payload)
+    {
+        if (!HaDiscovery.IsPress(payload))
+        {
+            _logger.LogWarning(
+                "Ignoring '{Payload}' on the stop-service topic; only '{Press}' stops the service.",
+                payload,
+                HaDiscovery.PayloadPress);
+            return Task.CompletedTask;
+        }
+
+        _shutdown.RequestStop("Home Assistant");
         return Task.CompletedTask;
     }
 

@@ -26,6 +26,15 @@ public sealed class ChargingControlCoordinator
     private readonly double _idlePowerThresholdWatts;
     private readonly ILogger<ChargingControlCoordinator> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _shutdownPauseTimeout;
+
+    /// <summary>
+    /// How long <see cref="PauseOnShutdownAsync"/> may spend trying to release the charger. Generous
+    /// against a charger that answers (it needs well under a second) and short against one that does
+    /// not: two unanswered Modbus exchanges cost 10 seconds on their own, and the whole shutdown has
+    /// to fit inside the container's stop grace period with room for everything else.
+    /// </summary>
+    public static readonly TimeSpan DefaultShutdownPauseTimeout = TimeSpan.FromSeconds(10);
 
     // Our own "are we charging?" state (vs paused), used for the controller's hysteresis, plus when it
     // last changed -- the dwell timers that stop the charger flapping are measured from it.
@@ -57,7 +66,8 @@ public sealed class ChargingControlCoordinator
         int pauseCurrentAmps,
         double idlePowerThresholdWatts,
         ILogger<ChargingControlCoordinator> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TimeSpan? shutdownPauseTimeout = null)
     {
         _controllers = controllers;
         _chargerControl = chargerControl;
@@ -66,6 +76,7 @@ public sealed class ChargingControlCoordinator
         _idlePowerThresholdWatts = idlePowerThresholdWatts;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _shutdownPauseTimeout = shutdownPauseTimeout ?? DefaultShutdownPauseTimeout;
     }
 
     /// <summary>Energy delivered to the car in the current session, in watt-hours.</summary>
@@ -191,6 +202,14 @@ public sealed class ChargingControlCoordinator
     /// <summary>
     /// Pauses charging on shutdown if we were driving it, so we don't strand the charger at a fixed
     /// current after the service stops. No-op when we weren't charging; failures are logged.
+    ///
+    /// <para><b>Bounded on purpose.</b> This is a read followed by a write against a charger that may
+    /// have stopped answering, and each unanswered exchange costs a 5-second Modbus timeout (see
+    /// <c>ModbusTcpClient</c>). Unbounded, that is exactly the wrong thing to do here: the container's
+    /// <c>stop_grace_period</c> is finite, and a shutdown that spends it all waiting on a dead charger
+    /// gets SIGKILLed part-way through this very write — with a car still drawing. Better to give up
+    /// on a stated deadline and say so in the log, which is at least a fact an operator can act on.
+    /// A charger that is answering completes this in well under a second.</para>
     /// </summary>
     public async Task PauseOnShutdownAsync(CancellationToken cancellationToken)
     {
@@ -199,12 +218,25 @@ public sealed class ChargingControlCoordinator
             return;
         }
 
+        // Linked, so the host's own shutdown deadline still wins if it is the shorter of the two.
+        using var deadline = new CancellationTokenSource(_shutdownPauseTimeout, _timeProvider);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+
         try
         {
-            var settings = await _chargerControl.ReadSettingsAsync(cancellationToken).ConfigureAwait(false);
-            await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, _pauseCurrentAmps, "Service stopping.", cancellationToken).ConfigureAwait(false);
+            var settings = await _chargerControl.ReadSettingsAsync(linked.Token).ConfigureAwait(false);
+            await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, _pauseCurrentAmps, "Service stopping.", linked.Token).ConfigureAwait(false);
             _charging = false;
             _logger.LogInformation("Paused charging on shutdown (current setpoint dropped to {Amps}A).", _pauseCurrentAmps);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            // Deliberately a warning with no exception: this is not a bug in progress, it is the
+            // charger not answering, and the sentence is the whole point of the line.
+            _logger.LogWarning(
+                "Gave up pausing the charger on shutdown after {Timeout} — it is not answering. It may "
+                + "still be charging under our last setpoint until something else changes it.",
+                _shutdownPauseTimeout);
         }
         catch (Exception ex)
         {

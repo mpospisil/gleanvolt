@@ -4,6 +4,112 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-16 — The service can be stopped from the UI and from Home Assistant, and stays stopped
+
+Killing the controller was the only way to take it down, and the cost of that is one specific thing:
+`SolaxPollingService.StopAsync` pauses the charger on the way out, so a killed process leaves the car
+drawing at the last current we wrote. Everything else the graceful path does — closing the open
+session as `ServiceStopped`, flushing the store, disconnecting MQTT — was already implemented and
+already correct. **No shutdown logic was added; only a way to ask for it that isn't an ssh session.**
+
+### One seam, two surfaces
+
+`Solax.Core/Interfaces/IServiceShutdown.cs` — `RequestStop(string source)` — sits alongside
+`IChargeControlModeSelector`: framework-free, driven by both control surfaces, owned by neither.
+`Solax.Worker/HostShutdown.cs` implements it over `IHostApplicationLifetime.StopApplication()` and
+records that the stop was asked for.
+
+- **Web UI.** `Health.razor` gets a *Service* section with a two-click **Stop service** control. Two
+  clicks because it is one-way from the browser: the page goes down with the service. The final
+  render carries the command that starts it again, since it is the last thing the user will see.
+- **Home Assistant.** A `button` entity, `homeassistant/button/solax_controller/stop_service/config`,
+  published unconditionally with `entity_category: "config"` so it lands in the device's
+  configuration panel rather than on the auto-generated dashboard card. Only an exact `PRESS` payload
+  acts (`HaDiscovery.IsPress`) — the topic is the one command that cannot be undone from HA, so a
+  stray retained message must not be able to take the controller off the air. The handler publishes
+  nothing afterwards: the shutdown it starts disposes the MQTT client, and racing a publish against
+  that only produces a logged failure in the last second of the run. The acknowledgement the
+  dashboard actually sees is the existing availability topic going `offline`, which
+  `MarkOfflineAndDisconnectAsync` already publishes.
+
+### The exit code is the mechanism, not a detail
+
+`restart: unless-stopped` restarts on *any* exit, so under it a Stop button is a Restart button. The
+controller therefore moves to `restart: on-failure` and chooses its exit code: `0` for a requested
+stop (stays down), `HostShutdown.TerminatedExitCode` = 143 for a SIGTERM (reboot, daemon restart —
+comes back), non-zero for a crash or a power cut (comes back). See DECISIONS.md for why the reboot
+case is worth the extra machinery on this particular box.
+
+`stop_grace_period: 60s` goes with it, and the shutdown pause is separately bounded to 10s
+(`ChargingControlCoordinator.DefaultShutdownPauseTimeout`). Both numbers come from measuring a real
+stop rather than guessing — see "What a real stop measured" below.
+
+### The log now marks the end of a run
+
+Caught by using the feature on a real run: the stop worked, but the log just *ended* after the last
+poll line — nothing said the process had stopped rather than died. `HostShutdown.LogWhenStopped()`
+hooks `ApplicationStopped` (not after `Run()`, where Serilog has already gone down with the service
+provider) and writes one of two lines, naming the requester and the exit code:
+
+```
+SolaX Local Controller stopped cleanly at the request of Web UI. Exiting with code 0: ...
+SolaX Local Controller stopped cleanly after a termination signal. Exiting with code 143: ...
+```
+
+A log ending without either is a run that died. On the Pi that is the only evidence there is — the
+journal is RAM-only, and the box hard-stops on its own.
+
+### What a real stop measured
+
+Stopping the service from the web UI on a live system took **19.3 seconds**, and two more poll cycles
+ran after the request. The log explains it without instrumentation: a poll that started at 09:53:37.8
+did not finish until 09:53:58.5 — 20.7 seconds — and returned `EvMode=n/a EvCurrent=n/a`, the
+absent-charger path. Each unanswered read costs the 5-second Modbus connect/IO timeout, and a read
+already in flight cannot observe the shutdown's cancellation until it returns.
+
+Nothing was wrong with the stop itself, but two numbers were wrong:
+
+- **`stop_grace_period` 30s → 60s.** 19s of it went on a shutdown with *nothing charging*.
+- **The pause now has its own 10s deadline.** This is the case that actually bites: with a session
+  active, `PauseOnShutdownAsync` does a read *and* a write against that same silent charger, so the
+  budget can run out mid-write — SIGKILL, car still drawing. It now gives up on a stated deadline and
+  logs "Gave up pausing the charger on shutdown after 00:00:10 — it is not answering", which is at
+  least actionable. Covered by a test that would hang rather than fail if the bound regressed, so it
+  uses `WaitAsync`.
+
+### Two things the tests would not have caught
+
+**Resolving from `host.Services` after `host.Run()` aborts the process.** `Run()` disposes the service
+provider on its way out, so the first version — `return host.Services.GetRequiredService<HostShutdown>().ExitCode;`
+— threw `ObjectDisposedException` and produced exit **134, core dumped**, on every SIGTERM. Found by
+running the built binary and sending it a signal, not by any unit test; the fix is to resolve before
+`Run()` and hold the reference.
+
+**Docker's restart semantics were verified rather than assumed** (Docker 29.7.1): exit 0 under
+`on-failure` stays exited (`restartCount=0`), exit 143 is restarted, `unless-stopped` restart-loops on
+exit 0, and a `docker compose stop` stays stopped whatever the code. The whole feature rests on the
+first two.
+
+The end-to-end path was then exercised against a real broker: discovery config published, `ON` on the
+stop topic rejected with the service still running, `PRESS` accepted → graceful shutdown → **exit 0**.
+
+### Files
+
+| File | Change |
+|---|---|
+| `src/Solax.Core/Interfaces/IServiceShutdown.cs` | new — the seam |
+| `src/Solax.Worker/HostShutdown.cs` | new — implementation, exit-code decision |
+| `src/Solax.Worker/Program.cs` | registration; resolve before `Run()`; return the exit code |
+| `src/Solax.Worker/HomeAssistant/HaDiscovery.cs` | stop-service topic, button config, `PRESS` parsing |
+| `src/Solax.Worker/HomeAssistant/HomeAssistantMqttWorker.cs` | subscribe and handle the press |
+| `src/Solax.Web/Components/Pages/Health.razor` | the Service section |
+| `src/Solax.Web/wwwroot/css/site.css` | `.danger` / `.secondary` buttons, `.stopping` |
+| `deploy/docker-compose.yml` | `restart: on-failure`, `stop_grace_period: 60s` |
+| `README.md`, `deploy/README.md`, `docs/DECISIONS.md` | the entity row, the stop/start runbook, the record |
+| `tests/…` | `HostShutdownTests`, button + payload cases in `HaDiscoveryTests`, the confirm flow in `HealthPageTests` |
+
+---
+
 ## 2026-08-14 — The repo builds and tests clean on a non-English Windows machine
 
 No control logic changed, and nothing here alters production behaviour on the Pi. Three unrelated

@@ -40,6 +40,7 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         builder.Services.AddSingleton<IChargeControlModeSelector>(new FakeChargeControlModeSelector());
         builder.Services.AddSingleton<IBatteryHoldSelector>(new FakeBatteryHoldSelector());
         builder.Services.AddSingleton<IForecastRuntimeSettings>(new FakeForecastRuntimeSettings());
+        builder.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
         builder.Services.AddSolaxWebUi(web);
 
         _app = builder.Build();

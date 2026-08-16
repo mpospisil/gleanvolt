@@ -26,7 +26,7 @@ using Solax.Worker.Sessions;
 if (args is ["hash-password", var plainPassword])
 {
     Console.WriteLine(WebPasswordHasher.Hash(plainPassword));
-    return;
+    return 0;
 }
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
@@ -258,6 +258,14 @@ builder.Services.AddSingleton<IBatteryDischargeControl>(services =>
 
 builder.Services.AddHostedService<SolaxPollingService>();
 
+// "Stop the service" as a control like any other: both surfaces drive this one seam, exactly as they
+// both drive the mode selector. It is what turns a stop into the host's own graceful shutdown -- the
+// charger paused, the open session closed, the store flushed -- instead of a killed process that
+// leaves the car drawing at our last setpoint. See IServiceShutdown and HostShutdown for why the
+// process's exit code, not the fact that it exited, is what keeps the container down afterwards.
+builder.Services.AddSingleton<HostShutdown>();
+builder.Services.AddSingleton<IServiceShutdown>(services => services.GetRequiredService<HostShutdown>());
+
 // Charging session store (issue #32). Observes only -- it subscribes to the same status snapshots the
 // Home Assistant worker consumes and writes them to a local SQLite file, so it touches no register and
 // no device. On by default for that reason; a failure to open the store disables recording for the run
@@ -373,4 +381,19 @@ if (OperatingSystem.IsWindows()
         TimeZoneInfo.Local.Id);
 }
 
+// Resolved before Run() rather than after it: Run() disposes the service provider on its way out, so
+// asking the container for anything once it returns throws ObjectDisposedException -- which, at this
+// point in the file, means the process aborts instead of exiting with the code below.
+var shutdown = host.Services.GetRequiredService<HostShutdown>();
+
+// The counterpart to the "starting" line above: a run that ends without its closing line ended badly.
+// Armed here, before Run(), because it hooks ApplicationStopped -- see LogWhenStopped().
+shutdown.LogWhenStopped();
+
 host.Run();
+
+// How this run ended, said in the only language a container restart policy understands. 0 means an
+// operator pressed Stop and the service is meant to stay down; 143 means the platform terminated us
+// -- a reboot, a daemon restart, `docker compose restart` -- and the controller has to come back by
+// itself. .NET does not distinguish the two on its own, which is what this line is for.
+return shutdown.ExitCode;

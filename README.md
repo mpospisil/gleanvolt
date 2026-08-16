@@ -35,7 +35,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
-- **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service).
+- **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service), and can be **stopped gracefully from the web UI or Home Assistant** — the charger released, the open session closed and written — instead of being killed. It stays stopped until you start it again, while a reboot or a power cut still brings it straight back; see [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller).
 - **Local data ownership** — no cloud dependency for core operation.
 
 ## Hardware targets
@@ -763,6 +763,7 @@ description or tooltip field. The meanings live here instead.
 | **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. Blank when no hold is armed. |
 | **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
 | **Charging now** | on/off | `ON` while *the controller* is commanding a charging current, as opposed to having paused or never taken control. This is our own decision, not the car's behaviour — a car can be plugged in and idle while this is `ON`. See **EV charging power** for what's actually flowing. |
+| **Stop service** | button | Shuts the controller down gracefully: the charger is returned to its pause current, the open session is closed and written, and the store is flushed — none of which happens if the process is killed. **One-way from here.** The service is what speaks MQTT, so this device goes unavailable and nothing in Home Assistant can start it again; that needs a shell on the Pi (`docker compose start solax-controller`). Lives in the device's *Configuration* section rather than on the dashboard card, and only an exact `PRESS` on its topic triggers it. See [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller). |
 
 The rest are populated only while the **Forecasted** mode is driving; in the other modes they report
 nothing rather than stale numbers from a plan nobody is acting on.
@@ -857,6 +858,17 @@ projection is the identical formula the live figure uses, evaluated at every rem
 period instead of only the current instant — so the picture can never disagree with the numbers next
 to it. Like the MQTT entities, the whole page shows an explicit empty state while any mode other than
 `Forecasted` is driving, rather than the last stale plan.
+
+The `/health` page also carries the one control that isn't about charging: **Stop service**, which
+shuts the whole controller down gracefully — the charger returned to its pause current, the open
+charging session closed and written, the session store flushed, Modbus and MQTT closed — rather than
+leaving it to be killed, which revokes nothing and leaves the car drawing at the last current we
+wrote. It takes two clicks, because it is one-way from the browser: the UI goes down with the
+service, and only a shell on the Pi (`docker compose start solax-controller`) brings it back. See
+[Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller) for the
+exit-code contract that keeps it stopped without also breaking restart-after-reboot. Note that the
+button is as reachable as the rest of the UI: with no password configured, anyone on the LAN can stop
+the controller — one more reason to consider [Authentication](#authentication) below.
 
 ```jsonc
 "Web": {

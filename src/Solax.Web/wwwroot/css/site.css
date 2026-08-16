@@ -240,6 +240,44 @@ h1 {
     margin-right: 0.5rem;
 }
 
+/* The only destructive control in the UI (Health's "Stop service"), so it is the only thing coloured
+   like one -- red enough to read as a warning, still a button rather than an alarm. */
+.control button.danger {
+    background: #d64545;
+    border: 1px solid #d64545;
+    border-radius: 6px;
+    color: #fff;
+    padding: 0.4rem 0.9rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.control button.danger:hover {
+    background: #bf3a3a;
+    border-color: #bf3a3a;
+}
+
+.control button.secondary {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--muted);
+    padding: 0.4rem 0.9rem;
+    margin-left: 0.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.control button.secondary:hover {
+    color: var(--ink);
+    border-color: var(--accent);
+}
+
+.stopping {
+    margin: 0 0 0.25rem;
+    font-weight: 600;
+}
+
 .control .hint {
     display: block;
     color: var(--muted);

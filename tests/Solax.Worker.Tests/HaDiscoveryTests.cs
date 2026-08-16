@@ -121,6 +121,38 @@ public class HaDiscoveryTests
         Assert.DoesNotContain(switchTopic, DiscoveryWithBatteryHold.RetiredDiscoveryTopics());
     }
 
+    [Fact]
+    public void DiscoveryMessages_IncludeTheStopServiceButton()
+    {
+        var messages = Discovery.DiscoveryMessages().ToList();
+
+        var buttonMsg = messages.Single(m => m.Topic == "homeassistant/button/solax_controller/stop_service/config");
+        using var json = JsonDocument.Parse(buttonMsg.Payload);
+        var s = json.RootElement;
+
+        Assert.Equal("solax_controller_stop_service", s.GetProperty("unique_id").GetString());
+        Assert.Equal("solax/solax_controller/stop_service/set", Discovery.StopServiceCommandTopic);
+        Assert.Equal(Discovery.StopServiceCommandTopic, s.GetProperty("command_topic").GetString());
+        Assert.Equal("PRESS", s.GetProperty("payload_press").GetString());
+
+        // Kept out of the auto-generated dashboard card: a control that cannot be undone from Home
+        // Assistant belongs in the device's configuration panel, not next to the charge mode.
+        Assert.Equal("config", s.GetProperty("entity_category").GetString());
+
+        // The availability topic is what makes the press visible -- the button greys out when the
+        // service it stopped goes offline.
+        Assert.Equal(Discovery.AvailabilityTopic, s.GetProperty("availability_topic").GetString());
+    }
+
+    [Theory]
+    [InlineData("PRESS", true)]
+    [InlineData("press", false)]
+    [InlineData("ON", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsPress_AcceptsOnlyTheExactPayload(string? payload, bool expected) =>
+        Assert.Equal(expected, HaDiscovery.IsPress(payload));
+
     [Theory]
     [InlineData("ON", true)]
     [InlineData("off", false)]

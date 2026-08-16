@@ -4,6 +4,77 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-16 — The service can be stopped from its own surfaces, and the exit code is what keeps it stopped
+
+**Context.** The only way to take the controller down was to kill it — no control surface offered a
+stop, so it meant an ssh session and, in practice, `docker rm -f` or a pulled plug. That skips the
+host's shutdown, and the expensive part of skipping it is not the data: SQLite is crash-safe in WAL
+mode and the Serilog file sink is unbuffered, so a killed process loses almost nothing on disk. It is
+the hardware. `SolaxPollingService.StopAsync` exists precisely to drop the charger's setpoint to the
+pause current on the way out; kill the process and nothing revokes it, so **the car keeps drawing at
+whatever current we last wrote**. The open charging session is also left to be recovered as
+interrupted rather than closed as `ServiceStopped`.
+
+**Decision — a stop is a control like any other, driven through one Core seam.** `IServiceShutdown`
+(`RequestStop(string source)`) joins `IChargeControlModeSelector` and friends: the web UI's Health
+page and a Home Assistant `button` entity both drive it, neither owns any logic, and `HostShutdown` in
+the worker turns it into `IHostApplicationLifetime.StopApplication()`. The existing `StopAsync`
+implementations then do what they were always written to do. Nothing new had to be added to the
+shutdown path — only a way to trigger it that isn't a shell.
+
+**Decision — the process's exit code distinguishes "stopped" from "terminated", and the deploy stack
+reads it.** `restart: unless-stopped` cannot express what an operator means by "stop": it restarts on
+any exit, so a Stop button would be a Restart button with extra steps. `restart: on-failure` can
+express it, but only because the worker now sets its exit code deliberately:
+
+| How the run ended | Exit code | Docker's response |
+|---|---|---|
+| `RequestStop` from the UI or Home Assistant | `0` | stays down |
+| SIGTERM — reboot, daemon restart, `docker compose restart` | `143` | comes back |
+| Crash, OOM kill, power cut | non-zero | comes back |
+
+Without the 143 the two are indistinguishable — .NET exits 0 for a SIGTERM as well — and a Pi that
+rebooted would come up with no controller running and nothing anywhere saying why. That case is not
+hypothetical on this deployment: the box hard-stops on its own, and automatic recovery from it is a
+property we are not willing to trade for a Stop button. Verified against Docker 29.7.1: a container
+exiting 0 under `on-failure` stays exited, one exiting 143 is restarted, and a `docker compose stop`
+stays stopped regardless of the code.
+
+**Decision — the shutdown pause has a deadline, and the grace period has headroom.** Docker's default
+10-second grace would SIGKILL the container part-way through the one thing a graceful stop exists to
+do. Measuring a real stop showed why the number has to be generous: it took **19 seconds** with
+nothing charging, because a Modbus read already in flight when the stop arrives cannot observe the
+cancellation until it times out, and an EV charger that has gone quiet costs 5 seconds per unanswered
+exchange. `stop_grace_period` is therefore 60s.
+
+That alone would not be enough, because the failure it guards against is the one that matters most:
+had a session been active, `PauseOnShutdownAsync` would then have done its own read-then-write against
+that same silent charger, and a shutdown that spends its whole budget waiting gets killed *during the
+pause write*, with a car still drawing. So the pause is bounded independently
+(`ChargingControlCoordinator.DefaultShutdownPauseTimeout`, 10s): a charger that answers needs well
+under a second, and one that doesn't is not going to start. Giving up on a stated deadline and saying
+so in the log leaves the operator a fact to act on; waiting forever leaves them a SIGKILL.
+
+**Decision — a run that ends properly says so, on its last line.** Until now a graceful stop left the
+log simply ending after the last poll, which is indistinguishable from the process dying mid-cycle.
+The closing line names which of the two cases it was, who asked for it, and the exit code the restart
+policy will read — so the *absence* of the line is now itself the diagnosis. This matters more here
+than it would elsewhere: the Pi's journal is RAM-only and the box hard-stops on its own, so the
+controller's log file is the only account of a run that survives the reboot. The line is written from
+`ApplicationStopped` rather than after `Run()` returns, because by then the service provider — and
+with it Serilog and its file sink — has been disposed and the write would be swallowed in silence.
+
+**Consequences accepted.** Stopping from the UI or Home Assistant is one-way from those surfaces: the
+service *is* both of them, so starting it again needs `docker compose start solax-controller` on the
+Pi. That is documented next to the stop rather than designed around. A standby mode — the process
+staying up, idle, with the UI serving a Start button — would avoid it, and is the obvious next step if
+the round trip through ssh becomes annoying; it was considered here and rejected as more machinery
+than the problem currently justifies. Also, with no `Web:PasswordHash` configured the stop control is
+as open as the rest of the UI, which is called out in the README rather than special-cased: a control
+surface that anyone on the LAN can drive is already the documented default.
+
+---
+
 ## 2026-08-15 — The web UI's default port moves from 8080 to 8090
 
 **Context.** 8080 is the most contended port on a general-purpose Linux box. The reference Pi turned
