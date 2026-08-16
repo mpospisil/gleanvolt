@@ -20,7 +20,7 @@
   <!--
     Package metadata shared by every packable project. Nothing is packable unless it opts in: the
     default here is off, and the four libraries turn it on individually. That way a new project (a
-    test project especially) cannot start publishing itself to nuget.org by existing.
+    test project especially) cannot start publishing itself by existing.
 
     The package version is the Version above, so a package, the image tag and the git tag are all
     the same number by construction.
