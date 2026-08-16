@@ -59,7 +59,7 @@ COPY --from=build C:\app .
 
 # The terms travel with the artifact, for the same reason as the Linux image: a registry label can be
 # stripped by a re-tag, a file inside the image cannot. Both files, so the image is self-contained.
-COPY LICENSE LICENSE-MIT C:\app\
+COPY LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md C:\app\
 
 # This job builds with plain `docker build` rather than build-push-action, so nothing injects OCI
 # labels for it -- the Windows image carried none at all before this line. See Dockerfile.

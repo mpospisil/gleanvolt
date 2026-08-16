@@ -80,7 +80,7 @@ COPY --from=build --chown=${APP_UID}:${APP_UID} /app .
 #
 # Both files, so the image is self-contained: LICENSE refers to LICENSE-MIT for the earlier versions
 # whose permissions this licence change cannot and does not withdraw.
-COPY --chown=${APP_UID}:${APP_UID} LICENSE LICENSE-MIT /app/
+COPY --chown=${APP_UID}:${APP_UID} LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md /app/
 
 # The same statement in the form a registry, a scanner or `docker inspect` can read. The Dockerfile
 # is the source of it for both images; publish-image.yml passes the identical value to

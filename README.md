@@ -1109,6 +1109,10 @@ Source code up to and including commit `00de500` (tag `mit-final`) was published
 and **remains available under it** ([LICENSE-MIT](LICENSE-MIT)) — a licence change cannot withdraw
 permissions already granted. The new terms apply to everything released after that commit.
 
-Third-party components keep their own licences: the .NET runtime and container base images,
-[uPlot](https://github.com/leeoniya/uPlot) (MIT), and the libraries listed in the project files
-(NModbus, MQTTnet, Serilog, SQLitePCLRaw — all MIT or Apache-2.0). Nothing here restricts them.
+Third-party components keep their own licences, and nothing here restricts them — every dependency is
+permissive (MIT or Apache-2.0), with the versions, copyright holders and full licence texts listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). That file ships inside the container images and the
+packages too.
+
+Contributions are welcome and need a sign-off; see [CONTRIBUTING.md](CONTRIBUTING.md) and
+[CLA.md](CLA.md) for what that means and why this project asks for it.
