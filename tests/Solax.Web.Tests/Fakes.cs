@@ -106,6 +106,17 @@ internal sealed class FakeBatteryHoldSelector(bool initialHold = false) : IBatte
     }
 }
 
+/// <summary>
+/// A stand-in for <c>HostShutdown</c> (which lives in Solax.Worker and owns the real host): records
+/// who asked to stop, and — crucially for a test — does not actually stop anything.
+/// </summary>
+internal sealed class FakeServiceShutdown : IServiceShutdown
+{
+    public List<string> Requests { get; } = [];
+
+    public void RequestStop(string source) => Requests.Add(source);
+}
+
 /// <summary>A minimal stand-in for <see cref="ForecastRuntimeSettings"/>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
 internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 {

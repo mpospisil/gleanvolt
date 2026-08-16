@@ -660,6 +660,68 @@ either a check or an idempotent repair — creating `logs/` and `data/` with the
 If a new build misbehaves, roll back to the previous tag with the same command. The database, logs
 and configuration are all still there, because the container was never where they lived.
 
+## Stopping and starting the controller
+
+### Stopping it
+
+Ask the service to stop; don't kill it. There are three ways, and they do the same thing:
+
+| From | How |
+|---|---|
+| The web UI | **Health** page → **Stop service**, then confirm |
+| Home Assistant | the device's **Stop service** button (in the device's *Configuration* section) |
+| A shell on the Pi | `docker compose stop solax-controller` |
+
+All three run the host's graceful shutdown: the charger's setpoint is returned to the pause current,
+the open charging session is closed and written as `ServiceStopped` rather than left to be recovered
+as interrupted, the session store is flushed, and the Modbus and MQTT connections are closed (Home
+Assistant sees the device go unavailable).
+
+**Killing the process instead — `docker kill`, `docker rm -f`, `kill -9`, pulling the plug — skips
+all of it.** Little is lost from the database (SQLite is crash-safe here and the log file is written
+unbuffered), but the first item is the one that matters: **nothing revokes the charging current**, so
+the car keeps drawing at whatever we last wrote until something else changes it.
+
+### Starting it again
+
+A stop from the UI or from Home Assistant is a *stop*, not a restart. Nothing brings the controller
+back on its own — that is the point of it — so starting it again means a shell on the Pi:
+
+```bash
+ssh martin@192.168.2.7
+cd /opt/solax
+
+docker compose start solax-controller      # start the container that is already there
+docker compose ps                          # confirm: State should be "running"
+docker compose logs -f solax-controller    # watch it come up
+```
+
+`docker compose up -d` works too, and is what a deploy runs anyway — so a deploy also starts a
+service that was stopped this way. Either way the controller comes back in charge mode **Off** with
+the battery hold disabled, like any other restart.
+
+> **Note.** While the controller is stopped there is no web UI and no Home Assistant integration —
+> the service *is* both of those. There is currently no way to start it back from either surface; a
+> future version may replace the stop with a standby mode that keeps the UI up so a **Start** button
+> has somewhere to live.
+
+### Why it stays stopped, and why a reboot doesn't
+
+`docker-compose.yml` runs the controller under `restart: on-failure`, and the worker chooses its exit
+code deliberately so that policy can tell the two cases apart:
+
+| How the run ended | Exit code | What Docker does |
+|---|---|---|
+| Somebody pressed **Stop** (UI, HA) | `0` | leaves it down until you start it |
+| `docker compose stop` | — | leaves it down (a manual stop always wins) |
+| SIGTERM: Pi reboot, Docker daemon restart, `docker compose restart` | `143` | starts it again |
+| Crash, OOM kill, power cut | non-zero | starts it again |
+
+So the Pi coming back from a power cut, a reboot or a Docker upgrade brings the controller back with
+it, exactly as before — only a stop somebody actually asked for is respected as one. If you ever need
+the old "always come back, no matter what" behaviour, set `restart: unless-stopped` again, and accept
+that the Stop button then means "restart in about a second".
+
 ## Everyday operations
 
 ```bash
@@ -668,7 +730,9 @@ cd /opt/solax
 
 docker compose ps                          # what's running
 docker compose logs -f solax-controller    # follow the poll loop
-docker compose restart solax-controller
+docker compose restart solax-controller    # comes back by itself; see "Stopping and starting"
+docker compose stop solax-controller       # stays down until you start it
+docker compose start solax-controller
 docker stats --no-stream                   # memory headroom -- the number that matters here
 
 # which build is actually running -- version and the commit it came from

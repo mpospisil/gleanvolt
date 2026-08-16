@@ -44,6 +44,7 @@ public sealed class HaDiscovery
     public string ModeStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/state";
     public string BatteryHoldCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/set";
     public string BatteryHoldStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/state";
+    public string StopServiceCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/stop_service/set";
 
     /// <summary>Object ids of the settable numbers, so the worker can subscribe and publish generically.</summary>
     public const string DailyEvTargetNumber = "daily_ev_target";
@@ -60,6 +61,17 @@ public sealed class HaDiscovery
     public const string PayloadOffline = "offline";
     public const string PayloadOn = "ON";
     public const string PayloadOff = "OFF";
+
+    /// <summary>
+    /// What Home Assistant sends when an MQTT button is pressed. Matched exactly, and nothing else is
+    /// accepted: this is the one command that cannot be undone from Home Assistant — once the service
+    /// is down it publishes nothing and listens to nothing — so a stray retained payload or a
+    /// hand-typed message on the topic must not be able to take the controller off the air.
+    /// </summary>
+    public const string PayloadPress = "PRESS";
+
+    public static bool IsPress(string? payload) =>
+        string.Equals(payload, PayloadPress, StringComparison.Ordinal);
 
     public string ModeState(ChargeControlMode mode) => mode.ToString();
 
@@ -170,6 +182,25 @@ public sealed class HaDiscovery
             ["state_topic"] = StateTopic,
             ["value_template"] = "{{ 'ON' if value_json.holding else 'OFF' }}",
             ["icon"] = "mdi:transmission-tower",
+        });
+
+        // Stops the whole service, gracefully -- the charger paused, the session closed, the store
+        // flushed -- and it then stays stopped until somebody starts the container again on the Pi.
+        // Home Assistant cannot start it back: the service is what speaks MQTT, so pressing this is
+        // the last thing this device does until an ssh session (deploy/README.md, "Stopping and
+        // starting the controller").
+        //
+        // entity_category "config" keeps it off the auto-generated dashboard card and in the device's
+        // configuration panel instead, which is the right amount of friction for a one-way control.
+        // The shared availability topic does the rest of the work: within a few seconds of the press
+        // the button greys out, which is how a dashboard says "it worked".
+        yield return Config("button", "stop_service", new Dictionary<string, object?>
+        {
+            ["name"] = "Stop service",
+            ["command_topic"] = StopServiceCommandTopic,
+            ["payload_press"] = PayloadPress,
+            ["entity_category"] = "config",
+            ["icon"] = "mdi:stop-circle-outline",
         });
     }
 

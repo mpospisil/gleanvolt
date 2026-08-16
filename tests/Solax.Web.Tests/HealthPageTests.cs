@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Solax.Core.Enums;
+using Solax.Core.Interfaces;
 using Solax.Core.Models;
 using Solax.Web.Components.Pages;
 
@@ -17,12 +18,14 @@ public class HealthPageTests : BunitContext
 
     private readonly ChargeControlStatusHolder _holder = new();
     private readonly FixedTimeProvider _time = new(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), Prague);
+    private readonly FakeServiceShutdown _shutdown = new();
 
     public HealthPageTests()
     {
         Services.AddSingleton(_holder);
         Services.AddSingleton(new WebBuildInfo("1.4.2 (31bf347)"));
         Services.AddSingleton<TimeProvider>(_time);
+        Services.AddSingleton<IServiceShutdown>(_shutdown);
     }
 
     [Fact]
@@ -112,5 +115,59 @@ public class HealthPageTests : BunitContext
         var page = Render<Health>();
 
         Assert.Contains("7 min ago", page.Markup);
+    }
+
+    // The stop control. What these are really guarding is that one click can't do it: the button is
+    // one-way from the browser's point of view -- the page it lives on goes down with the service --
+    // so a stray click has to be recoverable, and only the second one may reach the seam.
+
+    [Fact]
+    public void Does_not_stop_the_service_on_the_first_click()
+    {
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+
+        Assert.Empty(_shutdown.Requests);
+        Assert.Contains("Yes, stop it", page.Markup);
+    }
+
+    [Fact]
+    public void Stops_the_service_on_the_confirmation_and_says_who_asked()
+    {
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+        page.Find("button.danger").Click();
+
+        Assert.Equal(["Web UI"], _shutdown.Requests);
+    }
+
+    [Fact]
+    public void Cancelling_leaves_the_service_running()
+    {
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+        page.Find("button.secondary").Click();
+
+        Assert.Empty(_shutdown.Requests);
+        Assert.DoesNotContain("Yes, stop it", page.Markup);
+        Assert.Contains("Stop service", page.Markup);
+    }
+
+    [Fact]
+    public void Says_it_is_stopping_and_how_to_start_it_again()
+    {
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+        page.Find("button.danger").Click();
+
+        // The request returns immediately, so this render is the last thing the browser sees. It has
+        // to carry the one instruction the user now needs, because the UI is about to be gone.
+        Assert.Contains("Stopping", page.Markup);
+        Assert.Contains("docker compose start solax-controller", page.Markup);
+        Assert.Empty(page.FindAll("button.danger"));
     }
 }

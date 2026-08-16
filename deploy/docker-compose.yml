@@ -45,7 +45,25 @@ services:
   solax-controller:
     image: ghcr.io/mpospisil/solax-controller:${IMAGE_TAG:-latest}
     container_name: solax-controller
-    restart: unless-stopped
+    # `on-failure`, not `unless-stopped`, so that "Stop service" in the web UI (or the Home Assistant
+    # button) actually stops it: the container must stay down until somebody starts it again, and a
+    # policy that restarts on any exit would bring it straight back a second later.
+    #
+    # The exit code carries the difference, which is why the app sets one deliberately (HostShutdown):
+    #
+    #   0    an operator asked for the stop -> stays down until `docker compose start solax-controller`
+    #   143  SIGTERM: a Pi reboot, a Docker daemon restart, `docker compose restart` -> comes back
+    #   any other non-zero / killed  a crash or a power cut -> comes back
+    #
+    # That last column is the reason this is safe on a box that loses power: everything except a
+    # deliberate stop is still restarted, including at daemon start after an unclean shutdown.
+    # `docker compose stop` also stays stopped -- a manually stopped container ignores the policy
+    # entirely, whatever it exited with.
+    restart: on-failure
+    # Shutdown pauses the charger over Modbus, and that write can take three 5-second timeouts against
+    # a charger that has stopped answering. Docker's default grace period is 10s, which would SIGKILL
+    # the container part-way through the one thing a graceful stop exists to do.
+    stop_grace_period: 30s
     # Soft dependency, not a hard one: HomeAssistant:Enabled (below) is what actually decides whether
     # the controller speaks MQTT at all, and a controller-only deployment carries no `mosquitto`
     # service to depend on in the first place. `required: false` starts this before mosquitto if the
