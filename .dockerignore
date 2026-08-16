@@ -22,7 +22,9 @@ docs/
 .claude/
 *.md
 !README.md
-LICENSE
+
+# LICENSE is deliberately NOT excluded: the runtime stage copies it into the image so the terms
+# travel with the artifact rather than only with the repository.
 
 # Runtime state that only exists on a developer machine.
 logs/

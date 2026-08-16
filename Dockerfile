@@ -73,6 +73,20 @@ ARG APP_UID=1654
 
 WORKDIR /app
 COPY --from=build --chown=${APP_UID}:${APP_UID} /app .
+
+# The terms travel with the artifact. An image is pulled far more often than the repository it came
+# from is read, and a registry label can be stripped by anything that re-tags or re-pushes it; a file
+# inside the image cannot. Whoever holds the container can always answer "under what licence".
+#
+# Both files, so the image is self-contained: LICENSE refers to LICENSE-MIT for the earlier versions
+# whose permissions this licence change cannot and does not withdraw.
+COPY --chown=${APP_UID}:${APP_UID} LICENSE LICENSE-MIT /app/
+
+# The same statement in the form a registry, a scanner or `docker inspect` can read. The Dockerfile
+# is the source of it for both images; publish-image.yml passes the identical value to
+# metadata-action so its own licence auto-detection cannot overwrite this with a stale answer.
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
+
 USER ${APP_UID}
 
 # No diagnostic IPC socket: nothing here attaches a profiler, and it is one less writable path.

@@ -1091,4 +1091,24 @@ built — see [Browsing charging session history](#browsing-charging-session-his
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+**Free for any noncommercial purpose**, which includes running it on your own home installation,
+hobby and amateur use, and use by charities, schools, public research bodies and government
+institutions. No registration, no key, no telemetry — clone it, build it, run it.
+
+**Commercial use requires a separate licence** from the copyright holder. If you install, operate or
+resell this for clients, bundle it with hardware, or run it as part of a business, please
+[open an issue](https://github.com/mpospisil/solax-controller/issues) or email m.pospisil76@gmail.com
+— it is usually a short conversation.
+
+This applies to the published container images too: they carry the licence at `/app/LICENSE` and the
+`org.opencontainers.image.licenses` label, and pulling one is not a commercial licence.
+
+Source code up to and including commit `00de500` (tag `mit-final`) was published under the MIT License
+and **remains available under it** ([LICENSE-MIT](LICENSE-MIT)) — a licence change cannot withdraw
+permissions already granted. The new terms apply to everything released after that commit.
+
+Third-party components keep their own licences: the .NET runtime and container base images,
+[uPlot](https://github.com/leeoniya/uPlot) (MIT), and the libraries listed in the project files
+(NModbus, MQTTnet, Serilog, SQLitePCLRaw — all MIT or Apache-2.0). Nothing here restricts them.

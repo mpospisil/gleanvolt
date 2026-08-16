@@ -4,6 +4,56 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-16 — Noncommercial from here on, and the terms ship inside the artifact
+
+**Context.** The intent is that the controller stays free for the people it was written for — someone
+running it on their own house — while commercial use, an installer deploying it for clients or a
+vendor bundling it with hardware, is licensed separately. MIT grants commercial use expressly, so the
+intent and the licence disagreed.
+
+**Decision — PolyForm Noncommercial 1.0.0, from this version onward.** Chosen over writing our own
+terms because the hard part is defining "commercial", and PolyForm's wording is drafted and tested;
+over BSL/FSL because a change date is a promise this project has no reason to make yet; and over
+AGPL-plus-exception because AGPL barely inconveniences a company running a controller on its own LAN,
+so it would not produce the conversation it exists to produce.
+
+**The change is not retroactive, and the repository says so.** Every version published under MIT
+stays MIT — `LICENSE-MIT` is kept in the tree and referenced from `LICENSE` and the README. A licence
+change cannot withdraw a permission already granted, and pretending otherwise in the README would be
+both wrong and a bad look. The practical consequence is that someone can fork the last MIT commit;
+that is the accepted cost, and it is small for a project whose value is register maps verified against
+real hardware.
+
+**Decision — the terms live inside the artifact, not only beside it.** Three places, because each one
+can be lost independently:
+
+| Where | Why |
+|---|---|
+| `/app/LICENSE` and `/app/LICENSE-MIT` in both images | A registry label is stripped by any re-tag or re-push; a file in the image is not. `.dockerignore` no longer excludes them. |
+| `org.opencontainers.image.licenses` label | The machine-readable form, for `docker inspect` and scanners. Set in the Dockerfile so both images carry it — the Windows image, built with plain `docker build`, previously had no OCI labels at all. |
+| The licence text inside the NuGet packages | The packages already carry `PackageLicenseFile` rather than an SPDX expression, so they pick this up with no change. See below. |
+
+`publish-image.yml` passes the same value to `metadata-action`'s `labels:` input. Left to itself,
+that action fills the field from GitHub's licence detection, which does not recognise PolyForm and
+would leave the image unlabelled — or still claiming MIT — while `build-push-action`'s `--label`
+silently overrode the Dockerfile.
+
+**Consequence — the packages needed no change, and could not have used an expression anyway.** They
+already declare `PackageLicenseFile`, so they ship whatever `LICENSE` says. That turns out to have
+been the only option open to them: NuGet accepts SPDX expressions only for licences approved by the
+OSI or the FSF, and `PolyForm-Noncommercial-1.0.0` is a real SPDX identifier approved by neither, so
+`PackageLicenseExpression` would have been rejected outright. The file form is what every
+commercially licensed package on nuget.org uses, and it has the same virtue as the image copy: the
+terms are inside the artifact.
+
+**What this costs.** The project is no longer OSI open source. That most likely rules out a HACS or
+Home Assistant add-on listing, changes what the GitHub repo signals to a passing developer, and makes
+the libraries a trial rather than a funnel. Accepted deliberately: the alternative was a stated policy
+with nothing behind it.
+
+**What it does not buy.** Nothing here detects anything. A container on someone's LAN reports home
+never, and there is no key to check. These terms are a basis for invoicing an organisation that cares
+about compliance; they are not a control, and should not be mistaken for one.
 ## 2026-08-16 — The composition root is a library; the executable is only a host
 
 **Context.** `Program.cs` had grown to 399 lines, and the only way to run the controller was to run

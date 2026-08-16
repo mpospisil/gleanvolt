@@ -104,6 +104,12 @@ jobs:
             type=semver,pattern={{version}}
             type=ref,event=branch
             type=sha,prefix=sha-
+          # Stated rather than detected. metadata-action fills this field from GitHub's own licence
+          # detection, which does not recognise PolyForm and would leave the image either unlabelled
+          # or -- worse, on a cached answer -- still claiming MIT. The value must match the LABEL in
+          # the Dockerfile, which build-push-action's --label would otherwise silently override.
+          labels: |
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
 
       - name: Build and push
         uses: docker/build-push-action@v6
