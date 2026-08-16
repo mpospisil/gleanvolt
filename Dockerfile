@@ -23,7 +23,7 @@ ARG TARGETARCH
 
 # What the built worker will report at startup and to Home Assistant. Defaults match
 # Directory.Build.props, so a plain `docker build` is honestly labelled as a local build; CI passes
-# the release version and the commit. See src/Solax.Worker/BuildInfo.cs.
+# the release version and the commit. See src/Solax.Hosting/BuildInfo.cs.
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=
 
@@ -32,10 +32,11 @@ WORKDIR /source
 # Restore against the project files alone, so the slow restore layer stays cached until a dependency
 # actually changes -- not on every source edit.
 COPY SolaxLocalController.slnx ./
-COPY src/Solax.Core/Solax.Core.csproj                 src/Solax.Core/
+COPY src/Solax.Core/Solax.Core.csproj                     src/Solax.Core/
 COPY src/Solax.Infrastructure/Solax.Infrastructure.csproj src/Solax.Infrastructure/
-COPY src/Solax.Web/Solax.Web.csproj                   src/Solax.Web/
-COPY src/Solax.Worker/Solax.Worker.csproj             src/Solax.Worker/
+COPY src/Solax.Web/Solax.Web.csproj                       src/Solax.Web/
+COPY src/Solax.Hosting/Solax.Hosting.csproj               src/Solax.Hosting/
+COPY src/Solax.Worker/Solax.Worker.csproj                 src/Solax.Worker/
 RUN dotnet restore src/Solax.Worker/Solax.Worker.csproj -a "$TARGETARCH"
 
 COPY src/ src/

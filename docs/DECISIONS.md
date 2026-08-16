@@ -54,6 +54,54 @@ with nothing behind it.
 **What it does not buy.** Nothing here detects anything. A container on someone's LAN reports home
 never, and there is no key to check. These terms are a basis for invoicing an organisation that cares
 about compliance; they are not a control, and should not be mistaken for one.
+## 2026-08-16 — The composition root is a library; the executable is only a host
+
+**Context.** `Program.cs` had grown to 399 lines, and the only way to run the controller was to run
+`Solax.Worker`. That was an accident rather than a choice: of the 24 files in the project, exactly two
+— `Program.cs` and `DotEnv.cs` — were specific to *that* executable. The polling service, the
+coordinator, the selectors, the Home Assistant worker, the session recorder, the forecasting types
+and all seven options classes were host-agnostic library code that happened to live inside an
+`Microsoft.NET.Sdk.Web` project, and therefore could not be referenced, packaged or composed
+anywhere else. The DI wiring could not be exercised at all except by booting the process.
+
+**Decision — the wiring moves to `Solax.Hosting`, and the executable keeps only what makes it an
+executable.** `AddSolaxController()` holds every registration; `Solax.Worker` keeps the `.env` load,
+the Serilog configuration, the `hash-password` tool and the exit code, and lands at ~95 lines. The
+layer order becomes `Solax.Worker` → `Solax.Hosting` → `Solax.Infrastructure` → `Solax.Core`.
+
+`Solax.Worker` now references `Solax.Hosting` **and nothing else**. That is the enforcement, not the
+comment: host code cannot reach `Solax.Core` or `Solax.Infrastructure` directly any more, so the
+composition root cannot quietly grow a second half back inside the entry point.
+
+**Decision — the primary shape is `IServiceCollection`, not `WebApplicationBuilder`.** A host that is
+not built on `WebApplicationBuilder` — a console host, a desktop shell — should still be able to run
+the controller, so the registrations take an `IServiceCollection` and an `IConfiguration`. Two
+consequences:
+
+- The UI's port is set with `services.Configure<KestrelServerOptions>(...)` rather than
+  `builder.WebHost.ConfigureKestrel(...)`. These are the same registration; only the second needs a
+  builder.
+- `UseStaticWebAssets()` is the one thing that genuinely cannot be expressed as a registration, so it
+  is the only content of the `WebApplicationBuilder` overload. Without it, an unpublished build
+  serves `blazor.web.js` as an empty 200 and the UI renders once and then dies — see the 2026-08-13
+  record.
+
+**Decision — the implicit usings are declared in the `.csproj`.** The moved code was written against
+the Web SDK's implicit usings, which a plain class library does not supply. They are re-declared as
+`<Using Include="..." />` items rather than added as 22 files' worth of `using` directives, so that
+the move stays a move and the diff stays reviewable.
+
+**Decision — the four libraries are packages; the executable is not.** `IsPackable` defaults to
+`false` in `Directory.Build.props` and each library opts in, so a project (a test project especially)
+cannot start publishing itself by existing. The ids `Solax.Core`, `Solax.Infrastructure`, `Solax.Web`
+and `Solax.Hosting` were all unregistered on nuget.org when checked on 2026-08-16, so the package ids
+match the assembly names. The version is the same tag-derived number the image already uses, which is
+what makes a package, an image and a commit one release rather than three.
+
+**Consequence — `BuildInfo` reads `Solax.Hosting`'s attributes now, not `Solax.Worker`'s.** It reads
+its own assembly, and it moved. The reported string is unchanged because `Directory.Build.props`
+stamps every project in the repo with the same version and commit; a consumer that packages
+`Solax.Hosting` separately would see that assembly's version, which is the right answer for them.
 
 ## 2026-08-16 — The service can be stopped from its own surfaces, and the exit code is what keeps it stopped
 

@@ -4,6 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Solax.Core</PackageId>
+    <Description>Domain models, control strategies and hardware abstractions for the SolaX Local Controller. No hardware, hosting or framework dependencies -- the decision logic on its own.</Description>
   </PropertyGroup>
 
 </Project>

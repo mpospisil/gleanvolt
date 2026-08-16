@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Solax.Hosting</PackageId>
+    <Description>The SolaX Local Controller's composition root: AddSolaxController() registers polling, charge control, the session store, the Home Assistant integration and the web UI into any host.</Description>
+  </PropertyGroup>
+
+  <!--
+    The shared framework rather than individual packages: this library composes an ASP.NET Core host
+    (Kestrel's options, IServer, endpoint routing) and is only ever loaded into one, so there is
+    nothing to gain from pretending otherwise. Solax.Web takes the same reference for the same reason.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    The implicit usings this code was written against. It came from Solax.Worker, where the Web SDK
+    supplied them; the plain SDK supplies only the System ones. Declared here rather than added as
+    22 files' worth of using directives, so that the move stays a move and the diff stays readable.
+  -->
+  <ItemGroup>
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Hosting" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Solax.Core\Solax.Core.csproj" />
+    <ProjectReference Include="..\Solax.Infrastructure\Solax.Infrastructure.csproj" />
+    <ProjectReference Include="..\Solax.Web\Solax.Web.csproj" />
+  </ItemGroup>
+
+</Project>
