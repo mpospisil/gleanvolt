@@ -895,7 +895,13 @@ without it staleness cannot be judged.
 
 For a VW ID.4 via the [`volkswagen_connect`](https://github.com/rafaelhutter/ha-volkswagen-connect)
 integration. Publish **retained**, so a controller restart is handed the last known reading instead of
-waiting up to a quarter of an hour for the next one:
+waiting up to a quarter of an hour for the next one.
+
+> **Two shapes, one automation.** Home Assistant accepts automations in two places, and they are
+> indented differently — pasting the wrong shape fails validation, which is the most common way this
+> step goes wrong. Use the second block below if you are working in the UI, which most people are.
+
+In `configuration.yaml`, under a top-level `automation:` key:
 
 ```yaml
 automation:
@@ -924,9 +930,55 @@ automation:
              "source": "id4"}
 ```
 
+Or in the UI — **Settings → Automations & scenes → + Create automation → Create new automation**, then
+the **⋮ menu → Edit in YAML**. That editor holds one automation's *body*, so there is no `automation:`
+key and no leading `- `, and everything sits four spaces further left:
+
+```yaml
+alias: Publish ID.4 state to Gleanvolt
+trigger:
+  - platform: state
+    entity_id:
+      - sensor.id_4_pro_performance_battery
+      - sensor.id_4_pro_performance_charging_state
+      - sensor.id_4_pro_performance_plug
+condition:
+  - "{{ states('sensor.id_4_pro_performance_battery') | int(-1) >= 0 }}"
+action:
+  - service: mqtt.publish
+    data:
+      topic: gleanvolt/vehicle/id4/state
+      retain: true
+      payload: >-
+        {% set cs = states('sensor.id_4_pro_performance_charging_state') %}
+        {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
+         "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+         "charge_state": "{{ 'charging' if cs == 'charging'
+                             else 'idle' if cs in ['notReadyForCharging','readyForCharging']
+                             else 'unknown' }}",
+         "plug_state": "{{ states('sensor.id_4_pro_performance_plug') }}",
+         "source": "id4"}
+mode: single
+```
+
+`alias` is the automation's name, so Home Assistant fills that in for you on save.
+
 Then set `Vehicle:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
 being published while the integration's entities read `unavailable`, which happens whenever its cloud
 session expires.
+
+**Don't wait for the trigger to prove it works.** It fires on a *state change* of those three sensors,
+and a parked car may not produce one for hours. Publish immediately with the automation's
+**⋮ → Run actions**, which skips both the trigger and the condition. The controller logs the result:
+
+```
+[22:56:17 INF] First vehicle reading from gleanvolt/vehicle/id4/state:
+               SOC=28% charge=Idle plug=Disconnected captured 2026-08-17T10:44:23+00:00
+```
+
+If instead you see `Ignoring vehicle telemetry ... 'soc_percent' was a JSON String, expected a number`,
+the source entity was `unavailable` when the payload was built — which is what the `condition` prevents
+on a real trigger but cannot prevent when you force it with *Run actions*.
 
 Note the capture time comes from **`last_vehicle_report`**, not that integration's `data_captured`
 sensor — the latter belongs to its EU Data Act source and reads `unknown` until that is separately
