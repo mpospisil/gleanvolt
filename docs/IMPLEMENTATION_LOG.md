@@ -4,6 +4,124 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-17 — Vehicle telemetry phase 1: the car's battery SOC over MQTT (issue #73)
+
+The controller can now read the **car's own** battery state — as distinct from the home battery the
+inverter reports, and from the charger's view of what is plugged into it. Read-only: nothing in
+`ChargeControl` or `BatteryHold` consumes it, and it is not republished to Home Assistant, which is
+where it comes from.
+
+### Why MQTT rather than a car API
+
+There is no Volkswagen, Škoda or Tesla integration in this tree, deliberately. The controller
+subscribes to **one topic with one JSON schema**, and each car is adapted onto that schema by a
+template in Home Assistant.
+
+The reason is that every source spells the same facts differently — the VW EU Data Act portal emits
+`CHARGE_STATE_CHARGING_HV_BATTERY`, `volkswagen_connect` emits `notReadyForCharging`, an OBD dongle
+emits raw CAN values — and all of them are reverse-engineered against backends that change. In May–June
+2026 Volkswagen retired the WeConnect OAuth client and put the CARIAD token exchange behind app
+attestation, breaking `volkswagencarnet`, `evcc` and `openWB` outright. Owning a client here would mean
+chasing that forever, in a codebase whose stated point is not depending on clouds. Owning a *schema*
+instead means a second vehicle costs no code: an Elroq, a Tesla or a Kia is a copied automation.
+
+### What was built
+
+- `Gleanvolt.Core`: `VehicleState`, `VehicleChargeState`, `VehiclePlugState`, `IVehicleTelemetry`,
+  `VehicleStateHolder`.
+- `Gleanvolt.Infrastructure`: `Vehicles/VehicleTelemetryPayload` — the wire contract and its parser,
+  pure so it is testable without a broker.
+- `Gleanvolt.Hosting`: `Configuration/VehicleOptions`, `Vehicles/VehicleMqttWorker`.
+- `Gleanvolt.Web`: a dashboard section showing SOC *and the reading's age*, plus `VehicleDisplayOptions`
+  — the same arrangement as `WebBuildInfo`, since the UI cannot see the host's options classes.
+
+MQTTnet was already referenced by `Gleanvolt.Hosting`, so no project gained a package.
+`IVehicleTelemetry` copies `ISolarForecastService`'s contract — fed asynchronously, answers
+synchronously — so the poll loop never does I/O for this.
+
+### Architecture decisions
+
+- **Everything except `CapturedAt` is optional.** No two sources report the same set, and absent is
+  `null` or `Unknown`, never zero — a zero SOC would read as a flat battery. `CapturedAt` is mandatory
+  because it is the *car's* capture time rather than the arrival time, and staleness cannot be judged
+  without it.
+- **The parser's rule is: absent is fine, present-but-unusable is not.** `"soc_percent": "unavailable"`
+  is exactly what a Home Assistant template emits when its source entity drops out. Rejecting the whole
+  payload leaves the last good reading in place with a visibly growing age — a diagnosable state —
+  instead of half-trusting junk. Unrecognised *enum* values are the one exception and map to `Unknown`,
+  because those vocabularies are open-ended and an unfamiliar charge state should not cost us the SOC.
+- **A single concrete topic, not a `+` wildcard.** A wildcard across several cars would silently let the
+  newest message win regardless of which car it described. Multi-vehicle needs an explicit
+  active-vehicle selector, which is a later phase.
+- **The publisher must retain.** A controller restart is then handed the last reading on subscribe
+  rather than waiting up to a quarter of an hour for the source's next update.
+- **`Vehicle__BrokerHost` is overridable**, unlike the pinned `HomeAssistant__BrokerHost`. The car's
+  data is *published* by Home Assistant, and under `deploy-controller-only.sh` there is no `mosquitto`
+  on the compose network at all, so "the broker beside us" is the common case rather than the only one.
+
+### Why it is advisory only, and always will be
+
+Measured on the reference install rather than assumed:
+
+- A parked car's report was **2 hours** old on one reading, **3.5 hours** on another, and **10 hours**
+  on the first one the controller actually received. Hours stale is the normal case — and not a problem,
+  since a parked car's SOC does not drift.
+- The upstream `volkswagen_connect` session **expired after roughly 15 hours**, taking every entity to
+  `unavailable`. Recovery needed a human re-entering a password plus an email OTP; it cannot self-heal.
+- **Target SOC is not reliably available at all.** The portal's field is
+  `batteryStatus.navigationTargetSOC_pct` and is null unless the car has an active charge plan; the EU
+  Data Act equivalent (`settings.target_soc`) needs a separate continuous data request that VW can take
+  days to start filling.
+
+So `MaxAge` (12 h by default) exists to catch a **dead feed**, not to reject merely old numbers, and a
+charge target stays configuration rather than something read from the car. Phase 2 inherits that
+constraint: anything that writes to hardware must behave identically when this feed is absent, stale or
+gone.
+
+### Verification performed
+
+- 474 unit tests pass, 0 build warnings. The parser's cover offset preservation, absent versus
+  present-but-unusable SOC, epoch-number rejection, case-insensitive enum names, unknown-enum
+  tolerance, forward compatibility with unrecognised properties, and non-object payloads. The dashboard
+  tests cover the section being hidden entirely when nothing has reported, the stale marker past
+  `MaxAge`, and a 3.5-hour reading *not* being called stale.
+- **End to end against the live ID.4 on the Pi**, with the Home Assistant automation publishing
+  retained:
+
+  ```
+  [22:44:05 INF] Vehicle telemetry enabled; broker mosquitto:1883,
+                 topic gleanvolt/vehicle/id4/state, max age 12:00:00.
+  [22:44:05 INF] Subscribed to vehicle telemetry on gleanvolt/vehicle/id4/state.
+  [22:56:17 INF] First vehicle reading from gleanvolt/vehicle/id4/state:
+                 SOC=28% charge=Idle plug=Disconnected captured 2026-08-17T10:44:23+00:00
+  ```
+
+  Parsed on the first attempt with zero rejected payloads. `charge=Idle` confirms the template mapped
+  VW's `notReadyForCharging` onto the normalised vocabulary, and the `+00:00` offset survived intact —
+  taken from `last_vehicle_report`, not the arrival time. The reading was over ten hours old when
+  received, which is correct for a car parked all day and is precisely the case the design exists for.
+
+### Not done / open
+
+- Nothing consumes it. `ChargeControl` and `BatteryHold` are untouched.
+- No per-vehicle capacity and no kWh conversion, so no "kWh to deliver by departure" — that is phase 2,
+  and it is the point at which the unavailable target SOC starts to matter.
+- No active-vehicle selector, so a second car would need one before it could share the charger.
+- No Home Assistant entity for any of this, on purpose: Home Assistant is the source.
+
+### Files
+
+- `src/Gleanvolt.Core/Models/VehicleState.cs`, `VehicleStateHolder.cs`
+- `src/Gleanvolt.Core/Enums/VehicleChargeState.cs`, `VehiclePlugState.cs`
+- `src/Gleanvolt.Core/Interfaces/IVehicleTelemetry.cs`
+- `src/Gleanvolt.Infrastructure/Vehicles/VehicleTelemetryPayload.cs`
+- `src/Gleanvolt.Hosting/Configuration/VehicleOptions.cs`, `Vehicles/VehicleMqttWorker.cs`
+- `src/Gleanvolt.Web/VehicleDisplayOptions.cs`, `Components/Pages/Dashboard.razor`
+- `deploy/docker-compose.yml`, `deploy/.env.example` (PR #75 — the `Vehicle__*` pass-throughs, without
+  which the setting was unreachable on the Pi)
+
+---
+
 ## 2026-08-16 — Third-party notices gain the register-map source; releases stop assuming a feed
 
 Two follow-ups, neither of which changes any behaviour.
