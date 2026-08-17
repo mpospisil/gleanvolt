@@ -6,6 +6,8 @@
 @inject IChargeControlModeSelector Mode
 @inject IBatteryHoldSelector BatteryHold
 @inject IForecastRuntimeSettings ForecastSettings
+@inject IVehicleTelemetry Vehicle
+@inject VehicleDisplayOptions VehicleDisplay
 @inject TimeProvider Time
 
 @*
@@ -66,6 +68,38 @@ else
               Hint="The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging." />
         <Stat Label="Active current" Value="@Amps(_status.ActiveCurrentAmps)"
               Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
+    </section>
+}
+
+@*
+    Vehicle telemetry (#73). Read-only, and nothing in the control logic consumes it yet. Rendered only
+    when a reading exists, so an install with Vehicle:Enabled=false sees no empty section at all.
+
+    The age is shown next to the SOC rather than tucked into a hint because it is the number that
+    decides whether the SOC means anything: this data comes from a cloud integration whose readings are
+    routinely hours old while the car sleeps, and whose upstream session expires on its own.
+*@
+@if (_vehicle is not null)
+{
+    <h2>Vehicle</h2>
+
+    <p class="muted">
+        Reported by the car @VehicleAge(_vehicle) ago@(_vehicle.SourceId is null ? "" : $" via {_vehicle.SourceId}")
+        @if (_vehicleStale)
+        {
+            <strong> — stale, older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h</strong>
+        }
+    </p>
+
+    <section class="stat-grid">
+        <Stat Label="Car battery" Value="@Percent(_vehicle.SocPercent)"
+              Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
+        <Stat Label="Car reading age" Value="@VehicleAge(_vehicle)"
+              Hint="How long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died." />
+        <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()"
+              Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+        <Stat Label="Car plug state" Value="@_vehicle.PlugState.ToString()"
+              Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
     </section>
 }
 
@@ -134,6 +168,8 @@ else
 
 @code {
     private ChargeControlStatus? _status;
+    private VehicleState? _vehicle;
+    private bool _vehicleStale;
     private ChargeControlMode _selectedMode;
     private bool _batteryHoldDisplay;
     private double _dailyEvTargetKWh;
@@ -150,6 +186,7 @@ else
 
         _batteryHoldDisplay = _status?.BatteryHoldActive ?? BatteryHold.Hold;
 
+        RefreshVehicle();
         RefreshRuntimeNumbers();
     }
 
@@ -165,6 +202,11 @@ else
         // changed one since this page loaded -- the same reason the MQTT worker republishes them on
         // every status cycle.
         RefreshRuntimeNumbers();
+
+        // Read the car on the poll's cadence rather than subscribing to the holder as well. Vehicle
+        // readings arrive minutes apart at best, so a few seconds of latency is invisible, and this
+        // keeps the page to one event subscription and the render to one path.
+        RefreshVehicle();
 
         InvokeAsync(StateHasChanged);
     }
@@ -203,11 +245,47 @@ else
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
     }
 
+    private void RefreshVehicle()
+    {
+        _vehicle = Vehicle.GetCurrentState();
+        _vehicleStale = _vehicle is not null
+            && _vehicle.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
+    }
+
+    // Coarse on purpose: this data is hours old routinely, so minutes of precision would imply an
+    // accuracy the source doesn't have. A negative age (the car's clock ahead of ours) reads as "just
+    // now" rather than as a negative duration.
+    private string VehicleAge(VehicleState vehicle)
+    {
+        var age = vehicle.AgeAt(Time.GetUtcNow());
+
+        if (age < TimeSpan.Zero)
+        {
+            return "just now";
+        }
+
+        if (age < TimeSpan.FromMinutes(1))
+        {
+            return "under a minute";
+        }
+
+        if (age < TimeSpan.FromHours(1))
+        {
+            return $"{age.TotalMinutes:F0} min";
+        }
+
+        return age < TimeSpan.FromDays(1)
+            ? $"{age.TotalHours:F1} h"
+            : $"{age.TotalDays:F1} days";
+    }
+
     private static string Watts(double watts) => $"{watts:F0} W";
 
     private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
 
     private static string Percent(double percent) => $"{percent:F0}%";
+
+    private static string Percent(double? percent) => percent is null ? "—" : $"{percent.Value:F0}%";
 
     private static string Amps(int amps) => $"{amps} A";
 

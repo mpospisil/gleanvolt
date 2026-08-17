@@ -9,6 +9,7 @@ using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Sessions;
+using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Sessions;
@@ -279,6 +280,22 @@ public static class GleanvoltHostingExtensions
         // secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).
         services.Configure<HomeAssistantOptions>(configuration.GetSection(HomeAssistantOptions.SectionName));
         services.AddHostedService<HomeAssistantMqttWorker>();
+
+        // Vehicle telemetry read off MQTT (issue #73). Disabled by default; broker credentials are
+        // secrets supplied via .env / env var (Vehicle__Username / Vehicle__Password).
+        //
+        // The holder and IVehicleTelemetry are registered whether or not the feed is enabled, so the web
+        // UI can inject the read side unconditionally and render "no reading" rather than having to know
+        // about the configuration. Only the worker checks Enabled.
+        services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
+        services.AddSingleton<VehicleStateHolder>();
+        services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
+        services.AddHostedService<VehicleMqttWorker>();
+
+        // The UI needs MaxAge to mark a reading stale, but Gleanvolt.Web cannot see this assembly's
+        // options classes. Hand it the one value, exactly as WebBuildInfo is handed the version.
+        services.AddSingleton(provider =>
+            new VehicleDisplayOptions(provider.GetRequiredService<IOptions<VehicleOptions>>().Value.MaxAge));
 
         AddWebSurface(services, configuration);
 
