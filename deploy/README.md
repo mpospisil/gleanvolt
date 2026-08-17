@@ -89,6 +89,13 @@ file is a stack that comes up looking healthy while the controller is refused on
 Deploy with `./deploy/deploy.sh`, then complete Home Assistant's onboarding at `:8123` as described
 under [First run](#first-run).
 
+Optionally, this workflow can also read the **car's own** battery SOC back off the same broker —
+`VEHICLE_ENABLED`, `VEHICLE_TOPIC` and friends in [`.env.example`](.env.example), with the Home
+Assistant automation that feeds it in the main README's
+[Vehicle telemetry](../README.md#vehicle-telemetry-the-vehicle-section) section. It reuses
+`MQTT_USERNAME`/`MQTT_PASSWORD`, writes to nothing, and no charge decision depends on it, so it is safe
+to leave off and safe to turn on later.
+
 ### Workflow B — controller and its web UI only
 
 For a Pi with **1 GB of RAM**, or any board where you simply don't want Home Assistant. The

@@ -92,6 +92,26 @@ services:
       HomeAssistant__Username: ${MQTT_USERNAME:-}
       HomeAssistant__Password: ${MQTT_PASSWORD:-}
 
+      # Vehicle telemetry (issue #73). Reads the car's own SOC off MQTT; writes nothing, so there is no
+      # dry-run and the worst a wrong topic can do is leave the dashboard's Vehicle card absent.
+      #
+      # Unlike HomeAssistant__BrokerHost above, this one is overridable rather than pinned to the
+      # compose-network name. The car's data is *published* by Home Assistant, and under
+      # deploy-controller-only.sh there is no mosquitto on this network at all -- so "the broker beside
+      # us" is the common case, not the only one, and pointing this at the machine that does run Home
+      # Assistant has to stay possible.
+      #
+      # The credentials are deliberately the same MQTT_USERNAME/MQTT_PASSWORD the block above uses:
+      # publishing status to a broker and subscribing to it are the same broker in every deployment
+      # this file describes, and a second pair of variables would only be a way to get them out of sync.
+      Vehicle__Enabled: ${VEHICLE_ENABLED:-false}
+      Vehicle__BrokerHost: ${VEHICLE_BROKER_HOST:-mosquitto}
+      Vehicle__BrokerPort: ${VEHICLE_BROKER_PORT:-1883}
+      Vehicle__Username: ${MQTT_USERNAME:-}
+      Vehicle__Password: ${MQTT_PASSWORD:-}
+      Vehicle__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
+      Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
+
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
