@@ -63,6 +63,29 @@ public sealed class HaDiscovery
     public const string PayloadOff = "OFF";
 
     /// <summary>
+    /// Home Assistant's MQTT payload meaning "no value": it sets the sensor's state to <c>unknown</c>
+    /// rather than storing the literal string (<c>PAYLOAD_NONE</c> in HA's mqtt component).
+    /// </summary>
+    public const string PayloadNone = "None";
+
+    /// <summary>
+    /// The <c>value_template</c> for a metric <see cref="StateJson"/> may omit — a nullable field, or
+    /// any of the plan block outside the forecast-driven mode.
+    /// <para>
+    /// Home Assistant renders a sensor's template on <b>every</b> state message, whether or not the
+    /// entity is available, so an unguarded <c>value_json.x</c> logs a "'dict object' has no attribute
+    /// 'x'" warning on every publish — once per <c>StatusInterval</c>, per missing field, which fills
+    /// the log on an idle site. Jinja's <c>default</c> filter short-circuits on an undefined variable
+    /// without stringifying it (so nothing is logged), and substitutes
+    /// <see cref="PayloadNone"/> — which is exactly the "report nothing" these entities were always
+    /// meant to show.
+    /// </para>
+    /// Keep using a plain <c>value_json.x</c> template for keys that are always present; the
+    /// asymmetry is the documentation of which metrics are optional.
+    /// </summary>
+    private static string Optional(string key) => $"{{{{ value_json.{key} | default('{PayloadNone}') }}}}";
+
+    /// <summary>
     /// What Home Assistant sends when an MQTT button is pressed. Matched exactly, and nothing else is
     /// accepted: this is the one command that cannot be undone from Home Assistant — once the service
     /// is down it publishes nothing and listens to nothing — so a stray retained payload or a
@@ -118,11 +141,11 @@ public sealed class HaDiscovery
         yield return Sensor("control_state", "Control state", template: "{{ value_json.state }}", icon: "mdi:state-machine");
         yield return Sensor("charger_status", "Charger status", template: "{{ value_json.charger_status }}", icon: "mdi:ev-station");
         yield return Sensor("solar_power", "Solar power", template: "{{ value_json.solar_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
-        yield return Sensor("surplus", "Solar surplus", template: "{{ value_json.surplus_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        yield return Sensor("surplus", "Solar surplus", template: Optional("surplus_w"), unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("ev_power", "EV charging power", template: "{{ value_json.ev_power_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("ev_current", "EV charging current", template: "{{ value_json.ev_current_a }}", unit: "A", deviceClass: "current", stateClass: "measurement");
-        yield return Sensor("target_current", "Target charging current", template: "{{ value_json.target_a }}", unit: "A", deviceClass: "current");
-        yield return Sensor("active_current", "Active charging current", template: "{{ value_json.active_a }}", unit: "A", deviceClass: "current");
+        yield return Sensor("target_current", "Target charging current", template: Optional("target_a"), unit: "A", deviceClass: "current");
+        yield return Sensor("active_current", "Active charging current", template: Optional("active_a"), unit: "A", deviceClass: "current");
         yield return Sensor("battery_soc", "Battery SOC", template: "{{ value_json.soc }}", unit: "%", deviceClass: "battery", stateClass: "measurement");
         yield return Sensor("battery_power", "Battery power", template: "{{ value_json.battery_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("grid_power", "Grid power", template: "{{ value_json.grid_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
@@ -143,23 +166,23 @@ public sealed class HaDiscovery
             });
 
             yield return Sensor(
-                "battery_hold_target", "Battery hold target", template: "{{ value_json.hold_target_w }}",
+                "battery_hold_target", "Battery hold target", template: Optional("hold_target_w"),
                 unit: "W", deviceClass: "power");
         }
 
         // Forecast-driven mode (issue #22). Published unconditionally: the mode is selectable at
         // runtime, so the entities have to exist before it is picked. They simply report nothing while
         // another mode is active.
-        yield return Sensor("day_outlook", "Day outlook", template: "{{ value_json.outlook }}", icon: "mdi:weather-partly-cloudy");
-        yield return Sensor("plan_state", "Plan state", template: "{{ value_json.plan_reason }}", icon: "mdi:text-box-outline");
-        yield return Sensor("charge_window", "Charge window", template: "{{ value_json.window }}", icon: "mdi:clock-outline");
-        yield return Sensor("ev_budget", "EV energy budget", template: "{{ value_json.ev_budget_kwh }}", unit: "kWh", deviceClass: "energy");
-        yield return Sensor("ev_expected_today", "EV energy expected today", template: "{{ value_json.ev_expected_kwh }}", unit: "kWh", deviceClass: "energy");
-        yield return Sensor("shortfall", "Projected shortfall", template: "{{ value_json.shortfall_kwh }}", unit: "kWh", deviceClass: "energy");
-        yield return Sensor("soc_floor", "Required SOC floor", template: "{{ value_json.soc_floor }}", unit: "%", icon: "mdi:battery-arrow-down");
-        yield return Sensor("forecast_remaining", "Forecast remaining today", template: "{{ value_json.forecast_remaining_kwh }}", unit: "kWh", deviceClass: "energy");
-        yield return Sensor("tomorrow_forecast", "Tomorrow forecast", template: "{{ value_json.tomorrow_kwh }}", unit: "kWh", deviceClass: "energy");
-        yield return Sensor("forecast_accuracy", "Forecast accuracy", template: "{{ value_json.bias_percent }}", unit: "%", icon: "mdi:chart-bell-curve");
+        yield return Sensor("day_outlook", "Day outlook", template: Optional("outlook"), icon: "mdi:weather-partly-cloudy");
+        yield return Sensor("plan_state", "Plan state", template: Optional("plan_reason"), icon: "mdi:text-box-outline");
+        yield return Sensor("charge_window", "Charge window", template: Optional("window"), icon: "mdi:clock-outline");
+        yield return Sensor("ev_budget", "EV energy budget", template: Optional("ev_budget_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("ev_expected_today", "EV energy expected today", template: Optional("ev_expected_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("shortfall", "Projected shortfall", template: Optional("shortfall_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("soc_floor", "Required SOC floor", template: Optional("soc_floor"), unit: "%", icon: "mdi:battery-arrow-down");
+        yield return Sensor("forecast_remaining", "Forecast remaining today", template: Optional("forecast_remaining_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("tomorrow_forecast", "Tomorrow forecast", template: Optional("tomorrow_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("forecast_accuracy", "Forecast accuracy", template: Optional("bias_percent"), unit: "%", icon: "mdi:chart-bell-curve");
         yield return Sensor("session_energy", "Session energy", template: "{{ value_json.session_kwh }}", unit: "kWh", deviceClass: "energy");
         yield return Sensor("loaned_today", "Battery loaned today", template: "{{ value_json.loaned_kwh }}", unit: "kWh", deviceClass: "energy");
         yield return Sensor("loan_power", "Battery loan power", template: "{{ value_json.loan_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");

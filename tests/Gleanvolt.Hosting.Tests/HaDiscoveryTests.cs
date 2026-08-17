@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
@@ -28,14 +29,20 @@ public class HaDiscoveryTests
         bool holdActive = true,
         double? holdTarget = -2450.4,
         SolarDayPlan? plan = null,
-        double loanWatts = 0) =>
+        double loanWatts = 0,
+        double? tomorrow = 24500) =>
         new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
             ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
             EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, BatteryPowerWatts: -1250.2,
             GridPowerWatts: 1601.4,
             BatteryHoldEnabled: true, BatteryHoldRequested: true, BatteryHoldActive: holdActive,
             BatteryHoldTargetWatts: holdTarget, Plan: plan, LoanPowerWatts: loanWatts, SessionEnergyWh: 8400,
-            LoanedTodayWh: 1800, TomorrowForecastWh: 24500, Timestamp: DateTimeOffset.UtcNow);
+            LoanedTodayWh: 1800, TomorrowForecastWh: tomorrow, Timestamp: DateTimeOffset.UtcNow);
+
+    /// <summary>Everything nullable actually null — no surplus, no target, no hold, no plan.</summary>
+    private static ChargeControlStatus IdleStatus() =>
+        Status(mode: ChargeControlMode.Off, state: ChargeControlState.Disabled, surplus: null, target: null,
+            active: null, holdActive: false, holdTarget: null, plan: null, tomorrow: null);
 
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
@@ -203,6 +210,39 @@ public class HaDiscoveryTests
             foreach (var property in json.RootElement.EnumerateObject())
             {
                 Assert.False(property.Value.ValueKind == JsonValueKind.Null, $"{topic} has null field '{property.Name}'");
+            }
+        }
+    }
+
+    [Fact]
+    public void DiscoveryMessages_GuardEverySensorKeyTheStatePayloadCanOmit()
+    {
+        // Home Assistant renders a sensor's value_template on every state message, whether or not the
+        // entity is available. So an unguarded value_json.x on a key StateJson omits logs a
+        // "'dict object' has no attribute 'x'" warning once per StatusInterval, per missing field --
+        // which fills the log on an idle site. The optional keys are derived from an all-nulls payload
+        // rather than listed here, so a new nullable metric cannot quietly reintroduce the noise.
+        using var idle = JsonDocument.Parse(DiscoveryWithBatteryHold.StateJson(IdleStatus()));
+        var present = idle.RootElement.EnumerateObject().Select(p => p.Name).ToHashSet();
+
+        foreach (var (topic, payload) in DiscoveryWithBatteryHold.DiscoveryMessages())
+        {
+            using var config = JsonDocument.Parse(payload);
+            if (!config.RootElement.TryGetProperty("value_template", out var templateNode))
+            {
+                continue;
+            }
+
+            var template = templateNode.GetString()!;
+            foreach (var match in Regex.Matches(template, @"value_json\.(\w+)").Cast<Match>())
+            {
+                var key = match.Groups[1].Value;
+                if (present.Contains(key))
+                {
+                    continue;
+                }
+
+                Assert.Contains("| default(", template);
             }
         }
     }
