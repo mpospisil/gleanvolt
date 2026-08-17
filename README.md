@@ -34,6 +34,9 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
+- **Vehicle telemetry** — optionally reads the **car's own** battery SOC from MQTT, normalised so any
+  vehicle Home Assistant can see becomes a source without new code. Advisory only: no control decision
+  depends on it.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service), and can be **stopped gracefully from the web UI or Home Assistant** — the charger released, the open session closed and written — instead of being killed. It stays stopped until you start it again, while a reboot or a power cut still brings it straight back; see [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller).
 - **Local data ownership** — no cloud dependency for core operation.
@@ -76,7 +79,8 @@ Gleanvolt.slnx
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
 │   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
-│   │   └── Solcast/                # Solar-forecast HTTP client
+│   │   ├── Solcast/                # Solar-forecast HTTP client
+│   │   └── Vehicles/               # The EV telemetry JSON contract and its parser
 │   │
 │   ├── Gleanvolt.Web/                  # The optional self-hosted UI (a Blazor component library)
 │   │   ├── Components/             # Pages, layout and the root document
@@ -90,7 +94,8 @@ Gleanvolt.slnx
 │   │   ├── Configuration/          # Options classes bound from appsettings.json
 │   │   ├── Forecasting/            # The day plan and its runtime settings
 │   │   ├── HomeAssistant/          # MQTT discovery and the HA worker
-│   │   └── Sessions/               # Charging-session recording worker
+│   │   ├── Sessions/               # Charging-session recording worker
+│   │   └── Vehicles/               # EV telemetry MQTT subscriber
 │   │
 │   └── Gleanvolt.Worker/               # The executable host, and nothing else
 │       ├── Program.cs              # .env, Serilog, AddGleanvolt(), the exit code
@@ -837,6 +842,112 @@ A ready-to-run broker + Home Assistant for local development lives in [`dev/home
 ```bash
 docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
 ```
+
+### Vehicle telemetry (the `Vehicle` section)
+
+The controller can read the **car's own** battery state — as distinct from the home battery the
+inverter reports, and from the charger's view of what's plugged into it. Off by default:
+
+```jsonc
+"Vehicle": {
+  "Enabled": false,
+  "BrokerHost": "localhost",
+  "BrokerPort": 1883,
+  "Topic": "gleanvolt/vehicle/state",   // whatever your HA automation publishes to
+  "MaxAge": "12:00:00"                  // past this, a reading is shown as stale
+}
+```
+
+`Vehicle:Username` / `Vehicle:Password` are supported for an authenticated broker and are secrets —
+supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
+
+This phase is **read-only**: nothing in `ChargeControl` or `BatteryHold` consumes it. It appears on the
+web UI dashboard and nowhere else — in particular it is *not* republished to Home Assistant, since
+Home Assistant is where it comes from.
+
+#### It reads MQTT, not a car API
+
+There is no integration with Volkswagen, Škoda, Tesla or anyone else in this codebase, deliberately.
+Instead the controller subscribes to **one topic with one JSON schema**, and each car is adapted onto
+that schema by a template or automation in Home Assistant:
+
+```jsonc
+{
+  "captured_at":  "2026-08-17T10:44:23+00:00",   // required: the CAR's capture time
+  "soc_percent":  28,                            // optional, 0-100
+  "charge_state": "charging",                    // optional: idle | charging | complete | unknown
+  "plug_state":   "connected",                   // optional: connected | disconnected | unknown
+  "source":       "id4"                          // optional, for display
+}
+```
+
+Every source spells things differently — the VW EU Data Act portal emits
+`CHARGE_STATE_CHARGING_HV_BATTERY`, `volkswagen_connect` emits `notReadyForCharging`, an OBD dongle
+emits raw CAN. Doing that mapping in Home Assistant rather than here means **a second car costs no
+code**: a Škoda Elroq, a Tesla, a Kia — anything Home Assistant can see becomes a source by copying
+one automation.
+
+Everything except `captured_at` is optional, and absent is a supported configuration rather than an
+error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
+without it staleness cannot be judged.
+
+#### Publishing from Home Assistant
+
+For a VW ID.4 via the [`volkswagen_connect`](https://github.com/rafaelhutter/ha-volkswagen-connect)
+integration. Publish **retained**, so a controller restart is handed the last known reading instead of
+waiting up to a quarter of an hour for the next one:
+
+```yaml
+automation:
+  - alias: Publish ID.4 state to Gleanvolt
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.id_4_pro_performance_battery
+          - sensor.id_4_pro_performance_charging_state
+          - sensor.id_4_pro_performance_plug
+    condition:
+      - "{{ states('sensor.id_4_pro_performance_battery') | int(-1) >= 0 }}"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: gleanvolt/vehicle/id4/state
+          retain: true
+          payload: >-
+            {% set cs = states('sensor.id_4_pro_performance_charging_state') %}
+            {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
+             "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+             "charge_state": "{{ 'charging' if cs == 'charging'
+                                 else 'idle' if cs in ['notReadyForCharging','readyForCharging']
+                                 else 'unknown' }}",
+             "plug_state": "{{ states('sensor.id_4_pro_performance_plug') }}",
+             "source": "id4"}
+```
+
+Then set `Vehicle:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
+being published while the integration's entities read `unavailable`, which happens whenever its cloud
+session expires.
+
+Note the capture time comes from **`last_vehicle_report`**, not that integration's `data_captured`
+sensor — the latter belongs to its EU Data Act source and reads `unknown` until that is separately
+configured.
+
+#### Why it is advisory only, and always will be
+
+Measured on the reference install, not assumed:
+
+- A parked car's report was **2 hours** old on one reading and **3.5 hours** on another. Hours stale is
+  the normal case, not a fault — and not a problem either, since a parked car's SOC does not drift.
+- The upstream cloud session **expired after ~15 hours**, taking every entity to `unavailable`.
+  Recovery needed a human re-entering a password plus an email OTP.
+- **Target SOC is not reliably available at all**: the portal's field is null unless the car has an
+  active charge plan, and the EU Data Act equivalent needs a separate request that can take days to
+  start delivering.
+
+So `MaxAge` exists to catch a **dead feed**, not to reject merely old numbers, and a charge target
+stays a Gleanvolt setting rather than something read from the car. Anything that writes to hardware
+must behave identically when this feed is absent, stale, or gone — which in this phase is trivially
+true, because nothing consumes it yet.
 
 ### Self-hosted web UI (the `Web` section)
 

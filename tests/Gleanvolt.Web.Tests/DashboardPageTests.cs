@@ -22,6 +22,11 @@ public class DashboardPageTests : BunitContext
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
 
+    // Vehicle telemetry (#73) is read through the same holder seam. Registered empty by default, so the
+    // pre-existing tests below assert the page's behaviour with no car configured -- which is what an
+    // install with Vehicle:Enabled=false looks like.
+    private readonly VehicleStateHolder _vehicle = new();
+
     public DashboardPageTests()
     {
         Services.AddSingleton(_holder);
@@ -29,6 +34,8 @@ public class DashboardPageTests : BunitContext
         Services.AddSingleton<IChargeControlModeSelector>(_mode);
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
+        Services.AddSingleton<IVehicleTelemetry>(_vehicle);
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
     }
 
     [Fact]
@@ -37,6 +44,76 @@ public class DashboardPageTests : BunitContext
         var page = Render<Dashboard>();
 
         Assert.Contains("No poll has completed yet", page.Markup);
+    }
+
+    [Fact]
+    public void Hides_the_vehicle_section_entirely_when_no_car_has_reported()
+    {
+        // Vehicle:Enabled=false must not leave an empty card on the dashboard of an install that has
+        // no car configured at all.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.DoesNotContain("Car battery", page.Markup);
+        Assert.DoesNotContain("Car reading age", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_the_cars_soc_alongside_the_age_of_the_reading()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(
+            _time.Now.AddHours(-3.5),
+            SocPercent: 28,
+            ChargeState: VehicleChargeState.Idle,
+            PlugState: VehiclePlugState.Disconnected,
+            SourceId: "id4"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Car battery", page.Markup);
+        Assert.Contains("28%", page.Markup);
+        // The age is a first-class value, not a hint: it is what decides whether the SOC means anything.
+        Assert.Contains("3.5 h", page.Markup);
+        Assert.Contains("id4", page.Markup);
+        Assert.Contains("Disconnected", page.Markup);
+    }
+
+    [Fact]
+    public void Marks_the_reading_stale_once_it_passes_max_age()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-30), SocPercent: 28));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("stale", page.Markup);
+    }
+
+    [Fact]
+    public void Does_not_call_a_recent_reading_stale()
+    {
+        // Hours old and parked is the normal case, not a fault -- a parked car's SOC does not drift.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-3.5), SocPercent: 28));
+
+        var page = Render<Dashboard>();
+
+        Assert.DoesNotContain("stale", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_a_dash_for_a_source_that_does_not_report_soc()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-20)));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Car battery", page.Markup);
+        Assert.Contains("20 min", page.Markup);
+        Assert.Contains("Unknown", page.Markup);
     }
 
     [Fact]

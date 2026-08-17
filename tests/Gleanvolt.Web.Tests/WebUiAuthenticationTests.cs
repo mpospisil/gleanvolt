@@ -41,6 +41,11 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         builder.Services.AddSingleton<IBatteryHoldSelector>(new FakeBatteryHoldSelector());
         builder.Services.AddSingleton<IForecastRuntimeSettings>(new FakeForecastRuntimeSettings());
         builder.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
+
+        // Vehicle telemetry (#73): hand-registered here for the same reason WebBuildInfo is -- this test
+        // builds a minimal host rather than calling AddGleanvolt, so it owns the UI's dependencies.
+        builder.Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
+        builder.Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         builder.Services.AddGleanvoltWebUi(web);
 
         _app = builder.Build();
