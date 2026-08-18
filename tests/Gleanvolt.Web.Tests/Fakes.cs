@@ -126,6 +126,8 @@ internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 
     public double MinBatterySocFloorPercent { get; private set; } = 50;
 
+    public double FloorResumeMarginPercent { get; private set; } = 5;
+
     public List<(string Setting, double Value, string Source)> Sets { get; } = [];
 
     public void SetDailyEvTargetWh(double wattHours, string source)
@@ -144,6 +146,12 @@ internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
     {
         MinBatterySocFloorPercent = Math.Clamp(percent, 0, 100);
         Sets.Add((nameof(MinBatterySocFloorPercent), MinBatterySocFloorPercent, source));
+    }
+
+    public void SetFloorResumeMarginPercent(double percent, string source)
+    {
+        FloorResumeMarginPercent = Math.Clamp(percent, 0, 100);
+        Sets.Add((nameof(FloorResumeMarginPercent), FloorResumeMarginPercent, source));
     }
 }
 
@@ -264,6 +272,13 @@ internal static class TestSessions
             FromGridWh: 0,
             FromBatteryWh: 0,
             LoanedWh: 0,
+            SolarWh: 0,
+            ForecastSolarWh: null,
+            GridImportWh: 0,
+            VehicleSocPercent: null,
+            VehicleSocCapturedAt: null,
+            VehicleChargeTimeRemainingMinutes: 0,
+            VehicleChargeTimeRemainingReported: false,
             SurplusWatts: 2_000,
             LoanPowerWatts: 0,
             BatteryHoldActive: false,
@@ -291,6 +306,7 @@ internal static class TestPlans
             FeasibleEvEnergyWh: 4_500,
             NextFeasibleWindow: window ?? (now.AddHours(1), now.AddHours(3)),
             RequiredSocFloorPercent: 62,
+            TrajectorySocFloorPercent: 62,
             ShortfallWh: 1_000,
             EvExpectedTodayWh: 6_000,
             EvTargetWh: 15_000,

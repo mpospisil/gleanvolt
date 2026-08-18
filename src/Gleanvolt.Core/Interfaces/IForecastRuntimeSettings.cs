@@ -19,6 +19,13 @@ public interface IForecastRuntimeSettings
     /// <summary>The hard SOC floor the computed trajectory is clamped to.</summary>
     double MinBatterySocFloorPercent { get; }
 
+    /// <summary>
+    /// How far above that floor the battery must have recovered before a paused session restarts.
+    /// Worth a runtime knob for the same reason as the floor itself: it is the one number to reach for
+    /// when a marginal day turns out to start and stop the car more than the owner is comfortable with.
+    /// </summary>
+    double FloorResumeMarginPercent { get; }
+
     /// <summary>Sets the daily EV target. <paramref name="source"/> names who changed it, for logging.</summary>
     void SetDailyEvTargetWh(double wattHours, string source);
 
@@ -27,4 +34,7 @@ public interface IForecastRuntimeSettings
 
     /// <summary>Sets the hard SOC floor.</summary>
     void SetMinBatterySocFloorPercent(double percent, string source);
+
+    /// <summary>Sets the recovery margin required above the floor before charging restarts.</summary>
+    void SetFloorResumeMarginPercent(double percent, string source);
 }

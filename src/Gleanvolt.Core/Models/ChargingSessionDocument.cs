@@ -22,8 +22,15 @@ public sealed record ChargingSessionDocument(
     IReadOnlyList<ChargingSessionSample> Samples,
     IReadOnlyList<ChargingSessionEvent> Events)
 {
-    /// <summary>The version this build writes.</summary>
-    public const int CurrentSchemaVersion = 1;
+    /// <summary>
+    /// The version this build writes.
+    ///
+    /// <para>2 added the site-wide progress figures and the car's own SOC to every sample —
+    /// <c>solarWh</c>, <c>forecastSolarWh</c>, <c>gridImportWh</c>, <c>vehicleSocPercent</c> and
+    /// <c>vehicleSocCapturedAt</c>. Purely additive, so a v1 reader is unaffected; the bump is for the
+    /// consumer that wants those and needs to know whether to expect them.</para>
+    /// </summary>
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>
     /// Builds a document at the current schema version.

@@ -293,12 +293,14 @@ public class DashboardPageTests : BunitContext
         _forecast.SetDailyEvTargetWh(12_000, "test setup");
         _forecast.SetSessionEnergyTargetWh(5_000, "test setup");
         _forecast.SetMinBatterySocFloorPercent(55, "test setup");
+        _forecast.SetFloorResumeMarginPercent(6, "test setup");
 
         var page = Render<Dashboard>();
 
         Assert.Equal("12", page.Find("#daily-ev-target").GetAttribute("value"));
         Assert.Equal("5", page.Find("#session-energy-target").GetAttribute("value"));
         Assert.Equal("55", page.Find("#min-battery-soc").GetAttribute("value"));
+        Assert.Equal("6", page.Find("#resume-margin").GetAttribute("value"));
     }
 
     [Fact]
@@ -332,6 +334,17 @@ public class DashboardPageTests : BunitContext
 
         Assert.Equal(40, _forecast.MinBatterySocFloorPercent);
         Assert.Contains(_forecast.Sets, s => s.Setting == "MinBatterySocFloorPercent" && s.Source == "Web UI");
+    }
+
+    [Fact]
+    public void Changing_the_resume_margin_drives_the_settings()
+    {
+        var page = Render<Dashboard>();
+
+        page.Find("#resume-margin").Change("8");
+
+        Assert.Equal(8, _forecast.FloorResumeMarginPercent);
+        Assert.Contains(_forecast.Sets, s => s.Setting == "FloorResumeMarginPercent" && s.Source == "Web UI");
     }
 
     [Fact]

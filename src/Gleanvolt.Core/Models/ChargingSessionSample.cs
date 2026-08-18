@@ -11,6 +11,43 @@ namespace Gleanvolt.Core.Models;
 /// five seconds. The running totals are carried on each row so a session interrupted by a power cut is
 /// still readable from its last sample alone.</para>
 /// </summary>
+/// <param name="SolarWh">
+/// PV <b>produced on site</b> since the session opened. Distinct from <paramref name="FromSolarWh"/>,
+/// which is only the part attributed to the car: the difference is what the house and the battery took.
+/// </param>
+/// <param name="ForecastSolarWh">
+/// What the forecast expected the roof to make over the same window, integrated from the same
+/// per-instant figure as <paramref name="ForecastPowerWatts"/>. Null while no forecast has been
+/// available for any part of the session — an honest gap rather than a zero that reads as "predicted
+/// nothing". Against <paramref name="SolarWh"/> it is the session's own forecast-versus-reality line.
+/// </param>
+/// <param name="GridImportWh">
+/// Energy imported from the grid <b>by the whole site</b> since the session opened, export excluded.
+/// Again distinct from <paramref name="FromGridWh"/>, the car's attributed share: the gap is what the
+/// house drew off-peak of the car.
+/// </param>
+/// <param name="VehicleSocPercent">
+/// The <b>car's own</b> battery SOC, as last reported by the vehicle feed, or null when nothing has
+/// been received. Nothing here depends on it; it is recorded so a finished session can be read against
+/// what the car actually gained.
+/// </param>
+/// <param name="VehicleSocCapturedAt">
+/// When the <em>vehicle</em> produced that reading. Stored alongside it because it routinely lags by
+/// hours — a SOC without its capture time cannot be told apart from a live one, and would silently
+/// flatten a chart. Null whenever <paramref name="VehicleSocPercent"/> is.
+/// </param>
+/// <param name="VehicleChargeTimeRemainingMinutes">
+/// How much longer the <b>car itself</b> reckons it needs. Its own estimate, not one of ours — it
+/// knows its charge curve, its taper and its target, and we know none of those.
+///
+/// <para><b>0 when the car did not report it</b>, which is not an error: plenty of feeds publish SOC
+/// and nothing else. Because 0 is also a legitimate reading ("done"), the two are told apart by
+/// <paramref name="VehicleChargeTimeRemainingReported"/> — never read the number without it.</para>
+/// </param>
+/// <param name="VehicleChargeTimeRemainingReported">
+/// Whether the 0 above is the car's answer or the absence of one. False means no estimate was
+/// provided, by a feed that isn't configured, hasn't spoken yet, or simply doesn't publish this field.
+/// </param>
 /// <param name="EvChargerPowerWatts">
 /// <b>Measured</b> power the charger is drawing. The ground truth, and the basis of every energy total
 /// here — the amp figures are derived conveniences, never the basis of a sum.
@@ -59,6 +96,13 @@ public sealed record ChargingSessionSample(
     double FromGridWh,
     double FromBatteryWh,
     double LoanedWh,
+    double SolarWh,
+    double? ForecastSolarWh,
+    double GridImportWh,
+    double? VehicleSocPercent,
+    DateTimeOffset? VehicleSocCapturedAt,
+    double VehicleChargeTimeRemainingMinutes,
+    bool VehicleChargeTimeRemainingReported,
     double? SurplusWatts,
     double LoanPowerWatts,
     bool BatteryHoldActive,

@@ -16,6 +16,7 @@ namespace Gleanvolt.Infrastructure.Vehicles;
 /// {
 ///   "captured_at":  "2026-08-17T10:44:23+00:00",   // required: the CAR's capture time
 ///   "soc_percent":  28,                            // optional, 0-100
+///   "charge_time_remaining_minutes": 95,           // optional: the CAR's own estimate
 ///   "charge_state": "charging",                    // optional: idle | charging | complete | unknown
 ///   "plug_state":   "connected",                   // optional: connected | disconnected | unknown
 ///   "source":       "id4"                          // optional, for display
@@ -29,6 +30,7 @@ public static class VehicleTelemetryPayload
 {
     public const string CapturedAtProperty = "captured_at";
     public const string SocPercentProperty = "soc_percent";
+    public const string ChargeTimeRemainingProperty = "charge_time_remaining_minutes";
     public const string ChargeStateProperty = "charge_state";
     public const string PlugStateProperty = "plug_state";
     public const string SourceProperty = "source";
@@ -91,9 +93,15 @@ public static class VehicleTelemetryPayload
                 return false;
             }
 
+            if (!TryReadChargeTimeRemaining(root, out var remaining, out error))
+            {
+                return false;
+            }
+
             state = new VehicleState(
                 capturedAt,
                 soc,
+                remaining,
                 ReadEnum(root, ChargeStateProperty, VehicleChargeState.Unknown),
                 ReadEnum(root, PlugStateProperty, VehiclePlugState.Unknown),
                 ReadString(root, SourceProperty));
@@ -162,6 +170,43 @@ public static class VehicleTelemetryPayload
         error = null;
         return true;
     }
+
+    // Optional, in whole or fractional minutes. Absent is a supported configuration -- plenty of cars
+    // report SOC and nothing else -- but a negative or absurd figure is a broken template, and a car
+    // that claims 40 days of charging left would poison any chart drawn from it.
+    private static bool TryReadChargeTimeRemaining(JsonElement root, out TimeSpan? remaining, out string? error)
+    {
+        remaining = null;
+
+        if (!root.TryGetProperty(ChargeTimeRemainingProperty, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            error = null;
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.Number || !property.TryGetDouble(out var minutes))
+        {
+            error = $"'{ChargeTimeRemainingProperty}' was a JSON {property.ValueKind}, expected a number of minutes";
+            return false;
+        }
+
+        if (minutes < 0 || minutes > MaxChargeTimeRemainingMinutes || double.IsNaN(minutes))
+        {
+            error = $"'{ChargeTimeRemainingProperty}' was {minutes}, outside 0-{MaxChargeTimeRemainingMinutes} minutes";
+            return false;
+        }
+
+        remaining = TimeSpan.FromMinutes(minutes);
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Sanity ceiling on a reported remaining time: a week. Even a 2 kW granny lead on the largest
+    /// domestic pack is well inside that, so anything beyond it is a unit mix-up (seconds published as
+    /// minutes) rather than a patient owner.
+    /// </summary>
+    private const double MaxChargeTimeRemainingMinutes = 7 * 24 * 60;
 
     private static TEnum ReadEnum<TEnum>(JsonElement root, string property, TEnum fallback)
         where TEnum : struct, Enum =>

@@ -114,6 +114,112 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task TheSiteEnergyTotalsAndTheCarsSocSurviveTheRoundTrip()
+    {
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+
+        var capturedAt = Noon.AddHours(-2);
+        await store.AppendAsync(
+            [Sample(session.Id, Noon, deliveredWh: 2000, vehicleSoc: 42, vehicleSocAt: capturedAt, vehicleRemainingMinutes: 95)],
+            [],
+            Ct);
+
+        var sample = (await store.ExportAsync(session.Id, Ct))!.Samples.Single();
+
+        Assert.Equal(3000, sample.SolarWh, 0);
+        Assert.Equal(2800, sample.ForecastSolarWh!.Value, 0);
+        Assert.Equal(25, sample.GridImportWh, 0);
+        Assert.Equal(42, sample.VehicleSocPercent);
+        Assert.Equal(capturedAt, sample.VehicleSocCapturedAt);
+        Assert.Equal(95, sample.VehicleChargeTimeRemainingMinutes, 1);
+        Assert.True(sample.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public async Task AbsentVehicleTelemetryStaysNullRatherThanBecomingZero()
+    {
+        // A car SOC of 0% and "no car feed configured" are entirely different facts, and a chart that
+        // confused them would be worse than one with a gap in it.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+        await store.AppendAsync([Sample(session.Id, Noon)], [], Ct);
+
+        var sample = (await store.ExportAsync(session.Id, Ct))!.Samples.Single();
+
+        Assert.Null(sample.VehicleSocPercent);
+        Assert.Null(sample.VehicleSocCapturedAt);
+
+        // Zero, and flagged as never answered -- the store must not let a missing estimate read as a
+        // car that says it is finished.
+        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.False(sample.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public async Task AVersionOneFileIsMigratedInPlaceRatherThanRejected()
+    {
+        // The reference install already has a v1 database with real sessions in it. Upgrading must add
+        // the columns and leave the existing rows readable, with 0 for totals nothing ever integrated.
+        var path = Path.Combine(_directory, "sessions.db");
+        Directory.CreateDirectory(_directory);
+
+        Guid sessionId;
+        using (var v1 = new SqliteChargingSessionStore(path, NullLogger<SqliteChargingSessionStore>.Instance))
+        {
+            await v1.InitializeAsync(Ct);
+            var session = OpenSession();
+            sessionId = session.Id;
+            await v1.StartSessionAsync(session, Ct);
+            await v1.AppendAsync([Sample(sessionId, Noon)], [], Ct);
+        }
+
+        await DropSchemaV2ColumnsAsync(path);
+
+        using var upgraded = new SqliteChargingSessionStore(path, NullLogger<SqliteChargingSessionStore>.Instance);
+        await upgraded.InitializeAsync(Ct);
+
+        var sample = (await upgraded.ExportAsync(sessionId, Ct))!.Samples.Single();
+
+        Assert.Equal(0, sample.SolarWh);
+        Assert.Equal(0, sample.GridImportWh);
+        Assert.Null(sample.ForecastSolarWh);
+        Assert.Null(sample.VehicleSocPercent);
+        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.False(sample.VehicleChargeTimeRemainingReported);
+
+        // The columns v1 did write are untouched by the migration.
+        Assert.Equal(4000, sample.EvChargerPowerWatts, 0);
+    }
+
+    // Rewinds a file the current code has just created back to what v1 would have produced: the v2
+    // columns removed and user_version reset, so InitializeAsync has a genuine upgrade to perform.
+    private static async Task DropSchemaV2ColumnsAsync(string path)
+    {
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}");
+        await connection.OpenAsync(Ct);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            ALTER TABLE session_samples DROP COLUMN solar_wh;
+            ALTER TABLE session_samples DROP COLUMN forecast_solar_wh;
+            ALTER TABLE session_samples DROP COLUMN grid_import_wh;
+            ALTER TABLE session_samples DROP COLUMN vehicle_soc_percent;
+            ALTER TABLE session_samples DROP COLUMN vehicle_soc_captured_at;
+            ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_min;
+            ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_reported;
+            PRAGMA user_version = 1;
+            """;
+        await command.ExecuteNonQueryAsync(Ct);
+    }
+
+    [Fact]
     public async Task AnUnreadableChargerSetpointStaysNullRatherThanBecomingZero()
     {
         using var store = NewStore();
@@ -358,7 +464,10 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         int? activeAmps = 6,
         int? targetAmps = 6,
         double deliveredWh = 0,
-        double soc = 96) => new(
+        double soc = 96,
+        double? vehicleSoc = null,
+        DateTimeOffset? vehicleSocAt = null,
+        double? vehicleRemainingMinutes = null) => new(
         SessionId: sessionId,
         Timestamp: at,
         Mode: ChargeControlMode.Solar,
@@ -380,6 +489,13 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         FromGridWh: 0,
         FromBatteryWh: 0,
         LoanedWh: 0,
+        SolarWh: deliveredWh * 1.5,
+        ForecastSolarWh: deliveredWh * 1.4,
+        GridImportWh: 25,
+        VehicleSocPercent: vehicleSoc,
+        VehicleSocCapturedAt: vehicleSocAt,
+        VehicleChargeTimeRemainingMinutes: vehicleRemainingMinutes ?? 0,
+        VehicleChargeTimeRemainingReported: vehicleRemainingMinutes is not null,
         SurplusWatts: 4200,
         LoanPowerWatts: 0,
         BatteryHoldActive: false,
@@ -399,6 +515,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         FeasibleEvEnergyWh: 12_000,
         NextFeasibleWindow: (Noon, Noon.AddHours(4)),
         RequiredSocFloorPercent: 55,
+        TrajectorySocFloorPercent: 55,
         ShortfallWh: 0,
         EvExpectedTodayWh: 12_000,
         EvTargetWh: 15_000,
