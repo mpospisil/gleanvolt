@@ -156,6 +156,7 @@ public sealed class PollingService : BackgroundService
                     ChargerStatus: state.EvChargerStatus,
                     CarConnected: state.EvChargerStatus.IsCarConnected(),
                     SolarPowerWatts: state.SolarPowerWatts,
+                    ForecastSolarPowerWatts: ForecastSolarPowerWatts(state.Timestamp),
                     EvChargerPowerWatts: state.EvChargerPowerWatts,
                     EvChargingCurrentAmps: (int)Math.Round(_power.WattsToAmps(state.EvChargerPowerWatts)),
                     BatteryPowerWatts: state.BatteryPowerWatts,
@@ -326,6 +327,16 @@ public sealed class PollingService : BackgroundService
         _autoHold = armed;
         return armed;
     }
+
+    /// <summary>
+    /// What the forecast expected the roof to be making right now, to sit beside the measured figure.
+    /// Zero rather than null when nothing covers this instant — no forecast fetched, the provider
+    /// down, or past the horizon — so the pair always charts. The session store keeps its own
+    /// nullable copy of the same lookup, because there "no forecast" and "forecast said zero" are
+    /// different facts worth telling apart after the event.
+    /// </summary>
+    private double ForecastSolarPowerWatts(DateTimeOffset at) =>
+        Math.Max(0, _solarForecast.GetForecastForToday()?.ExpectedPowerWattsAt(at) ?? 0);
 
     /// <summary>
     /// Tomorrow's forecast production, purely so a shortfall today can be read with the context of

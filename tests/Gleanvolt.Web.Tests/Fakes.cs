@@ -38,6 +38,7 @@ internal static class Statuses
             ChargerStatus: EvChargerStatus.Available,
             CarConnected: false,
             SolarPowerWatts: 1200,
+            ForecastSolarPowerWatts: 6100,
             EvChargerPowerWatts: 0,
             EvChargingCurrentAmps: 0,
             BatteryPowerWatts: 400,
