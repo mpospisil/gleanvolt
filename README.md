@@ -178,9 +178,9 @@ one you want** — Home Assistant is the expensive part; the controller and its 
 ./deploy/deploy-controller-only.sh    # B: controller alone, with its own web UI on :8090
 ```
 
-Home Assistant reserves 600 MB of the full stack's 848 MB and really uses most of it, so on a 1 GB
-board workflow A commits 94% of the machine before the OS gets a look in. It runs, but with no
-headroom — prefer **B** there. Nothing is lost by doing so: the controller's
+Home Assistant uses around 500 MB in steady state — half of a 1 GB board before the OS and page cache
+get a look in, against about 75 MB for the controller and its UI. Workflow A runs there, but with no
+headroom — prefer **B** on 1 GB. Nothing is lost by doing so: the controller's
 [own web UI](#self-hosted-web-ui-the-web-section) drives every control Home Assistant would, and
 shows telemetry, charging-session history and the forecast plan. Switching later is a matter of
 running the other script.
@@ -1061,7 +1061,7 @@ true, because nothing consumes it yet.
 ### Self-hosted web UI (the `Web` section)
 
 The controller can serve its own UI, as an alternative to Home Assistant or alongside it. It exists
-because on a 1 GB board Home Assistant is the binding constraint — it alone reserves 600 MB of the
+because on a 1 GB board Home Assistant is the binding constraint — it alone uses around 500 MB of the
 roughly 905 MB available, which a 4 GB board no longer feels — and because a controller that can be
 looked at without a
 second application is simpler to reason about. The two surfaces are independent adapters over the
@@ -1188,7 +1188,7 @@ publishes port 8090 and leaves `Web__Enabled` at its default, so a fresh Pi ends
 `http://<pi>:8090`. See
 [deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
 for the memory budget of running the controller and its UI **without** Home Assistant or an MQTT
-broker at all (roughly 200 MB against 848 MB for the full stack — 22% of a 1 GB board, or 5% of a
+broker at all (roughly 75 MB against ~590 MB for the full stack — 8% of a 1 GB board, or 2% of a
 4 GB one).
 
 The host port is published unconditionally, which is the one thing to understand about

@@ -1,4 +1,4 @@
-# Production stack for the Raspberry Pi 3 B (issue #26). Home Assistant and MQTT are opt-in
+# Production stack for the Raspberry Pi (issue #26). Home Assistant and MQTT are opt-in
 # (issue #51) -- the controller and its self-hosted UI run on their own.
 #
 # Deployed to /opt/gleanvolt on the Pi by deploy/deploy.sh or deploy/deploy-controller-only.sh; every
@@ -151,7 +151,7 @@ services:
       # -wal and -shm alongside the file, so the *directory* has to be writable by uid 1654, not
       # just the database.
       - ./data:/app/data
-    mem_limit: ${CONTROLLER_MEM_LIMIT:-200m}
+    mem_limit: ${CONTROLLER_MEM_LIMIT:-512m}
     logging:
       driver: json-file
       options:
@@ -176,10 +176,13 @@ services:
       # This is the one directory whose loss cannot be recovered from git -- back it up.
       - ./homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
-    # The binding constraint on a 1 GB Pi 3 B. HA is by far the hungriest of the three; raise this
-    # (and re-check `docker stats`) if it gets OOM-killed during startup, and see README.md for the
-    # recorder tuning that keeps it down. Bridge networking is enough -- HA only speaks MQTT here.
-    mem_limit: ${HA_MEM_LIMIT:-600m}
+    # HA is by far the hungriest of the three: ~500 MB in steady state on the reference install, and
+    # it spikes above that during startup, an update, or a recorder purge. This is a hard cap, not a
+    # reservation -- raising it does not make HA use more, it only stops the kernel killing it at a
+    # bad moment, so the default is set well clear of the measured figure rather than just above it.
+    # Lower it only on a board too small for the headroom, and see README.md for the recorder tuning
+    # that brings the usage itself down. Bridge networking is enough -- HA only speaks MQTT here.
+    mem_limit: ${HA_MEM_LIMIT:-1536m}
     logging:
       driver: json-file
       options:

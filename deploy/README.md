@@ -41,22 +41,28 @@ Assistant is part of it — and Home Assistant is what sets the hardware bar.
 | **RAM required** | **2 GB minimum, 4 GB recommended** | **1 GB is enough** |
 | **Disk** | 16 GB minimum, 32 GB recommended | 8 GB |
 | Containers | controller, broker, Home Assistant | controller |
-| `mem_limit` total | 848 MB | 200 MB |
+| `mem_limit` total | 2096 MB of ceiling, ~590 MB actually used | 512 MB of ceiling, ~75 MB actually used |
 | Deploy script | `deploy.sh` | `deploy-controller-only.sh` |
 | Control surfaces | Home Assistant `:8123` **and** web UI `:8090` | web UI `:8090` |
 | Required in `.env` | site addresses, `HOMEASSISTANT_ENABLED`, MQTT credentials | site addresses only |
 | Extra setup steps | broker password file, Home Assistant onboarding | none |
 
-**RAM is the deciding factor, and Home Assistant is why.** It reserves 600 MB of the 848 MB the full
-stack claims, and it genuinely uses most of that — around 485 MB in steady state, not a theoretical
-ceiling. The controller with its UI is a single .NET process using roughly 70 MB against its 200 MB
-limit, and the broker sits under 5 MB.
+**RAM is the deciding factor, and Home Assistant is why.** Measured on the reference 4 GB install,
+steady state is Home Assistant **~500 MB**, the controller with its UI **~75 MB** (a single .NET
+process), and the broker **~15 MB** — about **590 MB** for the three together.
 
-So on a **1 GB board the full stack commits 94% of the machine** before the OS and page cache get a
-look in. It runs — that was the original reference install — but there is no headroom, and a board
-with no headroom is one that swaps under load. Two gigabytes makes it comfortable; four makes it a
-non-issue. If your Pi has 1 GB, **choose workflow B** rather than trying to squeeze Home Assistant
-in beside it.
+Read the `mem_limit` values as ceilings rather than as a budget: Docker's `mem_limit` is a hard cap,
+not a reservation, so raising one does not make a container use more, and the sum of the caps is not
+memory that has been committed. What the caps decide is when the kernel kills something. They are set
+well clear of the measured figures, because the moment a container actually needs its headroom —
+Home Assistant starting up, updating, or purging its recorder database — is the worst possible moment
+to be OOM-killed.
+
+So the number that matters on a small board is that **Home Assistant alone is ~500 MB**, half of a
+1 GB machine before the OS and page cache get a look in. It runs — that was the original reference
+install — but with no headroom, and a board with no headroom is one that swaps under load. Two
+gigabytes makes it comfortable; four makes it a non-issue. If your Pi has 1 GB, **choose workflow B**
+rather than trying to squeeze Home Assistant in beside it, and lower the caps to suit the board.
 
 Disk follows the same split: the Home Assistant image alone is about 3.4 GB, against roughly 375 MB
 for the controller.
@@ -386,8 +392,8 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 
 > **Optional, and only on a 1 GB board running workflow A.** zram lives in RAM, so it competes for
 > the resource that is already scarce: compression buys roughly 2–3× on typical data but cannot
-> manufacture capacity, and the full stack's limits total 848 MB (600 + 200 + 48) against about
-> 905 MB usable. A plain swapfile on the root disk, at a *lower* priority than zram, is a cheap
+> manufacture capacity, and the full stack's ~590 MB of steady-state usage leaves little of the
+> roughly 905 MB usable. A plain swapfile on the root disk, at a *lower* priority than zram, is a cheap
 > overflow tier that only catches what zram cannot hold:
 >
 > ```bash
@@ -401,8 +407,8 @@ than writing it out, and there is still a disk tier behind it. **Nothing to do h
 > [Storage and the boot medium](#storage-and-the-boot-medium)). Leave `vm.swappiness` at its default
 > 60 so the disk tier is a safety net rather than a first resort.
 >
-> **On 2 GB or more the whole argument collapses**, and on workflow B it never applied: 848 MB of
-> limits against 4 GB is not a scarce resource, zram scales up with the board, and it already has
+> **On 2 GB or more the whole argument collapses**, and on workflow B it never applied: ~590 MB of
+> usage against 4 GB is not a scarce resource, zram scales up with the board, and it already has
 > `/var/swap` behind it. Adding a third tier below two that never fill is work for nothing. Enforced
 > `mem_limit` values (step 3) are the better answer to the same worry, because they stop a leak at
 > the container instead of absorbing it.
