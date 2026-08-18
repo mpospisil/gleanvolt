@@ -17,6 +17,14 @@ namespace Gleanvolt.Core.Models;
 /// <param name="ChargerStatus">The charger's status (Available / Preparing / Charging / ChargePaused / ...).</param>
 /// <param name="CarConnected">Whether a vehicle is plugged into the charger.</param>
 /// <param name="SolarPowerWatts">Actual solar (PV) production.</param>
+/// <param name="ForecastSolarPowerWatts">
+/// What the forecast expected the roof to be making <em>at this instant</em> — the direct counterpart
+/// to <paramref name="SolarPowerWatts"/>, so the two can be read and charted side by side.
+///
+/// <para><b>0 when no forecast covers this moment</b>: none fetched yet, the provider is down, or the
+/// instant is past the forecast horizon. Reported in every mode, not only the forecast-driven one,
+/// because the comparison is worth having whatever is driving the charger.</para>
+/// </param>
 /// <param name="EvChargerPowerWatts">Actual power the EV charger is drawing.</param>
 /// <param name="EvChargingCurrentAmps">Actual charging current, derived from the charger power (phase-aware).</param>
 /// <param name="BatteryPowerWatts">Battery power: positive = charging, negative = discharging.</param>
@@ -56,6 +64,7 @@ public sealed record ChargeControlStatus(
     EvChargerStatus ChargerStatus,
     bool CarConnected,
     double SolarPowerWatts,
+    double ForecastSolarPowerWatts,
     double EvChargerPowerWatts,
     int EvChargingCurrentAmps,
     double BatteryPowerWatts,

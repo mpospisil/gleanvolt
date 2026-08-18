@@ -186,6 +186,39 @@ public class DashboardPageTests : BunitContext
     }
 
     [Fact]
+    public void Shows_the_forecast_solar_power_beside_the_measured_one()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with
+        {
+            SolarPowerWatts = 3200,
+            ForecastSolarPowerWatts = 4100,
+        });
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Forecast solar power", page.Markup);
+        Assert.Contains("3200 W", page.Markup);
+        Assert.Contains("4100 W", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_a_zero_forecast_when_none_covers_this_moment()
+    {
+        // No forecast fetched yet is not an error state and must not blank the tile -- the pair is
+        // meant to be readable at a glance, including before the first fetch of the day lands.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with
+        {
+            SolarPowerWatts = 3200,
+            ForecastSolarPowerWatts = 0,
+        });
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Forecast solar power", page.Markup);
+        Assert.Contains("0 W", page.Markup);
+    }
+
+    [Fact]
     public void Shows_the_charge_mode_select_with_the_current_mode_chosen()
     {
         _mode.Set(ChargeControlMode.Forecasted, "test setup");

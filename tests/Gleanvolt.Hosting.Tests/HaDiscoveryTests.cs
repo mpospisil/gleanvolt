@@ -33,6 +33,7 @@ public class HaDiscoveryTests
         double? tomorrow = 24500) =>
         new(mode, DryRun: true, HoldingControl: true, state, surplus, target, active, BatterySocPercent: 98.6,
             ChargerStatus: EvChargerStatus.Charging, CarConnected: true, SolarPowerWatts: 7010.4,
+            ForecastSolarPowerWatts: 6488.6,
             EvChargerPowerWatts: 10784.9, EvChargingCurrentAmps: 16, BatteryPowerWatts: -1250.2,
             GridPowerWatts: 1601.4,
             BatteryHoldEnabled: true, BatteryHoldRequested: true, BatteryHoldActive: holdActive,
@@ -331,6 +332,7 @@ public class HaDiscoveryTests
     [InlineData("homeassistant/sensor/solax_controller/shortfall/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor_traj/config")]
+    [InlineData("homeassistant/sensor/solax_controller/forecast_power/config")]
     [InlineData("homeassistant/sensor/solax_controller/forecast_remaining/config")]
     [InlineData("homeassistant/sensor/solax_controller/tomorrow_forecast/config")]
     [InlineData("homeassistant/sensor/solax_controller/forecast_accuracy/config")]
@@ -383,6 +385,19 @@ public class HaDiscoveryTests
         Assert.Equal(8.4, s.GetProperty("session_kwh").GetDouble());
         Assert.Equal(1.8, s.GetProperty("loaned_kwh").GetDouble());
         Assert.Equal(24.5, s.GetProperty("tomorrow_kwh").GetDouble());
+    }
+
+    [Fact]
+    public void StateJson_CarriesTheForecastPowerBesideTheMeasuredOneInEveryMode()
+    {
+        // Off, so the plan block is absent -- the forecast/actual pair must survive that, because it is
+        // how you decide whether to select the Forecasted mode in the first place.
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status(mode: ChargeControlMode.Off)));
+        var s = json.RootElement;
+
+        Assert.Equal(7010, s.GetProperty("solar_w").GetDouble());
+        Assert.Equal(6489, s.GetProperty("forecast_solar_w").GetDouble());
+        Assert.False(s.TryGetProperty("outlook", out _));
     }
 
     [Fact]

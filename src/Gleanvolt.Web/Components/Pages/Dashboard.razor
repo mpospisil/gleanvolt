@@ -51,6 +51,8 @@ else
 
         <Stat Label="Solar power" Value="@Watts(_status.SolarPowerWatts)"
               Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
+        <Stat Label="Forecast solar power" Value="@Watts(_status.ForecastSolarPowerWatts)"
+              Hint="What the forecast expected the roof to be making right now, to read against the measured figure beside it. 0 when no forecast covers this moment." />
         <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
               Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
         <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"

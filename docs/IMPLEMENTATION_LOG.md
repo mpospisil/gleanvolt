@@ -91,7 +91,15 @@ columns by `ALTER TABLE`; a v1 file upgrades in place on startup and keeps `0` f
 integrated at the time. `ChargingSessionDocument.CurrentSchemaVersion` moves to 2 — purely additive, so
 a v1 reader is unaffected.
 
-Rendering is **deliberately deferred to a later change**, not overlooked: this one lands the capture
+One figure *is* surfaced now, because it answers a question you have while the day is running rather
+than afterwards: **Forecast solar power**, the forecast's expectation at this instant, published beside
+the measured `Solar power` in Home Assistant (`forecast_solar_w`) and on the web dashboard. Zero rather
+than absent when nothing covers the moment, and published in **every** mode — a forecast-versus-reality
+comparison that only existed while the `Forecasted` mode was driving would be useless for deciding
+whether to select it. The session store keeps its own nullable copy of the same lookup, because after
+the event "no forecast" and "the forecast said zero" are worth telling apart.
+
+The rest of the rendering is **deliberately deferred to a later change**, not overlooked: this one lands the capture
 path so real sessions start accumulating the data now, and the charts can be built against sessions
 that already have it rather than against an empty table. The session detail page still charts
 home-battery SOC alone, and no Home Assistant entity was added (this feature is history, not
@@ -99,7 +107,7 @@ telemetry).
 
 ### Verification performed
 
-- 510 unit tests pass. New coverage: the resume margin (start vs continue at the same SOC, restart once
+- 514 unit tests pass. New coverage: the resume margin (start vs continue at the same SOC, restart once
   met, never demanding more than 100 %), the clamp-vs-trajectory split in both directions and past the
   dwell timer, the guard band (trimmed setpoint inside it, whole surplus above it, a marginal surplus
   handed to the battery, no loan inside it), the planner reporting the two floors, the hold-release
@@ -109,7 +117,9 @@ telemetry).
   SOC carrying no capture time either, everything resetting between sessions, the SQLite round trip,
   and a v1 file migrating in place with its existing rows still readable. For the car's estimate:
   parsing it, an absent one, a reported zero kept apart from an absent one, impossible values rejected
-  at both ends, and the zero-plus-flag pair surviving the round trip.
+  at both ends, and the zero-plus-flag pair surviving the round trip. For the forecast power: the
+  discovery config, the payload carrying it beside the measured figure with no plan block present, and
+  the dashboard tile in both the populated and the no-forecast case.
 - **Not yet verified on real hardware, and this needs a plugged-in car to verify.** Nothing here can
   be confirmed from unit tests or a dry run: the whole point is how the loop behaves against a real
   pack, a real charger and real cloud cover. What to watch on the first marginal morning:

@@ -142,6 +142,10 @@ public sealed class HaDiscovery
         yield return Sensor("control_state", "Control state", template: "{{ value_json.state }}", icon: "mdi:state-machine");
         yield return Sensor("charger_status", "Charger status", template: "{{ value_json.charger_status }}", icon: "mdi:ev-station");
         yield return Sensor("solar_power", "Solar power", template: "{{ value_json.solar_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
+        // Deliberately next to the measured figure and published in every mode: the pair is the point,
+        // and a comparison that only exists while the Forecasted mode is driving would be useless for
+        // deciding whether to select it in the first place.
+        yield return Sensor("forecast_power", "Forecast solar power", template: "{{ value_json.forecast_solar_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("surplus", "Solar surplus", template: Optional("surplus_w"), unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("ev_power", "EV charging power", template: "{{ value_json.ev_power_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
         yield return Sensor("ev_current", "EV charging current", template: "{{ value_json.ev_current_a }}", unit: "A", deviceClass: "current", stateClass: "measurement");
@@ -243,6 +247,7 @@ public sealed class HaDiscovery
             ["charger_status"] = s.ChargerStatus.ToString(),
             ["car_connected"] = s.CarConnected,
             ["solar_w"] = Math.Round(s.SolarPowerWatts),
+            ["forecast_solar_w"] = Math.Round(s.ForecastSolarPowerWatts),
             ["surplus_w"] = s.SurplusWatts is null ? null : Math.Round(s.SurplusWatts.Value),
             ["ev_power_w"] = Math.Round(s.EvChargerPowerWatts),
             ["ev_current_a"] = s.EvChargingCurrentAmps,
