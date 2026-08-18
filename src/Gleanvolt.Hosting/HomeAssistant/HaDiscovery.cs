@@ -50,9 +50,10 @@ public sealed class HaDiscovery
     public const string DailyEvTargetNumber = "daily_ev_target";
     public const string SessionEnergyTargetNumber = "session_energy_target";
     public const string MinBatterySocNumber = "min_battery_soc";
+    public const string ResumeMarginNumber = "resume_margin";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
-        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber];
+        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber];
 
     public string NumberCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
     public string NumberStateTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/state";
@@ -180,6 +181,10 @@ public sealed class HaDiscovery
         yield return Sensor("ev_expected_today", "EV energy expected today", template: Optional("ev_expected_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("shortfall", "Projected shortfall", template: Optional("shortfall_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("soc_floor", "Required SOC floor", template: Optional("soc_floor"), unit: "%", icon: "mdi:battery-arrow-down");
+        // The unclamped floor next to the one in force: together they say whether the car is being held
+        // back by the forecast or merely by the configured minimum, which is the first thing to look at
+        // when a session pauses.
+        yield return Sensor("soc_floor_traj", "Trajectory SOC floor", template: Optional("soc_floor_traj"), unit: "%", icon: "mdi:chart-line-variant");
         yield return Sensor("forecast_remaining", "Forecast remaining today", template: Optional("forecast_remaining_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("tomorrow_forecast", "Tomorrow forecast", template: Optional("tomorrow_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("forecast_accuracy", "Forecast accuracy", template: Optional("bias_percent"), unit: "%", icon: "mdi:chart-bell-curve");
@@ -190,6 +195,7 @@ public sealed class HaDiscovery
         yield return Number(DailyEvTargetNumber, "Daily EV target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:car-electric");
         yield return Number(SessionEnergyTargetNumber, "Session energy target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:battery-charging-80");
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
+        yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
 
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
@@ -269,6 +275,7 @@ public sealed class HaDiscovery
             payload["ev_expected_kwh"] = Math.Round(plan.EvExpectedTodayWh / 1000, 1);
             payload["shortfall_kwh"] = Math.Round(plan.ShortfallWh / 1000, 1);
             payload["soc_floor"] = Math.Round(plan.RequiredSocFloorPercent);
+            payload["soc_floor_traj"] = Math.Round(plan.TrajectorySocFloorPercent);
             payload["forecast_remaining_kwh"] = Math.Round(plan.RemainingPvWh / 1000, 1);
             payload["bias_percent"] = Math.Round(plan.BiasFactor * 100);
         }

@@ -26,12 +26,29 @@ public sealed class ChargingSessionTracker
     private readonly bool _recordUncontrolled;
     private readonly TimeProvider _timeProvider;
 
-    // The five running totals. They integrate on every observation, not on every stored sample.
+    // The running totals. They integrate on every observation, not on every stored sample.
+    //
+    // The first five are about the car: what it received and where each watt came from. The last three
+    // are about the *site* over the same window — what the roof made, what the forecast said it would
+    // make, and what came off the grid — which is a different question and not derivable from the
+    // first five, since the house and the home battery take a share of both.
     private readonly EnergyIntegrator _delivered = new();
     private readonly EnergyIntegrator _fromSolar = new();
     private readonly EnergyIntegrator _fromGrid = new();
     private readonly EnergyIntegrator _fromBattery = new();
     private readonly EnergyIntegrator _loaned = new();
+    private readonly EnergyIntegrator _solar = new();
+    private readonly EnergyIntegrator _forecastSolar = new();
+    private readonly EnergyIntegrator _gridImport = new();
+
+    // Whether the forecast integrator has ever been given a reading. Without it a session recorded
+    // with no forecast at all would report 0 Wh expected, which reads as "the forecast predicted
+    // nothing" rather than "there was no forecast".
+    private bool _forecastSeen;
+
+    // The last vehicle reading handed in, carried so a sample forced between telemetry messages still
+    // reports the car's SOC rather than a hole. The feed updates in minutes at best.
+    private VehicleState? _vehicle;
 
     private ChargingSession? _open;
     private DateTimeOffset? _lastSampleAt;
@@ -72,10 +89,16 @@ public sealed class ChargingSessionTracker
     /// rather than looked up so this type stays free of the forecast service.
     /// </param>
     /// <param name="forecastRemainingTodayWh">Forecast PV still to come today; recorded on the session header at open.</param>
+    /// <param name="vehicle">
+    /// The car's own last-known state, for the same reason and on the same terms as the forecast: passed
+    /// in rather than looked up, and purely advisory. Its reading may be hours old, so its capture time
+    /// is recorded next to it and nothing here treats it as live.
+    /// </param>
     public ChargingSessionUpdate Observe(
         ChargeControlStatus status,
         double? forecastPowerWatts = null,
-        double? forecastRemainingTodayWh = null)
+        double? forecastRemainingTodayWh = null,
+        VehicleState? vehicle = null)
     {
         var shouldRecord = ShouldRecord(status);
         if (_open is null && !shouldRecord)
@@ -97,7 +120,7 @@ public sealed class ChargingSessionTracker
             events.AddRange(DetectChanges(status));
         }
 
-        Integrate(status);
+        Integrate(status, forecastPowerWatts, vehicle);
 
         // A session that began while nothing was controlling becomes a controlled one the moment a
         // mode takes over, rather than staying labelled as a bystander for its whole length.
@@ -257,7 +280,7 @@ public sealed class ChargingSessionTracker
         return events;
     }
 
-    private void Integrate(ChargeControlStatus status)
+    private void Integrate(ChargeControlStatus status, double? forecastPowerWatts, VehicleState? vehicle)
     {
         var now = status.Timestamp;
         var evPower = Math.Max(0, status.EvChargerPowerWatts);
@@ -268,6 +291,25 @@ public sealed class ChargingSessionTracker
         _fromGrid.Add(now, split.GridWatts);
         _fromBattery.Add(now, split.BatteryWatts);
         _loaned.Add(now, status.LoanPowerWatts);
+
+        _solar.Add(now, Math.Max(0, status.SolarPowerWatts));
+
+        // Positive grid power is import in this model; export is a different quantity and is not
+        // netted off, or a sunny hour would cancel out the evening the car actually cost money.
+        _gridImport.Add(now, Math.Max(0, status.GridPowerWatts));
+
+        if (forecastPowerWatts is { } forecastWatts)
+        {
+            _forecastSolar.Add(now, Math.Max(0, forecastWatts));
+            _forecastSeen = true;
+        }
+
+        // Only overwritten by an actual reading: a feed that goes quiet mid-session should leave the
+        // last SOC standing with its own (now visibly ageing) capture time, not blank the column.
+        if (vehicle is not null)
+        {
+            _vehicle = vehicle;
+        }
 
         _peakPowerWatts = Math.Max(_peakPowerWatts, evPower);
         _lastSocPercent = status.BatterySocPercent;
@@ -299,6 +341,18 @@ public sealed class ChargingSessionTracker
             FromGridWh: _fromGrid.EnergyWattHours,
             FromBatteryWh: _fromBattery.EnergyWattHours,
             LoanedWh: _loaned.EnergyWattHours,
+            SolarWh: _solar.EnergyWattHours,
+            ForecastSolarWh: _forecastSeen ? _forecastSolar.EnergyWattHours : null,
+            GridImportWh: _gridImport.EnergyWattHours,
+            VehicleSocPercent: _vehicle?.SocPercent,
+            // Only meaningful next to a SOC: a capture time on its own would say the feed is alive
+            // while the column it explains is empty.
+            VehicleSocCapturedAt: _vehicle?.SocPercent is null ? null : _vehicle.CapturedAt,
+            // Stored as a plain number with a companion flag rather than as a nullable: a chart wants
+            // a series it can draw, and "the car didn't say" is carried by the flag next to it. Zero
+            // on its own is ambiguous -- it is also what a car that has finished reports.
+            VehicleChargeTimeRemainingMinutes: _vehicle?.ChargeTimeRemaining?.TotalMinutes ?? 0,
+            VehicleChargeTimeRemainingReported: _vehicle?.ChargeTimeRemaining is not null,
             SurplusWatts: status.SurplusWatts,
             LoanPowerWatts: status.LoanPowerWatts,
             BatteryHoldActive: status.BatteryHoldActive,
@@ -364,6 +418,12 @@ public sealed class ChargingSessionTracker
         _fromGrid.Reset();
         _fromBattery.Reset();
         _loaned.Reset();
+        _solar.Reset();
+        _forecastSolar.Reset();
+        _gridImport.Reset();
+
+        _forecastSeen = false;
+        _vehicle = null;
     }
 }
 

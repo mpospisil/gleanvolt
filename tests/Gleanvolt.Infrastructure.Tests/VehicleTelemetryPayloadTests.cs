@@ -7,6 +7,7 @@ public class VehicleTelemetryPayloadTests
 {
     private const string Full = """
         {"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":28,
+         "charge_time_remaining_minutes":95,
          "charge_state":"charging","plug_state":"connected","source":"id4"}
         """;
 
@@ -18,6 +19,7 @@ public class VehicleTelemetryPayloadTests
 
         Assert.Equal(DateTimeOffset.Parse("2026-08-17T10:44:23+00:00"), state!.CapturedAt);
         Assert.Equal(28, state.SocPercent);
+        Assert.Equal(TimeSpan.FromMinutes(95), state.ChargeTimeRemaining);
         Assert.Equal(VehicleChargeState.Charging, state.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, state.PlugState);
         Assert.Equal("id4", state.SourceId);
@@ -135,5 +137,50 @@ public class VehicleTelemetryPayloadTests
 
         Assert.Null(error);
         Assert.Equal(28, state!.SocPercent);
+    }
+
+    [Fact]
+    public void TryParse_AcceptsAFeedThatReportsNoRemainingTime()
+    {
+        // The common case: plenty of integrations publish SOC and nothing else. Absent is a supported
+        // configuration, not a rejected payload.
+        const string payload = """{"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":28}""";
+
+        Assert.True(VehicleTelemetryPayload.TryParse(payload, out var state, out var error));
+        Assert.Null(error);
+        Assert.Null(state!.ChargeTimeRemaining);
+    }
+
+    [Fact]
+    public void TryParse_KeepsAZeroRemainingTimeApartFromAnAbsentOne()
+    {
+        // Zero is the car saying "done", which is a reading -- not the same as saying nothing.
+        const string payload = """{"captured_at":"2026-08-17T10:44:23+00:00","charge_time_remaining_minutes":0}""";
+
+        Assert.True(VehicleTelemetryPayload.TryParse(payload, out var state, out _));
+        Assert.Equal(TimeSpan.Zero, state!.ChargeTimeRemaining);
+    }
+
+    [Theory]
+    [InlineData(-5)]
+    [InlineData(20_000)]
+    public void TryParse_RejectsAnImpossibleRemainingTime(double minutes)
+    {
+        // Negative is nonsense and a fortnight is a unit mix-up (seconds published as minutes); either
+        // way the template is broken, and half-trusting the payload is worse than dropping it.
+        var payload = $$"""{"captured_at":"2026-08-17T10:44:23+00:00","charge_time_remaining_minutes":{{minutes}}}""";
+
+        Assert.False(VehicleTelemetryPayload.TryParse(payload, out var state, out var error));
+        Assert.Null(state);
+        Assert.Contains("charge_time_remaining_minutes", error);
+    }
+
+    [Fact]
+    public void TryParse_RejectsANonNumericRemainingTime()
+    {
+        const string payload = """{"captured_at":"2026-08-17T10:44:23+00:00","charge_time_remaining_minutes":"unavailable"}""";
+
+        Assert.False(VehicleTelemetryPayload.TryParse(payload, out _, out var error));
+        Assert.Contains("charge_time_remaining_minutes", error);
     }
 }

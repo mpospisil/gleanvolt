@@ -93,7 +93,8 @@ public static class SolarDayPlanner
         // deeper discharge simply grows the need, which the battery outranks the car to satisfy.
         var batteryRefillableWh = slices.Sum(s => s.SurplusWh);
 
-        var socFloor = RequiredSocFloor(batteryRefillableWh, options);
+        var trajectoryFloor = TrajectorySocFloor(batteryRefillableWh, options);
+        var socFloor = ClampFloor(trajectoryFloor, options);
 
         var feasibleEnergyWh = slices.Where(s => s.IsFeasible(options)).Sum(s => s.AvailableWh);
         var evBudgetWh = Math.Max(0, remainingPvWh - expectedHouseWh - batteryToFullWh);
@@ -116,6 +117,7 @@ public static class SolarDayPlanner
             FeasibleEvEnergyWh: usableEvWh,
             NextFeasibleWindow: window,
             RequiredSocFloorPercent: socFloor,
+            TrajectorySocFloorPercent: trajectoryFloor,
             ShortfallWh: shortfallWh,
             EvExpectedTodayWh: evDeliveredTodayWh + evExpectedRemainingWh,
             EvTargetWh: options.DailyEvTargetWh,
@@ -130,8 +132,8 @@ public static class SolarDayPlanner
 
     /// <summary>
     /// One <see cref="SolarDayPlanTimelinePoint"/> per slice, each carrying what the required SOC
-    /// floor would be if that slice's start were "now" — <see cref="RequiredSocFloor"/>, the same
-    /// formula the live plan uses, evaluated at every point instead of only the current one. Built
+    /// floor would be if that slice's start were "now" — <see cref="TrajectorySocFloor"/> clamped, the
+    /// same formula the live plan uses, evaluated at every point instead of only the current one. Built
     /// back-to-front because each point needs the surplus of every slice from it to the end, which is
     /// exactly the running total a reverse pass accumulates for free.
     /// </summary>
@@ -148,7 +150,7 @@ public static class SolarDayPlanner
                 slices[i].End,
                 slices[i].SurplusWatts,
                 slices[i].IsPlateau,
-                RequiredSocFloor(suffixSurplusWh, options)));
+                ClampFloor(TrajectorySocFloor(suffixSurplusWh, options), options)));
         }
 
         timeline.Reverse();
@@ -156,17 +158,27 @@ public static class SolarDayPlanner
     }
 
     /// <summary>
-    /// The SOC the battery must not fall below now. Derived purely from the energy still coming its
-    /// way: as the day runs out that approaches zero, so the floor approaches 100% and the car is
-    /// squeezed out of the late afternoon — the evening guarantee, with no scheduling code.
+    /// The SOC the battery must not fall below now if the evening deadline is still to be met.
+    /// Derived purely from the energy still coming its way: as the day runs out that approaches zero,
+    /// so the floor approaches 100% and the car is squeezed out of the late afternoon — the evening
+    /// guarantee, with no scheduling code.
+    ///
+    /// <para>This is the trajectory on its own, <b>unclamped</b>. On a sunny morning it sits far below
+    /// the owner's configured minimum, and the difference matters: falling through the trajectory
+    /// costs the evening 100%, while falling through the clamp above it costs only a preference the
+    /// day still has hours to make good.</para>
     /// </summary>
-    private static double RequiredSocFloor(double batteryRefillableWh, SolarDayPlannerOptions options)
+    private static double TrajectorySocFloor(double batteryRefillableWh, SolarDayPlannerOptions options)
     {
         var recoverablePercent = batteryRefillableWh * Math.Clamp(options.ChargeEfficiency, 0.1, 1.0)
             / options.BatteryCapacityWh * 100;
 
-        return Math.Clamp(100 - recoverablePercent, Math.Clamp(options.MinBatterySocFloorPercent, 0, 100), 100);
+        return Math.Clamp(100 - recoverablePercent, 0, 100);
     }
+
+    /// <summary>The trajectory raised to the owner's hard minimum — the floor actually in force.</summary>
+    private static double ClampFloor(double trajectoryFloorPercent, SolarDayPlannerOptions options) =>
+        Math.Max(trajectoryFloorPercent, Math.Clamp(options.MinBatterySocFloorPercent, 0, 100));
 
     // Cuts the forecast into the part of each period that falls inside (now, horizon]. Periods
     // straddling either edge are prorated, so a plan built at 12:47 doesn't count the whole 12:30-13:00

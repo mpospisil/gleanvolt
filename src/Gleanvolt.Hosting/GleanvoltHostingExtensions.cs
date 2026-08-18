@@ -162,6 +162,10 @@ public static class GleanvoltHostingExtensions
                     MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
                     CurrentStepAmps: chargeControl.CurrentStepAmps,
                     ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
+                    // Only the fallback for a null runtime; in the host the runtime settings supply it
+                    // (and are the ones that enforce the floor against the hold's release margin).
+                    FloorResumeMarginPercent: forecast.FloorResumeMarginPercent,
+                    FloorGuardReserveWatts: forecast.FloorGuardReserveWatts,
                     EnableBatteryLoan: forecast.EnableBatteryLoan,
                     MaxLoanPowerWatts: forecast.MaxLoanPowerWatts,
                     MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts,

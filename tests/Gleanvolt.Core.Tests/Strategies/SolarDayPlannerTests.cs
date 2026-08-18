@@ -141,6 +141,29 @@ public class SolarDayPlannerTests
     }
 
     [Fact]
+    public void TheTrajectoryFloorIsReportedSeparatelyFromTheClampAboveIt()
+    {
+        // Same bell day. The floor in force is the 50% clamp, but the forecast on its own would allow
+        // the pack down to ~12% -- the distinction the controller uses to decide how hard to stop.
+        var plan = Plan(socPercent: 60);
+
+        Assert.Equal(50, plan.RequiredSocFloorPercent, 1);
+        Assert.Equal(12, plan.TrajectorySocFloorPercent, 0);
+        Assert.True(plan.FloorIsClamped);
+    }
+
+    [Fact]
+    public void WhereTheTrajectoryBindsTheTwoFloorsAgree()
+    {
+        // A thin day: the trajectory is already above the clamp, so the clamp adds nothing and a breach
+        // of the floor is a breach of the forecast's own requirement.
+        var plan = Plan(socPercent: 90, Forecast([2500, 2500, 2500, 2500]));
+
+        Assert.Equal(plan.RequiredSocFloorPercent, plan.TrajectorySocFloorPercent, 3);
+        Assert.False(plan.FloorIsClamped);
+    }
+
+    [Fact]
     public void TheSocFloorTracksWhatTheRemainingForecastCanActuallyRefill()
     {
         // A thin day: four half-hours at 2kW of surplus is 4kWh, worth 38% of a 10kWh pack after charge

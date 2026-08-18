@@ -9,6 +9,22 @@ namespace Gleanvolt.Core.Models;
 /// <param name="MaxChargingCurrentAmps">Maximum current to command (usually the car's limit, not the charger's).</param>
 /// <param name="CurrentStepAmps">Granularity of the setpoint the hardware accepts.</param>
 /// <param name="ResumeHysteresisWatts">Extra surplus required to (re)start, so a marginal surplus can't flap the charger.</param>
+/// <param name="FloorResumeMarginPercent">
+/// The SOC counterpart of <paramref name="ResumeHysteresisWatts"/>: how far above the plan's floor the
+/// battery must have recovered before a paused session may restart. Charging continues down to the
+/// floor itself, but coming back requires the margin — without it the gate flips on a single percent
+/// of SOC (the inverter reports whole percent) and the car cycles on and off all morning. Set it
+/// larger than the battery hold's release margin, so the pack is discharging freely again before the
+/// car returns to compete for the surplus.
+/// </param>
+/// <param name="FloorGuardReserveWatts">
+/// Surplus withheld from the car while the SOC is inside the guard band — the same
+/// <paramref name="FloorResumeMarginPercent"/> band, measured up from the plan's floor. The resume
+/// margin stops the car flapping across the floor; this stops it <em>hovering</em> on it, which is the
+/// other failure mode: a car that takes every watt the sun makes leaves the pack pinned at the floor
+/// all morning with the grid covering each dip. Withholding a few hundred watts inside the band walks
+/// the battery back out of it instead. 0 disables the reserve.
+/// </param>
 /// <param name="EnableBatteryLoan">Whether the home battery may bridge a sub-minimum surplus up to the charger's floor.</param>
 /// <param name="MaxLoanPowerWatts">Ceiling on that bridge, which also caps the battery's discharge rate.</param>
 /// <param name="MinBridgeSurplusWatts">
@@ -33,6 +49,8 @@ public sealed record ForecastedChargingOptions(
     int MaxChargingCurrentAmps,
     int CurrentStepAmps,
     double ResumeHysteresisWatts,
+    double FloorResumeMarginPercent,
+    double FloorGuardReserveWatts,
     bool EnableBatteryLoan,
     double MaxLoanPowerWatts,
     double MinBridgeSurplusWatts,

@@ -43,6 +43,14 @@ namespace Gleanvolt.Core.Models;
 /// return it to 100% by <see cref="Deadline"/>. Rises towards 100% as the day runs out, which is what
 /// squeezes the car out of the late afternoon without any scheduling code.
 /// </param>
+/// <param name="TrajectorySocFloorPercent">
+/// The same figure <em>before</em> the configured hard clamp is applied — what the forecast alone
+/// says the battery may fall to. Below <see cref="RequiredSocFloorPercent"/> exactly when the clamp
+/// is the binding constraint, which is the normal case on a sunny morning: the sun can still recover
+/// a much deeper discharge, and the 50% floor is the owner's preference rather than the physics. The
+/// controller treats a breach of the two differently — see
+/// <see cref="Strategies.ForecastedChargingController"/>.
+/// </param>
 /// <param name="ShortfallWh">
 /// How far the forecast falls short of house + battery-to-full + the day's EV target. Positive means
 /// the car will not get everything it wanted; the battery keeps priority regardless.
@@ -77,6 +85,7 @@ public sealed record SolarDayPlan(
     double FeasibleEvEnergyWh,
     (DateTimeOffset Start, DateTimeOffset End)? NextFeasibleWindow,
     double RequiredSocFloorPercent,
+    double TrajectorySocFloorPercent,
     double ShortfallWh,
     double EvExpectedTodayWh,
     double EvTargetWh,
@@ -90,6 +99,13 @@ public sealed record SolarDayPlan(
 {
     /// <summary>Whether the day cannot cover the house, the battery and the car's target together.</summary>
     public bool HasShortfall => ShortfallWh > 0;
+
+    /// <summary>
+    /// Whether the floor in force is the owner's configured clamp rather than the forecast's own
+    /// trajectory. True through most of a sunny day, and the reason a dip under the floor in the
+    /// morning is not the same event as one at four in the afternoon.
+    /// </summary>
+    public bool FloorIsClamped => RequiredSocFloorPercent > TrajectorySocFloorPercent;
 
     /// <summary>
     /// An unusable plan: no forecast, a stale one, or one whose accuracy has broken the trust band.
@@ -107,6 +123,7 @@ public sealed record SolarDayPlan(
         FeasibleEvEnergyWh: 0,
         NextFeasibleWindow: null,
         RequiredSocFloorPercent: 100,
+        TrajectorySocFloorPercent: 100,
         ShortfallWh: 0,
         EvExpectedTodayWh: 0,
         EvTargetWh: 0,

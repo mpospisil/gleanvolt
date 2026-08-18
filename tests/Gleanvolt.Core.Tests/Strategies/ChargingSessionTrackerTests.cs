@@ -372,6 +372,153 @@ public class ChargingSessionTrackerTests
         Assert.Equal(5400, sample.SolarPowerWatts, 0);
     }
 
+    [Fact]
+    public void SitewideSolarGridAndForecastEnergyAreIntegratedAcrossTheSession()
+    {
+        var tracker = NewTracker();
+
+        // Four minutes at 6000W of PV, 500W of grid import and a 6100W forecast. Steps stay inside the
+        // integrator's five-minute gap limit, which is what a real poll interval does.
+        tracker.Observe(Status(Noon, solarWatts: 6000, gridWatts: 500), forecastPowerWatts: 6100);
+        var sample = tracker.Observe(Status(Noon.AddMinutes(4), solarWatts: 6000, gridWatts: 500), forecastPowerWatts: 6100).Sample!;
+
+        Assert.Equal(400, sample.SolarWh, 1);
+        Assert.Equal(406.7, sample.ForecastSolarWh!.Value, 1);
+        Assert.Equal(33.3, sample.GridImportWh, 1);
+    }
+
+    [Fact]
+    public void ExportIsNotNettedOffTheGridImportTotal()
+    {
+        // Four minutes exporting 3kW then four importing 500W is 33Wh imported, not a negative total
+        // that would make an expensive evening look free.
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon, gridWatts: -3000));
+        tracker.Observe(Status(Noon.AddMinutes(4), gridWatts: 500));
+        var sample = tracker.Observe(Status(Noon.AddMinutes(8), gridWatts: 500)).Sample!;
+
+        Assert.Equal(33.3, sample.GridImportWh, 1);
+    }
+
+    [Fact]
+    public void WithoutAForecastTheExpectedEnergyIsNullRatherThanZero()
+    {
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon));
+
+        var sample = tracker.Observe(Status(Noon.AddMinutes(4))).Sample!;
+
+        Assert.Null(sample.ForecastSolarWh);
+        Assert.True(sample.SolarWh > 0);
+    }
+
+    [Fact]
+    public void TheCarsOwnSocIsRecordedWithTheTimeTheCarCapturedIt()
+    {
+        var capturedAt = Noon.AddHours(-2);
+        var tracker = NewTracker();
+
+        var sample = tracker.Observe(Status(Noon), vehicle: new VehicleState(capturedAt, SocPercent: 42)).Sample!;
+
+        Assert.Equal(42, sample.VehicleSocPercent);
+        Assert.Equal(capturedAt, sample.VehicleSocCapturedAt);
+    }
+
+    [Fact]
+    public void AVehicleFeedThatGoesQuietLeavesTheLastReadingStanding()
+    {
+        // Samples are forced far more often than the car reports, so blanking the column between
+        // messages would leave a chart full of holes rather than a visibly ageing reading.
+        var capturedAt = Noon.AddHours(-2);
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon), vehicle: new VehicleState(capturedAt, SocPercent: 42));
+
+        var sample = tracker.Observe(Status(Noon.AddMinutes(1)), vehicle: null).Sample!;
+
+        Assert.Equal(42, sample.VehicleSocPercent);
+        Assert.Equal(capturedAt, sample.VehicleSocCapturedAt);
+    }
+
+    [Fact]
+    public void AVehicleReadingWithoutASocCarriesNoCaptureTimeEither()
+    {
+        // Some feeds report plug state but no SOC; a capture time on its own would claim the feed is
+        // alive while the column it explains is empty.
+        var tracker = NewTracker();
+
+        var sample = tracker.Observe(Status(Noon), vehicle: new VehicleState(Noon, SocPercent: null)).Sample!;
+
+        Assert.Null(sample.VehicleSocPercent);
+        Assert.Null(sample.VehicleSocCapturedAt);
+    }
+
+    [Fact]
+    public void TheCarsOwnEstimateOfTheTimeLeftIsRecorded()
+    {
+        var tracker = NewTracker();
+
+        var sample = tracker.Observe(
+            Status(Noon),
+            vehicle: new VehicleState(Noon, SocPercent: 42, ChargeTimeRemaining: TimeSpan.FromMinutes(95))).Sample!;
+
+        Assert.Equal(95, sample.VehicleChargeTimeRemainingMinutes, 1);
+        Assert.True(sample.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public void ACarThatReportsNoEstimateStoresZeroAndSaysSo()
+    {
+        // Not an error -- plenty of feeds publish SOC and nothing else. The zero is only readable
+        // because the flag beside it says the car never answered.
+        var tracker = NewTracker();
+
+        var sample = tracker.Observe(Status(Noon), vehicle: new VehicleState(Noon, SocPercent: 42)).Sample!;
+
+        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.False(sample.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public void ACarSayingItIsDoneIsNotTheSameAsACarSayingNothing()
+    {
+        var tracker = NewTracker();
+
+        var done = tracker.Observe(
+            Status(Noon),
+            vehicle: new VehicleState(Noon, ChargeTimeRemaining: TimeSpan.Zero)).Sample!;
+
+        Assert.Equal(0, done.VehicleChargeTimeRemainingMinutes);
+        Assert.True(done.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public void WithNoVehicleFeedAtAllTheEstimateIsZeroAndUnreported()
+    {
+        var tracker = NewTracker();
+
+        var sample = tracker.Observe(Status(Noon)).Sample!;
+
+        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.False(sample.VehicleChargeTimeRemainingReported);
+    }
+
+    [Fact]
+    public void TheSiteTotalsAndTheCarsSocStartAfreshWithTheNextSession()
+    {
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon, solarWatts: 6000, gridWatts: 500), forecastPowerWatts: 6100, vehicle: new VehicleState(Noon, SocPercent: 42));
+        tracker.Observe(Status(Noon.AddMinutes(4), solarWatts: 6000, gridWatts: 500), forecastPowerWatts: 6100);
+        tracker.Observe(Status(Noon.AddMinutes(5), carConnected: false, evWatts: 0));
+
+        var next = tracker.Observe(Status(Noon.AddMinutes(9), solarWatts: 6000, gridWatts: 500)).Sample!;
+
+        Assert.Equal(0, next.SolarWh, 0);
+        Assert.Equal(0, next.GridImportWh, 0);
+        Assert.Null(next.ForecastSolarWh);
+        Assert.Null(next.VehicleSocPercent);
+        Assert.False(next.VehicleChargeTimeRemainingReported);
+    }
+
     private static SolarDayPlan Plan(bool isUsable) => new(
         RemainingPvWh: 18_000,
         ShoulderEnergyWh: 4000,
@@ -383,6 +530,7 @@ public class ChargingSessionTrackerTests
         FeasibleEvEnergyWh: 12_000,
         NextFeasibleWindow: (Noon, Noon.AddHours(4)),
         RequiredSocFloorPercent: 55,
+        TrajectorySocFloorPercent: 55,
         ShortfallWh: 0,
         EvExpectedTodayWh: 12_000,
         EvTargetWh: 15_000,

@@ -190,6 +190,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         yield return (HaDiscovery.DailyEvTargetNumber, _forecastSettings.DailyEvTargetWh / 1000);
         yield return (HaDiscovery.SessionEnergyTargetNumber, _forecastSettings.SessionEnergyTargetWh / 1000);
         yield return (HaDiscovery.MinBatterySocNumber, _forecastSettings.MinBatterySocFloorPercent);
+        yield return (HaDiscovery.ResumeMarginNumber, _forecastSettings.FloorResumeMarginPercent);
     }
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
@@ -289,6 +290,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 break;
             case HaDiscovery.MinBatterySocNumber:
                 _forecastSettings.SetMinBatterySocFloorPercent(value, "Home Assistant");
+                break;
+            case HaDiscovery.ResumeMarginNumber:
+                _forecastSettings.SetFloorResumeMarginPercent(value, "Home Assistant");
                 break;
             default:
                 return Task.CompletedTask;

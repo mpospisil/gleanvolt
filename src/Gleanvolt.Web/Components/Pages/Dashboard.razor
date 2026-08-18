@@ -164,6 +164,16 @@ else
             across restarts.
         </span>
     </div>
+
+    <div class="control">
+        <label for="resume-margin">SOC resume margin (%)</label>
+        <input id="resume-margin" type="number" step="1" min="0" max="50"
+               @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
+        <span class="hint">
+            How far above the floor the battery must recover before a paused session restarts. Raise it
+            if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.
+        </span>
+    </div>
 </section>
 
 @code {
@@ -175,6 +185,7 @@ else
     private double _dailyEvTargetKWh;
     private double _sessionEnergyTargetKWh;
     private double _minBatterySocPercent;
+    private double _resumeMarginPercent;
 
     protected override void OnInitialized()
     {
@@ -238,11 +249,15 @@ else
     private void OnMinBatterySocSelected() =>
         ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
 
+    private void OnResumeMarginSelected() =>
+        ForecastSettings.SetFloorResumeMarginPercent(_resumeMarginPercent, "Web UI");
+
     private void RefreshRuntimeNumbers()
     {
         _dailyEvTargetKWh = Math.Round(ForecastSettings.DailyEvTargetWh / 1000, 1);
         _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+        _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
     }
 
     private void RefreshVehicle()

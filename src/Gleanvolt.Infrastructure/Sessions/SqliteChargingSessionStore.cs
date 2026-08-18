@@ -29,7 +29,7 @@ namespace Gleanvolt.Infrastructure.Sessions;
 public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposable
 {
     /// <summary>The schema this build writes, tracked in SQLite's own <c>user_version</c>.</summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     // One writer at a time. SQLite would serialise these itself and hand back SQLITE_BUSY; taking the
     // lock in-process turns a retry-and-hope into a wait, and the only writer is the recording worker.
@@ -132,6 +132,9 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                         ev_charger_power_watts, ev_charging_current_amps, active_current_amps,
                         target_current_amps, from_solar_watts, from_grid_watts, from_battery_watts,
                         energy_delivered_wh, from_solar_wh, from_grid_wh, from_battery_wh, loaned_wh,
+                        solar_wh, forecast_solar_wh, grid_import_wh,
+                        vehicle_soc_percent, vehicle_soc_captured_at,
+                        vehicle_charge_time_remaining_min, vehicle_charge_time_remaining_reported,
                         surplus_watts, loan_power_watts, battery_hold_active, forecast_power_watts,
                         plan_remaining_pv_wh, plan_feasible_ev_energy_wh, plan_required_soc_floor_percent)
                     VALUES (
@@ -140,6 +143,9 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                         $ev_power, $ev_amps, $active_amps,
                         $target_amps, $from_solar_w, $from_grid_w, $from_battery_w,
                         $delivered_wh, $from_solar_wh, $from_grid_wh, $from_battery_wh, $loaned_wh,
+                        $solar_wh, $forecast_solar_wh, $grid_import_wh,
+                        $vehicle_soc, $vehicle_soc_at,
+                        $vehicle_remaining_min, $vehicle_remaining_reported,
                         $surplus, $loan_power, $hold, $forecast_power,
                         $plan_remaining, $plan_feasible, $plan_floor);
                     """;
@@ -169,6 +175,13 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 p.Add("$from_grid_wh", SqliteType.Real);
                 p.Add("$from_battery_wh", SqliteType.Real);
                 p.Add("$loaned_wh", SqliteType.Real);
+                p.Add("$solar_wh", SqliteType.Real);
+                p.Add("$forecast_solar_wh", SqliteType.Real);
+                p.Add("$grid_import_wh", SqliteType.Real);
+                p.Add("$vehicle_soc", SqliteType.Real);
+                p.Add("$vehicle_soc_at", SqliteType.Text);
+                p.Add("$vehicle_remaining_min", SqliteType.Real);
+                p.Add("$vehicle_remaining_reported", SqliteType.Integer);
                 p.Add("$surplus", SqliteType.Real);
                 p.Add("$loan_power", SqliteType.Real);
                 p.Add("$hold", SqliteType.Integer);
@@ -200,6 +213,13 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     p["$from_grid_wh"].Value = sample.FromGridWh;
                     p["$from_battery_wh"].Value = sample.FromBatteryWh;
                     p["$loaned_wh"].Value = sample.LoanedWh;
+                    p["$solar_wh"].Value = sample.SolarWh;
+                    p["$forecast_solar_wh"].Value = (object?)sample.ForecastSolarWh ?? DBNull.Value;
+                    p["$grid_import_wh"].Value = sample.GridImportWh;
+                    p["$vehicle_soc"].Value = (object?)sample.VehicleSocPercent ?? DBNull.Value;
+                    p["$vehicle_soc_at"].Value = sample.VehicleSocCapturedAt is { } capturedAt ? Utc(capturedAt) : DBNull.Value;
+                    p["$vehicle_remaining_min"].Value = sample.VehicleChargeTimeRemainingMinutes;
+                    p["$vehicle_remaining_reported"].Value = sample.VehicleChargeTimeRemainingReported ? 1 : 0;
                     p["$surplus"].Value = (object?)sample.SurplusWatts ?? DBNull.Value;
                     p["$loan_power"].Value = sample.LoanPowerWatts;
                     p["$hold"].Value = sample.BatteryHoldActive ? 1 : 0;
@@ -531,7 +551,10 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                    from_solar_watts, from_grid_watts, from_battery_watts, energy_delivered_wh,
                    from_solar_wh, from_grid_wh, from_battery_wh, loaned_wh, surplus_watts,
                    loan_power_watts, battery_hold_active, forecast_power_watts, plan_remaining_pv_wh,
-                   plan_feasible_ev_energy_wh, plan_required_soc_floor_percent
+                   plan_feasible_ev_energy_wh, plan_required_soc_floor_percent,
+                   solar_wh, forecast_solar_wh, grid_import_wh,
+                   vehicle_soc_percent, vehicle_soc_captured_at,
+                   vehicle_charge_time_remaining_min, vehicle_charge_time_remaining_reported
             FROM session_samples WHERE session_id = $id ORDER BY timestamp, rowid;
             """;
         command.Parameters.AddWithValue("$id", sessionId.ToString());
@@ -568,7 +591,16 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 ForecastPowerWatts: NullableDouble(reader, 23),
                 PlanRemainingPvWh: NullableDouble(reader, 24),
                 PlanFeasibleEvEnergyWh: NullableDouble(reader, 25),
-                PlanRequiredSocFloorPercent: NullableDouble(reader, 26)));
+                PlanRequiredSocFloorPercent: NullableDouble(reader, 26),
+                // Appended in schema v2 rather than slotted in beside the other totals: the column
+                // order here follows the file's history, not the record's field order.
+                SolarWh: reader.GetDouble(27),
+                ForecastSolarWh: NullableDouble(reader, 28),
+                GridImportWh: reader.GetDouble(29),
+                VehicleSocPercent: NullableDouble(reader, 30),
+                VehicleSocCapturedAt: reader.IsDBNull(31) ? null : Instant(reader.GetString(31)),
+                VehicleChargeTimeRemainingMinutes: reader.GetDouble(32),
+                VehicleChargeTimeRemainingReported: reader.GetInt64(33) != 0));
         }
 
         return samples;
@@ -717,6 +749,23 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             );
 
             CREATE INDEX IF NOT EXISTS ix_events_session ON session_events (session_id, timestamp);
+            """),
+        (2, """
+            -- Session progress against the *site*, not just the car (see ChargingSessionSample): what
+            -- the roof made, what the forecast said it would make, what came off the grid -- plus the
+            -- car's own SOC and the time the car captured it. Existing rows keep 0 for the three
+            -- totals, which is the truth for them: nothing integrated those quantities at the time.
+            ALTER TABLE session_samples ADD COLUMN solar_wh              REAL NOT NULL DEFAULT 0;
+            ALTER TABLE session_samples ADD COLUMN forecast_solar_wh     REAL NULL;
+            ALTER TABLE session_samples ADD COLUMN grid_import_wh        REAL NOT NULL DEFAULT 0;
+            ALTER TABLE session_samples ADD COLUMN vehicle_soc_percent   REAL NULL;
+            ALTER TABLE session_samples ADD COLUMN vehicle_soc_captured_at TEXT NULL;
+
+            -- The car's own estimate of how long it still needs. Zero where it said nothing, which is
+            -- not an error -- hence the companion flag: zero is also what a finished car reports, and
+            -- the number must never be read without it.
+            ALTER TABLE session_samples ADD COLUMN vehicle_charge_time_remaining_min      REAL NOT NULL DEFAULT 0;
+            ALTER TABLE session_samples ADD COLUMN vehicle_charge_time_remaining_reported INTEGER NOT NULL DEFAULT 0;
             """),
     ];
 }

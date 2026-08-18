@@ -24,6 +24,12 @@ namespace Gleanvolt.Core.Models;
 /// offset so a source reporting local time is not silently reinterpreted as UTC.
 /// </param>
 /// <param name="SocPercent">The drive battery's state of charge, 0-100, or null if not reported.</param>
+/// <param name="ChargeTimeRemaining">
+/// How much longer the <b>car</b> says it needs to finish charging, or null if not reported. The car's
+/// own estimate, not one of ours: it knows its charge curve, its taper and its target, and we know
+/// none of those. Null and <see cref="TimeSpan.Zero"/> are different facts — zero means the car says
+/// it is done.
+/// </param>
 /// <param name="ChargeState">What the car says it is doing, or <see cref="VehicleChargeState.Unknown"/>.</param>
 /// <param name="PlugState">Whether the car says a cable is connected, or <see cref="VehiclePlugState.Unknown"/>.</param>
 /// <param name="SourceId">
@@ -33,6 +39,7 @@ namespace Gleanvolt.Core.Models;
 public sealed record VehicleState(
     DateTimeOffset CapturedAt,
     double? SocPercent = null,
+    TimeSpan? ChargeTimeRemaining = null,
     VehicleChargeState ChargeState = VehicleChargeState.Unknown,
     VehiclePlugState PlugState = VehiclePlugState.Unknown,
     string? SourceId = null)

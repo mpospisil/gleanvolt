@@ -22,6 +22,8 @@ public class ForecastedChargingControllerTests
         double minBridgeSurplusWatts = 2000,
         double maxDailyLoanWh = 4000,
         double sessionTargetWh = 0,
+        double floorResumeMarginPercent = 0,
+        double floorGuardReserveWatts = 0,
         TimeSpan? minRunTime = null,
         TimeSpan? minPauseTime = null) =>
         new(
@@ -29,6 +31,8 @@ public class ForecastedChargingControllerTests
             MaxChargingCurrentAmps: 16,
             CurrentStepAmps: 1,
             ResumeHysteresisWatts: 200,
+            FloorResumeMarginPercent: floorResumeMarginPercent,
+            FloorGuardReserveWatts: floorGuardReserveWatts,
             EnableBatteryLoan: enableLoan,
             MaxLoanPowerWatts: maxLoanPowerWatts,
             MinBridgeSurplusWatts: minBridgeSurplusWatts,
@@ -47,7 +51,8 @@ public class ForecastedChargingControllerTests
         double socFloor = 50,
         double shortfallWh = 0,
         DayOutlook outlook = DayOutlook.Surplus,
-        bool usable = true) =>
+        bool usable = true,
+        double? trajectoryFloor = null) =>
         new(
             RemainingPvWh: 20_000,
             ShoulderEnergyWh: 2000,
@@ -59,6 +64,9 @@ public class ForecastedChargingControllerTests
             FeasibleEvEnergyWh: feasibleEvWh,
             NextFeasibleWindow: (Now, Now.AddHours(3)),
             RequiredSocFloorPercent: socFloor,
+            // Defaults to the floor in force, i.e. the forecast's own trajectory is what binds: a
+            // breach is then the serious kind. Tests about the configured clamp pass a lower one.
+            TrajectorySocFloorPercent: trajectoryFloor ?? socFloor,
             ShortfallWh: shortfallWh,
             EvExpectedTodayWh: feasibleEvWh,
             EvTargetWh: 15_000,
@@ -137,6 +145,132 @@ public class ForecastedChargingControllerTests
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Contains("floor", decision.Reason);
+    }
+
+    [Fact]
+    public void RestartingRequiresTheSocMarginAboveTheFloor()
+    {
+        // The morning case the mode was flapping on: SOC one percent over the floor. Enough to keep a
+        // running session alive, nowhere near enough to bring a paused one back.
+        var options = Options(enableLoan: false, floorResumeMarginPercent: 5);
+
+        var starting = Controller(options).Decide(
+            Input(8000, socPercent: 51, charging: false, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+        var continuing = Controller(options).Decide(
+            Input(8000, socPercent: 51, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+
+        Assert.Equal(ChargingControlAction.Pause, starting.Action);
+        Assert.Contains("has not recovered", starting.Reason);
+        Assert.Equal(ChargingControlAction.Charge, continuing.Action);
+    }
+
+    [Fact]
+    public void OnceTheSocMarginIsMet_ChargingRestarts()
+    {
+        var decision = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5)).Decide(
+            Input(8000, socPercent: 55, charging: false, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+    }
+
+    [Fact]
+    public void TheResumeMarginNeverDemandsMoreThanAFullBattery()
+    {
+        // Late in the day the floor is already at 100%; adding a margin on top would make the gate
+        // unsatisfiable in a way the final guard doesn't intend.
+        var decision = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5)).Decide(
+            Input(8000, socPercent: 100, charging: false, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 100)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+    }
+
+    [Fact]
+    public void DippingThroughTheConfiguredClampHoldsTheSessionAtTheMinimum()
+    {
+        // A sunny morning: the floor in force is the owner's 50% clamp, while the forecast's own
+        // trajectory sits at 20%. A one-percent dip under the clamp is not worth ending a session for.
+        var decision = Controller(Options(enableLoan: false)).Decide(
+            Input(8000, socPercent: 49, charging: true, timeInState: TimeSpan.FromMinutes(2),
+                plan: Plan(socFloor: 50, trajectoryFloor: 20)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Contains("minimum run time", decision.Reason);
+    }
+
+    [Fact]
+    public void DippingThroughTheForecastTrajectoryStopsTheSessionAtOnce()
+    {
+        // Same dip, but now the trajectory is what binds: the evening 100% is genuinely at risk, so the
+        // dwell timer does not get to keep the car running.
+        var decision = Controller(Options(enableLoan: false)).Decide(
+            Input(8000, socPercent: 49, charging: true, timeInState: TimeSpan.FromMinutes(2),
+                plan: Plan(socFloor: 50, trajectoryFloor: 50)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Contains("floor", decision.Reason);
+    }
+
+    [Fact]
+    public void PastTheMinimumRunTime_AClampDipStillPauses()
+    {
+        var decision = Controller(Options(enableLoan: false)).Decide(
+            Input(8000, socPercent: 49, charging: true, timeInState: TimeSpan.FromHours(1),
+                plan: Plan(socFloor: 50, trajectoryFloor: 20)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+    }
+
+    [Fact]
+    public void InsideTheGuardBand_PartOfTheSurplusIsHeldBackForTheBattery()
+    {
+        // SOC one percent over the floor, so inside the 5% band: 8000W of surplus reaches the car as
+        // 7250W (10A) instead of 8000W (11A), and the 750W difference walks the pack back up.
+        var options = Options(enableLoan: false, floorResumeMarginPercent: 5, floorGuardReserveWatts: 750);
+        var input = Input(8000, socPercent: 51, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50));
+
+        var guarded = Controller(options).Decide(input);
+        var unguarded = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5)).Decide(input);
+
+        Assert.Equal(ChargingControlAction.Charge, guarded.Action);
+        Assert.Equal(10, guarded.ChargeCurrentAmps);
+        Assert.Equal(11, unguarded.ChargeCurrentAmps);
+        Assert.Contains("reserved for the battery", guarded.Reason);
+    }
+
+    [Fact]
+    public void AboveTheGuardBand_TheCarGetsTheWholeSurplus()
+    {
+        var decision = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5, floorGuardReserveWatts: 750)).Decide(
+            Input(8000, socPercent: 56, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+
+        Assert.Equal(11, decision.ChargeCurrentAmps);
+        Assert.DoesNotContain("reserved", decision.Reason);
+    }
+
+    [Fact]
+    public void InsideTheGuardBand_AMarginalSurplusGoesToTheBatteryInstead()
+    {
+        // 4600W clears the 4140W floor on its own, but not once the battery's 750W is taken out. The
+        // session stops, the pack gets the whole surplus, and the resume margin keeps the car off until
+        // it has climbed clear -- one long cycle instead of a dozen short ones.
+        var decision = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5, floorGuardReserveWatts: 750)).Decide(
+            Input(4600, socPercent: 51, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Contains("reserved for the battery", decision.Reason);
+    }
+
+    [Fact]
+    public void InsideTheGuardBand_TheBatteryLendsNothing()
+    {
+        // A loan and a reserve at the same SOC would cancel out: the pack would be discharging to the
+        // car and being topped up from the same surplus, paying a round trip for no net movement.
+        var decision = Controller(Options(floorResumeMarginPercent: 5, floorGuardReserveWatts: 0)).Decide(
+            Input(3000, socPercent: 53, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.LoanPowerWatts);
     }
 
     [Fact]

@@ -18,11 +18,13 @@ public class ForecastRuntimeSettingsTests
             DailyEvTargetKWh = 12,
             SessionEnergyTargetKWh = 30,
             MinBatterySocFloorPercent = 55,
+            FloorResumeMarginPercent = 7,
         });
 
         Assert.Equal(12_000, settings.DailyEvTargetWh);
         Assert.Equal(30_000, settings.SessionEnergyTargetWh);
         Assert.Equal(55, settings.MinBatterySocFloorPercent);
+        Assert.Equal(7, settings.FloorResumeMarginPercent);
     }
 
     [Fact]
@@ -33,10 +35,12 @@ public class ForecastRuntimeSettingsTests
         settings.SetDailyEvTargetWh(20_000, "test");
         settings.SetSessionEnergyTargetWh(25_000, "test");
         settings.SetMinBatterySocFloorPercent(70, "test");
+        settings.SetFloorResumeMarginPercent(8, "test");
 
         Assert.Equal(20_000, settings.DailyEvTargetWh);
         Assert.Equal(25_000, settings.SessionEnergyTargetWh);
         Assert.Equal(70, settings.MinBatterySocFloorPercent);
+        Assert.Equal(8, settings.FloorResumeMarginPercent);
     }
 
     [Fact]
@@ -49,5 +53,37 @@ public class ForecastRuntimeSettingsTests
 
         Assert.Equal(0, settings.DailyEvTargetWh);
         Assert.Equal(100, settings.MinBatterySocFloorPercent);
+    }
+
+    [Fact]
+    public void TheResumeMarginNeverDropsBelowTheHoldsReleaseMargin()
+    {
+        // Letting the car back before the auto-armed hold releases pins SOC to the floor with the grid
+        // covering every dip, so the hold's margin is the lower bound however it is configured or set.
+        var settings = Settings(new ForecastChargeOptions
+        {
+            AutoArmBatteryHoldAtFloor = true,
+            HoldReleaseMarginPercent = 3,
+            FloorResumeMarginPercent = 1,
+        });
+
+        Assert.Equal(3, settings.FloorResumeMarginPercent);
+
+        settings.SetFloorResumeMarginPercent(0, "test");
+
+        Assert.Equal(3, settings.FloorResumeMarginPercent);
+    }
+
+    [Fact]
+    public void WithoutTheAutoArmedHoldTheResumeMarginMayBeZero()
+    {
+        var settings = Settings(new ForecastChargeOptions
+        {
+            AutoArmBatteryHoldAtFloor = false,
+            HoldReleaseMarginPercent = 3,
+            FloorResumeMarginPercent = 0,
+        });
+
+        Assert.Equal(0, settings.FloorResumeMarginPercent);
     }
 }

@@ -49,6 +49,33 @@ public sealed class ForecastChargeOptions
     /// <summary>The hard SOC floor the computed trajectory is clamped to, whatever the forecast says.</summary>
     public double MinBatterySocFloorPercent { get; init; } = 50;
 
+    /// <summary>
+    /// How far above the floor the SOC must have recovered before a paused session may restart.
+    /// Charging continues down to the floor itself; only coming back costs the margin.
+    ///
+    /// <para>Without it the gate turns on a single percent of SOC — the inverter reports whole
+    /// percent — so a morning that starts just above the floor stops and restarts the car every few
+    /// minutes. Keep it above <see cref="HoldReleaseMarginPercent"/>: the battery hold must have let
+    /// go before the car comes back to compete for the surplus, or SOC simply pins to the floor with
+    /// the grid covering every dip. On a 9 kWh pack 5% is ~450 Wh, roughly nine minutes of a 3 kW
+    /// surplus going into the battery.</para>
+    /// </summary>
+    public double FloorResumeMarginPercent { get; init; } = 5;
+
+    /// <summary>
+    /// Surplus withheld from the car while SOC is inside the guard band — the same
+    /// <see cref="FloorResumeMarginPercent"/> width, measured up from the plan's floor. 0 disables it.
+    ///
+    /// <para>The resume margin stops the car flapping across the floor; this stops it hovering on it.
+    /// A car that takes every watt the sun makes holds the pack exactly at the floor for the whole
+    /// morning — no start/stop churn, but no recovery either, and every dip covered by the grid
+    /// because the hold is armed. Withholding a few hundred watts inside the band walks the battery
+    /// back out of it: on the 9 kWh default, 750 W clears a 5% band in about forty minutes and costs a
+    /// three-phase session roughly one amp. Raise it to get out of the band faster, lower it if
+    /// marginal mornings stop reaching the charger's 6 A floor at all.</para>
+    /// </summary>
+    public double FloorGuardReserveWatts { get; init; } = 750;
+
     /// <summary>What the owner would like the car to receive on a normal day, in kWh.</summary>
     public double DailyEvTargetKWh { get; init; } = 15;
 

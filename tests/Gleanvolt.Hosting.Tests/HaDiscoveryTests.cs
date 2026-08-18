@@ -309,6 +309,8 @@ public class HaDiscoveryTests
         // make this test depend on the machine's timezone.
         NextFeasibleWindow: (new DateTimeOffset(new DateTime(2026, 7, 27, 12, 30, 0, DateTimeKind.Local)), new DateTimeOffset(new DateTime(2026, 7, 27, 15, 50, 0, DateTimeKind.Local))),
         RequiredSocFloorPercent: 62,
+        // Lower than the floor in force: the 62% is the owner's clamp, not the forecast's own line.
+        TrajectorySocFloorPercent: 20,
         ShortfallWh: 4400,
         EvExpectedTodayWh: 10_500,
         EvTargetWh: 15_000,
@@ -328,6 +330,7 @@ public class HaDiscoveryTests
     [InlineData("homeassistant/sensor/solax_controller/ev_expected_today/config")]
     [InlineData("homeassistant/sensor/solax_controller/shortfall/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor/config")]
+    [InlineData("homeassistant/sensor/solax_controller/soc_floor_traj/config")]
     [InlineData("homeassistant/sensor/solax_controller/forecast_remaining/config")]
     [InlineData("homeassistant/sensor/solax_controller/tomorrow_forecast/config")]
     [InlineData("homeassistant/sensor/solax_controller/forecast_accuracy/config")]
@@ -341,6 +344,7 @@ public class HaDiscoveryTests
     [InlineData("daily_ev_target")]
     [InlineData("session_energy_target")]
     [InlineData("min_battery_soc")]
+    [InlineData("resume_margin")]
     public void DiscoveryMessages_IncludeTheSettableNumbers(string objectId)
     {
         var message = Discovery.DiscoveryMessages()
@@ -372,6 +376,7 @@ public class HaDiscoveryTests
         Assert.Equal(10.5, s.GetProperty("ev_budget_kwh").GetDouble());
         Assert.Equal(4.4, s.GetProperty("shortfall_kwh").GetDouble());
         Assert.Equal(62, s.GetProperty("soc_floor").GetDouble());
+        Assert.Equal(20, s.GetProperty("soc_floor_traj").GetDouble());
         Assert.Equal(11, s.GetProperty("forecast_remaining_kwh").GetDouble());
         Assert.Equal(94, s.GetProperty("bias_percent").GetDouble());
         Assert.Equal(1140, s.GetProperty("loan_w").GetDouble());

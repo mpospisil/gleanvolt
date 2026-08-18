@@ -4,6 +4,145 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-18 — Hysteresis on the forecast mode's SOC floor
+
+The `Forecasted` mode's SOC floor was the one threshold in it with no hysteresis. Everything else is
+deliberately asymmetric — `ResumeHysteresisWatts` on the surplus, `OutlookHysteresisFraction` on the
+day outlook, `LoanSocMarginPercent` on the loan — but the floor gate was a bare `soc < floor`, and a
+hard stop that skipped the `MinRunTime` dwell timer on the way down.
+
+### The failure mode
+
+A morning that starts just above the floor. SOC arrives as **whole percent**, so the gate turns on a
+single count: a cloud or a house-load step the 3-minute surplus average hasn't caught yet takes the
+pack from 51 % to 49 %, the session is cut, and 15 minutes later (the `MinPauseTime` dwell) it comes
+back at 50 % to do it again. A contactor cycle and a vehicle wake per iteration.
+
+Worse than the churn was an **inverted ordering** against the auto-armed battery hold. The hold arms
+at `soc <= floor` and releases at `floor + HoldReleaseMarginPercent` (2 %), while the car resumed at
+`floor + 0`. The car therefore came back *while the pack was still held*, and the steady state was not
+oscillation at all: SOC pinned to the floor, the car eating the whole surplus, and the grid covering
+every dip.
+
+### What was built
+
+- **A resume margin.** `FloorResumeMarginPercent` (default 5 %): charging continues down to the floor,
+  a paused session restarts only at `floor + margin`. Runtime-settable from Home Assistant and the web
+  UI like the floor itself, and floored at `HoldReleaseMarginPercent` in `ForecastRuntimeSettings` —
+  one place, so neither configuration nor an HA number can recreate the inversion. On a 9 kWh pack 5 %
+  is ~450 Wh, about nine minutes of a 3 kW surplus going into the battery.
+- **The clamp and the trajectory split apart.** `SolarDayPlanner` now reports
+  `TrajectorySocFloorPercent` (unclamped) alongside `RequiredSocFloorPercent` (clamped to
+  `MinBatterySocFloorPercent`). Falling through the trajectory risks the evening 100 % and still stops
+  the session at once; falling through the clamp while the trajectory sits far below — the normal case
+  on a sunny morning, when the sun could recover a much deeper discharge — is a preference rather than
+  a physics problem, so it goes through `MinRunTime` like any other soft reason and the session is held
+  at 6 A instead of being cut short.
+- Both floors are published: `soc_floor` and the new `soc_floor_traj`, so the reason a session paused
+  is readable from the dashboard rather than from the logs.
+
+- **A guard band, so the pack recovers rather than hovers.** The two changes above stop the flapping
+  but not the second failure mode: a car taking every watt the sun makes holds SOC exactly on the floor
+  for the whole morning, no cycling at all but no recovery either. While SOC is inside the resume
+  margin, `FloorGuardReserveWatts` (default 750) is withheld from the car and the loan is suppressed —
+  a loan and a reserve at the same SOC would cancel out, paying a round trip for no net movement. The
+  band reuses the resume margin's width rather than adding a second knob to keep in sync with it, and
+  by construction only a running session can be inside it: a paused one is held below by the margin.
+  On a marginal surplus the reserve stops the session, which is the point — the pack takes the whole
+  surplus and the margin keeps the car off until it is clear, converting a dozen short cycles into one
+  long one.
+
+### Session samples also record the site and the car (same PR)
+
+The floor work above needed a way to see what actually happened on a real morning, and the session
+store only recorded the car's side of it. Five fields were added to every sample:
+
+- `SolarWh`, `GridImportWh` — what the *roof produced* and what the *site imported* since the session
+  opened. Neither is derivable from the existing `FromSolarWh` / `FromGridWh`, which are the car's
+  attributed share: the difference is what the house and the home battery took. Export is not netted
+  off the import total, or a sunny hour would cancel out an expensive evening.
+- `ForecastSolarWh` — the same integral over the forecast, so a session carries its own
+  forecast-versus-reality line. Null rather than 0 while no forecast has been available for any part of
+  the session; 0 would read as "the forecast predicted nothing".
+- `VehicleChargeTimeRemainingMinutes`, `VehicleChargeTimeRemainingReported` — the car's **own**
+  estimate of the time it still needs, which is a number only the car can produce: it knows its charge
+  curve, its taper and its target. Stored as a plain number with a companion flag rather than as a
+  nullable, on request: a chart wants a series it can draw. The flag is not optional decoration —
+  `0` is also what a car that has finished reports, so without it a feed that publishes nothing is
+  indistinguishable from a car saying "done". `VehicleState` itself keeps the codebase's usual
+  `null`-means-absent contract; the flattening to `0` + flag happens only at the storage boundary.
+- `VehicleSocPercent`, `VehicleSocCapturedAt` — the car's own SOC from the vehicle feed, with the time
+  the *car* captured it. The capture time is not optional decoration: the reference feed lags by hours
+  (2h and 3.5h both observed), so a SOC stored without it cannot be told from a live reading. A feed
+  that goes quiet mid-session leaves the last reading standing rather than blanking the column, since
+  samples are forced far more often than the car reports.
+
+The MQTT contract gained one optional key, `charge_time_remaining_minutes`, parsed on the same terms
+as everything else there — absent is fine, present-but-unusable is not. A value outside 0–10080 minutes
+is rejected with the rest of the payload: negative is nonsense and a fortnight is a unit mix-up
+(seconds published as minutes), and either would poison a chart. The documented Home Assistant
+templates omit the key rather than defaulting it, since a defaulted `0` would arrive flagged as
+reported and read as a finished car.
+
+`ChargingSessionTracker` gained the three integrators and takes the vehicle state the same way it
+already takes the forecast — passed in by `SessionRecordingWorker`, not looked up, so the strategy stays
+free of both services and the control path acquires no new dependency. Database schema v2 adds the
+columns by `ALTER TABLE`; a v1 file upgrades in place on startup and keeps `0` for the totals nothing
+integrated at the time. `ChargingSessionDocument.CurrentSchemaVersion` moves to 2 — purely additive, so
+a v1 reader is unaffected.
+
+Rendering is **deliberately deferred to a later change**, not overlooked: this one lands the capture
+path so real sessions start accumulating the data now, and the charts can be built against sessions
+that already have it rather than against an empty table. The session detail page still charts
+home-battery SOC alone, and no Home Assistant entity was added (this feature is history, not
+telemetry).
+
+### Verification performed
+
+- 510 unit tests pass. New coverage: the resume margin (start vs continue at the same SOC, restart once
+  met, never demanding more than 100 %), the clamp-vs-trajectory split in both directions and past the
+  dwell timer, the guard band (trimmed setpoint inside it, whole surplus above it, a marginal surplus
+  handed to the battery, no loan inside it), the planner reporting the two floors, the hold-release
+  lower bound in the runtime settings, and the new HA entities. For the session fields: the three
+  integrators across a session, export not netted off import, the null-not-zero forecast total, the
+  car's SOC with its capture time, a quiet feed leaving the last reading standing, a reading with no
+  SOC carrying no capture time either, everything resetting between sessions, the SQLite round trip,
+  and a v1 file migrating in place with its existing rows still readable. For the car's estimate:
+  parsing it, an absent one, a reported zero kept apart from an absent one, impossible values rejected
+  at both ends, and the zero-plus-flag pair surviving the round trip.
+- **Not yet verified on real hardware, and this needs a plugged-in car to verify.** Nothing here can
+  be confirmed from unit tests or a dry run: the whole point is how the loop behaves against a real
+  pack, a real charger and real cloud cover. What to watch on the first marginal morning:
+  - the count of `Charging` → `Paused` transitions in one morning — the number this change exists to
+    reduce. Anything above two or three means the margin is too small for this site's noise.
+  - `soc_floor` against `soc_floor_traj` while the car is charging: on a sunny morning they should be
+    far apart, and a pause with them apart should log the "Holding at 6A for the minimum run time"
+    reason rather than an outright pause.
+  - that the hold releases *before* the car returns — SOC should visibly climb off the floor between
+    the pause and the restart, and grid import while the car is charging should not sit at the floor
+    for long stretches.
+  - the effect on delivered EV energy: the margin and the reserve both cost charging time on marginal
+    days by design, and 5 % / 750 W may prove too conservative on this pack. The reserve is the first
+    knob to lower if marginal mornings stop reaching the 6 A floor at all.
+  - **that the session store's new columns fill in.** The car's SOC in particular: it comes from a
+    feed that can be absent, stale or dead, and a session recorded with `vehicle_soc_percent` null
+    throughout means the feed, not the store, is what needs looking at.
+  - **whether the ID.4 reports a remaining time at all.** The entity name in the documented template is
+    unverified against this install, and `volkswagen_connect` does not expose one on every model. A
+    session with `vehicle_charge_time_remaining_reported` false throughout means the automation needs
+    the right entity, or that this car simply has nothing to say — both fine, neither an error.
+  - **that the reserve actually lands in the battery.** It only does if the withheld surplus has
+    nowhere else to go; watch `Battery power` climb while the car charges at the trimmed setpoint, and
+    watch for export instead, which would mean the reserve is being spilled rather than stored.
+  - **grid import during a clamp dip.** Routing the clamp breach through `SoftPause` inherits that
+    method's existing trade — up to `MinRunTime` at 6 A — and a clamp dip that coincides with the sun
+    disappearing entirely will now hold ~4.2 kW for up to ten minutes, covered by the grid because the
+    hold is armed. That is at most ~700 Wh and it is the same bargain the surplus dip already makes,
+    but it is the one place this change can cost money rather than save wear. Watch grid import around
+    a pause; if it is material, gate the soft path on the live surplus still clearing the 6 A floor.
+
+---
+
 ## 2026-08-17 — Vehicle telemetry phase 1: the car's battery SOC over MQTT (issue #73)
 
 The controller can now read the **car's own** battery state — as distinct from the home battery the

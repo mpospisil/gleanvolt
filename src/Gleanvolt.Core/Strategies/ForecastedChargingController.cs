@@ -13,7 +13,10 @@ namespace Gleanvolt.Core.Strategies;
 /// charger's own use-mode is <see cref="EvChargerMode.Fast"/>, and it never starts or stops a session.
 /// What it adds:</para>
 /// <list type="bullet">
-/// <item><description>a <b>moving SOC floor</b> from the plan instead of a fixed 95% gate;</description></item>
+/// <item><description>a <b>moving SOC floor</b> from the plan instead of a fixed 95% gate, with its own
+/// resume margin, a guard band that hands the battery part of the surplus while it recovers, and a
+/// lighter touch when the floor in force is the owner's clamp rather than the forecast's
+/// trajectory;</description></item>
 /// <item><description>a bounded <b>battery loan</b> that bridges a real-but-insufficient surplus up to
 /// the charger's 6 A floor, repaid later from sun that would otherwise have been exported;</description></item>
 /// <item><description><b>dwell timers</b>, so a passing cloud can't start and stop the session every few
@@ -73,6 +76,10 @@ public sealed class ForecastedChargingController : IChargingController
     /// <summary>The charger's minimum viable power — the line between shoulder and plateau production.</summary>
     public double MinChargePowerWatts => _power.AmpsToWatts(_minAmps);
 
+    /// <summary>How far above the plan's floor the SOC must have recovered before a pause may end.</summary>
+    private double FloorResumeMarginPercent =>
+        Math.Max(0, _runtime?.FloorResumeMarginPercent ?? _options.FloorResumeMarginPercent);
+
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -111,9 +118,26 @@ public sealed class ForecastedChargingController : IChargingController
             return Pause($"Final guard before {plan.Deadline.LocalDateTime:HH:mm}: battery at {soc:F0}%, everything goes to it.");
         }
 
-        if (soc < plan.RequiredSocFloorPercent)
+        // The floor gate, asymmetric in the same way as the surplus threshold below: charging continues
+        // down to the floor, but a paused session may only come back once the battery has recovered a
+        // margin above it. Without that margin the gate turns on a single percent of SOC — the inverter
+        // reports whole percent — and the car cycles on and off for the whole morning.
+        var floorToClear = input.Charging
+            ? plan.RequiredSocFloorPercent
+            : Math.Min(100, plan.RequiredSocFloorPercent + FloorResumeMarginPercent);
+
+        if (soc < floorToClear)
         {
-            return Pause($"Battery {soc:F0}% below the {plan.RequiredSocFloorPercent:F0}% floor the forecast requires for 100% by {plan.Deadline.LocalDateTime:HH:mm}.");
+            var reason = input.Charging
+                ? $"Battery {soc:F0}% below the {plan.RequiredSocFloorPercent:F0}% floor the forecast requires for 100% by {plan.Deadline.LocalDateTime:HH:mm}."
+                : $"Battery {soc:F0}% has not recovered to the {floorToClear:F0}% needed to restart (floor {plan.RequiredSocFloorPercent:F0}% + {FloorResumeMarginPercent:F0}% margin).";
+
+            // Which floor was breached decides how hard the stop is. Falling through the *trajectory*
+            // costs the evening 100% and ends the session at once. Falling through the owner's *clamp*
+            // while the trajectory is still far below — the normal case on a sunny morning — costs only
+            // a preference the rest of the day can make good, so it goes through the dwell timer like
+            // any other soft reason rather than cutting a running session short on a 1% wobble.
+            return soc < plan.TrajectorySocFloorPercent ? Pause(reason) : SoftPause(input, reason);
         }
 
         if (plan.Outlook == DayOutlook.NoChargeToday)
@@ -134,8 +158,20 @@ public sealed class ForecastedChargingController : IChargingController
         }
 
         var surplusWatts = input.SurplusWatts;
-        var loanWatts = LoanWatts(input, plan, surplusWatts);
-        var availableWatts = surplusWatts + loanWatts;
+
+        // The guard band: the resume margin's width, measured up from the floor. Inside it the battery
+        // is still recovering, so it gets first refusal on part of the surplus — and lends nothing,
+        // since a loan and a reserve at the same SOC would just cancel out. Only a running session can
+        // be in here at all; a paused one is held below by the resume margin itself.
+        var inGuardBand = soc < plan.RequiredSocFloorPercent + FloorResumeMarginPercent;
+        var reserveWatts = inGuardBand ? Math.Max(0, _options.FloorGuardReserveWatts) : 0;
+
+        var loanWatts = inGuardBand ? 0 : LoanWatts(input, plan, surplusWatts);
+        var availableWatts = Math.Max(0, surplusWatts + loanWatts - reserveWatts);
+
+        var reserveText = reserveWatts > 0
+            ? $" − {reserveWatts:F0}W reserved for the battery inside the {FloorResumeMarginPercent:F0}% guard band"
+            : string.Empty;
 
         // Asymmetric threshold: keep charging down to the minimum, but only (re)start a hysteresis
         // margin above it.
@@ -144,7 +180,7 @@ public sealed class ForecastedChargingController : IChargingController
         {
             return SoftPause(
                 input,
-                $"Available {availableWatts:F0}W (surplus {surplusWatts:F0}W + loan {loanWatts:F0}W) below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
+                $"Available {availableWatts:F0}W (surplus {surplusWatts:F0}W + loan {loanWatts:F0}W{reserveText}) below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
         }
 
         var targetAmps = ToHardwareCurrent(availableWatts);
@@ -155,7 +191,7 @@ public sealed class ForecastedChargingController : IChargingController
 
         var loanText = loanWatts > 0
             ? $" (loan +{loanWatts:F0}W bridging {surplusWatts:F0}W to {MinChargePowerWatts:F0}W)"
-            : string.Empty;
+            : reserveText;
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,

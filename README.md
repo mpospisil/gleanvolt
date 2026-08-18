@@ -532,12 +532,42 @@ and, only if needed, the plateau tail), and hands the car whatever is left at a 
 ```
 EvBudget      = RemainingPv − ExpectedHouse − BatteryToFull
 FeasibleEv    = the part of that arriving at ≥ the charger's minimum power, after the battery's booking
-SocFloor      = 100 − (remaining surplus × efficiency ÷ capacity) × 100,  clamped to MinBatterySocFloorPercent
+TrajectoryFloor = 100 − (remaining surplus × efficiency ÷ capacity) × 100
+SocFloor      = max(TrajectoryFloor, MinBatterySocFloorPercent)
 ```
 
 The evening guarantee needs no scheduling code: as the day burns down, the remaining surplus falls, so
 `SocFloor` climbs toward 100 % and squeezes the car out of the late afternoon by itself. A
 `FinalGuardBefore` window (default 1 h) pauses the car outright as a backstop.
+
+##### Not flapping on the floor
+
+The floor is where the mode is easiest to get wrong. SOC arrives as **whole percent**, so a bare
+`soc < floor` test turns on a single count — a morning that starts one percent above the floor would
+otherwise stop and restart the car every few minutes, which is a contactor cycle and a vehicle wake
+each time. Two things prevent that:
+
+- **A resume margin.** Charging continues down to `SocFloor` itself, but a paused session only comes
+  back at `SocFloor + FloorResumeMarginPercent` (default 5 %) — the SOC counterpart of
+  `ResumeHysteresisWatts`. It is held at or above `HoldReleaseMarginPercent`, because a car allowed
+  back before the auto-armed [battery hold](#battery-discharge-hold-writes-to-the-inverter) releases
+  would simply pin SOC to the floor with the grid covering every dip.
+- **The clamp and the trajectory are different events.** Falling through `TrajectoryFloor` puts the
+  evening 100 % at risk and stops the session at once. Falling through the `MinBatterySocFloorPercent`
+  clamp while the trajectory sits far below — the normal case on a sunny morning, when the sun could
+  still recover a much deeper discharge — is a preference, not a physics problem, so it goes through
+  the `MinRunTime` dwell timer like any other soft reason and the session is held at 6 A rather than
+  cut short. Both floors are published, as `soc_floor` and `soc_floor_traj`.
+- **A guard band, so the pack recovers instead of hovering.** Not flapping is not the same as getting
+  better: a car that takes every watt the sun makes holds SOC *exactly* on the floor all morning, with
+  the auto-armed hold sending every dip to the grid. So while SOC is inside the resume margin,
+  `FloorGuardReserveWatts` (default 750) of surplus is withheld from the car and the battery lends
+  nothing — a loan and a reserve at the same SOC would only cancel out. On the 9 kWh default that
+  clears a 5 % band in about forty minutes and costs a three-phase session roughly one amp. Where the
+  surplus is marginal it stops the session outright, which is the intent: the pack gets the whole
+  surplus and the resume margin keeps the car off until it has climbed clear, so a morning that used to
+  produce a dozen short cycles produces one long one. Only a *running* session is ever inside the band
+  — a paused one is held below it by the resume margin itself.
 
 #### The battery loan
 
@@ -619,6 +649,8 @@ the deadline.
     "BaselineHouseLoadWatts": 350,   // seed for the learned hour-of-day house-load profile
     "ForecastConfidence": "P10",     // P10 | P50 | P90 — P10 is what makes the guarantee honest
     "MinBatterySocFloorPercent": 50, // hard floor, whatever the forecast says
+    "FloorResumeMarginPercent": 5,   // SOC recovery required before a paused session restarts
+    "FloorGuardReserveWatts": 750,   // surplus kept for the battery inside that band, 0 = off
     "DailyEvTargetKWh": 15,          // what the car should get; the shortfall is measured against it
     "SessionEnergyTargetKWh": 0,     // per-session ceiling, 0 = unlimited (stands in for "charge to 80%")
     "EnableBatteryLoan": true,
@@ -751,12 +783,13 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
 - forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
   **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
-  **Projected shortfall**, **Required SOC floor**, **Forecast remaining today**,
+  **Projected shortfall**, **Required SOC floor**, **Trajectory SOC floor**, **Forecast remaining today**,
   **Tomorrow forecast**, **Forecast accuracy**, **Session energy**, **Battery loaned today** and
   **Battery loan power**. `Day outlook` and `Projected shortfall` are what a "not enough sun for the
   car today" notification automation keys off.
 - numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
-  unlimited) and **Minimum battery SOC** (%). Like the mode, changes don't persist across restarts.
+  unlimited), **Minimum battery SOC** (%) and **SOC resume margin** (%). Like the mode, changes don't
+  persist across restarts.
 - binary sensors: **Car connected** and **Charging now**.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 
@@ -778,6 +811,7 @@ description or tooltip field. The meanings live here instead.
 | **Daily EV target** | kWh | How much energy the car should get on a normal day. The forecast plan measures its projected shortfall against this. Doesn't persist across restarts. |
 | **Session energy target** | kWh | Stop charging once this much has gone into the car in one session (since it was plugged in). `0` means no limit. Doesn't persist across restarts. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
+| **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
 | **Control state** | — | What charge control is doing right now. `Disabled`: no mode selected, the charger is the owner's. `Idle`: a mode is selected but not acting, most often because the charger's use-mode isn't Fast. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
 | **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
 | **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |
@@ -806,6 +840,7 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **EV energy expected today** | kWh | What the car can realistically receive in total today, including what it has already taken. |
 | **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full battery plus the daily EV target. Above zero means the car won't get everything it wanted; the battery keeps priority regardless. |
 | **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what arms the discharge hold automatically. |
+| **Trajectory SOC floor** | % | The same figure before the **Minimum battery SOC** clamp is applied: what the forecast on its own says the battery could be drawn down to. Well below the floor in force on a sunny morning, equal to it once the day is short. The pair is the first thing to read when a session pauses — it says whether the car is being held back by the forecast or merely by your configured minimum, and the controller stops the session harder in the first case. |
 | **Forecast remaining today** | kWh | Forecast PV still to come today, at the configured confidence band and already scaled by **Forecast accuracy**. |
 | **Tomorrow forecast** | kWh | Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out. |
 | **Forecast accuracy** | % | Actual production against forecast so far today. 100% is on the nose, above means the roof is beating the forecast. The rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted, so the mode falls back to live-solar behaviour. |
@@ -875,6 +910,7 @@ that schema by a template or automation in Home Assistant:
 {
   "captured_at":  "2026-08-17T10:44:23+00:00",   // required: the CAR's capture time
   "soc_percent":  28,                            // optional, 0-100
+  "charge_time_remaining_minutes": 95,           // optional: the CAR's own estimate
   "charge_state": "charging",                    // optional: idle | charging | complete | unknown
   "plug_state":   "connected",                   // optional: connected | disconnected | unknown
   "source":       "id4"                          // optional, for display
@@ -890,6 +926,13 @@ one automation.
 Everything except `captured_at` is optional, and absent is a supported configuration rather than an
 error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
 without it staleness cannot be judged.
+
+`charge_time_remaining_minutes` is the **car's own** estimate of how much longer it needs — it knows
+its charge curve, its taper and its target, and nothing here does. Publish the key only when the car
+actually reports it: `0` means "the car says it is finished", which is a different fact from "the car
+didn't say", and the templates below omit the key rather than defaulting it. A value outside
+0–10080 minutes is rejected as a broken template (usually seconds published as minutes) along with the
+rest of that payload.
 
 #### Publishing from Home Assistant
 
@@ -921,8 +964,12 @@ automation:
           retain: true
           payload: >-
             {% set cs = states('sensor.id_4_pro_performance_charging_state') %}
+            {% set left = states('sensor.id_4_pro_performance_charging_time_left') %}
             {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
              "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+             {% if left not in ['unknown', 'unavailable', 'none', ''] %}
+             "charge_time_remaining_minutes": {{ left | float(0) }},
+             {% endif %}
              "charge_state": "{{ 'charging' if cs == 'charging'
                                  else 'idle' if cs in ['notReadyForCharging','readyForCharging']
                                  else 'unknown' }}",
@@ -951,8 +998,12 @@ action:
       retain: true
       payload: >-
         {% set cs = states('sensor.id_4_pro_performance_charging_state') %}
+        {% set left = states('sensor.id_4_pro_performance_charging_time_left') %}
         {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
          "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+         {% if left not in ['unknown', 'unavailable', 'none', ''] %}
+         "charge_time_remaining_minutes": {{ left | float(0) }},
+         {% endif %}
          "charge_state": "{{ 'charging' if cs == 'charging'
                              else 'idle' if cs in ['notReadyForCharging','readyForCharging']
                              else 'unknown' }}",
@@ -966,6 +1017,11 @@ mode: single
 Then set `Vehicle:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
 being published while the integration's entities read `unavailable`, which happens whenever its cloud
 session expires.
+
+**Check the remaining-time entity name against your own install** — it varies by integration and by
+car, and `volkswagen_connect` does not expose one on every model. If yours has no such sensor, delete
+the `{% if %}` block: the guard already omits the key when the entity is missing, and a feed that never
+publishes it is a supported configuration, not a fault.
 
 **Don't wait for the trigger to prove it works.** It fires on a *state change* of those three sensors,
 and a parked car may not produce one for hours. Publish immediately with the automation's
@@ -1199,7 +1255,7 @@ from the moment the car was plugged in whether or not anything is controlling it
 |---|---|
 | **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, and the forecast day plan as it stood at the start |
 | **Totals** | energy delivered, split into **from solar / from grid / from battery**, plus what the forecast mode *commanded* the battery to lend |
-| **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, and the running totals |
+| **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, the running totals, and the site-wide progress figures below |
 | **Events** | mode changed, charging started/paused, setpoint changed, hold armed/released, plan fell out of trust, session ended — each with the controller's own reason string |
 
 #### The four charging figures, and why they are kept apart
@@ -1215,6 +1271,26 @@ The gaps are the diagnostic. **Target ≠ active** means the write didn't land, 
 `CurrentChangeThresholdAmps`. **Active ≠ actual** means the *car* is the limiter — its charge curve,
 its taper near full, its on-board charger ceiling — which is what separates "the strategy
 under-delivered" from "the car wouldn't take more".
+
+#### Progress against the site, and against the car
+
+The totals above are all about the car: what it received, and which source each watt is attributed to.
+Three more are integrated over the same window and answer a different question — what the *site* did
+while the car was charging — plus the car's own view of itself:
+
+| Field | What it is |
+|---|---|
+| `SolarWh` | PV **produced on site** since the session opened. Not the same as `FromSolarWh`: the difference is what the house and the home battery took. |
+| `ForecastSolarWh` | What the forecast expected the roof to make over that same window. Against `SolarWh` it is the session's own forecast-versus-reality line. `null` — not `0` — while no forecast has been available for any part of the session. |
+| `GridImportWh` | Energy the **whole site** imported, export excluded rather than netted off, so a sunny hour can't cancel out an expensive evening. Again distinct from `FromGridWh`, the car's attributed share. |
+| `VehicleSocPercent` | The **car's own** battery SOC from the [vehicle feed](#vehicle-telemetry-the-vehicle-section), or `null` when none is configured or nothing has arrived. Advisory: nothing in charge control reads it. |
+| `VehicleChargeTimeRemainingMinutes` | How much longer the **car itself** reckons it needs, from `charge_time_remaining_minutes`. **`0` when the car did not report it** — not an error, just a feed that doesn't publish it. Because `0` is also a legitimate reading ("done"), never read this without the flag below. |
+| `VehicleChargeTimeRemainingReported` | Whether that `0` is the car's answer or the absence of one. `false` means no estimate was provided. |
+| `VehicleSocCapturedAt` | When the *vehicle* produced that reading. Stored next to it because it routinely lags by hours — a SOC without its capture time cannot be told from a live one, and a chart would silently flatten. A feed that goes quiet mid-session leaves the last reading standing with a visibly ageing capture time rather than blanking the column. |
+
+These arrived in database schema **v2**; a v1 file is migrated in place on startup and its existing
+rows keep `0` for the three totals, which is the truth for them — nothing integrated those quantities
+at the time. Published documents move to `schemaVersion` 2 for the same reason, purely additively.
 
 #### How the energy is attributed to a source
 

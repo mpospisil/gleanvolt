@@ -39,6 +39,7 @@ public sealed class SessionRecordingWorker : BackgroundService
     private readonly IChargingSessionStore _store;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ISolarForecastService _forecast;
+    private readonly IVehicleTelemetry _vehicle;
     private readonly ChargingSessionTracker _tracker;
     private readonly ILogger<SessionRecordingWorker> _logger;
     private readonly TimeProvider _timeProvider;
@@ -57,6 +58,7 @@ public sealed class SessionRecordingWorker : BackgroundService
         IChargingSessionStore store,
         ChargeControlStatusHolder statusHolder,
         ISolarForecastService forecast,
+        IVehicleTelemetry vehicle,
         ILogger<SessionRecordingWorker> logger,
         TimeProvider? timeProvider = null)
     {
@@ -64,6 +66,7 @@ public sealed class SessionRecordingWorker : BackgroundService
         _store = store;
         _statusHolder = statusHolder;
         _forecast = forecast;
+        _vehicle = vehicle;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _tracker = new ChargingSessionTracker(
@@ -172,7 +175,11 @@ public sealed class SessionRecordingWorker : BackgroundService
 
         try
         {
-            var update = _tracker.Observe(status, ForecastPowerWatts(status.Timestamp), ForecastRemainingTodayWh(status.Timestamp));
+            var update = _tracker.Observe(
+                status,
+                ForecastPowerWatts(status.Timestamp),
+                ForecastRemainingTodayWh(status.Timestamp),
+                _vehicle.GetCurrentState());
             await PersistAsync(update, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
