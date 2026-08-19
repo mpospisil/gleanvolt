@@ -4,6 +4,121 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-19 — An energy history of the site, at 15-minute resolution
+
+The session store records charges. Nothing recorded the **site**: how much the roof made last March,
+how well the forecast tracked it across a season, how much was exported at noon and bought back in the
+evening. None of that is derivable from session data, because most of the year has no session in it —
+and the questions analytics will want to ask years from now are not ones anybody has asked yet, which
+is precisely why the recording has to start before they are.
+
+### What was built
+
+A **second observer of the same status snapshots**, with its own tables in its own database file, that
+does nothing but record.
+
+- `EnergyIntervalTracker` (Core/Strategies) — pure, framework-free, and where every rule about what a
+  row *means* lives. Takes poll snapshots, hands finished buckets back.
+- `EnergyInterval` (Core/Models) — one bucket. In **kWh**, the one place in this codebase that isn't
+  in watt-hours: it is the analytics surface, read by spreadsheets rather than by control code.
+- `SqliteEnergyIntervalStore` (Infrastructure/Monitoring) — `data/energy.db`, one table, schema v1.
+- `EnergyMonitorWorker` (Hosting/Monitoring) — a `BackgroundService` subscribing to
+  `ChargeControlStatusHolder.Updated`, exactly as `SessionRecordingWorker` does: channel in, work on
+  its own loop, so the poll loop can never be stalled by a disk.
+- `EnergyMonitor` configuration section, **on by default** for the same reason the session store is.
+
+### The decisions worth writing down
+
+**A bucket, not a sample.** A session sample is an instant whose totals run from the start of that
+session; an interval covers a fixed window and its figures belong to that window alone. Summing a
+day's buckets gives the day, exactly — which no arithmetic on session samples can do.
+
+**Split at the boundary, don't round to it.** A snapshot at 10:14:58 followed by one at 10:15:03
+straddles the quarter hour. `EnergyIntegrator` could not express this — it accumulates until reset, so
+resetting on arrival of the second snapshot would post all five seconds to whichever bucket won the
+race. The tracker splits instead: two seconds settle the closing bucket, three open the next. That is
+why this is a new class rather than a second use of the old one, and it is what makes a poll cadence
+sharing no common factor with the interval unable to skew the series.
+
+**`covered_seconds` is a column, not an assumption.** Energy is integrated by holding each reading
+until the next, which is how the poll loop sees the hardware. Beyond `MaxGap` (5 min) that stops being
+true — the service was restarting, or the inverter was unreachable — and holding across it would
+invent energy nobody measured. So the bucket is closed short and the row says so. Without this a
+restart at 09:07 would read as "the sun went out for seven minutes".
+
+**Appends merge; they do not replace.** `period_start` is the primary key and a second write for the
+same window *adds* to the stored row (`ON CONFLICT DO UPDATE`, with the SOC statistics merged as
+statistics and `soc_mean_percent` re-weighted by the two coverages). The worker flushes its
+part-finished bucket on shutdown, so a planned restart loses nothing: the stopping process contributes
+the minutes it saw, the starting one contributes the rest. Without the merge every deploy would
+silently delete the minutes before it.
+
+**Nothing is netted.** Import and export are separate columns, and so are battery charge and
+discharge. A quarter hour that exported 0.4 kWh and imported 0.4 kWh is not the same event as one that
+did neither, and a net of zero cannot tell them apart afterwards. It also makes the row *balance*, so
+house load needs no column of its own — it is `solar + import - export - charge + discharge`, and
+storing it would only create a second version that could disagree with the columns it came from.
+
+**`forecast_solar_kwh` is nullable.** "We had no forecast" is not "we expected nothing", and a chart
+must be able to break the line rather than draw a dip. This is also why the worker reads the forecast
+service directly instead of taking `ChargeControlStatus.ForecastSolarPowerWatts`, which reports 0 for
+"no forecast" and so cannot be told apart from a genuine night-time zero. The merge preserves the
+distinction in both directions: a null half never zeroes a half that had one.
+
+**SOC averages over time, not over samples.** A reading that stood for ten minutes counts ten times
+one that stood for one. Sample-count averaging would let a burst of polls during a Modbus retry storm
+drag the figure toward whatever the pack happened to be doing that second. Consecutive buckets also
+join up — the SOC standing at a boundary ends one bucket and starts the next — so a chart drawn from
+the rows has no gap between them.
+
+**Its own file, beside `sessions.db` rather than inside it.** `SqliteChargingSessionStore` serialises
+writes on an in-process lock; a second writer holding a *different* lock over the same file would turn
+that back into the `SQLITE_BUSY` retry loop the lock exists to avoid. The two stores also have
+separate retention and separate reasons to fail. Nothing is lost: an analysis that wants both opens
+one and `ATTACH`es the other.
+
+**Buckets align to the UTC epoch, not to local midnight.** 15 minutes divides every real UTC offset in
+use — including the 30- and 45-minute ones — so the two agree anyway, and aligning on UTC keeps a
+daylight-saving change from producing a 45- or 75-minute bucket. `local_date` is stored alongside so
+"group by day" stays a column rather than timezone maths in every query.
+
+**`RetentionDays` defaults to 0 — keep everything**, the opposite of the session store's 365. At 96
+rows a day a decade is still a file you could email, and a table built to be looked at years later
+should not be quietly deleting the years.
+
+### The viewer
+
+`/energy` in the web UI: one recorded day at a time, a row per interval, with a date picker and
+prev/next buttons that stop at today. It reads `IEnergyIntervalStore.GetIntervalsAsync` and reaches
+past nothing into SQLite, and it degrades to "isn't available right now" when the store can't be
+opened — the same shape `/sessions` already had.
+
+**A table rather than a chart, deliberately.** The value of this store is that the figures are exact
+and that a partial row is *visibly* partial. So a row below full coverage is marked, its percentage
+spelled out — and only then, because a column reading "100%" ninety-six times would bury the handful
+that matter — and counted in a note under the table; a window no forecast covered shows an em dash,
+not `0.00`. A chart would smooth over both. Charts can come later, over the same query.
+
+The `House` column is the residual — `solar + import - export - charge + discharge` — computed by
+`EnergyInterval.HouseLoadKwh` rather than stored, and the note under the table says so: a column that
+looks like a measurement and isn't is worse than no column.
+
+### Not built
+
+**No Home Assistant entities.** This feature is history, not telemetry, and nothing in it changes on a
+cadence worth an entity's retained state.
+
+### Tests
+
+41 new tests — 15 over the tracker (boundary splitting, the gap rule, the two-column sign handling,
+time-weighted SOC, interval validation, out-of-order snapshots, the closing balance), 11 over the
+store against a real SQLite file (round-trip of every column, the merging upsert, the forecast-null
+rules in both orders, pruning), 12 over the viewer (the local-day window, day stepping, the totals
+row, the partial-row marking, the forecast dash, the residual), and 3 over the composition root,
+which had no wiring test of its own before. Full suite: 555 passing.
+
+---
+
 ## 2026-08-18 — Hysteresis on the forecast mode's SOC floor
 
 The `Forecasted` mode's SOC floor was the one threshold in it with no hysteresis. Everything else is

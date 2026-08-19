@@ -1,0 +1,188 @@
+@page "/energy"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IEnergyIntervalStore Store
+@inject TimeProvider Time
+
+@*
+    The first way to look at what EnergyMonitor records. Read-only and deliberately plain: a day at a
+    time, one row per interval, exactly the columns the table stores. IEnergyIntervalStore's query
+    member already existed for this, so nothing here reaches past the interface into SQLite.
+
+    A table rather than a chart, on purpose. The point of this store is that the numbers are exact and
+    that a partial row is visibly partial; a chart would smooth over precisely the thing worth seeing
+    first. Charts can come later, over the same query.
+*@
+
+<PageTitle>Energy — Gleanvolt</PageTitle>
+
+<h1>Energy</h1>
+
+<div class="control range-control">
+    <label for="day">Day</label>
+    <button type="button" class="day-step" @onclick="() => StepAsync(-1)" aria-label="Previous day">‹</button>
+    <input id="day" type="date" max="@_today.ToString("yyyy-MM-dd")" @bind="_day" @bind:after="LoadAsync" />
+    @* Disabled rather than hidden past today: the control keeps its place, and a day with no data
+       reads as an empty day rather than as a missing button. *@
+    <button type="button" class="day-step" disabled="@(_day >= _today)" @onclick="() => StepAsync(1)" aria-label="Next day">›</button>
+</div>
+
+@if (_error)
+{
+    <p class="muted">The energy history isn't available right now.</p>
+}
+else if (_intervals is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_intervals.Count == 0)
+{
+    <p class="muted">Nothing was recorded on this day.</p>
+}
+else
+{
+    <table class="sessions energy">
+        <thead>
+            <tr>
+                <th>From</th>
+                <th class="num">Solar</th>
+                <th class="num">Forecast</th>
+                <th class="num">Import</th>
+                <th class="num">Export</th>
+                <th class="num">To car</th>
+                <th class="num">Batt in</th>
+                <th class="num">Batt out</th>
+                <th class="num">House</th>
+                <th class="num">SOC</th>
+                <th class="num">Covered</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var interval in _intervals)
+            {
+                <tr class="@(IsPartial(interval) ? "partial" : null)">
+                    <td>@Local(interval.PeriodStart)</td>
+                    <td class="num">@Kwh(interval.SolarKwh)</td>
+                    @* An em dash, not 0.00: no forecast covered this window, which is a different
+                       fact from a forecast of nothing. *@
+                    <td class="num">@(interval.ForecastSolarKwh is { } forecast ? Kwh(forecast) : "—")</td>
+                    <td class="num">@Kwh(interval.GridImportKwh)</td>
+                    <td class="num">@Kwh(interval.GridExportKwh)</td>
+                    <td class="num">@Kwh(interval.EvKwh)</td>
+                    <td class="num">@Kwh(interval.BatteryChargeKwh)</td>
+                    <td class="num">@Kwh(interval.BatteryDischargeKwh)</td>
+                    <td class="num">@Kwh(interval.HouseLoadKwh)</td>
+                    <td class="num">@Soc(interval)</td>
+                    @* Only spelled out when it is short. A column reading "100%" ninety-six times
+                       would bury the handful of rows the reader actually has to be careful with. *@
+                    <td class="num">@(IsPartial(interval) ? $"{interval.Coverage * 100:F0}%" : "—")</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Day</th>
+                <td class="num">@Kwh(_intervals.Sum(i => i.SolarKwh))</td>
+                <td class="num">@(_intervals.Any(i => i.ForecastSolarKwh is not null)
+                                    ? Kwh(_intervals.Sum(i => i.ForecastSolarKwh ?? 0))
+                                    : "—")</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.GridImportKwh))</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.GridExportKwh))</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.EvKwh))</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.BatteryChargeKwh))</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.BatteryDischargeKwh))</td>
+                <td class="num">@Kwh(_intervals.Sum(i => i.HouseLoadKwh))</td>
+                <td class="num">@($"{_intervals[0].SocStartPercent:F0} → {_intervals[^1].SocEndPercent:F0}%")</td>
+                <td class="num">@_intervals.Count rows</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <p class="muted table-note">
+        Every figure is kWh over that interval, in @Time.LocalTimeZone.Id time. Import and export are
+        kept apart, and so are the battery's two directions — a net figure could not tell an idle
+        quarter hour from a busy one that happened to balance. <strong>House</strong> is the residual
+        of the others (the car included), not a separate measurement.
+        @if (_partialCount > 0)
+        {
+            <text>
+                <strong>@_partialCount row@(_partialCount == 1 ? "" : "s")</strong> cover@(_partialCount == 1 ? "s" : "") less
+                than the full interval — the service was starting, stopping, or had lost the inverter —
+                so every energy figure on @(_partialCount == 1 ? "that row is" : "those rows are") short
+                by the same fraction.
+            </text>
+        }
+    </p>
+}
+
+@code {
+    private DateOnly _day;
+    private DateOnly _today;
+    private IReadOnlyList<EnergyInterval>? _intervals;
+    private int _partialCount;
+    private bool _error;
+
+    protected override Task OnInitializedAsync()
+    {
+        _today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).DateTime);
+        _day = _today;
+        return LoadAsync();
+    }
+
+    private Task StepAsync(int days)
+    {
+        var moved = _day.AddDays(days);
+        if (moved > _today)
+        {
+            return Task.CompletedTask;
+        }
+
+        _day = moved;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = false;
+        try
+        {
+            var (from, to) = LocalDay(_day);
+            _intervals = await Store.GetIntervalsAsync(from, to, CancellationToken.None);
+            _partialCount = _intervals.Count(IsPartial);
+        }
+        catch (Exception)
+        {
+            // The store isn't ready -- EnergyMonitor:Enabled is false, or the file couldn't be opened
+            // -- and that must read as "not available", not crash the page. Recording's own failures
+            // are already silent by design (EnergyMonitorWorker); browsing degrades the same way.
+            _intervals = null;
+            _partialCount = 0;
+            _error = true;
+        }
+    }
+
+    /// <summary>
+    /// The selected day as an instant range. Built from the zone's offset at each end rather than
+    /// from a fixed 24 hours, so the clocks-change days are the 23 and 25 hours they really are.
+    /// </summary>
+    private (DateTimeOffset From, DateTimeOffset To) LocalDay(DateOnly day)
+    {
+        var zone = Time.LocalTimeZone;
+        var start = day.ToDateTime(TimeOnly.MinValue);
+        var end = start.AddDays(1);
+
+        return (new DateTimeOffset(start, zone.GetUtcOffset(start)), new DateTimeOffset(end, zone.GetUtcOffset(end)));
+    }
+
+    // Rounded before comparing: a bucket closed a fraction of a second short is not something a
+    // reader needs warning about, and floating-point seconds would flag almost every row.
+    private static bool IsPartial(EnergyInterval interval) => interval.Coverage < 0.995;
+
+    private string Local(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("HH:mm");
+
+    private static string Kwh(double value) => value.ToString("F2");
+
+    private static string Soc(EnergyInterval interval) =>
+        $"{interval.SocStartPercent:F0} → {interval.SocEndPercent:F0}%";
+}

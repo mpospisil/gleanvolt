@@ -8,10 +8,12 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
+using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
+using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Sessions;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web;
@@ -279,6 +281,30 @@ public static class GleanvoltHostingExtensions
         });
 
         services.AddHostedService<SessionRecordingWorker>();
+
+        // Energy interval monitoring. A second observer of the same status snapshots, with its own
+        // tables in its own file: it records what the *site* did in fixed windows — solar, forecast,
+        // grid both ways, the car, and the home battery — for every quarter hour of every day, whether
+        // or not anything was charging. The session store cannot answer that; most of the year has no
+        // session in it. On by default for the same reason the session store is, and a failure to open
+        // its file disables this feature alone.
+        services.Configure<EnergyMonitorOptions>(configuration.GetSection(EnergyMonitorOptions.SectionName));
+
+        services.AddSingleton<IEnergyIntervalStore>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<EnergyMonitorOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+
+            // Resolved against the content root so a relative path means the same thing however the
+            // service was started -- `dotnet run`, the debugger, or the container's working directory.
+            var path = Path.IsPathRooted(options.Path)
+                ? options.Path
+                : Path.Combine(environment.ContentRootPath, options.Path);
+
+            return new SqliteEnergyIntervalStore(path, provider.GetRequiredService<ILogger<SqliteEnergyIntervalStore>>());
+        });
+
+        services.AddHostedService<EnergyMonitorWorker>();
 
         // Home Assistant integration over MQTT (issue #17). Disabled by default; broker credentials are
         // secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).

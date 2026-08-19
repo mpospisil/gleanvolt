@@ -329,3 +329,77 @@ internal static class TestPlans
         new(now.AddHours(1), now.AddHours(1.5), 5_500, true, 62),
     ];
 }
+
+/// <summary>
+/// An in-memory <see cref="IEnergyIntervalStore"/> for the energy viewer, filtering on the same
+/// half-open window the SQLite store does so a page test can prove it asked for the right day.
+/// </summary>
+internal sealed class FakeEnergyIntervalStore : IEnergyIntervalStore
+{
+    public List<EnergyInterval> Intervals { get; } = [];
+
+    /// <summary>Makes every query throw, the way browsing does when EnergyMonitor:Enabled is false.</summary>
+    public bool Unavailable { get; set; }
+
+    public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task AppendAsync(IReadOnlyList<EnergyInterval> intervals, CancellationToken cancellationToken)
+    {
+        Intervals.AddRange(intervals);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<EnergyInterval>> GetIntervalsAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        if (Unavailable)
+        {
+            throw new InvalidOperationException("The energy interval store is unavailable (test double).");
+        }
+
+        IReadOnlyList<EnergyInterval> result = Intervals
+            .Where(i => i.PeriodStart >= from && i.PeriodStart < to)
+            .OrderBy(i => i.PeriodStart)
+            .ToList();
+
+        return Task.FromResult(result);
+    }
+
+    public Task<int> PruneAsync(TimeSpan retention, CancellationToken cancellationToken) => Task.FromResult(0);
+}
+
+/// <summary>Plausible <see cref="EnergyInterval"/> values for tests.</summary>
+internal static class TestIntervals
+{
+    public static EnergyInterval Sample(
+        DateTimeOffset periodStart,
+        double solarKwh = 1.0,
+        double? forecastSolarKwh = 0.9,
+        double gridImportKwh = 0.1,
+        double gridExportKwh = 0.2,
+        double evKwh = 0.5,
+        double batteryChargeKwh = 0.2,
+        double batteryDischargeKwh = 0,
+        double socStartPercent = 60,
+        double socEndPercent = 62,
+        TimeSpan? covered = null) =>
+        new(
+            PeriodStart: periodStart,
+            PeriodEnd: periodStart.AddMinutes(15),
+            TimeZoneId: "Europe/Prague",
+            LocalDate: DateOnly.FromDateTime(periodStart.UtcDateTime),
+            SolarKwh: solarKwh,
+            ForecastSolarKwh: forecastSolarKwh,
+            GridImportKwh: gridImportKwh,
+            GridExportKwh: gridExportKwh,
+            EvKwh: evKwh,
+            BatteryChargeKwh: batteryChargeKwh,
+            BatteryDischargeKwh: batteryDischargeKwh,
+            SocStartPercent: socStartPercent,
+            SocEndPercent: socEndPercent,
+            SocMinPercent: Math.Min(socStartPercent, socEndPercent),
+            SocMaxPercent: Math.Max(socStartPercent, socEndPercent),
+            SocMeanPercent: (socStartPercent + socEndPercent) / 2,
+            Covered: covered ?? TimeSpan.FromMinutes(15),
+            SampleCount: 180);
+}
