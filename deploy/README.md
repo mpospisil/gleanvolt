@@ -602,6 +602,7 @@ Everything that is state, because none of it lives inside a container:
 |---|---|
 | `/opt/gleanvolt/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
 | `data/sessions.db` | charging-session history, with its SQLite WAL |
+| `data/energy.db` | the site's 15-minute energy history, with its SQLite WAL |
 | `logs/` | the controller's own log files |
 | `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
 | `mosquitto/config/passwd` | broker credentials, created by hand |
@@ -918,7 +919,7 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | Host path | In the container | What it is | Back up? |
 |---|---|---|---|
 | `/opt/gleanvolt/.env` | (environment) | secrets, `chmod 600` | yes |
-| `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — the charging-session history | **critical** |
+| `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — charging-session history; `energy.db` — the site's 15-minute energy history | **critical** |
 | `/opt/gleanvolt/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
 | `/opt/gleanvolt/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
 | `/opt/gleanvolt/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |
@@ -926,9 +927,10 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | `/opt/gleanvolt/docker-compose.yml` | — | redeployed from git | no |
 
 **Back up** — two directories are irreplaceable, for different reasons. `homeassistant/config/.storage`
-costs you onboarding, the account and the MQTT integration; `data/sessions.db` is charging history
-that **cannot be regenerated** — telemetry can be re-polled, a session that already happened cannot be
-re-lived. Stop the stack first so SQLite isn't mid-write:
+costs you onboarding, the account and the MQTT integration; `data/` holds `sessions.db` and
+`energy.db`, both of which **cannot be regenerated** — telemetry can be re-polled, but a session that
+already happened cannot be re-lived and a quarter hour of last March cannot be measured again. Stop
+the stack first so SQLite isn't mid-write:
 
 ```bash
 cd /opt/gleanvolt && docker compose stop gleanvolt-controller

@@ -38,6 +38,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
   vehicle Home Assistant can see becomes a source without new code. Advisory only: no control decision
   depends on it.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
+- **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service), and can be **stopped gracefully from the web UI or Home Assistant** — the charger released, the open session closed and written — instead of being killed. It stays stopped until you start it again, while a reboot or a power cut still brings it straight back; see [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller).
 - **Local data ownership** — no cloud dependency for core operation.
 
@@ -78,6 +79,7 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Infrastructure/       # External communication
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
 │   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
+│   │   ├── Monitoring/             # SQLite energy-interval store (the analytics tables)
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   ├── Solcast/                # Solar-forecast HTTP client
 │   │   └── Vehicles/               # The EV telemetry JSON contract and its parser
@@ -94,6 +96,7 @@ Gleanvolt.slnx
 │   │   ├── Configuration/          # Options classes bound from appsettings.json
 │   │   ├── Forecasting/            # The day plan and its runtime settings
 │   │   ├── HomeAssistant/          # MQTT discovery and the HA worker
+│   │   ├── Monitoring/             # Energy-interval monitoring worker
 │   │   ├── Sessions/               # Charging-session recording worker
 │   │   └── Vehicles/               # EV telemetry MQTT subscriber
 │   │
@@ -1330,6 +1333,141 @@ shape is deliberately independent of the database's own tables, so uploading ses
 storage (one object per session) can be added later without migrating anything. The
 `sessions.synced_at` column is reserved for exactly that. Reading them from a web app is already
 built — see [Browsing charging session history](#browsing-charging-session-history) above.
+
+### Energy history (the `EnergyMonitor` section)
+
+The session store answers questions about *charges*. This one answers questions about the **site**,
+and it runs whether or not anything is plugged in — because most of the year has no session in it, and
+"how much did the roof make last March?" or "how well did the forecast track reality across the
+autumn?" are not questions session data can be made to answer.
+
+It is a **separate service with its own tables in its own database file**, and it does nothing but
+record. Like the session store it only ever observes — it reads no register the poll loop wasn't
+already reading and writes to no device — so it too is **on by default**.
+
+```jsonc
+"EnergyMonitor": {
+  "Enabled": true,
+  "Path": "data/energy.db",   // its own file, beside sessions.db — see below
+  "Interval": "00:15:00",     // one row per quarter hour; must divide 24 h evenly
+  "MaxGap": "00:05:00",       // longer silences are lost time, not a steady reading
+  "RetentionDays": 0          // 0 = keep everything, which is the point of this table
+}
+```
+
+#### One row per quarter hour
+
+Each row is a **bucket**, not a sample: it covers a fixed window and its figures belong to that window
+alone, so summing a day's buckets gives the day exactly. Buckets align to the interval measured from
+the UTC epoch, so they land on :00, :15, :30 and :45 whatever time the service started, and a
+daylight-saving change cannot produce a 45- or 75-minute one.
+
+Everything is in **kWh** — the one place in this codebase that isn't in watt-hours, deliberately: this
+is the analytics surface, read by spreadsheets and notebooks rather than by control code.
+
+| Column | Meaning |
+|---|---|
+| `period_start` / `period_end` | The window, UTC. `period_start` is the primary key. |
+| `time_zone_id`, `local_date` | The IANA zone, and the local calendar day — so "group by day" is a column, not timezone maths in every query. |
+| `solar_kwh` | PV produced on site. |
+| `forecast_solar_kwh` | What the forecast expected over the same window. **NULL, not 0**, when no forecast covered it. |
+| `grid_import_kwh`, `grid_export_kwh` | Each direction separately. |
+| `ev_kwh` | Energy delivered to the car, measured at the charger. |
+| `battery_charge_kwh`, `battery_discharge_kwh` | The home battery, each direction separately. |
+| `soc_start_percent`, `soc_end_percent` | Home battery SOC at each end of the window. Consecutive buckets join up: one bucket's end SOC is the next one's start. |
+| `soc_min_percent`, `soc_max_percent` | The range covered inside the window. |
+| `soc_mean_percent` | SOC averaged over **time**, not over samples — a reading that stood for ten minutes counts ten times one that stood for one. |
+| `covered_seconds` | How much of the window was actually observed. **Read this first**; see below. |
+| `sample_count` | How many poll snapshots fed the window. Diagnostic only. |
+
+#### Nothing is netted, so the balance closes
+
+Import and export are separate columns, and so are battery charge and discharge. A quarter hour that
+exported 0.4 kWh and imported 0.4 kWh is not the same event as one that did neither, and a net of zero
+cannot tell them apart afterwards.
+
+Keeping them apart is also what makes the row *balance*, so house consumption needs no column of its
+own — it is the residual:
+
+```
+house load = solar + import - export - battery charge + battery discharge
+other loads = house load - ev
+```
+
+#### `covered_seconds` is not optional reading
+
+Energy is integrated by holding each power reading until the next one arrives, which is how the poll
+loop observes the hardware. Beyond `MaxGap` that stops being true: the service was restarting, or the
+inverter was unreachable, and holding a reading across the gap would invent energy nobody measured.
+So the open bucket is **closed short** and a fresh one opens when polling resumes.
+
+That is what leaves `covered_seconds` below the full interval, and why it is a stored column rather
+than an assumption. **A row below full coverage is short on every energy figure by the same fraction**
+— without checking it, a restart at 09:07 reads as "the sun went out for seven minutes".
+
+A *planned* stop loses nothing: the worker writes the part-finished bucket on shutdown, and an append
+for a window that already exists **adds to it rather than replacing it**. The stopping process
+contributes the minutes it saw, the starting one contributes the rest, and the row ends up whole with
+`covered_seconds` back at the full interval.
+
+#### Why its own database file
+
+The two stores have separate writers, separate retention and separate reasons to fail, and
+`SqliteChargingSessionStore` serialises its writes on an in-process lock — a second writer holding a
+*different* lock over the same file would turn that arrangement back into the `SQLITE_BUSY` retry loop
+it exists to avoid.
+
+Nothing is lost by the split. An analysis that wants both opens one and attaches the other:
+
+```sql
+ATTACH DATABASE 'sessions.db' AS s;
+
+-- Every quarter hour of a session, against what the whole site was doing at the time
+SELECT e.period_start, e.solar_kwh, e.forecast_solar_kwh, e.ev_kwh, e.soc_mean_percent
+FROM energy_intervals e
+JOIN s.sessions ss ON e.period_start >= ss.started_at AND e.period_start < ss.ended_at
+WHERE ss.id = '…';
+```
+
+Some queries the table is shaped for:
+
+```sql
+-- Daily production against forecast, and what the car's share of it was
+SELECT local_date,
+       ROUND(SUM(solar_kwh), 2)          AS solar,
+       ROUND(SUM(forecast_solar_kwh), 2) AS forecast,
+       ROUND(SUM(ev_kwh), 2)             AS to_car,
+       ROUND(SUM(grid_import_kwh), 2)    AS imported,
+       ROUND(SUM(grid_export_kwh), 2)    AS exported
+FROM energy_intervals
+WHERE covered_seconds >= 890            -- full 15-minute buckets only
+GROUP BY local_date
+ORDER BY local_date DESC;
+
+-- The average shape of a day, by time of day
+SELECT strftime('%H:%M', period_start) AS utc_slot,
+       ROUND(AVG(solar_kwh), 3) AS avg_solar,
+       ROUND(AVG(soc_mean_percent), 1) AS avg_soc
+FROM energy_intervals
+GROUP BY utc_slot ORDER BY utc_slot;
+```
+
+#### Operational notes
+
+- **Back up `data/energy.db` too.** Like the session store it is the only copy that exists, and
+  nothing reconstructs it. Both files sit under the same `./data` bind mount in `deploy/`.
+- **It is cheap.** 96 rows a day, ~35,000 a year, a few megabytes — one write per quarter hour, which
+  is why this store needs none of the batching the session recorder does.
+- **`RetentionDays` defaults to 0 (keep everything)**, the opposite of the session store's 365. This
+  table exists to be looked at years later, and at 15-minute resolution a decade of it is still a file
+  you could email.
+- **An interval that can't tile a day is corrected, not fatal.** Anything that doesn't divide 24 hours
+  evenly would leave a short stub bucket at midnight; the service logs a warning and records at 15
+  minutes instead.
+- **Failure is contained.** If the file can't be opened, this feature alone is disabled for the run
+  with an error in the log — polling, charge control, session recording and Home Assistant carry on
+  untouched.
+- **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
 
 ## License
 
