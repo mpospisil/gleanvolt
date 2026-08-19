@@ -38,7 +38,8 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
   vehicle Home Assistant can see becomes a source without new code. Advisory only: no control decision
   depends on it.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
-- **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on.
+- **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on, with a
+  day-at-a-time viewer in the web UI.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service), and can be **stopped gracefully from the web UI or Home Assistant** — the charger released, the open session closed and written — instead of being killed. It stays stopped until you start it again, while a reboot or a power cut still brings it straight back; see [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller).
 - **Local data ownership** — no cloud dependency for core operation.
 
@@ -1215,6 +1216,23 @@ The chart uses [uPlot](https://github.com/leeoniya/uPlot) (MIT licensed), vendor
 readable during an internet outage, which is exactly when a locally controlled system is most worth
 looking at.
 
+#### Browsing the energy history
+
+`/energy` shows one recorded day at a time, as the table it is stored as: a row per interval with
+solar, forecast, grid each way, energy to the car, the battery each way, the house residual, SOC and
+coverage, and a day total beneath them. A date picker and prev/next buttons move the window; the
+"next" button stops at today.
+
+A **table rather than a chart, on purpose.** The point of this store is that the figures are exact and
+that a partial row is *visibly* partial — a row that covers less than the full interval is marked and
+counted in a note under the table, and a window no forecast covered shows an em dash rather than
+`0.00`. A chart would smooth over precisely the two things worth seeing first. It reads through
+`IEnergyIntervalStore.GetIntervalsAsync` and degrades to "isn't available right now" when
+`EnergyMonitor:Enabled` is off or the file can't be opened, exactly as `/sessions` does.
+
+Nothing was added to Home Assistant. This is history, not telemetry — see
+[Energy history](#energy-history-the-energymonitor-section) below for what is recorded.
+
 The published container image is now based on `dotnet/aspnet` rather than `dotnet/runtime` — about
 25 MB more, on every platform, whether or not the UI is enabled. The framework reference is fixed at
 build time, so there is no variant that avoids it.
@@ -1468,6 +1486,8 @@ GROUP BY utc_slot ORDER BY utc_slot;
   with an error in the log — polling, charge control, session recording and Home Assistant carry on
   untouched.
 - **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
+- **A viewer is built in.** The web UI's `/energy` page shows a day at a time — see
+  [Browsing the energy history](#browsing-the-energy-history) above.
 
 ## License
 

@@ -86,19 +86,36 @@ daylight-saving change from producing a 45- or 75-minute bucket. `local_date` is
 rows a day a decade is still a file you could email, and a table built to be looked at years later
 should not be quietly deleting the years.
 
+### The viewer
+
+`/energy` in the web UI: one recorded day at a time, a row per interval, with a date picker and
+prev/next buttons that stop at today. It reads `IEnergyIntervalStore.GetIntervalsAsync` and reaches
+past nothing into SQLite, and it degrades to "isn't available right now" when the store can't be
+opened — the same shape `/sessions` already had.
+
+**A table rather than a chart, deliberately.** The value of this store is that the figures are exact
+and that a partial row is *visibly* partial. So a row below full coverage is marked, its percentage
+spelled out — and only then, because a column reading "100%" ninety-six times would bury the handful
+that matter — and counted in a note under the table; a window no forecast covered shows an em dash,
+not `0.00`. A chart would smooth over both. Charts can come later, over the same query.
+
+The `House` column is the residual — `solar + import - export - charge + discharge` — computed by
+`EnergyInterval.HouseLoadKwh` rather than stored, and the note under the table says so: a column that
+looks like a measurement and isn't is worse than no column.
+
 ### Not built
 
-No Home Assistant entities and no web UI page. This feature is history, not telemetry, and the request
-was for a service responsible for monitoring alone; a surface over it is a separate piece of work that
-this schema is ready for.
+**No Home Assistant entities.** This feature is history, not telemetry, and nothing in it changes on a
+cadence worth an entity's retained state.
 
 ### Tests
 
-29 new tests — 15 over the tracker (boundary splitting, the gap rule, the two-column sign handling,
+41 new tests — 15 over the tracker (boundary splitting, the gap rule, the two-column sign handling,
 time-weighted SOC, interval validation, out-of-order snapshots, the closing balance), 11 over the
 store against a real SQLite file (round-trip of every column, the merging upsert, the forecast-null
-rules in both orders, pruning), and 3 over the composition root, which had no wiring test of its own
-before. Full suite: 543 passing.
+rules in both orders, pruning), 12 over the viewer (the local-day window, day stepping, the totals
+row, the partial-row marking, the forecast dash, the residual), and 3 over the composition root,
+which had no wiring test of its own before. Full suite: 555 passing.
 
 ---
 
