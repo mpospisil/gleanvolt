@@ -6,6 +6,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -155,6 +156,7 @@ public class FastNoBatteryModeTests
             forecast,
             coordinator,
             dayPlan,
+            TargetedCharge.Provider(forecast, dayPlan, power, chargeControl, forecastOptions),
             _mode,
             _manualHold,
             _inverter,

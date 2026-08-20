@@ -129,6 +129,19 @@ public class ChargingSessionTrackerTests
     }
 
     [Fact]
+    public void TheTargetedModeIsRecordedLikeAnyOtherControllingMode()
+    {
+        // An overnight target is a session worth having in the history like any other -- and it is the
+        // one whose "where did the energy come from" split is most worth reading afterwards.
+        var tracker = NewTracker();
+
+        var started = tracker.Observe(Status(Noon, mode: ChargeControlMode.Targeted)).Started;
+
+        Assert.NotNull(started);
+        Assert.Equal(ChargeControlMode.Targeted, started!.StartMode);
+    }
+
+    [Fact]
     public void SwitchingModeMidSessionRecordsAnEventRatherThanSplittingTheSession()
     {
         var tracker = NewTracker();

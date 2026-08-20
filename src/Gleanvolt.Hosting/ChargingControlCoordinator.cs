@@ -88,11 +88,13 @@ public sealed class ChargingControlCoordinator
     /// <param name="state">The latest telemetry reading.</param>
     /// <param name="mode">The mode selected at runtime; picks which controller decides this cycle.</param>
     /// <param name="plan">The forecast-driven day plan, or null when the mode doesn't use one.</param>
+    /// <param name="targetedPlan">The energy-by-departure plan, or null when the mode doesn't use one.</param>
     public async Task<ChargeControlCycleResult> RunCycleAsync(
         EnergyState state,
         ChargeControlMode mode,
         SolarDayPlan? plan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TargetedChargePlan? targetedPlan = null)
     {
         if (!_controllers.TryGetValue(mode, out var controller))
         {
@@ -117,6 +119,7 @@ public sealed class ChargingControlCoordinator
                 settings,
                 _charging,
                 plan,
+                targetedPlan,
                 TimeInCurrentState(state.Timestamp),
                 _sessionEnergy.EnergyWattHours,
                 _loanedToday.EnergyWattHours,

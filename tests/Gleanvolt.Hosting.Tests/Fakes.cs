@@ -1,6 +1,12 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
+using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -39,4 +45,29 @@ internal sealed class StubChargingController : IChargingController
         LastInput = input;
         return NextDecision;
     }
+}
+
+/// <summary>
+/// A <see cref="TargetedChargeProvider"/> built the way the host builds it. Every poll-loop test needs
+/// one whether or not it exercises the targeted mode, so the assembly lives in one place.
+/// </summary>
+internal static class TargetedCharge
+{
+    public static TargetedChargeProvider Provider(
+        ISolarForecastService forecast,
+        DayPlanProvider dayPlan,
+        ChargePowerConverter power,
+        ChargeControlOptions chargeControl,
+        IOptions<ForecastChargeOptions> forecastOptions,
+        ITargetedChargeSelector? selector = null,
+        TargetedChargeOptions? options = null) =>
+        new(
+            selector ?? new TargetedChargeSelector(NullLogger<TargetedChargeSelector>.Instance),
+            forecast,
+            dayPlan,
+            power,
+            Options.Create(chargeControl),
+            forecastOptions,
+            Options.Create(options ?? new TargetedChargeOptions()),
+            NullLogger<TargetedChargeProvider>.Instance);
 }

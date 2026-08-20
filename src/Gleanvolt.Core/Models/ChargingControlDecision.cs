@@ -18,6 +18,11 @@ namespace Gleanvolt.Core.Models;
 /// The forecast-driven day plan, when one is available. Only the forecast-driven controller uses it;
 /// live-solar control ignores it entirely, which is why it defaults to null.
 /// </param>
+/// <param name="TargetedPlan">
+/// The energy-by-departure plan, when the targeted mode is the one driving. Only
+/// <see cref="Strategies.TargetedChargingController"/> reads it, which is why it defaults to null and
+/// no other controller or test has to know it exists.
+/// </param>
 /// <param name="TimeInCurrentState">
 /// How long we have been charging (or paused) without interruption, for the dwell timers that stop the
 /// charger being started and stopped every few minutes.
@@ -39,6 +44,7 @@ public sealed record ChargingControlInput(
     EvChargerSettings CurrentSettings,
     bool Charging,
     SolarDayPlan? Plan = null,
+    TargetedChargePlan? TargetedPlan = null,
     TimeSpan TimeInCurrentState = default,
     double SessionEnergyWh = 0,
     double LoanedTodayWh = 0,
