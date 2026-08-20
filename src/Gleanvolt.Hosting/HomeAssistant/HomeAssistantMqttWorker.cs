@@ -20,11 +20,20 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IChargeControlModeSelector _mode;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IForecastRuntimeSettings _forecastSettings;
+    private readonly ITargetedChargeSelector _target;
     private readonly IServiceShutdown _shutdown;
+    private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ILogger<HomeAssistantMqttWorker> _logger;
     private IMqttClient? _client;
+
+    // The half-made request: what the number and the text entities hold until the button applies them.
+    // It lives here rather than in the selector because an amount typed and not yet activated is not a
+    // request -- the selector only ever holds something the controller is actually working to.
+    private double _pendingEnergyKWh;
+    private DateTimeOffset? _pendingDeparture;
+    private string _pendingDepartureText = string.Empty;
 
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
@@ -32,9 +41,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IChargeControlModeSelector mode,
         IBatteryHoldSelector batteryHold,
         IForecastRuntimeSettings forecastSettings,
+        ITargetedChargeSelector target,
         IServiceShutdown shutdown,
         ChargeControlStatusHolder statusHolder,
-        ILogger<HomeAssistantMqttWorker> logger)
+        ILogger<HomeAssistantMqttWorker> logger,
+        TimeProvider? timeProvider = null)
     {
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
@@ -42,7 +53,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _mode = mode;
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
+        _target = target;
         _shutdown = shutdown;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _statusHolder = statusHolder;
         _logger = logger;
     }
@@ -138,6 +151,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.NumberCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        foreach (var objectId in HaDiscovery.TextObjectIds)
+        {
+            await _client.SubscribeAsync(_discovery.TextCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
+        await _client.SubscribeAsync(_discovery.ActivateTargetCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
@@ -164,6 +183,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
+        await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
 
         if (status is not null)
         {
@@ -191,6 +211,21 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         yield return (HaDiscovery.SessionEnergyTargetNumber, _forecastSettings.SessionEnergyTargetWh / 1000);
         yield return (HaDiscovery.MinBatterySocNumber, _forecastSettings.MinBatterySocFloorPercent);
         yield return (HaDiscovery.ResumeMarginNumber, _forecastSettings.FloorResumeMarginPercent);
+
+        // The active request outranks whatever was last typed: a target set from the web UI has to
+        // show up here too, or the two surfaces would disagree about what the car is being charged to.
+        yield return (HaDiscovery.TargetEnergyNumber, (_target.Request?.RequiredEnergyWh / 1000) ?? _pendingEnergyKWh);
+    }
+
+    // The departure as text, echoed back so a Home Assistant restart (or a second dashboard) sees what
+    // is actually being worked to rather than an empty box.
+    private Task PublishTextStatesAsync(CancellationToken cancellationToken)
+    {
+        var text = _target.Request is { } request
+            ? TimeZoneInfo.ConvertTime(request.DepartBy, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm")
+            : _pendingDepartureText;
+
+        return PublishAsync(_discovery.TextStateTopic(HaDiscovery.TargetDepartureText), text, retain: true, cancellationToken);
     }
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
@@ -198,6 +233,19 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (e.ApplicationMessage.Topic == _discovery.StopServiceCommandTopic)
         {
             return OnStopServiceCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+        }
+
+        if (e.ApplicationMessage.Topic == _discovery.ActivateTargetCommandTopic)
+        {
+            return OnActivateTargetAsync(e.ApplicationMessage.ConvertPayloadToString());
+        }
+
+        foreach (var objectId in HaDiscovery.TextObjectIds)
+        {
+            if (e.ApplicationMessage.Topic == _discovery.TextCommandTopic(objectId))
+            {
+                return OnTextCommandAsync(objectId, e.ApplicationMessage.ConvertPayloadToString());
+            }
         }
 
         if (_batteryHoldEnabled && e.ApplicationMessage.Topic == _discovery.BatteryHoldCommandTopic)
@@ -294,6 +342,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             case HaDiscovery.ResumeMarginNumber:
                 _forecastSettings.SetFloorResumeMarginPercent(value, "Home Assistant");
                 break;
+            case HaDiscovery.TargetEnergyNumber:
+                // Held, not applied: the button is what turns an amount into a promise.
+                _pendingEnergyKWh = Math.Max(0, value);
+                break;
             default:
                 return Task.CompletedTask;
         }
@@ -301,6 +353,60 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // Echo back what was actually stored (the setters clamp), so a rejected value doesn't leave the
         // HA box showing something the controller isn't using.
         return PublishNumberStatesAsync(CancellationToken.None);
+    }
+
+    private Task OnTextCommandAsync(string objectId, string? payload)
+    {
+        if (objectId != HaDiscovery.TargetDepartureText)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!HaDiscovery.TryParseDeparture(payload, _timeProvider.GetUtcNow(), _timeProvider.LocalTimeZone, out var departure))
+        {
+            _logger.LogWarning(
+                "Ignoring unparseable departure time '{Payload}'; expected HH:mm or yyyy-MM-dd HH:mm.", payload);
+            return Task.CompletedTask;
+        }
+
+        _pendingDeparture = departure;
+        _pendingDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+
+        // Echoed as the resolved timestamp rather than what was typed: "07:00" and "tomorrow 07:00" are
+        // the same request, and only one of them can be read back a day later without ambiguity.
+        return PublishTextStatesAsync(CancellationToken.None);
+    }
+
+    // The two halves become a request here, in the same order the web page applies them: the request
+    // first, then the mode, so the controller never sees a cycle of Targeted with nothing to aim at.
+    private Task OnActivateTargetAsync(string? payload)
+    {
+        if (!HaDiscovery.IsPress(payload))
+        {
+            _logger.LogWarning("Ignoring '{Payload}' on the activate-target topic.", payload);
+            return Task.CompletedTask;
+        }
+
+        if (_pendingEnergyKWh <= 0 || _pendingDeparture is not { } departure)
+        {
+            _logger.LogWarning(
+                "Activate target pressed with nothing to activate: set both Target energy and Departure time first.");
+            return Task.CompletedTask;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        if (departure <= now)
+        {
+            _logger.LogWarning(
+                "Activate target pressed with a departure already past ({Departure}); set it again.",
+                departure.LocalDateTime);
+            return Task.CompletedTask;
+        }
+
+        _target.Set(new TargetedChargeRequest(_pendingEnergyKWh * 1000, departure, now), "Home Assistant");
+        _mode.Set(Core.Enums.ChargeControlMode.Targeted, "Home Assistant");
+
+        return PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
     }
 
     private async Task PublishAsync(string topic, string payload, bool retain, CancellationToken cancellationToken)
