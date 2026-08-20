@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting;
 
@@ -18,6 +19,7 @@ public sealed class PollingService : BackgroundService
     private readonly ISolarForecastService _solarForecast;
     private readonly ChargingControlCoordinator _chargingControl;
     private readonly DayPlanProvider _dayPlan;
+    private readonly TargetedChargeProvider _targetedCharge;
     private readonly IChargeControlModeSelector _mode;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IBatteryDischargeControl _batteryDischargeControl;
@@ -42,6 +44,7 @@ public sealed class PollingService : BackgroundService
         ISolarForecastService solarForecast,
         ChargingControlCoordinator chargingControl,
         DayPlanProvider dayPlan,
+        TargetedChargeProvider targetedCharge,
         IChargeControlModeSelector mode,
         IBatteryHoldSelector batteryHold,
         IBatteryDischargeControl batteryDischargeControl,
@@ -58,6 +61,7 @@ public sealed class PollingService : BackgroundService
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
         _dayPlan = dayPlan;
+        _targetedCharge = targetedCharge;
         _mode = mode;
         _batteryHold = batteryHold;
         _batteryDischargeControl = batteryDischargeControl;
@@ -117,13 +121,19 @@ public sealed class PollingService : BackgroundService
                 // worth having even when the plan isn't the thing driving the charger.
                 var plan = _dayPlan.Update(state, _chargingControl.LoanedTodayWh);
 
+                // Built whenever a request exists, in every mode, for the same reason the day plan is:
+                // the delivered-energy meter has to keep running across a mode switch, or re-selecting
+                // Targeted would restart the count and re-promise energy the car already has.
+                var targetedPlan = _targetedCharge.Update(state);
+
                 var mode = _mode.Mode;
                 WarnOnModeEntry(mode);
 
                 ChargeControlCycleResult result;
-                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery)
+                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
+                    or ChargeControlMode.Targeted)
                 {
-                    result = await _chargingControl.RunCycleAsync(state, mode, plan, stoppingToken);
+                    result = await _chargingControl.RunCycleAsync(state, mode, plan, stoppingToken, targetedPlan);
                 }
                 else
                 {
@@ -142,7 +152,7 @@ public sealed class PollingService : BackgroundService
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
 
-                var hold = await ApplyBatteryHoldAsync(state, mode, plan, stoppingToken);
+                var hold = await ApplyBatteryHoldAsync(state, mode, plan, targetedPlan, stoppingToken);
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -166,6 +176,7 @@ public sealed class PollingService : BackgroundService
                     BatteryHoldActive: hold.Held,
                     BatteryHoldTargetWatts: hold.ActivePowerTargetWatts,
                     Plan: mode == ChargeControlMode.Forecasted ? plan : null,
+                    TargetedPlan: mode == ChargeControlMode.Targeted ? targetedPlan : null,
                     LoanPowerWatts: result.LoanPowerWatts,
                     SessionEnergyWh: _chargingControl.SessionEnergyWh,
                     LoanedTodayWh: _chargingControl.LoanedTodayWh,
@@ -213,7 +224,7 @@ public sealed class PollingService : BackgroundService
 
         _lastMode = mode;
 
-        if (mode == ChargeControlMode.FastNoBattery && !_batteryHoldOptions.Enabled)
+        if (mode is ChargeControlMode.FastNoBattery or ChargeControlMode.Targeted && !_batteryHoldOptions.Enabled)
         {
             _logger.LogWarning(
                 "{Mode} selected but BatteryHold:Enabled is false: charging at the maximum current anyway, "
@@ -233,6 +244,7 @@ public sealed class PollingService : BackgroundService
         EnergyState state,
         ChargeControlMode mode,
         SolarDayPlan plan,
+        TargetedChargePlan? targetedPlan,
         CancellationToken cancellationToken)
     {
         if (!_batteryHoldOptions.Enabled)
@@ -240,7 +252,7 @@ public sealed class PollingService : BackgroundService
             return default;
         }
 
-        var hold = _batteryHold.Hold || AutoHold(state, mode, plan);
+        var hold = _batteryHold.Hold || AutoHold(state, mode, plan, targetedPlan);
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
         BatteryHoldState result;
@@ -287,7 +299,7 @@ public sealed class PollingService : BackgroundService
     /// covers the gap instead of the pack. Released again only after SOC has recovered a margin above the
     /// floor, so the hold doesn't chatter around the line.</para>
     /// </summary>
-    private bool AutoHold(EnergyState state, ChargeControlMode mode, SolarDayPlan plan)
+    private bool AutoHold(EnergyState state, ChargeControlMode mode, SolarDayPlan plan, TargetedChargePlan? targetedPlan)
     {
         if (mode == ChargeControlMode.FastNoBattery)
         {
@@ -298,6 +310,26 @@ public sealed class PollingService : BackgroundService
             }
 
             return true;
+        }
+
+        if (mode == ChargeControlMode.Targeted)
+        {
+            // Scoped to the part of the plan that imports, unlike the fast mode's blanket hold: outside
+            // the grid block the car is running on surplus, and holding the pack there would only push
+            // the house onto the grid for nothing.
+            var importing = targetedPlan?.IsInGridBlock(state.Timestamp) == true;
+
+            if (importing != _autoHold)
+            {
+                _logger.LogInformation(
+                    "Battery discharge hold {Action} automatically: the {Mode} plan's grid top-up {State}.",
+                    importing ? "armed" : "released",
+                    mode,
+                    importing ? "has started" : "is not running");
+            }
+
+            _autoHold = importing;
+            return importing;
         }
 
         if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)

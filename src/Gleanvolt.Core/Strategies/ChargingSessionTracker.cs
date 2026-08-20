@@ -183,7 +183,8 @@ public sealed class ChargingSessionTracker
 
     // Off is the only mode that isn't controlling: it leaves the charger exactly as its owner set it.
     private static bool IsControlling(ChargeControlMode mode) =>
-        mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery;
+        mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
+            or ChargeControlMode.Targeted;
 
     private ChargingSession OpenSessionAt(ChargeControlStatus status, double? forecastRemainingTodayWh)
     {

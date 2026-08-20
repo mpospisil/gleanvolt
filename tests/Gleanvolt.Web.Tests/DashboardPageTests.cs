@@ -229,7 +229,7 @@ public class DashboardPageTests : BunitContext
         Assert.Equal("Forecasted", select.GetAttribute("value"));
 
         var options = select.Children.Select(o => o.GetAttribute("value")).ToList();
-        Assert.Equal(["Off", "Solar", "Forecasted", "FastNoBattery"], options);
+        Assert.Equal(["Off", "Solar", "Forecasted", "FastNoBattery", "Targeted"], options);
     }
 
     [Fact]

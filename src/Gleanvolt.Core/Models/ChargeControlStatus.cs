@@ -44,6 +44,11 @@ namespace Gleanvolt.Core.Models;
 /// <param name="SessionEnergyWh">Energy delivered to the car in the current session.</param>
 /// <param name="LoanedTodayWh">Energy lent out of the home battery today.</param>
 /// <param name="TomorrowForecastWh">Tomorrow's forecast production, purely informational.</param>
+/// <param name="TargetedPlan">
+/// The energy-by-departure plan, populated <b>only</b> while
+/// <see cref="ChargeControlMode.Targeted"/> is the mode driving the charger — the same rule
+/// <paramref name="Plan"/> follows, so a different mode cannot leave a stale target on display.
+/// </param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 /// <param name="SessionCompleted">
 /// This cycle the controller reported the car had finished and the mode ended itself (only
@@ -79,4 +84,5 @@ public sealed record ChargeControlStatus(
     double LoanedTodayWh,
     double? TomorrowForecastWh,
     DateTimeOffset Timestamp,
+    TargetedChargePlan? TargetedPlan = null,
     bool SessionCompleted = false);

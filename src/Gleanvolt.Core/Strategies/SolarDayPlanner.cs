@@ -73,7 +73,8 @@ public static class SolarDayPlanner
         var lastPeriodEnd = forecast.Periods.Max(p => p.PeriodEnd);
         var horizon = now < deadline ? deadline : lastPeriodEnd;
 
-        var slices = SliceForecast(forecast, now, horizon, houseLoad, biasFactor, options);
+        var slices = ForecastSlicer.Slice(
+            forecast, now, horizon, houseLoad, biasFactor, options.MinChargePowerWatts, options.Confidence);
         var remainingPvWh = slices.Sum(s => s.PvWh);
         var expectedHouseWh = slices.Sum(s => s.HouseWh);
 
@@ -81,7 +82,7 @@ public static class SolarDayPlanner
         var batteryToFullWh = Math.Max(0, (100 - state.BatterySocPercent) / 100 * options.BatteryCapacityWh)
             / Math.Clamp(options.ChargeEfficiency, 0.1, 1.0);
 
-        Reserve(slices, batteryToFullWh);
+        ForecastSlicer.Reserve(slices, batteryToFullWh);
 
         var shoulderWh = slices.Where(s => !s.IsPlateau).Sum(s => s.SurplusWh);
         var plateauWh = slices.Where(s => s.IsPlateau).Sum(s => s.SurplusWh);
@@ -96,7 +97,7 @@ public static class SolarDayPlanner
         var trajectoryFloor = TrajectorySocFloor(batteryRefillableWh, options);
         var socFloor = ClampFloor(trajectoryFloor, options);
 
-        var feasibleEnergyWh = slices.Where(s => s.IsFeasible(options)).Sum(s => s.AvailableWh);
+        var feasibleEnergyWh = slices.Where(s => IsFeasible(s, options)).Sum(s => s.AvailableWh);
         var evBudgetWh = Math.Max(0, remainingPvWh - expectedHouseWh - batteryToFullWh);
         var usableEvWh = Math.Min(evBudgetWh, feasibleEnergyWh);
         var window = FirstViableWindow(slices, options);
@@ -137,7 +138,7 @@ public static class SolarDayPlanner
     /// back-to-front because each point needs the surplus of every slice from it to the end, which is
     /// exactly the running total a reverse pass accumulates for free.
     /// </summary>
-    private static List<SolarDayPlanTimelinePoint> BuildTimeline(List<Slice> slices, SolarDayPlannerOptions options)
+    private static List<SolarDayPlanTimelinePoint> BuildTimeline(List<ForecastSlice> slices, SolarDayPlannerOptions options)
     {
         var timeline = new List<SolarDayPlanTimelinePoint>(slices.Count);
         var suffixSurplusWh = 0.0;
@@ -180,73 +181,11 @@ public static class SolarDayPlanner
     private static double ClampFloor(double trajectoryFloorPercent, SolarDayPlannerOptions options) =>
         Math.Max(trajectoryFloorPercent, Math.Clamp(options.MinBatterySocFloorPercent, 0, 100));
 
-    // Cuts the forecast into the part of each period that falls inside (now, horizon]. Periods
-    // straddling either edge are prorated, so a plan built at 12:47 doesn't count the whole 12:30-13:00
-    // period as still to come.
-    private static List<Slice> SliceForecast(
-        SolarForecast forecast,
-        DateTimeOffset now,
-        DateTimeOffset horizon,
-        IHouseLoadProfile houseLoad,
-        double biasFactor,
-        SolarDayPlannerOptions options)
-    {
-        var slices = new List<Slice>();
-
-        foreach (var period in forecast.Periods.OrderBy(p => p.PeriodEnd))
-        {
-            var start = period.PeriodStart > now ? period.PeriodStart : now;
-            var end = period.PeriodEnd < horizon ? period.PeriodEnd : horizon;
-            var hours = (end - start).TotalHours;
-            if (hours <= 0)
-            {
-                continue;
-            }
-
-            var pvWatts = Math.Max(0, period.PowerWatts(options.Confidence) * biasFactor);
-
-            // Per slice, not one figure for the whole day: the house has a shape, and charging the car
-            // is decided by what the house will draw *then*, not by what it happens to draw now.
-            var houseWatts = Math.Max(0, houseLoad.ExpectedWattsAt(start));
-            var surplusWatts = pvWatts - houseWatts;
-
-            slices.Add(new Slice
-            {
-                Start = start,
-                End = end,
-                Hours = hours,
-                SurplusWatts = surplusWatts,
-                PvWh = pvWatts * hours,
-                HouseWh = houseWatts * hours,
-                SurplusWh = Math.Max(0, surplusWatts) * hours,
-                IsPlateau = surplusWatts >= options.MinChargePowerWatts,
-            });
-        }
-
-        return slices;
-    }
-
-    // Books the battery's need against the LATEST production first. That is what "100% by evening,
-    // not by lunchtime" means: the battery takes the afternoon shoulder and, only if it must, the tail
-    // of the plateau — leaving the car the earliest chargeable weather, when it is most likely to be
-    // plugged in and when a forecast error still has the rest of the day to correct itself.
-    private static void Reserve(List<Slice> slices, double batteryNeedWh)
-    {
-        var remaining = batteryNeedWh;
-
-        for (var i = slices.Count - 1; i >= 0 && remaining > 0; i--)
-        {
-            var take = Math.Min(remaining, slices[i].SurplusWh);
-            slices[i].ReservedWh = take;
-            remaining -= take;
-        }
-    }
-
     // The first stretch of chargeable weather long enough to be worth starting a session for. Slices
     // are contiguous by construction (they come from consecutive forecast periods), so a run breaks at
     // the first infeasible slice or a gap in the timeline.
     private static (DateTimeOffset Start, DateTimeOffset End)? FirstViableWindow(
-        List<Slice> slices,
+        List<ForecastSlice> slices,
         SolarDayPlannerOptions options)
     {
         DateTimeOffset? runStart = null;
@@ -256,7 +195,7 @@ public static class SolarDayPlanner
 
         foreach (var slice in slices)
         {
-            if (!slice.IsFeasible(options))
+            if (!IsFeasible(slice, options))
             {
                 if (RunIsViable())
                 {
@@ -348,41 +287,17 @@ public static class SolarDayPlanner
         };
     }
 
-    // One prorated forecast period. Mutable on purpose: the reservation pass writes back into it.
-    private sealed class Slice
+    /// <summary>
+    /// Whether the car could actually charge in this slice: the power left after the battery's booking
+    /// must clear the charger's minimum — or come within a loan's reach of it, when the battery is
+    /// allowed to bridge the gap.
+    /// </summary>
+    private static bool IsFeasible(ForecastSlice slice, SolarDayPlannerOptions options)
     {
-        public required DateTimeOffset Start { get; init; }
-        public required DateTimeOffset End { get; init; }
-        public required double Hours { get; init; }
-        public required double SurplusWatts { get; init; }
-        public required double PvWh { get; init; }
-        public required double HouseWh { get; init; }
-        public required double SurplusWh { get; init; }
-        public required bool IsPlateau { get; init; }
+        var threshold = options.EnableBatteryLoan
+            ? options.MinChargePowerWatts - options.MaxLoanPowerWatts
+            : options.MinChargePowerWatts;
 
-        /// <summary>How much of this period's surplus the battery has booked.</summary>
-        public double ReservedWh { get; set; }
-
-        /// <summary>What is left for the car after the battery's booking.</summary>
-        public double AvailableWh => Math.Max(0, SurplusWh - ReservedWh);
-
-        /// <summary>
-        /// Whether the car could actually charge in this period: the power left after the battery's
-        /// booking must clear the charger's minimum — or come within a loan's reach of it, when the
-        /// battery is allowed to bridge the gap.
-        /// </summary>
-        public bool IsFeasible(SolarDayPlannerOptions options)
-        {
-            if (Hours <= 0 || AvailableWh <= 0)
-            {
-                return false;
-            }
-
-            var threshold = options.EnableBatteryLoan
-                ? options.MinChargePowerWatts - options.MaxLoanPowerWatts
-                : options.MinChargePowerWatts;
-
-            return AvailableWh / Hours >= Math.Max(0, threshold);
-        }
+        return slice.IsChargeable(threshold);
     }
 }

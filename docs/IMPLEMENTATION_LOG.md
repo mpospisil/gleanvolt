@@ -4,6 +4,86 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-20 — Targeted charging: an amount of energy, a departure, and as little grid as possible
+
+Issue #80, in the four phases it was cut into (#81–#84). The mode answers the one question none of the
+other four could: **"I need 22 kWh in the car by 07:00 — do that, and use as little grid as you can."**
+
+### What was built
+
+- `TargetedChargePlanner` (Core/Strategies) — pure, stateless, rebuilt every poll. Slices the forecast
+  over `(now, departure − margin]`, books the home battery's need backwards out of it, gives the car
+  what is left, and finds the grid block by a backward pass from the deadline.
+- `TargetedChargePlan` / `TargetedChargeBlock` / `TargetedChargeRequest` / `TargetedChargePlannerOptions`
+  (Core/Models), `TargetedChargeStrategy` / `TargetedChargeSource` (Core/Enums).
+- `ForecastSlicer` (Core/Strategies) — the one refactor: `SolarDayPlanner`'s private slicing and
+  reservation, extracted so both planners share them rather than growing a second copy that drifts.
+  `SolarDayPlannerTests` is the guard that its behaviour did not change.
+- `TargetedChargingController` (Core/Strategies) + `ITargetedChargeSelector` (Core/Interfaces).
+- `TargetedChargeSelector` and `TargetedChargeProvider` (Hosting/Targeting) — the `DayPlanProvider`
+  pattern: meter the delivery, fetch the forecast over the request's window, rebuild the plan, log it
+  rate-limited.
+- `/targeted` and `TargetedPlanNarrative` (Web) — the plan in words, not a chart.
+- Home Assistant: a **Target energy** number, a **Departure time** text, an **Activate target** button
+  and six plan sensors; `HaDiscovery` gained `Text()` and `Button()` helpers and a target state block.
+
+### The decisions worth writing down
+
+The two central ones — late grid placement, and the home battery keeping priority — are in
+[DECISIONS.md](DECISIONS.md). Four smaller ones belong here.
+
+**The ceiling has to cover hours the forecast says nothing about.** Slicing alone stops at the last
+forecast period, so an overnight target's window would end there and `P_max × time` would understate
+what the charger can do by most of the night. `ForecastSlicer.SliceContiguous` fills every gap with a
+zero-PV slice, which makes the ceiling exactly `P_max × (deadline − now)` however far the forecast
+reaches — and makes the "not enough time" case fall out of the same arithmetic as the others rather
+than being a branch of its own.
+
+**Delivery is metered on measured charger power, from activation.** Not on the commanded current, and
+not from when the car was plugged in. A car that limits itself to less than we asked for simply pulls
+the grid block earlier on the next poll, with no special case anywhere; and energy the car took under
+some earlier mode is not part of this promise.
+
+**"The car has stopped" only counts while we are asking it to charge.** The fast mode can read a
+silent car as a finished one because it is always commanding a current. This mode pauses between
+blocks, and reading that silence the same way would end the mode every time it waited for the sun. The
+completion check is gated on `input.Charging` for that reason.
+
+**No usable forecast is not a failure here.** `Forecasted` degrades towards conservatism — an absent
+forecast must never read as headroom. This mode degrades towards *keeping the promise*: every solar
+term goes to zero, the plan becomes grid-only, and the target is still met. `IsUsable: false` is a
+caveat the UI reports, not a fallback anything takes.
+
+### What to watch on the first real overnight run
+
+1. **Does the grid block actually shrink?** Plug in at 21:00 with a morning departure and watch
+   `Targeted plan: … Grid=…kWh GridStart=…` across the night. The block should hold roughly steady
+   while nothing is charging, then shrink as sun or delivery arrives. A block that *grows* without the
+   departure moving means delivery is being metered wrong.
+2. **Does the hold arm exactly at `GridStart`, and release at completion?** The log line is "Battery
+   discharge hold armed automatically: the Targeted plan's grid top-up has started". Armed early means
+   the block placement is wrong; never armed means the plan never entered its own block.
+3. **Does the car reach the target before the departure?** The safety margin is 15 minutes; a car that
+   negotiates slowly, or derates, eats into it. If the target is met at the deadline rather than
+   before it, raise `ChargeControl:Targeted:SafetyMargin`.
+4. **Does the mode return itself to `Off`?** Three ways in: target met, departure passed, car stopped
+   at its own limit. The first is the expected one; the third should name the shortfall.
+5. **The 05:00 failure mode.** The request does not survive a restart. If the container restarts
+   overnight — a deploy, an OOM, a power cut — the car stops charging and nothing says so. Worth
+   watching the first few nights before trusting it with an actual trip.
+
+### Verification performed
+
+- 275 Core, 143 Hosting, 121 Web and 91 Infrastructure tests pass. New: the planner (both regimes, the
+  latest-possible block, the prorated overlap, no forecast, the battery's reservation, target met,
+  departure in the past, a departure onto tomorrow's periods), the controller's decision table, the
+  mode end to end through the poll loop, the page and its narrative, and the Home Assistant entities
+  plus the departure-text parse path.
+- Nothing verified against hardware yet: this writes only the current setpoint, through the same
+  charge-control path every other mode uses, but no overnight run has happened.
+
+---
+
 ## 2026-08-19 — An energy history of the site, at 15-minute resolution
 
 The session store records charges. Nothing recorded the **site**: how much the roof made last March,

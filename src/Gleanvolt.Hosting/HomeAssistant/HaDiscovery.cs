@@ -51,12 +51,24 @@ public sealed class HaDiscovery
     public const string SessionEnergyTargetNumber = "session_energy_target";
     public const string MinBatterySocNumber = "min_battery_soc";
     public const string ResumeMarginNumber = "resume_margin";
+    public const string TargetEnergyNumber = "target_energy";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
-        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber];
+        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber];
+
+    /// <summary>Object id of the departure-time text entity, which the worker subscribes to like a number.</summary>
+    public const string TargetDepartureText = "target_departure";
+
+    public static readonly IReadOnlyList<string> TextObjectIds = [TargetDepartureText];
 
     public string NumberCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
     public string NumberStateTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/state";
+
+    /// <summary>Same shape as the number topics; separate methods only so call sites read as what they are.</summary>
+    public string TextCommandTopic(string objectId) => NumberCommandTopic(objectId);
+    public string TextStateTopic(string objectId) => NumberStateTopic(objectId);
+
+    public string ActivateTargetCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/activate_target/set";
 
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
@@ -201,6 +213,38 @@ public sealed class HaDiscovery
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
         yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
 
+        // Targeted charging (issue #80). The mode itself needs no entity -- the select above picks it
+        // up from Enum.GetNames -- but the request does: an amount, a time, and a press to apply both.
+        // Published unconditionally, like the forecast entities, because the mode is selectable at any
+        // moment and the controls have to exist before it is picked.
+        yield return Number(TargetEnergyNumber, "Target energy", min: 0, max: 100, step: 0.5, unit: "kWh", icon: "mdi:battery-clock");
+
+        // A text entity rather than a datetime one: MQTT discovery has no datetime platform. "07:00"
+        // means the next 07:00, which is what somebody typing it at 22:00 means by it; a full
+        // "2026-08-11 07:00" is there for the case where it isn't.
+        yield return Text(
+            TargetDepartureText,
+            "Departure time",
+            pattern: @"^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
+            icon: "mdi:clock-outline");
+
+        // Pressing this is what makes the two above real: it sets the request and selects the mode, the
+        // same order and the same seam the web page uses.
+        yield return Config("button", "activate_target", new Dictionary<string, object?>
+        {
+            ["name"] = "Activate target",
+            ["command_topic"] = ActivateTargetCommandTopic,
+            ["payload_press"] = PayloadPress,
+            ["icon"] = "mdi:play-circle-outline",
+        });
+
+        yield return Sensor("target_plan_state", "Target plan state", template: Optional("target_reason"), icon: "mdi:text-box-outline");
+        yield return Sensor("target_solar", "Target solar energy", template: Optional("target_solar_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("target_grid", "Target grid energy", template: Optional("target_grid_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("target_expected", "Target expected", template: Optional("target_expected_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("target_shortfall", "Target shortfall", template: Optional("target_shortfall_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("target_grid_start", "Grid top-up start", template: Optional("target_grid_start"), icon: "mdi:transmission-tower-import");
+
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
             ["name"] = "Car connected",
@@ -285,11 +329,89 @@ public sealed class HaDiscovery
             payload["bias_percent"] = Math.Round(plan.BiasFactor * 100);
         }
 
+        // The target block follows the same rule the plan block does: present only while the mode that
+        // owns it is driving, so no dashboard can show a target nothing is working towards.
+        if (s.TargetedPlan is { } target)
+        {
+            payload["target_reason"] = target.Reason;
+            payload["target_solar_kwh"] = Math.Round(target.SolarEnergyWh / 1000, 1);
+            payload["target_grid_kwh"] = Math.Round(target.GridEnergyWh / 1000, 1);
+            payload["target_expected_kwh"] = Math.Round(target.ExpectedEnergyWh / 1000, 1);
+            payload["target_shortfall_kwh"] = Math.Round(target.ShortfallWh / 1000, 1);
+            payload["target_grid_start"] = target.GridStart is { } start
+                ? $"{start.LocalDateTime:HH:mm}"
+                : "none";
+        }
+
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so
         // drop them explicitly to keep the payload clean.
         var present = payload.Where(kvp => kvp.Value is not null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         return JsonSerializer.Serialize(present, Json);
     }
+
+    /// <summary>
+    /// Parses a departure the way somebody types it: a bare <c>HH:mm</c> means the <b>next</b>
+    /// occurrence of that time — which is what "07:00" typed at 22:00 means — and a full
+    /// <c>yyyy-MM-dd HH:mm</c> means exactly itself. Anything else is refused, so a stray payload on
+    /// the topic cannot silently become a departure.
+    ///
+    /// <para>Composed through <paramref name="zone"/> rather than the machine's local time, so the
+    /// answer is the site's clock and a DST boundary between now and then cannot move it by an hour.</para>
+    /// </summary>
+    public static bool TryParseDeparture(string? payload, DateTimeOffset now, TimeZoneInfo zone, out DateTimeOffset departure)
+    {
+        departure = default;
+
+        var text = payload?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var styles = System.Globalization.DateTimeStyles.None;
+        var localNow = TimeZoneInfo.ConvertTime(now, zone);
+
+        if (DateTime.TryParseExact(text, ["HH:mm", "H:mm"], culture, styles, out var timeOnly))
+        {
+            var candidate = localNow.Date + timeOnly.TimeOfDay;
+            departure = Compose(candidate, zone);
+
+            // Today's 07:00 is in the past at 22:00, and the request that matters is tomorrow's.
+            if (departure <= now)
+            {
+                departure = Compose(candidate.AddDays(1), zone);
+            }
+
+            return true;
+        }
+
+        string[] stampFormats = ["yyyy-MM-dd HH:mm", "yyyy-MM-ddTHH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss"];
+        if (DateTime.TryParseExact(text, stampFormats, culture, styles, out var stamp))
+        {
+            departure = Compose(stamp, zone);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static DateTimeOffset Compose(DateTime local, TimeZoneInfo zone) =>
+        new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone.GetUtcOffset(local));
+
+    // A free-text control. Home Assistant has no datetime platform over MQTT discovery, so the
+    // departure arrives as text and is parsed here; the pattern only keeps the obvious typos out of
+    // the round trip, and TryParseDeparture is what actually decides.
+    private (string Topic, string Payload) Text(string objectId, string name, string pattern, string icon) =>
+        Config("text", objectId, new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["command_topic"] = TextCommandTopic(objectId),
+            ["state_topic"] = TextStateTopic(objectId),
+            ["pattern"] = pattern,
+            ["max"] = 16,
+            ["icon"] = icon,
+        });
 
     // A settable number. Unlike the sensors it has its own state topic rather than reading the shared
     // JSON payload, so Home Assistant's optimistic update and our echo agree on one value.

@@ -4,6 +4,56 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-20 — The grid block goes as late as it can, and the home battery still comes first
+
+Issue #80 adds a fifth charge mode: an amount of energy, a departure time, and "use as little grid as
+you can". Two decisions in it are worth recording, because both look wrong at first glance.
+
+### The grid block is placed as late as it possibly can be
+
+The obvious arrangement is the opposite: a car plugged in at 21:00 for an 07:00 departure could start
+importing immediately and be done by 23:00, and everyone sleeps easier. The plan does the reverse —
+it computes the import it still needs and places that block **ending at the deadline**, so nothing is
+imported until the last possible moment.
+
+The reason is that **the plan is rebuilt every poll and never committed to**. Between 21:00 and 05:00
+there are thousands of chances for the forecast to improve, for the car to have taken more than
+expected, or for a sunny morning to appear inside the window. Every one of them shrinks the block —
+often to nothing — *before a single watt of it is bought*. Scheduling the import early converts all
+of that optionality into a purchase. Late placement costs nothing in exchange: the deadline is met
+either way, because the block is sized to meet it.
+
+The cost is that a failure late in the window has less time to recover. That is exactly what the
+comparison against `P_max × (departure − now)` is for: the moment the remaining need exceeds what the
+charger could physically deliver in the time left, the plan says so — with the shortfall and the
+departure that would have covered it — instead of quietly falling short.
+
+It also means the block must be found by a **backward pass**, not by `deficit / P_max`. Where the
+block reaches back over a sunny slice the grid only has to supply `P_max` minus what the sun is
+already giving, so the start is prorated inside that slice by power rather than by time. The naive
+division understates the block and misses the deadline on exactly the days the mode exists for.
+
+### The home battery keeps its priority, and the grid pays for the gap
+
+The car has a deadline here and the pack does not, which is an argument for letting the car take the
+pack's surplus and refilling it tomorrow. It is rejected, for two reasons.
+
+The first is that the two deadlines are not comparable. The car's is a promise the owner made and can
+change — moving the departure by an hour is a keystroke. The pack's evening 100% is what carries the
+house through the night, and its cost when missed is paid by the house at the evening tariff, not by
+the person who set the target.
+
+The second is that the alternative is not free energy, only a **more expensive route to the same
+kilowatt-hours**. Energy taken from the pack and repaid tomorrow pays a round-trip loss and a cycle on
+both packs; the grid block pays the tariff and nothing else. Taking the pack's share would not reduce
+the import, only move it to the evening — which is why there is no battery loan in this mode, and why
+the discharge hold arms while the grid block runs. The pack is not a cheaper source here. It is the
+same source, borrowed at a loss.
+
+The hold is scoped to the importing part of the plan rather than to the whole mode, unlike
+`FastNoBattery`. Outside the grid block the car is running on surplus the pack has already been
+offered and declined, and holding the pack there would push the house onto the grid for nothing.
+
 ## 2026-08-16 — The product is Gleanvolt; the vendor is still SolaX
 
 **Context.** "SolaX Local Controller" put someone else's trademark in the project's name, its

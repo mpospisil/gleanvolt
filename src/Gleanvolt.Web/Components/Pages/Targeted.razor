@@ -1,0 +1,223 @@
+@page "/targeted"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject IChargeControlModeSelector Mode
+@inject ITargetedChargeSelector Target
+@inject TargetedDisplayOptions Display
+@inject TimeProvider Time
+
+@*
+    Phase 3 of #80: the surface the owner actually uses. Text, not a chart -- the timeline chart is
+    its own story and will consume TargetedChargePlan.Blocks unchanged.
+
+    Activate sets the request on ITargetedChargeSelector and then selects the mode, which is the same
+    Core seam Home Assistant drives, so the two surfaces cannot disagree about what was asked for.
+
+    Follows Forecast.razor: seeded from ChargeControlStatusHolder.Current, then pushed on every
+    Updated, and it subscribes to both selectors as well because either can move without this page's
+    help -- the mode returns itself to Off when the target is met.
+*@
+
+<PageTitle>Targeted charge — Gleanvolt</PageTitle>
+
+<h1>Targeted charge</h1>
+
+<p class="muted">
+    Say how much energy the car needs and when it has to be there. The plan takes every kilowatt-hour
+    of forecast surplus the home battery has not already claimed, and buys the rest from the grid as
+    late as it can and still finish in time.
+</p>
+
+<section class="controls">
+    <h2>The request</h2>
+
+    <div class="control">
+        <label for="target-energy">Energy needed (kWh)</label>
+        <input id="target-energy" type="number" step="0.5" min="0" @bind="_energyKWh" @bind:event="onchange" />
+        <span class="hint">Measured at the charger, from the moment you press Activate.</span>
+    </div>
+
+    <div class="control">
+        <label for="target-departure">Ready by</label>
+        <input id="target-departure" type="datetime-local" @bind="_departure" @bind:event="onchange" />
+        <span class="hint">
+            Charging finishes a few minutes before this, so the car is ready rather than still drawing.
+            At most @(Display.MaxHorizon.TotalHours.ToString("F0")) hours ahead.
+        </span>
+    </div>
+
+    <div class="control">
+        <button type="button" class="primary" @onclick="Activate">Activate</button>
+        <button type="button" class="secondary" @onclick="Cancel">Cancel</button>
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="error" role="alert">@_error</p>
+    }
+
+    <p class="hint">
+        The request does not survive a restart of the service. If it restarts overnight the car stops
+        charging, and nothing will have told you.
+    </p>
+</section>
+
+@if (_status?.TargetedPlan is { } plan)
+{
+    <section class="plan">
+        <h2>The plan</h2>
+
+        @foreach (var paragraph in TargetedPlanNarrative.Describe(plan, Time.LocalTimeZone))
+        {
+            <p>@paragraph</p>
+        }
+    </section>
+
+    <section class="stat-grid">
+        <Stat Label="Plan state" Value="@plan.Strategy.ToString()"
+              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: sun plus a late grid block. Maximum: there is not enough time, so everything available is taken." />
+        <Stat Label="Still needed" Value="@Kwh(plan.RemainingEnergyWh)"
+              Hint="The request less what the charger has measurably delivered since it was activated." />
+        <Stat Label="Delivered so far" Value="@Kwh(plan.DeliveredEnergyWh)"
+              Hint="Measured at the charger, so a car that limits itself to less than we asked for simply pulls the grid block earlier." />
+        <Stat Label="From sun" Value="@Kwh(plan.SolarEnergyWh)"
+              Hint="Forecast surplus the home battery has not already claimed. The pack keeps its priority." />
+        <Stat Label="From grid" Value="@Kwh(plan.GridEnergyWh)"
+              Hint="What the sun cannot cover. Rebuilt every poll, so a better afternoon than forecast shrinks this before any of it is bought." />
+        <Stat Label="Grid top-up starts" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"
+              Hint="The latest start that still meets the target. Every poll before it is another chance for the sun to make it unnecessary." />
+        <Stat Label="Expected by departure" Value="@Kwh(plan.ExpectedEnergyWh)"
+              Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
+        <Stat Label="Shortfall" Value="@Kwh(plan.ShortfallWh)"
+              Hint="How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount asked for." />
+        <Stat Label="Battery SOC floor" Value="@Percent(plan.SocFloorPercent)"
+              Hint="The home battery is not drawn below this to feed the car; the grid covers the gap instead." />
+        <Stat Label="Ready by" Value="@Clock(plan.Deadline)"
+              Hint="The finish line the plan works to: your departure less the safety margin." />
+    </section>
+}
+else if (_status is null)
+{
+    <p class="muted">No poll has completed yet.</p>
+}
+else
+{
+    <p class="muted">
+        The plan is only shown while <strong>Targeted</strong> is the active charge mode.
+        Current mode: @_status.Mode.
+    </p>
+}
+
+@code {
+    private ChargeControlStatus? _status;
+    private double _energyKWh = 20;
+    private DateTime _departure;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+        Mode.Changed += OnSelectorChanged;
+        Target.Changed += OnRequestChanged;
+
+        SeedForm(Target.Request);
+    }
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Raised on the polling loop's thread whenever either selector moves for any reason -- including
+    // this mode returning itself to Off once the target is met.
+    private void OnSelectorChanged(ChargeControlMode mode) => InvokeAsync(StateHasChanged);
+
+    private void OnRequestChanged(TargetedChargeRequest? request)
+    {
+        SeedForm(request);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        StatusHolder.Updated -= OnStatusUpdated;
+        Mode.Changed -= OnSelectorChanged;
+        Target.Changed -= OnRequestChanged;
+    }
+
+    // The form shows what is actually being worked to, when there is one -- a page opened in a second
+    // browser must not offer to overwrite the running request with its own defaults.
+    private void SeedForm(TargetedChargeRequest? request)
+    {
+        if (request is not null)
+        {
+            _energyKWh = Math.Round(request.RequiredEnergyWh / 1000, 1);
+            _departure = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).DateTime;
+            return;
+        }
+
+        // Tomorrow morning: the case this mode exists for.
+        var localNow = TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).DateTime;
+        _departure = localNow.Date.AddDays(1).AddHours(7);
+    }
+
+    private void Activate()
+    {
+        var now = Time.GetUtcNow();
+        var departBy = Compose(_departure);
+
+        if (_energyKWh <= 0)
+        {
+            _error = "Enter how much energy the car needs.";
+            return;
+        }
+
+        if (departBy <= now)
+        {
+            _error = "The departure time is in the past.";
+            return;
+        }
+
+        if (departBy - now > Display.MaxHorizon)
+        {
+            _error = $"A departure more than {Display.MaxHorizon.TotalHours:F0} hours away is further than "
+                + "the forecast — or a request that does not survive a restart — can honestly promise.";
+            return;
+        }
+
+        _error = null;
+
+        // The request first, then the mode: the controller reads both in the same cycle, and a mode
+        // selected a poll before its request would report "no target set" for that poll.
+        Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
+        Mode.Set(ChargeControlMode.Targeted, "Web UI");
+    }
+
+    private void Cancel()
+    {
+        _error = null;
+        Target.Clear("Web UI");
+
+        if (Mode.Mode == ChargeControlMode.Targeted)
+        {
+            Mode.Set(ChargeControlMode.Off, "Web UI");
+        }
+    }
+
+    // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock
+    // here whatever the server or the browser thinks, and a DST boundary between now and then cannot
+    // move it by an hour.
+    private DateTimeOffset Compose(DateTime local) =>
+        new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Time.LocalTimeZone.GetUtcOffset(local));
+
+    private string Clock(DateTimeOffset instant) =>
+        TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString("ddd HH:mm");
+
+    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+
+    private static string Percent(double percent) => $"{percent:F0}%";
+}

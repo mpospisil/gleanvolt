@@ -10,6 +10,7 @@ using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
+using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
@@ -189,6 +190,33 @@ public static class GleanvoltHostingExtensions
             return new FastChargingController(options.MaxChargingCurrentAmps, options.CompletionDwell);
         });
 
+        // Targeted charging (issue #80): a stated amount of energy by a stated departure time, with the
+        // grid block placed as late as it still can be. The request itself is runtime state rather than
+        // configuration -- it belongs to one trip -- so the selector starts empty and, like the mode,
+        // does not survive a restart.
+        services.Configure<TargetedChargeOptions>(configuration.GetSection(TargetedChargeOptions.SectionName));
+        services.AddSingleton<ITargetedChargeSelector, TargetedChargeSelector>();
+        services.AddSingleton<TargetedChargeProvider>();
+
+        services.AddSingleton(provider =>
+        {
+            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var forecast = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+
+            return new TargetedChargingController(
+                provider.GetRequiredService<ChargePowerConverter>(),
+                new TargetedChargingOptions(
+                    MinChargingCurrentAmps: chargeControl.MinChargingCurrentAmps,
+                    MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
+                    CurrentStepAmps: chargeControl.CurrentStepAmps,
+                    ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
+                    // The dwell timers are the forecast mode's: they exist to spare the contactor and
+                    // the car, which is a property of the hardware rather than of either strategy.
+                    MinRunTime: forecast.MinRunTime,
+                    MinPauseTime: forecast.MinPauseTime,
+                    CompletionDwell: chargeControl.CompletionDwell));
+        });
+
         services.AddSingleton(provider =>
             new SurplusMovingAverage(provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
@@ -203,6 +231,7 @@ public static class GleanvoltHostingExtensions
                 [ChargeControlMode.Solar] = provider.GetRequiredService<IChargingController>(),
                 [ChargeControlMode.Forecasted] = provider.GetRequiredService<ForecastedChargingController>(),
                 [ChargeControlMode.FastNoBattery] = provider.GetRequiredService<FastChargingController>(),
+                [ChargeControlMode.Targeted] = provider.GetRequiredService<TargetedChargingController>(),
             };
 
             return new ChargingControlCoordinator(
@@ -326,6 +355,11 @@ public static class GleanvoltHostingExtensions
         // options classes. Hand it the one value, exactly as WebBuildInfo is handed the version.
         services.AddSingleton(provider =>
             new VehicleDisplayOptions(provider.GetRequiredService<IOptions<VehicleOptions>>().Value.MaxAge));
+
+        // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
+        // before the request is ever made, and that limit lives in this assembly's options.
+        services.AddSingleton(provider =>
+            new TargetedDisplayOptions(provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value.MaxHorizon));
 
         AddWebSurface(services, configuration);
 

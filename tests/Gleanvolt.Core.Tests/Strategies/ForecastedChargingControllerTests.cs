@@ -95,9 +95,10 @@ public class ForecastedChargingControllerTests
             new EvChargerSettings(mode, 6),
             charging,
             plan ?? Plan(),
-            timeInState,
-            sessionEnergyWh,
-            loanedTodayWh);
+            TargetedPlan: null,
+            TimeInCurrentState: timeInState,
+            SessionEnergyWh: sessionEnergyWh,
+            LoanedTodayWh: loanedTodayWh);
 
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()

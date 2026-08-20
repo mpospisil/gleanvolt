@@ -403,3 +403,131 @@ internal static class TestIntervals
             Covered: covered ?? TimeSpan.FromMinutes(15),
             SampleCount: 180);
 }
+
+/// <summary>
+/// A minimal stand-in for <c>TargetedChargeSelector</c> (which lives in the hosting assembly): records
+/// every call and raises <see cref="Changed"/> exactly like the real thing, which is what the targeted
+/// page depends on to notice a request being made or dropped from somewhere else.
+/// </summary>
+internal sealed class FakeTargetedChargeSelector(TargetedChargeRequest? initial = null) : ITargetedChargeSelector
+{
+    public TargetedChargeRequest? Request { get; private set; } = initial;
+
+    public List<(TargetedChargeRequest Request, string Source)> Sets { get; } = [];
+
+    public List<string> Clears { get; } = [];
+
+    public event Action<TargetedChargeRequest?>? Changed;
+
+    public void Set(TargetedChargeRequest request, string source)
+    {
+        Sets.Add((request, source));
+        Request = request;
+        Changed?.Invoke(request);
+    }
+
+    public void Clear(string source)
+    {
+        Clears.Add(source);
+
+        if (Request is null)
+        {
+            return;
+        }
+
+        Request = null;
+        Changed?.Invoke(null);
+    }
+}
+
+/// <summary>Targeted plans with every field filled in plausibly, so a test can name only what it is about.</summary>
+internal static class TestTargetedPlans
+{
+    public static TargetedChargePlan SolarPlusGrid(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.SolarPlusGrid,
+        solarWh: 14_600,
+        gridWh: 7_400,
+        gridStart: now.AddHours(6.5));
+
+    public static TargetedChargePlan Solar(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.Solar,
+        solarWh: 22_000,
+        gridWh: 0,
+        gridStart: null);
+
+    public static TargetedChargePlan Maximum(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.Maximum,
+        solarWh: 0,
+        gridWh: 8_300,
+        gridStart: now,
+        departBy: now.AddHours(2).AddMinutes(10),
+        requiredWh: 12_000,
+        expectedWh: 8_300,
+        shortfallWh: 3_700,
+        feasibleDeparture: now.AddHours(3).AddMinutes(5));
+
+    public static TargetedChargePlan Complete(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.Complete,
+        solarWh: 0,
+        gridWh: 0,
+        gridStart: null,
+        deliveredWh: 22_000,
+        remainingWh: 0,
+        expectedWh: 0);
+
+    private static TargetedChargePlan Plan(
+        DateTimeOffset now,
+        TargetedChargeStrategy strategy,
+        double solarWh,
+        double gridWh,
+        DateTimeOffset? gridStart,
+        DateTimeOffset? departBy = null,
+        double requiredWh = 22_000,
+        double deliveredWh = 0,
+        double? remainingWh = null,
+        double? expectedWh = null,
+        double shortfallWh = 0,
+        DateTimeOffset? feasibleDeparture = null,
+        bool isUsable = true)
+    {
+        var depart = departBy ?? now.AddHours(9);
+        var blocks = new List<TargetedChargeBlock>();
+
+        if (solarWh > 0)
+        {
+            blocks.Add(new TargetedChargeBlock(
+                now.AddHours(12), now.AddHours(16), TargetedChargeSource.Solar, 3_650, solarWh));
+        }
+
+        if (gridWh > 0 && gridStart is { } start)
+        {
+            blocks.Add(new TargetedChargeBlock(start, depart, TargetedChargeSource.Grid, 11_040, gridWh));
+        }
+
+        return new TargetedChargePlan(
+            Strategy: strategy,
+            Now: now,
+            DepartBy: depart,
+            Deadline: depart.AddMinutes(-15),
+            RequiredEnergyWh: requiredWh,
+            DeliveredEnergyWh: deliveredWh,
+            RemainingEnergyWh: remainingWh ?? requiredWh - deliveredWh,
+            SolarEnergyWh: solarWh,
+            GridEnergyWh: gridWh,
+            CeilingEnergyWh: 90_000,
+            ExpectedEnergyWh: expectedWh ?? solarWh + gridWh,
+            ShortfallWh: shortfallWh,
+            GridStart: gridStart,
+            FeasibleDeparture: feasibleDeparture,
+            SocFloorPercent: 55,
+            BatteryToFullWh: 2_000,
+            Blocks: blocks,
+            ForecastAsOf: now.AddHours(-1),
+            IsUsable: isUsable,
+            Reason: "test plan");
+    }
+}
