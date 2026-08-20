@@ -226,6 +226,7 @@ h1 {
 }
 
 .control select,
+.control input[type="datetime-local"],
 .control input[type="number"] {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--line);
@@ -238,6 +239,31 @@ h1 {
 
 .control input[type="checkbox"] {
     margin-right: 0.5rem;
+}
+
+/* The one affirmative action in the UI (Targeted's "Activate"), in the accent the nav already uses
+   rather than a fourth colour. Its Cancel sits beside it as .secondary, like every other pairing. */
+.control button.primary {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: #fff;
+    padding: 0.4rem 0.9rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.control button.primary:hover {
+    filter: brightness(0.92);
+}
+
+/* The plan in words. Held to a readable measure -- these are sentences, not a stat grid. */
+.plan {
+    margin-top: 1.5rem;
+}
+
+.plan p {
+    max-width: 70ch;
 }
 
 /* The only destructive control in the UI (Health's "Stop service"), so it is the only thing coloured

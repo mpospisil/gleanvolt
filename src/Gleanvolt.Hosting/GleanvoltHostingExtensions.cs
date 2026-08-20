@@ -356,6 +356,11 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider =>
             new VehicleDisplayOptions(provider.GetRequiredService<IOptions<VehicleOptions>>().Value.MaxAge));
 
+        // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
+        // before the request is ever made, and that limit lives in this assembly's options.
+        services.AddSingleton(provider =>
+            new TargetedDisplayOptions(provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value.MaxHorizon));
+
         AddWebSurface(services, configuration);
 
         return services;
