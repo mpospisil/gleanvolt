@@ -32,4 +32,17 @@ public enum ChargeControlMode
     /// releases the hold. Like the other modes it only acts while the charger's own use-mode is Fast.
     /// </summary>
     FastNoBattery,
+
+    /// <summary>
+    /// Deliver a stated amount of energy by a stated departure time, with as little grid as possible:
+    /// the car takes every kilowatt-hour of forecast surplus the home battery has not already claimed,
+    /// and the grid covers only the remainder — in a block placed as <b>late</b> as it can be and still
+    /// finish in time, so a sunnier afternoon than forecast shrinks it before any of it is bought. When
+    /// there is not enough time left for the request, it charges flat out and reports how far short it
+    /// will fall rather than pretending otherwise. The home battery keeps its priority throughout, and
+    /// the discharge hold arms while the grid block runs so the pack never feeds the car. The request
+    /// does not survive a restart. Like the other modes it only acts while the charger's own use-mode
+    /// is Fast.
+    /// </summary>
+    Targeted,
 }
