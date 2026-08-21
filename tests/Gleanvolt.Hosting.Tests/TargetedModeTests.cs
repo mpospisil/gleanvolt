@@ -129,12 +129,36 @@ public class TargetedModeTests
         Assert.NotNull(_target.Request);
     }
 
+    [Fact]
+    public async Task PastTheDeparture_TheModeEndsItselfInsteadOfTakingTheCycleDown()
+    {
+        // Regression (2026-08-21, live): past the departure the provider asked the forecast for a
+        // window running backwards, ForPeriod rejected it, and the exception escaped the poll cycle
+        // before charge control ran. The mode could not notice its own deadline, so a met target went
+        // on charging at 16A for 23 minutes until it was stopped by hand.
+        //
+        // A real forecast, unlike the rest of this class: the throw was in ForPeriod, so a service
+        // that answers null cannot reproduce it.
+        Request(1_500, Now.AddMinutes(10));
+
+        await RunAsync(
+            forecast: new StubForecastService(Now),
+            Drawing(Now.AddMinutes(11), 0),
+            Drawing(Now.AddMinutes(12), 0));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Equal(0, LastTarget);
+        Assert.Contains("has passed", _writes[^1].Reason);
+    }
+
     private void Request(double energyWh, DateTimeOffset departBy) =>
         _target.Set(new TargetedChargeRequest(energyWh, departBy, Now), "test");
 
     // Drives the real poll loop over a scripted telemetry sequence, then stops it. The service parks on
     // the reader once the script runs out, so exactly these polls happen -- no timing assumptions.
-    private async Task RunAsync(params EnergyState[] states)
+    private Task RunAsync(params EnergyState[] states) => RunAsync(new NoForecastService(), states);
+
+    private async Task RunAsync(ISolarForecastService forecast, params EnergyState[] states)
     {
         var chargeControl = new ChargeControlOptions
         {
@@ -146,7 +170,6 @@ public class TargetedModeTests
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecast = new NoForecastService();
         var forecastOptions = Options.Create(new ForecastChargeOptions());
 
         var coordinator = new ChargingControlCoordinator(
@@ -214,4 +237,19 @@ public class TargetedModeTests
     private static EnergyState Drawing(DateTimeOffset at, double evWatts) =>
         new(at, BatterySocPercent: 90, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: evWatts + 300,
             EvChargerStatus.Charging, EvChargerPowerWatts: evWatts);
+}
+
+/// <summary>
+/// A forecast that answers from real <see cref="SolarForecast"/> periods, so <c>ForPeriod</c>'s own
+/// argument checking is in play — which is where the poll loop was thrown from.
+/// </summary>
+internal sealed class StubForecastService(DateTimeOffset from) : ISolarForecastService
+{
+    private readonly SolarForecast _forecast = new(
+        from,
+        [new SolarForecastPeriod(from.AddMinutes(30), TimeSpan.FromMinutes(30), EstimatedPowerWatts: 0)]);
+
+    public SolarForecast? GetForecastForToday() => _forecast;
+
+    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => _forecast.ForPeriod(from, to);
 }

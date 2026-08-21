@@ -119,12 +119,18 @@ public sealed class PollingService : BackgroundService
 
                 // Built in every mode: the forecast accuracy tracking and today's energy totals are
                 // worth having even when the plan isn't the thing driving the charger.
-                var plan = _dayPlan.Update(state, _chargingControl.LoanedTodayWh);
+                //
+                // Both are wrapped because planning is not control: a plan that cannot be built is a
+                // reason to fall back, never a reason to stop driving the charger. Unwrapped, one
+                // arithmetic slip in a planner aborts the cycle before a single decision is made --
+                // which is how a finished target went on charging for 23 minutes on 2026-08-21.
+                var plan = Planned("day plan", () => _dayPlan.Update(state, _chargingControl.LoanedTodayWh))
+                    ?? SolarDayPlan.Unavailable(state.Timestamp, "the day plan could not be built this cycle");
 
                 // Built whenever a request exists, in every mode, for the same reason the day plan is:
                 // the delivered-energy meter has to keep running across a mode switch, or re-selecting
                 // Targeted would restart the count and re-promise energy the car already has.
-                var targetedPlan = _targetedCharge.Update(state);
+                var targetedPlan = Planned("targeted plan", () => _targetedCharge.Update(state));
 
                 var mode = _mode.Mode;
                 WarnOnModeEntry(mode);
@@ -206,6 +212,24 @@ public sealed class PollingService : BackgroundService
             {
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Runs a plan build, turning a failure into null and a warning rather than an aborted cycle. The
+    /// controllers all have a defined answer for "no plan" — falling back, or pausing — and any of
+    /// those beats leaving the charger at its last setpoint with nothing watching it.
+    /// </summary>
+    private T? Planned<T>(string what, Func<T?> build) where T : class
+    {
+        try
+        {
+            return build();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to build the {What} this cycle; charge control continues without it.", what);
+            return null;
         }
     }
 
