@@ -50,28 +50,83 @@ public class HaDiscoveryTests
     {
         Assert.Equal("solax/solax_controller/availability", Discovery.AvailabilityTopic);
         Assert.Equal("solax/solax_controller/state", Discovery.StateTopic);
-        Assert.Equal("solax/solax_controller/charge_mode/set", Discovery.ModeCommandTopic);
-        Assert.Equal("solax/solax_controller/charge_mode/state", Discovery.ModeStateTopic);
+        Assert.Equal("solax/solax_controller/start_solar/set", Discovery.ButtonCommandTopic("start_solar"));
+        Assert.Equal("solax/solax_controller/charge_off/set", Discovery.ChargeOffCommandTopic);
     }
 
     [Fact]
-    public void DiscoveryMessages_IncludeAModeSelectWithEveryMode()
+    public void DiscoveryMessages_PublishNoSelectAtAll()
     {
+        // #89: charging is started by an action. Nothing offers a mode to pick any more.
         var messages = Discovery.DiscoveryMessages().ToList();
 
-        var selectMsg = messages.Single(m => m.Topic == "homeassistant/select/solax_controller/charge_mode/config");
-        using var json = JsonDocument.Parse(selectMsg.Payload);
-        var s = json.RootElement;
-
-        Assert.Equal("solax_controller_charge_mode", s.GetProperty("unique_id").GetString());
-        Assert.Equal(Discovery.ModeCommandTopic, s.GetProperty("command_topic").GetString());
-        Assert.Equal(Discovery.ModeStateTopic, s.GetProperty("state_topic").GetString());
-        var options = s.GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToArray();
-        Assert.Equal(["Off", "Solar", "Forecasted", "FastNoBattery", "Targeted"], options);
-
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/"));
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
-        Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
+    }
+
+    [Theory]
+    [InlineData("homeassistant/button/solax_controller/start_solar/config")]
+    [InlineData("homeassistant/button/solax_controller/start_forecasted/config")]
+    [InlineData("homeassistant/button/solax_controller/start_fast_no_battery/config")]
+    [InlineData("homeassistant/button/solax_controller/activate_target/config")]
+    [InlineData("homeassistant/button/solax_controller/charge_off/config")]
+    public void DiscoveryMessages_IncludeAButtonPerStrategyPlusOff(string topic) =>
+        Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
+
+    [Fact]
+    public void EveryStrategyButtonTakesOnlyAPressOnItsOwnTopic()
+    {
+        foreach (var (objectId, _, name, _) in HaDiscovery.StartButtons)
+        {
+            var message = Discovery.DiscoveryMessages()
+                .Single(m => m.Topic == $"homeassistant/button/solax_controller/{objectId}/config");
+
+            using var json = JsonDocument.Parse(message.Payload);
+            var config = json.RootElement;
+
+            Assert.Equal(name, config.GetProperty("name").GetString());
+            Assert.Equal($"solax/solax_controller/{objectId}/set", config.GetProperty("command_topic").GetString());
+            Assert.Equal(HaDiscovery.PayloadPress, config.GetProperty("payload_press").GetString());
+
+            // A button has no state; anything that claimed otherwise would give HA a topic nobody
+            // publishes to and an entity permanently "unknown".
+            Assert.False(config.TryGetProperty("state_topic", out _));
+        }
+    }
+
+    [Fact]
+    public void TheModeSurvivesAsAReadOnlySensor()
+    {
+        var message = Discovery.DiscoveryMessages()
+            .Single(m => m.Topic == "homeassistant/sensor/solax_controller/charge_mode/config");
+
+        using var json = JsonDocument.Parse(message.Payload);
+        var config = json.RootElement;
+
+        Assert.Equal("Charge mode", config.GetProperty("name").GetString());
+        Assert.Equal(Discovery.StateTopic, config.GetProperty("state_topic").GetString());
+        Assert.Equal("{{ value_json.mode }}", config.GetProperty("value_template").GetString());
+        Assert.False(config.TryGetProperty("command_topic", out _));
+    }
+
+    [Fact]
+    public void TheRetiredSelectIsRemovedFromHomeAssistantOnItsOwn()
+    {
+        // An empty retained payload to the old config topic is what deletes the entity, so an upgrade
+        // does not leave a dead select behind for somebody to notice and remove by hand.
+        Assert.Contains(
+            "homeassistant/select/solax_controller/charge_mode/config",
+            Discovery.RetiredDiscoveryTopics());
+    }
+
+    [Fact]
+    public void NoDiscoveryMessageNamesTheRetiredModeCommandTopic()
+    {
+        Assert.DoesNotContain(
+            Discovery.DiscoveryMessages(),
+            m => m.Payload.Contains("charge_mode/set") || m.Payload.Contains("charge_mode/state"));
     }
 
     [Theory]
@@ -254,23 +309,6 @@ public class HaDiscoveryTests
         Assert.Contains("homeassistant/switch/solax_controller/charge_control/config", Discovery.RetiredDiscoveryTopics());
     }
 
-    [Theory]
-    [InlineData("Off", ChargeControlMode.Off)]
-    [InlineData("solar", ChargeControlMode.Solar)]
-    public void TryParseMode_AcceptsTheOptionStrings(string payload, ChargeControlMode expected)
-    {
-        Assert.True(HaDiscovery.TryParseMode(payload, out var mode));
-        Assert.Equal(expected, mode);
-    }
-
-    [Fact]
-    public void TryParseMode_RejectsUnknown() =>
-        Assert.False(HaDiscovery.TryParseMode("nonsense", out _));
-
-    [Fact]
-    public void ModeState_RoundTripsTheEnumName() =>
-        Assert.Equal("Solar", Discovery.ModeState(ChargeControlMode.Solar));
-
     [Fact]
     public void StateJson_SerialisesEveryFieldTheSensorsReference()
     {
@@ -411,10 +449,16 @@ public class HaDiscoveryTests
     }
 
     [Fact]
-    public void TryParseMode_AcceptsForecasted()
+    public void TheModeSensorReportsEveryModeByName()
     {
-        Assert.True(HaDiscovery.TryParseMode("forecasted", out var mode));
-        Assert.Equal(ChargeControlMode.Forecasted, mode);
+        // The sensor reads value_json.mode, so the string it shows is the enum name -- the same string
+        // the select's options used to be, which is what keeps existing dashboards readable.
+        foreach (var mode in Enum.GetValues<ChargeControlMode>())
+        {
+            using var json = JsonDocument.Parse(Discovery.StateJson(Status(mode: mode)));
+
+            Assert.Equal(mode.ToString(), json.RootElement.GetProperty("mode").GetString());
+        }
     }
 }
 

@@ -21,6 +21,7 @@ public sealed class PollingService : BackgroundService
     private readonly DayPlanProvider _dayPlan;
     private readonly TargetedChargeProvider _targetedCharge;
     private readonly IChargeControlModeSelector _mode;
+    private readonly IChargeActions _chargeActions;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IBatteryDischargeControl _batteryDischargeControl;
     private readonly ChargeControlStatusHolder _statusHolder;
@@ -46,6 +47,7 @@ public sealed class PollingService : BackgroundService
         DayPlanProvider dayPlan,
         TargetedChargeProvider targetedCharge,
         IChargeControlModeSelector mode,
+        IChargeActions chargeActions,
         IBatteryHoldSelector batteryHold,
         IBatteryDischargeControl batteryDischargeControl,
         ChargeControlStatusHolder statusHolder,
@@ -63,6 +65,7 @@ public sealed class PollingService : BackgroundService
         _dayPlan = dayPlan;
         _targetedCharge = targetedCharge;
         _mode = mode;
+        _chargeActions = chargeActions;
         _batteryHold = batteryHold;
         _batteryDischargeControl = batteryDischargeControl;
         _statusHolder = statusHolder;
@@ -150,10 +153,14 @@ public sealed class PollingService : BackgroundService
 
                 if (result.SessionComplete)
                 {
+                    // A mode that switches itself off has to leave the charger where the Off button
+                    // would: stopped, not sitting in Fast at the pause current. That is one code path,
+                    // and this is the other caller of it.
+                    //
                     // The controller has already had the pause current written. Ending the mode here --
                     // before the hold is reconciled below -- means the release reaches the inverter in
                     // this same cycle rather than a poll later.
-                    _mode.Set(ChargeControlMode.Off, $"{mode} (charging finished)");
+                    await _chargeActions.StopAsync($"{mode} (charging finished)", stoppingToken);
                     mode = ChargeControlMode.Off;
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }

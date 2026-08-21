@@ -257,6 +257,32 @@ h1 {
     filter: brightness(0.92);
 }
 
+/* The strategy buttons (#89). A row that wraps rather than a grid: there are four of them, they are
+   different widths by name, and on a phone they should stack in reading order. Off is pushed to the
+   far end on a wide screen -- it is the one that undoes the others, not a fifth of the same kind. */
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0.15rem;
+}
+
+.actions button.secondary.off {
+    margin-left: auto;
+}
+
+/* The mode itself, no longer a control: read-only, but still the line the eye goes to first, so it
+   carries the weight a control's label would have. */
+.control .mode-state {
+    margin: 0 0 0.35rem;
+    font-weight: 600;
+}
+
+.control .mode-state .muted {
+    font-weight: 400;
+    color: var(--muted);
+}
+
 /* The plan in words. Held to a readable measure -- these are sentences, not a stat grid. */
 .plan {
     margin-top: 1.5rem;
@@ -292,6 +318,12 @@ h1 {
     margin-left: 0.5rem;
     font-size: 1rem;
     cursor: pointer;
+}
+
+/* The .secondary margin above exists for the Activate/Cancel pairing; inside a gapped flex row it
+   would add a second gap on one side only. */
+.actions button.secondary {
+    margin-left: 0;
 }
 
 .control button.secondary:hover {

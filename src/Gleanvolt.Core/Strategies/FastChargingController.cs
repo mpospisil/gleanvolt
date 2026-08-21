@@ -17,7 +17,8 @@ namespace Gleanvolt.Core.Strategies;
 /// grid import, battery locked) ends by itself rather than sitting armed until somebody notices.
 ///
 /// Like the other controllers it only acts while the charger's own use-mode is
-/// <see cref="EvChargerMode.Fast"/>, and it only ever writes the current setpoint.
+/// <see cref="EvChargerMode.Fast"/> — which starting the mode wrote, and which nothing here
+/// re-asserts — and it only ever decides the current setpoint.
 /// </summary>
 public sealed class FastChargingController : IChargingController
 {
@@ -42,9 +43,9 @@ public sealed class FastChargingController : IChargingController
 
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
-        // Precondition: only modulate the current while the owner has the charger in Fast mode. In any
-        // other mode we don't control it at all -- and we don't end the session either, since we were
-        // never driving it.
+        // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote
+        // Fast once; if the charger has left it since, somebody changed it at the wallbox and we don't
+        // control it at all -- and we don't end the session either, since we were never driving it.
         if (input.CurrentSettings.Mode != EvChargerMode.Fast)
         {
             return new ChargingControlDecision(

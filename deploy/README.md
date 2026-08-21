@@ -561,7 +561,7 @@ Assistant's presence or absence changes nothing about it.
    appear by themselves.
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
-only once you select a mode — Home Assistant or the web UI, whichever is enabled — and
+only once a charging button is pressed — Home Assistant or the web UI, whichever is enabled — and
 `BatteryHold` is disabled and dry-run. Change either in `.env` only after verifying the register
 addresses on your own device, per the root README's warnings.
 
@@ -632,7 +632,9 @@ That skips copying any updated compose files, so use it for a plain image bump, 
 An update recreates the container, and the worker always boots in charge mode **Off** with the
 battery hold disabled — by design, so that a deployment never inherits control it wasn't given. If a
 mode was active when you updated, **it is not active afterwards**; the charger is left exactly as it
-was and waits for you to select a mode again in Home Assistant or the web UI.
+was and waits for you to start charging again in Home Assistant or the web UI. Nothing writes the
+charger's use-mode either, so a charger left in Fast stays in Fast — at whatever setpoint the last
+cycle put there.
 
 Nothing is written to your hardware during the update itself, and a charging session in progress is
 not lost: on a clean stop the recorder closes it with reason `ServiceStopped` and persists it, so it

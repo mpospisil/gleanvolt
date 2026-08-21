@@ -99,6 +99,10 @@ public class TargetedModeTests
         Assert.Equal(0, LastTarget);
         Assert.Contains("Target reached", _writes[^1].Reason);
         Assert.False(_inverter.Applied[^1]);
+
+        // #89: the same end state the Off button leaves -- stopped, not idling in Fast at the pause
+        // current, which the car would happily start drawing from again.
+        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
     }
 
     [Fact]
@@ -211,6 +215,9 @@ public class TargetedModeTests
                 // No margin, so the arithmetic in these tests is the clock and the ceiling alone.
                 new TargetedChargeOptions { SafetyMargin = TimeSpan.Zero }),
             _mode,
+            // The real actions over the fake charger: a mode that ends itself has to stop the charger
+            // exactly as the Off button does, and that is the code path it goes through.
+            new ChargeActions(_charger, _mode, NullLogger<ChargeActions>.Instance),
             _manualHold,
             _inverter,
             _status,

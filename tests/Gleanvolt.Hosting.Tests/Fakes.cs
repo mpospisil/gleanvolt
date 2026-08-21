@@ -10,13 +10,19 @@ using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting.Tests;
 
-/// <summary>Records current-setpoint writes and reflects them back as the new "current", like hardware.</summary>
+/// <summary>Records both kinds of write and reflects them back as the new settings, like hardware.</summary>
 internal sealed class FakeEvChargerControl : IEvChargerControl
 {
     public EvChargerSettings CurrentSettings { get; set; } = new(EvChargerMode.Fast, 0);
 
     /// <summary>Every SetCurrentAsync call, in order.</summary>
     public List<(int Active, int Target, string Reason)> CurrentWrites { get; } = [];
+
+    /// <summary>Every SetModeAsync call, in order — the use-mode writes an action made.</summary>
+    public List<(EvChargerMode Mode, string Reason)> ModeWrites { get; } = [];
+
+    /// <summary>Makes every use-mode write fail, the way a charger that has stopped answering does.</summary>
+    public string? ModeWriteFailure { get; set; }
 
     /// <summary>The target amps of the last write, or null if none.</summary>
     public int? LastTarget => CurrentWrites.Count == 0 ? null : CurrentWrites[^1].Target;
@@ -28,6 +34,18 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     {
         CurrentWrites.Add((activeAmps, targetAmps, reason));
         CurrentSettings = CurrentSettings with { ChargeCurrentAmps = targetAmps };
+        return Task.CompletedTask;
+    }
+
+    public Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default)
+    {
+        if (ModeWriteFailure is { } failure)
+        {
+            return Task.FromException(new InvalidOperationException(failure));
+        }
+
+        ModeWrites.Add((mode, reason));
+        CurrentSettings = CurrentSettings with { Mode = mode };
         return Task.CompletedTask;
     }
 }

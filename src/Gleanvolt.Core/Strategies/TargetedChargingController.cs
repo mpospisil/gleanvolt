@@ -15,7 +15,8 @@ namespace Gleanvolt.Core.Strategies;
 /// arrives as a plan with a smaller grid block, and the block is never drawn.</para>
 ///
 /// <para>Pure and side-effect free, like every other strategy, and it only modulates the current while
-/// the charger's own use-mode is <see cref="EvChargerMode.Fast"/>. There is no battery loan in this
+/// the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — written once when the target was
+/// activated, and never re-asserted from here. There is no battery loan in this
 /// mode: the home battery keeps its priority and the grid is the honest source for the gap.</para>
 /// </summary>
 public sealed class TargetedChargingController : IChargingController
@@ -46,8 +47,8 @@ public sealed class TargetedChargingController : IChargingController
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // Precondition, unchanged from every other mode: the owner keeps the charger in Fast mode and
-        // we only modulate the current under it.
+        // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
+        // wrote it) and we only modulate the current under it.
         if (input.CurrentSettings.Mode != EvChargerMode.Fast)
         {
             return new ChargingControlDecision(

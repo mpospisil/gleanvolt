@@ -4,6 +4,7 @@
 @implements IDisposable
 @inject ChargeControlStatusHolder StatusHolder
 @inject IChargeControlModeSelector Mode
+@inject IChargeActions Actions
 @inject IBatteryHoldSelector BatteryHold
 @inject IForecastRuntimeSettings ForecastSettings
 @inject IVehicleTelemetry Vehicle
@@ -13,9 +14,14 @@
 @*
     Phase 1 (#46) is the telemetry stat-grid below; phase 3 (#48) adds the controls section, gated
     by the [Authorize] attribute phase 2 (#47) put on every page. Both drive the same Core
-    interfaces the MQTT worker uses -- IChargeControlModeSelector, IBatteryHoldSelector,
-    IForecastRuntimeSettings -- so there is no separate control path and no way for this page to
-    disagree with Home Assistant about what the charger is doing.
+    interfaces the MQTT worker uses -- IChargeActions, IBatteryHoldSelector, IForecastRuntimeSettings
+    -- so there is no separate control path and no way for this page to disagree with Home Assistant
+    about what the charger is doing.
+
+    Since #89 the mode is not a setting on this page: it is what a button did. Each strategy button
+    writes the charger's use-mode Fast and then selects its mode; Off writes Stop and returns the mode
+    to Off. The mode itself stays here as a read-only line, because it can still move without this
+    page's help.
 
     Follows StatusHolder.Updated exactly like the health page: seeded from Current before
     subscribing, so a browser that arrives between two polls sees the last one rather than nothing,
@@ -41,9 +47,9 @@ else
 
     <section class="stat-grid">
         <Stat Label="Charge mode" Value="@_status.Mode.ToString()"
-              Hint="Which strategy is driving the charger. Always starts at Off after a restart." />
+              Hint="Which strategy is driving the charger, as of the last poll. Always starts at Off after a restart." />
         <Stat Label="Control state" Value="@_status.State.ToString()"
-              Hint="What charge control is doing right now: Disabled (no mode selected), Idle (selected but not acting), Charging, or Paused." />
+              Hint="What charge control is doing right now: Disabled (nothing running), Idle (running but not acting, usually because the charger is no longer in Fast), Charging, or Paused." />
         <Stat Label="Charger status" Value="@_status.ChargerStatus.ToString()"
               Hint="The charger's own reported state, straight from its register." />
         <Stat Label="Car connected" Value="@(_status.CarConnected ? "Yes" : "No")"
@@ -109,17 +115,35 @@ else
     <h2>Controls</h2>
 
     <div class="control">
-        <label for="mode">Charge mode</label>
-        <select id="mode" @bind="_selectedMode" @bind:after="OnModeSelected">
-            @foreach (var mode in Enum.GetValues<ChargeControlMode>())
+        <p id="mode-state" class="mode-state">
+            Charge mode: <span class="mode">@_currentMode</span>@if (_actionNote is not null)
             {
-                <option value="@mode">@mode</option>
+                <span class="muted"> (@_actionNote)</span>
             }
-        </select>
+        </p>
+
+        <div class="actions">
+            <button type="button" class="primary" id="start-solar" disabled="@_busy"
+                    @onclick="() => StartAsync(ChargeControlMode.Solar)">Solar</button>
+            <button type="button" class="primary" id="start-forecasted" disabled="@_busy"
+                    @onclick="() => StartAsync(ChargeControlMode.Forecasted)">Forecasted</button>
+            <button type="button" class="primary" id="start-fast-no-battery" disabled="@_busy"
+                    @onclick="() => StartAsync(ChargeControlMode.FastNoBattery)">Fast (no battery)</button>
+            <button type="button" class="secondary off" id="charge-off" disabled="@_busy"
+                    @onclick="StopAsync">Off</button>
+        </div>
+
+        @if (_actionError is not null)
+        {
+            <p class="error" role="alert">@_actionError</p>
+        }
+
         <span class="hint">
-            Which strategy drives the charger. Always starts at Off after a restart; FastNoBattery
-            and Targeted return themselves to Off once the car finishes. Targeted also needs a
-            request — set the energy and departure on the <a href="/targeted">Targeted</a> page.
+            Pressing one of these puts the charger into Fast and starts that strategy; Off stops the
+            car. Nothing survives a restart — the service boots in Off and writes nothing until a
+            button is pressed. FastNoBattery and Targeted switch themselves off once the car finishes,
+            and change the mode above without this page's help. Targeted has no button here because it
+            needs an amount and a departure: start it from the <a href="/targeted">Targeted</a> page.
         </span>
     </div>
 
@@ -183,7 +207,10 @@ else
     private ChargeControlStatus? _status;
     private VehicleState? _vehicle;
     private bool _vehicleStale;
-    private ChargeControlMode _selectedMode;
+    private ChargeControlMode _currentMode;
+    private string? _actionNote;
+    private string? _actionError;
+    private bool _busy;
     private bool _batteryHoldDisplay;
     private double _dailyEvTargetKWh;
     private double _sessionEnergyTargetKWh;
@@ -195,8 +222,8 @@ else
         _status = StatusHolder.Current;
         StatusHolder.Updated += OnStatusUpdated;
 
-        _selectedMode = Mode.Mode;
-        Mode.Changed += OnModeChangedElsewhere;
+        _currentMode = Mode.Mode;
+        Mode.Changed += OnModeChanged;
 
         _batteryHoldDisplay = _status?.BatteryHoldActive ?? BatteryHold.Hold;
 
@@ -226,20 +253,72 @@ else
     }
 
     // Raised on the polling loop's thread whenever the mode changes for any reason, including
-    // FastNoBattery ending its own session -- not only when this page asked for it.
-    private void OnModeChangedElsewhere(ChargeControlMode mode)
+    // FastNoBattery ending its own session -- not only when this page asked for it. The note goes with
+    // it: "started from the Web UI at 13:42" is only true of the action that set it, and a mode that
+    // has moved on since is not that action.
+    private void OnModeChanged(ChargeControlMode mode)
     {
-        _selectedMode = mode;
+        _currentMode = mode;
+        _actionNote = null;
         InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
     {
         StatusHolder.Updated -= OnStatusUpdated;
-        Mode.Changed -= OnModeChangedElsewhere;
+        Mode.Changed -= OnModeChanged;
     }
 
-    private void OnModeSelected() => Mode.Set(_selectedMode, "Web UI");
+    // Both actions go through the one seam, so a press here and a press in Home Assistant do the same
+    // thing in the same order. Disabled while it runs: the write is a Modbus round trip, and a second
+    // press landing on top of the first would only queue a duplicate behind it.
+    private async Task StartAsync(ChargeControlMode mode)
+    {
+        _busy = true;
+        _actionError = null;
+
+        try
+        {
+            var result = await Actions.StartAsync(mode, "Web UI");
+            Apply(result, $"started from the Web UI at {Now()}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        _busy = true;
+        _actionError = null;
+
+        try
+        {
+            var result = await Actions.StopAsync("Web UI");
+            Apply(result, $"stopped from the Web UI at {Now()}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // The note is set after the result, not before: OnModeChanged has already run by now (the seam
+    // sets the mode synchronously) and cleared whatever the last action left behind.
+    private void Apply(ChargeActionResult result, string note)
+    {
+        if (result.Succeeded)
+        {
+            _actionNote = note;
+            return;
+        }
+
+        _actionError = result.Message;
+    }
+
+    private string Now() =>
+        TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).ToString("HH:mm");
 
     private void OnBatteryHoldSelected() => BatteryHold.Set(_batteryHoldDisplay, "Web UI");
 

@@ -9,9 +9,9 @@ namespace Gleanvolt.Core.Strategies;
 /// battery-full gate: the car may charge as soon as the plan shows enough remaining sun for the home
 /// battery to still reach 100% by the evening deadline (see <see cref="SolarDayPlanner"/>).
 ///
-/// <para>Like the live-solar controller it only ever modulates the <em>current</em>, only while the
-/// charger's own use-mode is <see cref="EvChargerMode.Fast"/>, and it never starts or stops a session.
-/// What it adds:</para>
+/// <para>Like the live-solar controller it only ever modulates the <em>current</em>, and only while the
+/// charger's own use-mode is <see cref="EvChargerMode.Fast"/> — which starting the mode wrote once and
+/// which nothing here re-asserts. What it adds:</para>
 /// <list type="bullet">
 /// <item><description>a <b>moving SOC floor</b> from the plan instead of a fixed 95% gate, with its own
 /// resume margin, a guard band that hands the battery part of the surplus while it recovers, and a
@@ -84,8 +84,8 @@ public sealed class ForecastedChargingController : IChargingController
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // Precondition, unchanged from live-solar control: the owner keeps the charger in Fast mode and
-        // we only modulate the current under it.
+        // Precondition, unchanged from live-solar control: the charger is in Fast (starting the mode
+        // wrote it) and we only modulate the current under it.
         if (input.CurrentSettings.Mode != EvChargerMode.Fast)
         {
             return new ChargingControlDecision(

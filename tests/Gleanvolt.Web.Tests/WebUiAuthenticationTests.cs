@@ -37,7 +37,9 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         // Phase 3 (#48): the dashboard now also injects these to drive the runtime controls. Fakes
         // are enough here -- this suite is about the auth pipeline, not control behaviour, which
         // DashboardPageTests already covers.
-        builder.Services.AddSingleton<IChargeControlModeSelector>(new FakeChargeControlModeSelector());
+        var mode = new FakeChargeControlModeSelector();
+        builder.Services.AddSingleton<IChargeControlModeSelector>(mode);
+        builder.Services.AddSingleton<IChargeActions>(new FakeChargeActions(mode));
         builder.Services.AddSingleton<IBatteryHoldSelector>(new FakeBatteryHoldSelector());
         builder.Services.AddSingleton<IForecastRuntimeSettings>(new FakeForecastRuntimeSettings());
         builder.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());

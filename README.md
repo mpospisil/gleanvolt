@@ -201,8 +201,8 @@ the containers are disposable: upgrades, rollbacks and `docker compose down` los
 requires authentication and is not published to the LAN.
 
 Deploying writes **nothing** to your hardware: charge control boots in mode `Off` and takes control
-only when you select a mode — Home Assistant or the web UI, whichever is enabled — and the battery
-hold stays disabled and dry-run until
+only when a charging button is pressed — Home Assistant or the web UI, whichever is enabled — and the
+battery hold stays disabled and dry-run until
 you turn it on deliberately.
 
 **Updating a Pi that is already running is the same command.** From the developer machine, re-run
@@ -218,7 +218,7 @@ It copies the compose files, pulls, and recreates only the containers that actua
 state survives — `.env` is never even copied, and the session database, logs and Home Assistant's
 configuration live on bind mounts under `/opt/gleanvolt` rather than inside any container. Two things
 worth knowing: the pull covers *every* image in the stack, so on workflow A Home Assistant moves
-with it, and the controller restarts into charge mode `Off`, so an active mode has to be selected
+with it, and the controller restarts into charge mode `Off`, so charging has to be started
 again afterwards. Full detail, including settings-only changes and rollbacks, is under
 [Updating a running deployment](deploy/README.md#updating-a-running-deployment).
 
@@ -309,7 +309,7 @@ If the API key or resource id is missing, the worker logs a warning and skips fo
 
 ### EV charge control (writes to the charger)
 
-When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. It writes **only the charge-current setpoint** — it never changes the charger's use-mode and never sends a start/stop command, so you keep the charger in Fast mode and the controller modulates the current under it (see "Current-only control" below). It writes only values that differ from what's already on the device and logs every change.
+When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. Two things are written, by two different callers: the **charge-current setpoint**, by the control loop, on every cycle that calls for a change; and the charger's **use-mode**, once per action — `Fast` when a strategy is started, `Stop` when it is switched off (see "What is written, and by whom" below). It writes only current values that differ from what's already on the device and logs every change.
 
 The current setpoint is always constrained to what the hardware accepts (**6–32 A**): the configured min/max are clamped into that range up-front, so the controller can never even target an illegal value, and the write path clamps again as a final guard.
 
@@ -357,12 +357,22 @@ and the telemetry line carries the full energy picture plus the charger's active
 SOC=96% BatteryPower=-56W Solar=4180W Grid=-388W EvCharger=Charging EvMode=Fast EvCurrent=16A EvPower=3680W
 ```
 
-#### Current-only control: what it changes, and what it doesn't
+#### What is written, and by whom
 
-The controller runs its own Modbus loop and sets the charging **current** from its `Surplus = PV − household load` calculation. It deliberately does the **minimum**:
+Until #89 the controller wrote the current setpoint and nothing else: the owner was expected to have
+left the charger in Fast by hand, and a mode selected over a charger sitting in Green did nothing at
+all and said so only through **Control state** reading `Idle`. Charging is now started by an action
+instead, and the action takes responsibility for the use-mode. The two writes stay separate:
 
-- It **only writes the current setpoint** (`0x628`). It **never** changes the charger's use-mode (Green/ECO/Fast) and **never** sends a start/stop command.
-- It **only acts when all three hold**: the SolaX device is reachable, its own use-mode reads **Fast**, and the HA mode is **Solar**. In any other mode (Green/ECO/Stop) it leaves the charger completely alone — you keep the charger in Fast; the controller just modulates the current under it.
+- **The control loop writes the current setpoint (`0x628`) and only that**, from its
+  `Surplus = PV − household load` calculation. It is still the minimum it can do.
+- **An action writes the use-mode (`0x60D`), once.** Pressing a strategy button writes `Fast` and then
+  selects the mode; pressing **Off** writes `Stop` and returns the mode to `Off`. Nothing else writes
+  it, and nothing re-asserts it.
+- **The loop still only acts when all three hold**: the SolaX device is reachable, its own use-mode
+  reads **Fast**, and a strategy is running. If the charger is changed at the wallbox mid-session it
+  drops out of Fast, every controller goes `Idle`, and **nothing writes `Fast` back** — the owner has
+  the last word on their own hardware, and the controller does not fight them for it.
 
 #### The 6 A hard cutoff — pause by dropping the current
 
@@ -409,11 +419,20 @@ Setting a max above what the car will accept isn't dangerous (it simply won't dr
 
 The current setpoint is encoded to the SolaX hardware's requirements automatically: rounded to a whole amp, clamped to `0…32 A` (0 for pause), and written with the register's **0.01 A scale** (value = amps × 100).
 
-**Validate first with `DryRun`.** Set `Enabled: true` and `DryRun: true` to run the full control loop and log exactly what it *would* write — e.g. `[DRY RUN] would set charger current setpoint: 6A -> 16A (register 1600)` — without touching the charger. This is the safe way to confirm the register values against your device before allowing real writes.
+**Validate first with `DryRun`.** Set `DryRun: true` to run the full control loop and log exactly what it *would* write, without touching the charger — both writes, in the same shape:
+
+```
+[DRY RUN] would set charger use-mode: Fast (register 1). Solar started by Web UI.
+[DRY RUN] would set charger current setpoint: 6A -> 16A (register 1600). Charge at 16A from 3700W surplus.
+```
+
+This is the safe way to confirm the register values against your device before allowing real writes. In dry-run the values that were "written" also stand in for the hardware on the next read, so a dry run behaves like a real one rather than reporting every mode `Idle` because the charger is still in Green.
+
+There is deliberately **no `ChargeControl:Enabled`**: the service boots in mode `Off` and writes nothing at all until somebody presses a button, which is a stronger guarantee than a config flag and one nobody can leave switched on by accident.
 
 In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice: each write site is skipped, and the Modbus clients are wrapped in a read-only decorator that drops writes outright, so even a caller that forgot its guard cannot reach the hardware. A suppressed write logs a warning as a tripwire — it should never appear.
 
-> ⚠️ **This feature writes to your charger.** It writes only the charge-current setpoint (`ChargeCurrentSetpoint 0x628`) and reads the use-mode (`ChargerUseMode 0x60D`) as a precondition — both from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Verify against your charger before setting `Enabled: true`.** Disabled by default for exactly this reason.
+> ⚠️ **This feature writes to your charger — two registers.** The charge-current setpoint (`ChargeCurrentSetpoint 0x628`, written by the control loop) and the use-mode (`ChargerUseMode 0x60D`, **written** by a start/stop action: `0=Stop, 1=Fast`). Both come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). `0x60D` in particular was read-only in this project until #89, so its write path has less mileage on it than the setpoint's. Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Run with `DryRun: true` and check the logged register values against your hardware first.** Nothing is written until a button is pressed, which is why there is no enable flag to forget.
 
 ### Battery discharge hold (writes to the inverter)
 
@@ -714,7 +733,8 @@ battery out of it.** While it is selected:
 2. The charger is pinned at **`MaxChargingCurrentAmps`**, every cycle, whatever the sun, the SOC, the
    forecast or the time of day. PV covers what it can and the **grid covers the rest**.
 3. When the car stops drawing because it reached **its own** charge limit, the setpoint drops to
-   `PauseCurrentAmps`, the mode returns itself to **`Off`**, and the hold it armed is released.
+   `PauseCurrentAmps`, the charger is written `Stop`, the mode returns itself to **`Off`**, and the
+   hold it armed is released — exactly the end state the **Off** button produces, in the one cycle.
 
 Point 3 is what makes it safe to press. The state it creates is expensive — maximum current, grid
 import, battery locked — and it ends by itself instead of sitting armed until somebody notices.
@@ -749,8 +769,8 @@ charger's own doing, which is exactly what our pause write produces.
   lapses within `BatteryHold:Duration`.
 - **It doesn't touch a hold you asked for yourself.** On completion it releases only the hold it
   armed; the Home Assistant switch stays exactly as you set it.
-- **It doesn't change the charger's use-mode.** As with the other modes, the owner keeps the charger
-  in Fast and this only moves the current setpoint.
+- **It doesn't change the charger's use-mode while it runs.** Starting it wrote `Fast` once and
+  ending it writes `Stop`; in between, like every other mode, it only moves the current setpoint.
 
 With `BatteryHold:Enabled` false the mode still charges at maximum current, and logs a warning once on
 selection: it cannot keep the battery out of the charge, which is half of what it promises.
@@ -827,8 +847,10 @@ drawn*. Scheduling the grid early would spend money on energy the day was about 
 From the web UI, `/targeted`: the energy, the departure, and **Activate**. From Home Assistant: the
 **Target energy** number, the **Departure time** text (`07:00` means the next 07:00; `2026-08-11
 07:00` means exactly that), and the **Activate target** button. Both drive the same two seams in
-`Gleanvolt.Core` — the request selector and the mode selector, in that order — so the two surfaces
-cannot disagree about what was asked for.
+`Gleanvolt.Core` — the request selector and then the charge action, in that order — so the two
+surfaces cannot disagree about what was asked for. **Activate** also puts the charger into `Fast`,
+like every other way of starting charging; **Cancel** is the same `Off` action the dashboard's button
+is.
 
 A departure may be at most `ChargeControl:Targeted:MaxHorizon` (36 hours) ahead. Solcast's cached
 forecast runs days further, but a target four days out is a promise the forecast cannot keep — and
@@ -847,25 +869,33 @@ neither can a request that does not survive a restart.
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
 
-- a **Charge mode** select — change the mode **at runtime**, no restart:
-  - **Off** — the controller doesn't touch the charger; its current setpoint is left exactly as it is.
-  - **Solar** — modulate the charging current from live surplus while the battery is full (and only while the charger's own use-mode is Fast); pause when there isn't enough sun.
-  - **Forecasted** — as Solar, but the fixed battery-full gate is replaced by a forecast-driven day
-    plan, so the car can start well before the battery is full. See
+- **one button per strategy, plus Off.** Charging is started by an action and by nothing else: each
+  button writes the charger's use-mode `Fast` and then selects its strategy, so a press works on a
+  charger sitting in Green rather than waiting for the wallbox to have been set by hand.
+  - **Charge solar** — modulate the charging current from live surplus while the battery is full;
+    pause when there isn't enough sun.
+  - **Charge forecasted** — as Solar, but the fixed battery-full gate is replaced by a forecast-driven
+    day plan, so the car can start well before the battery is full. See
     [Forecast-driven charging](#forecast-driven-charging-the-forecasted-mode) below.
-  - **FastNoBattery** — charge at the maximum configured current from PV and grid together, with the
-    battery discharge hold armed automatically, and return to `Off` when the car is full. See
+  - **Charge fast** — charge at the maximum configured current from PV and grid together, with the
+    battery discharge hold armed automatically, and stop when the car is full. See
     [Fast charge without the battery](#fast-charge-without-the-battery-the-fastnobattery-mode) below.
-    This is the one mode that switches *itself* off, so the select will change under you when the car
-    finishes.
-  - **Targeted** — deliver a stated amount of energy by a stated departure time, sun first and grid
-    as late as possible. See [Targeted charging](#targeted-charging-the-targeted-mode) below. It
-    needs a request as well as the mode: set **Target energy** and **Departure time**, then press
-    **Activate target**. Like `FastNoBattery`, it returns itself to `Off` once the target is met.
+    This is one of the two that switch *themselves* off, so **Charge mode** will change under you when
+    the car finishes.
+  - **Activate target** — deliver a stated amount of energy by a stated departure time, sun first and
+    grid as late as possible. See [Targeted charging](#targeted-charging-the-targeted-mode) below.
+    It has no button of its own in the row because it needs a request: set **Target energy** and
+    **Departure time**, and this button applies both and starts the mode. Like `FastNoBattery`, it
+    stops itself once the target is met.
+  - **Charge off** — writes `Stop` to the charger and returns the mode to `Off`, whatever was running.
+    It always writes, even if the controller had never taken control. Not to be confused with **Stop
+    service**, which takes the whole controller off the air.
 
   **The service always starts in `Off`**, whatever is in the config, and nothing persists a mode
   across restarts. After a crash, a power cut or a deploy the charger is therefore left exactly as its
-  owner set it, rather than being grabbed by whichever mode a config file happened to name.
+  owner set it, rather than being grabbed by whichever mode a config file happened to name. A previous
+  version published a **Charge mode** *select*; upgrading retires it, and Home Assistant removes the
+  entity on its own — there is nothing to delete by hand.
 - a **Battery discharge hold** switch, when `BatteryHold:Enabled` is on — see
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
@@ -899,13 +929,17 @@ description or tooltip field. The meanings live here instead.
 
 | Entity | Unit | What it means |
 | --- | --- | --- |
-| **Charge mode** | select | Which strategy drives the charger: `Off`, `Solar`, `Forecasted`, `FastNoBattery` or `Targeted` (see the list above). Always starts at `Off` after a restart. |
+| **Charge mode** | sensor | Which strategy is driving the charger: `Off`, `Solar`, `Forecasted`, `FastNoBattery` or `Targeted`. Read-only — it reports what a button did, and it moves on its own when `FastNoBattery` or `Targeted` finish. Always `Off` after a restart. |
+| **Charge solar** | button | Starts the `Solar` strategy: writes the charger's use-mode `Fast`, then selects the mode. A charger that refuses the write leaves the mode untouched and logs a warning, rather than reporting a strategy that is doing nothing. |
+| **Charge forecasted** | button | The same, for `Forecasted`. |
+| **Charge fast** | button | The same, for `FastNoBattery`. Read the warning about `MaxChargingCurrentAmps` before pressing it — this one draws the site's supply limit for hours. |
+| **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` arms it automatically; a mode never turns it off for you. |
 | **Daily EV target** | kWh | How much energy the car should get on a normal day. The forecast plan measures its projected shortfall against this. Doesn't persist across restarts. |
 | **Session energy target** | kWh | Stop charging once this much has gone into the car in one session (since it was plugged in). `0` means no limit. Doesn't persist across restarts. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
-| **Control state** | — | What charge control is doing right now. `Disabled`: no mode selected, the charger is the owner's. `Idle`: a mode is selected but not acting, most often because the charger's use-mode isn't Fast. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
+| **Control state** | — | What charge control is doing right now. `Disabled`: nothing is running, the charger is the owner's. `Idle`: a strategy is running but not acting — most often because the charger has been taken out of Fast at the wallbox since it was started. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
 | **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
 | **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |
 | **Forecast solar power** | W | What the forecast expected the roof to be making **at this instant** — the direct counterpart to **Solar power**, so the two chart against each other. `0` when no forecast covers this moment: none fetched yet, the provider is down, or the instant is past the horizon. Published in every mode, not only `Forecasted`, because the comparison is how you decide whether to select that mode at all. |
@@ -950,7 +984,7 @@ same rule the forecast plan follows.
 | --- | --- | --- |
 | **Target energy** | kWh | How much energy the car needs by the departure time, measured at the charger from the moment **Activate target** is pressed. Nothing happens until it is. |
 | **Departure time** | text | When that energy has to be there. A bare `07:00` means the **next** 07:00 — which is what somebody typing it at 22:00 means by it; `2026-08-11 07:00` means exactly that. MQTT discovery has no datetime platform, which is why this is text. Read back as the resolved timestamp, so a day later it is still unambiguous. Anything else is refused with a warning in the log rather than guessed at. |
-| **Activate target** | button | Applies the two above: sets the request and selects the `Targeted` mode, in that order. Pressed with either half missing, it logs a warning and does nothing. |
+| **Activate target** | button | Applies the two above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with either half missing, or with a departure already past, it logs a warning and does nothing. |
 | **Target plan state** | — | One line on what the plan is doing and why — the same explanation the log carries. |
 | **Target solar energy** | kWh | The share of what is still needed that forecast surplus is expected to cover, after the home battery's own booking. |
 | **Target grid energy** | kWh | The share planned to come from the grid. Rebuilt every poll, so a better afternoon than forecast shrinks this before any of it is bought. |
@@ -1188,17 +1222,20 @@ optional authentication — a single shared password that gates every page once 
 [Authentication](#authentication) — landing before phase 3 gives the UI anything that can write to
 hardware.
 
-Phase 3 adds the same controls Home Assistant has, on the same page: the **charge mode** select
-(`Off` / `Solar` / `Forecasted` / `FastNoBattery` / `Targeted`), the **battery discharge hold** switch — shown
-only while `BatteryHold:Enabled` is on — and the runtime numbers (**daily EV target**, **session
-energy target**, **minimum battery SOC**). They drive the exact same Core interfaces the MQTT worker
-uses (`IChargeControlModeSelector`, `IBatteryHoldSelector`, `IForecastRuntimeSettings`), so there is
-no second control path and the two surfaces cannot disagree about what the charger is doing — the
-last one to write wins, visible on the other within a poll interval. The same semantics apply here as
-on the MQTT side: nothing set from this page persists across a restart, `FastNoBattery` can switch
-the mode back to `Off` on its own once the car finishes (the select follows it), and the battery-hold
-switch shows the last command that was actually written to the inverter, not what was requested — a
-write that fails to take shows the switch springing back on its own.
+Phase 3 adds the same controls Home Assistant has, on the same page: a **row of charging buttons**
+(**Solar**, **Forecasted**, **Fast (no battery)** and **Off**) with the running mode reported above
+them read-only, the **battery discharge hold** switch — shown only while `BatteryHold:Enabled` is on —
+and the runtime numbers (**daily EV target**, **session energy target**, **minimum battery SOC**).
+They drive the exact same Core interfaces the MQTT worker uses (`IChargeActions`,
+`IBatteryHoldSelector`, `IForecastRuntimeSettings`), so there is no second control path and the two
+surfaces cannot disagree about what the charger is doing — the last one to press wins, visible on the
+other within a poll interval. The same semantics apply here as on the MQTT side: nothing set from this
+page persists across a restart, `FastNoBattery` can switch the mode back to `Off` on its own once the
+car finishes (the line follows it, and the "started from the Web UI at 13:42" note goes with it), a
+charger that refuses the use-mode write says so on the page instead of leaving a mode that quietly
+does nothing, and the battery-hold switch shows the last command that was actually written to the
+inverter, not what was requested — a write that fails to take shows the switch springing back on its
+own.
 
 Phase 5 adds `/forecast`: the `Forecasted` mode's day plan as one coherent view instead of the dozen
 loosely related entities Home Assistant renders it as. The same eleven figures — day outlook, plan
