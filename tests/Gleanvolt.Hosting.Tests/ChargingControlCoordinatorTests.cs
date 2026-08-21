@@ -331,6 +331,24 @@ public class ChargingControlCoordinatorTests
         Assert.True(result.SessionComplete);
     }
 
+    [Fact]
+    public async Task ADroppedChargerReading_DoesNotRestartTheSessionEnergy()
+    {
+        // Unknown means the charger didn't answer this poll. Read as "no car", it looks like an unplug
+        // followed by a replug, which zeroes the session's energy and its "the car has drawn power"
+        // verdict -- both of which the strategies meter their decisions against.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Unreachable(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // 207Wh over the first three minutes, and the blink neither zeroed it nor stopped it accruing.
+        Assert.True(_coordinator.SessionEnergyWh > 207);
+    }
+
     private static EnergyState State(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Available, EvChargerPowerWatts: 0);
@@ -343,6 +361,11 @@ public class ChargingControlCoordinatorTests
     private static EnergyState WindingDown(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.SuspendedEv, EvChargerPowerWatts: 1000);
+
+    // The charger stopped answering Modbus: the reader reports Unknown and zero power.
+    private static EnergyState Unreachable(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Unknown, EvChargerPowerWatts: 0);
 
     // Plugged in, drawing nothing.
     private static EnergyState Connected(DateTimeOffset at) =>

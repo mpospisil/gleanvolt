@@ -56,7 +56,9 @@ public sealed class FastChargingController : IChargingController
         // then would be the opposite of what was asked for.
         if (input.EvDrewPower)
         {
-            if (!input.State.EvChargerStatus.IsCarConnected())
+            // Known-disconnected, not merely "not connected": a charger that has stopped answering
+            // reports Unknown, and a dropped read is not a car that has gone away.
+            if (input.State.EvChargerStatus.IsCarKnownDisconnected())
             {
                 return Complete("Car unplugged");
             }
