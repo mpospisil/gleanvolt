@@ -14,6 +14,7 @@ public class ChargingSessionTrackerTests
         ChargeControlMode mode = ChargeControlMode.Solar,
         ChargeControlState state = ChargeControlState.Charging,
         bool carConnected = true,
+        EvChargerStatus? chargerStatus = null,
         double evWatts = 4000,
         double solarWatts = 6000,
         double forecastSolarWatts = 6000,
@@ -34,7 +35,7 @@ public class ChargingSessionTrackerTests
         TargetCurrentAmps: targetAmps,
         ActiveCurrentAmps: activeAmps,
         BatterySocPercent: soc,
-        ChargerStatus: carConnected ? EvChargerStatus.Charging : EvChargerStatus.Available,
+        ChargerStatus: chargerStatus ?? (carConnected ? EvChargerStatus.Charging : EvChargerStatus.Available),
         CarConnected: carConnected,
         SolarPowerWatts: solarWatts,
         ForecastSolarPowerWatts: forecastSolarWatts,
@@ -556,4 +557,32 @@ public class ChargingSessionTrackerTests
         IsUsable: isUsable,
         Reason: "Plenty of sun left today.",
         Timeline: []);
+
+    [Fact]
+    public void ADroppedChargerReading_DoesNotCloseTheOpenSession()
+    {
+        // The blink that ended a live session on 2026-08-21: the charger stopped answering, so the
+        // status arrived as Unknown with CarConnected false, and the recorded session was filed as
+        // "the car was unplugged" while the car was still sitting on the drive.
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon));
+
+        var update = tracker.Observe(Status(
+            Noon.AddMinutes(1), carConnected: false, chargerStatus: EvChargerStatus.Unknown, evWatts: 0));
+
+        Assert.Null(update.Ended);
+    }
+
+    [Fact]
+    public void AnActualUnplugStillClosesTheSession()
+    {
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon));
+
+        var update = tracker.Observe(Status(
+            Noon.AddMinutes(1), carConnected: false, chargerStatus: EvChargerStatus.Available, evWatts: 0));
+
+        Assert.NotNull(update.Ended);
+        Assert.Equal(ChargingSessionEndReason.CarUnplugged, update.Ended!.EndReason);
+    }
 }

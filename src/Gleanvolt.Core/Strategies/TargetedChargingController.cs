@@ -81,7 +81,9 @@ public sealed class TargetedChargingController : IChargingController
         // end the mode every time it waited for the sun.
         if (input.Charging && input.EvDrewPower)
         {
-            if (!input.State.EvChargerStatus.IsCarConnected())
+            // Known-disconnected, not merely "not connected": Unknown is a failed read, and ending
+            // the mode on one costs the owner the whole request — there is nothing left to restart it.
+            if (input.State.EvChargerStatus.IsCarKnownDisconnected())
             {
                 return Complete("Car unplugged");
             }

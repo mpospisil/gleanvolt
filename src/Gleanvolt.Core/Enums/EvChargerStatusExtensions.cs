@@ -19,6 +19,25 @@ public static class EvChargerStatusExtensions
     };
 
     /// <summary>
+    /// Whether the charger told us anything at all. <see cref="EvChargerStatus.Unknown"/> is what a
+    /// <b>failed read</b> produces — the charger stopped answering Modbus, or answered with a value
+    /// outside the register's range (see <c>EnergyStateReader</c> and <c>EvChargerStatusMapping</c>).
+    /// It is the absence of information, not a fact about the car.
+    /// </summary>
+    public static bool IsConnectionKnown(this EvChargerStatus status) => status != EvChargerStatus.Unknown;
+
+    /// <summary>
+    /// Whether the charger <b>positively reports</b> that no car is plugged in. The distinction from
+    /// <c>!IsCarConnected()</c> is the whole point: that expression is also true for
+    /// <see cref="EvChargerStatus.Unknown"/>, so a single dropped Modbus read reads as an unplugged
+    /// car — which is exactly what happened in production on 2026-08-21, ending a running session and
+    /// returning the mode to Off one poll after the charger blinked. Anything that <em>ends</em>
+    /// something must ask this question, never the negation of the other one.
+    /// </summary>
+    public static bool IsCarKnownDisconnected(this EvChargerStatus status) =>
+        status.IsConnectionKnown() && !status.IsCarConnected();
+
+    /// <summary>
     /// Whether the charger reports the session ending on the <em>car's</em> initiative rather than
     /// still delivering: <see cref="EvChargerStatus.SuspendedEv"/> is the EV side stopping the draw
     /// (typically its target SOC), <see cref="EvChargerStatus.Finishing"/> is the session closing.

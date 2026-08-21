@@ -19,6 +19,23 @@ public class EvChargerStatusExtensionsTests
         Assert.Equal(expected, status.IsCarConnected());
 
     [Theory]
+    [InlineData(EvChargerStatus.Available, true)]        // the charger says so: no car
+    [InlineData(EvChargerStatus.Unavailable, true)]
+    [InlineData(EvChargerStatus.Faulted, true)]
+    [InlineData(EvChargerStatus.Charging, false)]
+    [InlineData(EvChargerStatus.ChargePaused, false)]
+    [InlineData(EvChargerStatus.Unknown, false)]         // a failed read is not a fact about the car
+    public void IsCarKnownDisconnected(EvChargerStatus status, bool expected) =>
+        Assert.Equal(expected, status.IsCarKnownDisconnected());
+
+    [Theory]
+    [InlineData(EvChargerStatus.Unknown, false)]
+    [InlineData(EvChargerStatus.Available, true)]
+    [InlineData(EvChargerStatus.Charging, true)]
+    public void IsConnectionKnown(EvChargerStatus status, bool expected) =>
+        Assert.Equal(expected, status.IsConnectionKnown());
+
+    [Theory]
     [InlineData(EvChargerStatus.SuspendedEv, true)]      // the car stopped it -- typically its target SOC
     [InlineData(EvChargerStatus.Finishing, true)]        // the session is closing
     [InlineData(EvChargerStatus.Charging, false)]

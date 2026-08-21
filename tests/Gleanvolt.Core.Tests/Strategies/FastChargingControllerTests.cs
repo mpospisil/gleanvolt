@@ -123,6 +123,17 @@ public class FastChargingControllerTests
     }
 
     [Fact]
+    public void ADroppedChargerReading_DoesNotEndTheSession()
+    {
+        // Unknown is a charger that didn't answer, not a car that left. Ending the mode on one costs
+        // the owner the fast charge they asked for, and nothing brings it back by itself.
+        var result = Controller.Decide(Input(status: EvChargerStatus.Unknown));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.False(result.SessionComplete);
+    }
+
+    [Fact]
     public void NoCarAtAll_KeepsChargingUntilOneArrives()
     {
         // The mode selected before the car is plugged in: it waits, it doesn't switch itself off.

@@ -173,7 +173,13 @@ public sealed class ChargingSessionTracker
 
     private bool ShouldRecord(ChargeControlStatus status)
     {
-        if (!status.CarConnected)
+        // Unknown is a charger that has stopped answering, and it says nothing about the plug. An open
+        // session rides one out rather than being closed and filed as "the car was unplugged"; a
+        // session that has not started yet still needs a positive reading before it may begin.
+        var connected = status.CarConnected
+            || (_open is not null && !status.ChargerStatus.IsConnectionKnown());
+
+        if (!connected)
         {
             return false;
         }

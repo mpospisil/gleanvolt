@@ -164,6 +164,33 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
+    public void ADroppedChargerReading_DoesNotEndTheSession()
+    {
+        // Regression (2026-08-21, live): the charger stopped answering for a single poll, the status
+        // came back Unknown, and `!IsCarConnected()` read that as an unplugged car. The mode ended
+        // itself mid-charge and the request went with it -- nothing was left to restart the plan.
+        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, Now.AddMinutes(-5), Now.AddHours(2))]);
+
+        var decision = Controller().Decide(Input(
+            plan, charging: true, evDrewPower: true, status: EvChargerStatus.Unknown));
+
+        Assert.False(decision.SessionComplete);
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+    }
+
+    [Fact]
+    public void AnActualUnplugStillEndsTheSession()
+    {
+        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, Now.AddMinutes(-5), Now.AddHours(2))]);
+
+        var decision = Controller().Decide(Input(
+            plan, charging: true, evDrewPower: true, status: EvChargerStatus.Available));
+
+        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+    }
+
+    [Fact]
     public void WhenTheTargetIsReached_TheSessionIsComplete()
     {
         var decision = Controller().Decide(Input(Plan(strategy: TargetedChargeStrategy.Complete, deliveredWh: 22_000)));

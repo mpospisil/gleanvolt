@@ -251,15 +251,22 @@ public sealed class ChargingControlCoordinator
     // next evening) starts its energy ceiling from zero. The daily loan budget rolls at local midnight.
     private void TrackSession(EnergyState state)
     {
-        var connected = state.EvChargerStatus.IsCarConnected();
-        if (connected && !_carWasConnected)
+        // A charger that isn't answering reports Unknown, which is no news about the plug. Carrying the
+        // last known state through it keeps a blink from reading as unplug-and-replug -- which would
+        // reset the session's energy and its "the car has drawn power" verdict half way through a charge.
+        if (state.EvChargerStatus.IsConnectionKnown())
         {
-            _sessionEnergy.Reset();
-            _evDrewPower = false;
-            _evIdleSince = null;
+            var connected = state.EvChargerStatus.IsCarConnected();
+            if (connected && !_carWasConnected)
+            {
+                _sessionEnergy.Reset();
+                _evDrewPower = false;
+                _evIdleSince = null;
+            }
+
+            _carWasConnected = connected;
         }
 
-        _carWasConnected = connected;
         _sessionEnergy.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
 
         // The status is consulted alongside the power because a car can announce it is done while
