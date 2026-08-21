@@ -6,13 +6,14 @@ namespace Gleanvolt.Core.Strategies;
 
 /// <summary>
 /// Decides the charging <em>current</em> from live solar surplus, while the home battery is full. It
-/// never changes the charger's use-mode or starts/stops the session — the owner keeps the charger in
-/// Fast mode, and this only modulates the current setpoint (or drops it to the pause value when there
-/// isn't enough sun).
+/// decides nothing about the use-mode: starting this strategy is what put the charger into Fast (see
+/// <see cref="IChargeActions"/>), and all this does is modulate the current setpoint under it (or drop
+/// it to the pause value when there isn't enough sun).
 ///
 /// It only acts while the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — in any other
 /// mode (Green/Eco/Stop) it returns <see cref="ChargingControlAction.None"/> and leaves the charger
-/// alone. Above the battery-SOC gate it sets the current the surplus can cover (phase-aware, whole
+/// alone. Nothing writes Fast back: a charger changed at the wallbox mid-session belongs to whoever
+/// changed it. Above the battery-SOC gate it sets the current the surplus can cover (phase-aware, whole
 /// amps, clamped to min/max), with resume hysteresis; below the gate or below the minimum it pauses.
 /// </summary>
 public sealed class LiveSolarChargingController : IChargingController
@@ -60,8 +61,9 @@ public sealed class LiveSolarChargingController : IChargingController
 
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
-        // Precondition: only modulate the current while the owner has the charger in Fast mode. In any
-        // other mode we don't control it at all.
+        // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote
+        // Fast once; if the charger has left it since, somebody changed it at the wallbox and we don't
+        // control it at all -- nothing here writes Fast back.
         if (input.CurrentSettings.Mode != EvChargerMode.Fast)
         {
             return new ChargingControlDecision(

@@ -4,6 +4,58 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-21 — Charging is an action, and the action owns the charger's use-mode
+
+This reverses a promise the project made in as many words, in four places (`IEvChargerControl`,
+`EvChargerControl`, `ChargingControlCoordinator`, and three separate README claims): **the controller
+writes only the charge-current setpoint, never the use-mode, never a start/stop command.**
+
+### Why that was right
+
+It was right for what the controller was: a *modulator*. The owner made the decision — car plugged in,
+charger set to Fast — and the controller's whole job was to move the current under a session somebody
+else had started. In that shape, writing the use-mode would have been the controller taking a decision
+that was not its to take, over hardware whose register map is transcribed from a third-party
+integration rather than from a SolaX document. The narrow write surface was the safety argument, and
+"the owner keeps the charger in Fast" was the price of it.
+
+### Why it is wrong now
+
+Because the mode stopped being a *setting* and became a *thing you press*. A select is a statement of
+intent that waits for the world to agree with it: picked while the charger sits in Green it does
+nothing at all, and says so only through a `Control state` sensor reading `Idle` — five words down a
+dashboard, and the single most common "it isn't working" report this project produced. A button is a
+promise that something happens. It cannot keep that promise without the use-mode.
+
+Two surfaces already had the better shape and proved it: `Activate target` and `/targeted`'s `Cancel`
+are presses, and nobody has ever had to explain either of them.
+
+### What the reversal is careful about
+
+- **`Fast` is written once, by the action, and nothing re-asserts it.** All four controllers keep
+  their `if (use-mode != Fast) → Idle` precondition. A charger changed at the wallbox mid-session
+  leaves the controller idle exactly as it does today. The owner has the last word on their own
+  hardware; the controller does not fight them for it, poll after poll.
+- **`Off` writes `Stop` and does not touch the current setpoint.** `Stop` is what stops the car;
+  re-writing the setpoint would be a second write to say the same thing.
+- **Shutdown is unchanged.** `PauseOnShutdownAsync` still pauses the current and does **not** write
+  `Stop`: a container restart for a deploy is not the owner saying "stop".
+- **The self-off paths run the same action.** `FastNoBattery` and `Targeted` finishing now stop the
+  charger too — otherwise a mode that switches itself off would leave the charger in Fast at the pause
+  current, which is a different end state from the button and one a car can start drawing from again.
+- **There is still no enable flag, and nothing is written until a button is pressed.** That was
+  already the property `ChargeControl:Enabled`'s removal bought; it is now more literally true.
+
+### The one asymmetry, and why
+
+A failed use-mode write on **start** leaves the mode alone: nothing happened, and the surface says so.
+A failed write on **stop** still returns the mode to `Off`, and *also* reports the failure. Releasing
+control is the half of the button that cannot depend on the hardware answering — a controller left
+driving a charger it cannot reach would go on commanding currents at a wallbox whose owner has just
+said stop, which is the worse of the two failures by a distance.
+
+---
+
 ## 2026-08-20 — The grid block goes as late as it can, and the home battery still comes first
 
 Issue #80 adds a fifth charge mode: an amount of energy, a departure time, and "use as little grid as

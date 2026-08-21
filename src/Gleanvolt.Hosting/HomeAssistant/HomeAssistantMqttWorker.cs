@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
@@ -9,15 +10,16 @@ namespace Gleanvolt.Hosting.HomeAssistant;
 
 /// <summary>
 /// Publishes the controller to Home Assistant over MQTT: on connect it sends retained discovery
-/// configs (so HA auto-creates the device + entities), marks itself available, and subscribes to the
-/// charge-control switch command; it then republishes status periodically. An incoming switch command
-/// toggles charge control at runtime. Disabled by default.
+/// configs (so HA auto-creates the device + entities), marks itself available, and subscribes to every
+/// command topic it published; it then republishes status periodically. An incoming press starts or
+/// stops charging through <see cref="IChargeActions"/> — the same seam the web UI drives, so the two
+/// surfaces cannot disagree. Disabled by default.
 /// </summary>
 public sealed class HomeAssistantMqttWorker : BackgroundService
 {
     private readonly HomeAssistantOptions _options;
     private readonly HaDiscovery _discovery;
-    private readonly IChargeControlModeSelector _mode;
+    private readonly IChargeActions _actions;
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IForecastRuntimeSettings _forecastSettings;
     private readonly ITargetedChargeSelector _target;
@@ -38,7 +40,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
-        IChargeControlModeSelector mode,
+        IChargeActions actions,
         IBatteryHoldSelector batteryHold,
         IForecastRuntimeSettings forecastSettings,
         ITargetedChargeSelector target,
@@ -50,7 +52,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
         _discovery = new HaDiscovery(_options, _batteryHoldEnabled);
-        _mode = mode;
+        _actions = actions;
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
         _target = target;
@@ -139,7 +141,13 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         await PublishAsync(_discovery.AvailabilityTopic, HaDiscovery.PayloadOnline, retain: true, cancellationToken).ConfigureAwait(false);
-        await _client!.SubscribeAsync(_discovery.ModeCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        foreach (var (objectId, _, _, _) in HaDiscovery.StartButtons)
+        {
+            await _client!.SubscribeAsync(_discovery.ButtonCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
+        await _client!.SubscribeAsync(_discovery.ChargeOffCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (_batteryHoldEnabled)
         {
@@ -168,8 +176,6 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         {
             return;
         }
-
-        await PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, cancellationToken).ConfigureAwait(false);
 
         var status = _statusHolder.Current;
 
@@ -228,57 +234,101 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         return PublishAsync(_discovery.TextStateTopic(HaDiscovery.TargetDepartureText), text, retain: true, cancellationToken);
     }
 
-    private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
+    private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e) =>
+        HandleCommandAsync(e.ApplicationMessage.Topic, e.ApplicationMessage.ConvertPayloadToString());
+
+    /// <summary>
+    /// Routes one incoming command. Split out from the MQTTnet event so the command surface — which
+    /// button does what, and what a payload that isn't a press does — can be tested without a broker.
+    /// </summary>
+    internal Task HandleCommandAsync(string topic, string? payload)
     {
-        if (e.ApplicationMessage.Topic == _discovery.StopServiceCommandTopic)
+        if (topic == _discovery.StopServiceCommandTopic)
         {
-            return OnStopServiceCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+            return OnStopServiceCommandAsync(payload);
         }
 
-        if (e.ApplicationMessage.Topic == _discovery.ActivateTargetCommandTopic)
+        if (topic == _discovery.ActivateTargetCommandTopic)
         {
-            return OnActivateTargetAsync(e.ApplicationMessage.ConvertPayloadToString());
+            return OnActivateTargetAsync(payload);
+        }
+
+        foreach (var (objectId, mode, _, _) in HaDiscovery.StartButtons)
+        {
+            if (topic == _discovery.ButtonCommandTopic(objectId))
+            {
+                return OnStartAsync(mode, payload);
+            }
+        }
+
+        if (topic == _discovery.ChargeOffCommandTopic)
+        {
+            return OnChargeOffAsync(payload);
         }
 
         foreach (var objectId in HaDiscovery.TextObjectIds)
         {
-            if (e.ApplicationMessage.Topic == _discovery.TextCommandTopic(objectId))
+            if (topic == _discovery.TextCommandTopic(objectId))
             {
-                return OnTextCommandAsync(objectId, e.ApplicationMessage.ConvertPayloadToString());
+                return OnTextCommandAsync(objectId, payload);
             }
         }
 
-        if (_batteryHoldEnabled && e.ApplicationMessage.Topic == _discovery.BatteryHoldCommandTopic)
+        if (_batteryHoldEnabled && topic == _discovery.BatteryHoldCommandTopic)
         {
-            return OnBatteryHoldCommandAsync(e.ApplicationMessage.ConvertPayloadToString());
+            return OnBatteryHoldCommandAsync(payload);
         }
 
         foreach (var objectId in HaDiscovery.NumberObjectIds)
         {
-            if (e.ApplicationMessage.Topic == _discovery.NumberCommandTopic(objectId))
+            if (topic == _discovery.NumberCommandTopic(objectId))
             {
-                return OnNumberCommandAsync(objectId, e.ApplicationMessage.ConvertPayloadToString());
+                return OnNumberCommandAsync(objectId, payload);
             }
         }
 
-        if (e.ApplicationMessage.Topic != _discovery.ModeCommandTopic)
-        {
-            return Task.CompletedTask;
-        }
-
-        var payload = e.ApplicationMessage.ConvertPayloadToString();
-        if (HaDiscovery.TryParseMode(payload, out var mode))
-        {
-            _mode.Set(mode, "Home Assistant");
-        }
-        else
-        {
-            _logger.LogWarning("Ignoring unknown charge mode command '{Payload}'.", payload);
-        }
-
-        // Reflect the current mode back immediately so the HA select settles.
-        _ = PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
         return Task.CompletedTask;
+    }
+
+    // A press writes the charger's use-mode and only then selects the strategy, so a mode that could
+    // not be started is not reported as running. There is no state topic to echo to: a button has none,
+    // and what the dashboard shows next is the Charge mode sensor on the next status publish.
+    private async Task OnStartAsync(ChargeControlMode mode, string? payload)
+    {
+        if (!HaDiscovery.IsPress(payload))
+        {
+            _logger.LogWarning("Ignoring '{Payload}' on the {Mode} start topic.", payload, mode);
+            return;
+        }
+
+        var result = await _actions.StartAsync(mode, "Home Assistant").ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning("Starting {Mode} from Home Assistant failed: {Message}", mode, result.Message);
+            return;
+        }
+
+        // Straight away rather than at the next StatusInterval: the sensor is the only feedback a
+        // press gets, and a dashboard that shows nothing for 30 seconds reads as a button that did
+        // nothing.
+        await PublishStatusAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task OnChargeOffAsync(string? payload)
+    {
+        if (!HaDiscovery.IsPress(payload))
+        {
+            _logger.LogWarning("Ignoring '{Payload}' on the charge-off topic.", payload);
+            return;
+        }
+
+        var result = await _actions.StopAsync("Home Assistant").ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning("Stopping charging from Home Assistant: {Message}", result.Message);
+        }
+
+        await PublishStatusAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
     // The one command with no echo and no state topic: a button has no state, and by the time Home
@@ -379,19 +429,19 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     // The two halves become a request here, in the same order the web page applies them: the request
     // first, then the mode, so the controller never sees a cycle of Targeted with nothing to aim at.
-    private Task OnActivateTargetAsync(string? payload)
+    private async Task OnActivateTargetAsync(string? payload)
     {
         if (!HaDiscovery.IsPress(payload))
         {
             _logger.LogWarning("Ignoring '{Payload}' on the activate-target topic.", payload);
-            return Task.CompletedTask;
+            return;
         }
 
         if (_pendingEnergyKWh <= 0 || _pendingDeparture is not { } departure)
         {
             _logger.LogWarning(
                 "Activate target pressed with nothing to activate: set both Target energy and Departure time first.");
-            return Task.CompletedTask;
+            return;
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -400,13 +450,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             _logger.LogWarning(
                 "Activate target pressed with a departure already past ({Departure}); set it again.",
                 departure.LocalDateTime);
-            return Task.CompletedTask;
+            return;
         }
 
         _target.Set(new TargetedChargeRequest(_pendingEnergyKWh * 1000, departure, now), "Home Assistant");
-        _mode.Set(Core.Enums.ChargeControlMode.Targeted, "Home Assistant");
-
-        return PublishAsync(_discovery.ModeStateTopic, _discovery.ModeState(_mode.Mode), retain: true, CancellationToken.None);
+        await OnStartAsync(ChargeControlMode.Targeted, payload).ConfigureAwait(false);
     }
 
     private async Task PublishAsync(string topic, string payload, bool retain, CancellationToken cancellationToken)

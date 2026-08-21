@@ -170,6 +170,11 @@ public class ChargingControlCoordinatorTests
 
             _settings = _settings with { ChargeCurrentAmps = targetAmps };
         }
+
+        // The coordinator never calls this -- the use-mode belongs to the actions, not the poll loop --
+        // so a charger double built for the coordinator's tests has nothing to say about it.
+        public Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("The control loop must not write the charger's use-mode.");
     }
 
     [Fact]

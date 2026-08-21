@@ -19,6 +19,7 @@ public class DashboardPageTests : BunitContext
     private readonly ChargeControlStatusHolder _holder = new();
     private readonly FixedTimeProvider _time = new(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), Prague);
     private readonly FakeChargeControlModeSelector _mode = new();
+    private readonly FakeChargeActions _actions;
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
 
@@ -29,9 +30,12 @@ public class DashboardPageTests : BunitContext
 
     public DashboardPageTests()
     {
+        _actions = new FakeChargeActions(_mode);
+
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IChargeControlModeSelector>(_mode);
+        Services.AddSingleton<IChargeActions>(_actions);
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
@@ -219,43 +223,111 @@ public class DashboardPageTests : BunitContext
     }
 
     [Fact]
-    public void Shows_the_charge_mode_select_with_the_current_mode_chosen()
+    public void Offers_no_charge_mode_select_at_all()
+    {
+        // #89: the mode is what a button did, not a setting to pick.
+        var page = Render<Dashboard>();
+
+        Assert.Empty(page.FindAll("select#mode"));
+        Assert.Empty(page.FindAll("select"));
+    }
+
+    [Fact]
+    public void Reports_the_current_mode_as_a_read_only_line()
     {
         _mode.Set(ChargeControlMode.Forecasted, "test setup");
 
         var page = Render<Dashboard>();
 
-        var select = page.Find("#mode");
-        Assert.Equal("Forecasted", select.GetAttribute("value"));
-
-        var options = select.Children.Select(o => o.GetAttribute("value")).ToList();
-        Assert.Equal(["Off", "Solar", "Forecasted", "FastNoBattery", "Targeted"], options);
+        Assert.Equal("Forecasted", page.Find("#mode-state .mode").TextContent);
     }
 
-    [Fact]
-    public void Selecting_a_mode_drives_the_selector_with_the_web_ui_as_source()
+    [Theory]
+    [InlineData("#start-solar", ChargeControlMode.Solar)]
+    [InlineData("#start-forecasted", ChargeControlMode.Forecasted)]
+    [InlineData("#start-fast-no-battery", ChargeControlMode.FastNoBattery)]
+    public void Each_button_starts_its_own_strategy_with_the_web_ui_as_source(string selector, ChargeControlMode expected)
     {
         var page = Render<Dashboard>();
 
-        page.Find("#mode").Change("Solar");
+        page.Find(selector).Click();
 
-        Assert.Equal(ChargeControlMode.Solar, _mode.Mode);
-        Assert.Contains(_mode.Sets, s => s.Mode == ChargeControlMode.Solar && s.Source == "Web UI");
+        Assert.Contains(_actions.Starts, s => s.Mode == expected && s.Source == "Web UI");
+        Assert.Equal(expected, _mode.Mode);
+    }
+
+    [Fact]
+    public void There_is_no_button_for_targeted_here()
+    {
+        // It needs an amount and a departure, so its press lives on /targeted where those are typed.
+        var page = Render<Dashboard>();
+
+        Assert.Empty(page.FindAll("#start-targeted"));
+    }
+
+    [Fact]
+    public void The_off_button_stops_charging_whatever_was_running()
+    {
+        _mode.Set(ChargeControlMode.FastNoBattery, "test setup");
+        var page = Render<Dashboard>();
+
+        page.Find("#charge-off").Click();
+
+        Assert.Contains("Web UI", _actions.Stops);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public void A_charger_that_refuses_the_use_mode_write_says_so_and_leaves_the_mode_alone()
+    {
+        _actions.Failure = "The charger did not accept Fast — it is still in Green.";
+        var page = Render<Dashboard>();
+
+        page.Find("#start-solar").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("did not accept Fast", page.Find("p.error").TextContent));
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public void Says_when_and_from_where_the_running_mode_was_started()
+    {
+        var page = Render<Dashboard>();
+
+        page.Find("#start-solar").Click();
+
+        // 10:00 UTC is noon in Prague, which is the clock this page formats in.
+        page.WaitForAssertion(() =>
+            Assert.Contains("started from the Web UI at 12:00", page.Find("#mode-state").TextContent));
     }
 
     [Fact]
     public void Reflects_a_mode_changing_underneath_it()
     {
         // FastNoBattery switches itself off when the car finishes -- the polling loop calls Set,
-        // not this page, and the select still has to catch up.
+        // not this page, and the line still has to catch up.
         var page = Render<Dashboard>();
 
         _mode.Set(ChargeControlMode.FastNoBattery, "the polling loop");
-        page.WaitForAssertion(() => Assert.Equal("FastNoBattery", page.Find("#mode").GetAttribute("value")));
+        page.WaitForAssertion(() => Assert.Equal("FastNoBattery", page.Find("#mode-state .mode").TextContent));
 
         _mode.Set(ChargeControlMode.Off, "the polling loop (charging finished)");
 
-        page.WaitForAssertion(() => Assert.Equal("Off", page.Find("#mode").GetAttribute("value")));
+        page.WaitForAssertion(() => Assert.Equal("Off", page.Find("#mode-state .mode").TextContent));
+    }
+
+    [Fact]
+    public void A_mode_that_ends_itself_takes_this_pages_note_with_it()
+    {
+        // "started from the Web UI at 12:00" is true of the action that set it, and of nothing else.
+        var page = Render<Dashboard>();
+        page.Find("#start-fast-no-battery").Click();
+        page.WaitForAssertion(() => Assert.Contains("started from the Web UI", page.Find("#mode-state").TextContent));
+
+        _mode.Set(ChargeControlMode.Off, "the polling loop (charging finished)");
+
+        page.WaitForAssertion(() =>
+            Assert.DoesNotContain("started from the Web UI", page.Find("#mode-state").TextContent));
     }
 
     [Fact]

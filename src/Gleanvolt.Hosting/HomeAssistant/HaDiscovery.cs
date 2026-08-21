@@ -7,7 +7,7 @@ namespace Gleanvolt.Hosting.HomeAssistant;
 
 /// <summary>
 /// Builds the MQTT topics and payloads for the Home Assistant integration: the retained discovery
-/// configs that make HA auto-create the entities, the JSON state payload, and the charge-mode state.
+/// configs that make HA auto-create the entities and the JSON state payload the sensors read from.
 /// Pure — no I/O — so it can be unit-tested.
 /// </summary>
 public sealed class HaDiscovery
@@ -40,8 +40,6 @@ public sealed class HaDiscovery
 
     public string AvailabilityTopic => $"{_options.BaseTopic}/{_options.DeviceId}/availability";
     public string StateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/state";
-    public string ModeCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/set";
-    public string ModeStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/charge_mode/state";
     public string BatteryHoldCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/set";
     public string BatteryHoldStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/state";
     public string StopServiceCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/stop_service/set";
@@ -60,6 +58,28 @@ public sealed class HaDiscovery
     public const string TargetDepartureText = "target_departure";
 
     public static readonly IReadOnlyList<string> TextObjectIds = [TargetDepartureText];
+
+    /// <summary>
+    /// The strategy buttons, in the order they are published: object id -> the mode each one starts.
+    /// <c>Targeted</c> is deliberately absent — it needs an amount and a departure, so its action stays
+    /// on <see cref="ActivateTargetCommandTopic"/>, next to the entities that carry them.
+    /// </summary>
+    public static readonly IReadOnlyList<(string ObjectId, ChargeControlMode Mode, string Name, string Icon)> StartButtons =
+    [
+        ("start_solar", ChargeControlMode.Solar, "Charge solar", "mdi:solar-power"),
+        ("start_forecasted", ChargeControlMode.Forecasted, "Charge forecasted", "mdi:weather-partly-cloudy"),
+        ("start_fast_no_battery", ChargeControlMode.FastNoBattery, "Charge fast", "mdi:lightning-bolt"),
+    ];
+
+    /// <summary>
+    /// The off button. Deliberately not <c>stop_service</c>, which stays what it is: the one-way "take
+    /// the controller off the air" button in the config panel. This one only stops the car.
+    /// </summary>
+    public const string ChargeOffButton = "charge_off";
+
+    public string ButtonCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
+
+    public string ChargeOffCommandTopic => ButtonCommandTopic(ChargeOffButton);
 
     public string NumberCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
     public string NumberStateTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/state";
@@ -99,20 +119,16 @@ public sealed class HaDiscovery
     private static string Optional(string key) => $"{{{{ value_json.{key} | default('{PayloadNone}') }}}}";
 
     /// <summary>
-    /// What Home Assistant sends when an MQTT button is pressed. Matched exactly, and nothing else is
-    /// accepted: this is the one command that cannot be undone from Home Assistant — once the service
-    /// is down it publishes nothing and listens to nothing — so a stray retained payload or a
-    /// hand-typed message on the topic must not be able to take the controller off the air.
+    /// What Home Assistant sends when an MQTT button is pressed. Matched exactly on every button topic,
+    /// and nothing else is accepted. The rule was written for <c>stop_service</c>, which cannot be
+    /// undone from Home Assistant — once the service is down it publishes nothing and listens to
+    /// nothing — and it holds for the rest: a stray retained payload or a hand-typed message must not
+    /// be able to start the car charging either.
     /// </summary>
     public const string PayloadPress = "PRESS";
 
     public static bool IsPress(string? payload) =>
         string.Equals(payload, PayloadPress, StringComparison.Ordinal);
-
-    public string ModeState(ChargeControlMode mode) => mode.ToString();
-
-    public static bool TryParseMode(string? payload, out ChargeControlMode mode) =>
-        Enum.TryParse(payload, ignoreCase: true, out mode);
 
     public static string SwitchState(bool on) => on ? PayloadOn : PayloadOff;
 
@@ -130,6 +146,11 @@ public sealed class HaDiscovery
     {
         yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/charge_control/config";
 
+        // The charge-mode select (issue #89). A mode is no longer something to pick: it is what a
+        // button did, reported by the charge_mode sensor below. Retiring the config topic is what makes
+        // Home Assistant delete the entity on its own, so nobody has to go and remove it by hand.
+        yield return $"{_options.DiscoveryPrefix}/select/{_options.DeviceId}/charge_mode/config";
+
         // Also retire the battery-hold entities while the feature is off, so turning it off actually
         // removes the switch from HA rather than leaving a retained config behind that does nothing.
         if (!_batteryHoldEnabled)
@@ -142,15 +163,20 @@ public sealed class HaDiscovery
     /// <summary>The retained discovery configs. Publish each on connect so HA (re)creates the entities.</summary>
     public IEnumerable<(string Topic, string Payload)> DiscoveryMessages()
     {
-        yield return Config("select", "charge_mode", new Dictionary<string, object?>
+        // One button per strategy, plus Off (issue #89). Charging is started by an action and by
+        // nothing else: each of these writes the charger's use-mode Fast and then selects its mode, so
+        // a press does something on a charger sitting in Green rather than waiting for the wallbox to
+        // have been set by hand.
+        foreach (var (objectId, _, name, icon) in StartButtons)
         {
-            ["name"] = "Charge mode",
-            ["command_topic"] = ModeCommandTopic,
-            ["state_topic"] = ModeStateTopic,
-            ["options"] = Enum.GetNames<ChargeControlMode>(),
-            ["icon"] = "mdi:ev-station",
-        });
+            yield return Button(objectId, name, icon);
+        }
 
+        yield return Button(ChargeOffButton, "Charge off", "mdi:stop-circle-outline");
+
+        // The mode survives as state, read-only: the same string the select used to hold, from the same
+        // field of the same payload.
+        yield return Sensor("charge_mode", "Charge mode", template: "{{ value_json.mode }}", icon: "mdi:ev-station");
         yield return Sensor("control_state", "Control state", template: "{{ value_json.state }}", icon: "mdi:state-machine");
         yield return Sensor("charger_status", "Charger status", template: "{{ value_json.charger_status }}", icon: "mdi:ev-station");
         yield return Sensor("solar_power", "Solar power", template: "{{ value_json.solar_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
@@ -213,10 +239,10 @@ public sealed class HaDiscovery
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
         yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
 
-        // Targeted charging (issue #80). The mode itself needs no entity -- the select above picks it
-        // up from Enum.GetNames -- but the request does: an amount, a time, and a press to apply both.
-        // Published unconditionally, like the forecast entities, because the mode is selectable at any
-        // moment and the controls have to exist before it is picked.
+        // Targeted charging (issue #80). The mode needs no button of its own in the row above -- it
+        // needs an amount, a time, and a press to apply both, which is what these three are. Published
+        // unconditionally, like the forecast entities, because the mode can be started at any moment
+        // and the controls have to exist before it is.
         yield return Number(TargetEnergyNumber, "Target energy", min: 0, max: 100, step: 0.5, unit: "kWh", icon: "mdi:battery-clock");
 
         // A text entity rather than a datetime one: MQTT discovery has no datetime platform. "07:00"
@@ -228,15 +254,10 @@ public sealed class HaDiscovery
             pattern: @"^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
             icon: "mdi:clock-outline");
 
-        // Pressing this is what makes the two above real: it sets the request and selects the mode, the
-        // same order and the same seam the web page uses.
-        yield return Config("button", "activate_target", new Dictionary<string, object?>
-        {
-            ["name"] = "Activate target",
-            ["command_topic"] = ActivateTargetCommandTopic,
-            ["payload_press"] = PayloadPress,
-            ["icon"] = "mdi:play-circle-outline",
-        });
+        // Pressing this is what makes the two above real: it sets the request and then starts the mode,
+        // the same order and the same seam the web page uses. The object id is unchanged from #80 on
+        // purpose -- existing dashboards and automations keep working across this upgrade.
+        yield return Button("activate_target", "Activate target", "mdi:play-circle-outline");
 
         yield return Sensor("target_plan_state", "Target plan state", template: Optional("target_reason"), icon: "mdi:text-box-outline");
         yield return Sensor("target_solar", "Target solar energy", template: Optional("target_solar_kwh"), unit: "kWh", deviceClass: "energy");
@@ -398,6 +419,17 @@ public sealed class HaDiscovery
 
     private static DateTimeOffset Compose(DateTime local, TimeZoneInfo zone) =>
         new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone.GetUtcOffset(local));
+
+    // A press and nothing else: an MQTT button has no state topic, so what a dashboard shows after a
+    // press is whatever the entities it acted on report next.
+    private (string Topic, string Payload) Button(string objectId, string name, string icon) =>
+        Config("button", objectId, new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["command_topic"] = ButtonCommandTopic(objectId),
+            ["payload_press"] = PayloadPress,
+            ["icon"] = icon,
+        });
 
     // A free-text control. Home Assistant has no datetime platform over MQTT discovery, so the
     // departure arrives as text and is parsed here; the pattern only keeps the obvious typos out of

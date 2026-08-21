@@ -4,6 +4,7 @@
 @implements IDisposable
 @inject ChargeControlStatusHolder StatusHolder
 @inject IChargeControlModeSelector Mode
+@inject IChargeActions Actions
 @inject ITargetedChargeSelector Target
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
@@ -12,8 +13,13 @@
     Phase 3 of #80: the surface the owner actually uses. Text, not a chart -- the timeline chart is
     its own story and will consume TargetedChargePlan.Blocks unchanged.
 
-    Activate sets the request on ITargetedChargeSelector and then selects the mode, which is the same
-    Core seam Home Assistant drives, so the two surfaces cannot disagree about what was asked for.
+    Activate sets the request on ITargetedChargeSelector and then starts the mode through
+    IChargeActions -- which puts the charger into Fast first (#89) -- and Cancel is the same Off action
+    the dashboard's button is. Both are the Core seams Home Assistant drives, so the two surfaces
+    cannot disagree about what was asked for.
+
+    This page keeps its own Activate button rather than gaining one in the dashboard's row: the mode
+    needs an amount and a departure, and the press belongs where those are typed.
 
     Follows Forecast.razor: seeded from ChargeControlStatusHolder.Current, then pushed on every
     Updated, and it subscribes to both selectors as well because either can move without this page's
@@ -49,8 +55,8 @@
     </div>
 
     <div class="control">
-        <button type="button" class="primary" @onclick="Activate">Activate</button>
-        <button type="button" class="secondary" @onclick="Cancel">Cancel</button>
+        <button type="button" class="primary" disabled="@_busy" @onclick="Activate">Activate</button>
+        <button type="button" class="secondary" disabled="@_busy" @onclick="Cancel">Cancel</button>
     </div>
 
     @if (_error is not null)
@@ -115,6 +121,7 @@ else
     private double _energyKWh = 20;
     private DateTime _departure;
     private string? _error;
+    private bool _busy;
 
     protected override void OnInitialized()
     {
@@ -165,7 +172,7 @@ else
         _departure = localNow.Date.AddDays(1).AddHours(7);
     }
 
-    private void Activate()
+    private async Task Activate()
     {
         var now = Time.GetUtcNow();
         var departBy = Compose(_departure);
@@ -190,21 +197,50 @@ else
         }
 
         _error = null;
+        _busy = true;
 
-        // The request first, then the mode: the controller reads both in the same cycle, and a mode
-        // selected a poll before its request would report "no target set" for that poll.
-        Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
-        Mode.Set(ChargeControlMode.Targeted, "Web UI");
+        try
+        {
+            // The request first, then the mode: the controller reads both in the same cycle, and a mode
+            // selected a poll before its request would report "no target set" for that poll.
+            Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
+
+            // Which also writes the charger's use-mode Fast. A charger that refuses it leaves the mode
+            // where it was, and the request set above with nothing driving it -- so the request is
+            // dropped again rather than left looking active.
+            var result = await Actions.StartAsync(ChargeControlMode.Targeted, "Web UI");
+            if (!result.Succeeded)
+            {
+                Target.Clear("Web UI");
+                _error = result.Message;
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
-    private void Cancel()
+    // The same Off action the dashboard's button is, and it runs whatever the mode was: the button says
+    // stop charging, so it stops charging.
+    private async Task Cancel()
     {
         _error = null;
-        Target.Clear("Web UI");
+        _busy = true;
 
-        if (Mode.Mode == ChargeControlMode.Targeted)
+        try
         {
-            Mode.Set(ChargeControlMode.Off, "Web UI");
+            Target.Clear("Web UI");
+
+            var result = await Actions.StopAsync("Web UI");
+            if (!result.Succeeded)
+            {
+                _error = result.Message;
+            }
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 

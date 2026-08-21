@@ -11,9 +11,11 @@ public sealed class ChargeControlOptions
     public const string SectionName = "ChargeControl";
 
     /// <summary>
-    /// When true, the control loop runs and logs exactly what it would write (mode and the encoded
-    /// current-register value) but performs no Modbus writes. Use it to validate the setpoints against
-    /// your charger before letting it write for real.
+    /// When true, nothing is written to the charger at all: the control loop logs the current setpoint
+    /// it would have written (with the encoded register value), and a start/stop action logs the
+    /// use-mode it would have written the same way. Simulated values then stand in for the hardware, so
+    /// reads agree with the writes and a dry run behaves like a real one. Use it to validate both
+    /// against your charger before letting it write for real.
     ///
     /// <para>Note there is deliberately no boot-mode setting here: the service always starts in
     /// <see cref="Gleanvolt.Core.Enums.ChargeControlMode.Off"/> and takes control only when asked, so a
@@ -46,9 +48,10 @@ public sealed class ChargeControlOptions
     public int CurrentStepAmps { get; init; } = 1;
 
     /// <summary>
-    /// The current setpoint written to pause charging (the controller only changes the current, never
-    /// the use-mode). 0 A suspends the car like Green mode does — but the SolaX docs list a 6–32 A
-    /// range, so if your charger doesn't accept 0, set a sub-6 A value the car refuses instead.
+    /// The current setpoint written to pause charging — a pause the <em>control loop</em> makes, which
+    /// is not the same thing as the Off button (that writes the use-mode Stop and leaves the setpoint
+    /// alone). 0 A suspends the car like Green mode does — but the SolaX docs list a 6–32 A range, so
+    /// if your charger doesn't accept 0, set a sub-6 A value the car refuses instead.
     /// </summary>
     public int PauseCurrentAmps { get; init; }
 

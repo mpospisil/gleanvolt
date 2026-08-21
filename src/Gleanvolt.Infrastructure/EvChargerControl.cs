@@ -9,11 +9,12 @@ namespace Gleanvolt.Infrastructure;
 
 /// <summary>
 /// <see cref="IEvChargerControl"/> over Modbus. Reads the charger's use-mode and current setpoint, and
-/// writes <em>only</em> the current setpoint — never the use-mode, never a start/stop command.
+/// writes both: the current setpoint on every control cycle that calls for one, and the use-mode only
+/// when an action starts or stops charging.
 ///
 /// In dry-run mode nothing is written: the intended change is logged (including the encoded register
-/// value) and a simulated current stands in for the hardware, so the logs read like a real run (change
-/// once, then quiet) without touching the charger.
+/// value) and simulated values stand in for the hardware, so the logs read like a real run (change
+/// once, then quiet) and a read after a write reports what was "written" — without touching the charger.
 /// </summary>
 public sealed class EvChargerControl : IEvChargerControl
 {
@@ -26,9 +27,12 @@ public sealed class EvChargerControl : IEvChargerControl
     private readonly bool _dryRun;
     private readonly int _currentChangeThresholdAmps;
 
-    // Dry-run only: the current setpoint the charger "would" now have, so reads reflect prior simulated
-    // writes and change-detection behaves like a real run.
+    // Dry-run only: the settings the charger "would" now have, so reads reflect prior simulated writes
+    // and change-detection behaves like a real run. The use-mode joined the current here when actions
+    // began writing it: a dry run in which the mode never becomes Fast would report every controller
+    // idle, which says nothing about the setpoints the run exists to check.
     private int? _simulatedCurrentAmps;
+    private EvChargerMode? _simulatedUseMode;
 
     public EvChargerControl(
         [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient client,
@@ -46,10 +50,19 @@ public sealed class EvChargerControl : IEvChargerControl
     {
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
 
-        var mode = await ReadRegisterAsync(EvChargerRegisterMap.ChargerUseMode, cancellationToken).ConfigureAwait(false);
+        // Both readings follow the same rule: in dry-run a value we have "written" stands in for the
+        // hardware; otherwise the register is read live and decoded.
+        EvChargerMode useMode;
+        if (_dryRun && _simulatedUseMode is EvChargerMode simulatedMode)
+        {
+            useMode = simulatedMode;
+        }
+        else
+        {
+            var raw = await ReadRegisterAsync(EvChargerRegisterMap.ChargerUseMode, cancellationToken).ConfigureAwait(false);
+            useMode = (EvChargerMode)raw;
+        }
 
-        // The use-mode is always read live (we never write it); the current is the simulated value in
-        // dry-run once we've "written" one, else read live and decoded from the 0.01A scale.
         int currentAmps;
         if (_dryRun && _simulatedCurrentAmps is int simulated)
         {
@@ -61,7 +74,7 @@ public sealed class EvChargerControl : IEvChargerControl
             currentAmps = (int)Math.Round(currentRaw * CurrentRegisterAmpsPerCount);
         }
 
-        return new EvChargerSettings((EvChargerMode)mode, currentAmps);
+        return new EvChargerSettings(useMode, currentAmps);
     }
 
     public async Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
@@ -91,6 +104,29 @@ public sealed class EvChargerControl : IEvChargerControl
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
         await _client
             .WriteSingleRegisterAsync(EvChargerRegisterMap.ChargeCurrentSetpoint.Address, registerValue, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default)
+    {
+        // The enum's numeric values are the register's: 0=Stop, 1=Fast, 2=Eco, 3=Green. Written raw,
+        // with no scaling -- unlike the current setpoint, which is hundredths of an amp.
+        var registerValue = (ushort)mode;
+        var prefix = _dryRun ? "[DRY RUN] would set " : "";
+
+        _logger.LogInformation(
+            "{Prefix}charger use-mode: {Mode} (register {RegisterValue}). {Reason}",
+            prefix, mode, registerValue, reason);
+
+        if (_dryRun)
+        {
+            _simulatedUseMode = mode;
+            return;
+        }
+
+        await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
+        await _client
+            .WriteSingleRegisterAsync(EvChargerRegisterMap.ChargerUseMode.Address, registerValue, cancellationToken)
             .ConfigureAwait(false);
     }
 

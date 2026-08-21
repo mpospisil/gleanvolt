@@ -23,13 +23,17 @@ public class TargetedPageTests : BunitContext
     private readonly ChargeControlStatusHolder _holder = new();
     private readonly FixedTimeProvider _time = new(Now, Prague);
     private readonly FakeChargeControlModeSelector _mode = new();
+    private readonly FakeChargeActions _actions;
     private readonly FakeTargetedChargeSelector _target = new();
 
     public TargetedPageTests()
     {
+        _actions = new FakeChargeActions(_mode);
+
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<Core.Interfaces.IChargeControlModeSelector>(_mode);
+        Services.AddSingleton<Core.Interfaces.IChargeActions>(_actions);
         Services.AddSingleton<Core.Interfaces.ITargetedChargeSelector>(_target);
         Services.AddSingleton(new TargetedDisplayOptions(TimeSpan.FromHours(36)));
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -55,7 +59,7 @@ public class TargetedPageTests : BunitContext
     }
 
     [Fact]
-    public void Activating_sets_the_request_and_then_selects_the_mode()
+    public void Activating_sets_the_request_and_then_starts_the_mode()
     {
         var page = Render<Targeted>();
 
@@ -70,11 +74,27 @@ public class TargetedPageTests : BunitContext
         // 07:00 Prague on 11 August is 05:00 UTC -- composed through the app's zone, never the
         // server's, so a build agent in another zone cannot make this pass by accident.
         Assert.Equal(new DateTimeOffset(2026, 8, 11, 5, 0, 0, TimeSpan.Zero), request.DepartBy);
+
+        // Through the action, not the selector: the charger is put into Fast before the mode moves.
+        Assert.Contains(_actions.Starts, s => s.Mode == ChargeControlMode.Targeted && s.Source == "Web UI");
         Assert.Equal(ChargeControlMode.Targeted, _mode.Mode);
     }
 
     [Fact]
-    public void Cancelling_clears_the_request_and_returns_the_mode_to_off()
+    public void A_charger_that_refuses_fast_leaves_no_request_looking_active()
+    {
+        _actions.Failure = "The charger did not accept Fast — it is still in Green.";
+        var page = Render<Targeted>();
+
+        Activate(page);
+
+        page.WaitForAssertion(() => Assert.Contains("did not accept Fast", page.Find("p.error").TextContent));
+        Assert.Null(_target.Request);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public void Cancelling_clears_the_request_and_stops_the_charger()
     {
         _target.Set(new TargetedChargeRequest(22_000, Now.AddHours(9), Now), "test");
         _mode.Set(ChargeControlMode.Targeted, "test");
@@ -84,6 +104,20 @@ public class TargetedPageTests : BunitContext
 
         Assert.NotEmpty(_target.Clears);
         Assert.Null(_target.Request);
+        Assert.Contains("Web UI", _actions.Stops);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public void Cancelling_stops_the_charger_even_when_another_mode_was_running()
+    {
+        // Cancel is the Off action now, not "undo Targeted": the button says stop, so it stops.
+        _mode.Set(ChargeControlMode.Solar, "test");
+        var page = Render<Targeted>();
+
+        page.Find("button:not(.primary)").Click();
+
+        Assert.Contains("Web UI", _actions.Stops);
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
     }
 

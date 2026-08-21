@@ -70,6 +70,35 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task AFinishedCarStopsTheChargerTheWayTheOffButtonWould()
+    {
+        // #89: a mode that switches itself off must leave the charger exactly where Off leaves it --
+        // stopped, not sitting in Fast at the pause current, which is a different end state.
+        await RunAsync(Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4)));
+
+        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Contains("charging finished", Assert.Single(_charger.ModeWrites).Reason);
+    }
+
+    [Fact]
+    public async Task TheChargerIsStoppedBeforeTheHoldIsReleased_InTheOneCycle()
+    {
+        var modeWritesWhenTheHoldWasReleased = new List<int>();
+        _inverter.OnApply = hold =>
+        {
+            if (!hold)
+            {
+                modeWritesWhenTheHoldWasReleased.Add(_charger.ModeWrites.Count);
+            }
+        };
+
+        await RunAsync(Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4)));
+
+        // The release that matters is the last one: by then the charger has been stopped.
+        Assert.Equal(1, modeWritesWhenTheHoldWasReleased[^1]);
+    }
+
+    [Fact]
     public async Task TheHoldTheOwnerAskedForSurvivesTheModeEnding()
     {
         _manualHold.Set(true, "test");
@@ -158,6 +187,9 @@ public class FastNoBatteryModeTests
             dayPlan,
             TargetedCharge.Provider(forecast, dayPlan, power, chargeControl, forecastOptions),
             _mode,
+            // The real actions over the fake charger: a mode that ends itself has to stop the charger
+            // exactly as the Off button does, and that is the code path it goes through.
+            new ChargeActions(_charger, _mode, NullLogger<ChargeActions>.Instance),
             _manualHold,
             _inverter,
             _status,
@@ -218,9 +250,18 @@ internal sealed class FakeBatteryDischargeControl : IBatteryDischargeControl
     /// <summary>The <c>hold</c> argument of every ApplyAsync call, in order.</summary>
     public List<bool> Applied { get; } = [];
 
+    /// <summary>
+    /// Run before each call is recorded, so a test can see what had already happened by the time the
+    /// inverter was written to. Ordering within a cycle is behaviour here, not an implementation
+    /// detail: the release has to reach the inverter after the charger has been stopped, in the one
+    /// cycle rather than a poll later.
+    /// </summary>
+    public Action<bool>? OnApply { get; set; }
+
     public Task<BatteryHoldState> ApplyAsync(
         bool hold, double activePowerTargetWatts, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
+        OnApply?.Invoke(hold);
         Applied.Add(hold);
         return Task.FromResult(new BatteryHoldState(hold, hold ? activePowerTargetWatts : null, hold ? now : null, Wrote: true));
     }

@@ -39,6 +39,15 @@
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
   </ItemGroup>
 
+  <!--
+    So the MQTT worker's command routing can be tested without standing up a broker: which button does
+    what, and what a payload that is not a press does, are behaviour worth a test, and the alternative
+    was making a BackgroundService's message handler public.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Hosting.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
     <ProjectReference Include="..\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />

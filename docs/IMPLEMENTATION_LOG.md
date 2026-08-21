@@ -4,6 +4,88 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-21 — Charging starts from a button, and the controller writes the charger's use-mode
+
+Issue #89. Controlled charging had been a *setting* since the first version: pick a strategy from a
+select, then hope the world agrees — car plugged in, charger left in Fast by hand. A mode selected
+over a charger sitting in Green did nothing at all and reported it only as `Control state: Idle`. Every
+kind of controlled charging is now started by an action and by nothing else.
+
+### What was built
+
+- **`IChargeActions` / `ChargeActions`** (Core interface, Hosting implementation — the
+  `IChargeControlModeSelector` shape, because `Gleanvolt.Web` sees only Core). `StartAsync(mode,
+  source)` writes `ChargerUseMode = Fast` and *then* selects the mode; `StopAsync(source)` writes
+  `Stop` and returns the mode to `Off`. `ChargeActionResult` carries success plus a sentence, because
+  for the first time a control surface can fail.
+- **`IEvChargerControl.SetModeAsync`** + its implementation against `EvChargerRegisterMap.ChargerUseMode`
+  (`0x60D`), written raw — the enum's values *are* the register's — with dry-run logging the encoded
+  value like `SetCurrentAsync` does, and a simulated use-mode so dry-run reads agree with dry-run
+  writes.
+- **Home Assistant**: five buttons (`start_solar`, `start_forecasted`, `start_fast_no_battery`,
+  `activate_target` — kept, so existing dashboards don't break — and `charge_off`), a read-only
+  `charge_mode` sensor off the same `value_json.mode` the select used to hold, and the select's config
+  topic added to `RetiredDiscoveryTopics` so HA deletes the entity on its own.
+- **Web UI**: the dashboard's select became a button row plus a state line; `/targeted`'s `Activate`
+  and `Cancel` go through the same seam, and a refused use-mode write lands in the existing `_error`
+  slot.
+- The reversal itself is written down in [DECISIONS.md](DECISIONS.md), because four class summaries and
+  three README claims asserted the old promise in as many words.
+
+### The decisions worth writing down
+
+**`Fast` is written once and never re-asserted.** The alternative — writing it every cycle the mode is
+selected — would make a charger changed at the wallbox unusable while any mode was running, and would
+turn one write into one per poll on a register nobody in this project had ever written before. The
+`if (use-mode != Fast) → Idle` precondition in all four controllers is what makes that safe, and it is
+unchanged.
+
+**The self-off paths go through `StopAsync`, not `_mode.Set(Off)`.** This is the part that would have
+been missed. `FastNoBattery` and `Targeted` end themselves after writing the pause current; without
+the `Stop`, a mode that switched itself off would leave the charger sitting in Fast at 0 A — which a
+car is free to start drawing from again the moment anything touches the setpoint, and which is a
+different end state from the one the button produces. One code path, two callers, and a test that
+pins the ordering: charger stopped, *then* hold released, in the one cycle.
+
+**A failed stop still releases control; a failed start does not take it.** The asymmetry is
+deliberate and argued in DECISIONS.md. The short version: "nothing happened" is an acceptable outcome
+for a start, and an unacceptable one for a stop.
+
+**The MQTT worker's command routing became internal rather than public.** `HandleCommandAsync(topic,
+payload)` with `InternalsVisibleTo` — the alternative was a public message handler on a
+`BackgroundService`, and the behaviour (which topic does what, and that only an exact `PRESS` counts)
+is worth a test. The worker's tests run with no broker at all: `_client` is null, so every publish
+inside a handler is a no-op and only the seam calls are visible.
+
+**The dashboard's "(started from the Web UI at 13:42)" is the page's own note, not new state.**
+`IChargeControlModeSelector` is untouched — it is still what the controllers, the status holder, the
+session tracker and the MQTT payload read — so the note lives in the component and is cleared by
+`Mode.Changed`. A mode that has moved on since is not the action that set it.
+
+### Verification
+
+- 289 Core, 178 Hosting, 131 Web and 97 Infrastructure tests pass. New: the use-mode encoding and its
+  dry-run behaviour, the action's ordering and both failure paths, the buttons and the retired select
+  in discovery, every command topic through the worker, the self-off path stopping the charger before
+  releasing the hold, and the dashboard and targeted pages against the new seam.
+- **Not verified on hardware.** `0x60D` has only ever been read by this project. The values
+  (`0=Stop, 1=Fast`) come from the wills106 register map, not from anything confirmed here by
+  writing. Per CONTRIBUTING, this wants a `ChargeControl:DryRun` run against the real charger with the
+  logged register values checked against the map before it goes near the Pi for real.
+
+### What to watch on the first live run
+
+1. **Does the charger actually enter Fast from Green?** The log line is `charger use-mode: Fast
+   (register 1)`, immediately followed within one poll by a `Control state` that is no longer `Idle`.
+2. **Does `Stop` actually stop the car**, rather than merely changing a register the charger ignores
+   while a session is live? If not, the Off button needs the pause write back after all.
+3. **Does a wallbox change mid-session behave?** Set the charger to Green by hand while a mode runs:
+   the controllers should go `Idle` and nothing should write `Fast` back.
+4. **The upgrade.** The old `select.charge_mode` should disappear from Home Assistant on its own the
+   first time the controller connects. If it doesn't, the retained config topic didn't clear.
+
+---
+
 ## 2026-08-20 — Targeted charging: an amount of energy, a departure, and as little grid as possible
 
 Issue #80, in the four phases it was cut into (#81–#84). The mode answers the one question none of the

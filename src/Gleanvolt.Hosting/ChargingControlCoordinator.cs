@@ -8,9 +8,10 @@ namespace Gleanvolt.Hosting;
 /// <summary>
 /// Orchestrates one charge-control cycle: reads the charger's settings, asks the
 /// <see cref="IChargingController"/> selected by the current mode for the target current, and writes
-/// the current setpoint — nothing else. It never changes the charger's use-mode or starts/stops the
-/// session; the owner keeps the charger in Fast mode and this only modulates the current (or drops it
-/// to the pause value).
+/// the current setpoint — nothing else. The use-mode is not this loop's business: an action put the
+/// charger into Fast when the strategy was started (see <see cref="Core.Interfaces.IChargeActions"/>)
+/// and nothing re-asserts it, so all this does is modulate the current under it (or drop it to the
+/// pause value).
 ///
 /// Holds every piece of cross-cycle state the strategies need but must not own themselves — whether we
 /// are charging, how long we have been in that state, energy delivered this session, and energy lent

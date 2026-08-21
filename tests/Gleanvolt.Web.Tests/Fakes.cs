@@ -58,8 +58,8 @@ internal static class Statuses
 /// <summary>
 /// A minimal stand-in for <see cref="ChargeControlModeSelector"/> (which lives in Gleanvolt.Worker and
 /// so isn't reachable from here): records every <see cref="Set"/> call and raises
-/// <see cref="Changed"/> exactly like the real thing, which is what the dashboard's mode select
-/// depends on to notice a mode changing underneath it (e.g. FastNoBattery ending its own session).
+/// <see cref="Changed"/> exactly like the real thing, which is what the dashboard's mode line depends
+/// on to notice a mode changing underneath it (e.g. FastNoBattery ending its own session).
 /// </summary>
 internal sealed class FakeChargeControlModeSelector(ChargeControlMode initialMode = ChargeControlMode.Off)
     : IChargeControlModeSelector
@@ -81,6 +81,53 @@ internal sealed class FakeChargeControlModeSelector(ChargeControlMode initialMod
 
         Mode = mode;
         Changed?.Invoke(mode);
+    }
+}
+
+/// <summary>
+/// A stand-in for <c>ChargeActions</c> (which lives in the hosting assembly, and writes to a charger):
+/// records every press and moves the mode selector the way the real one does, so a page test sees the
+/// same state change a press really causes. Set <see cref="Failure"/> to make the charger refuse the
+/// use-mode write — a start then leaves the mode alone, exactly as the real action does.
+/// </summary>
+internal sealed class FakeChargeActions(FakeChargeControlModeSelector selector) : IChargeActions
+{
+    public List<(ChargeControlMode Mode, string Source)> Starts { get; } = [];
+
+    public List<string> Stops { get; } = [];
+
+    /// <summary>The message a failed use-mode write reports, or null while the charger answers.</summary>
+    public string? Failure { get; set; }
+
+    public Task<ChargeActionResult> StartAsync(
+        ChargeControlMode mode, string source, CancellationToken cancellationToken = default)
+    {
+        if (mode == ChargeControlMode.Off)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Off is not a strategy to start.");
+        }
+
+        Starts.Add((mode, source));
+
+        if (Failure is { } failure)
+        {
+            return Task.FromResult(ChargeActionResult.Failed(failure));
+        }
+
+        selector.Set(mode, source);
+        return Task.FromResult(ChargeActionResult.Success);
+    }
+
+    public Task<ChargeActionResult> StopAsync(string source, CancellationToken cancellationToken = default)
+    {
+        Stops.Add(source);
+
+        // Off is released whether or not the write landed, like the real action.
+        selector.Set(ChargeControlMode.Off, source);
+
+        return Task.FromResult(Failure is { } failure
+            ? ChargeActionResult.Failed(failure)
+            : ChargeActionResult.Success);
     }
 }
 
