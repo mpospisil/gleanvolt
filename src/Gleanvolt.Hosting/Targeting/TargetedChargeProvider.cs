@@ -105,7 +105,13 @@ public sealed class TargetedChargeProvider
             _delivered.EnergyWattHours,
             // The window the request actually spans, not "today": an overnight target reaches into
             // tomorrow's periods, and this is the call that returns them.
-            _forecast.GetForecast(state.Timestamp, request.DepartBy),
+            //
+            // Only while there is a window left, though. Past the departure the range runs backwards,
+            // and ForPeriod rejects that -- which on 2026-08-21 threw straight out of this method and
+            // took the whole poll cycle with it, so the controller never got to notice the departure
+            // had passed and the charger sat at 16A until somebody stopped it by hand. The planner
+            // handles an expired deadline perfectly well on its own; it just needs to be reached.
+            ForecastForWindow(state.Timestamp, request.DepartBy),
             NextBatteryFullBy(state.Timestamp),
             _dayPlan.HouseLoad,
             _dayPlan.BiasFactor,
@@ -114,6 +120,14 @@ public sealed class TargetedChargeProvider
         LogPlan(plan);
         return plan;
     }
+
+    /// <summary>
+    /// The forecast over what is left of the request's window, or null once nothing is left of it.
+    /// Null is a state the planner already understands -- it is what "no forecast fetched yet" looks
+    /// like -- and the plan it produces is the one that ends the mode.
+    /// </summary>
+    private SolarForecast? ForecastForWindow(DateTimeOffset now, DateTimeOffset departBy) =>
+        departBy > now ? _forecast.GetForecast(now, departBy) : null;
 
     private TargetedChargePlannerOptions PlannerOptions() => new(
         BatteryCapacityWh: _forecastOptions.BatteryCapacityKWh * 1000,
