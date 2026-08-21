@@ -139,9 +139,10 @@ public class TargetedChargePlannerTests
     }
 
     [Fact]
-    public void TheGridBlockSitsAsLateAsItPossiblyCan()
+    public void WithNoSunAnywhereInTheWindow_TheGridBlockStartsAtOnce()
     {
-        // Overnight: plugged in at 21:00 for an 07:00 departure, with no sun in the window at all.
+        // Overnight: plugged in at 21:00 for an 07:00 departure, with no sun in the window at all —
+        // today's bell curve is hours behind us.
         var now = new DateTimeOffset(2026, 7, 27, 21, 0, 0, TimeSpan.Zero);
         var departBy = new DateTimeOffset(2026, 7, 28, 7, 0, 0, TimeSpan.Zero);
         var plan = Plan(requiredWh: 22_000, departBy: departBy, now: now, forecast: Forecast(BellDay));
@@ -149,11 +150,12 @@ public class TargetedChargePlannerTests
         Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
         Assert.Equal(0, plan.SolarEnergyWh, 1);
 
-        // 22kWh at 11.04kW takes just under two hours, and it ends at the deadline — so it starts
-        // around 05:00, not at 21:00 when the car was plugged in.
-        var expectedStart = departBy - TimeSpan.FromHours(22_000 / MaxChargePowerWatts);
-        Assert.Equal(expectedStart, plan.GridStart!.Value);
-        Assert.False(plan.IsInGridBlock(now));
+        // Every slice ties at zero surplus, so the tie-break decides: 22kWh at 11.04kW takes just under
+        // two hours, and those two hours start now. Waiting until 05:00 would buy exactly the same
+        // energy, exposed to exactly as much sun — none — with eight hours less room to recover in.
+        Assert.Equal(now, plan.GridStart!.Value);
+        Assert.True(plan.IsInGridBlock(now));
+        Assert.Equal(now + TimeSpan.FromHours(22_000 / MaxChargePowerWatts), plan.Blocks.Max(b => b.End));
     }
 
     [Fact]
@@ -186,16 +188,50 @@ public class TargetedChargePlannerTests
     }
 
     [Fact]
-    public void TheGridBlockAlwaysEndsAtTheDeadline()
+    public void TheGridBlockGoesWhereTheForecastSurplusIsBiggest()
     {
+        // A bell day whose peak is the middle three half-hours. The car cannot charge from the 500W
+        // shoulders, so the whole 12kWh falls to the grid — and it is the plateau, not the tail of the
+        // window, that gets it: importing there is importing at 11.04kW while the roof supplies part of
+        // it, which is the entire reason the placement rule exists.
+        var now = FirstPeriodEnd.AddMinutes(-30);
+        var departBy = FirstPeriodEnd.AddHours(3);
+        var plan = Plan(
+            requiredWh: 12_000,
+            departBy: departBy,
+            now: now,
+            socPercent: 100,
+            forecast: Forecast(1000, 1000, 4000, 4000, 4000, 1000));
+
+        Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
+
+        // 3.5kW of surplus is under the charger's 4.14kW minimum, so none of it is a solar block.
+        Assert.Equal(0, plan.SolarEnergyWh, 1);
+        Assert.Equal(12_000, plan.GridEnergyWh, 1);
+
+        // The plateau runs 09:30-11:00 and the import starts at the top of it, not at 08:30 and not at
+        // the deadline.
+        Assert.Equal(FirstPeriodEnd.AddHours(0.5), plan.GridStart!.Value);
+        Assert.True(plan.IsInGridBlock(FirstPeriodEnd.AddHours(1)));
+        Assert.False(plan.IsInGridBlock(now));
+    }
+
+    [Fact]
+    public void AWindowThatIsSunnyThroughout_IsFilledFromTheFrontOfIt()
+    {
+        // Nothing but plateau, so every slice offers the same surplus and the tie-break takes over:
+        // earliest first, which is also the earliest the car can start banking the target.
         var now = FirstPeriodEnd.AddMinutes(-30);
         var departBy = FirstPeriodEnd.AddHours(2.5);
         var plan = Plan(
             requiredWh: 25_000, departBy: departBy, now: now, socPercent: 100,
             forecast: Forecast(6000, 6000, 6000, 6000, 6000, 6000));
 
-        var lastGrid = plan.Blocks.Where(b => b.Source == TargetedChargeSource.Grid).Max(b => b.End);
-        Assert.Equal(departBy, lastGrid);
+        Assert.Equal(now, plan.GridStart!.Value);
+        Assert.True(plan.IsInGridBlock(now));
+
+        // And the grid blocks stay inside the window they were placed in.
+        Assert.All(plan.Blocks, b => Assert.True(b.End <= departBy, $"{b.Source} block ends past the deadline"));
     }
 
     // --- Degrading, and the edges ---
@@ -221,6 +257,9 @@ public class TargetedChargePlannerTests
         Assert.Equal(22_000, plan.GridEnergyWh, 1);
         Assert.Equal(0, plan.ShortfallWh, 1);
         Assert.Contains("grid-only", plan.Reason);
+
+        // Planning blind is planning with nothing to wait for, so it starts now.
+        Assert.Equal(now, plan.GridStart!.Value);
     }
 
     [Fact]
@@ -262,6 +301,11 @@ public class TargetedChargePlannerTests
 
         Assert.Equal(0, plan.SolarEnergyWh, 1);
         Assert.Equal(10_000, plan.GridEnergyWh, 1);
+
+        // Worth nothing to the car *on its own* — but the grid block is placed right on top of it, so
+        // the 3.5kW still comes off the meter while the charger runs at its maximum.
+        Assert.Equal(now, plan.GridStart!.Value);
+        Assert.True(plan.IsInGridBlock(now));
     }
 
     [Fact]
@@ -286,9 +330,10 @@ public class TargetedChargePlannerTests
         Assert.Equal(14_000, plan.RemainingEnergyWh, 1);
         Assert.Equal(14_000, plan.GridEnergyWh, 1);
 
-        // Less to deliver means a later start — which is exactly how a car that limits itself pulls
-        // the block earlier again on the next poll.
-        Assert.Equal(departBy - TimeSpan.FromHours(14_000 / MaxChargePowerWatts), plan.GridStart!.Value);
+        // Less to deliver means a shorter block from the same start — which is exactly how a car that
+        // limits itself to less than we asked for gets a longer one again on the next poll.
+        Assert.Equal(now, plan.GridStart!.Value);
+        Assert.Equal(now + TimeSpan.FromHours(14_000 / MaxChargePowerWatts), plan.Blocks.Max(b => b.End));
     }
 
     [Fact]
@@ -317,8 +362,9 @@ public class TargetedChargePlannerTests
 
         Assert.Equal(departBy.AddMinutes(-15), plan.Deadline);
 
-        var lastBlockEnd = plan.Blocks.Max(b => b.End);
-        Assert.Equal(departBy.AddMinutes(-15), lastBlockEnd);
+        // The margin shortens the window the blocks are placed in, so nothing runs into it — the whole
+        // point being that "ready at 07:00" is not "still charging at 07:00".
+        Assert.All(plan.Blocks, b => Assert.True(b.End <= departBy.AddMinutes(-15), "a block runs into the safety margin"));
     }
 
     [Fact]

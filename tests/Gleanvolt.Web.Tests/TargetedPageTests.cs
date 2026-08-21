@@ -217,8 +217,10 @@ public class TargetedPageTests : BunitContext
         Assert.Contains("There is time to wait for the sun", text);
         Assert.Contains("14.6 kWh should come from forecast surplus", text);
         Assert.Contains("7.4 kWh from the grid, starting 04:30 tomorrow", text);
-        Assert.Contains("discharge hold arms while the grid top-up runs", text);
-        Assert.Contains("sunnier afternoon than forecast will shrink the grid share", text);
+        Assert.Contains("placed over the sunniest hours it can reach", text);
+        Assert.Contains("sunnier day than forecast shrinks the grid share", text);
+        Assert.Contains("lifted to the 6 A floor from the grid rather than exported", text);
+        Assert.Contains("discharge hold arms whenever the plan is importing", text);
     }
 
     [Fact]

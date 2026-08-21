@@ -16,8 +16,9 @@ namespace Gleanvolt.Core.Strategies;
 ///
 /// <para>Pure and side-effect free, like every other strategy, and it only modulates the current while
 /// the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — written once when the target was
-/// activated, and never re-asserted from here. There is no battery loan in this
-/// mode: the home battery keeps its priority and the grid is the honest source for the gap.</para>
+/// activated, and never re-asserted from here. There is still no battery loan in this mode: the home
+/// battery keeps its priority. What the mode <em>will</em> do is bridge from the <b>grid</b> — see
+/// <see cref="GridBridgeWatts"/> — which is the same trade the plan already made, taken live.</para>
 /// </summary>
 public sealed class TargetedChargingController : IChargingController
 {
@@ -117,22 +118,39 @@ public sealed class TargetedChargingController : IChargingController
                 + $"-> charge at the maximum {_maxAmps}A.");
         }
 
-        if (plan.IsInSolarBlock(now))
-        {
-            return DecideFromSurplus(input, plan);
-        }
-
-        return Waiting(input, plan);
+        // Everything else is the sun's, whether or not the plan drew a solar block over it. Solar is
+        // the preferred source in this mode and the only free one, so the car takes as much of it as
+        // the window will give — and a half-hour the forecast said nothing about, or underestimated,
+        // is exactly the surplus most worth catching. The plan schedules *imports*; it has no business
+        // refusing sunshine.
+        return DecideFromSurplus(input, plan);
     }
 
     /// <summary>
-    /// Inside a solar block: take what the surplus supports, with the same dwell hysteresis the other
-    /// solar modes use — and the plan's SOC floor still gating, because the home battery's priority is
-    /// not suspended just because the car has a deadline. Anything the sun cannot cover is the grid
-    /// block's problem, and the grid block is placed to solve it.
+    /// Take what the surplus supports, with the same dwell hysteresis the other solar modes use — and
+    /// the plan's SOC floor still gating, because the home battery's priority is not suspended just
+    /// because the car has a deadline.
+    ///
+    /// <para>The gates are ordered so the sentence is honest. "Not enough sun" is decided first,
+    /// because a car sitting idle at midnight is waiting for the sun, not being held back by a restart
+    /// timer or by the pack — those only become the reason once there is something to hold back.</para>
+    ///
+    /// <para>What the sun cannot cover is the grid block's problem, and the grid block is placed to
+    /// solve it. The one case that cannot wait for the block is a surplus that is real but short of
+    /// the charger's floor: left alone it is exported and gone, so <see cref="Bridge"/> takes it.</para>
     /// </summary>
     private ChargingControlDecision DecideFromSurplus(ChargingControlInput input, TargetedChargePlan plan)
     {
+        var surplusWatts = input.SurplusWatts;
+
+        // Asymmetric, as everywhere else: keep charging down to the minimum, but only (re)start a
+        // hysteresis margin above it.
+        var startThresholdWatts = input.Charging ? MinChargePowerWatts : MinChargePowerWatts + _options.ResumeHysteresisWatts;
+        if (surplusWatts < startThresholdWatts)
+        {
+            return Bridge(input, plan) ?? Waiting(input, plan, surplusWatts, startThresholdWatts);
+        }
+
         var soc = input.State.BatterySocPercent;
         if (soc < plan.SocFloorPercent)
         {
@@ -146,35 +164,100 @@ public sealed class TargetedChargingController : IChargingController
             return Pause($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
         }
 
-        var surplusWatts = input.SurplusWatts;
-
-        // Asymmetric, as everywhere else: keep charging down to the minimum, but only (re)start a
-        // hysteresis margin above it.
-        var startThresholdWatts = input.Charging ? MinChargePowerWatts : MinChargePowerWatts + _options.ResumeHysteresisWatts;
-        if (surplusWatts < startThresholdWatts)
-        {
-            return SoftPause(input, $"Surplus {surplusWatts:F0}W below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
-        }
-
         var targetAmps = ToHardwareCurrent(surplusWatts);
         if (targetAmps < _minAmps)
         {
-            return SoftPause(input, $"Surplus {surplusWatts:F0}W quantises below the minimum {_minAmps}A.");
+            return Bridge(input, plan) ?? Waiting(input, plan, surplusWatts, startThresholdWatts);
         }
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             targetAmps,
-            $"Solar share of the target: {plan.SolarEnergyWh / 1000:F1}kWh planned from sun, surplus {surplusWatts:F0}W -> charge at {targetAmps}A.");
+            $"Sun first: surplus {surplusWatts:F0}W against the {plan.RemainingEnergyWh / 1000:F1}kWh still needed "
+            + $"-> charge at {targetAmps}A.");
     }
 
     /// <summary>
-    /// Between the blocks. The sentence matters more than the action here: the owner watching a car sit
-    /// idle at 22:00 with a 07:00 deadline needs to be told that this is the plan working, not the plan
-    /// failing.
+    /// The <b>grid bridge</b>: run at the charger's floor and let the grid make up what the sun is short
+    /// of, rather than export a real surplus and buy the same kilowatt-hours back after dark.
+    ///
+    /// <para>On three phases the floor is ~4.14 kW, so a perfectly good 3.5 kW surplus charges nothing
+    /// at all. The forecast-driven mode bridges that gap from the home battery and repays it from sun
+    /// that would otherwise have been exported. This mode will not touch the pack — but it does not
+    /// need to, because it is <em>already</em> committed to buying this energy: the only question a
+    /// <see cref="TargetedChargeStrategy.SolarPlusGrid"/> plan leaves open is when. Bridging now buys
+    /// <c>floor − surplus</c>; refusing buys the whole floor later, and exports the surplus meanwhile.
+    /// It is strictly the cheaper of the two, and it shrinks the planned grid block watt for watt.</para>
+    ///
+    /// <para>Three things it will not do. It will not fire on a plan the sun covers outright
+    /// (<see cref="TargetedChargeStrategy.Solar"/>) — there is no committed import to bring forward,
+    /// and buying now would spend money on energy the day was about to hand over free. It will not fire
+    /// below the plan's SOC floor, because the pack's priority is not suspended for this any more than
+    /// it is for a solar block. And it will not fire on a surplus too small to be worth it: below
+    /// <see cref="TargetedChargingOptions.MinBridgeSurplusWatts"/> the sun is not really contributing,
+    /// and this would just be an unplanned grid block in the wrong place.</para>
+    ///
+    /// <para>Sized to reach exactly the floor and never past it — a bridge, not a booster. The host
+    /// arms the battery discharge hold on the returned <see cref="ChargingControlDecision.GridBridgeWatts"/>,
+    /// without which the pack, not the grid, would quietly pay for the gap.</para>
     /// </summary>
-    private ChargingControlDecision Waiting(ChargingControlInput input, TargetedChargePlan plan) =>
-        SoftPause(input, $"Waiting for sun; {GridText(plan)}.");
+    /// <returns>A charge decision at the floor, or null when no bridge is warranted.</returns>
+    private ChargingControlDecision? Bridge(ChargingControlInput input, TargetedChargePlan plan)
+    {
+        if (!_options.GridBridge || !plan.ImportsFromGrid)
+        {
+            return null;
+        }
+
+        if (input.State.BatterySocPercent < plan.SocFloorPercent)
+        {
+            return null;
+        }
+
+        // The same restart dwell a solar block waits out: a bridge is still a contactor cycle and a
+        // vehicle wake.
+        if (!input.Charging && input.TimeInCurrentState < _options.MinPauseTime)
+        {
+            return null;
+        }
+
+        var surplusWatts = input.SurplusWatts;
+        if (surplusWatts < _options.MinBridgeSurplusWatts)
+        {
+            return null;
+        }
+
+        var gapWatts = MinChargePowerWatts - surplusWatts;
+        if (gapWatts <= 0)
+        {
+            // The sun already clears the floor; there is nothing to bridge, and the caller's own
+            // hysteresis is the thing holding the session back.
+            return null;
+        }
+
+        return new ChargingControlDecision(
+            ChargingControlAction.Charge,
+            _minAmps,
+            $"Grid bridge: surplus {surplusWatts:F0}W is under the {MinChargePowerWatts:F0}W floor, so +{gapWatts:F0}W "
+            + $"from the grid takes it there rather than exporting it -> charge at {_minAmps}A. "
+            + $"Comes straight off the {plan.GridEnergyWh / 1000:F1}kWh already planned for import.",
+            GridBridgeWatts: gapWatts);
+    }
+
+    /// <summary>
+    /// Not enough sun, and nothing worth bridging. The sentence matters more than the action here: the
+    /// owner watching a car sit idle at 22:00 with a 07:00 deadline needs to be told that this is the
+    /// plan working, not the plan failing.
+    /// </summary>
+    private ChargingControlDecision Waiting(
+        ChargingControlInput input,
+        TargetedChargePlan plan,
+        double surplusWatts,
+        double thresholdWatts) =>
+        SoftPause(
+            input,
+            $"Surplus {surplusWatts:F0}W is under the {thresholdWatts:F0}W the charger needs. "
+            + $"Waiting for sun; {GridText(plan)}.");
 
     private static string GridText(TargetedChargePlan plan) => plan.GridStart is { } start
         ? $"grid top-up starts at {start.LocalDateTime:HH:mm} if it is still needed"

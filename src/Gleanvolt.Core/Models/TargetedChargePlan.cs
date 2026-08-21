@@ -32,9 +32,9 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 /// <param name="ShortfallWh">How far <paramref name="ExpectedEnergyWh"/> falls short of what was asked. Zero unless <see cref="TargetedChargeStrategy.Maximum"/>.</param>
 /// <param name="GridStart">
-/// When the grid block begins, or null when none is planned. This is the <b>latest</b> start that
-/// still meets the target, which is the point: every poll between now and then is another chance for
-/// the sun to make the import unnecessary before any of it is bought.
+/// When the earliest grid block begins, or null when none is planned. The import is placed over the
+/// sunniest part of the window, so it runs alongside whatever the roof is actually producing then;
+/// with no forecast surplus in the window to run alongside, it starts at once.
 /// </param>
 /// <param name="FeasibleDeparture">
 /// The departure time that <em>would</em> have covered the request, when this one cannot. Null when

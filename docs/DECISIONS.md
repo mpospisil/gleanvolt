@@ -4,6 +4,98 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-21 — Targeted charging imports under the sun, not after it
+
+Supersedes the placement half of [2026-08-20](#2026-08-20--the-grid-block-goes-as-late-as-it-can-and-the-home-battery-still-comes-first).
+The battery-priority half of that record stands unchanged.
+
+### What was wrong with "as late as it can go"
+
+The old record argued the block should end at the deadline, because every poll before it is another
+chance for the sun to shrink it before a watt is bought. The optionality is real. What the argument
+missed is what late placement *costs*, and it turns out to be the same optionality, spent the other
+way round.
+
+Two cases, both reported from the site:
+
+**A poor forecast day with the departure this evening.** The plan concludes the sun cannot cover the
+target, so it books the grid block against the last hours before the deadline and the charger sits
+idle straight through the middle of the day. Meanwhile the roof is producing — just not enough per
+half-hour to clear the charger's 6 A minimum, which is exactly the condition that made the plan fall
+back on the grid in the first place. That surplus is exported for nothing, and the same energy is
+bought back at dusk. Placement *at* the peak turns it into an offset instead: the charger runs at
+maximum, the array supplies what it can at that instant, and only the difference is metered.
+
+**Any day at all, given a P10 forecast.** Planning on P10 means the plan is deliberately wrong in one
+direction — the day usually beats it. Late placement can only collect that upside by *cancelling*
+the block, which needs the surplus to have been chargeable on its own. Placement under the sun
+collects it as a smaller meter reading, whether or not any half-hour ever cleared the minimum.
+
+### And when there is no sun in the window, start at once
+
+The 21:00 → 07:00 case the old record led with is the one where late placement looked most obviously
+right, and it is the one where it does the least. There is no sun between 21:00 and 07:00. Deferring
+the import until 05:00 does not expose it to a single additional watt of surplus; it buys precisely
+the same kilowatt-hours eight hours later. What deferral does buy, at that point, is risk: a charger
+that drops its connection, a car that limits itself to 3 kW, a departure moved forward to 05:30 — all
+of them now land with no slack at all. So a window with no forecast surplus in it, and a window with
+no usable forecast at all, both start immediately.
+
+### The implementation is one ordering
+
+`AddGridBlocks` no longer walks the slices backwards from the deadline. It walks them by leftover
+forecast surplus, highest first, breaking ties earliest-first, and anchors each block at its slice's
+start. Both behaviours above fall out of that single comparison: a window with sun in it fills the
+sunny slices first, and a window without any ties at zero everywhere and is therefore filled from the
+front. Nothing else about the plan changes — the block is still sized by the same power-prorated
+arithmetic, still rebuilt every poll from the measured delivery, and still never committed to.
+
+`GridStart` is now the earliest of the grid blocks rather than the single start of one contiguous
+block, and the blocks may be scattered across the window instead of ending at the deadline. Nothing
+consumed it as "the last thing that happens" — the controller asks `IsInGridBlock(now)`, and the
+discharge hold follows the same predicate — so the arming window moves with the block and stays
+scoped to the importing part of the plan.
+
+### The cost we accept
+
+An import placed at noon is bought eight hours earlier than one placed at 05:00, and a day that goes
+on to beat its forecast *after* noon cannot un-buy it. That is a real loss and it is smaller than the
+one it replaces: the block is still resized every poll, so only the part actually drawn before the
+sun arrives is lost, and against it we now collect sub-minimum surplus and forecast upside on every
+day rather than only on the days generous enough to cancel the block outright.
+
+### The live half: sun is never refused, and the grid may bridge to the floor
+
+The placement rule above is a *forecast*-side fix, and it only reaches the surplus the forecast
+predicted. Two live cases were still throwing sun away, and the mode's own contract — deliver the
+energy, prefer the sun, the grid is allowed — says both should be taken.
+
+**Unplanned sun.** The controller only charged from surplus inside a block the planner had drawn. A
+half-hour the forecast said nothing about, or underestimated, found the car idle. The plan schedules
+*imports*; it has no business refusing sunshine, so the solar-block gate is gone. The car now takes
+live surplus whenever there is any, and the only thing that holds it back is the plan's SOC floor —
+which is the pack's priority talking, and is meant to.
+
+**Sub-floor surplus.** A 3.5 kW surplus cannot charge at all against a 4.14 kW floor, so the
+controller paused and the energy was exported. The **grid bridge** runs the charger at 6 A and buys
+the ~640 W difference instead. This reverses "there is no battery loan in this mode" only in its
+source, not in its principle: the pack is still untouched, and the argument for the grid is that a
+`SolarPlusGrid` plan has *already committed* to buying this energy — the only open question was when.
+Bridging pays `floor − surplus` now against the whole floor later, and shrinks the planned block watt
+for watt. It is refused where that argument fails: on a `Solar` plan (nothing committed), below the
+SOC floor, and under `MinBridgeSurplusWatts` (the sun is not really contributing). Sized to the floor
+and never past it — a bridge, not a booster.
+
+The bridge's one sharp edge is the discharge hold. It arms on `IsInGridBlock`, and a bridge is not
+inside a block. Left there, the controller commands 6 A against a surplus that cannot carry it and
+the *pack* silently funds the gap — a battery loan by accident, which is the one thing this mode
+promises never to do. So the decision now carries `GridBridgeWatts` out to the poll loop and the hold
+arms on it too. (On an installation with no `BATTERY_HOLD_*` configured the hold is a log warning
+rather than a write, and this drains the pack — that is pre-existing, and it is now one more reason
+to configure it.)
+
+---
+
 ## 2026-08-21 — Charging is an action, and the action owns the charger's use-mode
 
 This reverses a promise the project made in as many words, in four places (`IEvChargerControl`,

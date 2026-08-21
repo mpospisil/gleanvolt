@@ -17,9 +17,11 @@ public enum TargetedChargeStrategy
     Solar,
 
     /// <summary>
-    /// The sun covers part of it and the grid covers the rest, in a block placed as <b>late</b> as it
-    /// can possibly be. Because the plan is rebuilt every poll, an afternoon that turns out sunnier
-    /// than forecast shrinks that block — often to nothing — before a single watt of it is drawn.
+    /// The sun covers part of it and the grid covers the rest, in a block placed over the
+    /// <b>sunniest</b> slices of the window — so the import runs while the roof is producing and every
+    /// watt it delivers offsets the meter — or, when the window holds no forecast surplus at all,
+    /// starting straight away. Because the plan is rebuilt every poll, a day that turns out sunnier
+    /// than forecast shrinks that block, often to nothing.
     /// </summary>
     SolarPlusGrid,
 

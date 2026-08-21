@@ -28,6 +28,7 @@ public class TargetedChargingControllerTests
         double requiredWh = 22_000,
         double deliveredWh = 0,
         double socFloorPercent = 50,
+        double gridEnergyWh = 14_000,
         DateTimeOffset? gridStart = null,
         DateTimeOffset? now = null) =>
         new(
@@ -39,7 +40,7 @@ public class TargetedChargingControllerTests
             DeliveredEnergyWh: deliveredWh,
             RemainingEnergyWh: Math.Max(0, requiredWh - deliveredWh),
             SolarEnergyWh: 8_000,
-            GridEnergyWh: 14_000,
+            GridEnergyWh: gridEnergyWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: 22_000,
             ShortfallWh: 0,
@@ -146,6 +147,88 @@ public class TargetedChargingControllerTests
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
         Assert.Equal(16, decision.ChargeCurrentAmps);
+    }
+
+    // --- The grid bridge, and sun outside the plan's blocks ---
+
+    [Fact]
+    public void ASurplusUnderTheChargersFloor_IsBridgedFromTheGridRatherThanExported()
+    {
+        // 3.5kW is real energy and charges nothing at all: the 6A floor on three phases is 4.14kW. The
+        // plan already owes 14kWh to the grid, so buying the 640W gap now is strictly cheaper than
+        // exporting the 3.5kW and buying the whole 4.14kW back after dark.
+        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, DepartBy.AddHours(-2), DepartBy.AddMinutes(-15))]);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 3_500, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Equal(4_140 - 3_500, decision.GridBridgeWatts, 1);
+        Assert.Contains("Grid bridge", decision.Reason);
+    }
+
+    [Fact]
+    public void TheBridgeIsRefusedWhenTheSunCoversTheWholeTarget()
+    {
+        // Nothing is owed to the grid, so there is no committed import to bring forward — buying now
+        // would spend money on energy the day was about to hand over free.
+        var plan = Plan(strategy: TargetedChargeStrategy.Solar, gridEnergyWh: 0);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 3_500, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.GridBridgeWatts);
+    }
+
+    [Fact]
+    public void TheBridgeIsRefusedBelowThePlansSocFloor()
+    {
+        // The pack's priority is not suspended for this. Diverting the surplus to the car would delay
+        // the battery's own recovery, and the planned grid block still covers the target.
+        var plan = Plan(socFloorPercent: 70);
+
+        var decision = Controller().Decide(Input(
+            plan, surplusWatts: 3_500, socPercent: 65, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.GridBridgeWatts);
+    }
+
+    [Fact]
+    public void TheBridgeIsRefusedOnASurplusTooSmallToBeReal()
+    {
+        // Below the bridge threshold the sun is barely contributing, and this would just be an
+        // unplanned grid block in the wrong place.
+        var decision = Controller().Decide(Input(Plan(), surplusWatts: 900, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.GridBridgeWatts);
+    }
+
+    [Fact]
+    public void TheBridgeIsABridgeAndNotABooster()
+    {
+        // Once the sun clears the floor on its own there is nothing to bridge: the car runs on surplus
+        // and the grid contributes nothing, however much is still owed to it.
+        var decision = Controller().Decide(Input(Plan(), surplusWatts: 8_000, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(11, decision.ChargeCurrentAmps);      // 8000W / 690W per amp, floored
+        Assert.Equal(0, decision.GridBridgeWatts);
+    }
+
+    [Fact]
+    public void SunOutsideEveryPlannedBlock_IsStillTaken()
+    {
+        // Solar is the preferred source in this mode, so a half-hour the forecast said nothing about is
+        // not a reason to sit idle. The plan schedules imports; it does not get to refuse sunshine.
+        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, DepartBy.AddHours(-2), DepartBy.AddMinutes(-15))]);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 8_000, timeInState: TimeSpan.FromMinutes(20)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(11, decision.ChargeCurrentAmps);
+        Assert.Contains("Sun first", decision.Reason);
     }
 
     [Fact]

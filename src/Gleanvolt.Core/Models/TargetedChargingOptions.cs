@@ -20,6 +20,15 @@ namespace Gleanvolt.Core.Models;
 /// How long the car must draw nothing, <em>while we are asking it to charge</em>, before it counts as
 /// having stopped on its own limit.
 /// </param>
+/// <param name="GridBridge">
+/// Whether the <b>grid</b> may bridge a real-but-insufficient surplus up to the charger's floor. The
+/// forecast-driven mode bridges the same gap from the home battery; this mode will not touch the pack,
+/// so the grid is the source — and it is only ever spending money the plan had already committed to.
+/// </param>
+/// <param name="MinBridgeSurplusWatts">
+/// The surplus below which no bridge is granted. Below this the sun is not really contributing and the
+/// bridge would just be an unplanned grid block in the wrong place.
+/// </param>
 public sealed record TargetedChargingOptions(
     int MinChargingCurrentAmps,
     int MaxChargingCurrentAmps,
@@ -27,4 +36,6 @@ public sealed record TargetedChargingOptions(
     double ResumeHysteresisWatts,
     TimeSpan MinRunTime,
     TimeSpan MinPauseTime,
-    TimeSpan CompletionDwell);
+    TimeSpan CompletionDwell,
+    bool GridBridge = true,
+    double MinBridgeSurplusWatts = 2000);

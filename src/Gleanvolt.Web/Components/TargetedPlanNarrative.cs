@@ -68,9 +68,13 @@ public static class TargetedPlanNarrative
                 paragraphs.Add(headline);
                 paragraphs.Add(SolarPlusGrid(plan, zone));
                 paragraphs.Add(
-                    "The home battery keeps its priority; the discharge hold arms while the grid top-up runs "
-                    + "so the pack never feeds the car. A sunnier afternoon than forecast will shrink the grid "
-                    + "share before it is drawn.");
+                    "The top-up is placed over the sunniest hours it can reach, so whatever the roof really "
+                    + "produces then comes off the import, and a sunnier day than forecast shrinks the grid "
+                    + "share before the rest of it is drawn. A surplus too weak to run the charger on its own "
+                    + "is lifted to the 6 A floor from the grid rather than exported.");
+                paragraphs.Add(
+                    "The home battery keeps its priority throughout: the discharge hold arms whenever the plan "
+                    + "is importing, so the pack never feeds the car.");
                 break;
         }
 
@@ -93,8 +97,8 @@ public static class TargetedPlanNarrative
         return plan.SolarEnergyWh > 0
             ? $"There is time to wait for the sun: {Kwh(plan.SolarEnergyWh)} should come from forecast surplus "
                 + $"{Between(plan, zone)}, and {grid}."
-            : $"No usable surplus is forecast before then, so the whole {grid} — placed as late as it can be and "
-                + "still finish in time.";
+            : $"No usable surplus is forecast before then, so the whole {grid}. With no sun in the window to "
+                + "wait for, there is nothing to be gained by putting it off.";
     }
 
     private static string Between(TargetedChargePlan plan, TimeZoneInfo zone) =>

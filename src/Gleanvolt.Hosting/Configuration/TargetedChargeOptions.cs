@@ -26,4 +26,21 @@ public sealed class TargetedChargeOptions
     /// restart, so a multi-day one is a promise this service cannot keep either.
     /// </summary>
     public TimeSpan MaxHorizon { get; init; } = TimeSpan.FromHours(36);
+
+    /// <summary>
+    /// Whether the grid may bridge a real-but-insufficient surplus up to the charger's floor while a
+    /// target is running.
+    ///
+    /// <para>On three phases that floor is ~4.14 kW, so a perfectly good 3.5 kW surplus charges nothing
+    /// and is exported — and on a plan that already needs the grid, the same kilowatt-hours are then
+    /// bought back after dark. Bridging pays <c>floor − surplus</c> now instead of the whole floor
+    /// later, and shrinks the planned grid block watt for watt.</para>
+    ///
+    /// <para>It never funds a session on its own: it is refused on a plan the sun covers outright,
+    /// below the plan's SOC floor, and on a surplus under
+    /// <c>ChargeControl:Forecast:MinBridgeSurplusWatts</c> — the same "is this surplus real?" line the
+    /// battery loan uses. Turn it off to keep the mode's imports strictly
+    /// inside the blocks the plan drew.</para>
+    /// </summary>
+    public bool GridBridge { get; init; } = true;
 }

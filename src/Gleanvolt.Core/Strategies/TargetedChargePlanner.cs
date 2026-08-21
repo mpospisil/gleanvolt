@@ -19,14 +19,21 @@ namespace Gleanvolt.Core.Strategies;
 /// plan reports how much will really arrive, how far short of the request that is, and the departure
 /// time that <em>would</em> have covered it. Honesty is the whole value of this case.</description></item>
 /// <item><description><b>Enough time</b> — the car takes every kilowatt-hour of forecast surplus the
-/// home battery has not already claimed, and the grid covers only the remainder, in a block placed as
-/// <b>late</b> as it can possibly be.</description></item>
+/// home battery has not already claimed, and the grid covers only the remainder, in a block placed
+/// over the <b>sunniest</b> part of the window; or, when the window holds no forecast surplus at all,
+/// starting straight away.</description></item>
 /// </list>
 ///
-/// <para>Late placement is the trick the mode exists for. Because the plan is rebuilt every poll, an
-/// afternoon that turns out sunnier than forecast shrinks the grid block — often to nothing — before a
-/// single watt of it is drawn. Scheduling the grid early would spend money on energy the day was about
-/// to hand over for free.</para>
+/// <para>Placement is the trick the mode exists for. Importing while the roof is producing means the
+/// charger soaks up every watt the day actually delivers at that moment — the surplus below the
+/// charger's own minimum, which is worth nothing to the car on its own, and everything a P10 forecast
+/// underestimated — instead of exporting it and buying the same energy again after dark. And because
+/// the plan is rebuilt every poll from the <em>measured</em> delivery, the block keeps shrinking as a
+/// better-than-forecast day hands the target over for free.</para>
+///
+/// <para>With nothing to wait for — a dark window, or no usable forecast at all — the block starts at
+/// once. Deferring an import that no amount of sun can undo buys nothing and only leaves less room
+/// for a charger dropout, a car that limits itself, or a departure brought forward.</para>
 ///
 /// <para>Two things the mode deliberately does <em>not</em> do: it does not touch the home battery's
 /// priority (the pack's need is reserved out of the forecast by the same backward pass
@@ -49,8 +56,8 @@ public static class TargetedChargePlanner
     /// <param name="request">What the owner asked for.</param>
     /// <param name="deliveredWh">
     /// What the charger has <b>measurably</b> delivered since the request was activated. Measured, not
-    /// commanded: a car that limits itself to less than we asked for simply pulls the grid block
-    /// earlier on the next poll, with no special case anywhere.
+    /// commanded: a car that limits itself to less than we asked for simply gets a longer grid block
+    /// on the next poll, with no special case anywhere.
     /// </param>
     /// <param name="forecast">
     /// The forecast covering the window, or null when none has been fetched. Null is not a failure
@@ -243,12 +250,28 @@ public static class TargetedChargePlanner
     }
 
     /// <summary>
-    /// The grid block, found by a <b>backward pass</b> from the deadline rather than by
-    /// <c>deficit / P_max</c> — because where the block reaches back over a sunny slice the grid only
-    /// has to supply <c>P_max</c> minus what the sun is already giving. Inside such a slice the block's
-    /// start is therefore prorated by <em>power</em>, not by time.
+    /// The grid block, placed <b>where the roof is busiest</b>: the slices carrying the most forecast
+    /// surplus are filled first, and ties are broken earliest-first.
+    ///
+    /// <para>That one ordering answers both halves of the question. When the forecast says the sun
+    /// will be up, the import runs <em>alongside</em> it, so every watt the roof actually produces at
+    /// that moment — including the surplus that sits below the charger's minimum and is worth nothing
+    /// to the car on its own, and including everything a P10 forecast underestimated — offsets the
+    /// meter instead of being exported. When the window holds no forecast surplus at all, every slice
+    /// ties at zero and the tie-break takes over: the block starts <b>now</b>.</para>
+    ///
+    /// <para>This replaces an earlier backward pass that put the import as late as it could go. Late
+    /// placement bought one thing — the chance for a better-than-forecast afternoon to shrink the
+    /// block before any of it was drawn — and it is not free: it also guarantees the charger is idle
+    /// through the sunniest part of the day and then imports in the dark, where no amount of
+    /// unforecast sun can reach it. Running under the sun keeps the deferral value (the plan is still
+    /// rebuilt every poll, and the block still shrinks as delivery accrues) and collects the surplus
+    /// as well.</para>
+    ///
+    /// <para>Within a slice the energy is prorated by <em>power</em>, not by time: where the sun is
+    /// already giving the car something, the grid only has to supply <c>P_max</c> minus that.</para>
     /// </summary>
-    /// <returns>When the import starts, or null when none is needed.</returns>
+    /// <returns>The earliest instant the import starts, or null when none is needed.</returns>
     private static DateTimeOffset? AddGridBlocks(
         List<TargetedChargeBlock> blocks,
         List<ForecastSlice> slices,
@@ -260,13 +283,22 @@ public static class TargetedChargePlanner
         var remaining = deficitWh;
         DateTimeOffset? start = null;
 
-        for (var i = slices.Count - 1; i >= 0 && remaining > TargetToleranceWh; i--)
+        var sunniestFirst = Enumerable.Range(0, slices.Count)
+            .OrderByDescending(i => slices[i].AvailableWatts)
+            .ThenBy(i => slices[i].Start);
+
+        foreach (var i in sunniestFirst)
         {
+            if (remaining <= TargetToleranceWh)
+            {
+                break;
+            }
+
             var headroomWh = maxWh[i] - solarWh[i];
             if (headroomWh <= 0)
             {
                 // The sun alone already fills the charger in this slice; there is no room to import
-                // into it. (Not an error — just a slice the backward pass steps over.)
+                // into it. (Not an error — just a slice the pass steps over.)
                 continue;
             }
 
@@ -274,14 +306,22 @@ public static class TargetedChargePlanner
             remaining -= take;
 
             var gridPowerWatts = maxPowerWatts - (solarWh[i] / slices[i].Hours);
-            start = slices[i].End - TimeSpan.FromHours(take / gridPowerWatts);
+
+            // Anchored at the slice's start, so slices taken in sequence join up into one run rather
+            // than leaving gaps, and a wholly dark window really does begin at "now".
+            var blockStart = slices[i].Start;
 
             blocks.Add(new TargetedChargeBlock(
-                start.Value,
-                slices[i].End,
+                blockStart,
+                blockStart + TimeSpan.FromHours(take / gridPowerWatts),
                 TargetedChargeSource.Grid,
                 gridPowerWatts,
                 take));
+
+            if (start is null || blockStart < start)
+            {
+                start = blockStart;
+            }
         }
 
         return start;

@@ -191,7 +191,7 @@ public static class GleanvoltHostingExtensions
         });
 
         // Targeted charging (issue #80): a stated amount of energy by a stated departure time, with the
-        // grid block placed as late as it still can be. The request itself is runtime state rather than
+        // grid block placed over the sunniest hours it can reach. The request itself is runtime state rather than
         // configuration -- it belongs to one trip -- so the selector starts empty and, like the mode,
         // does not survive a restart.
         services.Configure<TargetedChargeOptions>(configuration.GetSection(TargetedChargeOptions.SectionName));
@@ -202,6 +202,7 @@ public static class GleanvoltHostingExtensions
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
             var forecast = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+            var targeted = provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value;
 
             return new TargetedChargingController(
                 provider.GetRequiredService<ChargePowerConverter>(),
@@ -214,7 +215,12 @@ public static class GleanvoltHostingExtensions
                     // the car, which is a property of the hardware rather than of either strategy.
                     MinRunTime: forecast.MinRunTime,
                     MinPauseTime: forecast.MinPauseTime,
-                    CompletionDwell: chargeControl.CompletionDwell));
+                    CompletionDwell: chargeControl.CompletionDwell,
+                    GridBridge: targeted.GridBridge,
+                    // Deliberately the forecast mode's figure. "Is this surplus real enough to bridge?"
+                    // is a question about the roof, not about which source pays for the gap, and two
+                    // numbers for it would only ever drift apart.
+                    MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts));
         });
 
         services.AddSingleton(provider =>
