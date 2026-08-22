@@ -587,6 +587,8 @@ internal static class TestTargetedPlans
         double shortfallWh = 0,
         DateTimeOffset? feasibleDeparture = null,
         bool isUsable = true,
+        double tailWh = 0,
+        DateTimeOffset? holdUntil = null,
         double? forecastSurplusWh = null,
         double? paceWatts = null)
     {
@@ -626,6 +628,8 @@ internal static class TestTargetedPlans
             Blocks: blocks,
             ForecastAsOf: now.AddHours(-1),
             IsUsable: isUsable,
+            TailEnergyWh: tailWh,
+            HoldUntil: holdUntil,
             Reason: "test plan");
     }
 }

@@ -4,6 +4,73 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-23 — Just-in-time charging: the last stretch lands at departure (issue #101)
+
+A targeted charge could say *how much* and *by when*, but not *when it should arrive*. Delivered as
+cheaply as possible it usually arrives early, and a car asked for 100% then sits at 100% overnight.
+
+### What changed
+
+`TargetedChargeRequest` gains `Priority` (`Cheapest` | `JustInTime`), `TailEnergyWh` and
+`RestSocPercent`. Every existing construction is unchanged — the defaults are the old behaviour, which
+is why nothing that was working before this had to be touched.
+
+`TargetedChargePlanner` gains `PlanHold`, `Within` and `Merge`. Under a hold the existing
+`PaceOverWindow` runs twice, over `[now, release]` and `[release, deadline]`, and the results are
+merged; `release = deadline − tail ÷ P_max − ReleaseSlack`. The plan carries `TailEnergyWh`,
+`HoldUntil` and `IsHoldingAt(instant)`.
+
+`TargetedChargingController` gains one branch, checked before the pace: while `IsHoldingAt` is true it
+soft-pauses with a sentence saying the idle charger is deliberate. That branch is where the sun is
+refused — with pace at zero it would otherwise walk straight through `DecideFromPace` and deliver the
+tail early on a bright afternoon.
+
+`VehicleTargetEnergy` gains `TailAboveRestWh` (the split) and `ResultingSocPercent` (the inverse of
+`RequiredWh`, so an owner who asked in kilowatt-hours still gets a rest point).
+
+### What was deliberately left out
+
+`TailPowerFactor`, a charge-limit gate on `settings.target_soc`, and a `VehicleChargeCurve` derived
+from the session store's `active`/`actual`/`VehicleSocPercent` samples. See the decision record — the
+short version is that the car stopping short is already reported by `CompletionDwell`, the feed that
+would drive a gate expires and needs a human, and the per-poll rebuild already self-corrects a slow
+tail. Both are recorded as deferred on the issue rather than deleted.
+
+### Surfaces
+
+- **Web**: a **Charging priority** select and a **Rest at (%)** field on the Targeted tab, both shown
+  only when a pack size and a reading make the rest point knowable. The plan view gains **Held back**
+  and **Released at**, and the narrative gains a hold paragraph with two forms — one for a hold planned
+  and one for a hold in force. *Preview* now builds a second plan at `Cheapest` and prints the
+  difference in grid import.
+- **Home Assistant**: `select` **Charge priority**, `number` **Target rest SOC**, `sensor` **Target
+  hold until**. The MQTT worker now takes `IVehicleTelemetry` and `VehicleOptions` so it can make the
+  same split the web tab makes; without a SOC or a capacity it warns and holds nothing.
+- **Config**: `ChargeControl:Targeted:JustInTime` — `RestSocPercent` (80), `ReleaseSlack` (30 min).
+
+### One existing test was narrowed, not weakened
+
+`HaDiscoveryTests.DiscoveryMessages_PublishNoSelectAtAll` asserted that discovery publishes no `select`
+of any kind. Its intent (from #89) was that nothing offers a *charge mode* to pick, in competition with
+the buttons. A charge **priority** select is a different thing — it only qualifies a target the activate
+button still has to apply, and nothing about it can put the charger into a mode. Renamed to
+`DiscoveryMessages_PublishNoModeSelect`, asserting that, and now also asserting the priority select is
+present.
+
+### Verification performed
+
+- **819 tests pass** (36 new). Planner: the release point and its slack, the tail scheduled after it
+  and the free part before it, the tail never exceeding what is still owed, the hold abandoned when the
+  release has passed and when the free part would not fit, and `Cheapest` unchanged. Controller: a
+  generous surplus refused while holding, the idle sentence, a *planned* hold not stopping the free
+  part charging, and the default path untouched. Plus the rest-point arithmetic, the narrative's two
+  forms, the tab's split, and the three HA entities.
+- **Not yet observed on hardware.** The interesting case — a real ID.4 taking the 80 → 100 stretch more
+  slowly than `P_max` and the pace correcting for it — needs an overnight run. `ReleaseSlack` at 30
+  minutes is a first guess and is the number to revisit against a recorded session.
+
+---
+
 ## 2026-08-22 — The targeted plan reads the car, and is quoted before it is promised (issue #99)
 
 `Targeted` still promises kilowatt-hours by a time. What changed is what it will accept as the

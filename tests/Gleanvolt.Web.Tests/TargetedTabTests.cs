@@ -575,6 +575,147 @@ public class TargetedTabTests : BunitContext
         Assert.Contains("Any surplus that does appear is used first", text);
     }
 
+    // --- Just in time (#101) ---
+
+    [Fact]
+    public void The_priority_switch_is_not_offered_without_a_way_to_find_the_rest_point()
+    {
+        // Same rule as the SOC basis: a rest point is a state of charge, and without a pack size and a
+        // reading there is no honest way to know where 80% of this car is.
+        CarReports();
+
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#charge-priority"));
+    }
+
+    [Fact]
+    public void The_priority_switch_appears_with_a_pack_and_a_reading()
+    {
+        WithAKnownPack();
+        CarReports();
+
+        var page = RenderTab();
+
+        Assert.NotEmpty(page.FindAll("#charge-priority"));
+
+        // And the rest field only under the priority that uses it.
+        Assert.Empty(page.FindAll("#rest-soc"));
+        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        Assert.NotEmpty(page.FindAll("#rest-soc"));
+    }
+
+    [Fact]
+    public void Just_in_time_splits_the_request_into_a_tail_at_the_rest_point()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("100");
+        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        page.Find("#rest-soc").Change("80");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+
+        Assert.Equal(TargetedChargePriority.JustInTime, request.Priority);
+        Assert.Equal(80, request.RestSocPercent);
+
+        // 80 -> 100 is 20% of 77 kWh in the cells; at 90% that is 17.1 kWh at the charger.
+        Assert.Equal(17_111, request.TailEnergyWh, 0);
+        Assert.True(request.HoldsTail);
+    }
+
+    [Fact]
+    public void Cheapest_is_the_default_and_holds_nothing()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+
+        Assert.Equal(TargetedChargePriority.Cheapest, request.Priority);
+        Assert.Equal(0, request.TailEnergyWh);
+        Assert.False(request.HoldsTail);
+    }
+
+    [Fact]
+    public void A_car_already_past_the_rest_point_is_told_the_whole_charge_is_held()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 85);
+
+        var page = RenderTab();
+        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+
+        Assert.Contains("already at 85%", page.Find("#rest-soc").ParentElement!.TextContent);
+        Assert.Contains("the whole charge is the held stretch", page.Find("#rest-soc").ParentElement!.TextContent);
+    }
+
+    [Fact]
+    public void A_target_that_never_reaches_the_rest_point_says_there_is_nothing_to_hold()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("70");
+        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+
+        Assert.Contains("nothing above it to hold", page.Find("#rest-soc").ParentElement!.TextContent);
+    }
+
+    [Fact]
+    public void The_narrative_of_a_planned_hold_says_what_is_held_and_until_when()
+    {
+        var plan = TestTargetedPlans.SolarPlusGrid(Now) with
+        {
+            TailEnergyWh = 6_000,
+            HoldUntil = Now.AddHours(8),
+        };
+
+        var text = Narrate(plan);
+
+        Assert.Contains("6.0 kWh", text);
+        Assert.Contains("held back until", text);
+        Assert.Contains("finishes just before departure", text);
+    }
+
+    [Fact]
+    public void The_narrative_of_a_hold_in_force_says_the_idle_charger_is_deliberate()
+    {
+        // RemainingEnergyWh == TailEnergyWh: everything below the rest point is in the car, so the
+        // charger is sitting still. This is the sentence that stops that reading as a fault.
+        var plan = TestTargetedPlans.SolarPlusGrid(Now) with
+        {
+            RemainingEnergyWh = 6_000,
+            TailEnergyWh = 6_000,
+            HoldUntil = Now.AddHours(8),
+        };
+
+        var text = Narrate(plan);
+
+        Assert.Contains("idle on purpose", text);
+        Assert.Contains("turned down", text);
+    }
+
+    [Fact]
+    public void The_narrative_says_nothing_about_holding_when_nothing_is_held()
+    {
+        var text = Narrate(TestTargetedPlans.SolarPlusGrid(Now));
+
+        Assert.DoesNotContain("held back", text);
+        Assert.DoesNotContain("idle on purpose", text);
+    }
+
     private static string Narrate(TargetedChargePlan plan) =>
         string.Join(" ", TargetedPlanNarrative.Describe(plan, Prague));
 

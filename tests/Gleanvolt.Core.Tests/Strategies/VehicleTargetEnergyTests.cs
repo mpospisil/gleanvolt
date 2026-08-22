@@ -73,4 +73,56 @@ public class VehicleTargetEnergyTests
             VehicleTargetEnergy.RequiredWh(-10, 130, PackWh, 0.9)!.Value,
             0);
     }
+
+    // --- The rest-point split (#101) ---
+
+    [Theory]
+    // 45% now, 100% target, 80% rest: the tail is 80 -> 100, which is 20% of 77kWh over 0.9.
+    [InlineData(45, 100, 80, 17_111)]
+    // Already past the rest point: measured from where the car actually is, not from a phantom 80%.
+    [InlineData(90, 100, 80, 8_556)]
+    // Target at the rest point exactly: nothing above it, so nothing to hold.
+    [InlineData(45, 80, 80, 0)]
+    // Target below the rest point: still nothing.
+    [InlineData(45, 60, 80, 0)]
+    public void TailAboveRest_MeasuresFromTheHigherOfTheRestPointAndTheCar(
+        double now, double target, double rest, double expectedWh)
+    {
+        var tail = VehicleTargetEnergy.TailAboveRestWh(now, target, rest, 77_000, 0.9);
+
+        Assert.NotNull(tail);
+        Assert.Equal(expectedWh, tail!.Value, 0);
+    }
+
+    [Fact]
+    public void TailAboveRest_IsNullWithoutAnSocOrACapacity()
+    {
+        Assert.Null(VehicleTargetEnergy.TailAboveRestWh(null, 100, 80, 77_000, 0.9));
+        Assert.Null(VehicleTargetEnergy.TailAboveRestWh(45, 100, 80, 0, 0.9));
+    }
+
+    [Fact]
+    public void ResultingSoc_IsTheInverseOfRequiredWh()
+    {
+        // The round trip is what lets an owner who asked in kilowatt-hours still get a rest point.
+        var requiredWh = VehicleTargetEnergy.RequiredWh(45, 80, 77_000, 0.9);
+        var back = VehicleTargetEnergy.ResultingSocPercent(45, requiredWh!.Value, 77_000, 0.9);
+
+        Assert.Equal(80, back!.Value, 6);
+    }
+
+    [Fact]
+    public void ResultingSoc_NeverClaimsMoreThanAFullBattery()
+    {
+        var soc = VehicleTargetEnergy.ResultingSocPercent(90, 100_000, 77_000, 0.9);
+
+        Assert.Equal(100, soc!.Value, 6);
+    }
+
+    [Fact]
+    public void ResultingSoc_IsNullWithoutAnSocOrACapacity()
+    {
+        Assert.Null(VehicleTargetEnergy.ResultingSocPercent(null, 10_000, 77_000, 0.9));
+        Assert.Null(VehicleTargetEnergy.ResultingSocPercent(45, 10_000, 0, 0.9));
+    }
 }

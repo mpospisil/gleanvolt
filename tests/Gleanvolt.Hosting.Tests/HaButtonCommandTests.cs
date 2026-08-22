@@ -142,6 +142,9 @@ public class HaButtonCommandTests
             new NoopShutdown(),
             new ChargeControlStatusHolder(),
             NullLogger<HomeAssistantMqttWorker>.Instance,
+            Options.Create(new TargetedChargeOptions()),
+            Options.Create(new VehicleOptions()),
+            vehicle: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>

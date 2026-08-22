@@ -31,7 +31,9 @@ public class TargetedChargingControllerTests
         double gridEnergyWh = 14_000,
         double paceWatts = 3_000,
         DateTimeOffset? gridStart = null,
-        DateTimeOffset? now = null) =>
+        DateTimeOffset? now = null,
+        double tailWh = 0,
+        DateTimeOffset? holdUntil = null) =>
         new(
             Strategy: strategy,
             Now: now ?? Now,
@@ -54,6 +56,8 @@ public class TargetedChargingControllerTests
             Blocks: blocks ?? [],
             ForecastAsOf: Now,
             IsUsable: true,
+            TailEnergyWh: tailWh,
+            HoldUntil: holdUntil,
             Reason: "test");
 
     private static TargetedChargeBlock Block(TargetedChargeSource source, DateTimeOffset start, DateTimeOffset end) =>
@@ -380,5 +384,71 @@ public class TargetedChargingControllerTests
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
         Assert.Equal(6, decision.ChargeCurrentAmps);
+    }
+
+    // --- Just in time (#101): the deliberately idle charger ---
+
+    [Fact]
+    public void WhileHolding_ItRefusesEvenAGenerousSurplus()
+    {
+        // The one place this mode turns real sun down. Everything below the rest point is delivered
+        // (need == tail), so charging on a bright afternoon would put the car at its target hours early
+        // -- which is exactly what the priority exists to prevent.
+        var plan = Plan(requiredWh: 5_000, deliveredWh: 0, tailWh: 5_000, holdUntil: Now.AddHours(6), paceWatts: 0);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 9_000, socPercent: 95));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Contains("Holding the last", decision.Reason);
+    }
+
+    [Fact]
+    public void WhileHolding_ItSaysTheIdleChargerIsThePlanWorking()
+    {
+        // The sentence is the feature. A charger sitting still at 23:00 with a 07:00 departure is the
+        // single state most likely to be read as a fault.
+        var plan = Plan(requiredWh: 5_000, tailWh: 5_000, holdUntil: Now.AddHours(6), paceWatts: 0);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 0));
+
+        Assert.Contains("this is the plan working", decision.Reason);
+        Assert.DoesNotContain("Waiting for sun", decision.Reason);
+    }
+
+    [Fact]
+    public void BeforeTheFreePartIsDelivered_APlannedHoldDoesNotStopItCharging()
+    {
+        // A hold planned is not a hold in force: 12kWh still needed against a 4kWh tail means there is
+        // 8kWh below the rest point to get on with, and the sun is the car's as usual.
+        var plan = Plan(requiredWh: 12_000, tailWh: 4_000, holdUntil: Now.AddHours(6), paceWatts: 0);
+
+        // Past the restart dwell, so what is being tested is the hold and not that.
+        var decision = Controller().Decide(
+            Input(plan, surplusWatts: 9_000, socPercent: 95, timeInState: TimeSpan.FromHours(1)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+    }
+
+    [Fact]
+    public void OnceTheReleaseHasPassed_TheTailChargesLikeAnythingElse()
+    {
+        // Past the release the planner stops setting HoldUntil at all, so this is only a guard that
+        // nothing in the controller keeps holding on its own.
+        var plan = Plan(requiredWh: 5_000, tailWh: 5_000, holdUntil: Now.AddHours(-1), paceWatts: 8_000);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 0, timeInState: TimeSpan.FromHours(1)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+    }
+
+    [Fact]
+    public void WithNoHoldPlanned_NothingAboutTheDefaultPathChanges()
+    {
+        var plan = Plan(paceWatts: 6_000);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 0, timeInState: TimeSpan.FromHours(1)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.DoesNotContain("Holding", decision.Reason);
     }
 }

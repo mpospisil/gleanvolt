@@ -111,6 +111,39 @@ else
     </div>
 }
 
+@*
+    The priority, and the rest SOC under it. Offered on the same terms as the basis selector above:
+    the rest point is a state of charge, so without a capacity and a reading there is no honest way to
+    know where 80% is, and a control that would have to guess is worse than no control.
+*@
+@if (CanTargetSoc)
+{
+    <div class="control">
+        <label for="charge-priority">Charging priority</label>
+        <select id="charge-priority" @bind="_priority" @bind:event="onchange" @bind:after="OnFormEdited">
+            <option value="@TargetedChargePriority.Cheapest">Cheapest — use as much sun as possible</option>
+            <option value="@TargetedChargePriority.JustInTime">Just in time — reach the target right before departure</option>
+        </select>
+        <span class="hint">
+            Both meet the departure. <strong>Cheapest</strong> paces the charge across the window and
+            takes every watt of sun above that pace, so the target is usually met well before you
+            leave. <strong>Just in time</strong> delivers everything up to the rest level the same way,
+            then holds the last stretch back so the car is not sitting full overnight — which costs
+            grid, because the sun is turned down while it waits.
+        </span>
+    </div>
+}
+
+@if (_priority == TargetedChargePriority.JustInTime && CanTargetSoc)
+{
+    <div class="control">
+        <label for="rest-soc">Rest at (%)</label>
+        <input id="rest-soc" type="number" step="5" min="0" max="100"
+               @bind="_restSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">@RestHint()</span>
+    </div>
+}
+
 <div class="control">
     <label for="target-departure">Ready by</label>
     <input id="target-departure" type="datetime-local"
@@ -165,6 +198,15 @@ else
         @if (_preview is { } preview)
         {
             <TargetedPlanView Plan="preview" />
+
+            @*
+                The cost of the choice, said before the button that commits it. A hold is worth making
+                with the number in front of you, not discovered on next month's bill.
+            *@
+            @if (HoldCost() is { } cost)
+            {
+                <p class="muted" id="hold-cost">@cost</p>
+            }
         }
         else
         {
@@ -224,8 +266,10 @@ else
     }
 
     private TargetBasis _basis = TargetBasis.Energy;
+    private TargetedChargePriority _priority = TargetedChargePriority.Cheapest;
     private double _energyKWh = 20;
     private double _targetSocPercent = 80;
+    private double _restSocPercent;
     private DateTime _departure;
     private double _minBatterySocPercent;
     private string? _error;
@@ -240,10 +284,16 @@ else
     private TargetedChargeRequest? _previewRequest;
     private bool _previewed;
 
+    // The same request priced the cheap way, kept only to name what just-in-time costs. Built in the
+    // preview and nowhere else: running two plans on every poll to report a counterfactual is not worth
+    // the cycles on a Pi, and a running plan should report what it is doing, not what it declined to do.
+    private TargetedChargePlan? _cheapestPreview;
+
     protected override void OnInitialized()
     {
         Target.Changed += OnRequestChanged;
 
+        _restSocPercent = Display.DefaultRestSocPercent;
         SeedForm(Target.Request);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
         RefreshVehicle();
@@ -300,6 +350,13 @@ else
                 _targetSocPercent = soc;
             }
 
+            _priority = request.Priority;
+
+            if (request.RestSocPercent is { } rest)
+            {
+                _restSocPercent = rest;
+            }
+
             return;
         }
 
@@ -324,6 +381,7 @@ else
     {
         _preview = null;
         _previewRequest = null;
+        _cheapestPreview = null;
         _previewed = false;
     }
 
@@ -343,6 +401,14 @@ else
         // pretending to a plan built on zeroes. Either way the owner gets the Start button: a service
         // that has only just come up can still be given a target.
         _preview = Preview.Preview(request);
+
+        // What the same energy by the same time would have cost without the hold. Only when a hold was
+        // actually planned: on a request with nothing above the rest point the two plans are the same
+        // plan, and "0.0 kWh more" is a sentence about nothing.
+        _cheapestPreview = request.HoldsTail
+            ? Preview.Preview(request with { Priority = TargetedChargePriority.Cheapest, TailEnergyWh = 0 })
+            : null;
+
         _previewed = true;
     }
 
@@ -443,7 +509,35 @@ else
             return false;
         }
 
-        request = new TargetedChargeRequest(energyWh, departBy, now, targetSoc, socNow);
+        request = new TargetedChargeRequest(energyWh, departBy, now, targetSoc, socNow)
+            with
+            {
+                Priority = _priority,
+            };
+
+        // The split, made once and here — the same place and the same moment as the SOC → kWh
+        // conversion above, so a reading that lands later cannot move a promise already part delivered.
+        // The planner is handed watt-hours and never sees a percentage again.
+        if (_priority == TargetedChargePriority.JustInTime && CanTargetSoc)
+        {
+            var endSoc = targetSoc ?? VehicleTargetEnergy.ResultingSocPercent(
+                _vehicle?.SocPercent, energyWh, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+
+            var tailWh = endSoc is { } end
+                ? VehicleTargetEnergy.TailAboveRestWh(
+                    _vehicle?.SocPercent, end, _restSocPercent,
+                    VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency)
+                : null;
+
+            request = request with
+            {
+                // Never more than the request itself: a rest point below where the car already sits
+                // would otherwise hold back energy the request never contained.
+                TailEnergyWh = Math.Clamp(tailWh ?? 0, 0, energyWh),
+                RestSocPercent = _restSocPercent,
+            };
+        }
+
         error = null;
         return true;
     }
@@ -454,6 +548,65 @@ else
             ? $"Charging to {target:F0}%, from the {request.VehicleSocPercentAtRequest:F0}% the car last "
                 + $"reported: {request.RequiredEnergyWh / 1000:F1} kWh at the charger, charge losses included."
             : $"{request.RequiredEnergyWh / 1000:F1} kWh at the charger.";
+
+    /// <summary>
+    /// What the hold will actually amount to, in the terms the owner set it in. The interesting case is
+    /// a car already past the rest point: there is no tail to hold, the whole charge is the tail, and
+    /// saying so is better than silently behaving like Cheapest.
+    /// </summary>
+    private string RestHint()
+    {
+        if (_vehicle?.SocPercent is not { } socNow)
+        {
+            return "No usable SOC reading to measure the rest point from.";
+        }
+
+        if (socNow >= _restSocPercent)
+        {
+            return $"The car is already at {Percent(socNow)}, at or above the {_restSocPercent:F0}% rest level, so "
+                + "the whole charge is the held stretch and none of it will start until the release time.";
+        }
+
+        var endSoc = _basis == TargetBasis.Soc && CanTargetSoc
+            ? _targetSocPercent
+            : VehicleTargetEnergy.ResultingSocPercent(
+                socNow, _energyKWh * 1000, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency) ?? 0;
+
+        if (endSoc <= _restSocPercent)
+        {
+            return $"This target finishes at about {endSoc:F0}%, at or below the {_restSocPercent:F0}% rest level, so "
+                + "there is nothing above it to hold and the charge runs as it would under Cheapest.";
+        }
+
+        var tailWh = VehicleTargetEnergy.TailAboveRestWh(
+            socNow, endSoc, _restSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+
+        return $"The car charges on the sun up to {_restSocPercent:F0}% whenever the sun is there, then waits. "
+            + $"The last {(tailWh ?? 0) / 1000:F1} kWh — about {_restSocPercent:F0}% to {endSoc:F0}% — is scheduled "
+            + "to land just before you leave.";
+    }
+
+    /// <summary>
+    /// What choosing the hold costs, against the same energy by the same time charged as cheaply as
+    /// possible. Empty when there is nothing to say: no comparison built, or the two plans buy the same.
+    /// </summary>
+    private string? HoldCost()
+    {
+        if (_preview is not { } held || _cheapestPreview is not { } cheap)
+        {
+            return null;
+        }
+
+        var extraWh = held.GridEnergyWh - cheap.GridEnergyWh;
+        if (extraWh <= 100)
+        {
+            return "Holding the last stretch costs nothing here — the forecast has no sun to give it up.";
+        }
+
+        return $"Just in time buys about {extraWh / 1000:F1} kWh more from the grid than charging as cheaply as "
+            + $"possible would, because the sun is turned down while the tail waits. That is the trade: the car "
+            + $"sits at {_restSocPercent:F0}% overnight instead of at its target.";
+    }
 
     private string SocConversionHint()
     {

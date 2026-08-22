@@ -4,6 +4,88 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-23 — A full battery arrives just before departure, and the car's own choices are decisive (issue #101)
+
+`Targeted` optimised one thing: grid spend. It answered "when does the car reach the target?" by
+accident — whenever the sun and the pace happened to land it, which on a sunny day with an 07:00
+departure is mid-afternoon, followed by fifteen hours sitting at 100%. Right for a partial charge,
+wrong for a full one.
+
+**A request now carries a priority.** `Cheapest` is the default and is the existing behaviour
+unchanged; `JustInTime` holds the last stretch back so the car finishes shortly before departure.
+
+### Only the tail is held, and the split is made in watt-hours
+
+Delaying the whole charge would forfeit a sunny day to protect the top of the pack and then buy the
+lot from the grid at 04:00. So the request carries a `TailEnergyWh` — the energy above a rest state of
+charge — and everything below it is delivered exactly as `Cheapest` delivers it.
+
+The split is computed **once, at activation**, alongside the SOC → kWh conversion in
+`VehicleTargetEnergy` and for the identical reason: a cloud SOC arriving at 02:00 must not move a
+promise that is already half delivered. Past that point nothing reasons about state of charge. The
+planner has spent four phases keeping percentages out of its arithmetic and this does not smuggle them
+back in.
+
+### The planner runs the same paced pass twice
+
+No new maths and no fifth `TargetedChargeStrategy`. `PaceOverWindow` runs over `[now, release]` for
+the free part and `[release, deadline]` for the tail, and the two are merged. `Within` prorates a slice
+that straddles the release — energies scale, powers do not, so `AvailableWatts` survives the cut and
+the pass does not know it is looking at a sub-window.
+
+`release = deadline − tail ÷ P_max − ReleaseSlack`.
+
+### What we deliberately did not build
+
+A first draft of the issue proposed a `TailPowerFactor` to model the taper, then an apparatus for doing
+better: reading `settings.target_soc` off the EU Data Act channel to gate impossible targets, and
+deriving an empirical charge curve from the `active`/`actual`/`VehicleSocPercent` samples the session
+store has recorded since #32. All of it was dropped, on the owner's call, and the reasoning is worth
+keeping:
+
+- **The car's limit is not ours to predict.** If it is set to stop at 80%, it stops at 80% — and
+  `TargetedChargingController` already reports that through `CompletionDwell`: *"car stopped drawing for
+  12 min at 12.4 kWh of 15.0 kWh — its own limit, short of the target."* That sentence is the honest
+  answer. Nothing is improved by having guessed it in advance.
+- **A gate on an advisory feed fails the wrong way.** The vehicle source expires after ~15 hours and
+  needs a human with an email OTP. A gate built on it would refuse valid charges whenever it lapsed,
+  which is worse than the failure it prevents.
+- **The loop already self-corrects.** The plan is rebuilt every poll from measured delivery, so a slow
+  tail raises its own pace until it saturates at maximum current, and `ShortfallWh` reports the gap
+  before departure. `ReleaseSlack` is a plain margin, not a model.
+
+Both are recorded as deferred on #101, with the trigger that would justify them: recorded sessions
+showing the tail routinely missing its release for reasons the pace cannot recover from.
+
+### The hold refuses the sun, and both surfaces say so
+
+This is the one place in the mode that turns real surplus down. Once the free part is delivered,
+`plan.IsHoldingAt(now)` is true and the controller pauses — taking a bright afternoon would put the car
+at its target by teatime, which is exactly what the priority exists to prevent. It costs money, so
+*Preview* runs the planner **both ways** and names the difference in kilowatt-hours before the button
+that commits it. Preview only: two plans per poll to report a counterfactual is not worth the cycles on
+a Pi.
+
+A charger sitting visibly idle for hours is the most convincing impersonation of a fault this
+controller can produce, so the controller's reason, the plan narrative and the README all say *"idle on
+purpose"* in as many words.
+
+### The deadline outranks the priority
+
+The hold is abandoned — silently, back to an ordinary paced charge — when the release has already
+passed, when there is nothing above the rest point, or when holding would leave the free part more than
+the shortened window can deliver. Worth noting that with zero slack that last case can never fire: the
+free window loses exactly the time the tail gains. It is `ReleaseSlack` that costs room, which is why
+the test demonstrating it has to set one.
+
+### Offered only when it can be honoured
+
+The rest point is a state of charge, so it needs the car's SOC *and* `Vehicle:BatteryCapacityKWh` — the
+same rule the **Battery target (%)** basis follows. Without both the web control does not appear, and a
+Home Assistant activation logs a warning and charges with nothing held rather than pretending.
+
+---
+
 ## 2026-08-22 — The car answers what it can, and the plan is quoted before it is promised
 
 Issue #99. `Targeted` asked for kilowatt-hours because the planner's contract is kilowatt-hours (#80),

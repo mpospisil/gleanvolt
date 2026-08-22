@@ -36,6 +36,18 @@
           Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
     <Stat Label="Shortfall" Value="@Kwh(Plan.ShortfallWh)"
           Hint="How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount asked for." />
+    @*
+        Only under a just-in-time hold. On every other plan these two would read "0.0 kWh" and "—",
+        which is a pair of answers to a question nobody asked.
+    *@
+    @if (Plan.HoldUntil is { } release)
+    {
+        <Stat Label="Held back" Value="@Kwh(Plan.TailEnergyWh)"
+              Hint="The last stretch of the target, scheduled to land just before departure instead of whenever the sun offers it — so the car does not sit at a high state of charge all night. Everything below it is charged normally." />
+        <Stat Label="Released at" Value="@Clock(release)"
+              Hint="When the held stretch starts. Worked out from the charger's maximum power plus a slack margin; if the car takes it more slowly than that, the pace rises on the next poll and the shortfall figure reports it if even that will not do it." />
+    }
+
     <Stat Label="Battery SOC floor" Value="@Percent(Plan.SocFloorPercent)"
           Hint="The home battery is not drawn below this to feed the car; the grid covers the gap instead." />
     <Stat Label="Ready by" Value="@Clock(Plan.Deadline)"

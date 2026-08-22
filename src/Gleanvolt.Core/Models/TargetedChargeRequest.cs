@@ -1,3 +1,5 @@
+using Gleanvolt.Core.Enums;
+
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -32,16 +34,48 @@ namespace Gleanvolt.Core.Models;
 /// What the car was reporting when the conversion was made, so the request can be read back as
 /// "42% → 80%" rather than only as a number of kilowatt-hours. Null on an energy request.
 /// </param>
+/// <param name="Priority">
+/// What to optimise while delivering it. <see cref="Enums.TargetedChargePriority.Cheapest"/> for every
+/// request that does not say otherwise, which is what makes this addition invisible to anything that
+/// was working before it.
+/// </param>
+/// <param name="TailEnergyWh">
+/// Under <see cref="Enums.TargetedChargePriority.JustInTime"/>, how much of
+/// <paramref name="RequiredEnergyWh"/> is the <b>held tail</b> — the last stretch, scheduled to land at
+/// the deadline rather than whenever the sun offers it. Zero under
+/// <see cref="Enums.TargetedChargePriority.Cheapest"/>, and zero whenever no rest point could be
+/// worked out.
+///
+/// <para><b>Watt-hours, and computed once.</b> The split is made at activation from a rest state of
+/// charge, by the same arithmetic and in the same place as the SOC → kWh conversion beside it, and for
+/// the identical reason: a cloud SOC that arrives at 02:00 must not move a promise that is already
+/// half delivered. Past this point nothing reasons about state of charge — the planner sees energy,
+/// as it always has.</para>
+/// </param>
+/// <param name="RestSocPercent">
+/// The state of charge the tail was measured down to, kept only so the hold can be described in the
+/// terms it was asked in ("holding at 80%"). Null when the split was not made.
+/// </param>
 public sealed record TargetedChargeRequest(
     double RequiredEnergyWh,
     DateTimeOffset DepartBy,
     DateTimeOffset ActivatedAt,
     double? TargetSocPercent = null,
-    double? VehicleSocPercentAtRequest = null)
+    double? VehicleSocPercentAtRequest = null,
+    TargetedChargePriority Priority = TargetedChargePriority.Cheapest,
+    double TailEnergyWh = 0,
+    double? RestSocPercent = null)
 {
     /// <summary>
     /// Whether the owner asked in state of charge. Purely about how the request is <em>described</em>
     /// — every consumer downstream of here reads <see cref="RequiredEnergyWh"/> either way.
     /// </summary>
     public bool IsSocBased => TargetSocPercent is not null;
+
+    /// <summary>
+    /// Whether this request actually asks for anything to be held back. Both halves matter: the
+    /// priority is the owner's choice, and a tail of zero means there was nothing above the rest point
+    /// to hold — a car already past it, or an install with no way to know where it is.
+    /// </summary>
+    public bool HoldsTail => Priority == TargetedChargePriority.JustInTime && TailEnergyWh > 0;
 }

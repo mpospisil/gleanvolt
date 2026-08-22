@@ -39,14 +39,16 @@ public class TargetedChargePlannerTests
 
     private static TargetedChargePlannerOptions Options(
         double minSocFloorPercent = 50,
-        TimeSpan? safetyMargin = null) =>
+        TimeSpan? safetyMargin = null,
+        TimeSpan? releaseSlack = null) =>
         new(
             BatteryCapacityWh: CapacityWh,
             ChargeEfficiency: 0.95,
             MinChargePowerWatts: MinChargePowerWatts,
             MaxChargePowerWatts: MaxChargePowerWatts,
             MinBatterySocFloorPercent: minSocFloorPercent,
-            SafetyMargin: safetyMargin ?? TimeSpan.Zero);
+            SafetyMargin: safetyMargin ?? TimeSpan.Zero,
+            ReleaseSlack: releaseSlack ?? TimeSpan.Zero);
 
     private static TargetedChargePlan Plan(
         double requiredWh,
@@ -56,10 +58,15 @@ public class TargetedChargePlannerTests
         SolarForecast? forecast = null,
         double deliveredWh = 0,
         TargetedChargePlannerOptions? options = null,
-        DateTimeOffset? batteryFullBy = null) =>
+        DateTimeOffset? batteryFullBy = null,
+        double tailWh = 0) =>
         TargetedChargePlanner.Plan(
             State(socPercent, now),
-            new TargetedChargeRequest(requiredWh, departBy, ActivatedAt: now),
+            new TargetedChargeRequest(requiredWh, departBy, ActivatedAt: now)
+            {
+                Priority = tailWh > 0 ? TargetedChargePriority.JustInTime : TargetedChargePriority.Cheapest,
+                TailEnergyWh = tailWh,
+            },
             deliveredWh,
             forecast ?? Forecast(BellDay),
             batteryFullBy ?? BatteryFullBy,
@@ -447,5 +454,172 @@ public class TargetedChargePlannerTests
         var plan = Plan(requiredWh: 5_000, departBy: FirstPeriodEnd.AddHours(4), now: now, options: Options(minSocFloorPercent: 60));
 
         Assert.Equal(60, plan.SocFloorPercent, 1);
+    }
+
+    // --- Just in time (#101): the last stretch lands at the deadline, not whenever the sun offers it ---
+
+    [Fact]
+    public void JustInTime_HoldsTheTailBackToTheLatestItCanStartAndStillFinish()
+    {
+        // 10 hours of window, 4kWh of tail. At 11.04kW the tail needs ~22 minutes, so the release is
+        // ~22 minutes before the deadline and everything else is charged before it.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var departBy = now.AddHours(10);
+        var plan = Plan(requiredWh: 12_000, departBy: departBy, now: now, tailWh: 4_000);
+
+        Assert.Equal(4_000, plan.TailEnergyWh, 1);
+        Assert.NotNull(plan.HoldUntil);
+
+        var expected = departBy - TimeSpan.FromHours(4_000 / MaxChargePowerWatts);
+        Assert.Equal(expected, plan.HoldUntil!.Value, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void JustInTime_LeavesTheEnergyBelowTheRestPointToChargeNormallyOnTheSun()
+    {
+        // The point of splitting at a rest point rather than delaying the lot: the free part still
+        // takes the plateau, so a sunny window is not forfeited to protect the top of the pack.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 12_000, departBy: now.AddHours(10), now: now, tailWh: 4_000);
+
+        Assert.True(plan.SolarEnergyWh > 0, "the free part should still be charging on forecast surplus");
+
+        // And it is charging before the release, not after it.
+        Assert.Contains(plan.Blocks, b => b.Source == TargetedChargeSource.Solar && b.Start < plan.HoldUntil);
+    }
+
+    [Fact]
+    public void JustInTime_SchedulesTheTailAfterTheReleaseAndNotBefore()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 12_000, departBy: now.AddHours(10), now: now, tailWh: 4_000);
+
+        var release = plan.HoldUntil!.Value;
+
+        // Everything scheduled at or after the release adds up to the tail: the two windows are
+        // planned separately and nothing leaks across the boundary.
+        var afterRelease = plan.Blocks.Where(b => b.End > release).Sum(b => b.EnergyWh);
+        Assert.InRange(afterRelease, 3_950, 4_050);
+    }
+
+    [Fact]
+    public void JustInTime_IsAbandonedWhenTheRestOfTheChargeWouldNotFitBeforeTheRelease()
+    {
+        // The promise outranks the preference.
+        //
+        // Note what makes this bite: the slack. Without it the free window shrinks by exactly the time
+        // the tail needs, so the split can never make an otherwise-feasible request infeasible. The
+        // release slack is what actually costs the free part room -- half an hour of it is 5.5kWh at
+        // full power -- and with a 20kWh request in a 22.08kWh window there is not that much to spare.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(
+            requiredWh: 20_000, departBy: now.AddHours(2), now: now, tailWh: 4_000,
+            options: Options(releaseSlack: TimeSpan.FromMinutes(30)));
+
+        Assert.Null(plan.HoldUntil);
+        Assert.Equal(0, plan.TailEnergyWh);
+
+        // And giving the hold up actually bought something: the same request held would have arrived
+        // further short than the unheld one does.
+        var cheapest = Plan(requiredWh: 20_000, departBy: now.AddHours(2), now: now);
+        Assert.True(
+            plan.ShortfallWh <= cheapest.ShortfallWh + 1,
+            $"abandoning the hold should not cost delivery: {plan.ShortfallWh} vs {cheapest.ShortfallWh}");
+    }
+
+    [Fact]
+    public void JustInTime_WithNoSlackNeverMakesAFeasibleRequestInfeasible()
+    {
+        // The complement of the case above, and the reason it needs a slack to demonstrate: the free
+        // window loses exactly the time the tail gains, so a request that fits at all still fits split.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 22_000, departBy: now.AddHours(2), now: now, tailWh: 4_000);
+
+        Assert.NotNull(plan.HoldUntil);
+
+        // Not "no shortfall" -- a request this close to the ceiling leaves a little on the table under
+        // either priority, because the paced pass cannot run every slice flat out. The claim is only
+        // that splitting it costs nothing extra.
+        var cheapest = Plan(requiredWh: 22_000, departBy: now.AddHours(2), now: now);
+        Assert.True(
+            plan.ShortfallWh <= cheapest.ShortfallWh + 1,
+            $"splitting a feasible request should not cost delivery: {plan.ShortfallWh} vs {cheapest.ShortfallWh}");
+    }
+
+    [Fact]
+    public void JustInTime_IsAbandonedOnceTheReleasePointHasPassed()
+    {
+        // 4kWh of tail needs ~22 minutes at full power; with 20 minutes left the release is behind us,
+        // so there is nothing to wait in and the plan is today's single pass.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 4_000, departBy: now.AddMinutes(20), now: now, tailWh: 4_000);
+
+        Assert.Null(plan.HoldUntil);
+        Assert.Equal(0, plan.TailEnergyWh);
+    }
+
+    [Fact]
+    public void JustInTime_ReleaseSlackBringsTheTailForward()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var departBy = now.AddHours(10);
+
+        var tight = Plan(requiredWh: 12_000, departBy: departBy, now: now, tailWh: 4_000);
+        var slack = Plan(
+            requiredWh: 12_000, departBy: departBy, now: now, tailWh: 4_000,
+            options: Options(releaseSlack: TimeSpan.FromMinutes(30)));
+
+        Assert.Equal(
+            tight.HoldUntil!.Value.AddMinutes(-30), slack.HoldUntil!.Value, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void JustInTime_TailNeverExceedsWhatIsStillOwed()
+    {
+        // 9kWh already delivered against a 12kWh request leaves 3kWh, which is less than the 4kWh tail.
+        // The tail is what is left, not a figure from a request that is mostly in the car already.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(
+            requiredWh: 12_000, departBy: now.AddHours(10), now: now, deliveredWh: 9_000, tailWh: 4_000);
+
+        Assert.Equal(3_000, plan.RemainingEnergyWh, 1);
+        Assert.Equal(3_000, plan.TailEnergyWh, 1);
+
+        // And with nothing below the rest point left, the plan is holding right now.
+        Assert.True(plan.IsHoldingAt(now));
+    }
+
+    [Fact]
+    public void JustInTime_IsNotHoldingWhileThereIsStillEnergyBelowTheRestPointToDeliver()
+    {
+        // A hold being planned is not a hold being in force. Until the free part is delivered the car
+        // charges exactly as Cheapest would, and the controller must not sit idle.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 12_000, departBy: now.AddHours(10), now: now, tailWh: 4_000);
+
+        Assert.NotNull(plan.HoldUntil);
+        Assert.False(plan.IsHoldingAt(now));
+    }
+
+    [Fact]
+    public void Cheapest_IsUnchangedByAnyOfThis()
+    {
+        // The default path must be byte-for-byte what it was: same strategy, same figures, no hold.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 12_000, departBy: now.AddHours(10), now: now);
+
+        Assert.Null(plan.HoldUntil);
+        Assert.Equal(0, plan.TailEnergyWh);
+        Assert.False(plan.IsHoldingAt(now));
+    }
+
+    [Fact]
+    public void JustInTime_SaysWhatItIsHoldingAndUntilWhen()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var plan = Plan(requiredWh: 12_000, departBy: now.AddHours(10), now: now, tailWh: 4_000);
+
+        Assert.Contains("Holding the last", plan.Reason);
+        Assert.Contains("4.0kWh", plan.Reason);
     }
 }

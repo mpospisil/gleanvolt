@@ -73,6 +73,11 @@ public static class TargetedPlanNarrative
                 break;
         }
 
+        if (Held(plan, zone) is { } held)
+        {
+            paragraphs.Add(held);
+        }
+
         if (!plan.IsUsable)
         {
             paragraphs.Add(
@@ -116,6 +121,34 @@ public static class TargetedPlanNarrative
         return $"No surplus at all is forecast before then, so the whole {Kwh(plan.RemainingEnergyWh)} still needed "
             + $"comes from the grid, paced at about {pace} across the window. With no sun to wait for there is "
             + "nothing to be gained by putting it off, and spreading it leaves room to recover if anything drops out.";
+    }
+
+    /// <summary>
+    /// The held tail in words, or null when nothing is being held.
+    ///
+    /// <para>Two sentences, and which one comes back matters more than either. A plan that is
+    /// <em>going</em> to hold is still charging, and saying "waiting" about a running charger is
+    /// confusing; a plan that <em>is</em> holding has a charger sitting visibly idle with hours to go,
+    /// which is the single state most likely to be read as a fault. This is the paragraph that says it
+    /// is not.</para>
+    /// </summary>
+    private static string? Held(TargetedChargePlan plan, TimeZoneInfo zone)
+    {
+        if (plan.HoldUntil is not { } release)
+        {
+            return null;
+        }
+
+        var tail = Kwh(plan.TailEnergyWh);
+
+        return plan.IsHoldingAt(plan.Now)
+            ? $"Everything below the rest level is in the car, and the last {tail} is being held back until "
+                + $"{At(release, plan.Now, zone)}. Nothing is wrong — the charger is idle on purpose, so the car "
+                + "reaches its target shortly before you leave rather than sitting full all night. Sun arriving "
+                + "before then is deliberately turned down; that is what this priority costs."
+            : $"The last {tail} of it is held back until {At(release, plan.Now, zone)}, so the car finishes just "
+                + "before departure rather than hours early. Everything below the rest level is charged normally "
+                + "until then, on the sun wherever the sun is there.";
     }
 
     private static string Between(TargetedChargePlan plan, TimeZoneInfo zone) =>

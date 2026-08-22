@@ -4,6 +4,7 @@ using MQTTnet.Client;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 
 namespace Gleanvolt.Hosting.HomeAssistant;
@@ -23,6 +24,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IForecastRuntimeSettings _forecastSettings;
     private readonly ITargetedChargeSelector _target;
+    private readonly IVehicleTelemetry? _vehicle;
+    private readonly VehicleOptions _vehicleOptions;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -36,6 +39,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private double _pendingEnergyKWh;
     private DateTimeOffset? _pendingDeparture;
     private string _pendingDepartureText = string.Empty;
+    private TargetedChargePriority _pendingPriority = TargetedChargePriority.Cheapest;
+    private double _pendingRestSocPercent;
 
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
@@ -47,6 +52,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IServiceShutdown shutdown,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger,
+        IOptions<TargetedChargeOptions> targetedOptions,
+        IOptions<VehicleOptions> vehicleOptions,
+        IVehicleTelemetry? vehicle = null,
         TimeProvider? timeProvider = null)
     {
         _options = options.Value;
@@ -56,6 +64,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
         _target = target;
+        _vehicle = vehicle;
+        _vehicleOptions = vehicleOptions.Value;
+        _pendingRestSocPercent = targetedOptions.Value.JustInTime.RestSocPercent;
         _shutdown = shutdown;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _statusHolder = statusHolder;
@@ -159,6 +170,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.NumberCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        foreach (var objectId in HaDiscovery.SelectObjectIds)
+        {
+            await _client.SubscribeAsync(_discovery.SelectCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
         foreach (var objectId in HaDiscovery.TextObjectIds)
         {
             await _client.SubscribeAsync(_discovery.TextCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -190,6 +206,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
+        await PublishSelectStatesAsync(cancellationToken).ConfigureAwait(false);
 
         if (status is not null)
         {
@@ -221,6 +238,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // The active request outranks whatever was last typed: a target set from the web UI has to
         // show up here too, or the two surfaces would disagree about what the car is being charged to.
         yield return (HaDiscovery.TargetEnergyNumber, (_target.Request?.RequiredEnergyWh / 1000) ?? _pendingEnergyKWh);
+        yield return (HaDiscovery.TargetRestSocNumber, _target.Request?.RestSocPercent ?? _pendingRestSocPercent);
     }
 
     // The departure as text, echoed back so a Home Assistant restart (or a second dashboard) sees what
@@ -264,6 +282,22 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (topic == _discovery.ChargeOffCommandTopic)
         {
             return OnChargeOffAsync(payload);
+        }
+
+        foreach (var objectId in HaDiscovery.SelectObjectIds)
+        {
+            if (topic == _discovery.SelectCommandTopic(objectId))
+            {
+                return OnSelectCommandAsync(objectId, payload);
+            }
+        }
+
+        foreach (var objectId in HaDiscovery.SelectObjectIds)
+        {
+            if (topic == _discovery.SelectCommandTopic(objectId))
+            {
+                return OnSelectCommandAsync(objectId, payload);
+            }
         }
 
         foreach (var objectId in HaDiscovery.TextObjectIds)
@@ -396,6 +430,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 // Held, not applied: the button is what turns an amount into a promise.
                 _pendingEnergyKWh = Math.Max(0, value);
                 break;
+            case HaDiscovery.TargetRestSocNumber:
+                _pendingRestSocPercent = Math.Clamp(value, 0, 100);
+                break;
             default:
                 return Task.CompletedTask;
         }
@@ -403,6 +440,39 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // Echo back what was actually stored (the setters clamp), so a rejected value doesn't leave the
         // HA box showing something the controller isn't using.
         return PublishNumberStatesAsync(CancellationToken.None);
+    }
+
+    // The priority as text, echoed back so a Home Assistant restart sees what is actually being worked
+    // to. The running request outranks whatever was last selected, exactly as the energy number does.
+    private Task PublishSelectStatesAsync(CancellationToken cancellationToken)
+    {
+        var priority = _target.Request?.Priority ?? _pendingPriority;
+
+        return PublishAsync(
+            _discovery.SelectStateTopic(HaDiscovery.TargetPrioritySelect),
+            priority.ToString(),
+            retain: true,
+            cancellationToken);
+    }
+
+    private Task OnSelectCommandAsync(string objectId, string? payload)
+    {
+        if (objectId != HaDiscovery.TargetPrioritySelect)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!Enum.TryParse<TargetedChargePriority>(payload, ignoreCase: true, out var priority))
+        {
+            _logger.LogWarning(
+                "Ignoring unrecognised charge priority '{Payload}'; expected Cheapest or JustInTime.", payload);
+            return Task.CompletedTask;
+        }
+
+        // Held like the energy and the departure: a priority chosen and not yet activated is not a
+        // request, and the button is what makes all four of them one.
+        _pendingPriority = priority;
+        return PublishSelectStatesAsync(CancellationToken.None);
     }
 
     private Task OnTextCommandAsync(string objectId, string? payload)
@@ -453,7 +523,42 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
-        _target.Set(new TargetedChargeRequest(_pendingEnergyKWh * 1000, departure, now), "Home Assistant");
+        var energyWh = _pendingEnergyKWh * 1000;
+        var request = new TargetedChargeRequest(energyWh, departure, now) with { Priority = _pendingPriority };
+
+        // The same split the web tab makes, made in the same place in the sequence and by the same
+        // arithmetic. It needs the car's SOC and a configured capacity: without both there is no honest
+        // rest point, so the priority is honoured as far as it can be -- the request is still marked
+        // JustInTime -- and the tail is zero, which means nothing is held. Warned about rather than
+        // silently ignored, because a hold that quietly did not happen is the worst of the three.
+        if (_pendingPriority == TargetedChargePriority.JustInTime)
+        {
+            var socNow = _vehicle?.GetCurrentState()?.SocPercent;
+            var capacityWh = _vehicleOptions.BatteryCapacityKWh * 1000;
+            var endSoc = VehicleTargetEnergy.ResultingSocPercent(
+                socNow, energyWh, capacityWh, _vehicleOptions.ChargeEfficiency);
+
+            var tailWh = endSoc is { } end
+                ? VehicleTargetEnergy.TailAboveRestWh(
+                    socNow, end, _pendingRestSocPercent, capacityWh, _vehicleOptions.ChargeEfficiency)
+                : null;
+
+            if (tailWh is null)
+            {
+                _logger.LogWarning(
+                    "Just-in-time asked for, but there is no car SOC and/or no Vehicle:BatteryCapacityKWh to "
+                    + "measure a {Rest:F0}% rest point from; charging without a hold.",
+                    _pendingRestSocPercent);
+            }
+
+            request = request with
+            {
+                TailEnergyWh = Math.Clamp(tailWh ?? 0, 0, energyWh),
+                RestSocPercent = _pendingRestSocPercent,
+            };
+        }
+
+        _target.Set(request, "Home Assistant");
         await OnStartAsync(ChargeControlMode.Targeted, payload).ConfigureAwait(false);
     }
 

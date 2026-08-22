@@ -25,6 +25,17 @@ namespace Gleanvolt.Core.Models;
 /// How far before departure the plan finishes. "Ready at 07:00" must not mean "still charging at
 /// 07:00" — the car needs a moment to settle and the owner needs to be able to unplug and go.
 /// </param>
+/// <param name="ReleaseSlack">
+/// How much earlier than strictly necessary a held tail is released under
+/// <see cref="TargetedChargePriority.JustInTime"/>.
+///
+/// <para>The release point is <c>deadline − tail ÷ MaxChargePowerWatts − ReleaseSlack</c>, and this is
+/// the only allowance made for the tail running slower than the charger's rated maximum — which it
+/// usually will, because a car near full tapers. Nothing here tries to predict by how much: the plan is
+/// rebuilt every poll from measured delivery, so a slow tail raises its own pace until it saturates at
+/// maximum current, and <see cref="TargetedChargePlan.ShortfallWh"/> reports the gap before departure
+/// if even that will not do it. Guessing the taper in advance buys nothing this does not.</para>
+/// </param>
 /// <param name="Confidence">Which forecast band to plan on. P10 by default, as elsewhere.</param>
 public sealed record TargetedChargePlannerOptions(
     double BatteryCapacityWh,
@@ -33,4 +44,5 @@ public sealed record TargetedChargePlannerOptions(
     double MaxChargePowerWatts,
     double MinBatterySocFloorPercent,
     TimeSpan SafetyMargin,
+    TimeSpan ReleaseSlack = default,
     ForecastConfidence Confidence = ForecastConfidence.P10);

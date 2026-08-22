@@ -401,7 +401,10 @@ public static class GleanvoltHostingExtensions
         // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
         // before the request is ever made, and that limit lives in this assembly's options.
         services.AddSingleton(provider =>
-            new TargetedDisplayOptions(provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value.MaxHorizon));
+        {
+            var targeted = provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value;
+            return new TargetedDisplayOptions(targeted.MaxHorizon, targeted.JustInTime.RestSocPercent);
+        });
 
         AddWebSurface(services, configuration);
 
