@@ -52,6 +52,29 @@ public sealed class VehicleOptions
     public TimeSpan MaxAge { get; init; } = TimeSpan.FromHours(12);
 
     /// <summary>
+    /// The drive battery's <b>usable</b> capacity, in kilowatt-hours — the figure the car's own SOC is
+    /// a percentage of, not the gross pack size on the brochure. An ID.4 Pro is 77 usable of 82 gross;
+    /// using the larger number would overshoot every SOC-based target by 6%.
+    ///
+    /// <para><b>No default, and that is deliberate.</b> Zero means "not configured", and the only thing
+    /// it costs is the <i>Battery target (%)</i> basis on the targeted plan: with no capacity there is
+    /// no honest conversion from "80%" to kilowatt-hours, and a guessed pack size would make every such
+    /// target quietly wrong rather than visibly unavailable. Everything else works exactly as before.</para>
+    /// </summary>
+    public double BatteryCapacityKWh { get; init; }
+
+    /// <summary>
+    /// How much of what the charger meters actually reaches the cells, (0..1]. Applied to SOC-based
+    /// targets: the target is measured at the charger, and asking for the difference in the pack alone
+    /// arrives short by the on-board rectifier's losses.
+    ///
+    /// <para>0.9 is a fair single-phase-to-three-phase AC average. It is not the same number as
+    /// <c>Forecast:ChargeEfficiency</c>, which is the <em>home battery's</em> PV → pack figure; the two
+    /// describe different hardware and are configured separately for that reason.</para>
+    /// </summary>
+    public double ChargeEfficiency { get; init; } = 0.9;
+
+    /// <summary>
     /// How long to wait before retrying after a failed connection, and how often the loop re-checks
     /// that the subscription is still alive. This is not a poll interval — telemetry arrives by
     /// subscription, whenever the publisher sends it.

@@ -16,8 +16,13 @@ namespace Gleanvolt.Hosting.Targeting;
 /// <para>The <see cref="DayPlanProvider"/> pattern, and for the same reason: the planner in
 /// <c>Gleanvolt.Core</c> stays pure, and this is where its output meets the clock, the forecast cache
 /// and the log. Singleton — it accumulates delivery against one request.</para>
+///
+/// <para>It also answers <see cref="ITargetedChargePreview"/>, because everything a preview needs is
+/// already here — the last reading, the forecast cache, the house-load profile, the bias and the
+/// options. A preview is the same planner call with nothing delivered and nothing logged, and it
+/// leaves the running target's metering exactly where it found it.</para>
 /// </summary>
-public sealed class TargetedChargeProvider
+public sealed class TargetedChargeProvider : ITargetedChargePreview
 {
     /// <summary>Floor on how often the plan line may be logged at Information. See <see cref="LogPlan"/>.</summary>
     private static readonly TimeSpan MinimumPlanLogInterval = TimeSpan.FromMinutes(5);
@@ -37,6 +42,11 @@ public sealed class TargetedChargeProvider
     // mode is not part of this promise.
     private readonly EnergyIntegrator _delivered = new();
     private DateTimeOffset? _activatedAt;
+
+    // The last reading a plan was built from, kept so a preview can be anchored to the same instant the
+    // running plan is. Volatile rather than locked: it is a whole immutable record replaced wholesale,
+    // and a preview reading the poll before the current one is a plan one cycle old, not a wrong one.
+    private volatile EnergyState? _lastState;
 
     private string? _lastSignature;
     private DateTimeOffset _lastLoggedAt = DateTimeOffset.MinValue;
@@ -79,6 +89,13 @@ public sealed class TargetedChargeProvider
     /// </summary>
     public TargetedChargePlan? Update(EnergyState state)
     {
+        ArgumentNullException.ThrowIfNull(state);
+
+        // Before the early return, not after it: a preview is wanted precisely when no target is
+        // running, and a "no poll has completed yet" on a service that has been up for hours would be
+        // a lie told at the moment the owner is deciding whether to trust the plan at all.
+        _lastState = state;
+
         var request = _selector.Request;
 
         // A new request starts a new count. Keyed on the activation instant rather than on reference
@@ -99,10 +116,32 @@ public sealed class TargetedChargeProvider
 
         _delivered.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
 
-        var plan = TargetedChargePlanner.Plan(
+        var plan = BuildPlan(state, request, _delivered.EnergyWattHours);
+
+        LogPlan(plan);
+        return plan;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Nothing delivered, because a preview is a quote for a charge that has not started — the whole
+    /// request is still ahead of it. And nothing logged: the owner may press Preview twenty times while
+    /// they settle on a departure, and twenty plan lines would bury the one the charger is actually
+    /// working to.
+    /// </remarks>
+    public TargetedChargePlan? Preview(TargetedChargeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return _lastState is { } state ? BuildPlan(state, request, deliveredWh: 0) : null;
+    }
+
+    private TargetedChargePlan BuildPlan(EnergyState state, TargetedChargeRequest request, double deliveredWh)
+    {
+        return TargetedChargePlanner.Plan(
             state,
             request,
-            _delivered.EnergyWattHours,
+            deliveredWh,
             // The window the request actually spans, not "today": an overnight target reaches into
             // tomorrow's periods, and this is the call that returns them.
             //
@@ -116,9 +155,6 @@ public sealed class TargetedChargeProvider
             _dayPlan.HouseLoad,
             _dayPlan.BiasFactor,
             PlannerOptions());
-
-        LogPlan(plan);
-        return plan;
     }
 
     /// <summary>

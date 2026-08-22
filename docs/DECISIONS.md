@@ -4,6 +4,64 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-22 — The car answers what it can, and the plan is quoted before it is promised
+
+Issue #99. `Targeted` asked for kilowatt-hours because the planner's contract is kilowatt-hours (#80),
+and the reason still holds: a cloud SOC is routinely hours stale, and a promise built on it is a
+promise built on a guess. But the owner standing at the charger at 22:00 thinks *"it's on 42%, I want
+80% by seven"*, and the car is plugged in and already telling us the 42%.
+
+**Decision — energy stays the contract; state of charge becomes a way of *asking*.** Everything
+downstream of the request reads `RequiredEnergyWh` and nothing else. `VehicleTargetEnergy` converts a
+percentage to watt-hours at the charger — `(target − now) / 100 × usable capacity ÷ charge
+efficiency` — and the result is what is recorded.
+
+**Decision — the conversion happens once, at activation, and is never re-derived.** A parked car
+reports when it feels like it. A SOC that jumps six points at 02:00 because the car finally phoned home
+would otherwise move a promise that is already half delivered — quietly, overnight, with nobody
+watching. The request keeps the target and the SOC it was measured from, but only so it can be *read
+back* as "42% → 80%".
+
+**Decision — no configured pack size, no SOC basis.** `Vehicle:BatteryCapacityKWh` has no default.
+Guessing a capacity would make every such target quietly wrong; refusing to offer the control makes the
+gap visible, and costs nothing else on the install.
+
+**Decision — a stale reading is flagged, not withdrawn.** Stale means "the feed may be dead", not "the
+number is wrong": a parked car's SOC does not drift. Withdrawing the basis would only push the owner
+into doing the same arithmetic in their head from the very same figure.
+
+**Decision — range is display only, and is not recorded on the session.** Nothing here could compute
+it and nothing here should plan on it, but it is the figure that actually answers "is 80% enough for
+the trip?" while a target is being set. A session that has finished is not asked that question, so it
+gains no column.
+
+### The plan is shown before the charger moves
+
+**Decision — Preview and Start are two presses, and the quote is a separate seam from the promise.**
+`ITargetedChargePreview` runs the same planner on the same telemetry with delivery at zero, and writes
+to nothing — no request, no mode, no device — so it can be pressed as often as the owner likes,
+including while a target is already running. `ITargetedChargeSelector` remains the only way to promise
+anything.
+
+The case it earns its keep on is the one that cannot be fixed afterwards: *"even flat out you get 24 of
+the 31 kWh you asked for; the departure that covers it is 05:40"* is worth knowing before the charger
+starts, not after.
+
+**Decision — the preview and the running plan render through one component.** What you confirm has to
+be what you then watch. A preview that summarised and a running plan that detailed would leave the
+owner comparing two descriptions instead of one plan against reality.
+
+**Decision — any edit drops the preview.** Otherwise a button that says start sits under a plan
+describing figures that have since changed. The Start button does not exist until a plan has been
+built, and stops existing the moment the form moves under it.
+
+**Decision — "nothing to plan from" is a sentence, not a locked button.** Before the first poll there
+is no SOC, no house load and no instant to anchor to, and a plan built on zeroes would look like an
+answer. The preview says so and still offers Start: a service that has only just come up can be given
+a target, and the plan appears on the first poll.
+
+---
+
 ## 2026-08-22 — The web UI splits along "reports" and "decides"
 
 Issue #98. The UI had grown one page per feature as the features landed: telemetry and controls on

@@ -1,0 +1,54 @@
+@inject TimeProvider Time
+
+@*
+    One targeted plan, in words and then in figures. Extracted from TargetedTab (#99) because the
+    plan is now shown twice on that tab and must read identically both times: once as a preview of a
+    request nobody has made yet, and once as the plan the charger is actually working to.
+
+    That identity is the point of the split, not a side-effect of it. What the owner confirms has to
+    be what they then watch -- a preview that summarised and a running plan that detailed would leave
+    them comparing two descriptions instead of one plan against reality.
+*@
+
+@foreach (var paragraph in TargetedPlanNarrative.Describe(Plan, Time.LocalTimeZone))
+{
+    <p>@paragraph</p>
+}
+
+<section class="stat-grid">
+    <Stat Label="Plan state" Value="@Plan.Strategy.ToString()"
+          Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: the sun carries what it can and the grid paces the rest. Maximum: there is not enough time, so everything available is taken." />
+    <Stat Label="Still needed" Value="@Kwh(Plan.RemainingEnergyWh)"
+          Hint="The request less what the charger has measurably delivered since it was activated." />
+    <Stat Label="Delivered so far" Value="@Kwh(Plan.DeliveredEnergyWh)"
+          Hint="Measured at the charger, so a car that limits itself to less than we asked for simply gets a longer grid block on the next poll." />
+    <Stat Label="Forecast surplus" Value="@Kwh(Plan.ForecastSurplusWh)"
+          Hint="All the surplus this window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided." />
+    <Stat Label="From sun" Value="@Kwh(Plan.SolarEnergyWh)"
+          Hint="The part of the surplus above that the car can actually run on alone. Zero does not mean no sun: it means no half-hour clears the charger's 6 A minimum, which is why the grid block is placed over the sunniest hours rather than after them." />
+    <Stat Label="From grid" Value="@Kwh(Plan.GridEnergyWh)"
+          Hint="What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought." />
+    <Stat Label="Charge pace" Value="@($"{Plan.RequiredPaceWatts / 1000:F1} kW")"
+          Hint="The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this plus whatever the roof is giving, so sun above it is free and lowers it for later. Zero means the forecast covers the target outright." />
+    <Stat Label="Charging from" Value="@(Plan.GridStart is { } start ? Clock(start) : "—")"
+          Hint="When the first grid-funded charging starts. The charge is spread across the window rather than run flat out, because the charger can only use the sun that shines while it runs." />
+    <Stat Label="Expected by departure" Value="@Kwh(Plan.ExpectedEnergyWh)"
+          Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
+    <Stat Label="Shortfall" Value="@Kwh(Plan.ShortfallWh)"
+          Hint="How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount asked for." />
+    <Stat Label="Battery SOC floor" Value="@Percent(Plan.SocFloorPercent)"
+          Hint="The home battery is not drawn below this to feed the car; the grid covers the gap instead." />
+    <Stat Label="Ready by" Value="@Clock(Plan.Deadline)"
+          Hint="The finish line the plan works to: your departure less the safety margin." />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public TargetedChargePlan Plan { get; set; } = default!;
+
+    private string Clock(DateTimeOffset instant) =>
+        TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString("ddd HH:mm");
+
+    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+
+    private static string Percent(double percent) => $"{percent:F0}%";
+}

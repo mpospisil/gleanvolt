@@ -112,6 +112,13 @@ services:
       Vehicle__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
 
+      # The car's *usable* pack, which is what its own SOC is a percentage of (issue #99). Zero means
+      # unconfigured, and costs exactly one thing: the targeted plan's "Battery target (%)" basis, which
+      # cannot convert 80% into kilowatt-hours without it. Efficiency is charger-meter to cells -- not
+      # the home battery's Forecast__ChargeEfficiency, which describes different hardware.
+      Vehicle__BatteryCapacityKWh: ${VEHICLE_BATTERY_CAPACITY_KWH:-0}
+      Vehicle__ChargeEfficiency: ${VEHICLE_CHARGE_EFFICIENCY:-0.9}
+
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 

@@ -41,7 +41,10 @@ public class ChargingPlanPageTests : BunitContext
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton<ITargetedChargeSelector>(_target);
+        Services.AddSingleton<ITargetedChargePreview>(new FakeTargetedChargePreview());
+        Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
         Services.AddSingleton(new TargetedDisplayOptions(TimeSpan.FromHours(36)));
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 

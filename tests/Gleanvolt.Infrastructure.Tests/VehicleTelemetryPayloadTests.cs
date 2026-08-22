@@ -6,7 +6,7 @@ namespace Gleanvolt.Infrastructure.Tests;
 public class VehicleTelemetryPayloadTests
 {
     private const string Full = """
-        {"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":28,
+        {"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":28,"range_km":176,
          "charge_time_remaining_minutes":95,
          "charge_state":"charging","plug_state":"connected","source":"id4"}
         """;
@@ -19,6 +19,7 @@ public class VehicleTelemetryPayloadTests
 
         Assert.Equal(DateTimeOffset.Parse("2026-08-17T10:44:23+00:00"), state!.CapturedAt);
         Assert.Equal(28, state.SocPercent);
+        Assert.Equal(176, state.RangeKm);
         Assert.Equal(TimeSpan.FromMinutes(95), state.ChargeTimeRemaining);
         Assert.Equal(VehicleChargeState.Charging, state.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, state.PlugState);
@@ -107,6 +108,44 @@ public class VehicleTelemetryPayloadTests
             out _));
 
         Assert.Equal(expected, state!.ChargeState);
+    }
+
+    [Fact]
+    public void TryParse_TreatsAnAbsentRangeAsASupportedConfiguration()
+    {
+        // Plenty of feeds report SOC and nothing else. Absent is null, never zero -- "0 km left" is a
+        // different and much more alarming claim than "the car didn't say".
+        Assert.True(VehicleTelemetryPayload.TryParse(
+            """{"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":41}""", out var state, out _));
+
+        Assert.Null(state!.RangeKm);
+    }
+
+    [Fact]
+    public void TryParse_KeepsAZeroRange()
+    {
+        // A flat car really does report it, so this is a reading and not a missing value.
+        Assert.True(VehicleTelemetryPayload.TryParse(
+            """{"captured_at":"2026-08-17T10:44:23+00:00","range_km":0}""", out var state, out _));
+
+        Assert.Equal(0, state!.RangeKm);
+    }
+
+    [Theory]
+    [InlineData("\"unavailable\"")]
+    [InlineData("-5")]
+    [InlineData("176000")]
+    public void TryParse_RejectsARangeNoRoadCarCouldMean(string reported)
+    {
+        // A template publishing metres, or an "unavailable" that got through as a string: the whole
+        // payload is dropped so the holder keeps its last good reading and its age visibly grows.
+        Assert.False(VehicleTelemetryPayload.TryParse(
+            $$"""{"captured_at":"2026-08-17T10:44:23+00:00","range_km":{{reported}}}""",
+            out var state,
+            out var error));
+
+        Assert.Null(state);
+        Assert.Contains("range_km", error);
     }
 
     [Theory]

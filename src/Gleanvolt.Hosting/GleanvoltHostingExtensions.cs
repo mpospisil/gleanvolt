@@ -219,6 +219,12 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<ITargetedChargeSelector, TargetedChargeSelector>();
         services.AddSingleton<TargetedChargeProvider>();
 
+        // The same provider, read-only: "what would this request do?" for a request nobody has made
+        // yet. The web UI puts the plan in front of the owner before the button that starts the
+        // charger, and needs a seam that cannot possibly start one.
+        services.AddSingleton<ITargetedChargePreview>(provider =>
+            provider.GetRequiredService<TargetedChargeProvider>());
+
         services.AddSingleton(provider =>
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
@@ -383,10 +389,14 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
         services.AddHostedService<VehicleMqttWorker>();
 
-        // The UI needs MaxAge to mark a reading stale, but Gleanvolt.Web cannot see this assembly's
-        // options classes. Hand it the one value, exactly as WebBuildInfo is handed the version.
+        // The UI needs MaxAge to mark a reading stale and the pack's size to offer a target in state of
+        // charge, but Gleanvolt.Web cannot see this assembly's options classes. Hand it the values,
+        // exactly as WebBuildInfo is handed the version.
         services.AddSingleton(provider =>
-            new VehicleDisplayOptions(provider.GetRequiredService<IOptions<VehicleOptions>>().Value.MaxAge));
+        {
+            var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
+            return new VehicleDisplayOptions(vehicle.MaxAge, vehicle.BatteryCapacityKWh, vehicle.ChargeEfficiency);
+        });
 
         // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
         // before the request is ever made, and that limit lives in this assembly's options.

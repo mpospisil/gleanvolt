@@ -31,13 +31,14 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Surplus-aware EV charging** — automatically ramp EV charge current up/down based on available household energy surplus.
 - **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
-- **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs.
+- **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs. Ask in kilowatt-hours, or, with a car that reports its own battery, in state of charge — "80% by seven". Either way the plan is put in front of you and started only when you confirm it.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
-- **Vehicle telemetry** — optionally reads the **car's own** battery SOC from MQTT, normalised so any
-  vehicle Home Assistant can see becomes a source without new code. Advisory only: no control decision
-  depends on it.
+- **Vehicle telemetry** — optionally reads the **car's own** battery SOC and range from MQTT, normalised
+  so any vehicle Home Assistant can see becomes a source without new code. It shapes what you *ask* for
+  — a targeted charge can be stated as a battery percentage — and never how it is delivered: no control
+  decision depends on it, and a feed that dies changes nothing about how the charger is driven.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on, with a
   day-at-a-time viewer in the web UI.
@@ -817,6 +818,11 @@ This mode takes an **energy in kWh** and a **departure time**, and plans backwar
 The plan is rebuilt from a refreshed forecast and the **measured** delivery on every poll, and nothing
 in it is ever committed to.
 
+With [vehicle telemetry](#vehicle-telemetry-the-vehicle-section) configured you can state the target as
+a **state of charge** instead — *"80% by seven"* — and the controller converts it to kilowatt-hours
+once, when you start it. Energy is still what is promised and still what is metered; see
+[Setting a target](#setting-a-target).
+
 Everything turns on one comparison: what is still needed against `P_max × (departure − now)`, the
 physical ceiling of the charger running flat out for every remaining minute.
 
@@ -908,12 +914,44 @@ keep imports strictly inside the blocks the plan drew.
 
 #### Setting a target
 
-From the web UI, the **Targeted** tab of **Charging plan**: the energy, the departure, and
-**Activate**. From Home Assistant: the
+From the web UI, the **Targeted** tab of **Charging plan**: what the car needs, the departure,
+**Preview plan**, and then **Start charging**.
+
+**The plan is shown before the charger moves.** *Preview* runs the same planner the poll loop runs,
+against the same telemetry and the same forecast, and writes to nothing — no request, no mode, no
+device. What comes back is the plan you will then watch, in the same words and the same figures, and
+*Start charging* under it commits exactly that. Editing any field drops the preview, so it is never
+possible to confirm a plan that no longer describes the form above it. This matters most in the case
+that cannot be fixed afterwards: *"even flat out you get 24 of the 31 kWh you asked for; the departure
+that covers it is 05:40"* is worth knowing **before** the charger starts.
+
+**Two ways to say what you need.** The default, and the only one an install without a vehicle feed ever
+sees, is **Energy to add (kWh)**. With a car reporting its SOC *and* `Vehicle:BatteryCapacityKWh` set,
+a second basis appears — **Battery target (%)** — and the kilowatt-hours are worked out for you:
+
+```
+(target% − now%) / 100 × usable capacity ÷ charge efficiency
+```
+
+The tab shows what the car last said about itself above the form — **battery, range, plug state,
+charge state and the age of the reading** — because those are the numbers the plan is about to be built
+from. A reading past `Vehicle:MaxAge` is flagged rather than withdrawn: a parked car's SOC does not
+drift, and refusing the basis outright would only push you into doing the same arithmetic in your head
+from the same figure.
+
+The conversion happens **once, at the moment you start it**, and is never re-derived. A parked car
+reports when it feels like it, so a SOC that jumps six points at 02:00 because the car finally phoned
+home would otherwise silently move a promise that is already half delivered. What is recorded is the
+energy; the target and the SOC it was measured from are kept only so the request can be read back as
+"42% → 80%".
+
+From Home Assistant: the
 **Target energy** number, the **Departure time** text (`07:00` means the next 07:00; `2026-08-11
 07:00` means exactly that), and the **Activate target** button. Both drive the same two seams in
 `Gleanvolt.Core` — the request selector and then the charge action, in that order — so the two
-surfaces cannot disagree about what was asked for. **Activate** also puts the charger into `Fast`,
+surfaces cannot disagree about what was asked for. Home Assistant speaks kilowatt-hours only: the
+battery-target basis is a convenience over a contract it already speaks, and a `target_soc` entity can
+follow if it is wanted. **Start charging** also puts the charger into `Fast`,
 like every other way of starting charging; **Cancel** is the same `Off` action the page's own button
 is, plus the one thing that button cannot know to do — dropping the request, so nothing is left
 looking like a promise.
@@ -1103,16 +1141,31 @@ inverter reports, and from the charger's view of what's plugged into it. Off by 
   "BrokerHost": "localhost",
   "BrokerPort": 1883,
   "Topic": "gleanvolt/vehicle/state",   // whatever your HA automation publishes to
-  "MaxAge": "12:00:00"                  // past this, a reading is shown as stale
+  "MaxAge": "12:00:00",                 // past this, a reading is shown as stale
+  "BatteryCapacityKWh": 0,              // the car's *usable* pack; 0 = unset, see below
+  "ChargeEfficiency": 0.9               // charger meter -> cells, for a battery-target request
 }
 ```
+
+`BatteryCapacityKWh` is the **usable** capacity — the figure the car's own SOC is a percentage of, not
+the gross pack on the brochure (an ID.4 Pro is 77 usable of 82 gross). It is unset by default and
+affects exactly one thing: the [targeted plan's](#targeted-charging-an-amount-of-energy-by-a-time)
+**Battery target (%)** basis, which cannot turn "80%" into kilowatt-hours without it and is simply not
+offered until it is set. Guessing a pack size would make every such target quietly wrong instead of
+visibly unavailable, which is the worse of the two failures.
+
+`ChargeEfficiency` is the AC-side loss between the charger's meter and the cells, applied to that
+conversion because the target is metered at the charger. It is **not**
+`ChargeControl:Forecast:ChargeEfficiency`, which is the *home* battery's PV → pack figure.
 
 `Vehicle:Username` / `Vehicle:Password` are supported for an authenticated broker and are secrets —
 supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
 
-This phase is **read-only**: nothing in `ChargeControl` or `BatteryHold` consumes it. It appears on the
-web UI dashboard and nowhere else — in particular it is *not* republished to Home Assistant, since
-Home Assistant is where it comes from.
+Nothing in `ChargeControl` or `BatteryHold` consumes it, and no charge decision depends on it: a feed
+that dies changes nothing about how the charger is driven. It appears on the web UI dashboard and on
+the [targeted plan](#targeted-charging-an-amount-of-energy-by-a-time), where its SOC can be *converted*
+into a request the owner then confirms — an input to what you ask for, never to how it is delivered.
+It is not republished to Home Assistant, since Home Assistant is where it comes from.
 
 #### It reads MQTT, not a car API
 
@@ -1124,6 +1177,7 @@ that schema by a template or automation in Home Assistant:
 {
   "captured_at":  "2026-08-17T10:44:23+00:00",   // required: the CAR's capture time
   "soc_percent":  28,                            // optional, 0-100
+  "range_km":     176,                           // optional: the CAR's own range estimate
   "charge_time_remaining_minutes": 95,           // optional: the CAR's own estimate
   "charge_state": "charging",                    // optional: idle | charging | complete | unknown
   "plug_state":   "connected",                   // optional: connected | disconnected | unknown
@@ -1140,6 +1194,11 @@ one automation.
 Everything except `captured_at` is optional, and absent is a supported configuration rather than an
 error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
 without it staleness cannot be judged.
+
+`range_km` is the car's own estimate off its own recent consumption — nothing here could compute it, and
+it is the figure that actually answers *"is 80% enough for the trip?"* while you are setting a target.
+Display only: no plan reads it. `0` is a real reading (a flat car reports it) and absent is null, so the
+two are never confused; a figure beyond 2000 km is rejected as a template publishing metres.
 
 `charge_time_remaining_minutes` is the **car's own** estimate of how much longer it needs — it knows
 its charge curve, its taper and its target, and nothing here does. Publish the key only when the car
@@ -1181,6 +1240,7 @@ automation:
             {% set left = states('sensor.id_4_pro_performance_charging_time_left') %}
             {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
              "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+             "range_km": {{ states('sensor.id_4_pro_performance_range') | float(0) }},
              {% if left not in ['unknown', 'unavailable', 'none', ''] %}
              "charge_time_remaining_minutes": {{ left | float(0) }},
              {% endif %}
@@ -1215,6 +1275,7 @@ action:
         {% set left = states('sensor.id_4_pro_performance_charging_time_left') %}
         {"captured_at": "{{ states('sensor.id_4_pro_performance_last_vehicle_report') }}",
          "soc_percent": {{ states('sensor.id_4_pro_performance_battery') | float(0) }},
+         "range_km": {{ states('sensor.id_4_pro_performance_range') | float(0) }},
          {% if left not in ['unknown', 'unavailable', 'none', ''] %}
          "charge_time_remaining_minutes": {{ left | float(0) }},
          {% endif %}
@@ -1231,6 +1292,10 @@ mode: single
 Then set `Vehicle:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
 being published while the integration's entities read `unavailable`, which happens whenever its cloud
 session expires.
+
+**Check the range entity name against your own install** too — `sensor.<car>_range` is what
+`volkswagen_connect` exposes here, but it is named differently by other integrations. Drop the line
+entirely if yours has none: an absent `range_km` is a supported configuration, and the tile reads "—".
 
 **Check the remaining-time entity name against your own install** — it varies by integration and by
 car, and `volkswagen_connect` does not expose one on every model. If yours has no such sensor, delete
@@ -1333,7 +1398,7 @@ sections, in the order the questions are actually asked:
   SOC and power, grid power. True whatever is or isn't plugged in, which is why it comes first.
 - **Vehicle** — the charger's own view of whether a car is connected, plus, on an install with
   [Vehicle telemetry](#vehicle-telemetry-the-vehicle-section) configured, what the car last said about
-  itself and how long ago it said it.
+  itself — battery, range, charge and plug state — and how long ago it said it.
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the
@@ -1354,7 +1419,7 @@ other:
 | **Solar** | Charge from surplus | Nothing to configure — the current is whatever the sun leaves over. The surplus, the battery SOC that gates it, and what the car is drawing. |
 | **Forecasted** | Charge to the forecast | The four runtime numbers the plan reads, then the day plan itself and the timeline chart. |
 | **Fast (no battery)** | Charge at maximum | What the speed costs: the car's actual draw and current, the setpoint read back, and grid power. |
-| **Targeted** | Activate / Cancel | The energy and the departure, the minimum battery SOC the planner works to, and then the plan in words followed by its figures. |
+| **Targeted** | Preview plan → Start charging / Cancel | What the car says about itself, then what you want — kilowatt-hours or a battery target — the departure, the minimum battery SOC the planner works to, and the plan in words and figures *before* the charger moves. |
 
 The tab is in the URL (`/charging-plan/forecasted`), so a bookmark and a refresh come back to the same
 mode and the back button walks them; `/charging-plan` with no tab opens on whatever is actually
