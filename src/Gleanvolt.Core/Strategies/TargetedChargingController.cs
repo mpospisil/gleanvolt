@@ -141,37 +141,66 @@ public sealed class TargetedChargingController : IChargingController
 
         // Above the floor the surplus is the car's to take; below it the pack has priority and the car
         // gets only what the deadline actually demands.
+        // Sum, not max: the pace is what the sun is *not* forecast to cover, so the two are additive.
+        // Taking the greater would let a bright hour swallow the grid's share and finish short.
         var aboveFloor = soc >= plan.SocFloorPercent;
-        var wantWatts = aboveFloor ? Math.Max(surplusWatts, paceWatts) : paceWatts;
+        var wantWatts = aboveFloor ? surplusWatts + paceWatts : paceWatts;
 
         if (wantWatts <= 0)
         {
-            return Waiting(input, plan, surplusWatts, paceWatts);
+            return Waiting(input, plan, surplusWatts, paceWatts, aboveFloor, soc);
         }
 
         // Restart dwell still applies -- a contactor cycle and a vehicle wake are not free -- but only
         // when we are choosing to start, never when the deadline is the thing asking.
+        var targetAmps = ToHardwareCurrent(Math.Min(wantWatts, _power.AmpsToWatts(_maxAmps)));
+        if (targetAmps < _minAmps)
+        {
+            // Wanted less than the charger's floor, so there is nothing to start and the restart dwell
+            // has no bearing on it.
+            //
+            // A non-zero pace is, by definition, energy the forecast says the sun will *not* cover, so
+            // there is nothing to be gained by deferring it -- and everything to lose, because deferral
+            // ends with the whole remainder crammed into the last minutes of the window where a dropout
+            // has no room to recover. Run at the floor instead. This self-regulates: delivering ahead
+            // of the pace drives it to zero, at which point the car goes back to living on surplus.
+            if (paceWatts > 0)
+            {
+                var bridged = Math.Max(0, MinChargePowerWatts - (aboveFloor ? surplusWatts : 0));
+
+                return new ChargingControlDecision(
+                    ChargingControlAction.Charge,
+                    _minAmps,
+                    $"A {paceWatts:F0}W pace is under the {MinChargePowerWatts:F0}W the charger can run at, and it is "
+                    + $"energy the sun is not forecast to cover -> hold the {_minAmps}A floor rather than defer "
+                    + $"{plan.RemainingEnergyWh / 1000:F1}kWh to the last minutes before {plan.Deadline.LocalDateTime:HH:mm}.",
+                    GridBridgeWatts: bridged);
+            }
+
+            return Bridge(input, plan) ?? Waiting(input, plan, surplusWatts, paceWatts, aboveFloor, soc);
+        }
+
+        // The dwell spares the contactor when *we* are choosing to start. It must not defer a pace the
+        // charger could hold outright -- that is the deadline asking, not us.
         if (!input.Charging && input.TimeInCurrentState < _options.MinPauseTime && paceWatts < MinChargePowerWatts)
         {
             return Pause($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
         }
 
-        var targetAmps = ToHardwareCurrent(Math.Min(wantWatts, _power.AmpsToWatts(_maxAmps)));
-        if (targetAmps < _minAmps)
-        {
-            // Wanted less than the charger's floor. Either there is sun worth catching at the floor, or
-            // there is time enough to wait for the pace to climb.
-            return Bridge(input, plan) ?? Waiting(input, plan, surplusWatts, paceWatts);
-        }
-
         var commandedWatts = _power.AmpsToWatts(targetAmps);
-        var fromGridWatts = Math.Max(0, commandedWatts - surplusWatts);
+
+        // Below the floor the surplus is the pack's, not the car's, so none of it counts against the
+        // import -- and this figure is what arms the discharge hold. Netting it off the raw surplus
+        // would leave the hold released while the car ran on a pace the grid was supposed to fund,
+        // which is the pack quietly paying for it: the one thing this mode promises never to do.
+        var usableSurplusWatts = aboveFloor ? surplusWatts : 0;
+        var fromGridWatts = Math.Max(0, commandedWatts - usableSurplusWatts);
 
         var how = !aboveFloor
             ? $"battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun and the grid funds the pace"
-            : surplusWatts >= paceWatts
-                ? $"surplus {surplusWatts:F0}W is above the {paceWatts:F0}W pace, so the sun sets the rate"
-                : $"surplus {surplusWatts:F0}W is under the {paceWatts:F0}W pace, so the grid covers {fromGridWatts:F0}W of it";
+            : paceWatts <= 0
+                ? $"surplus {surplusWatts:F0}W and nothing owed to the grid, so the sun sets the rate"
+                : $"surplus {surplusWatts:F0}W plus a {paceWatts:F0}W pace, so the grid covers {fromGridWatts:F0}W of it";
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
@@ -257,12 +286,22 @@ public sealed class TargetedChargingController : IChargingController
         ChargingControlInput input,
         TargetedChargePlan plan,
         double surplusWatts,
-        double paceWatts) =>
-        SoftPause(
+        double paceWatts,
+        bool aboveFloor,
+        double soc)
+    {
+        // Two different reasons to be idle, and the owner needs to be able to tell them apart: the sun
+        // has not turned up, or it has and the pack is keeping it.
+        var why = aboveFloor
+            ? $"Surplus {surplusWatts:F0}W and a {paceWatts:F0}W pace are both under the {MinChargePowerWatts:F0}W the charger needs."
+            : $"Battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun, and the "
+                + $"{paceWatts:F0}W pace alone is under the {MinChargePowerWatts:F0}W the charger needs.";
+
+        return SoftPause(
             input,
-            $"Surplus {surplusWatts:F0}W and a {paceWatts:F0}W pace are both under the "
-            + $"{MinChargePowerWatts:F0}W the charger needs. Waiting for sun; there is still time for the "
-            + $"pace to carry {plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.");
+            $"{why} Waiting for sun; there is still time for the pace to carry "
+            + $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.");
+    }
 
     private static string GridText(TargetedChargePlan plan) => plan.GridStart is { } start
         ? $"grid top-up starts at {start.LocalDateTime:HH:mm} if it is still needed"

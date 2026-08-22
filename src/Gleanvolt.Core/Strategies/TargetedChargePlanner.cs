@@ -249,13 +249,21 @@ public static class TargetedChargePlanner
             return new PacedPlan(blocks, 0, 0, null, 0);
         }
 
-        // How much the sun could still put in the car from each slice onwards, if the charger simply
-        // followed it. Built once, backwards, and read as "is there enough sun ahead to finish?".
+        // How much the sun could still put in the car from each slice onwards <b>unaided</b>. Built once,
+        // backwards, and read as "is there enough sun ahead to finish without buying anything?".
+        //
+        // Only slices whose surplus clears the charger's floor count. A half-hour of 3.5kW cannot run
+        // the charger by itself, so promising it here would defer the start on the strength of sun that
+        // can never arrive alone -- and then arrive at the deadline short. (Once the grid *is* paying,
+        // that same 3.5kW is used in full; it just cannot be counted on to remove the need for a pace.)
         var solarAheadWh = new double[slices.Count + 1];
         for (var i = slices.Count - 1; i >= 0; i--)
         {
-            solarAheadWh[i] = solarAheadWh[i + 1]
-                + (Math.Min(Math.Max(0, slices[i].AvailableWatts), maxPowerWatts) * slices[i].Hours);
+            var unaidedWatts = slices[i].AvailableWatts >= minPowerWatts
+                ? Math.Min(slices[i].AvailableWatts, maxPowerWatts)
+                : 0;
+
+            solarAheadWh[i] = solarAheadWh[i + 1] + (unaidedWatts * slices[i].Hours);
         }
 
         for (var index = 0; index < slices.Count; index++)
@@ -286,7 +294,10 @@ public static class TargetedChargePlanner
             var deficitWh = Math.Max(0, remaining - solarAheadWh[index]);
             var gridPaceWatts = deficitWh / hoursLeft;
 
-            var wantWatts = Math.Max(surplusWatts, gridPaceWatts);
+            // Sum, not max. The pace covers what the sun *cannot* reach -- the look-ahead already
+            // subtracted every watt it can -- so the two are additive. Taking the greater of them would
+            // let a sunny slice swallow the grid's share and quietly arrive at the deadline short.
+            var wantWatts = surplusWatts + gridPaceWatts;
 
             // Nothing owed to the grid and not enough sun to run on: wait for the plateau. Bumping a
             // 500W shoulder up to the charger's floor would import 3.6kW to harvest 500W, on a day the

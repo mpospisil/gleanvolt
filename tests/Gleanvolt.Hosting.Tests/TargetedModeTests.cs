@@ -63,13 +63,15 @@ public class TargetedModeTests
 
         await RunAsync(Drawing(Now, 0), Drawing(Now.AddMinutes(1), MaxPowerWatts));
 
-        Assert.All(_writes, w => Assert.Equal(16, w.Target));
+        // Not 16A any more: the pace is 2kWh over six hours, far under the charger's floor, so it runs
+        // at the 6A floor instead of emptying the request in eleven minutes at full power.
+        Assert.All(_writes, w => Assert.Equal(6, w.Target));
         Assert.All(_inverter.Applied, hold => Assert.True(hold));
-        Assert.Contains("Grid top-up", _writes[0].Reason);
+        Assert.Contains("hold the 6A floor", _writes[0].Reason);
     }
 
     [Fact]
-    public async Task WithWeakSunInTheWindow_TheImportWaitsForItAndTheHoldArmsOnlyThen()
+    public async Task WithWeakSunInTheWindow_ItRunsAtThePacedRateWithTheHoldArmed()
     {
         // The shape the placement rule exists for, and the one reported from the site: 4kW of forecast
         // PV less the house leaves ~3.65kW of surplus — real energy, but under the charger's 4.14kW
@@ -86,9 +88,11 @@ public class TargetedModeTests
             Drawing(Now, 0, socPercent: 100),                       // before the sun: waiting
             Drawing(sunFrom.AddMinutes(2), 0, socPercent: 100));    // under it: importing
 
-        Assert.Equal([false, true], _inverter.Applied);
-        Assert.Equal([0, 16], _writes.Select(w => w.Target));
-        Assert.Contains("Waiting for sun", _writes[0].Reason);
+        // The charge is spread across the window rather than deferred to a block, so it is running on
+        // both polls -- and the grid is funding part of it on both, so the hold is armed throughout.
+        Assert.All(_writes, w => Assert.True(w.Target >= 6, $"expected the paced floor, got {w.Target}A"));
+        Assert.All(_writes, w => Assert.NotEqual(16, w.Target));
+        Assert.All(_inverter.Applied, hold => Assert.True(hold));
     }
 
     [Fact]
@@ -108,9 +112,12 @@ public class TargetedModeTests
             Exporting(Now, surplusWatts: 3_500),                        // dwell unexpired: still waiting
             Exporting(Now.AddMinutes(20), surplusWatts: 3_500));        // bridged
 
+        // 3.5kW of surplus plus a 750W pace lands at the charger's 6A floor, with the grid funding the
+        // difference. The first poll is still held by the restart dwell; the second runs.
         Assert.Equal([0, 6], _writes.Select(w => w.Target));
-        Assert.Equal([false, true], _inverter.Applied);
-        Assert.Contains("Grid bridge", _writes[^1].Reason);
+
+        // And once it runs, the pack is held out of what the grid is paying for.
+        Assert.True(_inverter.Applied[^1]);
     }
 
     [Fact]
