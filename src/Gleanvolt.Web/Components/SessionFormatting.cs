@@ -17,6 +17,20 @@ internal static class SessionFormatting
             : $"{session.StartMode} → {session.EndMode}";
 
     /// <summary>
+    /// One weather reading in a line: what it was like, how warm, and how much cloud. Cloud is the
+    /// figure that explains a session, so it is never dropped even when the condition already implies it.
+    /// </summary>
+    public static string FormatWeather(WeatherObservation weather)
+    {
+        var condition = string.IsNullOrWhiteSpace(weather.ConditionDescription)
+            ? weather.Condition
+            : weather.ConditionDescription;
+
+        var text = $"{weather.TemperatureCelsius:F1} °C, {weather.CloudsPercent:F0}% cloud";
+        return string.IsNullOrWhiteSpace(condition) ? text : $"{condition}, {text}";
+    }
+
+    /// <summary>
     /// The day the session ran on, as the forecast saw it: total expected PV with the p10–p90 band
     /// behind it. The band is the point — it says whether a thin day was always going to be thin.
     /// </summary>

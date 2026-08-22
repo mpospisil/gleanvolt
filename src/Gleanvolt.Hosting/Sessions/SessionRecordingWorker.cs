@@ -40,6 +40,7 @@ public sealed class SessionRecordingWorker : BackgroundService
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ISolarForecastService _forecast;
     private readonly IVehicleTelemetry _vehicle;
+    private readonly IWeatherService _weather;
     private readonly ChargingSessionTracker _tracker;
     private readonly ILogger<SessionRecordingWorker> _logger;
     private readonly TimeProvider _timeProvider;
@@ -64,6 +65,7 @@ public sealed class SessionRecordingWorker : BackgroundService
         ChargeControlStatusHolder statusHolder,
         ISolarForecastService forecast,
         IVehicleTelemetry vehicle,
+        IWeatherService weather,
         ILogger<SessionRecordingWorker> logger,
         TimeProvider? timeProvider = null)
     {
@@ -72,6 +74,7 @@ public sealed class SessionRecordingWorker : BackgroundService
         _statusHolder = statusHolder;
         _forecast = forecast;
         _vehicle = vehicle;
+        _weather = weather;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _tracker = new ChargingSessionTracker(
@@ -208,8 +211,10 @@ public sealed class SessionRecordingWorker : BackgroundService
             return;
         }
 
-        if (update.Started is { } started)
+        if (update.Started is { } opened)
         {
+            var started = await WithWeatherAsync(opened, atStart: true, cancellationToken).ConfigureAwait(false);
+
             // Written immediately rather than batched: the header is what everything else references,
             // and a power cut that loses it would orphan every sample behind it.
             await _store.StartSessionAsync(started, cancellationToken).ConfigureAwait(false);
@@ -230,8 +235,10 @@ public sealed class SessionRecordingWorker : BackgroundService
             _pendingEvents.AddRange(update.Events);
         }
 
-        if (update.Ended is { } ended)
+        if (update.Ended is { } closed)
         {
+            var ended = await WithWeatherAsync(closed, atStart: false, cancellationToken).ConfigureAwait(false);
+
             // Flush before completing so the header's totals never describe rows that aren't there yet.
             await FlushAsync(cancellationToken).ConfigureAwait(false);
             await _store.CompleteSessionAsync(ended, cancellationToken).ConfigureAwait(false);
@@ -275,6 +282,44 @@ public sealed class SessionRecordingWorker : BackgroundService
         _pendingEvents.Clear();
 
         await _store.AppendAsync(samples, events, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Attaches the current weather to a session that has just opened or just closed.
+    ///
+    /// <para>Two readings per session and none in between: the sky at the moment the car was plugged
+    /// in and the sky when it stopped charging, which between them say whether the day changed. The
+    /// call happens here rather than in <see cref="ChargingSessionTracker"/> because it is I/O, and the
+    /// tracker is a pure strategy — the same reason the forecast and the vehicle state are handed to
+    /// it rather than looked up by it.</para>
+    ///
+    /// <para>The daylight bounds ride along with the opening reading only: they describe the day, not
+    /// the moment, and would be identical in both.</para>
+    /// </summary>
+    private async Task<ChargingSession> WithWeatherAsync(ChargingSession session, bool atStart, CancellationToken cancellationToken)
+    {
+        if (!_weather.IsConfigured)
+        {
+            return session;
+        }
+
+        // Never throws for a provider-side problem, and bounds its own wait -- see IWeatherService.
+        // A null here means the session is recorded without weather, which is the intended outcome and
+        // not worth a second warning on top of the one the service already logged.
+        var reading = await _weather.GetCurrentAsync(cancellationToken).ConfigureAwait(false);
+        if (reading is null)
+        {
+            return session;
+        }
+
+        return atStart
+            ? session with
+            {
+                WeatherAtStart = reading.Observation,
+                Sunrise = reading.Sunrise,
+                Sunset = reading.Sunset,
+            }
+            : session with { WeatherAtEnd = reading.Observation };
     }
 
     private double? ForecastPowerWatts(DateTimeOffset at) =>

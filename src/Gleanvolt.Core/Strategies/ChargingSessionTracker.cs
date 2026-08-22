@@ -227,6 +227,13 @@ public sealed class ChargingSessionTracker
             StartPlan: status.Plan,
             ForecastRemainingAtStartWh: forecastRemainingTodayWh,
             DayForecast: _dayForecast,
+
+            // The recorder attaches these on its way to the store: they cost an HTTP call, which is
+            // exactly the kind of thing this type exists not to know about.
+            WeatherAtStart: null,
+            WeatherAtEnd: null,
+            Sunrise: null,
+            Sunset: null,
             Controlled: IsControlling(status.Mode));
 
         _lastMode = status.Mode;

@@ -66,6 +66,34 @@ else
             <dt>Forecast for the day</dt>
             <dd>@SessionFormatting.FormatDayForecast(dayForecast)</dd>
         }
+
+        @if (session.WeatherAtStart is { } weatherAtStart)
+        {
+            @*
+                What the sky actually did, against what the forecast above expected of it. Both
+                readings when they differ; one line when the session ended in the weather it started in.
+            *@
+            <dt>Weather</dt>
+            <dd>
+                @SessionFormatting.FormatWeather(weatherAtStart)
+                @if (session.WeatherAtEnd is { } weatherAtEnd)
+                {
+                    @: → @SessionFormatting.FormatWeather(weatherAtEnd)
+                }
+            </dd>
+        }
+
+        @if (session.Sunrise is { } sunrise && session.Sunset is { } sunset)
+        {
+            <dt>Daylight</dt>
+            <dd>
+                @Local(sunrise, "HH:mm") – @Local(sunset, "HH:mm")
+                @if (session.DaylightLength is { } daylight)
+                {
+                    @: (@SessionFormatting.FormatDuration(daylight))
+                }
+            </dd>
+        }
     </dl>
 
     <section class="split">
@@ -178,8 +206,10 @@ else
         }
     }
 
-    private string Local(DateTimeOffset value) =>
-        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+    private string Local(DateTimeOffset value) => Local(value, "yyyy-MM-dd HH:mm");
+
+    private string Local(DateTimeOffset value, string format) =>
+        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString(format);
 
     private static string Share(double value, double total) =>
         $"{(total > 0 ? value / total * 100 : 0):F1}%";

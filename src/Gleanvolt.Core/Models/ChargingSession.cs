@@ -66,6 +66,32 @@ namespace Gleanvolt.Core.Models;
 /// morning as the day goes on. Null when no forecast was ever fetched, and short of a full day when
 /// the service was not running for all of it.</para>
 /// </param>
+/// <param name="WeatherAtStart">
+/// The weather when the session opened, or null when no weather provider is configured (the default)
+/// or the fetch failed. Recorded because the day's forecast curve says what the sun was <em>expected</em>
+/// to do and nothing said what the sky actually did.
+/// </param>
+/// <param name="WeatherAtEnd">
+/// The weather when it closed. Null while the session is open, and null when that fetch failed — which
+/// is not an error.
+///
+/// <para>Two readings rather than one because a six-hour session can finish in entirely different
+/// weather from the one it started in, and only the <em>pair</em> can say so. The same reason
+/// <paramref name="StartBatterySocPercent"/> has an end alongside it.</para>
+/// </param>
+/// <param name="Sunrise">
+/// Sunrise on the day the session started, from the opening weather reading. Null when no weather was
+/// recorded.
+/// </param>
+/// <param name="Sunset">
+/// Sunset on that day. With <paramref name="Sunrise"/> it bounds the daylight the roof had to work
+/// with — what makes an 8 kWh December session comparable with an 8 kWh June one, and what says
+/// whether a session ran out of sun or merely out of surplus.
+///
+/// <para>Stored once rather than on each reading: they belong to the day, not to the moment. A session
+/// running across midnight carries the <em>starting</em> day's pair, the same rule
+/// <paramref name="StartedAt"/> and <paramref name="DayForecast"/> already follow.</para>
+/// </param>
 /// <param name="Controlled">
 /// False for a session recorded while no mode was driving the charger (the opt-in
 /// <c>RecordUncontrolledSessions</c> baseline). Always true otherwise.
@@ -89,8 +115,18 @@ public sealed record ChargingSession(
     SolarDayPlan? StartPlan,
     double? ForecastRemainingAtStartWh,
     SolarForecast? DayForecast,
+    WeatherObservation? WeatherAtStart,
+    WeatherObservation? WeatherAtEnd,
+    DateTimeOffset? Sunrise,
+    DateTimeOffset? Sunset,
     bool Controlled)
 {
+    /// <summary>
+    /// How long the sun was up on the day the session started, or null when no weather was recorded.
+    /// The denominator behind "did this session use the day it had?".
+    /// </summary>
+    public TimeSpan? DaylightLength => Sunrise is { } rise && Sunset is { } set && set > rise ? set - rise : null;
+
     /// <summary>Whether the session is still running.</summary>
     public bool IsOpen => EndedAt is null;
 

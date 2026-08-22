@@ -201,6 +201,11 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         // null says exactly that rather than claiming a day with no sun in it.
         var upgradedSession = (await upgraded.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
         Assert.Null(upgradedSession.DayForecast);
+
+        // Same for v4's weather: nothing observed the sky for a session recorded before it existed.
+        Assert.Null(upgradedSession.WeatherAtStart);
+        Assert.Null(upgradedSession.WeatherAtEnd);
+        Assert.Null(upgradedSession.Sunrise);
     }
 
     // Rewinds a file the current code has just created back to what v1 would have produced: the later
@@ -220,6 +225,24 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
             ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_min;
             ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_reported;
             ALTER TABLE sessions DROP COLUMN day_forecast_json;
+            ALTER TABLE sessions DROP COLUMN weather_start_observed_at;
+            ALTER TABLE sessions DROP COLUMN weather_start_temp_c;
+            ALTER TABLE sessions DROP COLUMN weather_start_pressure_hpa;
+            ALTER TABLE sessions DROP COLUMN weather_start_humidity_pct;
+            ALTER TABLE sessions DROP COLUMN weather_start_clouds_pct;
+            ALTER TABLE sessions DROP COLUMN weather_start_visibility_m;
+            ALTER TABLE sessions DROP COLUMN weather_start_condition;
+            ALTER TABLE sessions DROP COLUMN weather_start_condition_desc;
+            ALTER TABLE sessions DROP COLUMN weather_end_observed_at;
+            ALTER TABLE sessions DROP COLUMN weather_end_temp_c;
+            ALTER TABLE sessions DROP COLUMN weather_end_pressure_hpa;
+            ALTER TABLE sessions DROP COLUMN weather_end_humidity_pct;
+            ALTER TABLE sessions DROP COLUMN weather_end_clouds_pct;
+            ALTER TABLE sessions DROP COLUMN weather_end_visibility_m;
+            ALTER TABLE sessions DROP COLUMN weather_end_condition;
+            ALTER TABLE sessions DROP COLUMN weather_end_condition_desc;
+            ALTER TABLE sessions DROP COLUMN sunrise;
+            ALTER TABLE sessions DROP COLUMN sunset;
             PRAGMA user_version = 1;
             """;
         await command.ExecuteNonQueryAsync(Ct);
@@ -266,6 +289,90 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         var stored = (await store.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
         Assert.Equal(2, stored.DayForecast!.Periods.Count);
     }
+
+    [Fact]
+    public async Task BothWeatherReadingsAndTheDaylightBoundsRoundTrip()
+    {
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession() with
+        {
+            WeatherAtStart = Weather(Noon, 19.6, clouds: 5, condition: "Clear", description: "clear sky"),
+            Sunrise = Noon.AddHours(-6),
+            Sunset = Noon.AddHours(8),
+        };
+        await store.StartSessionAsync(session, Ct);
+        await store.CompleteSessionAsync(
+            Closed(session) with { WeatherAtEnd = Weather(Noon.AddHours(3), 14.1, clouds: 92, condition: "Rain", description: "light rain") },
+            Ct);
+
+        var stored = (await store.ExportAsync(session.Id, Ct))!.Session;
+
+        // The pair is the whole point: a session that started under a clear sky and ended in rain.
+        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius, 2);
+        Assert.Equal(5, stored.WeatherAtStart.CloudsPercent, 2);
+        Assert.Equal("Clear", stored.WeatherAtStart.Condition);
+        Assert.Equal("clear sky", stored.WeatherAtStart.ConditionDescription);
+        Assert.Equal(1017, stored.WeatherAtStart.PressureHpa, 2);
+        Assert.Equal(51, stored.WeatherAtStart.HumidityPercent, 2);
+        Assert.Equal(10_000, stored.WeatherAtStart.VisibilityMetres);
+        Assert.Equal(Noon, stored.WeatherAtStart.ObservedAt);
+
+        Assert.Equal(92, stored.WeatherAtEnd!.CloudsPercent, 2);
+        Assert.Equal("Rain", stored.WeatherAtEnd.Condition);
+
+        Assert.Equal(Noon.AddHours(-6), stored.Sunrise);
+        Assert.Equal(Noon.AddHours(8), stored.Sunset);
+        Assert.Equal(TimeSpan.FromHours(14), stored.DaylightLength);
+    }
+
+    [Fact]
+    public async Task ClosingASessionCannotBlankTheWeatherItOpenedIn()
+    {
+        // The closing fetch is allowed to fail -- a timeout, a rate limit, a shutdown. When it does,
+        // the reading taken at the start must still be there: it is as much a fact about the row as
+        // the starting SOC, and the close does not own it.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession() with { WeatherAtStart = Weather(Noon, 19.6, 5, "Clear", "clear sky") };
+        await store.StartSessionAsync(session, Ct);
+
+        await store.CompleteSessionAsync(Closed(session) with { WeatherAtStart = null, WeatherAtEnd = null }, Ct);
+
+        var stored = (await store.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
+        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius, 2);
+        Assert.Null(stored.WeatherAtEnd);
+    }
+
+    [Fact]
+    public async Task NoWeatherProviderMeansNullColumns_NotAFreezingClearNight()
+    {
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+        await store.CompleteSessionAsync(Closed(session), Ct);
+
+        var stored = (await store.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
+
+        Assert.Null(stored.WeatherAtStart);
+        Assert.Null(stored.WeatherAtEnd);
+        Assert.Null(stored.Sunrise);
+        Assert.Null(stored.Sunset);
+        Assert.Null(stored.DaylightLength);
+    }
+
+    private static WeatherObservation Weather(
+        DateTimeOffset observedAt,
+        double temperature,
+        double clouds,
+        string condition,
+        string description) =>
+        new(observedAt, temperature, PressureHpa: 1017, HumidityPercent: 51, CloudsPercent: clouds,
+            VisibilityMetres: 10_000, Condition: condition, ConditionDescription: description);
 
     private static SolarForecast DayCurve() => new(
         Noon.AddHours(-6),
@@ -497,6 +604,10 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         StartPlan: null,
         ForecastRemainingAtStartWh: null,
         DayForecast: null,
+        WeatherAtStart: null,
+        WeatherAtEnd: null,
+        Sunrise: null,
+        Sunset: null,
         Controlled: true);
 
     private static ChargingSession Closed(ChargingSession session) => session with

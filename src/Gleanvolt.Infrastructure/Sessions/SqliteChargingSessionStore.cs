@@ -29,7 +29,7 @@ namespace Gleanvolt.Infrastructure.Sessions;
 public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposable
 {
     /// <summary>The schema this build writes, tracked in SQLite's own <c>user_version</c>.</summary>
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
 
     // One writer at a time. SQLite would serialise these itself and hand back SQLITE_BUSY; taking the
     // lock in-process turns a retry-and-hope into a wait, and the only writer is the recording worker.
@@ -81,11 +81,19 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     id, started_at, ended_at, time_zone_id, start_mode, end_mode, end_reason,
                     start_soc_percent, end_soc_percent, energy_delivered_wh, from_solar_wh,
                     from_grid_wh, from_battery_wh, loaned_wh, peak_power_watts, start_plan_json,
-                    forecast_remaining_at_start_wh, day_forecast_json, controlled)
+                    forecast_remaining_at_start_wh, day_forecast_json,
+                    weather_start_observed_at, weather_start_temp_c, weather_start_pressure_hpa,
+                    weather_start_humidity_pct, weather_start_clouds_pct, weather_start_visibility_m,
+                    weather_start_condition, weather_start_condition_desc, sunrise, sunset,
+                    controlled)
                 VALUES (
                     $id, $started_at, NULL, $time_zone_id, $start_mode, $end_mode, NULL,
                     $start_soc, NULL, 0, 0, 0, 0, 0, 0, $start_plan, $forecast_remaining,
-                    $day_forecast, $controlled);
+                    $day_forecast,
+                    $w_observed_at, $w_temp, $w_pressure,
+                    $w_humidity, $w_clouds, $w_visibility,
+                    $w_condition, $w_condition_desc, $sunrise, $sunset,
+                    $controlled);
                 """;
 
             command.Parameters.AddWithValue("$id", session.Id.ToString());
@@ -97,6 +105,9 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             command.Parameters.AddWithValue("$start_plan", (object?)SerializePlan(session.StartPlan) ?? DBNull.Value);
             command.Parameters.AddWithValue("$forecast_remaining", (object?)session.ForecastRemainingAtStartWh ?? DBNull.Value);
             command.Parameters.AddWithValue("$day_forecast", (object?)SerializeForecast(session.DayForecast) ?? DBNull.Value);
+            AddWeather(command, "w", session.WeatherAtStart);
+            command.Parameters.AddWithValue("$sunrise", (object?)(session.Sunrise is { } rise ? Utc(rise) : null) ?? DBNull.Value);
+            command.Parameters.AddWithValue("$sunset", (object?)(session.Sunset is { } set ? Utc(set) : null) ?? DBNull.Value);
             command.Parameters.AddWithValue("$controlled", session.Controlled ? 1 : 0);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -290,6 +301,16 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     -- Rewritten, not left as opened: the provider only forecasts forward, so the
                     -- curve known at close covers hours the one known at open could not.
                     day_forecast_json = $day_forecast,
+                    -- Only the *end* reading: the opening one belongs to the row already, exactly as
+                    -- start_soc_percent does, and a close must never be able to blank it.
+                    weather_end_observed_at = $w_observed_at,
+                    weather_end_temp_c = $w_temp,
+                    weather_end_pressure_hpa = $w_pressure,
+                    weather_end_humidity_pct = $w_humidity,
+                    weather_end_clouds_pct = $w_clouds,
+                    weather_end_visibility_m = $w_visibility,
+                    weather_end_condition = $w_condition,
+                    weather_end_condition_desc = $w_condition_desc,
                     controlled = $controlled
                 WHERE id = $id;
                 """;
@@ -306,6 +327,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             command.Parameters.AddWithValue("$loaned", session.LoanedWh);
             command.Parameters.AddWithValue("$peak", session.PeakChargingPowerWatts);
             command.Parameters.AddWithValue("$day_forecast", (object?)SerializeForecast(session.DayForecast) ?? DBNull.Value);
+            AddWeather(command, "w", session.WeatherAtEnd);
             command.Parameters.AddWithValue("$controlled", session.Controlled ? 1 : 0);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -642,7 +664,13 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
         id, started_at, ended_at, time_zone_id, start_mode, end_mode, end_reason, start_soc_percent,
         end_soc_percent, energy_delivered_wh, from_solar_wh, from_grid_wh, from_battery_wh, loaned_wh,
         peak_power_watts, start_plan_json, forecast_remaining_at_start_wh, day_forecast_json,
-        controlled
+        weather_start_observed_at, weather_start_temp_c, weather_start_pressure_hpa,
+        weather_start_humidity_pct, weather_start_clouds_pct, weather_start_visibility_m,
+        weather_start_condition, weather_start_condition_desc,
+        weather_end_observed_at, weather_end_temp_c, weather_end_pressure_hpa,
+        weather_end_humidity_pct, weather_end_clouds_pct, weather_end_visibility_m,
+        weather_end_condition, weather_end_condition_desc,
+        sunrise, sunset, controlled
         """;
 
     private static ChargingSession ReadSession(SqliteDataReader reader) => new(
@@ -664,7 +692,46 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
         StartPlan: reader.IsDBNull(15) ? null : DeserializePlan(reader.GetString(15)),
         ForecastRemainingAtStartWh: NullableDouble(reader, 16),
         DayForecast: reader.IsDBNull(17) ? null : DeserializeForecast(reader.GetString(17)),
-        Controlled: reader.GetInt64(18) != 0);
+        WeatherAtStart: ReadWeather(reader, 18),
+        WeatherAtEnd: ReadWeather(reader, 26),
+        Sunrise: NullableInstant(reader, 34),
+        Sunset: NullableInstant(reader, 35),
+        Controlled: reader.GetInt64(36) != 0);
+
+    // Eight consecutive columns per reading, in the order SessionColumns lists them. A reading exists
+    // only if it was observed: the timestamp is what says so, since 0 is a legitimate temperature and
+    // an empty condition string is what a provider that reported none would give.
+    private static WeatherObservation? ReadWeather(SqliteDataReader reader, int firstOrdinal) =>
+        reader.IsDBNull(firstOrdinal)
+            ? null
+            : new WeatherObservation(
+                ObservedAt: Instant(reader.GetString(firstOrdinal)),
+                TemperatureCelsius: reader.GetDouble(firstOrdinal + 1),
+                PressureHpa: reader.GetDouble(firstOrdinal + 2),
+                HumidityPercent: reader.GetDouble(firstOrdinal + 3),
+                CloudsPercent: reader.GetDouble(firstOrdinal + 4),
+                VisibilityMetres: NullableDouble(reader, firstOrdinal + 5),
+                Condition: reader.IsDBNull(firstOrdinal + 6) ? string.Empty : reader.GetString(firstOrdinal + 6),
+                ConditionDescription: reader.IsDBNull(firstOrdinal + 7) ? string.Empty : reader.GetString(firstOrdinal + 7));
+
+    private static DateTimeOffset? NullableInstant(SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Instant(reader.GetString(ordinal));
+
+    /// <summary>
+    /// Binds one weather reading's eight parameters, all null together when there is no reading.
+    /// Shared by the insert and the update so the two can never disagree about the shape.
+    /// </summary>
+    private static void AddWeather(SqliteCommand command, string prefix, WeatherObservation? weather)
+    {
+        command.Parameters.AddWithValue($"${prefix}_observed_at", (object?)(weather is null ? null : Utc(weather.ObservedAt)) ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_temp", (object?)weather?.TemperatureCelsius ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_pressure", (object?)weather?.PressureHpa ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_humidity", (object?)weather?.HumidityPercent ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_clouds", (object?)weather?.CloudsPercent ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_visibility", (object?)weather?.VisibilityMetres ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_condition", (object?)weather?.Condition ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_condition_desc", (object?)weather?.ConditionDescription ?? DBNull.Value);
+    }
 
     private static double? NullableDouble(SqliteDataReader reader, int ordinal) =>
         reader.IsDBNull(ordinal) ? null : reader.GetDouble(ordinal);
@@ -787,6 +854,33 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             -- travel with the session when the document is published -- none of which a join gives us.
             -- Existing rows stay NULL, which is the truth: nothing retained the elapsed periods then.
             ALTER TABLE sessions ADD COLUMN day_forecast_json TEXT NULL;
+            """),
+        (4, """
+            -- What the sky was actually doing, twice per session (see ChargingSession.WeatherAtStart).
+            -- Columns rather than a JSON document, unlike the forecast curve above: these are the axes
+            -- the analysis groups by -- solar share against cloud cover, delivered energy by
+            -- temperature band -- and that should be SQL, not a parse per row.
+            ALTER TABLE sessions ADD COLUMN weather_start_observed_at    TEXT NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_temp_c         REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_pressure_hpa   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_humidity_pct   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_clouds_pct     REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_visibility_m   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_condition      TEXT NULL;
+            ALTER TABLE sessions ADD COLUMN weather_start_condition_desc TEXT NULL;
+
+            ALTER TABLE sessions ADD COLUMN weather_end_observed_at    TEXT NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_temp_c         REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_pressure_hpa   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_humidity_pct   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_clouds_pct     REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_visibility_m   REAL NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_condition      TEXT NULL;
+            ALTER TABLE sessions ADD COLUMN weather_end_condition_desc TEXT NULL;
+
+            -- The day's daylight bounds, stored once: they belong to the day, not to either reading.
+            ALTER TABLE sessions ADD COLUMN sunrise TEXT NULL;
+            ALTER TABLE sessions ADD COLUMN sunset  TEXT NULL;
             """),
     ];
 }

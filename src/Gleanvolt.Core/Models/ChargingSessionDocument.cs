@@ -34,8 +34,13 @@ public sealed record ChargingSessionDocument(
     /// included, so a session can be read against the day it happened on without a forecast archive.
     /// Additive again — and nullable even at v3, since a day the controller only saw half of has only
     /// half a curve to give.</para>
+    ///
+    /// <para>4 added the weather: <c>weatherAtStart</c> and <c>weatherAtEnd</c> — the sky as a provider
+    /// reported it when the session opened and when it closed — plus <c>sunrise</c> and <c>sunset</c>
+    /// for the day it started on. Additive, and null throughout wherever no weather provider is
+    /// configured, which is the default.</para>
     /// </summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>
     /// Builds a document at the current schema version.

@@ -296,6 +296,10 @@ internal static class TestSessions
             StartPlan: null,
             ForecastRemainingAtStartWh: null,
             DayForecast: null,
+            WeatherAtStart: null,
+            WeatherAtEnd: null,
+            Sunrise: null,
+            Sunset: null,
             Controlled: true);
 
     public static ChargingSessionSample Sample(Guid sessionId, DateTimeOffset timestamp, double batterySocPercent) =>

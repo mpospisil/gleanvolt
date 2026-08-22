@@ -307,6 +307,26 @@ The **API key is a secret and must not be committed**. Provide it out-of-band, u
 
 If the API key or resource id is missing, the worker logs a warning and skips forecast refreshes; the rest of the service continues to run. The free Solcast hobbyist tier caps daily API calls, which is why the forecast is cached and refreshed only every 12 hours by default — keep the interval within your plan's quota.
 
+### Weather (the `Weather` section, optional)
+
+Records **what the sky was actually doing** while a session ran, so a finished session can be read against the day it happened on rather than only against the forecast. Entirely optional and **off unless configured**: with no key and no coordinates the controller makes no weather calls at all, and every session is simply recorded without weather.
+
+```jsonc
+"Weather": {
+  "BaseUrl": "https://api.openweathermap.org/",
+  "Latitude": null,             // the site, in decimal degrees — e.g. 49.267803
+  "Longitude": null,            // e.g. 16.529486
+  "Units": "metric",            // °C and metres; changing this changes what the stored numbers mean
+  "RequestTimeout": "00:00:05"  // a slow provider is abandoned, never waited for
+}
+```
+
+The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY`, `WEATHER_LATITUDE` and `WEATHER_LONGITUDE` in `deploy/.env`.
+
+**Two calls per charging session**, one when it opens and one when it closes, and none in between. There is no refresh worker and no cached forecast: weather is decoration on a record, not an input to any decision, so spending the provider's quota on hours when nothing is recording would buy nothing. Any free OpenWeatherMap plan covers a few sessions a day comfortably.
+
+It uses the **current-weather endpoint** (`data/2.5/weather`), not One Call 3.0 — One Call needs its own paid subscription and answers `401` without one, and everything recorded here comes back from the free endpoint anyway. See [The weather a session ran in](#the-weather-a-session-ran-in) below for what is stored.
+
 ### EV charge control (writes to the charger)
 
 When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. Two things are written, by two different callers: the **charge-current setpoint**, by the control loop, on every cycle that calls for a change; and the charger's **use-mode**, once per action — `Fast` when a strategy is started, `Stop` when it is switched off (see "What is written, and by whom" below). It writes only current values that differ from what's already on the device and logs every change.
@@ -1405,7 +1425,8 @@ existing `COMPOSE_FILE` line doesn't break — merging it is now a no-op.
 
 Phase 4 adds `/sessions`: a list of recorded sessions (date, duration, driving strategy, energy
 delivered, solar share), each linking to a detail page with the per-source energy split, the day's
-forecast total with its p10–p90 band, and a battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
+forecast total with its p10–p90 band, the weather at each end of the session with the day's daylight
+window, and a battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
 nothing here reaches past the interface into SQLite — and degrades to "isn't available right now"
 rather than an error page when `SessionStore:Enabled` is off or the file can't be opened. See
 [Charging session history](#charging-session-history-the-sessionstore-section) below for what is
@@ -1475,7 +1496,7 @@ from the moment the car was plugged in whether or not anything is controlling it
 
 | | |
 |---|---|
-| **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, the forecast day plan as it stood at the start, and **the whole day's forecast curve** (below) |
+| **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, the forecast day plan as it stood at the start, **the whole day's forecast curve**, and **the weather at each end of the session** (both below) |
 | **Totals** | energy delivered, split into **from solar / from grid / from battery**, plus what the forecast mode *commanded* the battery to lend |
 | **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, the running totals, and the site-wide progress figures below |
 | **Events** | mode changed, charging started/paused, setpoint changed, hold armed/released, plan fell out of trust, session ended — each with the controller's own reason string |
@@ -1541,6 +1562,26 @@ total with its band beside the other header facts.
 
 This is database schema **v3** and `schemaVersion` 3, additive again: older rows keep `NULL`, which is
 the truth for them.
+
+#### The weather a session ran in
+
+The day forecast above says what the sun was *expected* to do. This says what the sky **did** — because a session that under-delivered against a confident forecast otherwise has no explanation attached to it, and cloud that rolled in, a cold morning and snow on the panels all look identical afterwards.
+
+Configured via the [`Weather` section](#weather-the-weather-section-optional); `NULL` throughout when it isn't, which is the default.
+
+| Field | What it is |
+|---|---|
+| `WeatherAtStart` | The conditions when the session opened |
+| `WeatherAtEnd` | The conditions when it closed. `null` while a session is open, and when that fetch failed — neither is an error |
+| `Sunrise` / `Sunset` | The daylight bounds of the day it **started** on |
+
+Each reading carries `TemperatureCelsius`, `PressureHpa`, `HumidityPercent`, `CloudsPercent`, `VisibilityMetres` (`null` when unreported), `Condition` (`Clear`, `Rain`, `Snow`…), `ConditionDescription` (`light rain`) and `ObservedAt` — the time the *provider* stamped the reading, since these are typically a few minutes old and a reading without its own timestamp can't be told from a live one.
+
+**Two readings, not one.** A six-hour session can finish in entirely different weather from the one it started in, and only the *pair* can say so — the same reason the header has both a start and an end SOC. **Sunrise and sunset are stored once**, because they belong to the day rather than to either reading; a session running across midnight carries the starting day's pair, the same rule `StartedAt` and the day forecast already follow.
+
+These are **columns, not a JSON document** — unlike the forecast curve, which is written once and read whole. Cloud cover and temperature are the axes the analysis groups by, and "solar share against cloud cover" should be SQL rather than a parse per row.
+
+This is database schema **v4** and `schemaVersion` 4, additive: older rows keep `NULL`.
 
 #### How the energy is attributed to a source
 

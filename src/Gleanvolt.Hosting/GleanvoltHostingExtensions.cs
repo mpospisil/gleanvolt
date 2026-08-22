@@ -16,6 +16,7 @@ using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Sessions;
+using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web;
 
@@ -103,6 +104,26 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<SolcastForecastService>();
         services.AddSingleton<ISolarForecastService>(provider => provider.GetRequiredService<SolcastForecastService>());
         services.AddHostedService<SolarForecastRefreshWorker>();
+
+        // The weather a session ran in (issue #96). Off unless a key and the site's coordinates are
+        // configured, and secret on the same terms as Solcast: Weather:ApiKey / Weather__ApiKey.
+        // No refresh worker -- it is asked twice per charging session and never on a control path.
+        services.Configure<WeatherOptions>(configuration.GetSection(WeatherOptions.SectionName));
+
+        services.AddHttpClient(OpenWeatherMapService.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<WeatherOptions>>().Value;
+            if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            }
+
+            // The service bounds each call itself; this is the backstop for a connection that never
+            // gets as far as a response.
+            client.Timeout = options.RequestTimeout;
+        });
+
+        services.AddSingleton<IWeatherService, OpenWeatherMapService>();
 
         // Forecast-driven EV charge control (issue #10). Disabled by default -- it writes to the
         // charger and the control register addresses must be verified first (see EvChargerRegister).
