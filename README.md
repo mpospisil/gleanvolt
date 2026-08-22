@@ -924,7 +924,7 @@ neither can a request that does not survive a restart.
 "ChargeControl": {
   "Targeted": {
     "SafetyMargin": "00:15:00",   // finish this long before the stated departure
-    "MaxHorizon": "36:00:00",     // the furthest ahead a departure may be set
+    "MaxHorizon": "1.12:00:00",   // the furthest ahead a departure may be set (d.hh:mm:ss -- "36:00:00" is 36 *days*)
     "GridBridge": true            // may the grid lift a sub-floor surplus to 6A? see above
   }
 }
