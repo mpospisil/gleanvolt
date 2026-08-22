@@ -168,7 +168,7 @@ public class TargetedPageTests : BunitContext
         var page = Render<Targeted>();
 
         Assert.Contains("only shown while", page.Markup);
-        Assert.DoesNotContain("Grid top-up starts", page.Markup);
+        Assert.DoesNotContain("Charge pace", page.Markup);
     }
 
     [Fact]
@@ -187,7 +187,8 @@ public class TargetedPageTests : BunitContext
         Assert.Contains("14.6 kWh", page.Markup);
         Assert.Contains("From grid", page.Markup);
         Assert.Contains("7.4 kWh", page.Markup);
-        Assert.Contains("Grid top-up starts", page.Markup);
+        Assert.Contains("Charge pace", page.Markup);
+        Assert.Contains("Charging from", page.Markup);
         Assert.Contains("Battery SOC floor", page.Markup);
         Assert.Contains("55%", page.Markup);
     }
@@ -203,24 +204,27 @@ public class TargetedPageTests : BunitContext
             TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
         });
 
-        page.WaitForAssertion(() => Assert.Contains("There is time to wait for the sun", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("The sun should carry", page.Markup));
     }
 
     // --- The narrative, one case per strategy ---
 
     [Fact]
-    public void The_narrative_for_a_split_plan_names_both_shares_and_when_the_grid_starts()
+    public void The_narrative_for_a_split_plan_names_both_shares_and_the_pace()
     {
         var text = Narrate(TestTargetedPlans.SolarPlusGrid(Now));
 
         Assert.Contains("22.0 kWh by 07:00 tomorrow", text);
-        Assert.Contains("There is time to wait for the sun", text);
-        Assert.Contains("14.6 kWh should come from forecast surplus", text);
-        Assert.Contains("7.4 kWh from the grid, starting 04:30 tomorrow", text);
-        Assert.Contains("placed over the sunniest hours it can reach", text);
-        Assert.Contains("sunnier day than forecast shrinks the grid share", text);
-        Assert.Contains("lifted to the 6 A floor from the grid rather than exported", text);
-        Assert.Contains("discharge hold arms whenever the plan is importing", text);
+        Assert.Contains("The sun should carry", text);
+        Assert.Contains("The sun should carry 14.6 kWh", text);
+        Assert.Contains("the grid the remaining 7.4 kWh", text);
+        Assert.Contains("paced at about", text);
+        Assert.Contains("draws close to what the roof is producing", text);
+        Assert.Contains("discharge hold arms whenever the car is drawing more than the roof is giving", text);
+
+        // The old design's vocabulary must not survive anywhere in the sentence.
+        Assert.DoesNotContain("sunniest hours", text);
+        Assert.DoesNotContain("grid block", text);
     }
 
     [Fact]
@@ -234,7 +238,7 @@ public class TargetedPageTests : BunitContext
 
         Assert.Contains("6.4 kWh of surplus is forecast for this window", text);
         Assert.Contains("never climbs past the charger's 6 A minimum", text);
-        Assert.Contains("expect to import less than that", text);
+        Assert.Contains("only the difference is bought", text);
 
         // The two claims that were wrong, and the overstatement the user caught.
         Assert.DoesNotContain("No usable surplus is forecast", text);

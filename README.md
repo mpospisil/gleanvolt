@@ -31,7 +31,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Surplus-aware EV charging** — automatically ramp EV charge current up/down based on available household energy surplus.
 - **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full.
-- **Targeted charging** — "22 kWh in the car by 07:00, and use as little grid as you can": the plan takes every kilowatt-hour of forecast surplus the home battery hasn't claimed and buys the rest in a block placed over the sunniest hours it can reach, so the roof offsets the import while it runs; with no sun in the window to wait for, it starts straight away.
+- **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
@@ -805,25 +805,26 @@ with the discharge hold armed so the pack stays out of it. The value of the plan
 reports how much will really reach the car, how far short of the request that is, and the departure
 time that *would* have covered it.
 
-**Enough time** — the car takes every kilowatt-hour of forecast surplus the home battery has not
-already claimed, and the grid covers only the remainder, in a block placed over the **sunniest slices
-of the window** — or, when the window holds no forecast surplus at all, starting straight away.
+**Enough time** — the car is **paced** across the whole window rather than run flat out.
 
-Placement is the whole trick, and it has two halves.
+```
+pace = (energy still needed − sun forecast to reach the car) ÷ time left to the deadline
+charge at  live surplus + pace,  clamped to the charger's 6–16 A range
+```
 
-*Import under the sun.* A grid block that runs while the roof is producing is paid for partly by the
-roof: the charger runs at its maximum, and everything the array delivers at that moment comes off the
-meter instead of being exported. That includes the two things the solar share cannot use — surplus
-that sits below the charger's 6 A minimum, which is worth nothing to the car on its own, and
-everything a P10 forecast underestimated. Importing after dark instead throws both away and buys the
-same kilowatt-hours again. The block still shrinks poll by poll as the measured delivery accrues, so
-a better day than forecast still cancels the rest of it before it is drawn.
+Rate, not timing, is what decides the solar share, because **the charger can only use the sun that
+shines while it runs**. At 16 A the car outruns the roof by several kW whatever the weather and then
+stops: on 2026-08-22 a 13 kWh target on a day peaking at 8.5 kW was over in 87 minutes and took 9 kWh
+from the grid. The same 13 kWh paced over a four-hour window is ~3.3 kW — a rate the roof matches for
+much of the day.
 
-*Nothing to wait for means start now.* When the window is dark end to end — plugged in at 21:00 for
-an 07:00 departure — or when no usable forecast exists, there is no sun that deferring the import
-could capture. Waiting until 05:00 to buy exactly the same energy gains nothing and leaves no room
-for a charger dropout, a car that limits itself, or a departure brought forward, so the block starts
-at once.
+Sun above the pace is taken in full: free energy, and it lowers the pace for every minute after it.
+Sun below it is topped up from the grid. Falling behind raises the pace again on the next poll, so the
+loop self-corrects in both directions and nothing is ever committed to.
+
+A pace of **zero** means the forecast covers the target outright — then the car simply waits for the
+sun and buys nothing. Activated at 02:00 for 15 kWh by 17:00 on a good forecast, nothing happens
+overnight and charging starts at the first half-hour whose surplus clears the charger's 6 A minimum.
 
 #### Sun first, grid allowed
 
@@ -856,16 +857,18 @@ keep imports strictly inside the blocks the plan drew.
 
 - **The home battery keeps its priority.** Its need is reserved out of the forecast by the same
   backward pass [`SolarDayPlanner`](#the-shoulders-belong-to-the-battery-the-plateau-belongs-to-the-car)
-  uses, so the car is only ever offered what is left; and the discharge hold arms **while the plan is
-  importing** — inside the grid block *and* while the bridge runs. Unlike `FastNoBattery`, the hold is
-  scoped to the importing part of the cycle rather than to the whole mode: the rest of the time the car
-  is running on surplus, and holding the pack there would only push the house onto the grid for
-  nothing. The bridge half matters more than it looks — 6 A is commanded against a surplus that cannot
-  carry it, so without the hold the pack, not the grid, quietly pays the difference.
+  uses, so the car is only ever offered what is left; and the discharge hold arms **whenever the car is
+  drawing more than the roof is giving**. Unlike `FastNoBattery`, the hold is scoped to the importing
+  part of the cycle rather than to the whole mode. Below the plan's SOC floor the sun belongs to the
+  pack outright: the car still gets its pace, but funded entirely by the grid, and the whole of it
+  counts as imported so the hold arms for all of it.
 - **There is still no battery loan in this mode.** The pack keeps priority and the grid is the honest
   source for the gap, bridge included.
-- **Solar is taken earliest-first**, not best-surplus-first. Banking energy early is the robust choice
-  when a forecast may disappoint, and it costs nothing, because nothing is committed.
+- **Sub-minimum sun is still worth having.** A 3.2 kW half-hour cannot run the charger alone, but once
+  the charger is held at its floor the roof supplies that 3.2 kW and only the ~0.9 kW difference is
+  bought. Skipping it and buying the same energy after dark costs the whole 4.14 kW. The plan keeps two
+  separate figures for this: what the sun could do **unaided** decides whether anything need be bought
+  at all, and what it can do **assisted** decides how much.
 - **No usable forecast is not a failure.** Every solar term goes to zero, the plan becomes grid-only,
   and the target is still met — live surplus is used opportunistically anyway. Where `Forecasted`
   degrades towards conservatism, this mode degrades towards *keeping the promise*.
@@ -925,7 +928,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
     This is one of the two that switch *themselves* off, so **Charge mode** will change under you when
     the car finishes.
   - **Activate target** — deliver a stated amount of energy by a stated departure time, sun first and
-    the grid top-up placed over the sunniest hours it can reach. See
+    paced across the window so the roof covers as much of it as it can. See
     [Targeted charging](#targeted-charging-the-targeted-mode) below.
     It has no button of its own in the row because it needs a request: set **Target energy** and
     **Departure time**, and this button applies both and starts the mode. Like `FastNoBattery`, it
@@ -1020,7 +1023,7 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **Battery loan power** | W | How much of what the car is drawing right now is being covered by the home battery rather than by live sun. Zero outside the `Forecasted` mode. |
 
 The targeted-charge entities. The three controls are always live — a request can be prepared before
-the mode is selected — while the seven sensors are populated only while **Targeted** is driving, by the
+the mode is selected — while the eight sensors are populated only while **Targeted** is driving, by the
 same rule the forecast plan follows.
 
 | Entity | Unit | What it means |
@@ -1030,11 +1033,12 @@ same rule the forecast plan follows.
 | **Activate target** | button | Applies the two above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with either half missing, or with a departure already past, it logs a warning and does nothing. |
 | **Target plan state** | — | One line on what the plan is doing and why — the same explanation the log carries. |
 | **Target forecast surplus** | kWh | All the surplus the window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided. Read it against **Target solar energy**: the gap between them is sun the roof will produce but the charger cannot run on by itself. |
-| **Target solar energy** | kWh | The share of what is still needed that forecast surplus is expected to cover **as a solar block**, after the home battery's own booking. Zero does not mean "no sun" — it means no half-hour clears the charger's 6 A minimum, which is exactly when the grid block gets placed over the sunniest hours instead. |
+| **Target solar energy** | kWh | The share of what is still needed that the roof is expected to supply, after the home battery's own booking — including surplus below the charger's 6 A minimum, which the car can still use while the grid holds it at that minimum. Read it against **Target forecast surplus**. |
 | **Target grid energy** | kWh | The share planned to come from the grid, and an **upper bound** rather than a prediction. Rebuilt every poll, so a better day than forecast shrinks it before the rest is bought — and where the import sits over sub-minimum surplus the charger runs at maximum while the roof quietly covers part of it, which this figure does not model. Expect to import less than it says. |
 | **Target expected** | kWh | What will actually reach the car by the departure. Equal to what was asked for unless there isn't enough time. |
 | **Target shortfall** | kWh | How far **Target expected** falls short of the request. Anything above zero means the departure is too soon for the amount asked for; **Target plan state** names the departure that would have covered it. |
-| **Grid top-up start** | — | When the import begins, if it is still needed. It is placed over the **sunniest** hours in the window, so the roof offsets it while it runs; with no forecast surplus in the window to wait for, it starts at once. `none` while the forecast covers the whole request. |
+| **Target charge pace** | kW | The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this **plus** whatever the roof is giving. Zero means the forecast covers the target outright and nothing will be bought. |
+| **Charging from** | — | When the first grid-funded charging starts. `none` while the forecast covers the whole request. |
 
 #### Configuration
 

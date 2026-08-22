@@ -249,21 +249,30 @@ public static class TargetedChargePlanner
             return new PacedPlan(blocks, 0, 0, null, 0);
         }
 
-        // How much the sun could still put in the car from each slice onwards <b>unaided</b>. Built once,
-        // backwards, and read as "is there enough sun ahead to finish without buying anything?".
+        // Two look-aheads, because the sun answers two different questions and conflating them gets one
+        // of them badly wrong.
         //
-        // Only slices whose surplus clears the charger's floor count. A half-hour of 3.5kW cannot run
-        // the charger by itself, so promising it here would defer the start on the strength of sun that
-        // can never arrive alone -- and then arrive at the deadline short. (Once the grid *is* paying,
-        // that same 3.5kW is used in full; it just cannot be counted on to remove the need for a pace.)
-        var solarAheadWh = new double[slices.Count + 1];
+        // <b>Unaided</b> counts only slices whose surplus clears the charger's floor -- sun that can run
+        // the car by itself. It answers "need we buy anything at all?", and has to be the strict
+        // measure: promising sub-floor sun here would defer the start on strength that never arrives
+        // alone, and finish short.
+        //
+        // <b>Assisted</b> counts every watt of surplus. It answers "once the charger is running, how
+        // much of this does the roof actually cover?", and has to be the generous measure: a 3.2kW
+        // half-hour genuinely does supply 3.2kW to a charger held at its 4.14kW floor.
+        //
+        // Using the strict figure for both was a real defect. A 4.2kW day carrying 17.5kWh of surplus
+        // against a 15kWh target scored ~4kWh of "usable" sun and bought 11kWh from the grid, starting
+        // at 02:00 in the dark, on a day the roof could have covered outright.
+        var unaidedAheadWh = new double[slices.Count + 1];
+        var assistedAheadWh = new double[slices.Count + 1];
         for (var i = slices.Count - 1; i >= 0; i--)
         {
-            var unaidedWatts = slices[i].AvailableWatts >= minPowerWatts
-                ? Math.Min(slices[i].AvailableWatts, maxPowerWatts)
-                : 0;
+            var reachableWh = Math.Min(Math.Max(0, slices[i].AvailableWatts), maxPowerWatts) * slices[i].Hours;
 
-            solarAheadWh[i] = solarAheadWh[i + 1] + (unaidedWatts * slices[i].Hours);
+            assistedAheadWh[i] = assistedAheadWh[i + 1] + reachableWh;
+            unaidedAheadWh[i] = unaidedAheadWh[i + 1]
+                + (slices[i].AvailableWatts >= minPowerWatts ? reachableWh : 0);
         }
 
         for (var index = 0; index < slices.Count; index++)
@@ -286,36 +295,39 @@ public static class TargetedChargePlanner
             // sub-minimum sun stopped being worthless.
             var surplusWatts = Math.Max(0, slice.AvailableWatts);
 
-            // The pace is what the *grid* must sustain, not what the charger must: whatever the rest of
-            // the window's sun is forecast to deliver is subtracted first. Without that subtraction a
-            // pace would import through a cloudy morning to hit an average the afternoon was going to
-            // cover for nothing — buying energy the day was about to hand over free, which is the exact
-            // mistake this mode exists to avoid.
-            var deficitWh = Math.Max(0, remaining - solarAheadWh[index]);
+            // Can the sun finish this on its own from here? If so nothing is owed to the grid, and a
+            // sub-floor slice is not worth touching: bumping a 500W shoulder to the charger's floor
+            // would import 3.6kW to harvest 500W on a day the roof covers outright.
+            var unaidedCanFinish = remaining <= unaidedAheadWh[index] + TargetToleranceWh;
+            if (unaidedCanFinish && surplusWatts < minPowerWatts)
+            {
+                continue;
+            }
+
+            // The pace is what the *grid* must sustain, not what the charger must: every watt the roof
+            // will actually reach the car with is subtracted first. Without that a pace imports through
+            // the night to hit an average the day was going to cover for nothing.
+            var deficitWh = Math.Max(0, remaining - assistedAheadWh[index]);
             var gridPaceWatts = deficitWh / hoursLeft;
 
             // Sum, not max. The pace covers what the sun *cannot* reach -- the look-ahead already
             // subtracted every watt it can -- so the two are additive. Taking the greater of them would
             // let a sunny slice swallow the grid's share and quietly arrive at the deadline short.
             var wantWatts = surplusWatts + gridPaceWatts;
-
-            // Nothing owed to the grid and not enough sun to run on: wait for the plateau. Bumping a
-            // 500W shoulder up to the charger's floor would import 3.6kW to harvest 500W, on a day the
-            // forecast says the sun finishes the job by itself.
-            if (deficitWh <= TargetToleranceWh && surplusWatts < minPowerWatts)
-            {
-                continue;
-            }
-
             var chargeWatts = Math.Clamp(wantWatts, minPowerWatts, maxPowerWatts);
             if (chargeWatts <= 0)
             {
                 continue;
             }
 
-            // Where the wanted rate is under the charger's floor this is shorter than the slice: run at
-            // the floor for part of it rather than pretend the car can trickle.
-            var takeWh = Math.Min(remaining, Math.Min(wantWatts * slice.Hours, chargeWatts * slice.Hours));
+            // Once the sun cannot finish alone, a slice carrying any surplus at all is worth running
+            // right through at the charger's floor: the roof supplies what it has, and only the
+            // shortfall to the floor is bought. Harvesting a 3.2kW half-hour costs 0.9kW of grid;
+            // skipping it and buying the same energy after dark costs the whole 4.14kW.
+            var harvest = !unaidedCanFinish && surplusWatts > 0;
+            var wantWh = harvest ? chargeWatts * slice.Hours : wantWatts * slice.Hours;
+
+            var takeWh = Math.Min(remaining, Math.Min(wantWh, chargeWatts * slice.Hours));
             if (takeWh <= 0)
             {
                 continue;
@@ -350,7 +362,7 @@ public static class TargetedChargePlanner
         // covers outright -- there is nothing for the grid to keep up with.
         var hoursToDeadline = slices.Count > 0 ? (deadline - slices[0].Start).TotalHours : 0;
         var paceWatts = hoursToDeadline > 0
-            ? Math.Max(0, needWh - solarAheadWh[0]) / hoursToDeadline
+            ? Math.Max(0, needWh - assistedAheadWh[0]) / hoursToDeadline
             : 0;
 
         return new PacedPlan(blocks, solarTotalWh, gridTotalWh, gridStart, paceWatts);

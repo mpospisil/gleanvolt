@@ -68,13 +68,8 @@ public static class TargetedPlanNarrative
                 paragraphs.Add(headline);
                 paragraphs.Add(SolarPlusGrid(plan, zone));
                 paragraphs.Add(
-                    "The top-up is placed over the sunniest hours it can reach, so whatever the roof really "
-                    + "produces then comes off the import, and a sunnier day than forecast shrinks the grid "
-                    + "share before the rest of it is drawn. A surplus too weak to run the charger on its own "
-                    + "is lifted to the 6 A floor from the grid rather than exported.");
-                paragraphs.Add(
-                    "The home battery keeps its priority throughout: the discharge hold arms whenever the plan "
-                    + "is importing, so the pack never feeds the car.");
+                    "The home battery keeps its priority throughout: the discharge hold arms whenever the car is "
+                    + "drawing more than the roof is giving, so the pack never feeds it.");
                 break;
         }
 
@@ -100,25 +95,27 @@ public static class TargetedPlanNarrative
     /// </summary>
     private static string SolarPlusGrid(TargetedChargePlan plan, TimeZoneInfo zone)
     {
-        var from = plan.GridStart is { } start ? $", starting {At(start, plan.Now, zone)}" : string.Empty;
+        var pace = $"{plan.RequiredPaceWatts / 1000:F1} kW";
 
-        if (plan.SolarEnergyWh > 0)
+        if (plan.SolarEnergyWh > 0 && plan.GridEnergyWh > 0)
         {
-            return $"There is time to wait for the sun: {Kwh(plan.SolarEnergyWh)} should come from forecast "
-                + $"surplus {Between(plan, zone)}, and {Kwh(plan.GridEnergyWh)} from the grid{from}.";
+            return $"The sun should carry {Kwh(plan.SolarEnergyWh)} of it {Between(plan, zone)}, and the grid the "
+                + $"remaining {Kwh(plan.GridEnergyWh)}. Rather than charge flat out and finish early, the car is "
+                + $"paced at about {pace} across the window, so the charger draws close to what the roof is "
+                + "producing and buys only the shortfall.";
         }
 
         if (plan.HasUnusableSurplus)
         {
-            return $"{Kwh(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs "
-                + "past the charger's 6 A minimum, so the car cannot run on it unaided. The grid covers up to "
-                + $"{Kwh(plan.GridEnergyWh)}{from} — placed over the sunniest hours, where the charger runs "
-                + "flat out and the roof quietly pays for part of it, so expect to import less than that.";
+            return $"{Kwh(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs past "
+                + "the charger's 6 A minimum, so the car cannot run on it unaided. It is still worth having: the "
+                + $"charger is held at that minimum while the sun is up, the roof supplies what it has, and only the "
+                + $"difference is bought — about {pace} of grid on average.";
         }
 
-        return $"No surplus at all is forecast before then, so the whole {Kwh(plan.RemainingEnergyWh)} still "
-            + $"needed comes from the grid{from}. With no sun in the window to wait for, there is nothing to "
-            + "be gained by putting it off.";
+        return $"No surplus at all is forecast before then, so the whole {Kwh(plan.RemainingEnergyWh)} still needed "
+            + $"comes from the grid, paced at about {pace} across the window. With no sun to wait for there is "
+            + "nothing to be gained by putting it off, and spreading it leaves room to recover if anything drops out.";
     }
 
     private static string Between(TargetedChargePlan plan, TimeZoneInfo zone) =>
