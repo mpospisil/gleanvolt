@@ -29,6 +29,7 @@ public class TargetedChargingControllerTests
         double deliveredWh = 0,
         double socFloorPercent = 50,
         double gridEnergyWh = 14_000,
+        double paceWatts = 3_000,
         DateTimeOffset? gridStart = null,
         DateTimeOffset? now = null) =>
         new(
@@ -41,6 +42,7 @@ public class TargetedChargingControllerTests
             RemainingEnergyWh: Math.Max(0, requiredWh - deliveredWh),
             SolarEnergyWh: 8_000,
             ForecastSurplusWh: 8_000,
+            RequiredPaceWatts: paceWatts,
             GridEnergyWh: gridEnergyWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: 22_000,
