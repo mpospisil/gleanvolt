@@ -16,6 +16,7 @@ namespace Gleanvolt.Infrastructure.Vehicles;
 /// {
 ///   "captured_at":  "2026-08-17T10:44:23+00:00",   // required: the CAR's capture time
 ///   "soc_percent":  28,                            // optional, 0-100
+///   "range_km":     176,                           // optional: the CAR's own range estimate
 ///   "charge_time_remaining_minutes": 95,           // optional: the CAR's own estimate
 ///   "charge_state": "charging",                    // optional: idle | charging | complete | unknown
 ///   "plug_state":   "connected",                   // optional: connected | disconnected | unknown
@@ -30,6 +31,7 @@ public static class VehicleTelemetryPayload
 {
     public const string CapturedAtProperty = "captured_at";
     public const string SocPercentProperty = "soc_percent";
+    public const string RangeKmProperty = "range_km";
     public const string ChargeTimeRemainingProperty = "charge_time_remaining_minutes";
     public const string ChargeStateProperty = "charge_state";
     public const string PlugStateProperty = "plug_state";
@@ -93,6 +95,11 @@ public static class VehicleTelemetryPayload
                 return false;
             }
 
+            if (!TryReadRangeKm(root, out var rangeKm, out error))
+            {
+                return false;
+            }
+
             if (!TryReadChargeTimeRemaining(root, out var remaining, out error))
             {
                 return false;
@@ -101,6 +108,7 @@ public static class VehicleTelemetryPayload
             state = new VehicleState(
                 capturedAt,
                 soc,
+                rangeKm,
                 remaining,
                 ReadEnum(root, ChargeStateProperty, VehicleChargeState.Unknown),
                 ReadEnum(root, PlugStateProperty, VehiclePlugState.Unknown),
@@ -170,6 +178,43 @@ public static class VehicleTelemetryPayload
         error = null;
         return true;
     }
+
+    // Optional. Zero is a real reading -- a flat car reports it -- so the only rejections are a
+    // non-number and a figure no road car could mean. The ceiling is deliberately generous: it exists
+    // to catch a template publishing metres or a "unavailable" that slipped through as a number, not
+    // to have an opinion about how far anyone's car goes.
+    private static bool TryReadRangeKm(JsonElement root, out double? rangeKm, out string? error)
+    {
+        rangeKm = null;
+
+        if (!root.TryGetProperty(RangeKmProperty, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            error = null;
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.Number || !property.TryGetDouble(out var value))
+        {
+            error = $"'{RangeKmProperty}' was a JSON {property.ValueKind}, expected a number";
+            return false;
+        }
+
+        if (value < 0 || value > MaxRangeKm || double.IsNaN(value))
+        {
+            error = $"'{RangeKmProperty}' was {value}, outside 0-{MaxRangeKm} km";
+            return false;
+        }
+
+        rangeKm = value;
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Sanity ceiling on a reported range: 2000 km, comfortably past anything on sale and short enough
+    /// that a metres-for-kilometres mix-up is caught rather than displayed.
+    /// </summary>
+    private const double MaxRangeKm = 2000;
 
     // Optional, in whole or fractional minutes. Absent is a supported configuration -- plenty of cars
     // report SOC and nothing else -- but a negative or absurd figure is a broken template, and a car

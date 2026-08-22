@@ -1,42 +1,120 @@
+@using Gleanvolt.Core.Strategies
 @implements IDisposable
 @inject ITargetedChargeSelector Target
+@inject ITargetedChargePreview Preview
+@inject IVehicleTelemetry Vehicle
+@inject VehicleDisplayOptions VehicleDisplay
 @inject IForecastRuntimeSettings ForecastSettings
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
 
 @*
-    The old /targeted page, now the fourth tab (#98). Unchanged in substance: the request is set on
-    ITargetedChargeSelector and the mode is then started through the page's Start -- which puts the
-    charger into Fast first (#89) -- and Cancel clears the request and stops, which is the same Off
-    the header carries plus the clearing the header cannot know to do.
+    The old /targeted page, the fourth tab since #98, and since #99 a tab that asks the car before it
+    asks the owner.
+
+    Three things happen here, in this order, because that is the order the decision is made in:
+
+      1. What the car says about itself, when there is a feed and a reading. SOC and range are the
+         numbers the plan is about to be built from, so they belong above the form rather than a nav
+         item away on the dashboard.
+      2. What the owner wants, said either way round -- kilowatt-hours to add (the original contract,
+         the default, and the only basis an install with no vehicle feed ever sees) or a state of
+         charge to reach, which VehicleTargetEnergy converts once, here, at activation.
+      3. The plan, before the charger moves. Preview builds it through ITargetedChargePreview, which
+         writes to nothing; Start then does what Activate always did -- request first, then the mode,
+         because the controller reads both in the same cycle.
 
     Text, not a chart: the question at 22:00 is "is the car going to be ready, and why is nothing
-    happening yet?", and no chart answers that as directly as a sentence. The timeline chart is its
-    own story and will consume TargetedChargePlan.Blocks unchanged.
-
-    The minimum battery SOC appears here as well as on the Forecasted tab, through the same runtime
-    seam: it is the floor this planner will not draw the pack below, and reading it as a plan figure
-    without being able to move it is exactly the split this page was built to end.
+    happening yet?", and no chart answers that as directly as a sentence.
 
     Subscribes to the request itself, because it can move without this tab's help -- Home Assistant
     sets one too, and the mode clears itself once the target is met.
 *@
 
 <p class="muted">
-    Say how much energy the car needs and when it has to be there. The plan takes every kilowatt-hour
-    of forecast surplus the home battery has not already claimed, and buys the rest from the grid as
-    late as it can and still finish in time.
+    Say how much the car needs and when it has to be there, then look at the plan before it starts.
+    The plan takes every kilowatt-hour of forecast surplus the home battery has not already claimed,
+    and buys the rest from the grid as late as it can and still finish in time.
 </p>
 
-<div class="control">
-    <label for="target-energy">Energy needed (kWh)</label>
-    <input id="target-energy" type="number" step="0.5" min="0" @bind="_energyKWh" @bind:event="onchange" />
-    <span class="hint">Measured at the charger, from the moment you press Activate.</span>
-</div>
+@if (_vehicle is not null)
+{
+    @*
+        Only with a feed and a reading. An install with Vehicle:Enabled=false sees the form it has
+        always seen, which is the whole "default behaviour is unchanged" promise -- and an empty card
+        would be a worse answer than no card.
+    *@
+    <section class="plan" id="vehicle-card">
+        <h2>The car</h2>
+
+        <p class="muted">
+            Reported by the car @VehicleAge(_vehicle) ago@(_vehicle.SourceId is null ? "" : $" via {_vehicle.SourceId}").
+            @if (_vehicleStale)
+            {
+                <strong>
+                    Stale — older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h, so the feed may
+                    have died. Check the figures against the car before planning from them.
+                </strong>
+            }
+        </p>
+
+        <section class="stat-grid">
+            <Stat Label="Car battery" Value="@Percent(_vehicle.SocPercent)"
+                  Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
+            <Stat Label="Range" Value="@Km(_vehicle.RangeKm)"
+                  Hint="What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip." />
+            <Stat Label="Plugged in" Value="@PluggedIn()"
+                  Hint="What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours." />
+            <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()"
+                  Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+        </section>
+    </section>
+}
+
+@*
+    The basis selector appears only when it can be honoured: a capacity in Vehicle:BatteryCapacityKWh
+    and an SOC in the last reading. Without both there is no honest conversion from "80%" to
+    kilowatt-hours, and offering a control that would have to guess is worse than not offering it.
+*@
+@if (CanTargetSoc)
+{
+    <div class="control">
+        <label for="target-basis">What are you aiming at?</label>
+        <select id="target-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
+            <option value="@TargetBasis.Energy">Energy to add (kWh)</option>
+            <option value="@TargetBasis.Soc">Battery target (%)</option>
+        </select>
+        <span class="hint">
+            Either way the promise is metered in kilowatt-hours at the charger. A battery target is
+            converted once, when you start it — a later reading from the car does not move a target
+            that is already part delivered.
+        </span>
+    </div>
+}
+
+@if (_basis == TargetBasis.Soc && CanTargetSoc)
+{
+    <div class="control">
+        <label for="target-soc">Charge to (%)</label>
+        <input id="target-soc" type="number" step="5" min="0" max="100"
+               @bind="_targetSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">@SocConversionHint()</span>
+    </div>
+}
+else
+{
+    <div class="control">
+        <label for="target-energy">Energy needed (kWh)</label>
+        <input id="target-energy" type="number" step="0.5" min="0"
+               @bind="_energyKWh" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">Measured at the charger, from the moment you press Start.</span>
+    </div>
+}
 
 <div class="control">
     <label for="target-departure">Ready by</label>
-    <input id="target-departure" type="datetime-local" @bind="_departure" @bind:event="onchange" />
+    <input id="target-departure" type="datetime-local"
+           @bind="_departure" @bind:event="onchange" @bind:after="OnFormEdited" />
     <span class="hint">
         Charging finishes a few minutes before this, so the car is ready rather than still drawing.
         At most @(Display.MaxHorizon.TotalHours.ToString("F0")) hours ahead.
@@ -55,7 +133,7 @@
 </div>
 
 <div class="control">
-    <button type="button" class="primary" id="activate-target" disabled="@Busy" @onclick="Activate">Activate</button>
+    <button type="button" class="primary" id="preview-target" disabled="@Busy" @onclick="BuildPreview">Preview plan</button>
     <button type="button" class="secondary" id="cancel-target" disabled="@Busy" @onclick="Cancel">Cancel</button>
 
     @if (_error is not null)
@@ -64,47 +142,57 @@
     }
 
     <span class="hint">
-        The request does not survive a restart of the service. If it restarts overnight the car stops
-        charging, and nothing will have told you.
+        Preview writes to nothing — it is the same planner the poll loop runs, asked what would happen
+        if you started now. The request does not survive a restart of the service: if it restarts
+        overnight the car stops charging, and nothing will have told you.
     </span>
 </div>
+
+@*
+    The preview and the button that commits it, in that order and inside the same section: what you
+    confirm should be the thing you have just read, not a button somewhere above it.
+*@
+@if (_previewed)
+{
+    <section class="plan" id="target-preview">
+        <h2>The plan, if you start now</h2>
+
+        @if (_previewRequest is { } asked)
+        {
+            <p class="muted">@Asking(asked)</p>
+        }
+
+        @if (_preview is { } preview)
+        {
+            <TargetedPlanView Plan="preview" />
+        }
+        else
+        {
+            <p class="muted">
+                No poll has completed yet, so there is nothing to build a plan from — no battery SOC,
+                no house load, no forecast anchored to an instant. You can still start the target and
+                the plan will appear on the first poll.
+            </p>
+        }
+
+        <div class="control">
+            <button type="button" class="primary" id="activate-target" disabled="@Busy" @onclick="Activate">Start charging</button>
+            <button type="button" class="secondary" id="discard-preview" disabled="@Busy" @onclick="DiscardPreview">Back to the form</button>
+        </div>
+    </section>
+}
 
 @if (Status?.TargetedPlan is { } plan)
 {
     <section class="plan">
         <h2>The plan</h2>
 
-        @foreach (var paragraph in TargetedPlanNarrative.Describe(plan, Time.LocalTimeZone))
+        @if (Target.Request is { } running && running.IsSocBased)
         {
-            <p>@paragraph</p>
+            <p class="muted">@Asking(running)</p>
         }
-    </section>
 
-    <section class="stat-grid">
-        <Stat Label="Plan state" Value="@plan.Strategy.ToString()"
-              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: the sun carries what it can and the grid paces the rest. Maximum: there is not enough time, so everything available is taken." />
-        <Stat Label="Still needed" Value="@Kwh(plan.RemainingEnergyWh)"
-              Hint="The request less what the charger has measurably delivered since it was activated." />
-        <Stat Label="Delivered so far" Value="@Kwh(plan.DeliveredEnergyWh)"
-              Hint="Measured at the charger, so a car that limits itself to less than we asked for simply gets a longer grid block on the next poll." />
-        <Stat Label="Forecast surplus" Value="@Kwh(plan.ForecastSurplusWh)"
-              Hint="All the surplus this window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided." />
-        <Stat Label="From sun" Value="@Kwh(plan.SolarEnergyWh)"
-              Hint="The part of the surplus above that the car can actually run on alone. Zero does not mean no sun: it means no half-hour clears the charger's 6 A minimum, which is why the grid block is placed over the sunniest hours rather than after them." />
-        <Stat Label="From grid" Value="@Kwh(plan.GridEnergyWh)"
-              Hint="What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought." />
-        <Stat Label="Charge pace" Value="@($"{plan.RequiredPaceWatts / 1000:F1} kW")"
-              Hint="The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this plus whatever the roof is giving, so sun above it is free and lowers it for later. Zero means the forecast covers the target outright." />
-        <Stat Label="Charging from" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"
-              Hint="When the first grid-funded charging starts. The charge is spread across the window rather than run flat out, because the charger can only use the sun that shines while it runs." />
-        <Stat Label="Expected by departure" Value="@Kwh(plan.ExpectedEnergyWh)"
-              Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
-        <Stat Label="Shortfall" Value="@Kwh(plan.ShortfallWh)"
-              Hint="How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount asked for." />
-        <Stat Label="Battery SOC floor" Value="@Percent(plan.SocFloorPercent)"
-              Hint="The home battery is not drawn below this to feed the car; the grid covers the gap instead." />
-        <Stat Label="Ready by" Value="@Clock(plan.Deadline)"
-              Hint="The finish line the plan works to: your departure less the safety margin." />
+        <TargetedPlanView Plan="plan" />
     </section>
 }
 else if (Status is null)
@@ -128,11 +216,29 @@ else
 
     [Parameter, EditorRequired] public Func<Task<ChargeActionResult>> Stop { get; set; } = default!;
 
+    /// <summary>Which way round the owner is saying what they want. Purely a property of this form.</summary>
+    private enum TargetBasis
+    {
+        Energy,
+        Soc,
+    }
+
+    private TargetBasis _basis = TargetBasis.Energy;
     private double _energyKWh = 20;
+    private double _targetSocPercent = 80;
     private DateTime _departure;
     private double _minBatterySocPercent;
     private string? _error;
     private ChargeControlStatus? _seenStatus;
+    private VehicleState? _vehicle;
+    private bool _vehicleStale;
+
+    // The preview and what it was built for. Held together so Start commits the figures that were on
+    // screen, and so any edit can drop both at once -- it must never be possible to confirm a plan
+    // that no longer describes the form above it.
+    private TargetedChargePlan? _preview;
+    private TargetedChargeRequest? _previewRequest;
+    private bool _previewed;
 
     protected override void OnInitialized()
     {
@@ -140,6 +246,7 @@ else
 
         SeedForm(Target.Request);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+        RefreshVehicle();
     }
 
     // Only on a genuinely new poll, not on every render of the page above: the floor is a field the
@@ -153,6 +260,13 @@ else
 
         _seenStatus = Status;
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+
+        // The car on the poll's cadence, as the dashboard reads it: vehicle readings arrive minutes
+        // apart at best, so this is one subscription rather than two and one render path rather than
+        // two. A reading that lands mid-preview does not move the preview -- it was built from the
+        // reading that was on screen, and moving it under the owner would be the one thing this whole
+        // preview step exists to prevent.
+        RefreshVehicle();
     }
 
     private void OnRequestChanged(TargetedChargeRequest? request)
@@ -163,6 +277,14 @@ else
 
     public void Dispose() => Target.Changed -= OnRequestChanged;
 
+    /// <summary>
+    /// Whether a target may be asked for as a state of charge: a configured pack size and a reported
+    /// SOC to measure the gap from. Staleness deliberately does not withdraw it — a parked car's SOC
+    /// does not drift, the reading is flagged loudly above, and refusing the basis outright would only
+    /// push the owner into converting it in their head from the same stale number.
+    /// </summary>
+    private bool CanTargetSoc => VehicleDisplay.CanTargetSoc && _vehicle?.SocPercent is not null;
+
     // The form shows what is actually being worked to, when there is one -- a page opened in a second
     // browser must not offer to overwrite the running request with its own defaults.
     private void SeedForm(TargetedChargeRequest? request)
@@ -171,6 +293,13 @@ else
         {
             _energyKWh = Math.Round(request.RequiredEnergyWh / 1000, 1);
             _departure = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).DateTime;
+
+            if (request.TargetSocPercent is { } soc)
+            {
+                _basis = TargetBasis.Soc;
+                _targetSocPercent = soc;
+            }
+
             return;
         }
 
@@ -179,27 +308,53 @@ else
         _departure = localNow.Date.AddDays(1).AddHours(7);
     }
 
+    private void RefreshVehicle()
+    {
+        _vehicle = Vehicle.GetCurrentState();
+        _vehicleStale = _vehicle is not null && _vehicle.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
+    }
+
+    /// <summary>
+    /// Any edit drops the preview. The alternative is a plan on screen describing figures that have
+    /// since changed, above a button that says start.
+    /// </summary>
+    private void OnFormEdited() => DiscardPreview();
+
+    private void DiscardPreview()
+    {
+        _preview = null;
+        _previewRequest = null;
+        _previewed = false;
+    }
+
+    private void BuildPreview()
+    {
+        if (!TryCompose(Time.GetUtcNow(), out var request, out var error))
+        {
+            _error = error;
+            DiscardPreview();
+            return;
+        }
+
+        _error = null;
+        _previewRequest = request;
+
+        // Null when no poll has landed yet, which the section above says in words rather than
+        // pretending to a plan built on zeroes. Either way the owner gets the Start button: a service
+        // that has only just come up can still be given a target.
+        _preview = Preview.Preview(request);
+        _previewed = true;
+    }
+
     private async Task Activate()
     {
-        var now = Time.GetUtcNow();
-        var departBy = Compose(_departure);
-
-        if (_energyKWh <= 0)
+        // Recomposed rather than reusing the previewed request: activation is metered from the instant
+        // it happens, and the owner may have read the plan for a minute before pressing Start. Every
+        // figure that shapes the plan is unchanged -- an edit would have dropped the preview.
+        if (!TryCompose(Time.GetUtcNow(), out var request, out var error))
         {
-            _error = "Enter how much energy the car needs.";
-            return;
-        }
-
-        if (departBy <= now)
-        {
-            _error = "The departure time is in the past.";
-            return;
-        }
-
-        if (departBy - now > Display.MaxHorizon)
-        {
-            _error = $"A departure more than {Display.MaxHorizon.TotalHours:F0} hours away is further than "
-                + "the forecast — or a request that does not survive a restart — can honestly promise.";
+            _error = error;
+            DiscardPreview();
             return;
         }
 
@@ -207,7 +362,7 @@ else
 
         // The request first, then the mode: the controller reads both in the same cycle, and a mode
         // selected a poll before its request would report "no target set" for that poll.
-        Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
+        Target.Set(request, "Web UI");
 
         // Which also writes the charger's use-mode Fast. A charger that refuses it leaves the mode
         // where it was, and the request set above with nothing driving it -- so the request is
@@ -217,7 +372,12 @@ else
         if (!result.Succeeded)
         {
             Target.Clear("Web UI");
+            return;
         }
+
+        // The running plan takes over from here, and two plans on one tab -- one of them a quote for a
+        // charge that has already started -- would be one too many.
+        DiscardPreview();
     }
 
     // The same Off the header carries, plus the one thing it cannot know to do: drop the request, so
@@ -225,9 +385,89 @@ else
     private async Task Cancel()
     {
         _error = null;
+        DiscardPreview();
 
         Target.Clear("Web UI");
         await Stop();
+    }
+
+    /// <summary>
+    /// Turns the form into a request, or explains why it cannot be one. The single place both Preview
+    /// and Start go through, so the two can never disagree about what is valid.
+    /// </summary>
+    private bool TryCompose(DateTimeOffset now, out TargetedChargeRequest request, out string? error)
+    {
+        request = default!;
+        var departBy = Compose(_departure);
+
+        double energyWh;
+        double? targetSoc = null;
+        double? socNow = null;
+
+        if (_basis == TargetBasis.Soc && CanTargetSoc)
+        {
+            socNow = _vehicle!.SocPercent;
+            var requiredWh = VehicleTargetEnergy.RequiredWh(
+                socNow, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+
+            if (requiredWh is not { } wh || wh <= 0)
+            {
+                error = $"The car is already at {Percent(socNow)}, at or above the {_targetSocPercent:F0}% asked for.";
+                return false;
+            }
+
+            energyWh = wh;
+            targetSoc = _targetSocPercent;
+        }
+        else
+        {
+            if (_energyKWh <= 0)
+            {
+                error = "Enter how much energy the car needs.";
+                return false;
+            }
+
+            energyWh = _energyKWh * 1000;
+        }
+
+        if (departBy <= now)
+        {
+            error = "The departure time is in the past.";
+            return false;
+        }
+
+        if (departBy - now > Display.MaxHorizon)
+        {
+            error = $"A departure more than {Display.MaxHorizon.TotalHours:F0} hours away is further than "
+                + "the forecast — or a request that does not survive a restart — can honestly promise.";
+            return false;
+        }
+
+        request = new TargetedChargeRequest(energyWh, departBy, now, targetSoc, socNow);
+        error = null;
+        return true;
+    }
+
+    /// <summary>The request in the terms it was asked in, which for a SOC target is not kilowatt-hours.</summary>
+    private static string Asking(TargetedChargeRequest request) =>
+        request.TargetSocPercent is { } target
+            ? $"Charging to {target:F0}%, from the {request.VehicleSocPercentAtRequest:F0}% the car last "
+                + $"reported: {request.RequiredEnergyWh / 1000:F1} kWh at the charger, charge losses included."
+            : $"{request.RequiredEnergyWh / 1000:F1} kWh at the charger.";
+
+    private string SocConversionHint()
+    {
+        var requiredWh = VehicleTargetEnergy.RequiredWh(
+            _vehicle?.SocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+
+        return requiredWh switch
+        {
+            null => "No usable SOC reading to measure the gap from.",
+            <= 0 => $"The car is already at {Percent(_vehicle?.SocPercent)} — nothing to do.",
+            _ => $"From {Percent(_vehicle?.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
+                + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
+                + "of what the charger meters reaching the cells.",
+        };
     }
 
     // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock
@@ -239,10 +479,40 @@ else
     private void OnMinBatterySocSelected() =>
         ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
 
-    private string Clock(DateTimeOffset instant) =>
-        TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString("ddd HH:mm");
+    private string PluggedIn()
+    {
+        // Three answers at the socket, not two: before the first poll the charger has not been read at
+        // all, and reporting that as "no" would be a claim about hardware nobody has asked yet.
+        var charger = Status is null
+            ? "Not polled yet"
+            : Status.CarConnected ? "Yes at the charger" : "No at the charger";
+        var car = _vehicle?.PlugState switch
+        {
+            VehiclePlugState.Connected => "connected",
+            VehiclePlugState.Disconnected => "disconnected",
+            _ => "not reported",
+        };
 
-    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+        return $"{charger}, {car} by the car";
+    }
 
-    private static string Percent(double percent) => $"{percent:F0}%";
+    // Coarse on purpose, exactly as the dashboard renders it: this data is hours old routinely, so
+    // minutes of precision would imply an accuracy the source doesn't have.
+    private string VehicleAge(VehicleState vehicle)
+    {
+        var age = vehicle.AgeAt(Time.GetUtcNow());
+
+        return age switch
+        {
+            _ when age < TimeSpan.Zero => "just now",
+            _ when age < TimeSpan.FromMinutes(1) => "under a minute",
+            _ when age < TimeSpan.FromHours(1) => $"{age.TotalMinutes:F0} min",
+            _ when age < TimeSpan.FromDays(1) => $"{age.TotalHours:F1} h",
+            _ => $"{age.TotalDays:F0} d",
+        };
+    }
+
+    private static string Percent(double? percent) => percent is { } value ? $"{value:F0}%" : "—";
+
+    private static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
 }

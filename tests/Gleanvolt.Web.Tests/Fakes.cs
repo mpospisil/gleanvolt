@@ -492,6 +492,26 @@ internal sealed class FakeTargetedChargeSelector(TargetedChargeRequest? initial 
     }
 }
 
+/// <summary>
+/// A stand-in for <c>TargetedChargeProvider</c>'s read-only side: records what it was asked to price
+/// and hands back whatever the test has decided the planner would say. Null by default, which is what
+/// a service that has not completed a poll answers — and the case the tab has to render in words.
+/// </summary>
+internal sealed class FakeTargetedChargePreview(TargetedChargePlan? plan = null) : ITargetedChargePreview
+{
+    /// <summary>The plan every call returns. Null means "nothing to plan from yet".</summary>
+    public TargetedChargePlan? Plan { get; set; } = plan;
+
+    /// <summary>Every request priced, in order — the proof that a preview never became a request.</summary>
+    public List<TargetedChargeRequest> Requests { get; } = [];
+
+    public TargetedChargePlan? Preview(TargetedChargeRequest request)
+    {
+        Requests.Add(request);
+        return Plan;
+    }
+}
+
 /// <summary>Targeted plans with every field filled in plausibly, so a test can name only what it is about.</summary>
 internal static class TestTargetedPlans
 {

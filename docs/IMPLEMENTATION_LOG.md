@@ -4,6 +4,55 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-22 — The targeted plan reads the car, and is quoted before it is promised (issue #99)
+
+`Targeted` still promises kilowatt-hours by a time. What changed is what it will accept as the
+question, and when it shows its answer.
+
+### What was built
+
+- **`VehicleState.RangeKm` and `range_km` on the MQTT contract** — one more optional field on the same
+  rule as the rest: absent is a supported configuration, present-but-junk drops the whole payload so
+  the holder keeps its last good reading and its age visibly grows. `0` is a real reading; a figure
+  past 2000 km is a template publishing metres.
+- **`Vehicle:BatteryCapacityKWh` and `Vehicle:ChargeEfficiency`** — the car's *usable* pack and the
+  charger-meter-to-cells losses. The capacity has no default: unset means the SOC basis is not offered,
+  and nothing else on the install changes.
+- **`Core/Strategies/VehicleTargetEnergy`** — the whole SOC-based target, and deliberately no more than
+  arithmetic. Null when it cannot honestly convert (no SOC, no capacity), zero when the car is already
+  there — two different answers, and the caller refuses on the second.
+- **`TargetedChargeRequest.TargetSocPercent` / `VehicleSocPercentAtRequest`** — optional, so every
+  existing call site is untouched, and descriptive only: `RequiredEnergyWh` is still what every consumer
+  reads. Kept so the request can be read back as "42% → 80%" rather than as a bare 32.5 kWh.
+- **`ITargetedChargePreview`, implemented by `TargetedChargeProvider`** — the same planner, the same
+  telemetry, the same forecast, delivery at zero, nothing logged and nothing written. `Update` now
+  records the reading *before* its `request is null` early return, which is what makes a preview
+  possible when no target is running — the case it exists for.
+- **`Components/Plan/TargetedPlanView.razor`** — the narrative and the twelve figures, extracted so the
+  preview and the running plan cannot drift apart in wording.
+- **`Components/Plan/TargetedTab.razor`** — the car above the form (battery, range, plug state from both
+  sources, charge state, reading age, a stale flag); a basis selector that appears only with a capacity
+  *and* a reported SOC; a live conversion hint under the percentage input; **Preview plan** → the plan →
+  **Start charging** / **Back to the form**, with any edit dropping the preview.
+- **The dashboard's Vehicle card** gains **Car range**.
+
+### Tested
+
+`VehicleTargetEnergyTests` (8) pins the conversion in both directions, the two kinds of "no": no SOC
+and no configured pack, and the clamps on a mistyped efficiency. `VehicleTelemetryPayloadTests` gains
+the range field, an absent one, a zero one, and the three rejections. `TargetedChargePreviewTests` (6)
+is the new hosting suite, and it is mostly negative on purpose: pricing is not requesting, a preview
+does not disturb the metering behind a running target, and the provider keeps answering while no target
+is running — the early-return bug, caught by the test that names it. `TargetedTabTests` grew from 19 to
+34: the car card and its absence, the basis offered and withheld, the conversion at activation, the
+refusal when the car is already past the target, and the preview's whole life — priced without being
+promised, no Start button before a plan, dropped on an edit, discarded on request, startable before the
+first poll, and gone once the charge is running.
+
+783 tests pass, up from 749.
+
+---
+
 ## 2026-08-22 — The web UI regrouped: a dashboard that reports, a plan page that decides (issue #98)
 
 Three surfaces for one question became two with a clear division of labour. Nothing in `Gleanvolt.Core`

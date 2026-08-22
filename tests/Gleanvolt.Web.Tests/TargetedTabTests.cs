@@ -16,6 +16,11 @@ namespace Gleanvolt.Web.Tests;
 ///
 /// The narrative cases at the bottom go through <see cref="TargetedPlanNarrative"/> directly — the
 /// wording is the part worth testing, and a rendered component is a poor place to test a sentence.
+///
+/// Since #99 the tab also reads the car and quotes the plan before it starts one, so most cases here
+/// press two buttons rather than one: <c>#preview-target</c> builds the plan, <c>#activate-target</c>
+/// commits it. A form the preview refused never renders the second, which is what the refusal cases
+/// assert without having to say so.
 /// </summary>
 public class TargetedTabTests : BunitContext
 {
@@ -31,6 +36,11 @@ public class TargetedTabTests : BunitContext
     private readonly FakeTargetedChargeSelector _target = new();
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
+    private readonly FakeTargetedChargePreview _preview = new(TestTargetedPlans.SolarPlusGrid(Now));
+
+    // Registered empty, as an install with Vehicle:Enabled=false is: the cases below that want a car
+    // set one, and everything else asserts the tab a car-less install actually sees.
+    private readonly VehicleStateHolder _vehicle = new();
 
     public TargetedTabTests()
     {
@@ -43,9 +53,28 @@ public class TargetedTabTests : BunitContext
         Services.AddSingleton<Core.Interfaces.ITargetedChargeSelector>(_target);
         Services.AddSingleton<Core.Interfaces.IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<Core.Interfaces.IForecastRuntimeSettings>(_forecast);
+        Services.AddSingleton<Core.Interfaces.ITargetedChargePreview>(_preview);
+        Services.AddSingleton<Core.Interfaces.IVehicleTelemetry>(_vehicle);
         Services.AddSingleton(new TargetedDisplayOptions(TimeSpan.FromHours(36)));
+
+        // No pack size, so no SOC basis. A test that wants one registers its own before rendering —
+        // the later registration wins, and nothing has resolved this yet.
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
+
+    /// <summary>An ID.4 Pro's usable pack, and the AC losses between the charger's meter and it.</summary>
+    private void WithAKnownPack() =>
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityKWh: 77, ChargeEfficiency: 0.9));
+
+    private void CarReports(double? socPercent = 42, double? rangeKm = 176, TimeSpan? age = null) =>
+        _vehicle.Set(new VehicleState(
+            Now - (age ?? TimeSpan.FromMinutes(20)),
+            SocPercent: socPercent,
+            RangeKm: rangeKm,
+            PlugState: VehiclePlugState.Connected,
+            ChargeState: VehicleChargeState.Idle,
+            SourceId: "id4"));
 
     private IRenderedComponent<ChargingPlan> RenderTab() =>
         Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "targeted"));
@@ -221,6 +250,239 @@ public class TargetedTabTests : BunitContext
         page.WaitForAssertion(() => Assert.Contains("The sun should carry", page.Markup));
     }
 
+    // --- What the car says, and asking in its terms (#99) ---
+
+    [Fact]
+    public void Shows_nothing_about_a_car_that_has_never_reported()
+    {
+        // An install with Vehicle:Enabled=false: the form it has always had, and no empty card under it.
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#vehicle-card"));
+        Assert.Empty(page.FindAll("#target-basis"));
+        Assert.NotEmpty(page.FindAll("#target-energy"));
+    }
+
+    [Fact]
+    public void Shows_the_battery_and_the_range_the_car_last_reported()
+    {
+        _holder.Set(Statuses.Sample(Now, ChargeControlMode.Off) with { CarConnected = true });
+        CarReports(socPercent: 42, rangeKm: 176);
+
+        var page = RenderTab();
+        var card = page.Find("#vehicle-card").TextContent;
+
+        Assert.Contains("42%", card);
+        Assert.Contains("176 km", card);
+        Assert.Contains("Yes at the charger, connected by the car", card);
+        Assert.Contains("20 min ago", card);
+        Assert.Contains("via id4", card);
+    }
+
+    [Fact]
+    public void Marks_a_reading_too_old_to_plan_from_without_hiding_it()
+    {
+        // Stale is a dead feed, not a wrong number -- a parked car's SOC doesn't drift. So it is
+        // flagged and the basis stays offered, rather than being withdrawn and converted in someone's
+        // head from the very same figure.
+        WithAKnownPack();
+        CarReports(age: TimeSpan.FromHours(14));
+
+        var page = RenderTab();
+
+        Assert.Contains("Stale", page.Find("#vehicle-card").TextContent);
+        Assert.NotEmpty(page.FindAll("#target-basis"));
+    }
+
+    [Fact]
+    public void Offers_a_battery_target_only_when_the_pack_size_is_configured()
+    {
+        // Without Vehicle:BatteryCapacityKWh there is no honest conversion from 80% to kilowatt-hours,
+        // and a guessed pack size would make every such target quietly wrong.
+        CarReports();
+
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#target-basis"));
+        Assert.NotEmpty(page.FindAll("#target-energy"));
+    }
+
+    [Fact]
+    public void Offers_no_battery_target_for_a_car_that_reports_no_soc()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: null);
+
+        var page = RenderTab();
+
+        Assert.NotEmpty(page.FindAll("#vehicle-card"));
+        Assert.Empty(page.FindAll("#target-basis"));
+    }
+
+    [Fact]
+    public void Converts_a_battery_target_into_energy_at_the_charger()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        Activate(page);
+
+        // 38% of a 77 kWh pack is 29.26 kWh in the cells; at 90% it takes 32.5 kWh at the charger,
+        // which is where the promise is metered.
+        var (request, _) = Assert.Single(_target.Sets);
+        Assert.Equal(32_511, request.RequiredEnergyWh, 0);
+
+        // Recorded so the request can be read back in the terms it was asked in -- and never
+        // re-derived from a later reading.
+        Assert.Equal(80, request.TargetSocPercent);
+        Assert.Equal(42, request.VehicleSocPercentAtRequest);
+        Assert.True(request.IsSocBased);
+    }
+
+    [Fact]
+    public void Says_what_a_battery_target_works_out_at_before_it_is_started()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+
+        Assert.Contains("From 42% now, that is about 32.5 kWh", page.Markup);
+
+        page.Find("#preview-target").Click();
+
+        Assert.Contains("Charging to 80%, from the 42% the car last reported", page.Find("#target-preview").TextContent);
+    }
+
+    [Fact]
+    public void Refuses_a_battery_target_the_car_is_already_past()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 85);
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+        Activate(page);
+
+        Assert.Contains("already at 85%", page.Find("p.error").TextContent);
+        Assert.Empty(_target.Sets);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public void Reads_a_running_battery_target_back_in_its_own_terms()
+    {
+        _target.Set(new TargetedChargeRequest(32_511, Now.AddHours(9), Now, TargetSocPercent: 80, VehicleSocPercentAtRequest: 42), "test");
+        _holder.Set(Statuses.Sample(Now, ChargeControlMode.Targeted) with
+        {
+            TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
+        });
+
+        var page = RenderTab();
+
+        Assert.Contains("Charging to 80%, from the 42% the car last reported", page.Markup);
+    }
+
+    // --- The plan before the charger moves (#99) ---
+
+    [Fact]
+    public void Previewing_prices_the_request_without_making_it()
+    {
+        var page = RenderTab();
+
+        page.Find("#target-energy").Change("22");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        page.Find("#preview-target").Click();
+
+        // Priced, and priced only: no request, no mode, nothing written.
+        var priced = Assert.Single(_preview.Requests);
+        Assert.Equal(22_000, priced.RequiredEnergyWh);
+        Assert.Empty(_target.Sets);
+        Assert.Null(_target.Request);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Empty(_actions.Starts);
+
+        // And the plan is on screen, in the same words the running one is shown in.
+        var preview = page.Find("#target-preview").TextContent;
+        Assert.Contains("The sun should carry", preview);
+        Assert.Contains("Charge pace", preview);
+    }
+
+    [Fact]
+    public void There_is_no_start_button_until_a_plan_has_been_seen()
+    {
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#activate-target"));
+
+        page.Find("#preview-target").Click();
+
+        Assert.NotEmpty(page.FindAll("#activate-target"));
+    }
+
+    [Fact]
+    public void Editing_the_form_drops_the_preview_rather_than_leaving_it_to_be_confirmed()
+    {
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+        Assert.NotEmpty(page.FindAll("#activate-target"));
+
+        page.Find("#target-energy").Change("30");
+
+        // Otherwise the button that says start sits under a plan describing figures that have changed.
+        Assert.Empty(page.FindAll("#target-preview"));
+        Assert.Empty(page.FindAll("#activate-target"));
+    }
+
+    [Fact]
+    public void Discarding_the_preview_goes_back_to_the_form_and_makes_no_request()
+    {
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+
+        page.Find("#discard-preview").Click();
+
+        Assert.Empty(page.FindAll("#target-preview"));
+        Assert.Empty(_target.Sets);
+        Assert.NotEmpty(page.FindAll("#target-energy"));
+    }
+
+    [Fact]
+    public void A_target_can_still_be_started_before_the_first_poll_has_landed()
+    {
+        // Nothing to plan from is a sentence, not a locked button: a service that has just come up can
+        // still be given a target, and the plan appears on the first poll.
+        _preview.Plan = null;
+
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+
+        Assert.Contains("nothing to build a plan from", page.Find("#target-preview").TextContent);
+
+        page.Find("#activate-target").Click();
+
+        Assert.Single(_target.Sets);
+        Assert.Equal(ChargeControlMode.Targeted, _mode.Mode);
+    }
+
+    [Fact]
+    public void The_preview_gives_way_to_the_running_plan_once_it_is_started()
+    {
+        var page = RenderTab();
+        Activate(page);
+
+        // Two plans on one tab, one of them a quote for a charge that has already started, is one
+        // plan too many.
+        page.WaitForAssertion(() => Assert.Empty(page.FindAll("#target-preview")));
+    }
+
     // --- The narrative, one case per strategy ---
 
     [Fact]
@@ -316,5 +578,17 @@ public class TargetedTabTests : BunitContext
     private static string Narrate(TargetedChargePlan plan) =>
         string.Join(" ", TargetedPlanNarrative.Describe(plan, Prague));
 
-    private static void Activate(IRenderedComponent<ChargingPlan> page) => page.Find("#activate-target").Click();
+    // Preview, then confirm (#99). The Start button only exists once a plan is on screen, so a form
+    // the preview refused simply never reaches the second click -- which is the behaviour the refusal
+    // cases are asserting, and the reason this doesn't insist the button is there.
+    private static void Activate(IRenderedComponent<ChargingPlan> page)
+    {
+        page.Find("#preview-target").Click();
+
+        var start = page.FindAll("#activate-target");
+        if (start.Count > 0)
+        {
+            start[0].Click();
+        }
+    }
 }

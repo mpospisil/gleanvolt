@@ -92,6 +92,8 @@ else
         {
             <Stat Label="Car battery" Value="@Percent(_vehicle.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
+            <Stat Label="Car range" Value="@Km(_vehicle.RangeKm)"
+                  Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
             <Stat Label="Car reading age" Value="@VehicleAge(_vehicle)"
                   Hint="How long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died." />
             <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()"
@@ -181,6 +183,8 @@ else
     // Coarse on purpose: this data is hours old routinely, so minutes of precision would imply an
     // accuracy the source doesn't have. A negative age (the car's clock ahead of ours) reads as "just
     // now" rather than as a negative duration.
+    private static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
+
     private string VehicleAge(VehicleState vehicle)
     {
         var age = vehicle.AgeAt(Time.GetUtcNow());
