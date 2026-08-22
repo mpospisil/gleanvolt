@@ -55,13 +55,20 @@ public class HaDiscoveryTests
     }
 
     [Fact]
-    public void DiscoveryMessages_PublishNoSelectAtAll()
+    public void DiscoveryMessages_PublishNoModeSelect()
     {
-        // #89: charging is started by an action. Nothing offers a mode to pick any more.
+        // #89: charging is started by an action. Nothing offers a *mode* to pick any more.
+        //
+        // Narrowed from "no select at all" by #101, which adds one -- the charge priority. The two are
+        // different in the way that matters here: a mode select was a second way to start charging, in
+        // competition with the buttons, whereas the priority only qualifies a target that the activate
+        // button still has to apply. Nothing about it can put the charger into a mode.
         var messages = Discovery.DiscoveryMessages().ToList();
 
-        Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/"));
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/mode/"));
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/charge_mode/"));
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
+        Assert.Contains(messages, m => m.Topic == "homeassistant/select/solax_controller/target_priority/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
     }

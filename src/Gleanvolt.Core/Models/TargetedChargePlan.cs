@@ -90,6 +90,16 @@ namespace Gleanvolt.Core.Models;
 /// keeping its promise: every solar term goes to zero, the plan becomes grid-only, and the target is
 /// still met. It is a caveat to report, not a fallback to take.
 /// </param>
+/// <param name="TailEnergyWh">
+/// The part of <paramref name="RemainingEnergyWh"/> being held back to land at the deadline under
+/// <see cref="TargetedChargePriority.JustInTime"/>. Zero on every other plan.
+/// </param>
+/// <param name="HoldUntil">
+/// When the held tail is released, or null when nothing is being held — either because the priority is
+/// <see cref="TargetedChargePriority.Cheapest"/>, or because holding would put the promise at risk and
+/// the promise wins. See <see cref="IsHoldingAt"/> for the distinction between "a hold is planned" and
+/// "the charger is deliberately idle right now".
+/// </param>
 /// <param name="Reason">A short human-readable summary for logging and Home Assistant.</param>
 public sealed record TargetedChargePlan(
     TargetedChargeStrategy Strategy,
@@ -113,6 +123,8 @@ public sealed record TargetedChargePlan(
     IReadOnlyList<TargetedChargeBlock> Blocks,
     DateTimeOffset? ForecastAsOf,
     bool IsUsable,
+    double TailEnergyWh,
+    DateTimeOffset? HoldUntil,
     string Reason)
 {
     /// <summary>Whether the target has been met and the session can end.</summary>
@@ -156,4 +168,22 @@ public sealed record TargetedChargePlan(
     /// <summary>Whether <paramref name="instant"/> falls inside a planned solar block.</summary>
     public bool IsInSolarBlock(DateTimeOffset instant) =>
         Blocks.Any(b => b.Source == TargetedChargeSource.Solar && b.Covers(instant));
+
+    /// <summary>
+    /// Whether the charger should be <b>deliberately idle</b> at <paramref name="instant"/>: everything
+    /// except the held tail has been delivered, and the tail is not due to start yet.
+    ///
+    /// <para>Two conditions, and the second is the one that does the work. A hold being planned is not
+    /// the same as a hold being in force: while there is still energy below the rest point to deliver,
+    /// the car charges on the sun exactly as it would under
+    /// <see cref="TargetedChargePriority.Cheapest"/>. It is only once
+    /// <see cref="RemainingEnergyWh"/> has fallen to the tail that there is nothing left to do but
+    /// wait.</para>
+    ///
+    /// <para>And while it is in force the sun is refused, which is the whole point and the whole cost:
+    /// a bright afternoon taken here would put the car at its target by teatime, which is exactly what
+    /// this priority exists to prevent.</para>
+    /// </summary>
+    public bool IsHoldingAt(DateTimeOffset instant) =>
+        HoldUntil is { } release && instant < release && RemainingEnergyWh - TailEnergyWh <= 1;
 }

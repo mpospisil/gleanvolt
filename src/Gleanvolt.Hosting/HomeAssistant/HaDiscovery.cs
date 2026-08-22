@@ -50,9 +50,20 @@ public sealed class HaDiscovery
     public const string MinBatterySocNumber = "min_battery_soc";
     public const string ResumeMarginNumber = "resume_margin";
     public const string TargetEnergyNumber = "target_energy";
+    public const string TargetRestSocNumber = "target_rest_soc";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
-        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber];
+        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
+         TargetRestSocNumber];
+
+    /// <summary>
+    /// The charging-priority select. Its own platform rather than a switch, because "Cheapest" and
+    /// "Just in time" are two named choices rather than one thing being on or off — and a switch would
+    /// have to decide which of them counted as off.
+    /// </summary>
+    public const string TargetPrioritySelect = "target_priority";
+
+    public static readonly IReadOnlyList<string> SelectObjectIds = [TargetPrioritySelect];
 
     /// <summary>Object id of the departure-time text entity, which the worker subscribes to like a number.</summary>
     public const string TargetDepartureText = "target_departure";
@@ -87,6 +98,10 @@ public sealed class HaDiscovery
     /// <summary>Same shape as the number topics; separate methods only so call sites read as what they are.</summary>
     public string TextCommandTopic(string objectId) => NumberCommandTopic(objectId);
     public string TextStateTopic(string objectId) => NumberStateTopic(objectId);
+
+    /// <summary>Same shape again; a select round-trips exactly as a number does.</summary>
+    public string SelectCommandTopic(string objectId) => NumberCommandTopic(objectId);
+    public string SelectStateTopic(string objectId) => NumberStateTopic(objectId);
 
     public string ActivateTargetCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/activate_target/set";
 
@@ -254,6 +269,17 @@ public sealed class HaDiscovery
             pattern: @"^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
             icon: "mdi:clock-outline");
 
+        // The priority and its rest point (issue #101). Published beside the two halves they qualify,
+        // and before the button that applies all four -- a dashboard laid out in publication order then
+        // reads in the order the decision is actually made.
+        yield return Select(
+            TargetPrioritySelect,
+            "Charge priority",
+            [nameof(TargetedChargePriority.Cheapest), nameof(TargetedChargePriority.JustInTime)],
+            icon: "mdi:timer-sand");
+
+        yield return Number(TargetRestSocNumber, "Target rest SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-80");
+
         // Pressing this is what makes the two above real: it sets the request and then starts the mode,
         // the same order and the same seam the web page uses. The object id is unchanged from #80 on
         // purpose -- existing dashboards and automations keep working across this upgrade.
@@ -270,6 +296,7 @@ public sealed class HaDiscovery
         yield return Sensor("target_shortfall", "Target shortfall", template: Optional("target_shortfall_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_pace", "Target charge pace", template: Optional("target_pace_kw"), unit: "kW", deviceClass: "power");
         yield return Sensor("target_grid_start", "Charging from", template: Optional("target_grid_start"), icon: "mdi:transmission-tower-import");
+        yield return Sensor("target_hold_until", "Target hold until", template: Optional("target_hold_until"), icon: "mdi:timer-sand");
 
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
@@ -369,6 +396,12 @@ public sealed class HaDiscovery
             payload["target_grid_start"] = target.GridStart is { } start
                 ? $"{start.LocalDateTime:HH:mm}"
                 : "none";
+
+            // "none" rather than absent, so a dashboard shows that nothing is being held rather than
+            // an unavailable entity that reads the same as a broken feed.
+            payload["target_hold_until"] = target.HoldUntil is { } release
+                ? $"{release.LocalDateTime:HH:mm}"
+                : "none";
         }
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so
@@ -466,6 +499,18 @@ public sealed class HaDiscovery
             ["step"] = step,
             ["unit_of_measurement"] = unit,
             ["mode"] = "box",
+            ["icon"] = icon,
+        });
+
+    // A named choice. Like Number it carries its own state topic rather than reading the shared JSON
+    // payload, so Home Assistant's optimistic update and our echo agree on one value.
+    private (string Topic, string Payload) Select(string objectId, string name, string[] options, string icon) =>
+        Config("select", objectId, new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["command_topic"] = SelectCommandTopic(objectId),
+            ["state_topic"] = SelectStateTopic(objectId),
+            ["options"] = options,
             ["icon"] = icon,
         });
 

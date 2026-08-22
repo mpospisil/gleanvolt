@@ -158,6 +158,8 @@ public class HaTargetedEntityTests
         Blocks: [],
         ForecastAsOf: Now,
         IsUsable: true,
+        TailEnergyWh: 0,
+        HoldUntil: null,
         Reason: "22.0kWh by Tue 07:00: 14.6kWh from sun, 7.4kWh from the grid starting 04:30.");
 
     private static ChargeControlStatus Status(ChargeControlMode mode, TargetedChargePlan? plan) =>
@@ -169,4 +171,43 @@ public class HaTargetedEntityTests
             BatteryHoldRequested: false, BatteryHoldActive: true, BatteryHoldTargetWatts: -11_040,
             Plan: null, LoanPowerWatts: 0, SessionEnergyWh: 0, LoanedTodayWh: 0, TomorrowForecastWh: null,
             Timestamp: Now, TargetedPlan: plan);
+
+    // --- Just in time (#101) ---
+
+    [Fact]
+    public void ThePriorityIsPublishedAsASelectWithBothChoices()
+    {
+        var (_, payload) = Assert.Single(
+            Discovery.DiscoveryMessages(),
+            m => m.Topic == "homeassistant/select/solax_controller/target_priority/config");
+
+        Assert.Contains("\"Cheapest\"", payload);
+        Assert.Contains("\"JustInTime\"", payload);
+        Assert.Contains("Charge priority", payload);
+    }
+
+    [Fact]
+    public void TheRestSocIsPublishedAsASettableNumberAndSubscribedTo()
+    {
+        Assert.Contains(
+            Discovery.DiscoveryMessages(),
+            m => m.Topic == "homeassistant/number/solax_controller/target_rest_soc/config");
+
+        Assert.Contains(HaDiscovery.TargetRestSocNumber, HaDiscovery.NumberObjectIds);
+    }
+
+    [Fact]
+    public void TheHoldIsReportedAsATimeOrAsNone()
+    {
+        var held = Discovery.StateJson(Status(
+            ChargeControlMode.Targeted,
+            Plan() with { TailEnergyWh = 6_000, HoldUntil = Now.AddHours(8) }));
+
+        Assert.Contains("target_hold_until", held);
+
+        // "none" rather than absent: an unavailable entity reads the same as a dead feed, and nothing
+        // being held is a perfectly good answer.
+        var unheld = Discovery.StateJson(Status(ChargeControlMode.Targeted, Plan()));
+        Assert.Contains("\"target_hold_until\":\"none\"", unheld);
+    }
 }

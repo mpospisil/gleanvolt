@@ -174,6 +174,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         // the runtime settings when those are wired up — same as the day plan's.
         MinBatterySocFloorPercent: _runtime?.MinBatterySocFloorPercent ?? _forecastOptions.MinBatterySocFloorPercent,
         SafetyMargin: _options.SafetyMargin,
+        ReleaseSlack: _options.JustInTime.ReleaseSlack,
         Confidence: _forecastOptions.ForecastConfidence);
 
     /// <summary>
@@ -197,7 +198,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
     {
         var signature = string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{plan.Strategy}|{plan.RemainingEnergyWh / 1000:F0}|{plan.GridEnergyWh / 1000:F0}|{plan.GridStart:HH:mm}|{plan.IsUsable}");
+            $"{plan.Strategy}|{plan.RemainingEnergyWh / 1000:F0}|{plan.GridEnergyWh / 1000:F0}|{plan.GridStart:HH:mm}|{plan.IsUsable}|{plan.HoldUntil:HH:mm}");
 
         var material = plan.Strategy != _lastStrategy;
         var changed = signature != _lastSignature
@@ -215,7 +216,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
             changed ? LogLevel.Information : LogLevel.Debug,
             "Targeted plan: {Strategy} Need={NeedKWh:F1}kWh Delivered={DeliveredKWh:F1}kWh Solar={SolarKWh:F1}kWh "
             + "Grid={GridKWh:F1}kWh GridStart={GridStart} Ceiling={CeilingKWh:F1}kWh Short={ShortKWh:F1}kWh "
-            + "By={DepartBy:ddd HH:mm} Floor={Floor:F0}%. {Reason}",
+            + "By={DepartBy:ddd HH:mm} Floor={Floor:F0}% Hold={Hold}. {Reason}",
             plan.Strategy,
             plan.RemainingEnergyWh / 1000,
             plan.DeliveredEnergyWh / 1000,
@@ -226,6 +227,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
             plan.ShortfallWh / 1000,
             plan.DepartBy.LocalDateTime,
             plan.SocFloorPercent,
+            plan.HoldUntil is { } hold ? $"{plan.TailEnergyWh / 1000:F1}kWh->{hold.LocalDateTime:HH:mm}" : "none",
             plan.Reason);
     }
 }

@@ -109,6 +109,21 @@ public sealed class TargetedChargingController : IChargingController
                 + $"charge at the maximum {_maxAmps}A; expect {plan.ExpectedEnergyWh / 1000:F1}kWh ({plan.ShortfallWh / 1000:F1}kWh short).");
         }
 
+        // Deliberately idle, and the one place in this mode where a real surplus is turned down. Under
+        // JustInTime everything below the rest point has been delivered and only the held tail is left,
+        // so charging now -- on sun or on anything else -- would put the car at its target hours early,
+        // which is the single thing the priority exists to prevent. Checked before the pace, because the
+        // pace is zero here and the sun would otherwise walk straight through DecideFromPace.
+        if (plan.IsHoldingAt(now))
+        {
+            return SoftPause(
+                input,
+                $"Holding the last {plan.TailEnergyWh / 1000:F1}kWh until "
+                + $"{plan.HoldUntil?.LocalDateTime:HH:mm} so the car reaches its target just before "
+                + $"{plan.DepartBy.LocalDateTime:HH:mm} rather than sitting full overnight. "
+                + "Not waiting for sun -- this is the plan working.");
+        }
+
         // Everything else is one rule: hold the pace, and take the sun whenever it beats it. There are
         // no blocks to be inside or outside of any more -- the charge runs across the whole window, and
         // its rate is the only thing that moves.

@@ -125,7 +125,13 @@ public static class TargetedChargePlanner
                 request, now, deadline, deliveredWh, ceilingWh, socFloor, batteryToFullWh, forecastSurplusWh, forecast);
         }
 
-        var paced = PaceOverWindow(slices, deadline, needWh, options.MinChargePowerWatts, maxPowerWatts);
+        var hold = PlanHold(request, slices, now, deadline, needWh, maxPowerWatts, options);
+
+        var paced = hold is { } held
+            ? Merge(
+                PaceOverWindow(held.FreeSlices, held.Release, needWh - held.TailWh, options.MinChargePowerWatts, maxPowerWatts),
+                PaceOverWindow(held.TailSlices, deadline, held.TailWh, options.MinChargePowerWatts, maxPowerWatts))
+            : PaceOverWindow(slices, deadline, needWh, options.MinChargePowerWatts, maxPowerWatts);
 
         var paceWatts = paced.PaceWatts;
         var solarTakenWh = paced.SolarWh;
@@ -170,6 +176,8 @@ public static class TargetedChargePlanner
             Blocks: [.. blocks.OrderBy(b => b.Start).ThenBy(b => b.Source)],
             ForecastAsOf: forecast?.RetrievedAt,
             IsUsable: usable,
+            TailEnergyWh: hold?.TailWh ?? 0,
+            HoldUntil: hold?.Release,
             Reason: string.Empty);
 
         return plan with { Reason = Describe(plan, usable) };
@@ -201,6 +209,132 @@ public static class TargetedChargePlanner
             Math.Clamp(100 - recoverablePercent, 0, 100),
             Math.Clamp(options.MinBatterySocFloorPercent, 0, 100));
     }
+
+    /// <summary>
+    /// The window split in two by a <see cref="TargetedChargePriority.JustInTime"/> hold: everything
+    /// below the rest point is delivered before <see cref="Release"/>, and the tail after it.
+    /// </summary>
+    private readonly record struct HeldTail(
+        double TailWh,
+        DateTimeOffset Release,
+        List<ForecastSlice> FreeSlices,
+        List<ForecastSlice> TailSlices);
+
+    /// <summary>
+    /// Works out where — and whether — to hold the tail back.
+    ///
+    /// <para>The release point is arithmetic and nothing more: <c>deadline − tail ÷ P_max − slack</c>.
+    /// No taper model, no charge curve, no reading of what the car says its limit is. If the tail runs
+    /// slower than the charger's maximum the next poll simply finds a higher pace, and if the car stops
+    /// short of the target on its own limit the controller's completion path says so. Predicting either
+    /// in advance would add a way to be wrong without adding a way to be right.</para>
+    ///
+    /// <para>Returns null — no hold, today's single pass over the whole window — in four cases, and
+    /// they are all the same case wearing different hats: <b>the promise outranks the preference</b>.
+    /// The owner did not ask for a hold; there is nothing above the rest point to hold; the release
+    /// point has already passed, so there is no room left to wait in; or the energy below the rest
+    /// point could not fit in the shortened window that holding would leave it, which would trade a
+    /// full battery at 06:45 for a flat one.</para>
+    /// </summary>
+    private static HeldTail? PlanHold(
+        TargetedChargeRequest request,
+        List<ForecastSlice> slices,
+        DateTimeOffset now,
+        DateTimeOffset deadline,
+        double needWh,
+        double maxPowerWatts,
+        TargetedChargePlannerOptions options)
+    {
+        if (!request.HoldsTail || maxPowerWatts <= 0)
+        {
+            return null;
+        }
+
+        // Never more than is still owed. As delivery eats into the request the free part goes first, so
+        // the tail is the last thing standing — at which point need and tail are the same number and
+        // the charger has nothing to do but wait, which is precisely the state being aimed at.
+        var tailWh = Math.Min(request.TailEnergyWh, needWh);
+        if (tailWh <= TargetToleranceWh)
+        {
+            return null;
+        }
+
+        var release = deadline - TimeSpan.FromHours(tailWh / maxPowerWatts) - options.ReleaseSlack;
+        if (release <= now)
+        {
+            return null;
+        }
+
+        var freeSlices = Within(slices, now, release);
+        var tailSlices = Within(slices, release, deadline);
+
+        // Would holding leave enough room for everything below the rest point? Flat out for every
+        // minute before the release is the most that window can take, and if the free part needs more
+        // than that then the hold is what makes the target unreachable. Give it up rather than arrive
+        // short: the deadline was the promise, the timing was only a preference.
+        var freeWh = needWh - tailWh;
+        var freeCeilingWh = freeSlices.Sum(s => maxPowerWatts * s.Hours);
+        if (freeWh > freeCeilingWh)
+        {
+            return null;
+        }
+
+        return new HeldTail(tailWh, release, freeSlices, tailSlices);
+    }
+
+    /// <summary>
+    /// The part of each slice falling inside <c>[from, to]</c>, prorated across a slice that straddles
+    /// an edge. Energies scale with the fraction taken; powers do not, so
+    /// <see cref="ForecastSlice.AvailableWatts"/> survives the cut unchanged — which is what lets the
+    /// same paced pass run over a sub-window without knowing it is one.
+    ///
+    /// <para>The home battery's booking is prorated with everything else, so the pack keeps exactly the
+    /// share of each slice it had already claimed.</para>
+    /// </summary>
+    private static List<ForecastSlice> Within(List<ForecastSlice> slices, DateTimeOffset from, DateTimeOffset to)
+    {
+        var within = new List<ForecastSlice>();
+
+        foreach (var slice in slices)
+        {
+            var start = slice.Start > from ? slice.Start : from;
+            var end = slice.End < to ? slice.End : to;
+            var hours = (end - start).TotalHours;
+            if (hours <= 0)
+            {
+                continue;
+            }
+
+            var fraction = slice.Hours > 0 ? hours / slice.Hours : 0;
+
+            within.Add(new ForecastSlice
+            {
+                Start = start,
+                End = end,
+                Hours = hours,
+                SurplusWatts = slice.SurplusWatts,
+                PvWh = slice.PvWh * fraction,
+                HouseWh = slice.HouseWh * fraction,
+                SurplusWh = slice.SurplusWh * fraction,
+                IsPlateau = slice.IsPlateau,
+                ReservedWh = slice.ReservedWh * fraction,
+            });
+        }
+
+        return within;
+    }
+
+    /// <summary>
+    /// Two paced passes read as one plan. The pace is the <b>free</b> window's, not the tail's, because
+    /// the pace is what the controller works to right now and right now is before the release — and a
+    /// hold is only ever planned when the release is still ahead.
+    /// </summary>
+    private static PacedPlan Merge(PacedPlan free, PacedPlan tail) => new(
+        [.. free.Blocks, .. tail.Blocks],
+        free.SolarWh + tail.SolarWh,
+        free.GridWh + tail.GridWh,
+        free.GridStart ?? tail.GridStart,
+        free.PaceWatts);
 
     /// <summary>What one paced pass over the window produced.</summary>
     private readonly record struct PacedPlan(
@@ -407,11 +541,20 @@ public static class TargetedChargePlanner
             Blocks: [],
             ForecastAsOf: forecast?.RetrievedAt,
             IsUsable: true,
+            TailEnergyWh: 0,
+            HoldUntil: null,
             Reason: $"Target met: {Math.Max(0, deliveredWh) / 1000:F1}kWh of {request.RequiredEnergyWh / 1000:F1}kWh delivered.");
 
     private static string Describe(TargetedChargePlan plan, bool usable)
     {
         var blind = usable ? string.Empty : " No usable forecast; planned as grid-only.";
+
+        // Said first, because it is the sentence that answers the question an idle charger provokes. A
+        // plan holding 6kWh back until 04:10 looks identical to a broken one until this is read.
+        var held = plan.HoldUntil is { } release
+            ? $" Holding the last {plan.TailEnergyWh / 1000:F1}kWh until {release.LocalDateTime:HH:mm} so the car is "
+                + "full just before departure."
+            : string.Empty;
 
         return plan.Strategy switch
         {
@@ -423,7 +566,7 @@ public static class TargetedChargePlanner
 
             TargetedChargeStrategy.Solar =>
                 $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm} from forecast surplus alone; "
-                + $"no grid import planned.{blind}",
+                + $"no grid import planned.{held}{blind}",
 
             // Named explicitly, because "0.0kWh from sun" on a day with 6kWh of forecast surplus reads
             // as a broken plan rather than as the weak-sun case the placement is answering.
@@ -432,12 +575,12 @@ public static class TargetedChargePlanner
                 + $"{plan.ForecastSurplusWh / 1000:F1}kWh of surplus is forecast but none of it clears the charger's "
                 + $"minimum, so the grid covers up to {plan.GridEnergyWh / 1000:F1}kWh from "
                 + $"{plan.GridStart?.LocalDateTime:HH:mm} — placed over the best of that sun, which pays for part "
-                + $"of it.{blind}",
+                + $"of it.{held}{blind}",
 
             _ =>
                 $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: "
                 + $"{plan.SolarEnergyWh / 1000:F1}kWh from sun, {plan.GridEnergyWh / 1000:F1}kWh from the grid "
-                + $"starting {plan.GridStart?.LocalDateTime:HH:mm}.{blind}",
+                + $"starting {plan.GridStart?.LocalDateTime:HH:mm}.{held}{blind}",
         };
     }
 }

@@ -43,4 +43,44 @@ public sealed class TargetedChargeOptions
     /// inside the blocks the plan drew.</para>
     /// </summary>
     public bool GridBridge { get; init; } = true;
+
+    /// <summary>
+    /// The <see cref="Core.Enums.TargetedChargePriority.JustInTime"/> knobs. Two of them, and
+    /// deliberately no more — see <see cref="JustInTimeOptions"/>.
+    /// </summary>
+    public JustInTimeOptions JustInTime { get; init; } = new();
+}
+
+/// <summary>
+/// What a just-in-time hold needs to know, bound from <c>"ChargeControl:Targeted:JustInTime"</c>.
+///
+/// <para>Two settings, because the design turns on doing <em>less</em> here rather than more. There is
+/// no taper factor, no charge curve and no charge-limit setting: the plan is rebuilt every poll from
+/// measured delivery, so a tail that runs slow raises its own pace, and a car that stops on its own
+/// limit is reported by the controller's completion path. Predicting the car in advance would add ways
+/// to be wrong without adding a way to be right.</para>
+/// </summary>
+public sealed class JustInTimeOptions
+{
+    /// <summary>
+    /// Where the car waits before the last stretch is released, as a state of charge. The default
+    /// offered by the web UI; the owner can move it per request, and it means nothing at all under
+    /// <see cref="Core.Enums.TargetedChargePriority.Cheapest"/>.
+    ///
+    /// <para>80% is the conventional answer, and the one every manufacturer's own guidance lands on: it
+    /// is high enough that the held tail is small, and low enough that the pack is not sitting in the
+    /// voltage band that ages it.</para>
+    /// </summary>
+    public double RestSocPercent { get; init; } = 80;
+
+    /// <summary>
+    /// How much earlier than strictly necessary the held tail is released.
+    ///
+    /// <para>The release point is <c>deadline − tail ÷ P_max − this</c>. It is the whole allowance for
+    /// a tail that cannot run at the charger's rated maximum — which it usually cannot, because a car
+    /// near full tapers — and it is deliberately a plain margin rather than a model of the taper.
+    /// Thirty minutes covers a normal 80 → 100 stretch on a domestic AC charger; raise it if recorded
+    /// sessions show the tail arriving late.</para>
+    /// </summary>
+    public TimeSpan ReleaseSlack { get; init; } = TimeSpan.FromMinutes(30);
 }

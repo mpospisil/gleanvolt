@@ -6,4 +6,9 @@ namespace Gleanvolt.Web;
 /// Gleanvolt.Web cannot see the hosting assembly's options classes, and should not have to.
 /// </summary>
 /// <param name="MaxHorizon">How far ahead a departure may be set.</param>
-public sealed record TargetedDisplayOptions(TimeSpan MaxHorizon);
+/// <param name="DefaultRestSocPercent">
+/// Where a just-in-time hold parks the car by default, before the last stretch is released. Only ever
+/// a starting value for the field — the owner moves it per request, and it means nothing under
+/// <see cref="Core.Enums.TargetedChargePriority.Cheapest"/>.
+/// </param>
+public sealed record TargetedDisplayOptions(TimeSpan MaxHorizon, double DefaultRestSocPercent = 80);
