@@ -1020,7 +1020,7 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **Battery loan power** | W | How much of what the car is drawing right now is being covered by the home battery rather than by live sun. Zero outside the `Forecasted` mode. |
 
 The targeted-charge entities. The three controls are always live — a request can be prepared before
-the mode is selected — while the six sensors are populated only while **Targeted** is driving, by the
+the mode is selected — while the seven sensors are populated only while **Targeted** is driving, by the
 same rule the forecast plan follows.
 
 | Entity | Unit | What it means |
@@ -1029,8 +1029,9 @@ same rule the forecast plan follows.
 | **Departure time** | text | When that energy has to be there. A bare `07:00` means the **next** 07:00 — which is what somebody typing it at 22:00 means by it; `2026-08-11 07:00` means exactly that. MQTT discovery has no datetime platform, which is why this is text. Read back as the resolved timestamp, so a day later it is still unambiguous. Anything else is refused with a warning in the log rather than guessed at. |
 | **Activate target** | button | Applies the two above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with either half missing, or with a departure already past, it logs a warning and does nothing. |
 | **Target plan state** | — | One line on what the plan is doing and why — the same explanation the log carries. |
-| **Target solar energy** | kWh | The share of what is still needed that forecast surplus is expected to cover, after the home battery's own booking. |
-| **Target grid energy** | kWh | The share planned to come from the grid. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought. In an hour whose forecast surplus sits below the charger's minimum this is an upper bound: the charger runs at maximum and the roof quietly covers part of it, which is not modelled here. |
+| **Target forecast surplus** | kWh | All the surplus the window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided. Read it against **Target solar energy**: the gap between them is sun the roof will produce but the charger cannot run on by itself. |
+| **Target solar energy** | kWh | The share of what is still needed that forecast surplus is expected to cover **as a solar block**, after the home battery's own booking. Zero does not mean "no sun" — it means no half-hour clears the charger's 6 A minimum, which is exactly when the grid block gets placed over the sunniest hours instead. |
+| **Target grid energy** | kWh | The share planned to come from the grid, and an **upper bound** rather than a prediction. Rebuilt every poll, so a better day than forecast shrinks it before the rest is bought — and where the import sits over sub-minimum surplus the charger runs at maximum while the roof quietly covers part of it, which this figure does not model. Expect to import less than it says. |
 | **Target expected** | kWh | What will actually reach the car by the departure. Equal to what was asked for unless there isn't enough time. |
 | **Target shortfall** | kWh | How far **Target expected** falls short of the request. Anything above zero means the departure is too soon for the amount asked for; **Target plan state** names the departure that would have covered it. |
 | **Grid top-up start** | — | When the import begins, if it is still needed. It is placed over the **sunniest** hours in the window, so the roof offsets it while it runs; with no forecast surplus in the window to wait for, it starts at once. `none` while the forecast covers the whole request. |

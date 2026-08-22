@@ -20,8 +20,27 @@ namespace Gleanvolt.Core.Models;
 /// <param name="RequiredEnergyWh">The energy the owner asked for.</param>
 /// <param name="DeliveredEnergyWh">What the charger has measurably delivered since the request was activated.</param>
 /// <param name="RemainingEnergyWh">What is still needed: the request less what has arrived, floored at zero.</param>
-/// <param name="SolarEnergyWh">Of what is still needed, the part forecast surplus is expected to cover.</param>
-/// <param name="GridEnergyWh">The part planned to come from the grid.</param>
+/// <param name="SolarEnergyWh">
+/// Of what is still needed, the part forecast surplus is expected to cover <em>as a solar block</em> —
+/// the car charging on the sun alone. Zero does not mean "no sun": see
+/// <paramref name="ForecastSurplusWh"/>.
+/// </param>
+/// <param name="ForecastSurplusWh">
+/// All the surplus the window is forecast to hold, after the house and the home battery's booking —
+/// whether or not the car can charge on it unaided.
+///
+/// <para>The gap between this and <paramref name="SolarEnergyWh"/> is the whole weak-sun story. On
+/// three phases the charger's floor is ~4.14 kW, so a window forecast to hold 6 kWh of surplus in
+/// half-hours that never clear that line contributes <b>nothing</b> as a solar block: this figure is
+/// 6 kWh and <paramref name="SolarEnergyWh"/> is zero. Reporting only the latter says "no sun" about
+/// a sunny day, which is both wrong and the opposite of what the plan then does — it places the
+/// import on exactly those hours so the roof pays for part of it.</para>
+/// </param>
+/// <param name="GridEnergyWh">
+/// The part planned to come from the grid. An <b>upper bound</b> where the import is placed over
+/// sub-floor surplus: the charger runs at its maximum there and whatever the roof supplies at that
+/// moment comes off the meter, which this figure does not model.
+/// </param>
 /// <param name="CeilingEnergyWh">
 /// The physical ceiling: the charger at maximum power for every remaining minute. The comparison
 /// everything turns on — a need above this cannot be met however the plan is arranged.
@@ -69,6 +88,7 @@ public sealed record TargetedChargePlan(
     double DeliveredEnergyWh,
     double RemainingEnergyWh,
     double SolarEnergyWh,
+    double ForecastSurplusWh,
     double GridEnergyWh,
     double CeilingEnergyWh,
     double ExpectedEnergyWh,
@@ -90,6 +110,13 @@ public sealed record TargetedChargePlan(
 
     /// <summary>Whether any grid import is planned at all.</summary>
     public bool ImportsFromGrid => GridEnergyWh > 0 && GridStart is not null;
+
+    /// <summary>
+    /// Whether the window holds real surplus that the car cannot charge on unaided — sun the forecast
+    /// sees, in half-hours too weak to clear the charger's floor. The case the import is placed over,
+    /// and the one that must never be described as "no sun".
+    /// </summary>
+    public bool HasUnusableSurplus => ForecastSurplusWh > 0 && SolarEnergyWh <= 0;
 
     /// <summary>How long is left until the plan's finish line. Zero once it has passed.</summary>
     public TimeSpan TimeRemaining => Deadline > Now ? Deadline - Now : TimeSpan.Zero;

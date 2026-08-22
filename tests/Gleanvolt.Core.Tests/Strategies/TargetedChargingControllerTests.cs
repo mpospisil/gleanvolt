@@ -40,6 +40,7 @@ public class TargetedChargingControllerTests
             DeliveredEnergyWh: deliveredWh,
             RemainingEnergyWh: Math.Max(0, requiredWh - deliveredWh),
             SolarEnergyWh: 8_000,
+            ForecastSurplusWh: 8_000,
             GridEnergyWh: gridEnergyWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: 22_000,

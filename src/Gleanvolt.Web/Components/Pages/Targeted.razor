@@ -88,8 +88,10 @@
               Hint="The request less what the charger has measurably delivered since it was activated." />
         <Stat Label="Delivered so far" Value="@Kwh(plan.DeliveredEnergyWh)"
               Hint="Measured at the charger, so a car that limits itself to less than we asked for simply gets a longer grid block on the next poll." />
+        <Stat Label="Forecast surplus" Value="@Kwh(plan.ForecastSurplusWh)"
+              Hint="All the surplus this window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided." />
         <Stat Label="From sun" Value="@Kwh(plan.SolarEnergyWh)"
-              Hint="Forecast surplus the home battery has not already claimed. The pack keeps its priority." />
+              Hint="The part of the surplus above that the car can actually run on alone. Zero does not mean no sun: it means no half-hour clears the charger's 6 A minimum, which is why the grid block is placed over the sunniest hours rather than after them." />
         <Stat Label="From grid" Value="@Kwh(plan.GridEnergyWh)"
               Hint="What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought." />
         <Stat Label="Grid top-up starts" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"

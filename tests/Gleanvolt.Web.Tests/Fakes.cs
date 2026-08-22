@@ -516,6 +516,28 @@ internal static class TestTargetedPlans
         shortfallWh: 3_700,
         feasibleDeparture: now.AddHours(3).AddMinutes(5));
 
+    /// <summary>
+    /// The weak-sun day: real forecast surplus in the window, none of it clearing the charger's floor,
+    /// so the whole need falls to the grid — placed over the best of that sun. Solar share zero,
+    /// forecast surplus emphatically not.
+    /// </summary>
+    public static TargetedChargePlan WeakSun(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.SolarPlusGrid,
+        solarWh: 0,
+        gridWh: 14_000,
+        gridStart: now.AddHours(2),
+        forecastSurplusWh: 6_400);
+
+    /// <summary>The genuinely dark window: no surplus forecast at all, so the import starts at once.</summary>
+    public static TargetedChargePlan DarkWindow(DateTimeOffset now) => Plan(
+        now,
+        TargetedChargeStrategy.SolarPlusGrid,
+        solarWh: 0,
+        gridWh: 14_000,
+        gridStart: now,
+        forecastSurplusWh: 0);
+
     public static TargetedChargePlan Complete(DateTimeOffset now) => Plan(
         now,
         TargetedChargeStrategy.Complete,
@@ -539,7 +561,8 @@ internal static class TestTargetedPlans
         double? expectedWh = null,
         double shortfallWh = 0,
         DateTimeOffset? feasibleDeparture = null,
-        bool isUsable = true)
+        bool isUsable = true,
+        double? forecastSurplusWh = null)
     {
         var depart = departBy ?? now.AddHours(9);
         var blocks = new List<TargetedChargeBlock>();
@@ -564,6 +587,7 @@ internal static class TestTargetedPlans
             DeliveredEnergyWh: deliveredWh,
             RemainingEnergyWh: remainingWh ?? requiredWh - deliveredWh,
             SolarEnergyWh: solarWh,
+            ForecastSurplusWh: forecastSurplusWh ?? solarWh,
             GridEnergyWh: gridWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: expectedWh ?? solarWh + gridWh,
