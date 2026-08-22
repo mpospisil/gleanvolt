@@ -585,4 +585,46 @@ public class ChargingSessionTrackerTests
         Assert.NotNull(update.Ended);
         Assert.Equal(ChargingSessionEndReason.CarUnplugged, update.Ended!.EndReason);
     }
+
+    private static SolarForecast DayCurve(DateTimeOffset retrievedAt, params (double Hour, double Watts)[] periods) =>
+        new(retrievedAt, [.. periods.Select(p =>
+            new SolarForecastPeriod(Noon.Date.AddHours(p.Hour), TimeSpan.FromMinutes(30), p.Watts))]);
+
+    [Fact]
+    public void TheDaysForecastCurveIsRecordedOnTheSessionHeader()
+    {
+        var tracker = NewTracker();
+        var curve = DayCurve(Noon, (9, 2000), (12, 5000));
+
+        var update = tracker.Observe(Status(Noon), dayForecast: curve);
+
+        Assert.Same(curve, update.Started!.DayForecast);
+    }
+
+    [Fact]
+    public void TheCurveStoredAtCloseIsTheFullerOneTheDayEndedWith()
+    {
+        // The provider only forecasts forward, so the curve grows a morning as the day goes on: what
+        // the session is finally filed with has to be the version that covers the hours it ran through,
+        // not the half-day that was all we could see when it opened.
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon), dayForecast: DayCurve(Noon, (12, 5000)));
+
+        var complete = DayCurve(Noon.AddHours(5), (9, 2000), (12, 5000), (17, 1000));
+        tracker.Observe(Status(Noon.AddHours(5)), dayForecast: complete);
+
+        var update = tracker.Close(ChargingSessionEndReason.ServiceStopped, Noon.AddHours(5));
+
+        Assert.Same(complete, update.Ended!.DayForecast);
+    }
+
+    [Fact]
+    public void ASessionOpenedWithNoForecastAtAllCarriesNoCurve()
+    {
+        var tracker = NewTracker();
+
+        var update = tracker.Observe(Status(Noon));
+
+        Assert.Null(update.Started!.DayForecast);
+    }
 }

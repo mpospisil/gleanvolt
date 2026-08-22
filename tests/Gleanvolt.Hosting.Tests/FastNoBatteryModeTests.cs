@@ -273,4 +273,6 @@ internal sealed class NoForecastService : ISolarForecastService
     public SolarForecast? GetForecastForToday() => null;
 
     public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => null;
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) => null;
 }

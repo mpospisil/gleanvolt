@@ -295,6 +295,7 @@ internal static class TestSessions
             PeakChargingPowerWatts: 3_000,
             StartPlan: null,
             ForecastRemainingAtStartWh: null,
+            DayForecast: null,
             Controlled: true);
 
     public static ChargingSessionSample Sample(Guid sessionId, DateTimeOffset timestamp, double batterySocPercent) =>

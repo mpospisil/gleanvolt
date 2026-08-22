@@ -50,6 +50,22 @@ namespace Gleanvolt.Core.Models;
 /// since the poll loop only publishes a plan for that mode.
 /// </param>
 /// <param name="ForecastRemainingAtStartWh">Forecast PV still to come today when the session opened, if a forecast was available.</param>
+/// <param name="DayForecast">
+/// The <b>whole day's</b> forecast curve — every period of the local day the session started on,
+/// including the hours before it opened and the hours after it closed, with the p10/p90 bands each
+/// period carried.
+///
+/// <para>Carried on the session so the document is self-contained: a session read a year from now can
+/// be put against the day it happened on without the reader needing a forecast archive of their own.
+/// <see cref="ForecastRemainingAtStartWh"/> answers "how much sun was left?" in one number; this is
+/// the shape behind it, and the only thing that can say whether a poor session met a poor day or a
+/// good one.</para>
+///
+/// <para>Written when the session opens and rewritten when it closes, so what is stored is the fullest
+/// version of the day known by then — the provider only forecasts forward, so the curve grows a
+/// morning as the day goes on. Null when no forecast was ever fetched, and short of a full day when
+/// the service was not running for all of it.</para>
+/// </param>
 /// <param name="Controlled">
 /// False for a session recorded while no mode was driving the charger (the opt-in
 /// <c>RecordUncontrolledSessions</c> baseline). Always true otherwise.
@@ -72,6 +88,7 @@ public sealed record ChargingSession(
     double PeakChargingPowerWatts,
     SolarDayPlan? StartPlan,
     double? ForecastRemainingAtStartWh,
+    SolarForecast? DayForecast,
     bool Controlled)
 {
     /// <summary>Whether the session is still running.</summary>

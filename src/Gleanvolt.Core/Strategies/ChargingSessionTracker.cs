@@ -50,6 +50,11 @@ public sealed class ChargingSessionTracker
     // reports the car's SOC rather than a hole. The feed updates in minutes at best.
     private VehicleState? _vehicle;
 
+    // The day's forecast curve as last handed in. Held rather than only read at open because it fills
+    // in as the day passes: the version available when the session closes covers the morning the
+    // version available when it opened could not.
+    private SolarForecast? _dayForecast;
+
     private ChargingSession? _open;
     private DateTimeOffset? _lastSampleAt;
     private double _peakPowerWatts;
@@ -89,6 +94,10 @@ public sealed class ChargingSessionTracker
     /// rather than looked up so this type stays free of the forecast service.
     /// </param>
     /// <param name="forecastRemainingTodayWh">Forecast PV still to come today; recorded on the session header at open.</param>
+    /// <param name="dayForecast">
+    /// The whole day's forecast curve, elapsed periods included — recorded on the session header at
+    /// open and refreshed onto it at close. Advisory only: nothing here decides on it.
+    /// </param>
     /// <param name="vehicle">
     /// The car's own last-known state, for the same reason and on the same terms as the forecast: passed
     /// in rather than looked up, and purely advisory. Its reading may be hours old, so its capture time
@@ -98,8 +107,12 @@ public sealed class ChargingSessionTracker
         ChargeControlStatus status,
         double? forecastPowerWatts = null,
         double? forecastRemainingTodayWh = null,
-        VehicleState? vehicle = null)
+        VehicleState? vehicle = null,
+        SolarForecast? dayForecast = null)
     {
+        // Kept even when nothing is open: the next session to start gets the day as it stands.
+        _dayForecast = dayForecast ?? _dayForecast;
+
         var shouldRecord = ShouldRecord(status);
         if (_open is null && !shouldRecord)
         {
@@ -213,6 +226,7 @@ public sealed class ChargingSessionTracker
             PeakChargingPowerWatts: 0,
             StartPlan: status.Plan,
             ForecastRemainingAtStartWh: forecastRemainingTodayWh,
+            DayForecast: _dayForecast,
             Controlled: IsControlling(status.Mode));
 
         _lastMode = status.Mode;
@@ -382,6 +396,10 @@ public sealed class ChargingSessionTracker
             FromBatteryWh = _fromBattery.EnergyWattHours,
             LoanedWh = _loaned.EnergyWattHours,
             PeakChargingPowerWatts = _peakPowerWatts,
+
+            // The curve as it stands now, not as it stood at open: the day has since filled in behind
+            // us, and the fuller version is the one worth publishing.
+            DayForecast = _dayForecast ?? _open!.DayForecast,
         };
 
     private static ChargingSessionEndReason EndReasonFor(ChargeControlStatus status) => status switch

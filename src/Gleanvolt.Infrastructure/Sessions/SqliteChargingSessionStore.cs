@@ -29,7 +29,7 @@ namespace Gleanvolt.Infrastructure.Sessions;
 public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposable
 {
     /// <summary>The schema this build writes, tracked in SQLite's own <c>user_version</c>.</summary>
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
 
     // One writer at a time. SQLite would serialise these itself and hand back SQLITE_BUSY; taking the
     // lock in-process turns a retry-and-hope into a wait, and the only writer is the recording worker.
@@ -81,10 +81,11 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     id, started_at, ended_at, time_zone_id, start_mode, end_mode, end_reason,
                     start_soc_percent, end_soc_percent, energy_delivered_wh, from_solar_wh,
                     from_grid_wh, from_battery_wh, loaned_wh, peak_power_watts, start_plan_json,
-                    forecast_remaining_at_start_wh, controlled)
+                    forecast_remaining_at_start_wh, day_forecast_json, controlled)
                 VALUES (
                     $id, $started_at, NULL, $time_zone_id, $start_mode, $end_mode, NULL,
-                    $start_soc, NULL, 0, 0, 0, 0, 0, 0, $start_plan, $forecast_remaining, $controlled);
+                    $start_soc, NULL, 0, 0, 0, 0, 0, 0, $start_plan, $forecast_remaining,
+                    $day_forecast, $controlled);
                 """;
 
             command.Parameters.AddWithValue("$id", session.Id.ToString());
@@ -95,6 +96,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             command.Parameters.AddWithValue("$start_soc", session.StartBatterySocPercent);
             command.Parameters.AddWithValue("$start_plan", (object?)SerializePlan(session.StartPlan) ?? DBNull.Value);
             command.Parameters.AddWithValue("$forecast_remaining", (object?)session.ForecastRemainingAtStartWh ?? DBNull.Value);
+            command.Parameters.AddWithValue("$day_forecast", (object?)SerializeForecast(session.DayForecast) ?? DBNull.Value);
             command.Parameters.AddWithValue("$controlled", session.Controlled ? 1 : 0);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -285,6 +287,9 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     from_battery_wh = $from_battery,
                     loaned_wh = $loaned,
                     peak_power_watts = $peak,
+                    -- Rewritten, not left as opened: the provider only forecasts forward, so the
+                    -- curve known at close covers hours the one known at open could not.
+                    day_forecast_json = $day_forecast,
                     controlled = $controlled
                 WHERE id = $id;
                 """;
@@ -300,6 +305,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             command.Parameters.AddWithValue("$from_battery", session.FromBatteryWh);
             command.Parameters.AddWithValue("$loaned", session.LoanedWh);
             command.Parameters.AddWithValue("$peak", session.PeakChargingPowerWatts);
+            command.Parameters.AddWithValue("$day_forecast", (object?)SerializeForecast(session.DayForecast) ?? DBNull.Value);
             command.Parameters.AddWithValue("$controlled", session.Controlled ? 1 : 0);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -635,7 +641,8 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
     private const string SessionColumns = """
         id, started_at, ended_at, time_zone_id, start_mode, end_mode, end_reason, start_soc_percent,
         end_soc_percent, energy_delivered_wh, from_solar_wh, from_grid_wh, from_battery_wh, loaned_wh,
-        peak_power_watts, start_plan_json, forecast_remaining_at_start_wh, controlled
+        peak_power_watts, start_plan_json, forecast_remaining_at_start_wh, day_forecast_json,
+        controlled
         """;
 
     private static ChargingSession ReadSession(SqliteDataReader reader) => new(
@@ -656,7 +663,8 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
         PeakChargingPowerWatts: reader.GetDouble(14),
         StartPlan: reader.IsDBNull(15) ? null : DeserializePlan(reader.GetString(15)),
         ForecastRemainingAtStartWh: NullableDouble(reader, 16),
-        Controlled: reader.GetInt64(17) != 0);
+        DayForecast: reader.IsDBNull(17) ? null : DeserializeForecast(reader.GetString(17)),
+        Controlled: reader.GetInt64(18) != 0);
 
     private static double? NullableDouble(SqliteDataReader reader, int ordinal) =>
         reader.IsDBNull(ordinal) ? null : reader.GetDouble(ordinal);
@@ -669,6 +677,12 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
 
     private static SolarDayPlan? DeserializePlan(string json) =>
         JsonSerializer.Deserialize<SolarDayPlan>(json, ChargingSessionJson.Options);
+
+    private static string? SerializeForecast(SolarForecast? forecast) =>
+        forecast is null ? null : JsonSerializer.Serialize(forecast, ChargingSessionJson.Options);
+
+    private static SolarForecast? DeserializeForecast(string json) =>
+        JsonSerializer.Deserialize<SolarForecast>(json, ChargingSessionJson.Options);
 
     // Round-trip ("O") on the UTC instant: unambiguous, and lexically sortable, which a stored local
     // offset would not be across a daylight-saving change.
@@ -766,6 +780,13 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             -- the number must never be read without it.
             ALTER TABLE session_samples ADD COLUMN vehicle_charge_time_remaining_min      REAL NOT NULL DEFAULT 0;
             ALTER TABLE session_samples ADD COLUMN vehicle_charge_time_remaining_reported INTEGER NOT NULL DEFAULT 0;
+            """),
+        (3, """
+            -- The whole day's forecast curve, elapsed periods included (see ChargingSession.DayForecast).
+            -- One JSON document rather than a periods table: it is written once, read whole, and has to
+            -- travel with the session when the document is published -- none of which a join gives us.
+            -- Existing rows stay NULL, which is the truth: nothing retained the elapsed periods then.
+            ALTER TABLE sessions ADD COLUMN day_forecast_json TEXT NULL;
             """),
     ];
 }
