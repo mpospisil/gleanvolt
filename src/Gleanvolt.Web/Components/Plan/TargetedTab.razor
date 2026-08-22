@@ -459,88 +459,37 @@ else
 
     /// <summary>
     /// Turns the form into a request, or explains why it cannot be one. The single place both Preview
-    /// and Start go through, so the two can never disagree about what is valid.
+    /// and Start go through, so the two can never disagree about what is valid — and, since the API
+    /// composes requests too, no more than a translation of this form into the shared factory's terms.
     /// </summary>
     private bool TryCompose(DateTimeOffset now, out TargetedChargeRequest request, out string? error)
     {
-        request = default!;
-        var departBy = Compose(_departure);
+        // The basis the form is actually offering: asking in state of charge needs both a configured
+        // pack and a reading to measure the gap from, and without them the selector is not shown at all.
+        var socBasis = _basis == TargetBasis.Soc && CanTargetSoc;
 
-        double energyWh;
-        double? targetSoc = null;
-        double? socNow = null;
+        var result = TargetedChargeRequestFactory.Create(
+            departBy: Compose(_departure),
+            energyWh: socBasis ? null : _energyKWh * 1000,
+            targetSocPercent: socBasis ? _targetSocPercent : null,
+            priority: _priority,
+            restSocPercent: _restSocPercent,
+            vehicleSocPercent: _vehicle?.SocPercent,
+            limits: Limits,
+            now: now);
 
-        if (_basis == TargetBasis.Soc && CanTargetSoc)
-        {
-            socNow = _vehicle!.SocPercent;
-            var requiredWh = VehicleTargetEnergy.RequiredWh(
-                socNow, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+        request = result.Request!;
+        error = result.Error;
 
-            if (requiredWh is not { } wh || wh <= 0)
-            {
-                error = $"The car is already at {Percent(socNow)}, at or above the {_targetSocPercent:F0}% asked for.";
-                return false;
-            }
-
-            energyWh = wh;
-            targetSoc = _targetSocPercent;
-        }
-        else
-        {
-            if (_energyKWh <= 0)
-            {
-                error = "Enter how much energy the car needs.";
-                return false;
-            }
-
-            energyWh = _energyKWh * 1000;
-        }
-
-        if (departBy <= now)
-        {
-            error = "The departure time is in the past.";
-            return false;
-        }
-
-        if (departBy - now > Display.MaxHorizon)
-        {
-            error = $"A departure more than {Display.MaxHorizon.TotalHours:F0} hours away is further than "
-                + "the forecast — or a request that does not survive a restart — can honestly promise.";
-            return false;
-        }
-
-        request = new TargetedChargeRequest(energyWh, departBy, now, targetSoc, socNow)
-            with
-            {
-                Priority = _priority,
-            };
-
-        // The split, made once and here — the same place and the same moment as the SOC → kWh
-        // conversion above, so a reading that lands later cannot move a promise already part delivered.
-        // The planner is handed watt-hours and never sees a percentage again.
-        if (_priority == TargetedChargePriority.JustInTime && CanTargetSoc)
-        {
-            var endSoc = targetSoc ?? VehicleTargetEnergy.ResultingSocPercent(
-                _vehicle?.SocPercent, energyWh, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
-
-            var tailWh = endSoc is { } end
-                ? VehicleTargetEnergy.TailAboveRestWh(
-                    _vehicle?.SocPercent, end, _restSocPercent,
-                    VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency)
-                : null;
-
-            request = request with
-            {
-                // Never more than the request itself: a rest point below where the car already sits
-                // would otherwise hold back energy the request never contained.
-                TailEnergyWh = Math.Clamp(tailWh ?? 0, 0, energyWh),
-                RestSocPercent = _restSocPercent,
-            };
-        }
-
-        error = null;
-        return true;
+        return result.Request is not null;
     }
+
+    /// <summary>The installation figures the factory cannot compose a request without.</summary>
+    private TargetedChargeRequestLimits Limits => new(
+        Display.MaxHorizon,
+        VehicleDisplay.BatteryCapacityKWh,
+        VehicleDisplay.ChargeEfficiency,
+        Display.DefaultRestSocPercent);
 
     /// <summary>The request in the terms it was asked in, which for a SOC target is not kilowatt-hours.</summary>
     private static string Asking(TargetedChargeRequest request) =>

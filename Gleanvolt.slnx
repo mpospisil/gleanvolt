@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Gleanvolt.Core/Gleanvolt.Core.csproj" />
+    <Project Path="src/Gleanvolt.Api/Gleanvolt.Api.csproj" />
     <Project Path="src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj" />
     <Project Path="src/Gleanvolt.Web/Gleanvolt.Web.csproj" />
     <Project Path="src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj" />
@@ -8,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Gleanvolt.Core.Tests/Gleanvolt.Core.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Api.Tests/Gleanvolt.Api.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Infrastructure.Tests/Gleanvolt.Infrastructure.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Web.Tests/Gleanvolt.Web.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Hosting.Tests/Gleanvolt.Hosting.Tests.csproj" />

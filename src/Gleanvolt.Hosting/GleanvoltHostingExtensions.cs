@@ -18,6 +18,7 @@ using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Sessions;
 using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
+using Gleanvolt.Api;
 using Gleanvolt.Web;
 
 namespace Gleanvolt.Hosting;
@@ -406,7 +407,23 @@ public static class GleanvoltHostingExtensions
             return new TargetedDisplayOptions(targeted.MaxHorizon, targeted.JustInTime.RestSocPercent);
         });
 
-        AddWebSurface(services, configuration);
+        // The same figures as the two records above, in the shape TargetedChargeRequestFactory takes.
+        // A Core type rather than a third per-surface copy: composing a request is decision logic, it
+        // now has two doors (the form and the API), and both must reject the same things for the same
+        // reasons -- so the factory is shared and this is what it is fed.
+        services.AddSingleton(provider =>
+        {
+            var targeted = provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value;
+            var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
+
+            return new TargetedChargeRequestLimits(
+                targeted.MaxHorizon,
+                vehicle.BatteryCapacityKWh,
+                vehicle.ChargeEfficiency,
+                targeted.JustInTime.RestSocPercent);
+        });
+
+        AddHttpSurfaces(services, configuration);
 
         return services;
     }
@@ -439,54 +456,58 @@ public static class GleanvoltHostingExtensions
     public static WebApplication UseGleanvolt(this WebApplication app)
     {
         var web = app.Services.GetRequiredService<IOptions<WebOptions>>().Value;
-        if (!web.Enabled)
+        var api = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
+
+        if (web.Enabled)
         {
-            return app;
+            // Static assets come from Gleanvolt.Web's wwwroot, served at /_content/Gleanvolt.Web/... Reads the
+            // manifest UseStaticWebAssets() above wires up, which is why this stays here rather than moving
+            // into WebUiHost with everything else -- a test host has no such manifest.
+            app.MapStaticAssets();
+            app.MapGleanvoltWebUi(web);
         }
 
-        // Static assets come from Gleanvolt.Web's wwwroot, served at /_content/Gleanvolt.Web/... Reads the
-        // manifest UseStaticWebAssets() above wires up, which is why this stays here rather than moving
-        // into WebUiHost with everything else -- a test host has no such manifest.
-        app.MapStaticAssets();
-        app.MapGleanvoltWebUi(web);
+        // After the UI, so its authentication and antiforgery middleware are already in the pipeline when
+        // both are on. Neither applies to these routes -- the API carries its own key check and speaks
+        // JSON rather than forms -- and the order is what keeps that true rather than incidental.
+        app.MapGleanvoltApi(api, app.Logger);
 
         return app;
     }
 
-    // The self-hosted web UI (issue #44). It is a second adapter over the same seam the MQTT worker
-    // uses -- it reads ChargeControlStatusHolder and the Core selector interfaces, and owns no control
-    // logic of its own -- so the two surfaces are independent: either, both, or neither may run.
-    // On by default, unlike the Home Assistant integration: this is the surface a fresh install is
-    // operated through, and it needs no broker, no credentials and no onboarding to be useful.
-    private static void AddWebSurface(IServiceCollection services, IConfiguration configuration)
+    // The two HTTP surfaces: the self-hosted web UI (issue #44) and the API (issue #103). Both are
+    // adapters over the same seams the MQTT worker uses -- they read ChargeControlStatusHolder and drive
+    // the Core interfaces, and own no control logic -- so all three surfaces are independent: any, all,
+    // or none of them may run.
+    //
+    // They share one socket, because this is one appliance rather than two services that happen to be
+    // co-hosted, and Web:Port is therefore the HTTP port for both. What differs is the default: the UI
+    // is on, because it is the surface a fresh install is operated through and it needs no broker, no
+    // credentials and no onboarding; the API is off, because it is a control surface a program drives
+    // and two of its endpoints write to hardware.
+    private static void AddHttpSurfaces(IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<WebOptions>(configuration.GetSection(WebOptions.SectionName));
+        services.Configure<ApiOptions>(configuration.GetSection(ApiOptions.SectionName));
 
         var web = ReadWebOptions(configuration);
+        var api = ReadApiOptions(configuration);
 
-        // Only catches the unsatisfiable combination -- a login demanded with no password to check
-        // against, which would lock everyone out permanently. Whether a login is required at all is
-        // decided by whether a password was configured; see WebOptions.RequireAuthentication.
+        // Only catches the unsatisfiable combinations -- a login demanded with no password to check
+        // against, which would lock everyone out permanently, and an API switched on with no key, which
+        // would let anything that can reach the port drive the charger. Whether the UI requires a login
+        // at all is decided by whether a password was configured; see WebOptions.RequireAuthentication.
         web.ValidateAuthenticationConfig();
+        api.ValidateKeyConfig();
 
-        if (web.Enabled)
+        if (web.Enabled || api.Enabled)
         {
             // The port has exactly one source: the Web section. A code-backed endpoint outranks the
-            // hosting addresses, so an inherited ASPNETCORE_URLS cannot quietly move the UI somewhere
-            // else. Configured through Kestrel's options rather than IWebHostBuilder.ConfigureKestrel,
+            // hosting addresses, so an inherited ASPNETCORE_URLS cannot quietly move the surfaces
+            // somewhere else. Configured through Kestrel's options rather than IWebHostBuilder.ConfigureKestrel,
             // which is the same registration, so that a host without a WebApplicationBuilder can still
             // make this call.
             services.Configure<KestrelServerOptions>(kestrel => kestrel.ListenAnyIP(web.Port));
-
-            // What the UI displays as "this build". The host owns the answer -- the version is stamped
-            // on this assembly -- and hands it over, rather than Gleanvolt.Web guessing from its own
-            // attributes.
-            services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
-
-            // Everything else -- Razor components, cookie authentication, the RequireAuthentication
-            // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised
-            // by a test host too (issues #46, #47).
-            services.AddGleanvoltWebUi(web);
         }
         else
         {
@@ -497,12 +518,39 @@ public static class GleanvoltHostingExtensions
             // resolved.
             services.AddSingleton<IServer, NoListenServer>();
         }
+
+        if (web.Enabled)
+        {
+            // What the UI displays as "this build". The host owns the answer -- the version is stamped
+            // on this assembly -- and hands it over, rather than Gleanvolt.Web guessing from its own
+            // attributes.
+            services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
+
+            // Everything else -- Razor components, cookie authentication, the RequireAuthentication
+            // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised
+            // by a test host too (issues #46, #47).
+            services.AddGleanvoltWebUi(web);
+        }
+
+        if (api.Enabled)
+        {
+            // The same arrangement, for the same reason: the version is this assembly's, and Vehicle:MaxAge
+            // is bound here, so the API is handed both rather than reaching for either.
+            services.AddSingleton(provider => new ApiHostInfo(
+                BuildInfo.Describe(),
+                provider.GetRequiredService<IOptions<VehicleOptions>>().Value.MaxAge));
+
+            services.AddGleanvoltApi(api);
+        }
     }
 
     // Read straight from configuration rather than through IOptions: every caller here runs before the
     // service provider exists, and the answer decides what gets registered at all.
     private static WebOptions ReadWebOptions(IConfiguration configuration) =>
         configuration.GetSection(WebOptions.SectionName).Get<WebOptions>() ?? new WebOptions();
+
+    private static ApiOptions ReadApiOptions(IConfiguration configuration) =>
+        configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>() ?? new ApiOptions();
 
     // Enforces the dry-run guarantee structurally: when a device may not be written to, its client
     // physically cannot write, so even a caller that forgot its own guard can never reach the hardware.

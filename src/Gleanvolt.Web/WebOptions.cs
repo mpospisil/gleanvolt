@@ -19,7 +19,12 @@ public sealed class WebOptions
     /// </summary>
     public bool Enabled { get; init; } = true;
 
-    /// <summary>The TCP port the UI listens on, on every interface. Plain HTTP; this is a LAN appliance.</summary>
+    /// <summary>
+    /// The TCP port the UI listens on, on every interface. Plain HTTP; this is a LAN appliance.
+    ///
+    /// <para>The HTTP API shares it — one appliance, one socket — so this is the port for both, and
+    /// either surface being enabled is what makes the host listen at all.</para>
+    /// </summary>
     public int Port { get; init; } = 8090;
 
     /// <summary>

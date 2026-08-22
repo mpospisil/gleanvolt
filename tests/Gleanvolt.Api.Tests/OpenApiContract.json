@@ -1,0 +1,472 @@
+{
+  "title": "Gleanvolt",
+  "version": "v1",
+  "paths": {
+    "/api/v1/battery-hold": {
+      "put": {
+        "operationId": "setBatteryHold",
+        "parameters": [],
+        "requestBody": "application/json $BatteryHoldRequest",
+        "responses": [
+          "200 application/json $ControlActionResponse",
+          "409 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/charging/start": {
+      "post": {
+        "operationId": "startCharging",
+        "parameters": [],
+        "requestBody": "application/json $StartChargingRequest",
+        "responses": [
+          "200 application/json $ControlActionResponse",
+          "400 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/charging/stop": {
+      "post": {
+        "operationId": "stopCharging",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $ControlActionResponse"
+        ]
+      }
+    },
+    "/api/v1/energy/days/{date}": {
+      "get": {
+        "operationId": "getEnergyDay",
+        "parameters": [
+          "path:date (required) string(date)"
+        ],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $EnergyDayResponse",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/energy/intervals": {
+      "get": {
+        "operationId": "getEnergyIntervals",
+        "parameters": [
+          "query:from string(date-time)",
+          "query:to string(date-time)"
+        ],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $EnergySeriesResponse",
+          "400 application/problem\u002Bjson $ProblemDetails",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/forecast": {
+      "get": {
+        "operationId": "getForecast",
+        "parameters": [
+          "query:weather boolean"
+        ],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $ForecastResponse"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $HealthResponse"
+        ]
+      }
+    },
+    "/api/v1/plans/targeted/preview": {
+      "post": {
+        "operationId": "previewTargetedPlan",
+        "parameters": [],
+        "requestBody": "application/json $TargetedChargeRequestBody",
+        "responses": [
+          "200 application/json $TargetedPreviewResponse",
+          "400 application/problem\u002Bjson $ProblemDetails",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "operationId": "getSessions",
+        "parameters": [
+          "query:from string(date-time)",
+          "query:limit integer|string(int32)",
+          "query:to string(date-time)"
+        ],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $SessionListResponse",
+          "400 application/problem\u002Bjson $ProblemDetails",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}": {
+      "get": {
+        "operationId": "getSession",
+        "parameters": [
+          "path:id (required) string(uuid)"
+        ],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $SessionDetailResponse",
+          "404 application/problem\u002Bjson $ProblemDetails",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $StatusResponse",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
+    "/api/v1/vehicle": {
+      "get": {
+        "operationId": "getVehicle",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $VehicleResponse"
+        ]
+      }
+    }
+  },
+  "schemas": {
+    "BatteryHoldRequest": {
+      "hold": "boolean (required)"
+    },
+    "BatteryHoldResponse": {
+      "active": "boolean (required)",
+      "enabled": "boolean (required)",
+      "requested": "boolean (required)",
+      "targetWatts": "number|string(double)? (required)"
+    },
+    "ChargeControlMode": "enum[off|solar|forecasted|fastNoBattery|targeted]",
+    "ChargeControlState": "enum[disabled|idle|charging|paused]",
+    "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|]",
+    "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded]",
+    "ControlActionResponse": {
+      "message": "string? (required)",
+      "status": "any (required)",
+      "succeeded": "boolean (required)",
+      "target": "any (required)"
+    },
+    "DayOutlook": "enum[unknown|surplus|tight|shortfall|noChargeToday]",
+    "EnergyDayResponse": {
+      "batteryChargeKwh": "number|string(double) (required)",
+      "batteryDischargeKwh": "number|string(double) (required)",
+      "coverage": "number|string(double) (required)",
+      "date": "string(date) (required)",
+      "evKwh": "number|string(double) (required)",
+      "forecastSolarKwh": "number|string(double)? (required)",
+      "from": "string(date-time) (required)",
+      "gridExportKwh": "number|string(double) (required)",
+      "gridImportKwh": "number|string(double) (required)",
+      "houseLoadKwh": "number|string(double) (required)",
+      "intervalCount": "integer|string(int32) (required)",
+      "otherLoadsKwh": "number|string(double) (required)",
+      "socEndPercent": "number|string(double)? (required)",
+      "socMaxPercent": "number|string(double)? (required)",
+      "socMinPercent": "number|string(double)? (required)",
+      "socStartPercent": "number|string(double)? (required)",
+      "solarKwh": "number|string(double) (required)",
+      "timeZoneId": "string (required)",
+      "to": "string(date-time) (required)"
+    },
+    "EnergyIntervalResponse": {
+      "batteryChargeKwh": "number|string(double) (required)",
+      "batteryDischargeKwh": "number|string(double) (required)",
+      "coverage": "number|string(double) (required)",
+      "evKwh": "number|string(double) (required)",
+      "forecastSolarKwh": "number|string(double)? (required)",
+      "gridExportKwh": "number|string(double) (required)",
+      "gridImportKwh": "number|string(double) (required)",
+      "houseLoadKwh": "number|string(double) (required)",
+      "localDate": "string(date) (required)",
+      "otherLoadsKwh": "number|string(double) (required)",
+      "periodEnd": "string(date-time) (required)",
+      "periodStart": "string(date-time) (required)",
+      "sampleCount": "integer|string(int32) (required)",
+      "socEndPercent": "number|string(double) (required)",
+      "socMaxPercent": "number|string(double) (required)",
+      "socMeanPercent": "number|string(double) (required)",
+      "socMinPercent": "number|string(double) (required)",
+      "socStartPercent": "number|string(double) (required)",
+      "solarKwh": "number|string(double) (required)",
+      "timeZoneId": "string (required)"
+    },
+    "EnergySeriesResponse": {
+      "count": "integer|string(int32) (required)",
+      "from": "string(date-time) (required)",
+      "intervals": "array\u003C$EnergyIntervalResponse\u003E (required)",
+      "to": "string(date-time) (required)"
+    },
+    "EvChargerStatus": "enum[available|preparing|charging|finishing|faulted|unavailable|reserved|suspendedEv|suspendedEvse|update|cardActivation|startDelay|chargePaused|stopping|unknown]",
+    "ForecastPeriodResponse": {
+      "energyWh": "number|string(double) (required)",
+      "estimatedPowerWatts": "number|string(double) (required)",
+      "estimatedPowerWattsP10": "number|string(double)? (required)",
+      "estimatedPowerWattsP90": "number|string(double)? (required)",
+      "periodEnd": "string(date-time) (required)",
+      "periodStart": "string(date-time) (required)"
+    },
+    "ForecastResponse": {
+      "peakPowerWatts": "number|string(double) (required)",
+      "periods": "array\u003C$ForecastPeriodResponse\u003E (required)",
+      "retrievedAt": "string(date-time)? (required)",
+      "todayExpectedWh": "number|string(double)? (required)",
+      "todayRemainingWh": "number|string(double)? (required)",
+      "tomorrowExpectedWh": "number|string(double)? (required)",
+      "weather": "any (required)"
+    },
+    "HealthResponse": {
+      "dryRun": "boolean? (required)",
+      "energyHistoryAvailable": "boolean (required)",
+      "forecastAvailable": "boolean (required)",
+      "forecastRetrievedAt": "string(date-time)? (required)",
+      "lastPollAgeSeconds": "number|string(double)? (required)",
+      "lastPollAt": "string(date-time)? (required)",
+      "mode": "any (required)",
+      "now": "string(date-time) (required)",
+      "ok": "boolean (required)",
+      "sessionHistoryAvailable": "boolean (required)",
+      "timeZoneId": "string (required)",
+      "vehicleAgeSeconds": "number|string(double)? (required)",
+      "vehicleAvailable": "boolean (required)",
+      "vehicleStale": "boolean (required)",
+      "version": "string (required)",
+      "weatherConfigured": "boolean (required)"
+    },
+    "ProblemDetails": {
+      "detail": "string?",
+      "instance": "string?",
+      "status": "integer|string(int32)?",
+      "title": "string?",
+      "type": "string?"
+    },
+    "SessionDetailResponse": {
+      "events": "array\u003C$SessionEventResponse\u003E (required)",
+      "samples": "array\u003C$SessionSampleResponse\u003E (required)",
+      "schemaVersion": "integer|string(int32) (required)",
+      "session": "$SessionResponse (required)"
+    },
+    "SessionEventResponse": {
+      "detail": "string (required)",
+      "kind": "$ChargingSessionEventKind (required)",
+      "timestamp": "string(date-time) (required)"
+    },
+    "SessionListResponse": {
+      "count": "integer|string(int32) (required)",
+      "from": "string(date-time) (required)",
+      "sessions": "array\u003C$SessionResponse\u003E (required)",
+      "to": "string(date-time) (required)",
+      "truncated": "boolean (required)"
+    },
+    "SessionResponse": {
+      "controlled": "boolean (required)",
+      "endBatterySocPercent": "number|string(double)? (required)",
+      "endMode": "$ChargeControlMode (required)",
+      "endReason": "any (required)",
+      "endedAt": "string(date-time)? (required)",
+      "energyDeliveredWh": "number|string(double) (required)",
+      "forecastRemainingAtStartWh": "number|string(double)? (required)",
+      "fromBatteryWh": "number|string(double) (required)",
+      "fromGridWh": "number|string(double) (required)",
+      "fromSolarWh": "number|string(double) (required)",
+      "id": "string(uuid) (required)",
+      "loanedWh": "number|string(double) (required)",
+      "peakChargingPowerWatts": "number|string(double) (required)",
+      "solarFraction": "number|string(double)? (required)",
+      "startBatterySocPercent": "number|string(double) (required)",
+      "startMode": "$ChargeControlMode (required)",
+      "startedAt": "string(date-time) (required)",
+      "sunrise": "string(date-time)? (required)",
+      "sunset": "string(date-time)? (required)",
+      "timeZoneId": "string (required)",
+      "weatherAtEnd": "any (required)",
+      "weatherAtStart": "any (required)"
+    },
+    "SessionSampleResponse": {
+      "activeCurrentAmps": "integer|string(int32)? (required)",
+      "batteryHoldActive": "boolean (required)",
+      "batteryPowerWatts": "number|string(double) (required)",
+      "batterySocPercent": "number|string(double) (required)",
+      "chargerStatus": "$EvChargerStatus (required)",
+      "energyDeliveredWh": "number|string(double) (required)",
+      "evChargerPowerWatts": "number|string(double) (required)",
+      "evChargingCurrentAmps": "integer|string(int32) (required)",
+      "forecastPowerWatts": "number|string(double)? (required)",
+      "forecastSolarWh": "number|string(double)? (required)",
+      "fromBatteryWatts": "number|string(double) (required)",
+      "fromBatteryWh": "number|string(double) (required)",
+      "fromGridWatts": "number|string(double) (required)",
+      "fromGridWh": "number|string(double) (required)",
+      "fromSolarWatts": "number|string(double) (required)",
+      "fromSolarWh": "number|string(double) (required)",
+      "gridImportWh": "number|string(double) (required)",
+      "gridPowerWatts": "number|string(double) (required)",
+      "loanPowerWatts": "number|string(double) (required)",
+      "loanedWh": "number|string(double) (required)",
+      "mode": "$ChargeControlMode (required)",
+      "solarPowerWatts": "number|string(double) (required)",
+      "solarWh": "number|string(double) (required)",
+      "state": "$ChargeControlState (required)",
+      "surplusWatts": "number|string(double)? (required)",
+      "targetCurrentAmps": "integer|string(int32)? (required)",
+      "timestamp": "string(date-time) (required)",
+      "vehicleSocCapturedAt": "string(date-time)? (required)",
+      "vehicleSocPercent": "number|string(double)? (required)"
+    },
+    "SolarDayPlanResponse": {
+      "batteryToFullWh": "number|string(double) (required)",
+      "biasFactor": "number|string(double) (required)",
+      "deadline": "string(date-time) (required)",
+      "evBudgetWh": "number|string(double) (required)",
+      "evExpectedTodayWh": "number|string(double) (required)",
+      "evTargetWh": "number|string(double) (required)",
+      "expectedHouseWh": "number|string(double) (required)",
+      "feasibleEvEnergyWh": "number|string(double) (required)",
+      "forecastAsOf": "string(date-time)? (required)",
+      "isUsable": "boolean (required)",
+      "outlook": "$DayOutlook (required)",
+      "plateauClaimedByBatteryWh": "number|string(double) (required)",
+      "plateauEnergyWh": "number|string(double) (required)",
+      "reason": "string (required)",
+      "remainingPvWh": "number|string(double) (required)",
+      "requiredSocFloorPercent": "number|string(double) (required)",
+      "shortfallWh": "number|string(double) (required)",
+      "shoulderEnergyWh": "number|string(double) (required)",
+      "trajectorySocFloorPercent": "number|string(double) (required)"
+    },
+    "StartChargingRequest": {
+      "mode": "$ChargeControlMode (required)",
+      "target": "any"
+    },
+    "StatusResponse": {
+      "activeCurrentAmps": "integer|string(int32)? (required)",
+      "batteryHold": "$BatteryHoldResponse (required)",
+      "batteryPowerWatts": "number|string(double) (required)",
+      "batterySocPercent": "number|string(double) (required)",
+      "carConnected": "boolean (required)",
+      "chargerStatus": "$EvChargerStatus (required)",
+      "dayPlan": "any (required)",
+      "dryRun": "boolean (required)",
+      "evChargerPowerWatts": "number|string(double) (required)",
+      "evChargingCurrentAmps": "integer|string(int32) (required)",
+      "forecastSolarPowerWatts": "number|string(double) (required)",
+      "gridPowerWatts": "number|string(double) (required)",
+      "holdingControl": "boolean (required)",
+      "loanPowerWatts": "number|string(double) (required)",
+      "loanedTodayWh": "number|string(double) (required)",
+      "mode": "$ChargeControlMode (required)",
+      "sessionEnergyWh": "number|string(double) (required)",
+      "solarPowerWatts": "number|string(double) (required)",
+      "state": "$ChargeControlState (required)",
+      "surplusWatts": "number|string(double)? (required)",
+      "targetCurrentAmps": "integer|string(int32)? (required)",
+      "targetedPlan": "any (required)",
+      "timestamp": "string(date-time) (required)",
+      "tomorrowForecastWh": "number|string(double)? (required)"
+    },
+    "TargetedBlockResponse": {
+      "end": "string(date-time) (required)",
+      "energyWh": "number|string(double) (required)",
+      "powerWatts": "number|string(double) (required)",
+      "source": "$TargetedChargeSource (required)",
+      "start": "string(date-time) (required)"
+    },
+    "TargetedChargePriority": "enum[cheapest|justInTime]",
+    "TargetedChargeRequestBody": {
+      "departBy": "string(date-time) (required)",
+      "energyKWh": "number|string(double)? (required)",
+      "priority": "$TargetedChargePriority",
+      "restSocPercent": "number|string(double)?",
+      "targetSocPercent": "number|string(double)? (required)"
+    },
+    "TargetedChargeSource": "enum[solar|grid]",
+    "TargetedChargeStrategy": "enum[complete|solar|solarPlusGrid|maximum]",
+    "TargetedPlanResponse": {
+      "batteryToFullWh": "number|string(double) (required)",
+      "blocks": "array\u003C$TargetedBlockResponse\u003E (required)",
+      "ceilingEnergyWh": "number|string(double) (required)",
+      "deadline": "string(date-time) (required)",
+      "deliveredEnergyWh": "number|string(double) (required)",
+      "departBy": "string(date-time) (required)",
+      "expectedEnergyWh": "number|string(double) (required)",
+      "feasibleDeparture": "string(date-time)? (required)",
+      "forecastAsOf": "string(date-time)? (required)",
+      "forecastSurplusWh": "number|string(double) (required)",
+      "gridEnergyWh": "number|string(double) (required)",
+      "gridStart": "string(date-time)? (required)",
+      "holdUntil": "string(date-time)? (required)",
+      "isUsable": "boolean (required)",
+      "now": "string(date-time) (required)",
+      "reason": "string (required)",
+      "remainingEnergyWh": "number|string(double) (required)",
+      "requiredEnergyWh": "number|string(double) (required)",
+      "requiredPaceWatts": "number|string(double) (required)",
+      "shortfallWh": "number|string(double) (required)",
+      "socFloorPercent": "number|string(double) (required)",
+      "solarEnergyWh": "number|string(double) (required)",
+      "strategy": "$TargetedChargeStrategy (required)",
+      "tailEnergyWh": "number|string(double) (required)"
+    },
+    "TargetedPreviewResponse": {
+      "cheapestPlan": "any (required)",
+      "plan": "$TargetedPlanResponse (required)",
+      "request": "$TargetedRequestResponse (required)"
+    },
+    "TargetedRequestResponse": {
+      "activatedAt": "string(date-time) (required)",
+      "departBy": "string(date-time) (required)",
+      "priority": "$TargetedChargePriority (required)",
+      "requiredEnergyWh": "number|string(double) (required)",
+      "restSocPercent": "number|string(double)? (required)",
+      "tailEnergyWh": "number|string(double) (required)",
+      "targetSocPercent": "number|string(double)? (required)",
+      "vehicleSocPercentAtRequest": "number|string(double)? (required)"
+    },
+    "VehicleChargeState": "enum[unknown|idle|charging|complete]",
+    "VehiclePlugState": "enum[unknown|disconnected|connected]",
+    "VehicleResponse": {
+      "ageSeconds": "number|string(double)? (required)",
+      "available": "boolean (required)",
+      "canTargetSoc": "boolean (required)",
+      "capturedAt": "string(date-time)? (required)",
+      "chargeState": "$VehicleChargeState (required)",
+      "chargeTimeRemainingMinutes": "number|string(double)? (required)",
+      "plugState": "$VehiclePlugState (required)",
+      "rangeKm": "number|string(double)? (required)",
+      "socPercent": "number|string(double)? (required)",
+      "sourceId": "string? (required)",
+      "stale": "boolean (required)"
+    },
+    "WeatherResponse": {
+      "cloudsPercent": "number|string(double) (required)",
+      "condition": "string (required)",
+      "conditionDescription": "string (required)",
+      "humidityPercent": "number|string(double) (required)",
+      "observedAt": "string(date-time) (required)",
+      "pressureHpa": "number|string(double) (required)",
+      "temperatureCelsius": "number|string(double) (required)",
+      "visibilityMetres": "number|string(double)? (required)"
+    }
+  }
+}
