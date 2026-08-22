@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 
 namespace Gleanvolt.Infrastructure.Solcast;
 
@@ -27,6 +28,12 @@ public sealed class SolcastForecastService : ISolarForecastService
     // Reference-typed cache updated wholesale on refresh; volatile so query threads see the latest
     // publication. Reads snapshot the field once into a local before use.
     private volatile SolarForecast? _cached;
+
+    // What the cache above cannot hold: the periods that have already gone by. Solcast's forecasts
+    // endpoint only ever returns the future, so a wholesale replacement loses this morning the moment
+    // this morning happens -- and "what did we expect the roof to do at 09:00?" is exactly the
+    // question a finished session has to be read against. Nothing in charge control reads it.
+    private readonly SolarForecastHistory _history = new();
 
     public SolcastForecastService(
         IHttpClientFactory httpClientFactory,
@@ -56,6 +63,9 @@ public sealed class SolcastForecastService : ISolarForecastService
     {
         return _cached?.ForPeriod(from, to);
     }
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) =>
+        _history.ForDate(localDate, _timeProvider.LocalTimeZone);
 
     /// <summary>
     /// When the sun next rises above <paramref name="thresholdWatts"/> according to the cached
@@ -104,19 +114,26 @@ public sealed class SolcastForecastService : ISolarForecastService
                 .OrderBy(p => p.PeriodEnd)
                 .ToList();
 
-            _cached = new SolarForecast(_timeProvider.GetUtcNow(), periods);
+            var forecast = new SolarForecast(_timeProvider.GetUtcNow(), periods);
+            _cached = forecast;
+
+            // Merged *after* publication: the history is for later analysis, and no query on the hot
+            // path should ever wait behind it.
+            _history.Merge(forecast);
 
             // The day's overall shape is logged here, once per refresh -- the polling loop only
             // logs the live actual-vs-forecast comparison, not this summary.
             var today = GetForecastForToday();
             _logger.LogInformation(
                 "Refreshed Solcast forecast: {PeriodCount} periods, PeakToday={PeakPowerWatts:F0}W, "
-                + "EnergyToday={EnergyWattHours:F0}Wh (p10 {EnergyP10WattHours:F0}Wh, p90 {EnergyP90WattHours:F0}Wh).",
+                + "EnergyToday={EnergyWattHours:F0}Wh (p10 {EnergyP10WattHours:F0}Wh, p90 {EnergyP90WattHours:F0}Wh), "
+                + "{RetainedCount} periods retained for analysis.",
                 periods.Count,
                 today?.PeakPowerWatts ?? 0,
                 today?.ExpectedEnergyWattHours ?? 0,
                 today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P10) ?? 0,
-                today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P90) ?? 0);
+                today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P90) ?? 0,
+                _history.Count);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

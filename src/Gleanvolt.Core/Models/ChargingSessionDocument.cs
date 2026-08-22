@@ -29,8 +29,13 @@ public sealed record ChargingSessionDocument(
     /// <c>solarWh</c>, <c>forecastSolarWh</c>, <c>gridImportWh</c>, <c>vehicleSocPercent</c> and
     /// <c>vehicleSocCapturedAt</c>. Purely additive, so a v1 reader is unaffected; the bump is for the
     /// consumer that wants those and needs to know whether to expect them.</para>
+    ///
+    /// <para>3 added <c>dayForecast</c> to the header: the whole day's forecast curve, elapsed periods
+    /// included, so a session can be read against the day it happened on without a forecast archive.
+    /// Additive again — and nullable even at v3, since a day the controller only saw half of has only
+    /// half a curve to give.</para>
     /// </summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>
     /// Builds a document at the current schema version.

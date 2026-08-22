@@ -180,7 +180,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
             await v1.AppendAsync([Sample(sessionId, Noon)], [], Ct);
         }
 
-        await DropSchemaV2ColumnsAsync(path);
+        await RewindToVersionOneAsync(path);
 
         using var upgraded = new SqliteChargingSessionStore(path, NullLogger<SqliteChargingSessionStore>.Instance);
         await upgraded.InitializeAsync(Ct);
@@ -196,11 +196,16 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
 
         // The columns v1 did write are untouched by the migration.
         Assert.Equal(4000, sample.EvChargerPowerWatts, 0);
+
+        // v3's day forecast has nowhere to come from for a session recorded before it existed, and a
+        // null says exactly that rather than claiming a day with no sun in it.
+        var upgradedSession = (await upgraded.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
+        Assert.Null(upgradedSession.DayForecast);
     }
 
-    // Rewinds a file the current code has just created back to what v1 would have produced: the v2
+    // Rewinds a file the current code has just created back to what v1 would have produced: the later
     // columns removed and user_version reset, so InitializeAsync has a genuine upgrade to perform.
-    private static async Task DropSchemaV2ColumnsAsync(string path)
+    private static async Task RewindToVersionOneAsync(string path)
     {
         await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}");
         await connection.OpenAsync(Ct);
@@ -214,10 +219,60 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
             ALTER TABLE session_samples DROP COLUMN vehicle_soc_captured_at;
             ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_min;
             ALTER TABLE session_samples DROP COLUMN vehicle_charge_time_remaining_reported;
+            ALTER TABLE sessions DROP COLUMN day_forecast_json;
             PRAGMA user_version = 1;
             """;
         await command.ExecuteNonQueryAsync(Ct);
     }
+
+    [Fact]
+    public async Task TheWholeDaysForecastCurveRoundTripsWithTheSession()
+    {
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession() with { DayForecast = DayCurve() };
+        await store.StartSessionAsync(session, Ct);
+        await store.CompleteSessionAsync(Closed(session), Ct);
+
+        var stored = (await store.ExportAsync(session.Id, Ct))!.Session.DayForecast;
+
+        Assert.NotNull(stored);
+        Assert.Equal(2, stored!.Periods.Count);
+
+        // The bands matter as much as the median: they are what says whether a poor session met a day
+        // that was always going to be poor, or one that merely turned out that way.
+        Assert.Equal(Noon.AddHours(-3), stored.Periods[0].PeriodEnd);
+        Assert.Equal(1_000, stored.Periods[0].EstimatedPowerWatts, 3);
+        Assert.Equal(700, stored.Periods[0].EstimatedPowerWattsP10);
+        Assert.Equal(1_400, stored.Periods[0].EstimatedPowerWattsP90);
+        Assert.Equal(TimeSpan.FromMinutes(30), stored.Periods[0].Period);
+        Assert.Equal(Noon.AddHours(-6), stored.RetrievedAt);
+    }
+
+    [Fact]
+    public async Task ClosingASessionStoresTheCurveAsItStoodAtTheEnd()
+    {
+        // The morning only becomes knowable once the day has run: the curve written at close covers
+        // hours the one written at open could not, so the close must overwrite rather than leave it.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+
+        await store.CompleteSessionAsync(Closed(session) with { DayForecast = DayCurve() }, Ct);
+
+        var stored = (await store.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
+        Assert.Equal(2, stored.DayForecast!.Periods.Count);
+    }
+
+    private static SolarForecast DayCurve() => new(
+        Noon.AddHours(-6),
+        [
+            new SolarForecastPeriod(Noon.AddHours(-3), TimeSpan.FromMinutes(30), 1_000, 700, 1_400),
+            new SolarForecastPeriod(Noon, TimeSpan.FromMinutes(30), 5_000, 3_800, 6_100),
+        ]);
 
     [Fact]
     public async Task AnUnreadableChargerSetpointStaysNullRatherThanBecomingZero()
@@ -441,6 +496,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         PeakChargingPowerWatts: 0,
         StartPlan: null,
         ForecastRemainingAtStartWh: null,
+        DayForecast: null,
         Controlled: true);
 
     private static ChargingSession Closed(ChargingSession session) => session with

@@ -59,6 +59,13 @@ else
 
         <dt>Peak charging power</dt>
         <dd>@(session.PeakChargingPowerWatts.ToString("F0")) W</dd>
+
+        @if (session.DayForecast is { Periods.Count: > 0 } dayForecast)
+        {
+            @* The whole day, not the session: what the roof was expected to make around this car. *@
+            <dt>Forecast for the day</dt>
+            <dd>@SessionFormatting.FormatDayForecast(dayForecast)</dd>
+        }
     </dl>
 
     <section class="split">

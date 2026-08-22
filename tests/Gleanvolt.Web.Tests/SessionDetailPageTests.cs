@@ -48,6 +48,42 @@ public class SessionDetailPageTests : BunitContext
     }
 
     [Fact]
+    public void Shows_the_days_forecast_with_the_band_behind_it()
+    {
+        var session = TestSessions.Sample(startedAt: new DateTimeOffset(2026, 8, 12, 15, 0, 0, TimeSpan.Zero)) with
+        {
+            DayForecast = new SolarForecast(
+                new DateTimeOffset(2026, 8, 12, 6, 0, 0, TimeSpan.Zero),
+                [
+                    new SolarForecastPeriod(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), TimeSpan.FromHours(1), 4_000, 3_000, 5_000),
+                    new SolarForecastPeriod(new DateTimeOffset(2026, 8, 12, 13, 0, 0, TimeSpan.Zero), TimeSpan.FromHours(1), 6_000, 5_000, 7_000),
+                ]),
+        };
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [], []);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.Contains("Forecast for the day", page.Markup));
+        Assert.Contains("10.0 kWh", page.Markup);
+        Assert.Contains("p10 8.0", page.Markup);
+        Assert.Contains("p90 12.0", page.Markup);
+    }
+
+    [Fact]
+    public void Leaves_the_forecast_row_out_when_the_day_was_never_recorded()
+    {
+        var session = TestSessions.Sample(startedAt: new DateTimeOffset(2026, 8, 12, 15, 0, 0, TimeSpan.Zero));
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [], []);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.Contains("Peak charging power", page.Markup));
+        Assert.DoesNotContain("Forecast for the day", page.Markup);
+    }
+
+    [Fact]
     public void Shows_the_session_header_facts()
     {
         var session = TestSessions.Sample(

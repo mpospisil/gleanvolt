@@ -1404,8 +1404,8 @@ existing `COMPOSE_FILE` line doesn't break — merging it is now a no-op.
 #### Browsing charging session history
 
 Phase 4 adds `/sessions`: a list of recorded sessions (date, duration, driving strategy, energy
-delivered, solar share), each linking to a detail page with the per-source energy split and a
-battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
+delivered, solar share), each linking to a detail page with the per-source energy split, the day's
+forecast total with its p10–p90 band, and a battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
 nothing here reaches past the interface into SQLite — and degrades to "isn't available right now"
 rather than an error page when `SessionStore:Enabled` is off or the file can't be opened. See
 [Charging session history](#charging-session-history-the-sessionstore-section) below for what is
@@ -1475,7 +1475,7 @@ from the moment the car was plugged in whether or not anything is controlling it
 
 | | |
 |---|---|
-| **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, and the forecast day plan as it stood at the start |
+| **Session header** | start/end time (UTC, plus the IANA zone so a viewer can bucket by local day), start and end mode, why it ended, start/end SOC, peak power, the totals below, the forecast day plan as it stood at the start, and **the whole day's forecast curve** (below) |
 | **Totals** | energy delivered, split into **from solar / from grid / from battery**, plus what the forecast mode *commanded* the battery to lend |
 | **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, the running totals, and the site-wide progress figures below |
 | **Events** | mode changed, charging started/paused, setpoint changed, hold armed/released, plan fell out of trust, session ended — each with the controller's own reason string |
@@ -1513,6 +1513,34 @@ while the car was charging — plus the car's own view of itself:
 These arrived in database schema **v2**; a v1 file is migrated in place on startup and its existing
 rows keep `0` for the three totals, which is the truth for them — nothing integrated those quantities
 at the time. Published documents move to `schemaVersion` 2 for the same reason, purely additively.
+
+#### The day the session ran on
+
+`DayForecast` on the header is **the whole local day's forecast curve** — every 30-minute period, with
+the p10/p90 bands each one carried, from before the car was plugged in to after it was unplugged. It is
+what turns a session into an analysable one: `ForecastRemainingAtStartWh` says how much sun was left in
+one number, and this is the shape behind it. A 4 kWh session reads very differently against a day
+forecast at 6 kWh than against one forecast at 30.
+
+Two things about how it is captured are worth knowing:
+
+- **Solcast only ever forecasts forward.** Each refresh returns the periods still to come and nothing
+  behind them, so by mid-afternoon the live forecast can no longer say what the morning was predicted
+  to bring. The controller therefore **retains** every period a refresh has carried (7 days,
+  in memory) and serves the day from that. What survives for a given period is the *last* prediction
+  made about it — the closest thing to a nowcast the provider ever gave.
+- **A day the controller wasn't running for all of is short by that much.** Restart at 14:00 and the
+  morning is simply not there: nothing re-fetches the past. The curve is `null` rather than empty when
+  nothing at all is held, because an empty curve sums to zero and would read as a day the sun never
+  came up.
+
+It is written when the session opens and rewritten when it closes, so what ends up stored is the
+fullest version of the day known by then. Nothing in charge control reads it — the plan, not this,
+drives decisions — and the [session detail page](#browsing-charging-session-history) shows the day's
+total with its band beside the other header facts.
+
+This is database schema **v3** and `schemaVersion` 3, additive again: older rows keep `NULL`, which is
+the truth for them.
 
 #### How the energy is attributed to a source
 

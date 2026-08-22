@@ -4,6 +4,46 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-22 — Every session carries the whole day's forecast curve
+
+A recorded session could be compared against the forecast *while it ran*, never against the day it ran
+on. So "4 kWh delivered, 28 % solar" had no scale behind it: a poor session on a good day and a fair
+one on a hopeless day were the same row. The header now carries `DayForecast` — the whole local day,
+every 30-minute period with its p10/p90 bands, from before the car arrived to after it left.
+
+### What was built
+
+- **`SolarForecastHistory`** (Core, `Strategies/`). Solcast returns only the periods still to come, so
+  the live cache erases this morning by this afternoon. This retains every period any refresh has
+  carried, keyed by period end, for 7 days; a refresh upserts, so future periods get the newer estimate
+  and elapsed ones stay at the last thing said about them. Thread-safe, unlike its neighbours — the
+  refresh worker writes it and the poll loop reads it.
+- **`ISolarForecastService.GetDayForecast(DateOnly)`**, served from that history by
+  `SolcastForecastService`. Deliberately *not* a change to `GetForecastForToday`, which means
+  "remaining" to the day planner, the accuracy tracker and the day summary alike. `null`, never an
+  empty curve, when nothing is held for the day.
+- **`ChargingSession.DayForecast`**, filled by `ChargingSessionTracker` at open and refreshed onto the
+  session at close — the day fills in behind us as it passes, so the close-time version covers hours
+  the open-time one could not. Passed in by `SessionRecordingWorker` like the forecast power and the
+  vehicle state, so the strategy stays free of the forecast service; the worker memoises the curve per
+  local day and per fetch rather than rebuilding a few hundred periods every five seconds.
+- **Database schema v3** — `sessions.day_forecast_json`, one JSON document rather than a periods table:
+  written once, read whole, and it has to travel with the session when the document is published.
+  `ChargingSessionDocument.CurrentSchemaVersion` moves to 3, additive; older rows stay `NULL`.
+- **The session detail page** shows the day's total with its p10–p90 band beside the other header
+  facts, and omits the row entirely for sessions recorded before this existed.
+
+Nothing in charge control reads any of it, and no Home Assistant entity was added: this is history, not
+telemetry.
+
+### The limit worth knowing
+
+The history is in memory, so a restart at 14:00 loses that morning for good — nothing re-fetches the
+past, and doing so would mean a second Solcast endpoint and a second call against the daily quota. The
+15-minute energy history still holds forecast-versus-actual for those days.
+
+---
+
 ## 2026-08-21 — Charging starts from a button, and the controller writes the charger's use-mode
 
 Issue #89. Controlled charging had been a *setting* since the first version: pick a strategy from a

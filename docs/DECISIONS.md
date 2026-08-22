@@ -4,6 +4,60 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-22 — A session carries the whole day it happened on
+
+### The problem
+
+A recorded session could be read against what the forecast expected *while it ran* — every sample
+carries `ForecastPowerWatts`, and the header carries `ForecastRemainingAtStartWh`. Neither answers the
+question that actually comes up: **was this a good session, or merely a good day?** 4 kWh from the roof
+means one thing on a day forecast at 6 kWh and something else entirely on a day forecast at 30, and
+nothing stored could tell the two apart after the fact.
+
+The obvious fix — "snapshot today's forecast onto the session" — does not work, because of what a
+forecast provider actually returns.
+
+### Solcast only ever forecasts forward
+
+`rooftop_sites/{id}/forecasts` returns the periods still to come and nothing behind them. So the
+cached forecast is *self-erasing*: at 07:00 it holds the whole day, and by 16:00 it can no longer say
+what the morning was predicted to bring. A session opening at noon and snapshotting "today" would
+capture half a day, and the half it dropped is exactly the half already spent.
+
+**Decision — the controller retains what the provider forgets.** `SolarForecastHistory` (Core, pure,
+lock-guarded because the refresh worker writes it and the poll loop reads it) keeps every period any
+refresh has ever carried, keyed by period end, for 7 days. Each refresh upserts: future periods are
+replaced by the newer estimate, elapsed ones simply stay. What survives for a given period is
+therefore the **last prediction made about it before it happened** — the closest to a nowcast the
+provider ever gave, and the fairest thing to judge the roof against.
+
+**Decision — this is a new method, not a change to `GetForecastForToday`.** `GetDayForecast(DateOnly)`
+sits beside it on `ISolarForecastService`. Retained history in the existing method would have quietly
+changed what "today's forecast" means for the day planner, the accuracy tracker and the day summary —
+all of which mean *remaining* when they say today. A separate method makes the analysis surface
+explicitly not a control surface: nothing in charge control reads it.
+
+**Decision — one JSON column on the session header, not a periods table.** `sessions.day_forecast_json`
+(schema v3, `schemaVersion` 3, additive; older rows stay `NULL`). The curve is written once, read
+whole, and has to *travel with the session* when the document is published to object storage — none of
+which a join gives us. About 10 kB per session, against a 365-day retention: irrelevant next to the
+samples.
+
+**Decision — written at open, rewritten at close.** The day fills in behind us as it passes, so the
+version available when a session closes covers hours the version available when it opened could not.
+A closed session is still immutable; this is one more field the closing write sets, like the totals.
+
+### What it does not do
+
+**A day the controller wasn't running for all of is short by that much.** The history is in memory, so
+a restart at 14:00 loses that morning permanently — nothing re-fetches the past, and doing so would
+mean a second Solcast endpoint and a second call against the daily quota. The curve is `null` rather
+than empty when nothing is held, because an empty curve sums to zero and would read as a day the sun
+never came up. The [energy history](../README.md#energy-history-the-energymonitor-section) store still
+holds forecast-versus-actual per quarter hour for those days, which is the fallback.
+
+---
+
 ## 2026-08-22 — Rate, not timing, decides the solar share
 
 Supersedes the placement half of [2026-08-21](#2026-08-21--targeted-charging-imports-under-the-sun-not-after-it).

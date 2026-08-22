@@ -305,6 +305,8 @@ internal sealed class StubForecastService(DateTimeOffset from) : ISolarForecastS
     public SolarForecast? GetForecastForToday() => _forecast;
 
     public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => _forecast.ForPeriod(from, to);
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) => _forecast;
 }
 
 /// <summary>
@@ -320,4 +322,6 @@ internal sealed class WeakSunForecastService(DateTimeOffset sunFrom, double watt
     public SolarForecast? GetForecastForToday() => _forecast;
 
     public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => _forecast.ForPeriod(from, to);
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) => _forecast;
 }

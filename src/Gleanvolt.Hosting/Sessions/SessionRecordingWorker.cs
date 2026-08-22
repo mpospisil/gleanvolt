@@ -53,6 +53,11 @@ public sealed class SessionRecordingWorker : BackgroundService
     // to a warning on every single poll for as long as the service runs.
     private bool _storeFailed;
 
+    // The day's forecast curve, and what it was built from -- see DayForecast below.
+    private SolarForecast? _dayForecast;
+    private DateOnly _dayForecastDate;
+    private DateTimeOffset? _dayForecastRetrievedAt;
+
     public SessionRecordingWorker(
         IOptions<SessionStoreOptions> options,
         IChargingSessionStore store,
@@ -179,7 +184,8 @@ public sealed class SessionRecordingWorker : BackgroundService
                 status,
                 ForecastPowerWatts(status.Timestamp),
                 ForecastRemainingTodayWh(status.Timestamp),
-                _vehicle.GetCurrentState());
+                _vehicle.GetCurrentState(),
+                DayForecast(status.Timestamp));
             await PersistAsync(update, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -273,6 +279,31 @@ public sealed class SessionRecordingWorker : BackgroundService
 
     private double? ForecastPowerWatts(DateTimeOffset at) =>
         _forecast.GetForecastForToday()?.ExpectedPowerWattsAt(at);
+
+    /// <summary>
+    /// The whole local day's forecast curve, elapsed periods included, for the header of whatever
+    /// session is open or about to open.
+    ///
+    /// <para>Memoised per local day and per fetch: the curve only changes when a refresh lands, and
+    /// rebuilding a few hundred periods on every five-second poll to hand back the same list would be
+    /// work done purely to throw away.</para>
+    /// </summary>
+    private SolarForecast? DayForecast(DateTimeOffset at)
+    {
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, _timeProvider.LocalTimeZone).DateTime);
+        var retrievedAt = _forecast.GetForecastForToday()?.RetrievedAt;
+
+        if (_dayForecast is not null && _dayForecastDate == localDate && _dayForecastRetrievedAt == retrievedAt)
+        {
+            return _dayForecast;
+        }
+
+        _dayForecast = _forecast.GetDayForecast(localDate);
+        _dayForecastDate = localDate;
+        _dayForecastRetrievedAt = retrievedAt;
+
+        return _dayForecast;
+    }
 
     /// <summary>
     /// Forecast PV still to come between now and the end of the local day — the "estimated solar
