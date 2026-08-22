@@ -1,34 +1,26 @@
-@page "/targeted"
-@attribute [Authorize]
-@rendermode InteractiveServer
 @implements IDisposable
-@inject ChargeControlStatusHolder StatusHolder
-@inject IChargeControlModeSelector Mode
-@inject IChargeActions Actions
 @inject ITargetedChargeSelector Target
+@inject IForecastRuntimeSettings ForecastSettings
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
 
 @*
-    Phase 3 of #80: the surface the owner actually uses. Text, not a chart -- the timeline chart is
-    its own story and will consume TargetedChargePlan.Blocks unchanged.
+    The old /targeted page, now the fourth tab (#98). Unchanged in substance: the request is set on
+    ITargetedChargeSelector and the mode is then started through the page's Start -- which puts the
+    charger into Fast first (#89) -- and Cancel clears the request and stops, which is the same Off
+    the header carries plus the clearing the header cannot know to do.
 
-    Activate sets the request on ITargetedChargeSelector and then starts the mode through
-    IChargeActions -- which puts the charger into Fast first (#89) -- and Cancel is the same Off action
-    the dashboard's button is. Both are the Core seams Home Assistant drives, so the two surfaces
-    cannot disagree about what was asked for.
+    Text, not a chart: the question at 22:00 is "is the car going to be ready, and why is nothing
+    happening yet?", and no chart answers that as directly as a sentence. The timeline chart is its
+    own story and will consume TargetedChargePlan.Blocks unchanged.
 
-    This page keeps its own Activate button rather than gaining one in the dashboard's row: the mode
-    needs an amount and a departure, and the press belongs where those are typed.
+    The minimum battery SOC appears here as well as on the Forecasted tab, through the same runtime
+    seam: it is the floor this planner will not draw the pack below, and reading it as a plan figure
+    without being able to move it is exactly the split this page was built to end.
 
-    Follows Forecast.razor: seeded from ChargeControlStatusHolder.Current, then pushed on every
-    Updated, and it subscribes to both selectors as well because either can move without this page's
-    help -- the mode returns itself to Off when the target is met.
+    Subscribes to the request itself, because it can move without this tab's help -- Home Assistant
+    sets one too, and the mode clears itself once the target is met.
 *@
-
-<PageTitle>Targeted charge — Gleanvolt</PageTitle>
-
-<h1>Targeted charge</h1>
 
 <p class="muted">
     Say how much energy the car needs and when it has to be there. The plan takes every kilowatt-hour
@@ -36,41 +28,48 @@
     late as it can and still finish in time.
 </p>
 
-<section class="controls">
-    <h2>The request</h2>
+<div class="control">
+    <label for="target-energy">Energy needed (kWh)</label>
+    <input id="target-energy" type="number" step="0.5" min="0" @bind="_energyKWh" @bind:event="onchange" />
+    <span class="hint">Measured at the charger, from the moment you press Activate.</span>
+</div>
 
-    <div class="control">
-        <label for="target-energy">Energy needed (kWh)</label>
-        <input id="target-energy" type="number" step="0.5" min="0" @bind="_energyKWh" @bind:event="onchange" />
-        <span class="hint">Measured at the charger, from the moment you press Activate.</span>
-    </div>
+<div class="control">
+    <label for="target-departure">Ready by</label>
+    <input id="target-departure" type="datetime-local" @bind="_departure" @bind:event="onchange" />
+    <span class="hint">
+        Charging finishes a few minutes before this, so the car is ready rather than still drawing.
+        At most @(Display.MaxHorizon.TotalHours.ToString("F0")) hours ahead.
+    </span>
+</div>
 
-    <div class="control">
-        <label for="target-departure">Ready by</label>
-        <input id="target-departure" type="datetime-local" @bind="_departure" @bind:event="onchange" />
-        <span class="hint">
-            Charging finishes a few minutes before this, so the car is ready rather than still drawing.
-            At most @(Display.MaxHorizon.TotalHours.ToString("F0")) hours ahead.
-        </span>
-    </div>
+<div class="control">
+    <label for="min-battery-soc">Minimum battery SOC (%)</label>
+    <input id="min-battery-soc" type="number" step="1" min="0" max="100"
+           @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
+    <span class="hint">
+        The floor the home battery is not drawn below to feed the car; the grid covers the gap
+        instead. The same number the <a href="/charging-plan/forecasted">Forecasted</a> plan works to.
+        Doesn't persist across restarts.
+    </span>
+</div>
 
-    <div class="control">
-        <button type="button" class="primary" disabled="@_busy" @onclick="Activate">Activate</button>
-        <button type="button" class="secondary" disabled="@_busy" @onclick="Cancel">Cancel</button>
-    </div>
+<div class="control">
+    <button type="button" class="primary" id="activate-target" disabled="@Busy" @onclick="Activate">Activate</button>
+    <button type="button" class="secondary" id="cancel-target" disabled="@Busy" @onclick="Cancel">Cancel</button>
 
     @if (_error is not null)
     {
         <p class="error" role="alert">@_error</p>
     }
 
-    <p class="hint">
+    <span class="hint">
         The request does not survive a restart of the service. If it restarts overnight the car stops
         charging, and nothing will have told you.
-    </p>
-</section>
+    </span>
+</div>
 
-@if (_status?.TargetedPlan is { } plan)
+@if (Status?.TargetedPlan is { } plan)
 {
     <section class="plan">
         <h2>The plan</h2>
@@ -108,7 +107,7 @@
               Hint="The finish line the plan works to: your departure less the safety margin." />
     </section>
 }
-else if (_status is null)
+else if (Status is null)
 {
     <p class="muted">No poll has completed yet.</p>
 }
@@ -116,36 +115,45 @@ else
 {
     <p class="muted">
         The plan is only shown while <strong>Targeted</strong> is the active charge mode.
-        Current mode: @_status.Mode.
+        Current mode: @Status.Mode.
     </p>
 }
 
 @code {
-    private ChargeControlStatus? _status;
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
+
+    [Parameter, EditorRequired] public Func<Task<ChargeActionResult>> Stop { get; set; } = default!;
+
     private double _energyKWh = 20;
     private DateTime _departure;
+    private double _minBatterySocPercent;
     private string? _error;
-    private bool _busy;
+    private ChargeControlStatus? _seenStatus;
 
     protected override void OnInitialized()
     {
-        _status = StatusHolder.Current;
-        StatusHolder.Updated += OnStatusUpdated;
-        Mode.Changed += OnSelectorChanged;
         Target.Changed += OnRequestChanged;
 
         SeedForm(Target.Request);
+        _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
     }
 
-    private void OnStatusUpdated(ChargeControlStatus status)
+    // Only on a genuinely new poll, not on every render of the page above: the floor is a field the
+    // owner may be halfway through typing, and a button press elsewhere on the page must not reset it.
+    protected override void OnParametersSet()
     {
-        _status = status;
-        InvokeAsync(StateHasChanged);
-    }
+        if (ReferenceEquals(_seenStatus, Status))
+        {
+            return;
+        }
 
-    // Raised on the polling loop's thread whenever either selector moves for any reason -- including
-    // this mode returning itself to Off once the target is met.
-    private void OnSelectorChanged(ChargeControlMode mode) => InvokeAsync(StateHasChanged);
+        _seenStatus = Status;
+        _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+    }
 
     private void OnRequestChanged(TargetedChargeRequest? request)
     {
@@ -153,12 +161,7 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
-    {
-        StatusHolder.Updated -= OnStatusUpdated;
-        Mode.Changed -= OnSelectorChanged;
-        Target.Changed -= OnRequestChanged;
-    }
+    public void Dispose() => Target.Changed -= OnRequestChanged;
 
     // The form shows what is actually being worked to, when there is one -- a page opened in a second
     // browser must not offer to overwrite the running request with its own defaults.
@@ -201,51 +204,30 @@ else
         }
 
         _error = null;
-        _busy = true;
 
-        try
-        {
-            // The request first, then the mode: the controller reads both in the same cycle, and a mode
-            // selected a poll before its request would report "no target set" for that poll.
-            Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
+        // The request first, then the mode: the controller reads both in the same cycle, and a mode
+        // selected a poll before its request would report "no target set" for that poll.
+        Target.Set(new TargetedChargeRequest(_energyKWh * 1000, departBy, now), "Web UI");
 
-            // Which also writes the charger's use-mode Fast. A charger that refuses it leaves the mode
-            // where it was, and the request set above with nothing driving it -- so the request is
-            // dropped again rather than left looking active.
-            var result = await Actions.StartAsync(ChargeControlMode.Targeted, "Web UI");
-            if (!result.Succeeded)
-            {
-                Target.Clear("Web UI");
-                _error = result.Message;
-            }
-        }
-        finally
+        // Which also writes the charger's use-mode Fast. A charger that refuses it leaves the mode
+        // where it was, and the request set above with nothing driving it -- so the request is
+        // dropped again rather than left looking active. The failure itself is reported by the
+        // header, next to the mode that did not move.
+        var result = await Start(ChargeControlMode.Targeted);
+        if (!result.Succeeded)
         {
-            _busy = false;
+            Target.Clear("Web UI");
         }
     }
 
-    // The same Off action the dashboard's button is, and it runs whatever the mode was: the button says
-    // stop charging, so it stops charging.
+    // The same Off the header carries, plus the one thing it cannot know to do: drop the request, so
+    // nothing is left looking like a promise after the button that says stop.
     private async Task Cancel()
     {
         _error = null;
-        _busy = true;
 
-        try
-        {
-            Target.Clear("Web UI");
-
-            var result = await Actions.StopAsync("Web UI");
-            if (!result.Succeeded)
-            {
-                _error = result.Message;
-            }
-        }
-        finally
-        {
-            _busy = false;
-        }
+        Target.Clear("Web UI");
+        await Stop();
     }
 
     // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock
@@ -253,6 +235,9 @@ else
     // move it by an hour.
     private DateTimeOffset Compose(DateTime local) =>
         new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Time.LocalTimeZone.GetUtcOffset(local));
+
+    private void OnMinBatterySocSelected() =>
+        ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
 
     private string Clock(DateTimeOffset instant) =>
         TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString("ddd HH:mm");

@@ -4,6 +4,71 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-22 — The web UI splits along "reports" and "decides"
+
+Issue #98. The UI had grown one page per feature as the features landed: telemetry and controls on
+`/`, the forecast plan on `/forecast`, the targeted mode on `/targeted`. Every page was defensible on
+the day it was written and the set was not: the numbers a control shapes were a nav item away from the
+control, and two of the five nav items were modes — as if `Solar` and `FastNoBattery` simply had no
+opinions worth a page.
+
+**Decision — one axis, not five: a page that reports and a page that decides.** `/` answers "what is
+happening", `/charging-plan` answers "what should happen". Every control lives on the second, every
+figure that is not part of a plan on the first. A page that does both is what produced the split in
+the first place.
+
+### The dashboard groups by the question being asked
+
+**Decision — Energy, Vehicle, Charging session, in that order.** Fourteen equal tiles made the reader
+do the grouping, every time. The order is the order the questions arrive: the house is true whatever
+is plugged in, the car is next, and the session is last because it is the only one that may not exist.
+
+**Decision — the session section renders only while there is a session**, and its absence is a
+sentence naming the mode and the charger's state plus a link to start one — not a grid of dashes,
+which is eight tiles saying nothing eight times.
+
+**Decision — "is there a session" is not "is the mode `Off`".** A car drawing power under no mode at
+all — somebody put the charger into `Fast` at the wallbox — is precisely the case that must not be
+hidden behind "nothing is charging".
+
+### The modes get tabs, not pages
+
+**Decision — a tab per mode, under one page.** Tabs are the shape of the underlying model: exactly one
+mode drives the charger, and the modes are alternatives to each other. Four nav items would have said
+they were four independent things you might do at once.
+
+**Decision — the tab is in the URL** (`/charging-plan/forecasted`), so a bookmark, a refresh and the
+back button all behave. State in a field would have made "the forecast plan" unlinkable, which it was
+not before this change.
+
+**Decision — `/charging-plan` with no tab opens on the running mode, and only on the way in.**
+Resolving it on every render would let a mode that ends itself — `FastNoBattery` and `Targeted` both
+do — pull the tab out from under whoever is reading it.
+
+**Decision — `Off` has no tab.** It is not a strategy with terms of its own; it is the button that
+ends whichever one is running, and it belongs with the state line it changes.
+
+### What is common stays above the tabs
+
+**Decision — the battery discharge hold sits in the header, not in a tab.** It is not a property of
+any one strategy: `FastNoBattery` arms it for its whole run, `Targeted` arms it while the plan is
+importing, and the owner may want it under `Solar` for reasons no mode knows about. Putting it in a
+tab would have implied it belonged to that mode; repeating it in all four would have made four
+switches out of one setting.
+
+**Decision — the tabs do not hold `IChargeActions` themselves.** The page passes `Start` and `Stop`
+down as delegates and reports every outcome — the "started from the Web UI at 13:42" note, and any
+charger that refuses the use-mode write — beside the mode line those outcomes moved. Four tabs each
+with their own error paragraph would have been four places for the same message, and the message is
+about the mode, not about the tab.
+
+**Decision — `Minimum battery SOC` appears on two tabs.** Both planners work to it and both show it as
+a plan figure; reading a floor you cannot move from where you are reading it is the exact split this
+page was built to end. It is one runtime seam (`IForecastRuntimeSettings`), so the two cannot
+disagree — which is what makes the duplication safe rather than a second source of truth.
+
+---
+
 ## 2026-08-22 — The weather goes on the session, twice, in columns
 
 Issue #96, and the other half of [the day-forecast curve](#2026-08-22--a-session-carries-the-whole-day-it-happened-on). That record gave a session what the sun was *expected* to do. This one gives it what the sky actually did — without which a session that under-delivered against a confident forecast has no explanation attached to it at all, and cloud, a cold morning and snow on the panels are indistinguishable afterwards.

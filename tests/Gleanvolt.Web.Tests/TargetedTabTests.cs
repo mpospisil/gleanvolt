@@ -9,11 +9,15 @@ using Gleanvolt.Web.Components.Pages;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// Phase 3 of #80: the page the request is actually made from, and the plan in words. The narrative
-/// cases at the bottom go through <see cref="TargetedPlanNarrative"/> directly — the wording is the
-/// part worth testing, and a rendered component is a poor place to test a sentence.
+/// The request and the plan in words (phase 3 of #80), now the Targeted tab of the charging-plan
+/// page (#98) rather than a page of its own — so these tests render the page and ask for that tab.
+/// Cancel and the action failures it reports belong to the page's common header now, which is
+/// exactly what a tab test should be checking still works from inside a tab.
+///
+/// The narrative cases at the bottom go through <see cref="TargetedPlanNarrative"/> directly — the
+/// wording is the part worth testing, and a rendered component is a poor place to test a sentence.
 /// </summary>
-public class TargetedPageTests : BunitContext
+public class TargetedTabTests : BunitContext
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
@@ -25,8 +29,10 @@ public class TargetedPageTests : BunitContext
     private readonly FakeChargeControlModeSelector _mode = new();
     private readonly FakeChargeActions _actions;
     private readonly FakeTargetedChargeSelector _target = new();
+    private readonly FakeBatteryHoldSelector _batteryHold = new();
+    private readonly FakeForecastRuntimeSettings _forecast = new();
 
-    public TargetedPageTests()
+    public TargetedTabTests()
     {
         _actions = new FakeChargeActions(_mode);
 
@@ -35,14 +41,19 @@ public class TargetedPageTests : BunitContext
         Services.AddSingleton<Core.Interfaces.IChargeControlModeSelector>(_mode);
         Services.AddSingleton<Core.Interfaces.IChargeActions>(_actions);
         Services.AddSingleton<Core.Interfaces.ITargetedChargeSelector>(_target);
+        Services.AddSingleton<Core.Interfaces.IBatteryHoldSelector>(_batteryHold);
+        Services.AddSingleton<Core.Interfaces.IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton(new TargetedDisplayOptions(TimeSpan.FromHours(36)));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    private IRenderedComponent<ChargingPlan> RenderTab() =>
+        Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "targeted"));
+
     [Fact]
     public void Prefills_tomorrow_morning_when_nothing_has_been_requested()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         Assert.Equal("2026-08-11T07:00:00", page.Find("#target-departure").GetAttribute("value"));
     }
@@ -53,7 +64,7 @@ public class TargetedPageTests : BunitContext
         // A second browser must not offer to overwrite what is already being worked to.
         _target.Set(new TargetedChargeRequest(18_000, Now.AddHours(9), Now), "test");
 
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         Assert.Equal("18", page.Find("#target-energy").GetAttribute("value"));
     }
@@ -61,7 +72,7 @@ public class TargetedPageTests : BunitContext
     [Fact]
     public void Activating_sets_the_request_and_then_starts_the_mode()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         page.Find("#target-energy").Change("22");
         page.Find("#target-departure").Change("2026-08-11T07:00:00");
@@ -84,7 +95,7 @@ public class TargetedPageTests : BunitContext
     public void A_charger_that_refuses_fast_leaves_no_request_looking_active()
     {
         _actions.Failure = "The charger did not accept Fast — it is still in Green.";
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         Activate(page);
 
@@ -99,8 +110,8 @@ public class TargetedPageTests : BunitContext
         _target.Set(new TargetedChargeRequest(22_000, Now.AddHours(9), Now), "test");
         _mode.Set(ChargeControlMode.Targeted, "test");
 
-        var page = Render<Targeted>();
-        page.Find("button:not(.primary)").Click();
+        var page = RenderTab();
+        page.Find("#cancel-target").Click();
 
         Assert.NotEmpty(_target.Clears);
         Assert.Null(_target.Request);
@@ -113,9 +124,9 @@ public class TargetedPageTests : BunitContext
     {
         // Cancel is the Off action now, not "undo Targeted": the button says stop, so it stops.
         _mode.Set(ChargeControlMode.Solar, "test");
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
-        page.Find("button:not(.primary)").Click();
+        page.Find("#cancel-target").Click();
 
         Assert.Contains("Web UI", _actions.Stops);
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
@@ -124,7 +135,7 @@ public class TargetedPageTests : BunitContext
     [Fact]
     public void Refuses_a_request_with_no_energy_in_it()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         page.Find("#target-energy").Change("0");
         Activate(page);
@@ -137,7 +148,7 @@ public class TargetedPageTests : BunitContext
     [Fact]
     public void Refuses_a_departure_in_the_past()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         page.Find("#target-departure").Change("2026-08-10T21:00:00");   // an hour ago in Prague
         Activate(page);
@@ -149,7 +160,7 @@ public class TargetedPageTests : BunitContext
     [Fact]
     public void Refuses_a_departure_beyond_the_horizon()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         page.Find("#target-departure").Change("2026-08-14T07:00:00");   // three days out
         Activate(page);
@@ -165,10 +176,13 @@ public class TargetedPageTests : BunitContext
         // mode) -- the page must not show a stale target from whatever ran earlier.
         _holder.Set(Statuses.Sample(Now, ChargeControlMode.Solar));
 
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         Assert.Contains("only shown while", page.Markup);
         Assert.DoesNotContain("Charge pace", page.Markup);
+
+        // The request form is not part of the plan: a target can be prepared before the mode is on.
+        Assert.NotEmpty(page.FindAll("#target-energy"));
     }
 
     [Fact]
@@ -179,7 +193,7 @@ public class TargetedPageTests : BunitContext
             TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
         });
 
-        var page = Render<Targeted>();
+        var page = RenderTab();
 
         Assert.Contains("Still needed", page.Markup);
         Assert.Contains("22.0 kWh", page.Markup);
@@ -196,7 +210,7 @@ public class TargetedPageTests : BunitContext
     [Fact]
     public void Follows_the_status_holder_when_a_later_poll_lands()
     {
-        var page = Render<Targeted>();
+        var page = RenderTab();
         Assert.Contains("No poll has completed yet", page.Markup);
 
         _holder.Set(Statuses.Sample(Now, ChargeControlMode.Targeted) with
@@ -302,5 +316,5 @@ public class TargetedPageTests : BunitContext
     private static string Narrate(TargetedChargePlan plan) =>
         string.Join(" ", TargetedPlanNarrative.Describe(plan, Prague));
 
-    private static void Activate(IRenderedComponent<Targeted> page) => page.Find("button.primary").Click();
+    private static void Activate(IRenderedComponent<ChargingPlan> page) => page.Find("#activate-target").Click();
 }

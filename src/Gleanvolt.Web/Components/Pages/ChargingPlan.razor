@@ -1,0 +1,256 @@
+@page "/charging-plan"
+@page "/charging-plan/{Tab}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ChargeControlStatusHolder StatusHolder
+@inject IChargeControlModeSelector Mode
+@inject IChargeActions Actions
+@inject IBatteryHoldSelector BatteryHold
+@inject TimeProvider Time
+
+@*
+    Everything that starts, stops or shapes a charge, on one page (#98). It replaces the dashboard's
+    control section and the two mode-specific pages (/forecast and /targeted) that used to sit beside
+    it in the nav: those were three places to look for what is really one decision -- which strategy
+    is driving the car, and on what terms.
+
+    The shape is a common header over a tab per mode. The header carries what is true whatever is
+    running: the mode itself, the Off that ends it, and the battery discharge hold, which is not a
+    property of any one strategy -- FastNoBattery and Targeted arm it themselves, and the owner can
+    arm it by hand under any of them. Each tab then carries only what its own mode needs: the button
+    that starts it, the runtime numbers it reads, and the plan it publishes while it drives.
+
+    The tab is in the URL rather than in a field, so a bookmark and a refresh come back to the same
+    mode, and /charging-plan with no tab opens on whatever is actually running -- the tab you wanted
+    on the way in is nearly always the one already driving the charger.
+
+    Actions still go through IChargeActions and IBatteryHoldSelector, the same Core seams the MQTT
+    worker drives, so this page and Home Assistant cannot disagree about what the charger is doing.
+    The tabs do not hold those seams themselves: they are handed Start and Stop, so the note and the
+    error of every action land in one place -- the header, next to the mode they moved.
+
+    Subscribes to the holder and to the mode selector exactly as the dashboard does, because either
+    can move without this page's help: FastNoBattery and Targeted end their own sessions, and Home
+    Assistant can change anything at any time.
+*@
+
+<PageTitle>Charging plan — Gleanvolt</PageTitle>
+
+<h1>Charging plan</h1>
+
+<section class="controls">
+    <div class="control">
+        <p id="mode-state" class="mode-state">
+            Charge mode: <span class="mode">@_currentMode</span>@if (_actionNote is not null)
+            {
+                <span class="muted"> (@_actionNote)</span>
+            }
+        </p>
+
+        <div class="actions">
+            <button type="button" class="secondary off" id="charge-off" disabled="@_busy"
+                    @onclick="StopAsync">Off</button>
+        </div>
+
+        @if (_actionError is not null)
+        {
+            <p class="error" role="alert">@_actionError</p>
+        }
+
+        <span class="hint">
+            Starting any mode below puts the charger into Fast; Off stops the car, whichever mode was
+            running. Nothing survives a restart — the service boots in Off and writes nothing until
+            something here is pressed. Fast (no battery) and Targeted switch themselves off once the
+            car finishes, and the line above follows them without this page's help.
+        </span>
+    </div>
+
+    @if (_status?.BatteryHoldEnabled == true)
+    {
+        <div class="control">
+            <label>
+                <input type="checkbox" @bind="_batteryHoldDisplay" @bind:after="OnBatteryHoldSelected" />
+                Battery discharge hold
+            </label>
+            <span class="hint">
+                Common to every mode, which is why it sits above them: it stops the home battery
+                serving household load, so the car charges from PV and grid while the battery can
+                still charge from surplus. Shows the last command written successfully, not a device
+                read-back — a failed write shows this switching back off on its own.
+            </span>
+        </div>
+    }
+</section>
+
+<nav class="tabs" role="tablist" aria-label="Charging modes">
+    @foreach (var tab in Tabs)
+    {
+        <a role="tab" id="@($"tab-{tab.Slug}")" href="@($"/charging-plan/{tab.Slug}")"
+           class="@(tab.Slug == _tab ? "tab active" : "tab")"
+           aria-selected="@(tab.Slug == _tab ? "true" : "false")">
+            @tab.Label
+            @if (tab.Mode == _currentMode)
+            {
+                <span class="running" title="Driving the charger right now">●</span>
+            }
+        </a>
+    }
+</nav>
+
+<section class="tab-panel" role="tabpanel" aria-labelledby="@($"tab-{_tab}")">
+    @switch (_tab)
+    {
+        case ForecastedSlug:
+            <ForecastedTab Status="_status" Busy="_busy" Start="StartAsync" />
+            break;
+
+        case FastSlug:
+            <FastTab Status="_status" Busy="_busy" Start="StartAsync" />
+            break;
+
+        case TargetedSlug:
+            <TargetedTab Status="_status" Busy="_busy" Start="StartAsync" Stop="StopAsync" />
+            break;
+
+        default:
+            <SolarTab Status="_status" Busy="_busy" Start="StartAsync" />
+            break;
+    }
+</section>
+
+@code {
+    private const string SolarSlug = "solar";
+    private const string ForecastedSlug = "forecasted";
+    private const string FastSlug = "fast";
+    private const string TargetedSlug = "targeted";
+
+    // The order is the order they are worth reaching for: the two everyday solar modes first, then
+    // the two that will buy from the grid when they have to.
+    private static readonly (string Slug, string Label, ChargeControlMode Mode)[] Tabs =
+    [
+        (SolarSlug, "Solar", ChargeControlMode.Solar),
+        (ForecastedSlug, "Forecasted", ChargeControlMode.Forecasted),
+        (FastSlug, "Fast (no battery)", ChargeControlMode.FastNoBattery),
+        (TargetedSlug, "Targeted", ChargeControlMode.Targeted),
+    ];
+
+    /// <summary>Which mode's tab to show, from the route. Null opens on whatever is driving.</summary>
+    [Parameter] public string? Tab { get; set; }
+
+    private ChargeControlStatus? _status;
+    private ChargeControlMode _currentMode;
+    private string _tab = SolarSlug;
+    private string? _actionNote;
+    private string? _actionError;
+    private bool _busy;
+    private bool _batteryHoldDisplay;
+
+    protected override void OnInitialized()
+    {
+        _status = StatusHolder.Current;
+        StatusHolder.Updated += OnStatusUpdated;
+
+        _currentMode = Mode.Mode;
+        Mode.Changed += OnModeChanged;
+
+        _batteryHoldDisplay = _status?.BatteryHoldActive ?? BatteryHold.Hold;
+    }
+
+    // Only navigation sets parameters, so a mode that changes under the page cannot pull the tab out
+    // from under the reader -- the running-mode default applies on the way in and nowhere else.
+    protected override void OnParametersSet() =>
+        _tab = Tabs.FirstOrDefault(t => t.Slug == Tab).Slug ?? SlugFor(_currentMode);
+
+    private static string SlugFor(ChargeControlMode mode) =>
+        Tabs.FirstOrDefault(t => t.Mode == mode).Slug ?? SolarSlug;
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        _status = status;
+
+        // The device truth, not the request: a hold that failed to write shows up here as the switch
+        // springing back off, exactly like the MQTT worker's equivalent status publish.
+        _batteryHoldDisplay = status.BatteryHoldActive;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Raised on the polling loop's thread whenever the mode changes for any reason, including a mode
+    // ending its own session. The note goes with it: "started from the Web UI at 13:42" is only true
+    // of the action that set it, and a mode that has moved on since is not that action.
+    private void OnModeChanged(ChargeControlMode mode)
+    {
+        _currentMode = mode;
+        _actionNote = null;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        StatusHolder.Updated -= OnStatusUpdated;
+        Mode.Changed -= OnModeChanged;
+    }
+
+    // Handed to the tabs rather than duplicated in them. The result is returned as well as displayed:
+    // Targeted has to know whether the charger accepted Fast, because a request left set behind a
+    // start that failed would look active while nothing drove it.
+    //
+    // StateHasChanged is explicit here because the press happened in a child component: the child
+    // re-renders itself, this header would not.
+    private async Task<ChargeActionResult> StartAsync(ChargeControlMode mode)
+    {
+        _busy = true;
+        _actionError = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Actions.StartAsync(mode, "Web UI");
+            Apply(result, $"started from the Web UI at {Now()}");
+            return result;
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<ChargeActionResult> StopAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Actions.StopAsync("Web UI");
+            Apply(result, $"stopped from the Web UI at {Now()}");
+            return result;
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    // The note is set after the result, not before: OnModeChanged has already run by now (the seam
+    // sets the mode synchronously) and cleared whatever the last action left behind.
+    private void Apply(ChargeActionResult result, string note)
+    {
+        if (result.Succeeded)
+        {
+            _actionNote = note;
+            return;
+        }
+
+        _actionError = result.Message;
+    }
+
+    private string Now() =>
+        TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).ToString("HH:mm");
+
+    private void OnBatteryHoldSelected() => BatteryHold.Set(_batteryHoldDisplay, "Web UI");
+}

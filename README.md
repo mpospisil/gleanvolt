@@ -908,13 +908,15 @@ keep imports strictly inside the blocks the plan drew.
 
 #### Setting a target
 
-From the web UI, `/targeted`: the energy, the departure, and **Activate**. From Home Assistant: the
+From the web UI, the **Targeted** tab of **Charging plan**: the energy, the departure, and
+**Activate**. From Home Assistant: the
 **Target energy** number, the **Departure time** text (`07:00` means the next 07:00; `2026-08-11
 07:00` means exactly that), and the **Activate target** button. Both drive the same two seams in
 `Gleanvolt.Core` — the request selector and then the charge action, in that order — so the two
 surfaces cannot disagree about what was asked for. **Activate** also puts the charger into `Fast`,
-like every other way of starting charging; **Cancel** is the same `Off` action the dashboard's button
-is.
+like every other way of starting charging; **Cancel** is the same `Off` action the page's own button
+is, plus the one thing that button cannot know to do — dropping the request, so nothing is left
+looking like a promise.
 
 A departure may be at most `ChargeControl:Targeted:MaxHorizon` (36 hours) ahead. Solcast's cached
 forecast runs days further, but a target four days out is a promise the forecast cannot keep — and
@@ -1282,50 +1284,94 @@ same internal state, so all four combinations run: UI only, MQTT only, both, nei
 in phases. Phase 0 is the plumbing: `/health` shows the running build, the configured time zone, and
 the time of the last completed poll — a liveness check (the timestamp updates itself as each poll
 lands, so a page that sits still means the poll loop has stopped while the web host is fine).
-Phase 1 adds `/`, a read-only telemetry dashboard: charge mode, control state, charger status, car
-connected, solar power and surplus, battery SOC and power, grid power, EV charging power and current,
-and target/active current — each with its meaning inline, since MQTT discovery has nowhere to put one
-(see [What each entity means](#what-each-entity-means) above; the wording is the same). Phase 2 adds
+Phase 1 adds `/`, a read-only telemetry dashboard, since regrouped (see
+[The dashboard reports; the plan page decides](#the-dashboard-reports-the-plan-page-decides) below):
+every figure carries its meaning inline, since MQTT discovery has nowhere to put one (see
+[What each entity means](#what-each-entity-means) above; the wording is the same). Phase 2 adds
 optional authentication — a single shared password that gates every page once one is configured, see
 [Authentication](#authentication) — landing before phase 3 gives the UI anything that can write to
 hardware.
 
-Phase 3 adds the same controls Home Assistant has, on the same page: a **row of charging buttons**
-(**Solar**, **Forecasted**, **Fast (no battery)** and **Off**) with the running mode reported above
-them read-only, the **battery discharge hold** switch — shown only while `BatteryHold:Enabled` is on —
-and the runtime numbers (**daily EV target**, **session energy target**, **minimum battery SOC**).
-They drive the exact same Core interfaces the MQTT worker uses (`IChargeActions`,
-`IBatteryHoldSelector`, `IForecastRuntimeSettings`), so there is no second control path and the two
-surfaces cannot disagree about what the charger is doing — the last one to press wins, visible on the
-other within a poll interval. The same semantics apply here as on the MQTT side: nothing set from this
-page persists across a restart, `FastNoBattery` can switch the mode back to `Off` on its own once the
-car finishes (the line follows it, and the "started from the Web UI at 13:42" note goes with it), a
-charger that refuses the use-mode write says so on the page instead of leaving a mode that quietly
-does nothing, and the battery-hold switch shows the last command that was actually written to the
-inverter, not what was requested — a write that fails to take shows the switch springing back on its
-own.
+Phase 3 adds the same controls Home Assistant has — a button per strategy with the running mode
+reported read-only beside them, the **battery discharge hold** switch (shown only while
+`BatteryHold:Enabled` is on) and the runtime numbers (**daily EV target**, **session energy target**,
+**minimum battery SOC**, **SOC resume margin**). Phase 5 adds the `Forecasted` mode's day plan as one
+coherent view instead of the dozen loosely related entities Home Assistant renders it as: day
+outlook, plan state, charge window, EV energy budget, EV energy expected today, projected shortfall,
+required SOC floor, forecast remaining today, tomorrow's forecast, forecast accuracy and battery
+loaned today, each with an explanation next to it, plus a timeline chart plotting forecast surplus
+against the charge window with the required-SOC-floor projection overlaid on a second axis. The
+chart's data is computed once, in `Gleanvolt.Core`, by the same `SolarDayPlanner` that builds the plan
+itself — the floor projection is the identical formula the live figure uses, evaluated at every
+remaining forecast period instead of only the current instant — so the picture can never disagree
+with the numbers next to it.
 
-Phase 5 adds `/forecast`: the `Forecasted` mode's day plan as one coherent view instead of the dozen
-loosely related entities Home Assistant renders it as. The same eleven figures — day outlook, plan
-state, charge window, EV energy budget, EV energy expected today, projected shortfall, required SOC
-floor, forecast remaining today, tomorrow's forecast, forecast accuracy, battery loaned today — each
-with an explanation next to it, plus a timeline chart plotting forecast surplus against the charge
-window, with the required-SOC-floor projection overlaid on a second axis. The chart's data is
-computed once, in `Gleanvolt.Core`, by the same `SolarDayPlanner` that builds the plan itself — the floor
-projection is the identical formula the live figure uses, evaluated at every remaining forecast
-period instead of only the current instant — so the picture can never disagree with the numbers next
-to it. Like the MQTT entities, the whole page shows an explicit empty state while any mode other than
-`Forecasted` is driving, rather than the last stale plan.
+All of it drives the exact same Core interfaces the MQTT worker uses (`IChargeActions`,
+`IBatteryHoldSelector`, `IForecastRuntimeSettings`, `ITargetedChargeSelector`), so there is no second
+control path and the two surfaces cannot disagree about what the charger is doing — the last one to
+press wins, visible on the other within a poll interval. The same semantics apply here as on the MQTT
+side: nothing set from the UI persists across a restart, `FastNoBattery` and `Targeted` can switch the
+mode back to `Off` on their own once the car finishes (the state line follows, and the "started from
+the Web UI at 13:42" note goes with it), a charger that refuses the use-mode write says so on the page
+instead of leaving a mode that quietly does nothing, and the battery-hold switch shows the last
+command that was actually written to the inverter, not what was requested — a write that fails to take
+shows the switch springing back on its own.
 
-`/targeted` is where a target is set and read: the energy, the departure time, **Activate** and
-**Cancel**, and then the plan **in words** — what will come from the sun and between when, what the
-grid will supply and from when, and, when there isn't enough time, how far short it will fall and the
-departure that would have covered it. Prose rather than a chart, deliberately: the question at 22:00
-is "is my car going to be ready, and why is nothing happening yet?", and no chart answers that as
-directly as a sentence. (The timeline chart is a separate story, and will read the same plan's blocks
-unchanged.) The form is validated before anything is set — a positive amount, a departure in the
-future and inside the horizon — and composed through the app's configured time zone rather than the
-server's clock, so a DST boundary between now and the departure cannot move it by an hour.
+#### The dashboard reports; the plan page decides
+
+Those phases left the UI in three places for one question. The dashboard was fourteen telemetry tiles
+followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
+with a form of its own. Reading an outcome and adjusting its input meant changing pages.
+
+**The nav is now Dashboard · Charging plan · Sessions · Energy · Health.** `/forecast` and `/targeted`
+are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
+
+**`/` reports and no longer decides.** It carries no button, no input and no select at all — three
+sections, in the order the questions are actually asked:
+
+- **Energy** — solar power against what the forecast expected of this instant, solar surplus, battery
+  SOC and power, grid power. True whatever is or isn't plugged in, which is why it comes first.
+- **Vehicle** — the charger's own view of whether a car is connected, plus, on an install with
+  [Vehicle telemetry](#vehicle-telemetry-the-vehicle-section) configured, what the car last said about
+  itself and how long ago it said it.
+- **Charging session** — charge mode, control state, charger status, session energy, EV charging power
+  and current, target and active current, battery loan power. Shown **only while there is a session to
+  report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the
+  charger into `Fast` by hand — the one case worth not hiding). Otherwise it is a single line naming
+  the mode and the charger's state, and a link to start one, rather than a grid of dashes.
+
+**`/charging-plan` is where charging is decided**, and its shape is a common header over a tab per
+mode. The header carries what is true whatever is running — the mode itself, the **Off** that ends it,
+and the **battery discharge hold**, which belongs to no single strategy: `FastNoBattery` and
+`Targeted` arm it themselves, and it is worth arming by hand under any of them. Every action's note
+and every charger refusal lands there too, next to the mode it moved.
+
+Each tab then carries only what its own mode needs, which is what makes the modes legible against each
+other:
+
+| Tab | The button | What else is on it |
+| --- | --- | --- |
+| **Solar** | Charge from surplus | Nothing to configure — the current is whatever the sun leaves over. The surplus, the battery SOC that gates it, and what the car is drawing. |
+| **Forecasted** | Charge to the forecast | The four runtime numbers the plan reads, then the day plan itself and the timeline chart. |
+| **Fast (no battery)** | Charge at maximum | What the speed costs: the car's actual draw and current, the setpoint read back, and grid power. |
+| **Targeted** | Activate / Cancel | The energy and the departure, the minimum battery SOC the planner works to, and then the plan in words followed by its figures. |
+
+The tab is in the URL (`/charging-plan/forecasted`), so a bookmark and a refresh come back to the same
+mode and the back button walks them; `/charging-plan` with no tab opens on whatever is actually
+driving the charger, which is nearly always the one being reached for. A dot in the strip marks the
+running mode, so the tab you need is findable without reading the state line above it.
+
+The targeted tab is still the plan **in words** — what will come from the sun and between when, what
+the grid will supply and from when, and, when there isn't enough time, how far short it will fall and
+the departure that would have covered it. Prose rather than a chart, deliberately: the question at
+22:00 is "is my car going to be ready, and why is nothing happening yet?", and no chart answers that
+as directly as a sentence. (The timeline chart is a separate story, and will read the same plan's
+blocks unchanged.) Its form is validated before anything is set — a positive amount, a departure in
+the future and inside the horizon — and composed through the app's configured time zone rather than
+the server's clock, so a DST boundary between now and the departure cannot move it by an hour. The
+forecast tab shows an explicit empty state while any mode other than `Forecasted` is driving, rather
+than the last stale plan, and the targeted tab does the same — but the controls on both stay reachable
+whatever is running, because a target is prepared *before* the mode is on.
 
 The `/health` page also carries the one control that isn't about charging: **Stop service**, which
 shuts the whole controller down gracefully — the charger returned to its pause current, the open
