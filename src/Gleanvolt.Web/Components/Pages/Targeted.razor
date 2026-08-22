@@ -83,17 +83,17 @@
 
     <section class="stat-grid">
         <Stat Label="Plan state" Value="@plan.Strategy.ToString()"
-              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: sun plus a late grid block. Maximum: there is not enough time, so everything available is taken." />
+              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: sun plus a grid block over the sunniest hours. Maximum: there is not enough time, so everything available is taken." />
         <Stat Label="Still needed" Value="@Kwh(plan.RemainingEnergyWh)"
               Hint="The request less what the charger has measurably delivered since it was activated." />
         <Stat Label="Delivered so far" Value="@Kwh(plan.DeliveredEnergyWh)"
-              Hint="Measured at the charger, so a car that limits itself to less than we asked for simply pulls the grid block earlier." />
+              Hint="Measured at the charger, so a car that limits itself to less than we asked for simply gets a longer grid block on the next poll." />
         <Stat Label="From sun" Value="@Kwh(plan.SolarEnergyWh)"
               Hint="Forecast surplus the home battery has not already claimed. The pack keeps its priority." />
         <Stat Label="From grid" Value="@Kwh(plan.GridEnergyWh)"
-              Hint="What the sun cannot cover. Rebuilt every poll, so a better afternoon than forecast shrinks this before any of it is bought." />
+              Hint="What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought." />
         <Stat Label="Grid top-up starts" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"
-              Hint="The latest start that still meets the target. Every poll before it is another chance for the sun to make it unnecessary." />
+              Hint="Placed over the sunniest hours in the window, so the roof offsets the import while it runs — or straight away when there is no sun to wait for." />
         <Stat Label="Expected by departure" Value="@Kwh(plan.ExpectedEnergyWh)"
               Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
         <Stat Label="Shortfall" Value="@Kwh(plan.ShortfallWh)"

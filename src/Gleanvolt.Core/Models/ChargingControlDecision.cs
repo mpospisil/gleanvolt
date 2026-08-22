@@ -62,6 +62,13 @@ public sealed record ChargingControlInput(
 /// bridge that lets a sub-minimum surplus still reach the charger's 6 A floor. Zero unless the
 /// forecast-driven controller granted a loan; the orchestrator meters it against the daily cap.
 /// </param>
+/// <param name="GridBridgeWatts">
+/// The same bridge, paid for by the <b>grid</b> instead of the pack — the targeted mode's answer to a
+/// surplus that is real but under the charger's floor. Non-zero only while that bridge is being
+/// granted, and the host arms the battery discharge hold on it exactly as it does inside a planned
+/// grid block: the car is running partly on imported energy either way, and the pack must stay out
+/// of it.
+/// </param>
 /// <param name="SessionComplete">
 /// The controller's one way of saying "this is over": the car has finished (or has gone away) and
 /// there is nothing left to control. Accompanies a <see cref="ChargingControlAction.Pause"/> so the
@@ -73,4 +80,5 @@ public sealed record ChargingControlDecision(
     int? ChargeCurrentAmps,
     string Reason,
     double LoanPowerWatts = 0,
-    bool SessionComplete = false);
+    bool SessionComplete = false,
+    double GridBridgeWatts = 0);

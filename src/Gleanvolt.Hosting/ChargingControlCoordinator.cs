@@ -130,7 +130,7 @@ public sealed class ChargingControlCoordinator
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
                 + "({SampleCount} samples) Setpoint={SetpointAmps}A Action={Action} Target={TargetAmps} Loan={LoanWatts:F0}W "
-                + "Session={SessionKWh:F1}kWh LoanedToday={LoanedKWh:F1}kWh. {Reason}",
+                + "Bridge={BridgeWatts:F0}W Session={SessionKWh:F1}kWh LoanedToday={LoanedKWh:F1}kWh. {Reason}",
                 mode,
                 settings.Mode,
                 rawSurplus,
@@ -140,6 +140,7 @@ public sealed class ChargingControlCoordinator
                 decision.Action,
                 decision.ChargeCurrentAmps is int amps ? $"{amps}A" : "n/a",
                 decision.LoanPowerWatts,
+                decision.GridBridgeWatts,
                 _sessionEnergy.EnergyWattHours / 1000,
                 _loanedToday.EnergyWattHours / 1000,
                 decision.Reason);
@@ -174,7 +175,8 @@ public sealed class ChargingControlCoordinator
             };
 
             return new ChargeControlCycleResult(
-                reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts, decision.SessionComplete);
+                reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
+                decision.SessionComplete, decision.GridBridgeWatts);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -11,14 +11,14 @@ using Gleanvolt.Hosting.Targeting;
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
-/// The targeted mode end to end through the poll loop. Its headline behaviour — plan backwards, wait,
-/// import late, arm the hold only while importing, then end itself — is spread across the planner, the
-/// controller, the provider and the polling service, and only the assembly of the four is worth
-/// trusting.
+/// The targeted mode end to end through the poll loop. Its headline behaviour — plan backwards, put
+/// the import under the sun (or start it at once when there is none), arm the hold only while
+/// importing, then end itself — is spread across the planner, the controller, the provider and the
+/// polling service, and only the assembly of the four is worth trusting.
 ///
-/// <para>All of these run with no forecast at all, which is the mode's grid-only degradation and also
+/// <para>Most of these run with no forecast at all, which is the mode's grid-only degradation and also
 /// the only way to make the arithmetic exact: the charger's 11.04 kW ceiling and the clock, nothing
-/// else.</para>
+/// else. The one that needs a forecast says so.</para>
 /// </summary>
 public class TargetedModeTests
 {
@@ -54,39 +54,70 @@ public class TargetedModeTests
     }
 
     [Fact]
-    public async Task WithHoursToSpare_ItWaitsAndLeavesTheBatteryAlone()
+    public async Task WithNoSunInTheWindowToWaitFor_TheImportStartsAtOnce()
     {
-        // 2kWh needs about eleven minutes of the six hours available, so the block sits at the far end
-        // of the night and nothing happens now — including to the home battery.
+        // 2kWh needs about eleven minutes of the six hours available. There is no forecast, so nothing
+        // in those six hours could ever make the import unnecessary: holding it back until 03:00 would
+        // buy exactly the same 2kWh, eight hours later, with no slack left behind it.
         Request(2_000, Now.AddHours(6));
 
-        await RunAsync(Drawing(Now, 0), Drawing(Now.AddMinutes(1), 0));
+        await RunAsync(Drawing(Now, 0), Drawing(Now.AddMinutes(1), MaxPowerWatts));
 
-        Assert.Equal(0, LastTarget);
-        Assert.Contains("Waiting for sun", _writes[^1].Reason);
-        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.All(_writes, w => Assert.Equal(16, w.Target));
+        Assert.All(_inverter.Applied, hold => Assert.True(hold));
+        Assert.Contains("Grid top-up", _writes[0].Reason);
     }
 
     [Fact]
-    public async Task TheHoldArmsOnlyOnceTheImportStarts()
+    public async Task WithWeakSunInTheWindow_TheImportWaitsForItAndTheHoldArmsOnlyThen()
     {
-        // 1.5kWh by 22:10 needs ~8 minutes at full power, so the import starts about two minutes in —
-        // and the pack is only locked out for those minutes, not for the whole wait.
-        Request(1_500, Now.AddMinutes(10));
+        // The shape the placement rule exists for, and the one reported from the site: 4kW of forecast
+        // PV less the house leaves ~3.65kW of surplus — real energy, but under the charger's 4.14kW
+        // minimum, so the car cannot take it as a solar block and the whole 1.5kWh falls to the grid.
+        //
+        // Placed under that hour the charger runs at its maximum and the roof pays for a third of it.
+        // Placed at the deadline, as it used to be, the same surplus is exported for nothing and the
+        // same kilowatt-hours are bought again in the dark.
+        var sunFrom = Now.AddHours(1);
+        Request(1_500, Now.AddHours(2));
 
         await RunAsync(
-            Drawing(Now, 0),                                    // before the block: waiting
-            Drawing(Now.AddMinutes(2), MaxPowerWatts));         // inside it: importing
+            new WeakSunForecastService(sunFrom, watts: 4_000),
+            Drawing(Now, 0, socPercent: 100),                       // before the sun: waiting
+            Drawing(sunFrom.AddMinutes(2), 0, socPercent: 100));    // under it: importing
 
         Assert.Equal([false, true], _inverter.Applied);
         Assert.Equal([0, 16], _writes.Select(w => w.Target));
+        Assert.Contains("Waiting for sun", _writes[0].Reason);
+    }
+
+    [Fact]
+    public async Task ASurplusUnderTheChargersFloor_IsBridgedFromTheGrid_WithTheHoldArmed()
+    {
+        // The live half of the same problem. 3.5kW of real surplus charges nothing on its own -- the
+        // 6A floor is 4.14kW -- so without a bridge it is exported and the plan buys the whole 4.14kW
+        // back later. Bridging pays only the 640W gap.
+        //
+        // The hold is the half that is easy to miss: we have just commanded 6A against a surplus that
+        // cannot carry it, so unless the pack is locked out it, not the grid, quietly funds the bridge.
+        var sunFrom = Now.AddHours(1);
+        Request(1_500, Now.AddHours(2));
+
+        await RunAsync(
+            new WeakSunForecastService(sunFrom, watts: 3_000),
+            Exporting(Now, surplusWatts: 3_500),                        // dwell unexpired: still waiting
+            Exporting(Now.AddMinutes(20), surplusWatts: 3_500));        // bridged
+
+        Assert.Equal([0, 6], _writes.Select(w => w.Target));
+        Assert.Equal([false, true], _inverter.Applied);
+        Assert.Contains("Grid bridge", _writes[^1].Reason);
     }
 
     [Fact]
     public async Task WhenTheTargetIsMetTheModeReturnsItselfToOffAndTheHoldIsReleased()
     {
-        // A car already drawing when the request is made — the charger takes a cycle to obey a pause,
-        // and a car that delivers ahead of the plan simply meets the target before the block was due.
+        // A car already drawing when the request is made. There is no forecast, so the import starts
+        // at once and simply runs until the measured delivery crosses the target.
         Request(1_500, Now.AddMinutes(10));
 
         await RunAsync(
@@ -240,10 +271,18 @@ public class TargetedModeTests
     }
 
     // A plugged-in car taking the stated power. SOC is high enough that the home battery's booking
-    // never enters into it — these tests are about the clock, not the pack.
-    private static EnergyState Drawing(DateTimeOffset at, double evWatts) =>
-        new(at, BatterySocPercent: 90, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: evWatts + 300,
+    // never enters into it — these tests are about the clock, not the pack — and the forecast-driven
+    // one pins it at 100% so the pack books nothing at all out of the surplus being placed under.
+    private static EnergyState Drawing(DateTimeOffset at, double evWatts, double socPercent = 90) =>
+        new(at, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: evWatts + 300,
             EvChargerStatus.Charging, EvChargerPowerWatts: evWatts);
+
+    // A plugged-in car taking nothing while the roof exports. Surplus is Solar - OtherLoads, and
+    // OtherLoads is PV + Grid - EV - Battery, so exporting exactly the stated figure over a 300W house
+    // is what makes the surplus that figure. A full pack, so none of it is booked by the battery.
+    private static EnergyState Exporting(DateTimeOffset at, double surplusWatts) =>
+        new(at, BatterySocPercent: 100, BatteryPowerWatts: 0, SolarPowerWatts: surplusWatts + 300,
+            GridPowerWatts: -surplusWatts, EvChargerStatus.Charging, EvChargerPowerWatts: 0);
 }
 
 /// <summary>
@@ -255,6 +294,21 @@ internal sealed class StubForecastService(DateTimeOffset from) : ISolarForecastS
     private readonly SolarForecast _forecast = new(
         from,
         [new SolarForecastPeriod(from.AddMinutes(30), TimeSpan.FromMinutes(30), EstimatedPowerWatts: 0)]);
+
+    public SolarForecast? GetForecastForToday() => _forecast;
+
+    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => _forecast.ForPeriod(from, to);
+}
+
+/// <summary>
+/// A window with one weak sunny half-hour an hour into it: enough surplus to be worth importing under,
+/// not enough to clear the charger's 6 A minimum on its own.
+/// </summary>
+internal sealed class WeakSunForecastService(DateTimeOffset sunFrom, double watts) : ISolarForecastService
+{
+    private readonly SolarForecast _forecast = new(
+        sunFrom,
+        [new SolarForecastPeriod(sunFrom.AddMinutes(30), TimeSpan.FromMinutes(30), watts)]);
 
     public SolarForecast? GetForecastForToday() => _forecast;
 

@@ -165,7 +165,8 @@ public sealed class PollingService : BackgroundService
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
 
-                var hold = await ApplyBatteryHoldAsync(state, mode, plan, targetedPlan, stoppingToken);
+                var hold = await ApplyBatteryHoldAsync(
+                    state, mode, plan, targetedPlan, result.GridBridgeWatts > 0, stoppingToken);
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -276,6 +277,7 @@ public sealed class PollingService : BackgroundService
         ChargeControlMode mode,
         SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
+        bool gridBridging,
         CancellationToken cancellationToken)
     {
         if (!_batteryHoldOptions.Enabled)
@@ -283,7 +285,7 @@ public sealed class PollingService : BackgroundService
             return default;
         }
 
-        var hold = _batteryHold.Hold || AutoHold(state, mode, plan, targetedPlan);
+        var hold = _batteryHold.Hold || AutoHold(state, mode, plan, targetedPlan, gridBridging);
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
         BatteryHoldState result;
@@ -330,7 +332,12 @@ public sealed class PollingService : BackgroundService
     /// covers the gap instead of the pack. Released again only after SOC has recovered a margin above the
     /// floor, so the hold doesn't chatter around the line.</para>
     /// </summary>
-    private bool AutoHold(EnergyState state, ChargeControlMode mode, SolarDayPlan plan, TargetedChargePlan? targetedPlan)
+    private bool AutoHold(
+        EnergyState state,
+        ChargeControlMode mode,
+        SolarDayPlan plan,
+        TargetedChargePlan? targetedPlan,
+        bool gridBridging)
     {
         if (mode == ChargeControlMode.FastNoBattery)
         {
@@ -345,17 +352,24 @@ public sealed class PollingService : BackgroundService
 
         if (mode == ChargeControlMode.Targeted)
         {
-            // Scoped to the part of the plan that imports, unlike the fast mode's blanket hold: outside
-            // the grid block the car is running on surplus, and holding the pack there would only push
-            // the house onto the grid for nothing.
-            var importing = targetedPlan?.IsInGridBlock(state.Timestamp) == true;
+            // Scoped to the parts of the cycle that import, unlike the fast mode's blanket hold: the
+            // rest of the time the car is running on surplus, and holding the pack there would only
+            // push the house onto the grid for nothing.
+            //
+            // Two of them, not one. The planned grid block is the obvious case. The other is the live
+            // grid bridge, which is easy to miss and expensive to get wrong: the controller has just
+            // commanded 6 A against a surplus that cannot carry it, so without the hold the shortfall
+            // comes out of the pack and the "grid" bridge is quietly a battery loan -- the one thing
+            // this mode promises never to do.
+            var importing = targetedPlan?.IsInGridBlock(state.Timestamp) == true || gridBridging;
 
             if (importing != _autoHold)
             {
                 _logger.LogInformation(
-                    "Battery discharge hold {Action} automatically: the {Mode} plan's grid top-up {State}.",
+                    "Battery discharge hold {Action} automatically: the {Mode} plan's {Source} {State}.",
                     importing ? "armed" : "released",
                     mode,
+                    gridBridging ? "grid bridge" : "grid top-up",
                     importing ? "has started" : "is not running");
             }
 
