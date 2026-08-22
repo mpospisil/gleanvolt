@@ -268,7 +268,8 @@ public sealed class HaDiscovery
         yield return Sensor("target_grid", "Target grid energy", template: Optional("target_grid_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_expected", "Target expected", template: Optional("target_expected_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_shortfall", "Target shortfall", template: Optional("target_shortfall_kwh"), unit: "kWh", deviceClass: "energy");
-        yield return Sensor("target_grid_start", "Grid top-up start", template: Optional("target_grid_start"), icon: "mdi:transmission-tower-import");
+        yield return Sensor("target_pace", "Target charge pace", template: Optional("target_pace_kw"), unit: "kW", deviceClass: "power");
+        yield return Sensor("target_grid_start", "Charging from", template: Optional("target_grid_start"), icon: "mdi:transmission-tower-import");
 
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
@@ -364,6 +365,7 @@ public sealed class HaDiscovery
             payload["target_grid_kwh"] = Math.Round(target.GridEnergyWh / 1000, 1);
             payload["target_expected_kwh"] = Math.Round(target.ExpectedEnergyWh / 1000, 1);
             payload["target_shortfall_kwh"] = Math.Round(target.ShortfallWh / 1000, 1);
+            payload["target_pace_kw"] = Math.Round(target.RequiredPaceWatts / 1000, 2);
             payload["target_grid_start"] = target.GridStart is { } start
                 ? $"{start.LocalDateTime:HH:mm}"
                 : "none";

@@ -4,6 +4,78 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-22 — Rate, not timing, decides the solar share
+
+Supersedes the placement half of [2026-08-21](#2026-08-21--targeted-charging-imports-under-the-sun-not-after-it).
+That record moved the grid block onto the sunniest hours. This one deletes the block.
+
+### What the site showed
+
+A 13 kWh target, a day peaking at 8.5 kW, and the session summary:
+
+```
+Session ended after 01:27: 13.02kWh delivered — 3.59 solar / 9.09 grid / 0.34 battery
+```
+
+Nine of thirteen kilowatt-hours bought, on a sunny day, by a mode whose entire purpose is not to do
+that. Placement was not the problem. **Rate** was: inside a grid block the controller commanded a flat
+16 A, so the car drew 10.7 kW while the roof gave 3–5 kW, finished in 87 minutes, and stopped — missing
+the whole afternoon. No placement can fix that, because the charger can only use the sun that shines
+*while it runs*.
+
+### The pace
+
+```
+pace = (energy still needed − sun forecast to reach the car) ÷ time left to the deadline
+charge at  live surplus + pace,  clamped to 6–16 A, recomputed every poll
+```
+
+Sum, not maximum: the pace is by construction what the sun will *not* cover, so the two are additive.
+Taking the greater lets a sunny window swallow the grid's share and arrive short — a bug the tests
+caught before the hardware did.
+
+Blocks disappear entirely, which is a simplification rather than a cost: there is nothing left to
+place, and the sunniest-first pass from the previous record goes with it.
+
+### Two look-aheads, not one
+
+The subtle part, and the one that took two attempts.
+
+*Unaided* counts only half-hours whose surplus clears the charger's ~4.14 kW floor — sun that can run
+the car by itself. It answers **"need we buy anything at all?"** and must be strict: counting sub-floor
+sun here defers the start on strength that never arrives alone, and finishes short.
+
+*Assisted* counts every watt of surplus. It answers **"once the charger is running, how much does the
+roof cover?"** and must be generous: a 3.2 kW half-hour genuinely supplies 3.2 kW to a charger held at
+its floor.
+
+Using the strict figure for both was a real defect, caught by simulating the owner's own scenario —
+activate at 02:00 for 15 kWh by 17:00. On a 4.2 kW day carrying **17.5 kWh** of forecast surplus
+against a 15 kWh target, it scored the day at ~4 kWh of usable sun and planned to buy 11 kWh, starting
+at 02:00 in the dark, on a day the roof could have covered outright. With both figures it waits for
+daylight and buys roughly 3 kWh.
+
+### What follows from it
+
+- **Sub-floor sun is harvested, not skipped.** Once the sun cannot finish alone, any slice with surplus
+  runs right through at the floor: the roof supplies what it has, and only the difference is bought.
+  Harvesting a 3.2 kW half-hour costs 0.9 kW of grid; buying the same energy after dark costs 4.14 kW.
+- **A sub-floor pace is never deferred.** It is energy the sun will not cover, so waiting for the pace
+  to climb past the floor merely crams the remainder into the last minutes of the window, where a
+  dropout has no room to recover. It self-regulates: delivering ahead drives the pace to zero and the
+  car returns to living on surplus.
+- **The hold arms on what is actually imported.** Below the SOC floor the surplus belongs to the pack,
+  so it must not be netted off the commanded power — doing so reported zero import, left the hold
+  released, and had the pack quietly funding the pace.
+
+### The cost we accept
+
+Pacing spends the slack: a charger dropout late in the window has less room than the old finish-early
+behaviour. The safety margin is the only buffer, and it is worth revisiting if a real session ever
+runs close.
+
+---
+
 ## 2026-08-21 — Targeted charging imports under the sun, not after it
 
 Supersedes the placement half of [2026-08-20](#2026-08-20--the-grid-block-goes-as-late-as-it-can-and-the-home-battery-still-comes-first).

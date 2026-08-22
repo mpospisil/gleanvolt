@@ -71,28 +71,27 @@ public class TargetedModeTests
     }
 
     [Fact]
-    public async Task WithWeakSunInTheWindow_ItRunsAtThePacedRateWithTheHoldArmed()
+    public async Task WithWeakSunComingLater_ItWaitsInTheDarkInsteadOfImporting()
     {
-        // The shape the placement rule exists for, and the one reported from the site: 4kW of forecast
-        // PV less the house leaves ~3.65kW of surplus — real energy, but under the charger's 4.14kW
-        // minimum, so the car cannot take it as a solar block and the whole 1.5kWh falls to the grid.
+        // The requirement, stated by the owner: activate at 02:00 for 15kWh by 17:00 and charging must
+        // start when there is sun, not before. Here the whole target is 1.5kWh and the window holds a
+        // weak 4kW half-hour an hour out -- under the charger's floor, but carrying enough energy to
+        // cover the target once the grid tops it up to the floor.
         //
-        // Placed under that hour the charger runs at its maximum and the roof pays for a third of it.
-        // Placed at the deadline, as it used to be, the same surplus is exported for nothing and the
-        // same kilowatt-hours are bought again in the dark.
+        // So nothing is owed to the grid, and nothing should be bought in the dark. The regression this
+        // guards is a look-ahead that only counted sun able to run the charger unaided: it scored this
+        // window at zero, and imported from the first poll.
         var sunFrom = Now.AddHours(1);
         Request(1_500, Now.AddHours(2));
 
         await RunAsync(
             new WeakSunForecastService(sunFrom, watts: 4_000),
-            Drawing(Now, 0, socPercent: 100),                       // before the sun: waiting
-            Drawing(sunFrom.AddMinutes(2), 0, socPercent: 100));    // under it: importing
+            Drawing(Now, 0, socPercent: 100),
+            Drawing(Now.AddMinutes(20), 0, socPercent: 100));
 
-        // The charge is spread across the window rather than deferred to a block, so it is running on
-        // both polls -- and the grid is funding part of it on both, so the hold is armed throughout.
-        Assert.All(_writes, w => Assert.True(w.Target >= 6, $"expected the paced floor, got {w.Target}A"));
-        Assert.All(_writes, w => Assert.NotEqual(16, w.Target));
-        Assert.All(_inverter.Applied, hold => Assert.True(hold));
+        Assert.All(_writes, w => Assert.Equal(0, w.Target));
+        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.Contains("Waiting for sun", _writes[^1].Reason);
     }
 
     [Fact]
@@ -112,12 +111,13 @@ public class TargetedModeTests
             Exporting(Now, surplusWatts: 3_500),                        // dwell unexpired: still waiting
             Exporting(Now.AddMinutes(20), surplusWatts: 3_500));        // bridged
 
-        // 3.5kW of surplus plus a 750W pace lands at the charger's 6A floor, with the grid funding the
-        // difference. The first poll is still held by the restart dwell; the second runs.
-        Assert.Equal([0, 6], _writes.Select(w => w.Target));
+        // 3.5kW of surplus under a 4.14kW floor: the charger is held at the floor and the grid funds the
+        // ~640W difference, from the first poll. The restart dwell does not defer it -- a pace is the
+        // deadline asking, not us choosing to start.
+        Assert.All(_writes, w => Assert.Equal(6, w.Target));
 
-        // And once it runs, the pack is held out of what the grid is paying for.
-        Assert.True(_inverter.Applied[^1]);
+        // And the pack is held out of what the grid is paying for, throughout.
+        Assert.All(_inverter.Applied, hold => Assert.True(hold));
     }
 
     [Fact]

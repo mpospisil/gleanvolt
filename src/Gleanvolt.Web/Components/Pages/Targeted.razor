@@ -83,7 +83,7 @@
 
     <section class="stat-grid">
         <Stat Label="Plan state" Value="@plan.Strategy.ToString()"
-              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: sun plus a grid block over the sunniest hours. Maximum: there is not enough time, so everything available is taken." />
+              Hint="Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: the sun carries what it can and the grid paces the rest. Maximum: there is not enough time, so everything available is taken." />
         <Stat Label="Still needed" Value="@Kwh(plan.RemainingEnergyWh)"
               Hint="The request less what the charger has measurably delivered since it was activated." />
         <Stat Label="Delivered so far" Value="@Kwh(plan.DeliveredEnergyWh)"
@@ -94,8 +94,10 @@
               Hint="The part of the surplus above that the car can actually run on alone. Zero does not mean no sun: it means no half-hour clears the charger's 6 A minimum, which is why the grid block is placed over the sunniest hours rather than after them." />
         <Stat Label="From grid" Value="@Kwh(plan.GridEnergyWh)"
               Hint="What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought." />
-        <Stat Label="Grid top-up starts" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"
-              Hint="Placed over the sunniest hours in the window, so the roof offsets the import while it runs — or straight away when there is no sun to wait for." />
+        <Stat Label="Charge pace" Value="@($"{plan.RequiredPaceWatts / 1000:F1} kW")"
+              Hint="The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this plus whatever the roof is giving, so sun above it is free and lowers it for later. Zero means the forecast covers the target outright." />
+        <Stat Label="Charging from" Value="@(plan.GridStart is { } start ? Clock(start) : "—")"
+              Hint="When the first grid-funded charging starts. The charge is spread across the window rather than run flat out, because the charger can only use the sun that shines while it runs." />
         <Stat Label="Expected by departure" Value="@Kwh(plan.ExpectedEnergyWh)"
               Hint="What will actually reach the car. Below what was asked for only when there is not enough time left." />
         <Stat Label="Shortfall" Value="@Kwh(plan.ShortfallWh)"
