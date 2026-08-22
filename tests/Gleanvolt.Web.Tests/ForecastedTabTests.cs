@@ -1,34 +1,52 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Web.Components.Pages;
 
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// Phase 5 (#50): the forecast plan as one coherent view instead of a dozen loosely related
-/// entities. JSInterop is Loose: the timeline chart is rendered by vendored JS (uPlot) this suite
-/// cannot see, so these tests cover the data and markup around it, not the rendered pixels.
+/// The forecast plan as one coherent view instead of a dozen loosely related entities (#50), now the
+/// Forecasted tab of the charging-plan page (#98) rather than a page of its own — so these tests
+/// render the page and ask for that tab, which is also what exercises the wiring between them.
+/// The four runtime numbers the plan reads moved here from the dashboard with it.
+///
+/// JSInterop is Loose: the timeline chart is rendered by vendored JS (uPlot) this suite cannot see,
+/// so these tests cover the data and markup around it, not the rendered pixels.
 /// </summary>
-public class ForecastPageTests : BunitContext
+public class ForecastedTabTests : BunitContext
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
     private readonly ChargeControlStatusHolder _holder = new();
     private readonly FixedTimeProvider _time = new(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), Prague);
+    private readonly FakeChargeControlModeSelector _mode = new();
+    private readonly FakeChargeActions _actions;
+    private readonly FakeBatteryHoldSelector _batteryHold = new();
+    private readonly FakeForecastRuntimeSettings _forecast = new();
 
-    public ForecastPageTests()
+    public ForecastedTabTests()
     {
+        _actions = new FakeChargeActions(_mode);
+
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
+        Services.AddSingleton<IChargeControlModeSelector>(_mode);
+        Services.AddSingleton<IChargeActions>(_actions);
+        Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
+        Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
+
+    private IRenderedComponent<ChargingPlan> RenderTab() =>
+        Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "forecasted"));
 
     [Fact]
     public void Says_so_before_the_first_poll_has_landed()
     {
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("No poll has completed yet", page.Markup);
     }
@@ -40,11 +58,14 @@ public class ForecastPageTests : BunitContext
         // mode) -- the page must not show a stale plan from whatever ran earlier.
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { Plan = null });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("only shown while", page.Markup);
         Assert.Contains("Solar", page.Markup);
         Assert.DoesNotContain("Day outlook", page.Markup);
+
+        // The controls the mode reads are not part of the plan, and stay reachable whatever is driving.
+        Assert.NotEmpty(page.FindAll("#daily-ev-target"));
     }
 
     [Fact]
@@ -58,7 +79,7 @@ public class ForecastPageTests : BunitContext
             LoanedTodayWh = 800,
         });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("Day outlook", page.Markup);
         Assert.Contains("Tight", page.Markup);
@@ -92,7 +113,7 @@ public class ForecastPageTests : BunitContext
         var plan = TestPlans.Usable(_time.Now, window: window);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         // 10:00-12:00 UTC is 12:00-14:00 in Prague in August.
         Assert.Contains("12:00", page.Markup);
@@ -105,7 +126,7 @@ public class ForecastPageTests : BunitContext
         var plan = TestPlans.Usable(_time.Now) with { NextFeasibleWindow = null };
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("none", page.Markup);
     }
@@ -116,7 +137,7 @@ public class ForecastPageTests : BunitContext
         var plan = TestPlans.Usable(_time.Now);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         page.WaitForAssertion(() => Assert.NotEmpty(page.FindAll("#plan-chart")));
     }
@@ -130,7 +151,7 @@ public class ForecastPageTests : BunitContext
         var plan = TestPlans.Unavailable(_time.Now);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("no forecast fetched yet", page.Markup);
         Assert.Contains("No forecast data yet", page.Markup);
@@ -147,7 +168,7 @@ public class ForecastPageTests : BunitContext
             TomorrowForecastWh = null,
         });
 
-        var page = Render<Forecast>();
+        var page = RenderTab();
 
         Assert.Contains("—", page.Markup);
     }
@@ -155,7 +176,7 @@ public class ForecastPageTests : BunitContext
     [Fact]
     public void Follows_the_holder_instead_of_sampling_it_once()
     {
-        var page = Render<Forecast>();
+        var page = RenderTab();
         Assert.Contains("No poll has completed yet", page.Markup);
 
         var plan = TestPlans.Usable(_time.Now);
@@ -167,11 +188,84 @@ public class ForecastPageTests : BunitContext
     [Fact]
     public void Stops_following_the_holder_once_the_circuit_is_gone()
     {
-        var page = Render<Forecast>();
+        var page = RenderTab();
         page.Dispose();
 
         var exception = Record.Exception(() => _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted)));
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void Shows_the_runtime_numbers_from_the_forecast_settings()
+    {
+        _forecast.SetDailyEvTargetWh(12_000, "test setup");
+        _forecast.SetSessionEnergyTargetWh(5_000, "test setup");
+        _forecast.SetMinBatterySocFloorPercent(55, "test setup");
+        _forecast.SetFloorResumeMarginPercent(6, "test setup");
+
+        var page = RenderTab();
+
+        Assert.Equal("12", page.Find("#daily-ev-target").GetAttribute("value"));
+        Assert.Equal("5", page.Find("#session-energy-target").GetAttribute("value"));
+        Assert.Equal("55", page.Find("#min-battery-soc").GetAttribute("value"));
+        Assert.Equal("6", page.Find("#resume-margin").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void Changing_the_daily_ev_target_drives_the_settings_in_watt_hours()
+    {
+        var page = RenderTab();
+
+        page.Find("#daily-ev-target").Change("18.5");
+
+        Assert.Equal(18_500, _forecast.DailyEvTargetWh, precision: 3);
+        Assert.Contains(_forecast.Sets, s => s.Setting == "DailyEvTargetWh" && s.Source == "Web UI");
+    }
+
+    [Fact]
+    public void Changing_the_session_energy_target_drives_the_settings()
+    {
+        var page = RenderTab();
+
+        page.Find("#session-energy-target").Change("0");
+
+        Assert.Equal(0, _forecast.SessionEnergyTargetWh);
+        Assert.Contains(_forecast.Sets, s => s.Setting == "SessionEnergyTargetWh" && s.Source == "Web UI");
+    }
+
+    [Fact]
+    public void Changing_the_minimum_battery_soc_drives_the_settings()
+    {
+        var page = RenderTab();
+
+        page.Find("#min-battery-soc").Change("40");
+
+        Assert.Equal(40, _forecast.MinBatterySocFloorPercent);
+        Assert.Contains(_forecast.Sets, s => s.Setting == "MinBatterySocFloorPercent" && s.Source == "Web UI");
+    }
+
+    [Fact]
+    public void Changing_the_resume_margin_drives_the_settings()
+    {
+        var page = RenderTab();
+
+        page.Find("#resume-margin").Change("8");
+
+        Assert.Equal(8, _forecast.FloorResumeMarginPercent);
+        Assert.Contains(_forecast.Sets, s => s.Setting == "FloorResumeMarginPercent" && s.Source == "Web UI");
+    }
+
+    [Fact]
+    public void Picks_up_a_runtime_number_changed_by_another_surface()
+    {
+        var page = RenderTab();
+        Assert.Equal("15", page.Find("#daily-ev-target").GetAttribute("value"));
+
+        // Home Assistant (or another browser tab) changes it; the next poll should carry it here.
+        _forecast.SetDailyEvTargetWh(9_000, "Home Assistant");
+        _holder.Set(Statuses.Sample(_time.Now));
+
+        page.WaitForAssertion(() => Assert.Equal("9", page.Find("#daily-ev-target").GetAttribute("value")));
     }
 }

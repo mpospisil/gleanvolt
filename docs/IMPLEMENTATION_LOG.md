@@ -4,6 +4,52 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-22 — The web UI regrouped: a dashboard that reports, a plan page that decides (issue #98)
+
+Three surfaces for one question became two with a clear division of labour. Nothing in `Gleanvolt.Core`
+or `Gleanvolt.Hosting` changed: this is entirely the shape of `Gleanvolt.Web`.
+
+### What was built
+
+- **`Components/Pages/ChargingPlan.razor`** — `/charging-plan` and `/charging-plan/{Tab}`. A header
+  common to every mode (the read-only mode line, **Off**, the action note and any charger refusal,
+  and the **battery discharge hold** switch), then a tab strip, then the active tab. It owns the two
+  seams every tab needs and hands them down as `Start`/`Stop` delegates, so an action's outcome is
+  reported in one place rather than four.
+- **`Components/Plan/{Solar,Forecasted,Fast,Targeted}Tab.razor`** — one per mode, carrying that mode's
+  button, the runtime numbers it reads, and the plan it publishes while it drives. `ForecastedTab`
+  absorbs the old `/forecast` page *and* the four runtime numbers that used to sit on the dashboard;
+  `TargetedTab` absorbs `/targeted` whole. **Minimum battery SOC** appears on both, through the same
+  runtime seam, because both planners work to it.
+- **`Components/Pages/Dashboard.razor`** — regrouped as **Energy**, **Vehicle** and **Charging
+  session**, and stripped of every control. The session section renders only while there is a session
+  to report — a mode is driving, or the car is drawing under none — and otherwise says so in a line
+  with a link to the plan page, rather than showing a grid of dashes.
+- **`Components/Pages/Forecast.razor` and `Targeted.razor` deleted**; the nav is Dashboard · Charging
+  plan · Sessions · Energy · Health.
+- **The tab lives in the URL**, so a bookmark and a refresh return to the same mode and the back
+  button walks them. `/charging-plan` with no tab resolves to whatever is actually driving the
+  charger — computed on the way in only, so a mode that ends itself cannot pull the tab out from
+  under the reader.
+- **`site.css`** gains the tab strip and panel, and a global `h2` that reads as a divider between
+  grids. The panel is the same card the control sections are, so the active tab runs into it; the
+  stat cards and the chart inside it drop to the page background, or a card on a card of the same
+  colour would leave every figure edgeless.
+
+### Tested
+
+`ForecastPageTests` and `TargetedPageTests` became `ForecastedTabTests` and `TargetedTabTests`, each
+rendering the page and asking for its tab — which exercises the wiring between them rather than the
+tab in isolation. `ChargingPlanPageTests` is new: the tab strip (one per mode, none for `Off`, the
+running mode marked and opened on by default, a nonsense slug falling back to a real tab), the header
+(the mode line, the note, a refused `Fast`, a mode that ends itself taking the note with it, the hold
+switch above the tabs and not inside one), and the two tabs that are only a button and some figures.
+`DashboardPageTests` keeps its telemetry and vehicle cases and gains the grouping ones — the three
+headings in order, the empty session state and the uncontrolled session that must not be hidden by
+it, and that the page now carries no `button`, `input` or `select` at all. 150 web tests, 749 in all.
+
+---
+
 ## 2026-08-22 — The weather each session ran in (issue #96)
 
 The companion to the day-forecast curve: that says what the sun was expected to do, this says what the sky did. Both ends of every session now carry a weather reading, and the day carries its sunrise and sunset.

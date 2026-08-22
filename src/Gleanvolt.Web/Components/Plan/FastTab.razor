@@ -1,0 +1,52 @@
+@*
+    The mode for when the sun is beside the point. Nothing to configure either -- the maximum current
+    is an installation limit, not a runtime choice -- so this tab is the button, the warning that it
+    will import, and the four numbers that say what the car is actually taking.
+*@
+
+<p class="muted">
+    Charge as fast as the installation allows and keep the home battery out of it. The setpoint is
+    pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid
+    covers the rest, so expect to import. The discharge hold is armed for as long as this mode is
+    selected, and released when it ends.
+</p>
+
+<div class="control">
+    <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
+        Charge at maximum
+    </button>
+    <span class="hint">
+        Ends itself: when the car stops drawing because it has reached its own charge limit, the
+        setpoint drops to the pause current and the mode returns to Off, which releases the hold.
+    </span>
+</div>
+
+@if (Status is { } status)
+{
+    <section class="stat-grid">
+        <Stat Label="EV charging power" Value="@Watts(status.EvChargerPowerWatts)"
+              Hint="What the charger reports the car actually drawing right now — not a setpoint. This is what falls away when the car decides it is full." />
+        <Stat Label="EV charging current" Value="@Amps(status.EvChargingCurrentAmps)"
+              Hint="Charging current derived from the charger's measured power: what the car really takes, which can be below the maximum if the car itself limits it." />
+        <Stat Label="Active current" Value="@Amps(status.ActiveCurrentAmps)"
+              Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
+        <Stat Label="Grid power" Value="@Watts(status.GridPowerWatts)"
+              Hint="Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed." />
+    </section>
+}
+
+@code {
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
+
+    private Task StartFast() => Start(ChargeControlMode.FastNoBattery);
+
+    private static string Watts(double watts) => $"{watts:F0} W";
+
+    private static string Amps(int amps) => $"{amps} A";
+
+    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+}

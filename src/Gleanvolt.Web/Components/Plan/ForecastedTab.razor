@@ -1,0 +1,257 @@
+@implements IAsyncDisposable
+@inject IForecastRuntimeSettings ForecastSettings
+@inject TimeProvider Time
+@inject IJSRuntime JS
+
+@*
+    The forecast-driven mode, and the only one with a day plan behind it -- so this tab carries both
+    the four runtime numbers the plan reads and the plan it publishes while it drives. They used to
+    live a nav item apart, on the dashboard and on /forecast, which meant reading the outcome on one
+    page and adjusting the input on another.
+
+    The plan half is the old /forecast page unchanged: the same eleven figures with their meanings
+    inline, and the same timeline chart (vendored uPlot, #44) drawn from SolarDayPlanner's own
+    timeline, so the picture cannot disagree with the numbers beside it. Populated only while
+    Forecasted is the active mode -- status.Plan is null otherwise -- so a different mode driving the
+    charger shows an explicit empty state here rather than the last stale plan.
+
+    The numbers are written through IForecastRuntimeSettings, the seam the MQTT worker's number
+    entities write, and re-read whenever a new status lands: Home Assistant or a second browser can
+    move any of them, and this tab shows what the controller is actually using.
+*@
+
+<p class="muted">
+    Charge from surplus like <a href="/charging-plan/solar">Solar</a>, but with the fixed
+    battery-full gate replaced by the Solcast forecast: the plan decides how much of today's
+    remaining sun the car may have, so the home battery still reaches 100% by the evening deadline.
+    The midday plateau goes to the car, the shoulders stay with the house and the battery.
+</p>
+
+<div class="control">
+    <button type="button" class="primary" id="start-forecasted" disabled="@Busy" @onclick="StartForecasted">
+        Charge to the forecast
+    </button>
+    <span class="hint">
+        Falls back to plain surplus behaviour whenever no usable forecast is available, rather than
+        refusing to charge.
+    </span>
+</div>
+
+<div class="control">
+    <label for="daily-ev-target">Daily EV target (kWh)</label>
+    <input id="daily-ev-target" type="number" step="0.1" min="0"
+           @bind="_dailyEvTargetKWh" @bind:event="onchange" @bind:after="OnDailyEvTargetSelected" />
+    <span class="hint">
+        How much energy the car should get on a normal day. Doesn't persist across restarts.
+    </span>
+</div>
+
+<div class="control">
+    <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
+    <input id="session-energy-target" type="number" step="0.1" min="0"
+           @bind="_sessionEnergyTargetKWh" @bind:event="onchange" @bind:after="OnSessionEnergyTargetSelected" />
+    <span class="hint">
+        Stop charging once this much has gone into the car in one session. 0 means no limit.
+        Doesn't persist across restarts.
+    </span>
+</div>
+
+<div class="control">
+    <label for="min-battery-soc">Minimum battery SOC (%)</label>
+    <input id="min-battery-soc" type="number" step="1" min="0" max="100"
+           @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
+    <span class="hint">
+        The hard floor the plan may never take the home battery below. Shared with
+        <a href="/charging-plan/targeted">Targeted</a>, which works to the same floor. Doesn't persist
+        across restarts.
+    </span>
+</div>
+
+<div class="control">
+    <label for="resume-margin">SOC resume margin (%)</label>
+    <input id="resume-margin" type="number" step="1" min="0" max="50"
+           @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
+    <span class="hint">
+        How far above the floor the battery must recover before a paused session restarts. Raise it
+        if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.
+    </span>
+</div>
+
+@if (Status is null)
+{
+    <p class="muted">No poll has completed yet.</p>
+}
+else if (Status.Plan is not { } plan)
+{
+    <p class="muted">
+        The day plan is only shown while <strong>Forecasted</strong> is the active charge mode.
+        Current mode: @Status.Mode.
+    </p>
+}
+else
+{
+    <h2>The plan</h2>
+
+    <p class="muted">
+        Updated @TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+    </p>
+
+    <section class="stat-grid">
+        <Stat Label="Day outlook" Value="@plan.Outlook.ToString()"
+              Hint="How the rest of today looks for the car. Surplus: the day covers the house, the battery to 100% and the whole EV target. Tight: less than target. Shortfall: substantially less; the battery keeps priority. NoChargeToday: no window at all." />
+        <Stat Label="Plan state" Value="@plan.Reason"
+              Hint="Why the plan decided what it decided -- the same line the log carries." />
+        <Stat Label="Charge window" Value="@FormatWindow(plan.NextFeasibleWindow)"
+              Hint="The next stretch of today forecast to clear the charger's minimum power for long enough to be worth starting. 'none' when today offers no such window." />
+        <Stat Label="EV energy budget" Value="@Kwh(plan.FeasibleEvEnergyWh)"
+              Hint="How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power." />
+        <Stat Label="EV energy expected today" Value="@Kwh(plan.EvExpectedTodayWh)"
+              Hint="What the car can realistically receive in total today, including what it has already taken." />
+        <Stat Label="Projected shortfall" Value="@Kwh(plan.ShortfallWh)"
+              Hint="How far today's forecast falls short of the house plus a full battery plus the daily EV target. The battery keeps priority regardless." />
+        <Stat Label="Required SOC floor" Value="@Percent(plan.RequiredSocFloorPercent)"
+              Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what arms the discharge hold automatically." />
+        <Stat Label="Forecast remaining today" Value="@Kwh(plan.RemainingPvWh)"
+              Hint="Forecast PV still to come today, at the configured confidence band and already scaled by forecast accuracy." />
+        <Stat Label="Tomorrow forecast" Value="@(Status.TomorrowForecastWh is { } tomorrow ? Kwh(tomorrow) : "—")"
+              Hint="Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out." />
+        <Stat Label="Forecast accuracy" Value="@Percent(plan.BiasFactor * 100)"
+              Hint="Actual production against forecast so far today. 100% is on the nose; the rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted." />
+        <Stat Label="Battery loaned today" Value="@Kwh(Status.LoanedTodayWh)"
+              Hint="Energy the home battery has lent the car today so a surplus below the charger's floor could still reach it. Resets at local midnight." />
+    </section>
+
+    <section class="chart-section">
+        <h2>Charge window against forecast surplus</h2>
+        @if (plan.Timeline.Count == 0)
+        {
+            <p class="muted">No forecast data yet.</p>
+        }
+        else
+        {
+            <div id="plan-chart" class="chart"></div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
+
+    private double _dailyEvTargetKWh;
+    private double _sessionEnergyTargetKWh;
+    private double _minBatterySocPercent;
+    private double _resumeMarginPercent;
+
+    private bool _chartRendered;
+
+    // Deliberately not _chartRendered: that one is reset on every status update to force a redraw,
+    // so it cannot answer the question DisposeAsync actually has -- "is there a uPlot instance in
+    // the JS map to tear down?". Once true it stays true, and while it is false there is nothing to
+    // dispose *and* no interop is permitted: during the static prerender pass OnAfterRenderAsync
+    // never runs, and a JS call from disposal there throws InvalidOperationException.
+    private bool _chartCreated;
+
+    // Which status the numbers and the chart were last built from. Parameters are set on every render
+    // of the page above, including the two a button press causes; only a genuinely new poll should
+    // redraw the chart or overwrite a number the owner may be halfway through typing.
+    private ChargeControlStatus? _seenStatus;
+
+    protected override void OnInitialized() => RefreshRuntimeNumbers();
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_seenStatus, Status))
+        {
+            return;
+        }
+
+        _seenStatus = Status;
+
+        // The values the controller is actually using, in case Home Assistant (or another browser)
+        // changed one since this tab opened -- the same reason the MQTT worker republishes them on
+        // every status cycle.
+        RefreshRuntimeNumbers();
+
+        // The plan is recomputed every poll, so the chart is redrawn every poll too -- recreated
+        // rather than patched via setData: staying current costs a brief redraw instead of a second
+        // code path.
+        _chartRendered = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartRendered || Status?.Plan is not { Timeline.Count: > 0 } plan)
+        {
+            return;
+        }
+
+        _chartRendered = true;
+
+        var timestamps = plan.Timeline.Select(p => p.Start.ToUnixTimeSeconds()).ToArray();
+        var surplus = plan.Timeline.Select(p => p.SurplusWatts).ToArray();
+        var floor = plan.Timeline.Select(p => p.RequiredSocFloorPercent).ToArray();
+        var windowStart = plan.NextFeasibleWindow?.Start.ToUnixTimeSeconds();
+        var windowEnd = plan.NextFeasibleWindow?.End.ToUnixTimeSeconds();
+
+        // Set before the call, not after: if the interop is cut off mid-flight the chart may already
+        // exist on the other side, and disposing one that isn't there is a no-op anyway.
+        _chartCreated = true;
+
+        await JS.InvokeVoidAsync(
+            "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd);
+    }
+
+    // Runs when the owner switches tabs as well as when the page is left: the chart belongs to this
+    // component, so it goes when this component does.
+    public async ValueTask DisposeAsync()
+    {
+        if (!_chartCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "plan-chart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is already gone (e.g. the browser tab closed) -- nothing left to clean up.
+        }
+    }
+
+    private Task StartForecasted() => Start(ChargeControlMode.Forecasted);
+
+    private void OnDailyEvTargetSelected() =>
+        ForecastSettings.SetDailyEvTargetWh(_dailyEvTargetKWh * 1000, "Web UI");
+
+    private void OnSessionEnergyTargetSelected() =>
+        ForecastSettings.SetSessionEnergyTargetWh(_sessionEnergyTargetKWh * 1000, "Web UI");
+
+    private void OnMinBatterySocSelected() =>
+        ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
+
+    private void OnResumeMarginSelected() =>
+        ForecastSettings.SetFloorResumeMarginPercent(_resumeMarginPercent, "Web UI");
+
+    private void RefreshRuntimeNumbers()
+    {
+        _dailyEvTargetKWh = Math.Round(ForecastSettings.DailyEvTargetWh / 1000, 1);
+        _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
+        _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
+        _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
+    }
+
+    private string FormatWindow((DateTimeOffset Start, DateTimeOffset End)? window) =>
+        window is { } w
+            ? $"{TimeZoneInfo.ConvertTime(w.Start, Time.LocalTimeZone):HH:mm}–{TimeZoneInfo.ConvertTime(w.End, Time.LocalTimeZone):HH:mm}"
+            : "none";
+
+    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+
+    private static string Percent(double percent) => $"{percent:F0}%";
+}
