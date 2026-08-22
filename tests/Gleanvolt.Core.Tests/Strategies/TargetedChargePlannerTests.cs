@@ -150,16 +150,24 @@ public class TargetedChargePlannerTests
         Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
         Assert.Equal(0, plan.SolarEnergyWh, 1);
 
-        // Every slice ties at zero surplus, so the tie-break decides: 22kWh at 11.04kW takes just under
-        // two hours, and those two hours start now. Waiting until 05:00 would buy exactly the same
-        // energy, exposed to exactly as much sun — none — with eight hours less room to recover in.
+        // No sun anywhere, so the grid carries all of it -- starting now and spread across the night
+        // rather than crammed into two hours at full power. 22kWh over ten hours is a 2.2kW pace, under
+        // the charger's floor, so it runs at the floor for part of each slice.
         Assert.Equal(now, plan.GridStart!.Value);
         Assert.True(plan.IsInGridBlock(now));
-        Assert.Equal(now + TimeSpan.FromHours(22_000 / MaxChargePowerWatts), plan.Blocks.Max(b => b.End));
+        Assert.Equal(22_000, plan.GridEnergyWh, 1);
+
+        // Spread, not crammed: flat out this would be over in two hours. At the paced rate it takes
+        // more than twice that, which is the whole point -- every extra hour is an hour the sun could
+        // have displaced the import, on a window that happened not to have any.
+        var duration = plan.Blocks.Max(b => b.End) - plan.Blocks.Min(b => b.Start);
+        Assert.True(
+            duration > TimeSpan.FromHours(4),
+            $"charge ran for {duration.TotalHours:F1}h; flat out would be {22_000 / MaxChargePowerWatts:F1}h");
     }
 
     [Fact]
-    public void AGridBlockOverlappingASunnySlice_CountsOnlyThePowerTheSunLeavesFree()
+    public void WhereTheSunAndTheGridShareASlice_TheirEnergiesDoNotDoubleCount()
     {
         // A day of nothing but plateau, so the grid block is forced to reach back over sunny slices.
         // Six 30-minute slices at 6kW give a 5.5kW surplus each: 16.5kWh of sun over three hours,
@@ -177,18 +185,22 @@ public class TargetedChargePlannerTests
 
         Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
 
-        // The sun gives 5.5kW of the charger's 11.04kW, so each overlapped slice can only absorb the
-        // 5.54kW difference — the block reaches much further back than deficit / P_max would suggest.
+        // Where both contribute to one slice they overlap in time, and the grid supplies only what the
+        // sun does not: never more than the charger's ceiling less the 5.5kW the roof is giving.
         var gridBlocks = plan.Blocks.Where(b => b.Source == TargetedChargeSource.Grid).ToList();
-        Assert.All(gridBlocks, b => Assert.Equal(MaxChargePowerWatts - 5500, b.PowerWatts, 1));
+        Assert.NotEmpty(gridBlocks);
+        Assert.All(gridBlocks, b => Assert.True(
+            b.PowerWatts <= MaxChargePowerWatts - 5500 + 1, $"grid block drew {b.PowerWatts:F0}W over a 5.5kW slice"));
 
-        // And the two shares still add up to exactly what was asked for: no double counting.
+        // The sun takes as much of the target as it can, and the two shares add up to exactly what was
+        // asked for: no double counting.
+        Assert.True(plan.SolarEnergyWh >= 16_000, $"solar share was {plan.SolarEnergyWh:F0}Wh of a 16.5kWh plateau");
         Assert.Equal(25_000, plan.SolarEnergyWh + plan.GridEnergyWh, 1);
         Assert.Equal(0, plan.ShortfallWh, 1);
     }
 
     [Fact]
-    public void TheGridBlockGoesWhereTheForecastSurplusIsBiggest()
+    public void ThePlateauCarriesMoreOfTheTargetThanTheShoulders()
     {
         // A bell day whose peak is the middle three half-hours. The car cannot charge from the 500W
         // shoulders, so the whole 12kWh falls to the grid — and it is the plateau, not the tail of the
@@ -205,32 +217,39 @@ public class TargetedChargePlannerTests
 
         Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
 
-        // 3.5kW of surplus is under the charger's 4.14kW minimum, so none of it is a solar block.
-        Assert.Equal(0, plan.SolarEnergyWh, 1);
-        Assert.Equal(12_000, plan.GridEnergyWh, 1);
+        // Neither the 500W shoulders nor the 3.5kW plateau clears the charger's floor, so under the old
+        // plan every one of these 12kWh was grid. Paced, the sun carries a real share of it.
+        Assert.True(plan.SolarEnergyWh > 4_000, $"solar share was {plan.SolarEnergyWh:F0}Wh");
+        Assert.Equal(12_000, plan.SolarEnergyWh + plan.GridEnergyWh, 1);
 
-        // The plateau runs 09:30-11:00 and the import starts at the top of it, not at 08:30 and not at
-        // the deadline.
-        Assert.Equal(FirstPeriodEnd.AddHours(0.5), plan.GridStart!.Value);
-        Assert.True(plan.IsInGridBlock(FirstPeriodEnd.AddHours(1)));
-        Assert.False(plan.IsInGridBlock(now));
+        // The plateau slices contribute more per half-hour than the shoulders, because the charger runs
+        // at the same floor through both and the roof covers more of it in the middle of the day.
+        var plateau = plan.Blocks
+            .Where(b => b.Source == TargetedChargeSource.Solar && b.Start >= FirstPeriodEnd.AddHours(0.5) && b.Start < FirstPeriodEnd.AddHours(2))
+            .Sum(b => b.EnergyWh);
+        var shoulder = plan.Blocks
+            .Where(b => b.Source == TargetedChargeSource.Solar && b.Start < FirstPeriodEnd.AddHours(0.5))
+            .Sum(b => b.EnergyWh);
+
+        Assert.True(plateau > shoulder, $"plateau {plateau:F0}Wh should beat shoulder {shoulder:F0}Wh");
     }
 
     [Fact]
-    public void AWindowThatIsSunnyThroughout_IsFilledFromTheFrontOfIt()
+    public void AWindowThatIsSunnyThroughout_TakesTheSunFirstAndBuysOnlyTheRemainder()
     {
-        // Nothing but plateau, so every slice offers the same surplus and the tie-break takes over:
-        // earliest first, which is also the earliest the car can start banking the target.
+        // Nothing but plateau: 5.5kW of surplus every half-hour, 16.5kWh over the window, against a
+        // 25kWh ask. The sun is taken in full from the first slice, and the grid only makes up the
+        // 8.5kWh it cannot reach -- so the charge starts on sun, not on an import.
         var now = FirstPeriodEnd.AddMinutes(-30);
         var departBy = FirstPeriodEnd.AddHours(2.5);
         var plan = Plan(
             requiredWh: 25_000, departBy: departBy, now: now, socPercent: 100,
             forecast: Forecast(6000, 6000, 6000, 6000, 6000, 6000));
 
-        Assert.Equal(now, plan.GridStart!.Value);
-        Assert.True(plan.IsInGridBlock(now));
+        Assert.Equal(now, plan.Blocks.Where(b => b.Source == TargetedChargeSource.Solar).Min(b => b.Start));
+        Assert.True(plan.SolarEnergyWh >= 16_000, $"solar share was {plan.SolarEnergyWh:F0}Wh");
 
-        // And the grid blocks stay inside the window they were placed in.
+        // And nothing runs past the deadline.
         Assert.All(plan.Blocks, b => Assert.True(b.End <= departBy, $"{b.Source} block ends past the deadline"));
     }
 
@@ -277,19 +296,21 @@ public class TargetedChargePlannerTests
     }
 
     [Fact]
-    public void TheBatteryKeepsItsPriority_APackThatNeedsTheWholeDayLeavesTheCarNothing()
+    public void TheBatteryKeepsItsPriority_APackThatNeedsTheWholeDayLeavesTheCarAlmostNothing()
     {
         // 20% SOC needs ~8.4kWh with losses, which swallows the shoulders and the whole plateau.
         var now = FirstPeriodEnd.AddMinutes(-30);
         var plan = Plan(requiredWh: 10_000, departBy: FirstPeriodEnd.AddHours(3), now: now, socPercent: 20);
 
-        Assert.Equal(0, plan.SolarEnergyWh, 1);
+        // The pack books the day out from under the car: what is left is crumbs, and the grid carries
+        // essentially the whole target.
+        Assert.True(plan.SolarEnergyWh < 1_000, $"solar share was {plan.SolarEnergyWh:F0}Wh");
         Assert.Equal(TargetedChargeStrategy.SolarPlusGrid, plan.Strategy);
-        Assert.DoesNotContain(plan.Blocks, b => b.Source == TargetedChargeSource.Solar);
+        Assert.True(plan.GridEnergyWh > 9_000, $"grid share was {plan.GridEnergyWh:F0}Wh");
     }
 
     [Fact]
-    public void ASliceWhoseLeftoverSurplusMissesTheChargersMinimum_IsWorthNothingToTheCar()
+    public void ASliceWhoseSurplusMissesTheChargersMinimum_IsNowWorthSomething()
     {
         // 4kW of PV less 500W of house is 3.5kW: real energy, but below the 4.14kW the charger needs.
         var now = FirstPeriodEnd.AddMinutes(-30);
@@ -299,20 +320,15 @@ public class TargetedChargePlannerTests
             now: now,
             forecast: Forecast(4000, 4000, 4000, 4000, 4000, 4000));
 
-        Assert.Equal(0, plan.SolarEnergyWh, 1);
-        Assert.Equal(10_000, plan.GridEnergyWh, 1);
+        // The old plan scored this at zero solar: 3.5kW cannot run the charger alone, so the whole
+        // 10kWh was bought. Under a pace the charger runs at its floor anyway and the 3.5kW comes
+        // straight off the meter -- so most of that surplus now reaches the car.
+        Assert.True(plan.SolarEnergyWh > 6_000, $"solar share was {plan.SolarEnergyWh:F0}Wh");
+        Assert.True(plan.GridEnergyWh < 4_000, $"grid share was {plan.GridEnergyWh:F0}Wh");
+        Assert.Equal(10_000, plan.SolarEnergyWh + plan.GridEnergyWh, 1);
 
-        // Worth nothing to the car *on its own* — but the grid block is placed right on top of it, so
-        // the 3.5kW still comes off the meter while the charger runs at its maximum.
+        // And it starts straight away rather than waiting for sun that never clears the floor.
         Assert.Equal(now, plan.GridStart!.Value);
-        Assert.True(plan.IsInGridBlock(now));
-
-        // And the plan says so out loud. A zero solar share on a day with real surplus in it is the
-        // weak-sun case, not a dark one, and reporting only the share describes the wrong day.
-        // Six 30-minute slices at 3.5kW, less the pack's booking at 96% SOC.
-        Assert.True(plan.ForecastSurplusWh > 9_000, $"surplus was {plan.ForecastSurplusWh:F0}Wh");
-        Assert.True(plan.HasUnusableSurplus);
-        Assert.Contains("none of it clears the charger's minimum", plan.Reason);
     }
 
     [Fact]
@@ -364,10 +380,10 @@ public class TargetedChargePlannerTests
         Assert.Equal(14_000, plan.RemainingEnergyWh, 1);
         Assert.Equal(14_000, plan.GridEnergyWh, 1);
 
-        // Less to deliver means a shorter block from the same start — which is exactly how a car that
-        // limits itself to less than we asked for gets a longer one again on the next poll.
+        // Less to deliver means a slower pace over the same window, not an earlier finish: the point of
+        // pacing is to leave the sun as long as possible to displace the import.
         Assert.Equal(now, plan.GridStart!.Value);
-        Assert.Equal(now + TimeSpan.FromHours(14_000 / MaxChargePowerWatts), plan.Blocks.Max(b => b.End));
+        Assert.True(plan.RequiredPaceWatts < 22_000 / (departBy - now).TotalHours);
     }
 
     [Fact]

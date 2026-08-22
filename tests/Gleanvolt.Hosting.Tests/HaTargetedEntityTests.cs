@@ -146,6 +146,7 @@ public class HaTargetedEntityTests
         RemainingEnergyWh: 22_000,
         SolarEnergyWh: 14_600,
         ForecastSurplusWh: 14_600,
+        RequiredPaceWatts: 3_000,
         GridEnergyWh: 7_400,
         CeilingEnergyWh: 90_000,
         ExpectedEnergyWh: 22_000,

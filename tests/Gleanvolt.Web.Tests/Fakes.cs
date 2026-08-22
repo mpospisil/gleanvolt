@@ -562,7 +562,8 @@ internal static class TestTargetedPlans
         double shortfallWh = 0,
         DateTimeOffset? feasibleDeparture = null,
         bool isUsable = true,
-        double? forecastSurplusWh = null)
+        double? forecastSurplusWh = null,
+        double? paceWatts = null)
     {
         var depart = departBy ?? now.AddHours(9);
         var blocks = new List<TargetedChargeBlock>();
@@ -588,6 +589,7 @@ internal static class TestTargetedPlans
             RemainingEnergyWh: remainingWh ?? requiredWh - deliveredWh,
             SolarEnergyWh: solarWh,
             ForecastSurplusWh: forecastSurplusWh ?? solarWh,
+            RequiredPaceWatts: paceWatts ?? 3_000,
             GridEnergyWh: gridWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: expectedWh ?? solarWh + gridWh,

@@ -115,24 +115,9 @@ public static class TargetedChargePlanner
         // dark one, which is the opposite of why the import is about to be placed under the sun.
         var forecastSurplusWh = slices.Sum(s => s.AvailableWh);
 
-        // Per slice: what the car can take from the sun (s), and what it could take in total if the
-        // grid made up the difference (m). Their gap is the room the grid block has to work in.
-        var solarWh = new double[slices.Count];
-        var maxWh = new double[slices.Count];
-
-        for (var i = 0; i < slices.Count; i++)
-        {
-            maxWh[i] = maxPowerWatts * slices[i].Hours;
-
-            // A slice whose leftover surplus doesn't clear the charger's minimum is worth nothing to
-            // the car however much energy it holds — the car cannot sip a budget slowly.
-            solarWh[i] = slices[i].IsChargeable(options.MinChargePowerWatts)
-                ? Math.Min(slices[i].AvailableWh, maxWh[i])
-                : 0;
-        }
-
-        var ceilingWh = maxWh.Sum();
-        var availableSolarWh = solarWh.Sum();
+        // The physical ceiling, and the only per-slice precompute the plan still needs: the charger
+        // flat out for every remaining minute. Everything else now falls out of the paced pass.
+        var ceilingWh = slices.Sum(s => maxPowerWatts * s.Hours);
 
         if (needWh <= TargetToleranceWh)
         {
@@ -140,15 +125,13 @@ public static class TargetedChargePlanner
                 request, now, deadline, deliveredWh, ceilingWh, socFloor, batteryToFullWh, forecastSurplusWh, forecast);
         }
 
-        // The car never takes more sun than it still needs, so a bright day stops the session at the
-        // target rather than charging on past it.
-        var solarTakenWh = Math.Min(availableSolarWh, needWh);
-        var blocks = SolarBlocks(slices, solarWh, solarTakenWh);
+        var paced = PaceOverWindow(slices, deadline, needWh, options.MinChargePowerWatts, maxPowerWatts);
 
-        // The grid covers what the sun cannot — but never more than the remaining capacity, which is
-        // exactly what makes the "not enough time" case fall out of the same arithmetic as the others.
-        var gridWh = Math.Min(needWh - solarTakenWh, ceilingWh - availableSolarWh);
-        var gridStart = AddGridBlocks(blocks, slices, solarWh, maxWh, maxPowerWatts, gridWh);
+        var paceWatts = paced.PaceWatts;
+        var solarTakenWh = paced.SolarWh;
+        var gridWh = paced.GridWh;
+        var blocks = paced.Blocks;
+        var gridStart = paced.GridStart;
 
         var expectedWh = solarTakenWh + Math.Max(0, gridWh);
         var shortfallWh = Math.Max(0, needWh - expectedWh);
@@ -175,6 +158,7 @@ public static class TargetedChargePlanner
             RemainingEnergyWh: needWh,
             SolarEnergyWh: solarTakenWh,
             ForecastSurplusWh: forecastSurplusWh,
+            RequiredPaceWatts: paceWatts,
             GridEnergyWh: Math.Max(0, gridWh),
             CeilingEnergyWh: ceilingWh,
             ExpectedEnergyWh: expectedWh,
@@ -218,120 +202,158 @@ public static class TargetedChargePlanner
             Math.Clamp(options.MinBatterySocFloorPercent, 0, 100));
     }
 
+    /// <summary>What one paced pass over the window produced.</summary>
+    private readonly record struct PacedPlan(
+        List<TargetedChargeBlock> Blocks,
+        double SolarWh,
+        double GridWh,
+        DateTimeOffset? GridStart,
+        double PaceWatts);
+
     /// <summary>
-    /// The solar side of the plan, taken <b>earliest-first</b>. Not best-surplus-first: banking energy
-    /// early is the robust choice when a forecast may disappoint, and it costs nothing, because nothing
-    /// here is committed — a better afternoon than forecast simply shows up as a shrunken grid block on
-    /// the next poll.
+    /// Spreads the charge across the <b>whole window</b> at the slowest rate that still meets the
+    /// deadline, taking every watt of sun above that rate for free.
+    ///
+    /// <para>This replaces placing a full-power block somewhere in the window, and the reason is
+    /// arithmetic the site demonstrated on the first day: 13 kWh drawn at 10.7 kW is over in 87
+    /// minutes, and for all 87 of them the car outruns the roof by 7 kW — so 9 of the 13 kWh came off
+    /// the meter on a day that later peaked at 8.5 kW. The same 13 kWh paced across a four-hour window
+    /// is 3.3 kW, which the roof matches for much of it. <b>Rate, not placement, decides the solar
+    /// share</b>, because the charger can only ever use the sun that is shining while it runs.</para>
+    ///
+    /// <para>Per slice: want <c>max(surplus, pace)</c>. The pace is the floor — the promise has to be
+    /// kept — and the sun raises it whenever it can, which is free energy and lowers the pace for
+    /// every slice after it. Clamped into the charger's range: below its ~4.14 kW minimum the block
+    /// runs at the minimum for a <em>fraction</em> of the slice instead, because the car cannot sip;
+    /// above its maximum the slice is simply flat out, which is what makes the "not enough time" case
+    /// fall out of this same loop with no special case.</para>
+    ///
+    /// <para>The two blocks a slice emits overlap in time on purpose: they are one charging period
+    /// with two contributors, the sun supplying what it has and the grid making up the difference.</para>
     /// </summary>
-    private static List<TargetedChargeBlock> SolarBlocks(
+    private static PacedPlan PaceOverWindow(
         List<ForecastSlice> slices,
-        double[] solarWh,
-        double takeWh)
+        DateTimeOffset deadline,
+        double needWh,
+        double minPowerWatts,
+        double maxPowerWatts)
     {
         var blocks = new List<TargetedChargeBlock>();
-        var remaining = takeWh;
+        var remaining = needWh;
+        double solarTotalWh = 0;
+        double gridTotalWh = 0;
+        DateTimeOffset? gridStart = null;
 
-        for (var i = 0; i < slices.Count && remaining > 0; i++)
+        if (maxPowerWatts <= 0)
         {
-            if (solarWh[i] <= 0)
+            return new PacedPlan(blocks, 0, 0, null, 0);
+        }
+
+        // How much the sun could still put in the car from each slice onwards <b>unaided</b>. Built once,
+        // backwards, and read as "is there enough sun ahead to finish without buying anything?".
+        //
+        // Only slices whose surplus clears the charger's floor count. A half-hour of 3.5kW cannot run
+        // the charger by itself, so promising it here would defer the start on the strength of sun that
+        // can never arrive alone -- and then arrive at the deadline short. (Once the grid *is* paying,
+        // that same 3.5kW is used in full; it just cannot be counted on to remove the need for a pace.)
+        var solarAheadWh = new double[slices.Count + 1];
+        for (var i = slices.Count - 1; i >= 0; i--)
+        {
+            var unaidedWatts = slices[i].AvailableWatts >= minPowerWatts
+                ? Math.Min(slices[i].AvailableWatts, maxPowerWatts)
+                : 0;
+
+            solarAheadWh[i] = solarAheadWh[i + 1] + (unaidedWatts * slices[i].Hours);
+        }
+
+        for (var index = 0; index < slices.Count; index++)
+        {
+            var slice = slices[index];
+
+            if (remaining <= TargetToleranceWh || slice.Hours <= 0)
             {
                 continue;
             }
 
-            var powerWatts = solarWh[i] / slices[i].Hours;
-            var take = Math.Min(remaining, solarWh[i]);
-            remaining -= take;
-
-            // A partly-taken slice ends the block early rather than derating it: the charger runs at
-            // the power the sun supports and stops when the target is met.
-            blocks.Add(new TargetedChargeBlock(
-                slices[i].Start,
-                slices[i].Start + TimeSpan.FromHours(take / powerWatts),
-                TargetedChargeSource.Solar,
-                powerWatts,
-                take));
-        }
-
-        return blocks;
-    }
-
-    /// <summary>
-    /// The grid block, placed <b>where the roof is busiest</b>: the slices carrying the most forecast
-    /// surplus are filled first, and ties are broken earliest-first.
-    ///
-    /// <para>That one ordering answers both halves of the question. When the forecast says the sun
-    /// will be up, the import runs <em>alongside</em> it, so every watt the roof actually produces at
-    /// that moment — including the surplus that sits below the charger's minimum and is worth nothing
-    /// to the car on its own, and including everything a P10 forecast underestimated — offsets the
-    /// meter instead of being exported. When the window holds no forecast surplus at all, every slice
-    /// ties at zero and the tie-break takes over: the block starts <b>now</b>.</para>
-    ///
-    /// <para>This replaces an earlier backward pass that put the import as late as it could go. Late
-    /// placement bought one thing — the chance for a better-than-forecast afternoon to shrink the
-    /// block before any of it was drawn — and it is not free: it also guarantees the charger is idle
-    /// through the sunniest part of the day and then imports in the dark, where no amount of
-    /// unforecast sun can reach it. Running under the sun keeps the deferral value (the plan is still
-    /// rebuilt every poll, and the block still shrinks as delivery accrues) and collects the surplus
-    /// as well.</para>
-    ///
-    /// <para>Within a slice the energy is prorated by <em>power</em>, not by time: where the sun is
-    /// already giving the car something, the grid only has to supply <c>P_max</c> minus that.</para>
-    /// </summary>
-    /// <returns>The earliest instant the import starts, or null when none is needed.</returns>
-    private static DateTimeOffset? AddGridBlocks(
-        List<TargetedChargeBlock> blocks,
-        List<ForecastSlice> slices,
-        double[] solarWh,
-        double[] maxWh,
-        double maxPowerWatts,
-        double deficitWh)
-    {
-        var remaining = deficitWh;
-        DateTimeOffset? start = null;
-
-        var sunniestFirst = Enumerable.Range(0, slices.Count)
-            .OrderByDescending(i => slices[i].AvailableWatts)
-            .ThenBy(i => slices[i].Start);
-
-        foreach (var i in sunniestFirst)
-        {
-            if (remaining <= TargetToleranceWh)
+            var hoursLeft = (deadline - slice.Start).TotalHours;
+            if (hoursLeft <= 0)
             {
-                break;
-            }
-
-            var headroomWh = maxWh[i] - solarWh[i];
-            if (headroomWh <= 0)
-            {
-                // The sun alone already fills the charger in this slice; there is no room to import
-                // into it. (Not an error — just a slice the pass steps over.)
                 continue;
             }
 
-            var take = Math.Min(remaining, headroomWh);
-            remaining -= take;
+            // Not gated on clearing the charger's minimum. Under a pace the charger is running anyway,
+            // so a surplus far below its floor still comes off the meter — which is the whole reason
+            // sub-minimum sun stopped being worthless.
+            var surplusWatts = Math.Max(0, slice.AvailableWatts);
 
-            var gridPowerWatts = maxPowerWatts - (solarWh[i] / slices[i].Hours);
+            // The pace is what the *grid* must sustain, not what the charger must: whatever the rest of
+            // the window's sun is forecast to deliver is subtracted first. Without that subtraction a
+            // pace would import through a cloudy morning to hit an average the afternoon was going to
+            // cover for nothing — buying energy the day was about to hand over free, which is the exact
+            // mistake this mode exists to avoid.
+            var deficitWh = Math.Max(0, remaining - solarAheadWh[index]);
+            var gridPaceWatts = deficitWh / hoursLeft;
 
-            // Anchored at the slice's start, so slices taken in sequence join up into one run rather
-            // than leaving gaps, and a wholly dark window really does begin at "now".
-            var blockStart = slices[i].Start;
+            // Sum, not max. The pace covers what the sun *cannot* reach -- the look-ahead already
+            // subtracted every watt it can -- so the two are additive. Taking the greater of them would
+            // let a sunny slice swallow the grid's share and quietly arrive at the deadline short.
+            var wantWatts = surplusWatts + gridPaceWatts;
 
-            blocks.Add(new TargetedChargeBlock(
-                blockStart,
-                blockStart + TimeSpan.FromHours(take / gridPowerWatts),
-                TargetedChargeSource.Grid,
-                gridPowerWatts,
-                take));
-
-            if (start is null || blockStart < start)
+            // Nothing owed to the grid and not enough sun to run on: wait for the plateau. Bumping a
+            // 500W shoulder up to the charger's floor would import 3.6kW to harvest 500W, on a day the
+            // forecast says the sun finishes the job by itself.
+            if (deficitWh <= TargetToleranceWh && surplusWatts < minPowerWatts)
             {
-                start = blockStart;
+                continue;
             }
+
+            var chargeWatts = Math.Clamp(wantWatts, minPowerWatts, maxPowerWatts);
+            if (chargeWatts <= 0)
+            {
+                continue;
+            }
+
+            // Where the wanted rate is under the charger's floor this is shorter than the slice: run at
+            // the floor for part of it rather than pretend the car can trickle.
+            var takeWh = Math.Min(remaining, Math.Min(wantWatts * slice.Hours, chargeWatts * slice.Hours));
+            if (takeWh <= 0)
+            {
+                continue;
+            }
+
+            var hours = takeWh / chargeWatts;
+            var end = slice.Start + TimeSpan.FromHours(hours);
+
+            var solarWatts = Math.Min(surplusWatts, chargeWatts);
+            var solarWh = solarWatts * hours;
+            var gridWh = Math.Max(0, takeWh - solarWh);
+
+            if (solarWh > 0)
+            {
+                blocks.Add(new TargetedChargeBlock(slice.Start, end, TargetedChargeSource.Solar, solarWatts, solarWh));
+                solarTotalWh += solarWh;
+            }
+
+            if (gridWh > TargetToleranceWh)
+            {
+                blocks.Add(new TargetedChargeBlock(
+                    slice.Start, end, TargetedChargeSource.Grid, chargeWatts - solarWatts, gridWh));
+                gridTotalWh += gridWh;
+                gridStart ??= slice.Start;
+            }
+
+            remaining -= takeWh;
         }
 
-        return start;
+        // The pace as it stands right now, which is what the controller works to: the part of the need
+        // the window's sun is not forecast to cover, spread over the time left. Zero on a plan the sun
+        // covers outright -- there is nothing for the grid to keep up with.
+        var hoursToDeadline = slices.Count > 0 ? (deadline - slices[0].Start).TotalHours : 0;
+        var paceWatts = hoursToDeadline > 0
+            ? Math.Max(0, needWh - solarAheadWh[0]) / hoursToDeadline
+            : 0;
+
+        return new PacedPlan(blocks, solarTotalWh, gridTotalWh, gridStart, paceWatts);
     }
 
     /// <summary>
@@ -361,6 +383,7 @@ public static class TargetedChargePlanner
             RemainingEnergyWh: 0,
             SolarEnergyWh: 0,
             ForecastSurplusWh: forecastSurplusWh,
+            RequiredPaceWatts: 0,
             GridEnergyWh: 0,
             CeilingEnergyWh: ceilingWh,
             ExpectedEnergyWh: 0,

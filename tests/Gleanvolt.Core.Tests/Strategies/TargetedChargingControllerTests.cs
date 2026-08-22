@@ -29,6 +29,7 @@ public class TargetedChargingControllerTests
         double deliveredWh = 0,
         double socFloorPercent = 50,
         double gridEnergyWh = 14_000,
+        double paceWatts = 3_000,
         DateTimeOffset? gridStart = null,
         DateTimeOffset? now = null) =>
         new(
@@ -41,6 +42,7 @@ public class TargetedChargingControllerTests
             RemainingEnergyWh: Math.Max(0, requiredWh - deliveredWh),
             SolarEnergyWh: 8_000,
             ForecastSurplusWh: 8_000,
+            RequiredPaceWatts: paceWatts,
             GridEnergyWh: gridEnergyWh,
             CeilingEnergyWh: 90_000,
             ExpectedEnergyWh: 22_000,
@@ -89,15 +91,34 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
-    public void InsideTheGridBlock_ItChargesAtTheMaximumCurrent()
+    public void WithNoSun_ItHoldsThePaceAndTheGridFundsAllOfIt()
     {
-        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, Now.AddMinutes(-5), Now.AddHours(2))]);
+        // The behaviour this replaced ran flat out at 16A until the target was met, which on a real day
+        // bought 9 of 13kWh from the grid in 87 minutes. The pace runs at the rate the deadline needs
+        // and no faster, leaving the rest of the window for the sun to displace.
+        var plan = Plan(paceWatts: 6_000);
 
         var decision = Controller().Decide(Input(plan));
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
-        Assert.Equal(16, decision.ChargeCurrentAmps);
+        Assert.Equal(8, decision.ChargeCurrentAmps);      // 6000W / 690W per amp, floored
+        Assert.NotEqual(16, decision.ChargeCurrentAmps);
         Assert.Equal(0, decision.LoanPowerWatts);
+
+        // Every watt of it is imported, so the hold must arm.
+        Assert.True(decision.GridBridgeWatts > 5_000);
+    }
+
+    [Fact]
+    public void ThePaceRisesToMeetTheDeadlineAndIsCappedByTheCharger()
+    {
+        // A pace beyond the charger's ceiling simply pins it: the "not enough time" case reaches the
+        // same place by a different route.
+        var plan = Plan(paceWatts: 20_000);
+
+        var decision = Controller().Decide(Input(plan));
+
+        Assert.Equal(16, decision.ChargeCurrentAmps);
     }
 
     [Fact]
@@ -112,7 +133,7 @@ public class TargetedChargingControllerTests
     [Fact]
     public void InsideASolarBlock_ItChargesAtTheCurrentTheSurplusSupports()
     {
-        var plan = Plan(blocks: [Block(TargetedChargeSource.Solar, Now.AddMinutes(-5), Now.AddHours(2))]);
+        var plan = Plan(paceWatts: 0);
 
         // 5.5kW over three phases at 230V is ~7.97A, floored to 7A. Long enough paused to be allowed
         // to restart: the dwell timers apply to the solar side exactly as in the forecast-driven mode.
@@ -123,31 +144,38 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
-    public void InsideASolarBlock_ThePlansSocFloorStillGates()
+    public void BelowTheFloor_ThePaceStillRunsAndTheGridFundsAllOfIt()
     {
-        var plan = Plan(
-            blocks: [Block(TargetedChargeSource.Solar, Now.AddMinutes(-5), Now.AddHours(2))],
-            socFloorPercent: 70);
+        // 8kW of surplus and the car takes none of it: below the SOC floor the sun belongs to the pack.
+        // The promise is still kept, at the charger's floor, entirely on imported energy -- and all of
+        // it counts as bridged, so the hold arms and the pack is not quietly raided for it.
+        var plan = Plan(socFloorPercent: 70, paceWatts: 1_000);
 
-        var decision = Controller().Decide(Input(plan, surplusWatts: 8000, socPercent: 65, timeInState: TimeSpan.FromMinutes(20)));
+        var decision = Controller().Decide(Input(plan, surplusWatts: 8_000, socPercent: 65, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
-        Assert.Contains("floor", decision.Reason);
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Equal(4_140, decision.GridBridgeWatts, 0);
     }
 
     [Fact]
-    public void TheSocFloorDoesNotHoldBackTheGridBlock()
+    public void TheSocFloorDoesNotHoldBackThePace()
     {
-        // The pack's priority is about the *sun*. Inside the grid block the car is on imported energy
-        // and the discharge hold is armed, so a low battery is no reason to miss the departure.
-        var plan = Plan(
-            blocks: [Block(TargetedChargeSource.Grid, Now.AddMinutes(-5), Now.AddHours(2))],
-            socFloorPercent: 70);
+        // The pack's priority is about the *sun*, not about the promise. Below the floor the car still
+        // gets the pace -- funded by the grid, with the hold armed -- because a low battery is no reason
+        // to miss the departure.
+        var plan = Plan(socFloorPercent: 70, paceWatts: 6_000);
 
-        var decision = Controller().Decide(Input(plan, socPercent: 30));
+        var decision = Controller().Decide(Input(plan, socPercent: 30, surplusWatts: 9_000));
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
-        Assert.Equal(16, decision.ChargeCurrentAmps);
+
+        // The pace and only the pace: 6000W quantises to 8A. The 9kW of surplus is the pack's.
+        Assert.Equal(8, decision.ChargeCurrentAmps);
+        Assert.Contains("floor", decision.Reason);
+
+        // All of it is imported, so the pack must be held out of it.
+        Assert.True(decision.GridBridgeWatts > 0);
     }
 
     // --- The grid bridge, and sun outside the plan's blocks ---
@@ -158,7 +186,7 @@ public class TargetedChargingControllerTests
         // 3.5kW is real energy and charges nothing at all: the 6A floor on three phases is 4.14kW. The
         // plan already owes 14kWh to the grid, so buying the 640W gap now is strictly cheaper than
         // exporting the 3.5kW and buying the whole 4.14kW back after dark.
-        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, DepartBy.AddHours(-2), DepartBy.AddMinutes(-15))]);
+        var plan = Plan(paceWatts: 0);
 
         var decision = Controller().Decide(Input(plan, surplusWatts: 3_500, timeInState: TimeSpan.FromMinutes(20)));
 
@@ -173,7 +201,7 @@ public class TargetedChargingControllerTests
     {
         // Nothing is owed to the grid, so there is no committed import to bring forward — buying now
         // would spend money on energy the day was about to hand over free.
-        var plan = Plan(strategy: TargetedChargeStrategy.Solar, gridEnergyWh: 0);
+        var plan = Plan(strategy: TargetedChargeStrategy.Solar, gridEnergyWh: 0, paceWatts: 0);
 
         var decision = Controller().Decide(Input(plan, surplusWatts: 3_500, timeInState: TimeSpan.FromMinutes(20)));
 
@@ -186,7 +214,7 @@ public class TargetedChargingControllerTests
     {
         // The pack's priority is not suspended for this. Diverting the surplus to the car would delay
         // the battery's own recovery, and the planned grid block still covers the target.
-        var plan = Plan(socFloorPercent: 70);
+        var plan = Plan(socFloorPercent: 70, paceWatts: 0);
 
         var decision = Controller().Decide(Input(
             plan, surplusWatts: 3_500, socPercent: 65, timeInState: TimeSpan.FromMinutes(20)));
@@ -200,7 +228,7 @@ public class TargetedChargingControllerTests
     {
         // Below the bridge threshold the sun is barely contributing, and this would just be an
         // unplanned grid block in the wrong place.
-        var decision = Controller().Decide(Input(Plan(), surplusWatts: 900, timeInState: TimeSpan.FromMinutes(20)));
+        var decision = Controller().Decide(Input(Plan(paceWatts: 0), surplusWatts: 900, timeInState: TimeSpan.FromMinutes(20)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Equal(0, decision.GridBridgeWatts);
@@ -211,7 +239,7 @@ public class TargetedChargingControllerTests
     {
         // Once the sun clears the floor on its own there is nothing to bridge: the car runs on surplus
         // and the grid contributes nothing, however much is still owed to it.
-        var decision = Controller().Decide(Input(Plan(), surplusWatts: 8_000, timeInState: TimeSpan.FromMinutes(20)));
+        var decision = Controller().Decide(Input(Plan(paceWatts: 0), surplusWatts: 8_000, timeInState: TimeSpan.FromMinutes(20)));
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
         Assert.Equal(11, decision.ChargeCurrentAmps);      // 8000W / 690W per amp, floored
@@ -219,32 +247,45 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
-    public void SunOutsideEveryPlannedBlock_IsStillTaken()
+    public void SunAboveThePaceSetsTheRate()
     {
-        // Solar is the preferred source in this mode, so a half-hour the forecast said nothing about is
-        // not a reason to sit idle. The plan schedules imports; it does not get to refuse sunshine.
-        var plan = Plan(blocks: [Block(TargetedChargeSource.Grid, DepartBy.AddHours(-2), DepartBy.AddMinutes(-15))]);
+        // Nothing owed to the grid, so the pace is zero and the surplus alone decides the current.
+        var plan = Plan(paceWatts: 0);
 
         var decision = Controller().Decide(Input(plan, surplusWatts: 8_000, timeInState: TimeSpan.FromMinutes(20)));
 
         Assert.Equal(ChargingControlAction.Charge, decision.Action);
         Assert.Equal(11, decision.ChargeCurrentAmps);
-        Assert.Contains("Sun first", decision.Reason);
+        Assert.Contains("the sun sets the rate", decision.Reason);
+        Assert.Equal(0, decision.GridBridgeWatts);
     }
 
     [Fact]
-    public void BetweenTheBlocks_ItPausesAndSaysWhenTheGridWouldStart()
+    public void WithNothingOwedAndNoSun_ItWaitsAndSaysSo()
     {
-        var plan = Plan(
-            blocks: [Block(TargetedChargeSource.Grid, DepartBy.AddHours(-2), DepartBy.AddMinutes(-15))],
-            gridStart: DepartBy.AddHours(-2));
+        // Pace zero: the forecast covers the whole target on its own, so there is genuinely nothing to
+        // do but wait. The sentence has to read as the plan working, not the plan failing.
+        var plan = Plan(paceWatts: 0);
 
         var decision = Controller().Decide(Input(plan));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Contains("Waiting for sun", decision.Reason);
-        Assert.Contains($"{DepartBy.AddHours(-2).LocalDateTime:HH:mm}", decision.Reason);
+        Assert.Contains($"{DepartBy.AddMinutes(-15).LocalDateTime:HH:mm}", decision.Reason);
         Assert.False(decision.SessionComplete);
+    }
+
+    [Fact]
+    public void WithASubFloorPace_ItHoldsTheFloorRatherThanDeferringToTheDeadline()
+    {
+        // The regression this guards: a 1kW pace under a 4.14kW floor used to wait until the pace
+        // climbed past the floor, which crams the whole remainder into the last minutes of the window.
+        // The pace is energy the sun is not forecast to cover, so deferring it buys nothing at all.
+        var decision = Controller().Decide(Input(Plan(paceWatts: 1_000)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Contains("rather than defer", decision.Reason);
     }
 
     [Fact]
@@ -313,7 +354,7 @@ public class TargetedChargingControllerTests
         // The gap between blocks is us holding the charger at the pause current. Reading it as "the car
         // has finished" would end the mode every time it waited for the sun.
         var decision = Controller().Decide(Input(
-            Plan(), charging: false, evDrewPower: true, evIdleFor: TimeSpan.FromHours(3)));
+            Plan(paceWatts: 0), charging: false, evDrewPower: true, evIdleFor: TimeSpan.FromHours(3)));
 
         Assert.False(decision.SessionComplete);
         Assert.Equal(ChargingControlAction.Pause, decision.Action);

@@ -36,6 +36,18 @@ namespace Gleanvolt.Core.Models;
 /// a sunny day, which is both wrong and the opposite of what the plan then does — it places the
 /// import on exactly those hours so the roof pays for part of it.</para>
 /// </param>
+/// <param name="RequiredPaceWatts">
+/// The average power the charger must hold, from now to the deadline, to keep the promise:
+/// <c>RemainingEnergyWh / TimeRemaining</c>. The number the whole mode turns on.
+///
+/// <para>It is a <b>floor on the rate, not a setpoint</b>. The controller charges at
+/// <c>max(live surplus, pace)</c>, so sun above the pace is taken in full — free energy, and it lowers
+/// the pace for every minute after it. Sun below the pace is topped up from the grid.</para>
+///
+/// <para>Pacing rather than charging flat out is what maximises the solar share: the charger can only
+/// use the sun that shines <em>while it runs</em>, so a rate near the roof's own output collects far
+/// more of it than a short burst at maximum power that outruns the roof and then stops.</para>
+/// </param>
 /// <param name="GridEnergyWh">
 /// The part planned to come from the grid. An <b>upper bound</b> where the import is placed over
 /// sub-floor surplus: the charger runs at its maximum there and whatever the roof supplies at that
@@ -89,6 +101,7 @@ public sealed record TargetedChargePlan(
     double RemainingEnergyWh,
     double SolarEnergyWh,
     double ForecastSurplusWh,
+    double RequiredPaceWatts,
     double GridEnergyWh,
     double CeilingEnergyWh,
     double ExpectedEnergyWh,
