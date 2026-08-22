@@ -110,6 +110,11 @@ public static class TargetedChargePlanner
 
         var socFloor = SocFloor(slices.Sum(s => s.SurplusWh), options);
 
+        // What the window's sun offers the car once the house and the pack have had theirs — reported
+        // whether or not any of it clears the charger's floor. Without it a weak-sun plan reads as a
+        // dark one, which is the opposite of why the import is about to be placed under the sun.
+        var forecastSurplusWh = slices.Sum(s => s.AvailableWh);
+
         // Per slice: what the car can take from the sun (s), and what it could take in total if the
         // grid made up the difference (m). Their gap is the room the grid block has to work in.
         var solarWh = new double[slices.Count];
@@ -131,7 +136,8 @@ public static class TargetedChargePlanner
 
         if (needWh <= TargetToleranceWh)
         {
-            return Complete(request, now, deadline, deliveredWh, ceilingWh, socFloor, batteryToFullWh, forecast);
+            return Complete(
+                request, now, deadline, deliveredWh, ceilingWh, socFloor, batteryToFullWh, forecastSurplusWh, forecast);
         }
 
         // The car never takes more sun than it still needs, so a bright day stops the session at the
@@ -168,6 +174,7 @@ public static class TargetedChargePlanner
             DeliveredEnergyWh: Math.Max(0, deliveredWh),
             RemainingEnergyWh: needWh,
             SolarEnergyWh: solarTakenWh,
+            ForecastSurplusWh: forecastSurplusWh,
             GridEnergyWh: Math.Max(0, gridWh),
             CeilingEnergyWh: ceilingWh,
             ExpectedEnergyWh: expectedWh,
@@ -343,6 +350,7 @@ public static class TargetedChargePlanner
         double ceilingWh,
         double socFloorPercent,
         double batteryToFullWh,
+        double forecastSurplusWh,
         SolarForecast? forecast) => new(
             Strategy: TargetedChargeStrategy.Complete,
             Now: now,
@@ -352,6 +360,7 @@ public static class TargetedChargePlanner
             DeliveredEnergyWh: Math.Max(0, deliveredWh),
             RemainingEnergyWh: 0,
             SolarEnergyWh: 0,
+            ForecastSurplusWh: forecastSurplusWh,
             GridEnergyWh: 0,
             CeilingEnergyWh: ceilingWh,
             ExpectedEnergyWh: 0,
@@ -380,6 +389,15 @@ public static class TargetedChargePlanner
             TargetedChargeStrategy.Solar =>
                 $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm} from forecast surplus alone; "
                 + $"no grid import planned.{blind}",
+
+            // Named explicitly, because "0.0kWh from sun" on a day with 6kWh of forecast surplus reads
+            // as a broken plan rather than as the weak-sun case the placement is answering.
+            _ when plan.HasUnusableSurplus =>
+                $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: "
+                + $"{plan.ForecastSurplusWh / 1000:F1}kWh of surplus is forecast but none of it clears the charger's "
+                + $"minimum, so the grid covers up to {plan.GridEnergyWh / 1000:F1}kWh from "
+                + $"{plan.GridStart?.LocalDateTime:HH:mm} — placed over the best of that sun, which pays for part "
+                + $"of it.{blind}",
 
             _ =>
                 $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: "

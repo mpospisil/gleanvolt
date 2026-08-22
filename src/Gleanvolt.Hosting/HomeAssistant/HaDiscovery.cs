@@ -260,6 +260,10 @@ public sealed class HaDiscovery
         yield return Button("activate_target", "Activate target", "mdi:play-circle-outline");
 
         yield return Sensor("target_plan_state", "Target plan state", template: Optional("target_reason"), icon: "mdi:text-box-outline");
+        // Alongside target_solar rather than instead of it: the pair is the point. A zero solar share
+        // against a non-zero surplus is the weak-sun day -- sun the roof will produce that the charger
+        // cannot run on unaided -- and reporting only the share describes it as a dark one.
+        yield return Sensor("target_forecast_surplus", "Target forecast surplus", template: Optional("target_forecast_surplus_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_solar", "Target solar energy", template: Optional("target_solar_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_grid", "Target grid energy", template: Optional("target_grid_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("target_expected", "Target expected", template: Optional("target_expected_kwh"), unit: "kWh", deviceClass: "energy");
@@ -355,6 +359,7 @@ public sealed class HaDiscovery
         if (s.TargetedPlan is { } target)
         {
             payload["target_reason"] = target.Reason;
+            payload["target_forecast_surplus_kwh"] = Math.Round(target.ForecastSurplusWh / 1000, 1);
             payload["target_solar_kwh"] = Math.Round(target.SolarEnergyWh / 1000, 1);
             payload["target_grid_kwh"] = Math.Round(target.GridEnergyWh / 1000, 1);
             payload["target_expected_kwh"] = Math.Round(target.ExpectedEnergyWh / 1000, 1);

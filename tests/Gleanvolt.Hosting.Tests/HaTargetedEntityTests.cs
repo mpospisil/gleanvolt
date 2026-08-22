@@ -72,11 +72,23 @@ public class HaTargetedEntityTests
         var state = json.RootElement;
 
         Assert.Equal(plan.Reason, state.GetProperty("target_reason").GetString());
+        Assert.Equal(14.6, state.GetProperty("target_forecast_surplus_kwh").GetDouble(), 1);
         Assert.Equal(14.6, state.GetProperty("target_solar_kwh").GetDouble(), 1);
         Assert.Equal(7.4, state.GetProperty("target_grid_kwh").GetDouble(), 1);
         Assert.Equal(22.0, state.GetProperty("target_expected_kwh").GetDouble(), 1);
         Assert.Equal(0, state.GetProperty("target_shortfall_kwh").GetDouble(), 1);
         Assert.True(state.TryGetProperty("target_grid_start", out _));
+    }
+
+    [Fact]
+    public void TheForecastSurplusIsPublishedBesideTheSolarShare()
+    {
+        // The pair is the point: a zero solar share against a real surplus is the weak-sun day, and a
+        // dashboard showing only the share reports it as a dark one.
+        var messages = Discovery.DiscoveryMessages().ToList();
+
+        Assert.Contains(messages, m => m.Payload.Contains("Target forecast surplus"));
+        Assert.Contains(messages, m => m.Payload.Contains("target_forecast_surplus_kwh"));
     }
 
     [Fact]
@@ -133,6 +145,7 @@ public class HaTargetedEntityTests
         DeliveredEnergyWh: 0,
         RemainingEnergyWh: 22_000,
         SolarEnergyWh: 14_600,
+        ForecastSurplusWh: 14_600,
         GridEnergyWh: 7_400,
         CeilingEnergyWh: 90_000,
         ExpectedEnergyWh: 22_000,

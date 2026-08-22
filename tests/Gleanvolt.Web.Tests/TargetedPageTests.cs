@@ -224,6 +224,37 @@ public class TargetedPageTests : BunitContext
     }
 
     [Fact]
+    public void The_narrative_for_a_weak_sun_day_names_the_surplus_instead_of_denying_it()
+    {
+        // Reported live (2026-08-22): a 43kWh Solcast day with the import placed at 11:00 was described
+        // as "No usable surplus is forecast before then ... with no sun in the window to wait for".
+        // A zero solar share means no half-hour clears the charger's floor, not that the sky is empty --
+        // and the plan had just put the import under that very sun.
+        var text = Narrate(TestTargetedPlans.WeakSun(Now));
+
+        Assert.Contains("6.4 kWh of surplus is forecast for this window", text);
+        Assert.Contains("never climbs past the charger's 6 A minimum", text);
+        Assert.Contains("expect to import less than that", text);
+
+        // The two claims that were wrong, and the overstatement the user caught.
+        Assert.DoesNotContain("No usable surplus is forecast", text);
+        Assert.DoesNotContain("no sun in the window", text);
+        Assert.DoesNotContain("the whole", text);
+    }
+
+    [Fact]
+    public void The_narrative_for_a_genuinely_dark_window_still_says_there_is_nothing_to_wait_for()
+    {
+        // The overnight case the old wording was written for, which must survive the fix: no surplus at
+        // all, so starting at once really does cost nothing.
+        var text = Narrate(TestTargetedPlans.DarkWindow(Now));
+
+        Assert.Contains("No surplus at all is forecast before then", text);
+        Assert.Contains("nothing to be gained by putting it off", text);
+        Assert.DoesNotContain("of surplus is forecast for this window", text);
+    }
+
+    [Fact]
     public void The_narrative_for_a_sun_only_plan_says_no_import_is_planned()
     {
         var text = Narrate(TestTargetedPlans.Solar(Now));

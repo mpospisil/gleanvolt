@@ -306,6 +306,40 @@ public class TargetedChargePlannerTests
         // the 3.5kW still comes off the meter while the charger runs at its maximum.
         Assert.Equal(now, plan.GridStart!.Value);
         Assert.True(plan.IsInGridBlock(now));
+
+        // And the plan says so out loud. A zero solar share on a day with real surplus in it is the
+        // weak-sun case, not a dark one, and reporting only the share describes the wrong day.
+        // Six 30-minute slices at 3.5kW, less the pack's booking at 96% SOC.
+        Assert.True(plan.ForecastSurplusWh > 9_000, $"surplus was {plan.ForecastSurplusWh:F0}Wh");
+        Assert.True(plan.HasUnusableSurplus);
+        Assert.Contains("none of it clears the charger's minimum", plan.Reason);
+    }
+
+    [Fact]
+    public void ADarkWindowIsReportedAsHavingNoSurplusAtAll()
+    {
+        // The other side of the same distinction: overnight there really is nothing, and the plan must
+        // not be made to sound like the weak-sun case by the fix for it.
+        var now = new DateTimeOffset(2026, 7, 27, 21, 0, 0, TimeSpan.Zero);
+        var plan = Plan(requiredWh: 22_000, departBy: new DateTimeOffset(2026, 7, 28, 7, 0, 0, TimeSpan.Zero), now: now);
+
+        Assert.Equal(0, plan.ForecastSurplusWh, 1);
+        Assert.False(plan.HasUnusableSurplus);
+    }
+
+    [Fact]
+    public void TheForecastSurplusIsWhatIsLeftAfterTheHouseAndThePack()
+    {
+        // A full pack books nothing, so the whole plateau surplus is on offer to the car -- and here it
+        // does clear the floor, so the two figures agree.
+        var now = FirstPeriodEnd.AddMinutes(-30);
+        var plan = Plan(
+            requiredWh: 25_000, departBy: FirstPeriodEnd.AddHours(2.5), now: now, socPercent: 100,
+            forecast: Forecast(6000, 6000, 6000, 6000, 6000, 6000));
+
+        // Six 30-minute slices at 5.5kW of surplus.
+        Assert.Equal(6 * 2_750, plan.ForecastSurplusWh, 1);
+        Assert.False(plan.HasUnusableSurplus);
     }
 
     [Fact]

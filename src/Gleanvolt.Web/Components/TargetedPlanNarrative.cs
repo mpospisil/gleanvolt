@@ -88,17 +88,37 @@ public static class TargetedPlanNarrative
         return paragraphs;
     }
 
+    /// <summary>
+    /// The split plan in words. Three cases, not two — and the third is the one that matters, because
+    /// getting it wrong describes a sunny day as a dark one.
+    ///
+    /// <para>A zero solar share does <b>not</b> mean the window has no sun. It means no half-hour in it
+    /// clears the charger's ~4.14 kW floor, so none of it can carry the car unaided. The plan's answer
+    /// is to put the import on exactly those hours, where the roof pays for part of it — so the
+    /// sentence has to say that the sun is there, say how much of it, and stop short of promising the
+    /// grid figure will actually be bought.</para>
+    /// </summary>
     private static string SolarPlusGrid(TargetedChargePlan plan, TimeZoneInfo zone)
     {
-        var grid = plan.GridStart is { } start
-            ? $"{Kwh(plan.GridEnergyWh)} from the grid, starting {At(start, plan.Now, zone)}"
-            : $"{Kwh(plan.GridEnergyWh)} from the grid";
+        var from = plan.GridStart is { } start ? $", starting {At(start, plan.Now, zone)}" : string.Empty;
 
-        return plan.SolarEnergyWh > 0
-            ? $"There is time to wait for the sun: {Kwh(plan.SolarEnergyWh)} should come from forecast surplus "
-                + $"{Between(plan, zone)}, and {grid}."
-            : $"No usable surplus is forecast before then, so the whole {grid}. With no sun in the window to "
-                + "wait for, there is nothing to be gained by putting it off.";
+        if (plan.SolarEnergyWh > 0)
+        {
+            return $"There is time to wait for the sun: {Kwh(plan.SolarEnergyWh)} should come from forecast "
+                + $"surplus {Between(plan, zone)}, and {Kwh(plan.GridEnergyWh)} from the grid{from}.";
+        }
+
+        if (plan.HasUnusableSurplus)
+        {
+            return $"{Kwh(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs "
+                + "past the charger's 6 A minimum, so the car cannot run on it unaided. The grid covers up to "
+                + $"{Kwh(plan.GridEnergyWh)}{from} — placed over the sunniest hours, where the charger runs "
+                + "flat out and the roof quietly pays for part of it, so expect to import less than that.";
+        }
+
+        return $"No surplus at all is forecast before then, so the whole {Kwh(plan.RemainingEnergyWh)} still "
+            + $"needed comes from the grid{from}. With no sun in the window to wait for, there is nothing to "
+            + "be gained by putting it off.";
     }
 
     private static string Between(TargetedChargePlan plan, TimeZoneInfo zone) =>
