@@ -176,6 +176,31 @@ hands root to the USB disk. That works well, at the cost of two things it is eas
 Neither applies if you boot and root on the SD card in the usual way, or on a board that boots USB
 directly.
 
+## Recording the weather with each session (optional)
+
+The controller can record **what the sky was doing** at each end of every charging session — the
+conditions, the temperature and the cloud cover when it opened and when it closed, plus that day's
+sunrise and sunset. It is what lets a finished session be read against the day it happened on rather
+than only against the forecast; see
+[the weather a session ran in](../README.md#the-weather-a-session-ran-in).
+
+Three lines in `/opt/gleanvolt/.env`, and it applies to both workflows:
+
+```bash
+WEATHER_API_KEY=<your openweathermap key>
+WEATHER_LATITUDE=49.267803     # your site, in decimal degrees
+WEATHER_LONGITUDE=16.529486
+```
+
+The key is free: this makes **two API calls per charging session**, a handful a day, which no
+OpenWeatherMap plan charges for. Leave any of the three out and the controller makes no weather call
+at all — sessions are simply recorded without it, which is also what every session recorded before
+this existed looks like.
+
+Nothing about charge control reads any of it, so turning it on cannot change what the controller
+does to your car or your battery. A refused key or an outage costs one null column and a warning in
+the log, never a delayed or missing session.
+
 ## Putting a password on the web UI (optional)
 
 Out of the box the UI has **no login**: anyone who can reach `:8090` gets the dashboard and every
