@@ -4,6 +4,44 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-22 — The weather goes on the session, twice, in columns
+
+Issue #96, and the other half of [the day-forecast curve](#2026-08-22--a-session-carries-the-whole-day-it-happened-on). That record gave a session what the sun was *expected* to do. This one gives it what the sky actually did — without which a session that under-delivered against a confident forecast has no explanation attached to it at all, and cloud, a cold morning and snow on the panels are indistinguishable afterwards.
+
+### The endpoint chose itself
+
+The issue proposed OpenWeatherMap's One Call API. Against a real key it answers:
+
+```
+401 — Please note that using One Call 3.0 requires a separate subscription to the One Call by Call plan.
+```
+
+`data/2.5/weather` on the same key answers `200` with **every figure this feature records**: `main.temp`, `main.pressure`, `main.humidity`, `clouds.all`, `visibility`, `weather[0].main`, `weather[0].description`, `sys.sunrise`, `sys.sunset` and `dt`. One Call's extra horizons are forecast data, and a session is recorded against what the sky *did*.
+
+**Decision — the free current-weather endpoint, and no abstraction over providers.** One provider, one client. A second one can be abstracted over when there is a second one.
+
+### Two readings, and no series between them
+
+**Decision — one fetch when the session opens, one when it closes.** A six-hour session can finish in entirely different weather from the one it started in, and a single reading cannot say so; the *pair* can. It is the same shape the header already has for SOC, and it costs two API calls per session — a handful a day, inside any free plan.
+
+Not a per-sample series, deliberately. Weather moves in tens of minutes and is decoration on a record rather than an input to a decision; a reading every thirty seconds would be a hundredfold the storage and the quota to say the same thing. Not a background refresh worker either: that would spend calls on the hours when nothing is recording, which is most of them.
+
+**Decision — the fetch lives in `SessionRecordingWorker`, not in `ChargingSessionTracker`.** The tracker is a pure strategy with no I/O, exactly as it has no forecast service and no vehicle feed. The worker attaches the reading on its way to the store.
+
+**Decision — a weather call may never hurt a session.** `IWeatherService.GetCurrentAsync` returns null for every provider-side failure — bad key, rate limit, timeout, outage — and never throws. It bounds its own wait (5 s by default) because the closing call sits between a session ending and its totals being written, and no weather figure is worth delaying that. On the shutdown path a null `WeatherAtEnd` is the correct outcome rather than something to wait for.
+
+### Columns, not a document
+
+**Decision — eighteen columns rather than one JSON blob**, which is the opposite of what the day-forecast curve does one record above. The difference is how each is read. A forecast curve is written once and read whole; cloud cover and temperature are the *axes* the analysis groups by, and "solar share against cloud cover" or "delivered energy by temperature band" should be SQL rather than a parse per row.
+
+**Decision — sunrise and sunset are stored once, not per reading.** They belong to the day, not to the moment, and would be identical in both fetches. A session crossing midnight carries the starting day's pair — the rule `StartedAt` and `DayForecast` already follow. They are worth storing at all because they are the denominator: they make an 8 kWh December session comparable with an 8 kWh June one, and they say whether a session ran out of sun or merely out of surplus.
+
+### Off unless configured, and null when off
+
+Coordinates are `double?`, not `double`. Defaulted to 0 they would be a real place in the Atlantic, and an unconfigured site would silently record the weather in the Gulf of Guinea rather than recording none. With no key or no coordinates the service makes no HTTP call at all, and every weather column stays `NULL` — which must stay distinguishable from a genuine reading of 0 °C under a clear sky. Schema v4 and `schemaVersion` 4, additive; older rows keep `NULL`, which is the truth for them.
+
+---
+
 ## 2026-08-22 — A session carries the whole day it happened on
 
 ### The problem

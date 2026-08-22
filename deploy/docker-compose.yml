@@ -115,6 +115,13 @@ services:
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
+      # The weather each charging session ran in (issue #96). Entirely optional: with no key and no
+      # coordinates the controller makes no weather calls at all and sessions are recorded without it.
+      # Two calls per session, so any free OpenWeatherMap plan covers it.
+      Weather__ApiKey: ${WEATHER_API_KEY:-}
+      Weather__Latitude: ${WEATHER_LATITUDE:-}
+      Weather__Longitude: ${WEATHER_LONGITUDE:-}
+
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
       # that: the service always boots in mode Off and takes control only when a mode is selected
       # (Home Assistant or the web UI). The battery hold does, and stays disabled and dry-run unless

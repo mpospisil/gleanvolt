@@ -4,6 +4,28 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-22 — The weather each session ran in (issue #96)
+
+The companion to the day-forecast curve: that says what the sun was expected to do, this says what the sky did. Both ends of every session now carry a weather reading, and the day carries its sunrise and sunset.
+
+### What was built
+
+- **`WeatherObservation` / `WeatherReading` / `IWeatherService`** (Core). The observation is a moment — temperature, pressure, humidity, cloud, visibility, condition and its description, and the provider's own `ObservedAt`. The reading is one fetch: an observation plus the day's daylight bounds, which are not part of the observation because they belong to the day.
+- **`OpenWeatherMapService`** (Infrastructure) against `data/2.5/weather`. One Call 3.0 returns `401` without its own paid subscription, and the free endpoint carries every field recorded here. It never throws for a provider-side problem, bounds its own request (5 s), warns once rather than per call, and is inert without a key or coordinates.
+- **`WeatherOptions`** bound from `Weather`, with **nullable** coordinates — 0,0 is a real place in the Atlantic.
+- **`ChargingSession.WeatherAtStart` / `WeatherAtEnd` / `Sunrise` / `Sunset`**, attached by `SessionRecordingWorker` on its way to the store. The tracker is untouched: it is a pure strategy, and this is I/O.
+- **Database schema v4** — eighteen columns, not a JSON document, because these are the axes the analysis groups by. The insert writes the opening reading and the daylight bounds; the completing update writes only the closing one, so a failed close can never blank what the open recorded. `ChargingSessionDocument.CurrentSchemaVersion` moves to 4.
+- **The session detail page** shows both readings (`clear sky, 19.6 °C, 5% cloud → light rain, 14.1 °C, 88% cloud`) and the daylight window with its length.
+- **Deployment** passes `WEATHER_API_KEY`, `WEATHER_LATITUDE`, `WEATHER_LONGITUDE`; all three empty means no weather call is ever made.
+
+No Home Assistant entity, and nothing in charge control reads any of it.
+
+### Tested
+
+The client against a stubbed transport, including the cases that matter more than the happy path: no key and no coordinates make no network call at all, a 401 and a DNS failure are null readings rather than exceptions, and a provider that accepts the connection and then says nothing is abandoned in milliseconds. The store round-trips both readings and the bounds, keeps the opening reading through a close that carries none, and migrates a v1 file to v4 in place.
+
+---
+
 ## 2026-08-22 — Every session carries the whole day's forecast curve
 
 A recorded session could be compared against the forecast *while it ran*, never against the day it ran

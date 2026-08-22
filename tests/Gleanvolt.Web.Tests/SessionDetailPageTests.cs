@@ -48,6 +48,45 @@ public class SessionDetailPageTests : BunitContext
     }
 
     [Fact]
+    public void Shows_both_weather_readings_and_the_daylight_window()
+    {
+        var started = new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
+        var session = TestSessions.Sample(startedAt: started, endedAt: started.AddHours(4)) with
+        {
+            WeatherAtStart = new WeatherObservation(started, 19.6, 1017, 51, 5, 10_000, "Clear", "clear sky"),
+            WeatherAtEnd = new WeatherObservation(started.AddHours(4), 14.1, 1009, 76, 88, 4_000, "Rain", "light rain"),
+            Sunrise = started.AddHours(-3),
+            Sunset = started.AddHours(9),
+        };
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [], []);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.Contains("Weather", page.Markup));
+        Assert.Contains("clear sky, 19.6 °C, 5% cloud", page.Markup);
+        Assert.Contains("light rain, 14.1 °C, 88% cloud", page.Markup);
+
+        // Local time, and the length beside it -- the denominator for "did it use the day it had?".
+        Assert.Contains("Daylight", page.Markup);
+        Assert.Contains("12h 0m", page.Markup);
+    }
+
+    [Fact]
+    public void Leaves_the_weather_out_when_no_provider_was_configured()
+    {
+        var session = TestSessions.Sample(startedAt: new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero));
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [], []);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.Contains("Peak charging power", page.Markup));
+        Assert.DoesNotContain("Weather", page.Markup);
+        Assert.DoesNotContain("Daylight", page.Markup);
+    }
+
+    [Fact]
     public void Shows_the_days_forecast_with_the_band_behind_it()
     {
         var session = TestSessions.Sample(startedAt: new DateTimeOffset(2026, 8, 12, 15, 0, 0, TimeSpan.Zero)) with
