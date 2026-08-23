@@ -196,8 +196,12 @@ public sealed class TargetedChargingController : IChargingController
         }
 
         // The dwell spares the contactor when *we* are choosing to start. It must not defer a pace the
-        // charger could hold outright -- that is the deadline asking, not us.
-        if (!input.Charging && input.TimeInCurrentState < _options.MinPauseTime && paceWatts < MinChargePowerWatts)
+        // charger could hold outright -- that is the deadline asking, not us -- and it must not run at
+        // all before the first charge: see HasChargedThisTarget.
+        if (HasChargedThisTarget(plan)
+            && !input.Charging
+            && input.TimeInCurrentState < _options.MinPauseTime
+            && paceWatts < MinChargePowerWatts)
         {
             return Pause($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
         }
@@ -264,7 +268,7 @@ public sealed class TargetedChargingController : IChargingController
 
         // The same restart dwell a solar block waits out: a bridge is still a contactor cycle and a
         // vehicle wake.
-        if (!input.Charging && input.TimeInCurrentState < _options.MinPauseTime)
+        if (HasChargedThisTarget(plan) && !input.Charging && input.TimeInCurrentState < _options.MinPauseTime)
         {
             return null;
         }
@@ -339,6 +343,22 @@ public sealed class TargetedChargingController : IChargingController
 
         return Pause(reason);
     }
+
+    /// <summary>
+    /// Whether anything has actually been delivered against this target yet.
+    ///
+    /// <para>Gates the restart dwell, which exists to stop the charger flapping when the surplus wobbles
+    /// around the threshold — a <em>restart</em> timer. Before the first watt there is no charge to
+    /// restart, and applying it there had a real cost: activating a target set the coordinator's
+    /// state-changed clock, the controller immediately answered "pause", and the dwell then counted its
+    /// full 15 minutes from the moment the owner pressed <b>Activate</b>. Observed live on 2026-08-23
+    /// with 5 kW of surplus going to waste and the log reading "Paused 10min of the 15min minimum
+    /// before restarting" — a quarter of an hour of free sun lost to a timer guarding nothing.</para>
+    ///
+    /// <para>Metered from activation rather than from the plug-in, so re-activating a target starts a
+    /// fresh count and gets a prompt start too.</para>
+    /// </summary>
+    private static bool HasChargedThisTarget(TargetedChargePlan plan) => plan.DeliveredEnergyWh > 0;
 
     private static ChargingControlDecision Pause(string reason) => new(ChargingControlAction.Pause, null, reason);
 
