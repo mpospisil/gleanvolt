@@ -31,8 +31,14 @@ WORKDIR /source
 
 # Restore against the project files alone, so the slow restore layer stays cached until a dependency
 # actually changes -- not on every source edit.
+#
+# Every project the worker references transitively has to be listed: restore reads the whole graph, and
+# a project file that is not here fails the publish below with NETSDK1004 rather than being restored
+# late. A new project under src/ therefore needs a line here, one in Dockerfile.windows, and nothing
+# else -- which is why DockerfileTests asserts all three stay in step.
 COPY Gleanvolt.slnx ./
 COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj                     src/Gleanvolt.Core/
+COPY src/Gleanvolt.Api/Gleanvolt.Api.csproj                       src/Gleanvolt.Api/
 COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj                       src/Gleanvolt.Web/
 COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj               src/Gleanvolt.Hosting/

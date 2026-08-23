@@ -32,6 +32,7 @@ WORKDIR C:\source
 # nothing to cross-compile.
 COPY Gleanvolt.slnx ./
 COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj src/Gleanvolt.Core/
+COPY src/Gleanvolt.Api/Gleanvolt.Api.csproj src/Gleanvolt.Api/
 COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj src/Gleanvolt.Web/
 COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj src/Gleanvolt.Hosting/
