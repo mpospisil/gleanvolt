@@ -123,6 +123,10 @@ public static class GleanvoltApi
 
         var keys = new ApiKeyFilter(api, logger);
 
+        // Outside the group, so it answers without a key: a browser cannot send one, and an API that
+        // says nothing at its own base URL is indistinguishable from one that is broken.
+        app.MapIndex(DocumentPath);
+
         var group = app
             .MapGroup("/api/v1")
             .AddEndpointFilter(keys)
@@ -135,9 +139,14 @@ public static class GleanvoltApi
         group.MapPlans();
         group.MapControl();
 
-        // Behind the same key as everything else: the document describes a control surface, and there is
-        // no reason to hand its shape to a caller who cannot use it.
-        app.MapOpenApi("/api/{documentName}/openapi.json").AddEndpointFilter(keys);
+        // Unauthenticated, like the index. It was behind the key at first, on the reasoning that there is
+        // no point handing the shape of a control surface to a caller who cannot use it -- but the
+        // document is what a client is *generated* from, and requiring a key to read it means it cannot
+        // be opened in a browser or handed to a generator without one. The disclosure it avoided was
+        // slight next to that: the 401 already announces the API exists, and on the same host the web UI
+        // is open on the LAN by default with every control on it. The operations stay behind the key,
+        // which is where the writes are.
+        app.MapOpenApi("/api/{documentName}/openapi.json");
 
         logger.LogInformation(
             "HTTP API enabled on /api/{Document} with {KeyCount} key(s); the OpenAPI document is at {Path}.",

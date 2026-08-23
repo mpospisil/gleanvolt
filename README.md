@@ -1699,9 +1699,10 @@ reaches the log and the recorded charging session as the source of an action, so
 `Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* rather than an anonymous
 write. Several clients therefore get several keys.
 
-Present one as a bearer token on every call, the document included:
+Present one as a bearer token on every call that does anything:
 
 ```bash
+curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and what it serves
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
 
@@ -1713,11 +1714,14 @@ bearer-equivalent to the stop button on the wallbox — treat it that way.
 
 #### What it exposes
 
-Everything is under `/api/v1/`, and the document itself is at
-**`/api/v1/openapi.json`** (behind the same key).
+Everything is under `/api/v1/`. **Two endpoints need no key**, because a browser cannot send one and
+neither of them carries anything to act on: `/api/v1/` itself, which says what this is, which
+operations exist and how to authenticate, and the OpenAPI document at **`/api/v1/openapi.json`**,
+which is the thing a client is generated from. Everything else is behind the key.
 
 | Endpoint | Answers |
 |---|---|
+| `GET /` | What this is, where the document is, how to authenticate, and every operation this build serves. **No key.** |
 | `GET /status` | The live snapshot: mode, state, PV, grid, battery power and SOC, EV power and current, the hold, session energy, the running plan. 503 until the first poll completes. |
 | `GET /health` | Build version, age of the last poll, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read. |
 | `GET /energy/intervals?from=&to=` | The recorded series — solar, forecast solar, import, export, EV, battery in and out, the SOC band, and each window's **coverage**. Defaults to the last 24 hours. |

@@ -2,6 +2,16 @@
   "title": "Gleanvolt",
   "version": "v1",
   "paths": {
+    "/api/v1": {
+      "get": {
+        "operationId": "getIndex",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $ApiIndexResponse"
+        ]
+      }
+    },
     "/api/v1/battery-hold": {
       "put": {
         "operationId": "setBatteryHold",
@@ -149,6 +159,19 @@
     }
   },
   "schemas": {
+    "ApiIndexResponse": {
+      "authentication": "string (required)",
+      "build": "string (required)",
+      "documentation": "string (required)",
+      "name": "string (required)",
+      "operations": "array\u003C$ApiOperationResponse\u003E (required)",
+      "version": "string (required)"
+    },
+    "ApiOperationResponse": {
+      "method": "string (required)",
+      "path": "string (required)",
+      "summary": "string? (required)"
+    },
     "BatteryHoldRequest": {
       "hold": "boolean (required)"
     },
