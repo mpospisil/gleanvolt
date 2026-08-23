@@ -35,6 +35,11 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
+- **HTTP API, described by OpenAPI** (off by default) — the same telemetry, history, forecast and
+  actions the other two surfaces have, for programs rather than people: read the energies and the
+  car, ask what a targeted charge *would* do without starting one, and start it when the answer is
+  right. Built so that an **MCP server** can hand the lot to an LLM as generated tools — see
+  [HTTP API](#http-api-the-api-section).
 - **Vehicle telemetry** — optionally reads the **car's own** battery SOC and range from MQTT, normalised
   so any vehicle Home Assistant can see becomes a source without new code. It shapes what you *ask* for
   — a targeted charge can be stated as a battery percentage — and never how it is delivered: no control
@@ -65,6 +70,7 @@ site-specific number the forecast-driven mode cannot work without — see
 - Hosted as a [.NET Worker Service](https://learn.microsoft.com/dotnet/core/extensions/workers) (background service)
 - Modbus TCP client for inverter/charger communication
 - [Blazor](https://learn.microsoft.com/aspnet/core/blazor/) (interactive server rendering) for the optional self-hosted UI
+- Minimal APIs and [`Microsoft.AspNetCore.OpenApi`](https://learn.microsoft.com/aspnet/core/fundamentals/openapi/overview) for the optional HTTP API
 
 ## Project structure
 
@@ -86,6 +92,11 @@ Gleanvolt.slnx
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   ├── Solcast/                # Solar-forecast HTTP client
 │   │   └── Vehicles/               # The EV telemetry JSON contract and its parser
+│   │
+│   ├── Gleanvolt.Api/                  # The optional HTTP API (minimal-API endpoints + its OpenAPI document)
+│   │   ├── Contracts/              # The wire DTOs, owned here rather than shared with Core
+│   │   ├── Endpoints/              # One file per group: status, energy, sessions, forecast, plans, control
+│   │   └── ApiOptions.cs           # The "Api" configuration section
 │   │
 │   ├── Gleanvolt.Web/                  # The optional self-hosted UI (a Blazor component library)
 │   │   ├── Components/             # Pages, layout and the root document
@@ -110,6 +121,7 @@ Gleanvolt.slnx
 ├── tests/
 │   ├── Gleanvolt.Core.Tests/           # Unit tests for the control logic (mocking hardware)
 │   ├── Gleanvolt.Infrastructure.Tests/ # Register encoding and write-path tests
+│   ├── Gleanvolt.Api.Tests/            # The endpoints over TestServer, and the OpenAPI contract snapshot
 │   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
 │   └── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
@@ -126,21 +138,25 @@ Gleanvolt.slnx
 - **`Gleanvolt.Infrastructure` only implements `Gleanvolt.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
 - **`Gleanvolt.Hosting` is composition-only.** `AddGleanvolt()` wires up DI; `PollingService` orchestrates the poll/act loop by calling into `Gleanvolt.Core` abstractions — it should not contain control logic itself.
 - **`Gleanvolt.Worker` is a host and nothing else.** The `.env` load, the logging configuration and the exit code. Anything it grows that a second host would also need belongs in `Gleanvolt.Hosting` instead — which is why it references that assembly alone and cannot reach `Gleanvolt.Core` directly.
+- **`Gleanvolt.Api` references `Gleanvolt.Core` and nothing else**, on exactly the same terms as
+  `Gleanvolt.Web` below: it is a third reporting/control *surface*, it drives the same Core seams the
+  other two do, and it owns no decision logic. Composing a targeted request is decision logic, which
+  is why that moved into `Gleanvolt.Core` when this surface arrived rather than being written twice.
 - **`Gleanvolt.Web` references `Gleanvolt.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Gleanvolt.Hosting` hosts it; the dependency never runs the other way.
 - **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
 ### The libraries as packages
 
-Each `v*` tag produces a [GitHub Release](https://github.com/mpospisil/gleanvolt/releases) carrying self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the four libraries as `.nupkg` files ([`release.yml`](.github/workflows/release.yml)). `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
+Each `v*` tag produces a [GitHub Release](https://github.com/mpospisil/gleanvolt/releases) carrying self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files ([`release.yml`](.github/workflows/release.yml)). `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
 
 The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.AddGleanvolt();          // polling, control, sessions, Home Assistant, the web UI
+builder.AddGleanvolt();          // polling, control, sessions, Home Assistant, the web UI, the API
 
 var app = builder.Build();
-app.UseGleanvolt();              // the UI's endpoints, when it is enabled
+app.UseGleanvolt();              // the UI's and the API's endpoints, when they are enabled
 app.Run();
 ```
 
@@ -1638,6 +1654,169 @@ Nothing was added to Home Assistant. This is history, not telemetry — see
 The published container image is now based on `dotnet/aspnet` rather than `dotnet/runtime` — about
 25 MB more, on every platform, whether or not the UI is enabled. The framework reference is fixed at
 build time, so there is no variant that avoids it.
+
+### HTTP API (the `Api` section)
+
+A third control surface beside Home Assistant and the web UI, for **programs rather than people**:
+everything the controller can see, and the three actions that change something, described by
+[OpenAPI](https://www.openapis.org/) so a client is generated from the document rather than written
+against a moving target.
+
+It exists for one use case in particular — an **MCP server**, so an LLM can answer questions about
+this installation and act on it. That server is a separate process in a separate repository, and
+nothing here is specific to it: the test of whether this API is the right shape is that it would suit
+a script, a dashboard or an agent equally.
+
+Like the web UI, it is an adapter over the same Core seams the MQTT worker drives
+(`ChargeControlStatusHolder`, `IChargeActions`, `ITargetedChargePreview`, `ITargetedChargeSelector`,
+`IBatteryHoldSelector`) and owns no control logic of its own. It invents no capability: every action
+below is a button the web UI already has.
+
+#### Switched on knowingly, and never open
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `Api:Enabled` | `false` | Master switch. While false **no route is mapped and no document is served** — there is nothing to find, not merely nothing permitted. |
+| `Api:Keys` | *(empty)* | The keys that may call it, as `name → secret`. Enabled with none configured is a **startup failure**. |
+| `Api:MaxQueryRange` | `31.00:00:00` | The widest span one history query may ask for. |
+| `Api:MaxSessions` | `500` | The most sessions one listing may return. |
+
+The API shares the web UI's port (`Web:Port`, 8090) — this is one appliance, not two services that
+happen to be co-hosted — and either surface being enabled is what makes the process listen at all.
+
+Keys are stored as the secret itself and supplied out-of-band through `.env` or an environment
+variable, exactly like the broker password and the Solcast key:
+
+```bash
+Api__Enabled=true
+Api__Keys__claude-mcp=$(openssl rand -hex 32)
+```
+
+The web UI's password is hashed because it is a password a *human* chose and may have reused; these
+are generated, single-purpose and high-entropy, and a slow KDF on every request would buy nothing
+against an attacker who can already reach the port. The **name** is not a credential — it is what
+reaches the log and the recorded charging session as the source of an action, so
+`Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* rather than an anonymous
+write. Several clients therefore get several keys.
+
+Present one as a bearer token on every call, the document included:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
+```
+
+**Why the API defaults off when the UI defaults on.** Two of these endpoints write to hardware, and
+the project's rule for anything that writes is that an operator switches it on knowingly. The UI can
+afford to be an open LAN dashboard because it is a browser with a person in front of it; a
+non-interactive control surface that any program on the network can drive cannot. A key is
+bearer-equivalent to the stop button on the wallbox — treat it that way.
+
+#### What it exposes
+
+Everything is under `/api/v1/`, and the document itself is at
+**`/api/v1/openapi.json`** (behind the same key).
+
+| Endpoint | Answers |
+|---|---|
+| `GET /status` | The live snapshot: mode, state, PV, grid, battery power and SOC, EV power and current, the hold, session energy, the running plan. 503 until the first poll completes. |
+| `GET /health` | Build version, age of the last poll, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read. |
+| `GET /energy/intervals?from=&to=` | The recorded series — solar, forecast solar, import, export, EV, battery in and out, the SOC band, and each window's **coverage**. Defaults to the last 24 hours. |
+| `GET /energy/days/{date}` | One local day added up, so "how was Tuesday?" is one call rather than 96 rows. |
+| `GET /sessions?from=&to=&limit=` | Charging sessions, newest first, with the energy split by source. Defaults to the last 30 days. |
+| `GET /sessions/{id}` | One session in full: every recorded poll and every notable moment. |
+| `GET /forecast` | Today and tomorrow period by period, from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. |
+| `GET /vehicle` | What the car last said — SOC, range, plug and charge state — **and how old the reading is**. |
+| `POST /plans/targeted/preview` | What a targeted charge *would* do. Writes to nothing. |
+| `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). |
+| `POST /charging/stop` | Stop charging and clear any standing target. |
+| `PUT /battery-hold` | Arm or release the battery discharge hold. |
+
+Two rules run across the read endpoints. **Ranges are bounded** — a caller will cheerfully ask for a
+year of quarter-hours, and this runs on a Raspberry Pi. And **staleness is reported rather than
+hidden**: `/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a cloud
+reading arrives hours late as a matter of course and a caller that cannot see the clock will
+otherwise treat it as current.
+
+#### Quoting a plan without starting one
+
+The endpoint this API is worth building for:
+
+```bash
+curl -sS -X POST http://gleanvolt.local:8090/api/v1/plans/targeted/preview \
+  -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json' \
+  -d '{"targetSocPercent": 80, "departBy": "2026-08-24T07:00:00+02:00", "priority": "cheapest"}'
+```
+
+It returns the same plan the running mode would report — the strategy, the pace the charger must
+hold, the solar and grid shares, the forecast surplus in the window, when the import would start,
+what will actually arrive and, when it cannot be met, how far short and the departure that *would*
+have covered it. Ask in `energyKWh` instead of `targetSocPercent` on an installation with no vehicle
+feed; the conversion, the horizon check and the just-in-time split are the same
+[`TargetedChargeRequestFactory`](src/Gleanvolt.Core/Strategies/TargetedChargeRequestFactory.cs) the web
+form goes through, so a quote and the promise made from it can never disagree.
+
+It goes through `ITargetedChargePreview`, which **sets no request, selects no mode and writes to no
+device**, and it does not disturb a plan already running. So *"what does 80% by seven cost, and would
+leaving at eight make it free?"* is three calls and no hardware writes — a question that otherwise
+needs a person to fill in a form three times. Under `justInTime` the response also carries the same
+request priced as cheaply as possible, so what holding the last stretch back costs can be read off
+the difference in `gridEnergyWh`.
+
+#### Starting one
+
+```bash
+curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start \
+  -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json' \
+  -d '{"mode": "targeted", "target": {"energyKWh": 22, "departBy": "2026-08-24T07:00:00+02:00"}}'
+```
+
+One call does what one button does: the charger's Fast use-mode is written and the mode is then
+selected, so it works on a charger sitting in Green. For `targeted` the request is set **before** the
+mode — the controller reads both in the same cycle — and dropped again if the charger refuses.
+
+Every action returns what it did *and the controller's state afterwards*, so a caller never has to
+poll to find out what happened. A refused hardware write comes back as **200 with
+`succeeded: false`** and a message rather than an HTTP error: the call was understood and the
+controller is in a well-defined state — exactly the one it was in before. Read the flag, not the
+status code.
+
+`PUT /battery-hold` is refused with 409 when `BatteryHold:Enabled` is false, rather than recording an
+intent that silently does nothing. And what comes back as `batteryHold.active` is **what was last
+written to the inverter, not a read-back** — the command register cannot be read — so judge whether a
+hold is really in force by `batteryPowerWatts`, never by the flag.
+
+#### The document is the deliverable
+
+For a human client the OpenAPI file is documentation; for a generated MCP tool surface it is the
+*entire* interface, and the descriptions are what a model reads before choosing a tool. So:
+
+- **The DTOs are the API's own**, not Core records serialised straight out. Core records change for
+  internal reasons; the wire contract must not move when they do.
+- **The XML comments are the descriptions.** What is written next to a property in C# is what reaches
+  the document — which is why `Gleanvolt.Api` turns the documentation file on explicitly rather than
+  inheriting it.
+- **Units live in the names** (`...Wh`, `...Watts`, `...Percent`), because a model that has to guess
+  whether a number is watts or kilowatts will guess wrong. Timestamps are ISO-8601 **with an offset**:
+  a departure time here is a local-time promise.
+- **Enums cross the wire as camel-cased names**, closed, so a reordered member cannot silently change
+  what a stored request meant.
+- **The contract is pinned by a test.**
+  [`OpenApiContract.json`](tests/Gleanvolt.Api.Tests/OpenApiContract.json) records every operation id,
+  parameter, response code and schema property with its type and nullability. An intended change shows
+  up as a reviewable diff (regenerate with
+  `GLEANVOLT_UPDATE_OPENAPI_CONTRACT=1 dotnet test tests/Gleanvolt.Api.Tests`); an accidental one — a
+  renamed property, a dropped nullable — fails the build. Formatting changes from a new SDK do not,
+  which is what keeps the check honest rather than merely noisy.
+
+#### What it deliberately does not do
+
+- **Stop the service.** Stopping the whole controller is a deliberate, physical act with a deploy-stack
+  consequence (it stays stopped); it lives on the surfaces a person is looking at.
+- **Write raw Modbus registers.** That is a debugging tool, and a way to brick an inverter over the
+  network.
+- **TLS, users, per-key scopes, rate limiting.** A LAN appliance with a shared secret, as the web UI
+  already is. Scopes become interesting the day a read-only key is wanted.
+- **Bundle a Swagger or Scalar viewer.** The document plus `curl` is enough to start.
 
 ### Charging session history (the `SessionStore` section)
 

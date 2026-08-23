@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Api</PackageId>
+
+    <!--
+      The XML comments are load-bearing here in a way they are nowhere else: the OpenAPI document is
+      generated from them, and a client generated from that document, an MCP tool surface especially,
+      has nothing else to go on. Said here rather than left to the IsPackable rule in
+      Directory.Build.targets, which sets the same flag too late for the SDK to turn it into a
+      documentation file: that file is imported last of all, after the SDK targets that read it.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>The Gleanvolt's HTTP API, described by OpenAPI: live telemetry, energy history, charging sessions, the forecast and the car, a targeted plan that can be quoted without starting it, and the actions that start one.</Description>
+  </PropertyGroup>
+
+  <!--
+    The shared framework rather than the individual packages: these endpoints only ever run inside the
+    controller's own host, beside the services they read.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    The document is the deliverable (see docs/DECISIONS.md), so this is the one dependency that is not
+    optional. XML comments reach the schema through it: IsPackable already turns the documentation file
+    on, and .NET's OpenAPI generator reads it, which is what puts the reasoning in this codebase in
+    front of whatever generates a client, an MCP tool surface especially.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -70,7 +70,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Web Gleanvolt.Hosting; do
+          for project in Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:Version=${{ steps.version.outputs.version }} \
               -p:SourceRevisionId=${{ github.sha }} \

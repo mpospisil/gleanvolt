@@ -277,6 +277,40 @@ are now stale and one of them is actively harmful:
 
 An `.env` from before the web UI existed at all needs nothing: no `WEB_*` line means UI on, no login.
 
+## Letting a program drive it: the HTTP API (optional)
+
+The controller can also expose an [HTTP API](../README.md#http-api-the-api-section) — the same
+telemetry, history and actions the UI has, described by OpenAPI, for a script or an MCP server rather
+than a person. It is **off** by default, and unlike the UI it is never open: two of its endpoints
+write to hardware.
+
+Two `.env` lines turn it on. Generate a key, name it after whatever will be calling:
+
+```bash
+openssl rand -hex 32
+```
+
+```
+API_ENABLED=true
+API_KEY=3f1c...   # the generated secret; Api__Keys__client in docker-compose.yml
+```
+
+Redeploy, and the API answers on the port the UI already uses (`:8090`), under `/api/v1/`, with the
+document at `/api/v1/openapi.json`:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://<pi>:8090/api/v1/status
+```
+
+Enabled with no key set refuses to start, and says so in the log — the one combination worth failing
+loudly over, because the alternative is a charger any program on the LAN can drive. To take it off
+again, set `API_ENABLED=false` (or delete both lines) and redeploy; no route is mapped at all after
+that, so the path 404s rather than asking for a key.
+
+The name on the key matters operationally: `docker-compose.yml` passes `API_KEY` as
+`Api__Keys__client`, and *"API (client) started Targeted"* is what the log and the recorded charging
+session will say. Rename it, or add more `Api__Keys__<name>` lines, if more than one thing calls it.
+
 ## Prepare the Pi (once)
 
 **1. Passwordless SSH.** Either deploy script opens close to a dozen separate SSH connections — with

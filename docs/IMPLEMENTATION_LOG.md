@@ -4,6 +4,83 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-23 — An HTTP API described by OpenAPI, for programs rather than people (issue #103)
+
+Everything the controller knows was reachable by a human and by nothing else. This adds a third
+surface — `Gleanvolt.Api` — beside Home Assistant and the web UI: the same telemetry, history,
+forecast and actions, over HTTP, described by an OpenAPI document a client can be generated from. The
+use case that shaped it is an **MCP server**, so an LLM can answer questions about the installation and
+act on it; that server is a separate process in a separate repository, and nothing in the API is
+specific to it.
+
+### What was built
+
+- **`src/Gleanvolt.Api/`** — a packable class library referencing `Gleanvolt.Core` and nothing else,
+  composed by `Gleanvolt.Hosting`. Minimal APIs under `/api/v1/`, the document at
+  `/api/v1/openapi.json`, both behind the key.
+  - `ApiOptions` (`Enabled`, `Keys`, `MaxQueryRange`, `MaxSessions`), `ApiKeyFilter`, `ApiHostInfo`.
+  - `Contracts/` — the wire DTOs, owned here rather than shared with Core, with the XML comments that
+    become the schema descriptions.
+  - `Endpoints/` — `status`, `health`, `energy/intervals`, `energy/days/{date}`, `sessions`,
+    `sessions/{id}`, `forecast`, `vehicle`, `plans/targeted/preview`, `charging/start`,
+    `charging/stop`, `battery-hold`.
+- **`TargetedChargeRequestFactory` in `Gleanvolt.Core`** — the web form's own `TryCompose`, moved: the
+  SOC → kWh conversion, the just-in-time tail split, the horizon check and the four refusals. The
+  Targeted tab now translates its form into the factory's terms and nothing more. Two doors onto the
+  same promise must reject the same things for the same reasons.
+- **`AddWebSurface` became `AddHttpSurfaces`.** The listening socket now belongs to whichever surface
+  wants one rather than to the UI, so the API can run with `Web:Enabled=false`; `NoListenServer` is
+  reached only when neither is enabled.
+
+### The build fix the document needed
+
+Schema descriptions come from XML comments, and there were none: `GenerateDocumentationFile` is set in
+`Directory.Build.targets`, which MSBuild imports **after** the SDK targets that derive
+`DocumentationFile` from it — so the flag was set after the only thing that reads it had already
+looked, and no project in this repository was emitting XML documentation at all. `Gleanvolt.Api` sets
+the property in its own body, where the SDK still sees it. Fixing it repo-wide surfaces ~40
+pre-existing unresolvable `cref` warnings and is left as a separate change.
+
+### Decisions worth stating
+
+- **The API defaults off and demands a key; the UI defaults on and does not.** Two endpoints write to
+  hardware, and any program on the LAN can reach a port. `Api:Enabled` with no key is a startup
+  failure, like `Web:RequireAuthentication` with no hash.
+- **Keys are stored as secrets, not hashes** — generated, single-purpose, out-of-band, like the broker
+  password. The key's *name* is the action's source in the log and in the recorded session.
+- **An endpoint filter, not an authentication scheme**, so the API does not depend on the UI's
+  authentication services existing and does not inherit the cookie's `DefaultPolicy`.
+- **A failed hardware write is 200 with `succeeded: false`**, not an HTTP error. The call was
+  understood; the controller is in exactly the state it was in before.
+- **`/battery-hold` is 409 when the feature is disabled**, rather than recording an intent that
+  silently does nothing.
+- **Weather on `/forecast` is opt-in** (`?weather=true`): the forecast is cached and free to ask for,
+  the weather is a live third-party call against a quota.
+- **Stop-the-service, raw register writes, TLS, users, scopes and rate limiting are out**, and recorded
+  as such on the issue.
+
+### Verification performed
+
+- **890 tests pass** (71 new). The API suite runs the real routes over `TestServer` with the hardware
+  seams faked: the key check on every route and on the document, the 503 before the first poll, the
+  bounded range, the local-day sum in the site's zone rather than the machine's, vehicle staleness,
+  the preview writing nothing, the four refusals, the request set before the mode and dropped when the
+  charger refuses, and the disabled-hold conflict. Plus the factory's own tests in Core and the
+  composition-root tests in Hosting.
+- **The OpenAPI contract is pinned by a projection**, not by the document's bytes:
+  `tests/Gleanvolt.Api.Tests/OpenApiContract.json` holds every operation id, parameter, response code
+  and schema property with its type and nullability. Regenerate with
+  `GLEANVOLT_UPDATE_OPENAPI_CONTRACT=1 dotnet test tests/Gleanvolt.Api.Tests`. Byte-for-byte would have
+  broken on an SDK patch bump, since CI floats `10.0.x`.
+- **The test host uses `CreateSlimBuilder`.** The default builder watches `appsettings.json`, and a
+  suite that stands a host up per test exhausts the machine's inotify instances long before it runs out
+  of tests.
+- **Not yet exercised against live hardware.** Every write path goes through `IChargeActions` and the
+  selectors the UI already drives, so nothing new reaches Modbus, but the API has not been run against
+  the Pi.
+
+---
+
 ## 2026-08-23 — Just-in-time charging: the last stretch lands at departure (issue #101)
 
 A targeted charge could say *how much* and *by when*, but not *when it should arrive*. Delivered as

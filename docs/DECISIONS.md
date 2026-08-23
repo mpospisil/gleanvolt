@@ -4,6 +4,87 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-23 — A third surface, and the OpenAPI document is what it delivers (issue #103)
+
+Everything the controller knows was reachable by a human — the web UI renders it, Home Assistant
+publishes it — and by nothing else. The reason to change that is specific: an **MCP server**, so an
+LLM can answer questions about the installation and act on it. That server needs something to talk to,
+and what it needs is HTTP with a machine-readable contract, because its tool surface is *generated*
+from that contract rather than written against a moving target.
+
+**`Gleanvolt.Api` is a third first-class surface**, referencing `Gleanvolt.Core` and nothing else, on
+exactly the terms `Gleanvolt.Web` already sits on: it reads `ChargeControlStatusHolder`, drives the
+Core seams, and owns no decision logic. `Gleanvolt.Hosting` composes it. All three surfaces are
+independent — any, all, or none may run.
+
+### One socket, because this is one appliance
+
+The API shares the UI's port rather than binding its own, and `Web:Port` is now the HTTP port for
+both. The "nothing is listening" fallback (`NoListenServer`) moved from "the UI is off" to "no surface
+wants a socket", which is what lets the API run with the UI switched off — a controller-only Pi that
+is driven entirely by a program.
+
+### Off by default, and a key is mandatory when on
+
+The UI defaults to open on the LAN, and that is right: a browser with a person in front of it, and a
+fresh install has to produce something usable with no configuration. The API takes the opposite
+default on both counts — `Api:Enabled` is false, and enabling it with no key is a **startup failure**
+rather than an open control API. Two of its endpoints write to hardware, and the project's rule for
+anything that writes is that an operator switches it on knowingly.
+
+**Keys are stored as the secret, not a hash**, unlike `Web:PasswordHash`. The distinction is what the
+credential is: a password is chosen by a human and may be reused elsewhere, so the stored form must
+not be usable if the file leaks; an API key is generated, single-purpose and high-entropy, and a slow
+KDF on every request buys nothing against an attacker who can already reach the port. It is supplied
+out-of-band exactly like the broker password and the Solcast key. The key's *name* is not a
+credential — it is the action's source in the log and in the recorded session, which is the whole
+reason the map is `name → secret` rather than a list.
+
+**An endpoint filter rather than an authentication scheme.** A scheme would make the API depend on the
+UI being present, since the UI is what registers authentication and authorization at all, and it would
+share `DefaultPolicy` with the cookie — whose "no password configured means no login" rule is exactly
+the rule this must not follow.
+
+### Composing a targeted request moved into Core
+
+The web form's `TryCompose` — the SOC → kWh conversion, the just-in-time split, the horizon check, the
+"the car is already there" refusal — became `TargetedChargeRequestFactory` in `Gleanvolt.Core`. Two
+doors onto the same promise cannot be allowed to disagree about what is valid or about where a
+conversion happens, and it is pure logic, so it belongs beside the planner it feeds rather than in a
+Razor component. The tab now translates its form into the factory's terms and does nothing else.
+
+### The document is the deliverable, and its shape is pinned by a test
+
+For a human client the OpenAPI file is documentation. For a generated MCP tool surface it is the
+entire interface: the descriptions are what a model reads before choosing a tool, so a thin document
+produces a badly-behaved agent. Hence DTOs owned by the API rather than Core records serialised
+straight out, units in the field names, ISO-8601 with offsets, closed camel-cased string enums, and
+XML comments carried into the schema.
+
+That last one needed a build fix. `GenerateDocumentationFile` was being set in
+`Directory.Build.targets`, which MSBuild imports *after* the SDK targets that turn it into a
+`DocumentationFile` — so it was set after the only thing that reads it had already looked, and **no
+project in this repository was producing XML documentation at all**. `Gleanvolt.Api` sets the property
+in its own body, where the SDK still sees it. The repo-wide consequence (packages shipping without
+their documentation) is left alone here: fixing it globally surfaces about forty pre-existing
+unresolvable `cref` warnings, which is a separate change.
+
+The contract is pinned by a **projection**, not by the document's bytes:
+`tests/Gleanvolt.Api.Tests/OpenApiContract.json` records every operation id, parameter, response code
+and schema property with its type and nullability. A deliberate change is a reviewable diff; an
+accidental one fails. Byte-for-byte would have broken on an SDK patch bump — CI floats `10.0.x` — and
+a check that cries wolf is a check that gets regenerated without being read.
+
+### What it deliberately cannot do
+
+Stopping the service (a deliberate physical act with a deploy-stack consequence — it stays stopped),
+raw register writes (a way to brick an inverter over the network), and TLS, users, per-key scopes and
+rate limiting (a LAN appliance with a shared secret, as the UI already is). A failed hardware write is
+reported as 200 with `succeeded: false` rather than an HTTP error: the call was understood and the
+controller is in exactly the state it was in before, which is not a protocol failure.
+
+---
+
 ## 2026-08-23 — A full battery arrives just before departure, and the car's own choices are decisive (issue #101)
 
 `Targeted` optimised one thing: grid spend. It answered "when does the car reach the target?" by
