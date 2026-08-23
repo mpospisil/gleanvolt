@@ -4,6 +4,34 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-23 — The API's base URL answers, and the document can be read (issue #103 follow-up)
+
+Deployed to the Pi, opened `http://<pi>:8090/api/v1/` in a browser, and got an empty 404 — the base
+path was not a route, and every route that was one answered 401 because a browser cannot send an
+`Authorization` header. The API was working; there was no way to see that.
+
+### What changed
+
+- **`GET /api/v1/` — an unauthenticated index.** Product, version, running build, document URL, how to
+  authenticate, and the operations this build serves. The operation list is read from
+  `EndpointDataSource` at request time, so it cannot drift from what is actually mapped. Mapped outside
+  the key-filtered group; it carries no site data.
+- **`/api/v1/openapi.json` no longer needs the key.** See the decision record: the document is what a
+  client is generated from, and the disclosure it was protecting is slighter than the cost, on a host
+  whose web UI is already open on the LAN.
+- Both are 404 when `Api:Enabled` is false, like everything else — a disabled API announces nothing.
+
+### Verification performed
+
+- **905 tests pass** (4 new): the index without a key, with and without a trailing slash, listing the
+  real routes with their summaries, carrying only the six fields it should, and 404 when the API is
+  off. `OpenApiContract.json` regenerated — the diff is exactly `getIndex`, `ApiIndexResponse` and
+  `ApiOperationResponse`, which is the review this snapshot exists for.
+- The route template is `/api/v1`; ASP.NET matches `/api/v1/` to it, which is the form a person types,
+  and there is a test for that rather than an assumption.
+
+---
+
 ## 2026-08-23 — An HTTP API described by OpenAPI, for programs rather than people (issue #103)
 
 Everything the controller knows was reachable by a human and by nothing else. This adds a third

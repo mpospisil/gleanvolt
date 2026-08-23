@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-23 — The API says what it is before it asks who you are (issue #103)
+
+The API shipped with every route behind the key, the OpenAPI document included, and `/api/v1/` not
+mapped at all. The first thing that happened is the thing that always happens: somebody opened the
+base URL in a browser and got an **empty 404**, while every real endpoint answered 401, because no
+browser sends an `Authorization` header. A working API was indistinguishable from a broken one.
+
+**`GET /api/v1/` is now an index, and it needs no key.** It reports the product, the version, the
+running build, where the document is, how to authenticate, and every operation this build serves —
+read from the routing table rather than a list kept by hand, because a list that has to be maintained
+goes stale, and this one would go stale in the place a newcomer looks first.
+
+**The document is no longer behind the key either.** The original reasoning — no point handing the
+shape of a control surface to a caller who cannot use it — did not survive contact with what the
+document is *for*: a client is generated from it, and requiring a key to read it means it cannot be
+opened in a browser or handed to a generator without one. The disclosure avoided was slight next to
+that cost. The 401 already announces that the API exists, and on the same host and the same port the
+web UI is open on the LAN by default with every control on it, so keeping the document secret while
+the buttons are public was protecting the map and not the territory.
+
+**What stays behind the key is everything that reads telemetry or writes anything** — which is where
+the disclosure and all of the risk actually are. The index deliberately carries no site data: names of
+operations, and nothing about this house.
+
+A disabled API still maps nothing at all, index included: 404 rather than an index that announces a
+control surface nobody switched on.
+
+---
+
 ## 2026-08-23 — A third surface, and the OpenAPI document is what it delivers (issue #103)
 
 Everything the controller knows was reachable by a human — the web UI renders it, Home Assistant

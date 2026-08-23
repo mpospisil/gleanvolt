@@ -92,3 +92,30 @@ public sealed record HealthResponse(
     bool VehicleStale,
     bool EnergyHistoryAvailable,
     bool SessionHistoryAvailable);
+
+/// <summary>
+/// What this API is, and how to use it — the answer at <c>/api/v1/</c>, which is the first place
+/// anybody looks.
+///
+/// <para>The one endpoint that needs no key. It carries nothing an unauthenticated caller could act
+/// on: which operations exist, where the document is, and how to authenticate.</para>
+/// </summary>
+/// <param name="Name">The product this is the API of.</param>
+/// <param name="Version">The API version, which is also the path segment everything sits under.</param>
+/// <param name="Build">The running build of the controller.</param>
+/// <param name="Documentation">Where the OpenAPI document is served. It needs no key either.</param>
+/// <param name="Authentication">How to present a key on every other endpoint.</param>
+/// <param name="Operations">Every operation this build serves, path first.</param>
+public sealed record ApiIndexResponse(
+    string Name,
+    string Version,
+    string Build,
+    string Documentation,
+    string Authentication,
+    IReadOnlyList<ApiOperationResponse> Operations);
+
+/// <summary>One operation, as the index lists it.</summary>
+/// <param name="Method">The HTTP method.</param>
+/// <param name="Path">The route.</param>
+/// <param name="Summary">What it answers, in a line. The same summary the OpenAPI document carries.</param>
+public sealed record ApiOperationResponse(string Method, string Path, string? Summary);

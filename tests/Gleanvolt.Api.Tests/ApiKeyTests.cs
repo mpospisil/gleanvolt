@@ -54,13 +54,15 @@ public sealed class ApiKeyTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Guards_the_document_too()
+    public async Task Lets_the_index_and_the_document_be_read_without_one()
     {
         await _host.StartAsync();
+        var anonymous = _host.Anonymous();
 
-        Assert.Equal(
-            HttpStatusCode.Unauthorized,
-            (await _host.Anonymous().GetAsync(GleanvoltApi.DocumentPath)).StatusCode);
+        // The two endpoints a browser can actually reach, and the two that carry nothing to act on:
+        // what this is, and the shape a client is generated from.
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/api/v1")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync(GleanvoltApi.DocumentPath)).StatusCode);
     }
 
     [Fact]
@@ -95,8 +97,9 @@ public sealed class ApiKeyTests : IAsyncDisposable
     {
         await _host.StartAsync(new ApiOptions { Enabled = false });
 
-        // Not 401: a disabled API is not a locked door, it is no door. Nothing announces that a
-        // control surface exists here.
+        // Not 401, and not an index either: a disabled API is not a locked door, it is no door. Nothing
+        // announces that a control surface exists here.
         Assert.Equal(HttpStatusCode.NotFound, (await _host.Anonymous().GetAsync("/api/v1/status")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _host.Anonymous().GetAsync("/api/v1")).StatusCode);
     }
 }

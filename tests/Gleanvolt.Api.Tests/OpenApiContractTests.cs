@@ -86,7 +86,7 @@ public sealed class OpenApiContractTests : IAsyncDisposable
 
         Assert.All(
             document.GetProperty("paths").EnumerateObject(),
-            path => Assert.StartsWith("/api/v1/", path.Name));
+            path => Assert.StartsWith("/api/v1", path.Name));
     }
 
     [Fact]
