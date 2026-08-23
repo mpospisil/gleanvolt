@@ -265,6 +265,35 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
+    public void AFreshTargetDoesNotWaitOutTheRestartDwell()
+    {
+        // Observed live on 2026-08-23: a target activated under 5kW of surplus sat at 0A logging
+        // "Paused 10min of the 15min minimum before restarting". Activating sets the coordinator's
+        // state-changed clock, the controller answers "pause", and the dwell then counts its full 15
+        // minutes from the button press -- a quarter of an hour of free sun lost to a restart timer
+        // with nothing to restart.
+        var plan = Plan(deliveredWh: 0, paceWatts: 1_000);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 5_000, timeInState: TimeSpan.Zero));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.DoesNotContain("before restarting", decision.Reason);
+    }
+
+    [Fact]
+    public void OnceSomethingHasBeenDelivered_TheRestartDwellAppliesAgain()
+    {
+        // The flapping it guards against is real: past the first watt, a surplus wobbling around the
+        // threshold must not cycle the contactor every poll.
+        var plan = Plan(deliveredWh: 4_000, paceWatts: 1_000);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 5_000, timeInState: TimeSpan.FromMinutes(3)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Contains("before restarting", decision.Reason);
+    }
+
+    [Fact]
     public void WithNothingOwedAndNoSun_ItWaitsAndSaysSo()
     {
         // Pace zero: the forecast covers the whole target on its own, so there is genuinely nothing to
