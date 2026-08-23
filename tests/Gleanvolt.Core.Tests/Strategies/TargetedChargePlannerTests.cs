@@ -448,6 +448,24 @@ public class TargetedChargePlannerTests
     }
 
     [Fact]
+    public void TheSocFloorDoesNotSpikeAsTheDepartureApproaches()
+    {
+        // Measured live on 2026-08-23: the floor climbed 50% -> 78% -> 84% over one session, purely
+        // because the request window was shrinking. The pack sat at 70%, so the last stretch fell below
+        // the floor, the car was cut off from a sunny lunchtime and the rest of the target was bought.
+        //
+        // The two deadlines are unrelated. A car leaving at 11:00 does not shorten the afternoon the
+        // battery has to refill in, so a near departure must not raise the floor at all.
+        var now = FirstPeriodEnd.AddMinutes(-30);
+        var batteryFullBy = new DateTimeOffset(2026, 7, 27, 19, 0, 0, TimeSpan.Zero);
+
+        var early = Plan(requiredWh: 5_000, departBy: FirstPeriodEnd.AddMinutes(30), now: now, batteryFullBy: batteryFullBy);
+        var late = Plan(requiredWh: 5_000, departBy: FirstPeriodEnd.AddHours(3), now: now, batteryFullBy: batteryFullBy);
+
+        Assert.Equal(late.SocFloorPercent, early.SocFloorPercent, 1);
+    }
+
+    [Fact]
     public void TheSocFloorIsTheOwnersClampWhenTheForecastTrajectorySitsBelowIt()
     {
         var now = FirstPeriodEnd.AddMinutes(-30);

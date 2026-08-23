@@ -108,7 +108,21 @@ public static class TargetedChargePlanner
 
         ForecastSlicer.Reserve(ReservableFor(slices, batteryFullBy), batteryToFullWh);
 
-        var socFloor = SocFloor(slices.Sum(s => s.SurplusWh), options);
+        // Against the *pack's* horizon, not the car's. The two deadlines are unrelated: the car leaves
+        // at 13:45, the battery has until evening to reach 100%, and there is a long sunny afternoon in
+        // between that belongs to the pack's recovery whether or not the car is still plugged in.
+        //
+        // Measured live on 2026-08-23. Computing this over the request window meant the floor climbed as
+        // the departure approached -- 50% at 10:26, 78% at 12:47, 84% at 12:58 -- because the shrinking
+        // window recovered less and less. The pack was at 70%, so the last stretch of every session fell
+        // below the floor, the car was cut off from a sunny lunchtime, and the remainder was bought.
+        var recoveryWh = batteryFullBy > now
+            ? ForecastSlicer.SliceContiguous(
+                    forecast, now, batteryFullBy, houseLoad, biasFactor, options.MinChargePowerWatts, options.Confidence)
+                .Sum(s => s.SurplusWh)
+            : slices.Sum(s => s.SurplusWh);
+
+        var socFloor = SocFloor(recoveryWh, options);
 
         // What the window's sun offers the car once the house and the pack have had theirs — reported
         // whether or not any of it clears the charger's floor. Without it a weak-sun plan reads as a
@@ -195,7 +209,9 @@ public static class TargetedChargePlanner
     }
 
     /// <summary>
-    /// The SOC floor in force while this plan runs: the forecast's own trajectory — how far the pack
+    /// The SOC floor in force while this plan runs, from the surplus the pack can still recover from
+    /// <b>by its own deadline</b> — see the call site for why that is not the request's. Otherwise: the
+    /// forecast's own trajectory — how far the pack
     /// may fall and still recover from the surplus still coming its way — raised to the owner's
     /// configured minimum. The same formula the forecast-driven day plan uses, so the two modes agree
     /// about the battery.
