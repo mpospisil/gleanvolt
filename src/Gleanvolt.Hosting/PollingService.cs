@@ -13,7 +13,30 @@ public sealed class PollingService : BackgroundService
 {
     // How much battery discharge to tolerate before treating an armed hold as ineffective. See the
     // use site: a working hold still leaves a small standby trickle, so 0 is not the right line.
-    private const double ResidualDischargeWatts = 150;
+    /// <summary>
+    /// How far the battery may sit below zero, with the hold armed, before it counts as a breach.
+    ///
+    /// <para>Raised from 150W on 2026-08-24. Measured on this inverter while a 10 kW EV charge ran on a
+    /// working hold, the pack trickled at <b>165–460W</b> — inverter standby and control overhead, not
+    /// load being served — and the grid carried the rest, exactly as intended. At 150W that fired on
+    /// every poll, roughly a hundred times an hour, saying the command "may not be taking effect" about
+    /// a hold that was doing its job. Over four such hours the pack gave up 0.40kWh in total.</para>
+    ///
+    /// <para>The cost of a false alarm here is not noise, it is misdirection: this warning sent three
+    /// separate investigations after inverter firmware, register 0x7C and the power-target formula,
+    /// none of which was at fault.</para>
+    /// </summary>
+    private const double ResidualDischargeWatts = 500;
+
+    /// <summary>
+    /// How long a breach must persist before it is worth saying out loud. A hold takes a moment to bite
+    /// after arming, and a sudden PV collapse under load can pull the pack for a few seconds before the
+    /// setpoint catches up; neither is the failure this warning is for.
+    /// </summary>
+    private static readonly TimeSpan HoldBreachDwell = TimeSpan.FromMinutes(2);
+
+    /// <summary>When the current run of over-threshold discharge began, or null when the pack is behaving.</summary>
+    private DateTimeOffset? _holdBreachSince;
 
     private readonly IEnergyStateReader _energyStateReader;
     private readonly ISolarForecastService _solarForecast;
@@ -304,16 +327,28 @@ public sealed class PollingService : BackgroundService
         // on this firmware — which is exactly what the verification phase needs to surface. Skipped in
         // dry-run, where nothing was written and a discharging battery is the expected outcome.
         //
-        // The deadband matters: measured on this inverter, an armed hold leaves a residual 50-65W
-        // trickle out of the battery (inverter standby draw, not load being served). Warning on any
-        // negative value fires every poll and drowns out the signal it exists to give.
-        if (result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < -ResidualDischargeWatts)
+        // Both a deadband and a dwell, and it took a bad diagnosis to learn why: see
+        // ResidualDischargeWatts and HoldBreachDwell. A working hold trickles, and it takes a moment to
+        // bite; only a sustained, substantial discharge is evidence of anything.
+        var breaching = result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < -ResidualDischargeWatts;
+        if (!breaching)
         {
-            _logger.LogWarning(
-                "Battery discharge hold is armed (target {TargetWatts}W) but the battery is discharging at {BatteryPowerWatts}W. "
-                + "The power-control command may not be taking effect on this firmware.",
-                result.ActivePowerTargetWatts,
-                state.BatteryPowerWatts);
+            _holdBreachSince = null;
+        }
+        else
+        {
+            _holdBreachSince ??= state.Timestamp;
+
+            if (state.Timestamp - _holdBreachSince >= HoldBreachDwell)
+            {
+                _logger.LogWarning(
+                    "Battery discharge hold is armed (target {TargetWatts}W) but the battery has been discharging at "
+                    + "{BatteryPowerWatts}W for {BreachMinutes:F0} min. The power-control command may not be taking "
+                    + "effect on this firmware.",
+                    result.ActivePowerTargetWatts,
+                    state.BatteryPowerWatts,
+                    (state.Timestamp - _holdBreachSince.Value).TotalMinutes);
+            }
         }
 
         return result;
