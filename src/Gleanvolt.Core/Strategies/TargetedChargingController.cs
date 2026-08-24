@@ -48,6 +48,25 @@ public sealed class TargetedChargingController : IChargingController
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        var plan = input.TargetedPlan;
+        var now = input.State.Timestamp;
+
+        // The departure is checked *before* the use-mode precondition, and the order is the whole point.
+        //
+        // Measured live on 2026-08-24: the car was unplugged at 19:52 against a 20:00 departure, the
+        // charger fell back to Stop, and every poll after that returned "use-mode is Stop, not Fast;
+        // leaving it untouched" -- so the departure check below was never reached and the mode sat in
+        // Targeted, with a live request armed against a departure two hours past, until somebody noticed.
+        //
+        // Ending a mode is not modulating a charger. It writes nothing to hardware that is not already
+        // the Off action's job, so the "only touch the charger in Fast" contract has no bearing on it.
+        if (plan is not null && now >= plan.DepartBy)
+        {
+            return Complete(
+                $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with {plan.DeliveredEnergyWh / 1000:F1}kWh "
+                + $"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
+        }
+
         // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
         // wrote it) and we only modulate the current under it.
         if (input.CurrentSettings.Mode != EvChargerMode.Fast)
@@ -56,7 +75,6 @@ public sealed class TargetedChargingController : IChargingController
                 ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
         }
 
-        var plan = input.TargetedPlan;
         if (plan is null)
         {
             // The mode is selected but nothing has been asked for. Pausing rather than completing:
@@ -64,18 +82,9 @@ public sealed class TargetedChargingController : IChargingController
             return Pause("No target set: enter the energy and departure time to start.");
         }
 
-        var now = input.State.Timestamp;
-
         if (plan.IsComplete)
         {
             return Complete($"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
-        }
-
-        if (now >= plan.DepartBy)
-        {
-            return Complete(
-                $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with {plan.DeliveredEnergyWh / 1000:F1}kWh "
-                + $"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
         // "The car has stopped" is only meaningful while we are asking it to charge. Between blocks we
