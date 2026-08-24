@@ -349,6 +349,41 @@ public class TargetedChargingControllerTests
     }
 
     [Fact]
+    public void PastTheDeparture_TheModeEndsItselfEvenWithTheChargerStopped()
+    {
+        // Measured live on 2026-08-24: the car was unplugged at 19:52 against a 20:00 departure, the
+        // charger fell back to Stop, and the "use-mode is not Fast" precondition then short-circuited
+        // every poll before the departure check. The mode sat in Targeted for hours with a live request
+        // armed against a departure long past.
+        var decision = Controller().Decide(Input(
+            Plan(now: DepartBy.AddMinutes(5)),
+            mode: EvChargerMode.Stop,
+            now: DepartBy.AddMinutes(5)));
+
+        Assert.True(decision.SessionComplete);
+        Assert.Contains("has passed", decision.Reason);
+    }
+
+    [Fact]
+    public void WhenTheCarStopsAtItsOwnLimit_TheModeEndsItself()
+    {
+        // Pins the intended behaviour. Note it already passed before this branch: given a growing
+        // EvIdleFor the controller ends the mode correctly, so the live failures on 2026-08-23 (14 min)
+        // and 2026-08-24 (27 min) are NOT here -- something upstream is not feeding EvIdleFor,
+        // Charging or EvDrewPower as this test supplies them. Finding that needs an end-to-end
+        // reproduction through the coordinator, and is deliberately not attempted in this branch.
+        var decision = Controller().Decide(Input(
+            Plan(),
+            charging: true,
+            evDrewPower: true,
+            evIdleFor: TimeSpan.FromMinutes(5),
+            status: EvChargerStatus.Finishing));
+
+        Assert.True(decision.SessionComplete);
+        Assert.Contains("its own limit", decision.Reason);
+    }
+
+    [Fact]
     public void WhenTheTargetIsReached_TheSessionIsComplete()
     {
         var decision = Controller().Decide(Input(Plan(strategy: TargetedChargeStrategy.Complete, deliveredWh: 22_000)));
