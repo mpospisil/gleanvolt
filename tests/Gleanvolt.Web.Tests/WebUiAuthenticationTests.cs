@@ -47,6 +47,10 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         // Vehicle telemetry (#73): hand-registered here for the same reason WebBuildInfo is -- this test
         // builds a minimal host rather than calling AddGleanvolt, so it owns the UI's dependencies.
         builder.Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
+
+        // The installation (#111): the layout names it in the header, so every page needs it -- the
+        // sign-in page included, which is what two of these tests are about.
+        builder.Services.AddSingleton(Sites.Home);
         builder.Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         builder.Services.AddGleanvoltWebUi(web);
 
@@ -203,6 +207,19 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
 
         Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_page_says_which_installation_it_is()
+    {
+        // Two tabs onto two roofs is the case this exists for: the header carries the system's name,
+        // and so does the browser tab, because "Gleanvolt" is the one thing both tabs already agree on.
+        var client = await StartAsync(new WebOptions { Enabled = true });
+
+        var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
+
+        Assert.Contains("Home Roof", html);
+        Assert.Contains("<title>Dashboard — Home Roof</title>", html);
     }
 
     [Fact]

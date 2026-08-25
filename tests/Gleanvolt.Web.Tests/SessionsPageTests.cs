@@ -7,7 +7,7 @@ using Gleanvolt.Web.Components.Pages;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>Phase 4 (#49): the session list, the first way to browse what SessionStore has recorded.</summary>
-public class SessionsPageTests : BunitContext
+public class SessionsPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

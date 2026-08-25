@@ -6,7 +6,7 @@ using Gleanvolt.Web.Components.Pages;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>The energy viewer: one recorded day at a time, as the table it is stored as.</summary>
-public class EnergyPageTests : BunitContext
+public class EnergyPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

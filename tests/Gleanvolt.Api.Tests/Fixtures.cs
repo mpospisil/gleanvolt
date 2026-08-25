@@ -9,6 +9,25 @@ internal static class Fixtures
     /// <summary>The instant every test runs at: a winter afternoon, so "tomorrow morning" is a real departure.</summary>
     internal static readonly DateTimeOffset Now = new(2026, 1, 15, 14, 0, 0, TimeSpan.FromHours(1));
 
+    /// <summary>
+    /// The installation the API speaks for (issue #111). Fully described on purpose: /site's job is to
+    /// carry every field, and a fixture with half of them null would let a dropped one pass unnoticed.
+    /// </summary>
+    internal static readonly PvSystemInfo Site = new(
+        Id: "home-roof",
+        Name: "Home Roof",
+        Address: "Krásného 12, Praha",
+        Latitude: 50.0755,
+        Longitude: 14.4378,
+        AzimuthDegrees: 172,
+        TiltDegrees: 35,
+        CapacityKwp: 9.2,
+        InverterCapacityKw: 8,
+        LossFactor: 0.9,
+        InstallDate: new DateOnly(2024, 5, 1),
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", new DeviceConfig { Host = "192.168.2.10" }),
+        Chargers: [new PvDeviceInfo("wallbox", "Garage wallbox", "SolaX X3-HAC", new DeviceConfig { Host = "192.168.2.6", Port = 502, UnitId = 1 })]);
+
     internal static ChargeControlStatus Status(
         ChargeControlMode mode = ChargeControlMode.Solar,
         bool batteryHoldEnabled = true,

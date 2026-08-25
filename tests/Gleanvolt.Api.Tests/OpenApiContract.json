@@ -136,6 +136,16 @@
         ]
       }
     },
+    "/api/v1/site": {
+      "get": {
+        "operationId": "getSite",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $SiteResponse"
+        ]
+      }
+    },
     "/api/v1/status": {
       "get": {
         "operationId": "getStatus",
@@ -270,6 +280,8 @@
       "now": "string(date-time) (required)",
       "ok": "boolean (required)",
       "sessionHistoryAvailable": "boolean (required)",
+      "systemId": "string (required)",
+      "systemName": "string (required)",
       "timeZoneId": "string (required)",
       "vehicleAgeSeconds": "number|string(double)? (required)",
       "vehicleAvailable": "boolean (required)",
@@ -356,6 +368,29 @@
       "timestamp": "string(date-time) (required)",
       "vehicleSocCapturedAt": "string(date-time)? (required)",
       "vehicleSocPercent": "number|string(double)? (required)"
+    },
+    "SiteDeviceResponse": {
+      "host": "string (required)",
+      "id": "string (required)",
+      "model": "string (required)",
+      "name": "string (required)",
+      "port": "integer|string(int32) (required)",
+      "unitId": "integer|string(int32) (required)"
+    },
+    "SiteResponse": {
+      "address": "string (required)",
+      "azimuthDegrees": "number|string(double)? (required)",
+      "capacityKwp": "number|string(double)? (required)",
+      "chargers": "array\u003C$SiteDeviceResponse\u003E (required)",
+      "id": "string (required)",
+      "installDate": "string(date)? (required)",
+      "inverter": "$SiteDeviceResponse (required)",
+      "inverterCapacityKw": "number|string(double)? (required)",
+      "latitude": "number|string(double)? (required)",
+      "longitude": "number|string(double)? (required)",
+      "lossFactor": "number|string(double)? (required)",
+      "name": "string (required)",
+      "tiltDegrees": "number|string(double)? (required)"
     },
     "SolarDayPlanResponse": {
       "batteryToFullWh": "number|string(double) (required)",

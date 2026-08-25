@@ -16,7 +16,7 @@ namespace Gleanvolt.Web.Tests;
 /// JSInterop is Loose: the timeline chart is rendered by vendored JS (uPlot) this suite cannot see,
 /// so these tests cover the data and markup around it, not the rendered pixels.
 /// </summary>
-public class ForecastedTabTests : BunitContext
+public class ForecastedTabTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

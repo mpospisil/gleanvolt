@@ -1,0 +1,19 @@
+@inject PvSystemInfo Site
+
+@*
+    The browser tab, for someone with two of these open (issue #111). "Dashboard — Gleanvolt" says
+    which product; "Dashboard — Jinacovice" says which roof, which is the question a second tab
+    creates. The product name is already on every page, in the header.
+
+    A component rather than a line per page so that the pattern is decided once: eight pages spelling
+    out their own suffix is eight chances for one of them to drift.
+*@
+
+<PageTitle>@Page — @(string.IsNullOrWhiteSpace(Site.Name) ? "Gleanvolt" : Site.Name)</PageTitle>
+
+@code {
+    /// <summary>What this page is, in the two or three words that fit in a tab.</summary>
+    [Parameter]
+    [EditorRequired]
+    public required string Page { get; set; }
+}

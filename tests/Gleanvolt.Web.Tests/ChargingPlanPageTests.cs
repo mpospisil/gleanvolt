@@ -18,7 +18,7 @@ namespace Gleanvolt.Web.Tests;
 /// JSInterop is Loose throughout: the forecast tab draws its timeline with vendored JS (uPlot) that
 /// this suite cannot see, and it is reachable from here by a tab click.
 /// </summary>
-public class ChargingPlanPageTests : BunitContext
+public class ChargingPlanPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

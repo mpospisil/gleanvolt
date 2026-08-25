@@ -33,6 +33,7 @@ internal static class StatusEndpoints
             IWeatherService weather,
             IEnergyIntervalStore energy,
             IChargingSessionStore sessions,
+            PvSystemInfo site,
             ApiHostInfo host,
             TimeProvider time,
             CancellationToken cancellationToken) =>
@@ -57,6 +58,10 @@ internal static class StatusEndpoints
                 // seconds by default.
                 Ok: age is { } since && since < TimeSpan.FromMinutes(2),
                 Version: host.Version,
+                // Which installation is answering. A monitor polling several of these gets identical
+                // payloads otherwise, and "is it working?" is only useful once you know whose.
+                SystemId: site.Id,
+                SystemName: site.Name,
                 Now: now,
                 TimeZoneId: time.LocalTimeZone.Id,
                 LastPollAt: status?.Timestamp,
@@ -75,10 +80,10 @@ internal static class StatusEndpoints
             .WithName("getHealth")
             .WithSummary("Whether the controller is alive and what it can see")
             .WithDescription(
-                "Poll this to answer 'is it working?'. It reports the running build, how long ago the "
-                + "last poll completed, whether a forecast and a vehicle reading are in hand, and "
-                + "whether the two history databases can be read. It never fails for a component being "
-                + "down -- that is what it is reporting.")
+                "Poll this to answer 'is it working?'. It reports which installation is answering, the "
+                + "running build, how long ago the last poll completed, whether a forecast and a "
+                + "vehicle reading are in hand, and whether the two history databases can be read. It "
+                + "never fails for a component being down -- that is what it is reporting.")
             .Produces<HealthResponse>();
     }
 
