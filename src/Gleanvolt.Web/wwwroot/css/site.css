@@ -54,6 +54,14 @@ body {
     color: var(--accent);
 }
 
+/* The installation's name, beside the product's. Quieter than the brand: it identifies the page
+   rather than announcing it, and on a single-system install it is simply background. */
+.site {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-left: -1rem;
+}
+
 .topbar nav {
     display: flex;
     gap: 1rem;

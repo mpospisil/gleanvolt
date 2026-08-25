@@ -13,7 +13,7 @@ namespace Gleanvolt.Web.Tests;
 /// Vehicle and Charging session. Follows the same holder-subscription seam
 /// <see cref="HealthPageTests"/> already covers.
 /// </summary>
-public class DashboardPageTests : BunitContext
+public class DashboardPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

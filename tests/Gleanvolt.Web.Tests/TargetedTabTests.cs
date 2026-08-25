@@ -22,7 +22,7 @@ namespace Gleanvolt.Web.Tests;
 /// commits it. A form the preview refused never renders the second, which is what the refusal cases
 /// assert without having to say so.
 /// </summary>
-public class TargetedTabTests : BunitContext
+public class TargetedTabTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

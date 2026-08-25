@@ -71,6 +71,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<IChargingSessionStore>(Sessions);
         builder.Services.AddSingleton<IVehicleTelemetry>(Vehicle);
         builder.Services.AddSingleton(new ApiHostInfo("1.2.3-test", TimeSpan.FromHours(12)));
+        builder.Services.AddSingleton(Fixtures.Site);
         builder.Services.AddSingleton(new TargetedChargeRequestLimits(
             MaxHorizon: TimeSpan.FromHours(36),
             BatteryCapacityKWh: batteryCapacityKWh,

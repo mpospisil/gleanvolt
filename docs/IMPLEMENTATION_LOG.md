@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — The site is reportable (issue #111, phase 4)
+
+The installation had a description and two surfaces that knew it: the startup log, and one web page.
+A program asking "what am I connected to?" still had nowhere to ask, and two browser tabs onto two
+roofs were indistinguishable.
+
+### What changed
+
+- **`GET /api/v1/site`** — id, name, address, coordinates, bearing, tilt, capacity, inverter capacity,
+  loss factor, install date, and the devices with their models, addresses, ports and unit ids. Behind
+  the key like everything except the index: this is the configuration of somebody's house, down to the
+  addresses of the two devices that can be written to. It needs no probe and has no failure mode —
+  configuration is resolved once at startup, so if the host answers at all, the site it answers about
+  is the one it booted with.
+- **`/api/v1/health` reports `systemId` and `systemName`.** A monitor polling several controllers gets
+  otherwise identical payloads, and "is it working?" is only useful once you know whose.
+- **The web UI carries the system's name** in the header beside the product's, and in the browser tab —
+  `Dashboard — Home Roof`. A `SiteTitle` component rather than a line per page: eight pages spelling
+  out their own suffix is eight chances for one to drift. The sign-in page keeps the product name; it
+  is reached before anyone has signed in.
+- `OpenApiContract.json` regenerated — the diff is exactly `getSite`, `SiteResponse`,
+  `SiteDeviceResponse` and the two health fields, which is the review that snapshot exists for.
+
+### Deliberately not done
+
+The issue also asked health to report **reachability per device**. There is no per-device signal in
+`Gleanvolt.Core` to report: the poll loop reads both devices in one cycle and a failure is logged for
+the cycle, not for the device. Producing one means the loop tracking last-success per device and
+publishing it — a different change, about device health rather than about the site being reportable.
+Left for its own issue rather than half-built here.
+
+### Verification performed
+
+- **965 tests pass** (6 new): every field of `/site` including the devices, the endpoint refusing an
+  unauthenticated caller, health naming the system, and the served dashboard carrying
+  `<title>Dashboard — Home Roof</title>`.
+- A shared `PageTest` base registers the installation for the page fixtures — without it a page test
+  compiles, renders nothing and reports a missing service, which is a poor way to find out.
+
+---
+
 ## 2026-08-25 — The system's name reaches MQTT (issue #111, phase 3)
 
 Two installations could not share a broker: every topic was `solax/solax_controller/…` with both

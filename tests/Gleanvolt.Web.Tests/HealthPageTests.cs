@@ -12,7 +12,7 @@ namespace Gleanvolt.Web.Tests;
 /// the same <see cref="ChargeControlStatusHolder"/> singleton the polling loop writes to, and it
 /// follows that holder rather than sampling it once.
 /// </summary>
-public class HealthPageTests : BunitContext
+public class HealthPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

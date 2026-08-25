@@ -12,7 +12,7 @@ namespace Gleanvolt.Web.Tests;
 /// JSInterop is Loose: the chart itself is rendered by vendored JS (uPlot) this suite cannot see, so
 /// these tests cover the data and markup around it, not the rendered pixels.
 /// </summary>
-public class SessionDetailPageTests : BunitContext
+public class SessionDetailPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 

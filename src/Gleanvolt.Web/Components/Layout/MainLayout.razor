@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject PvSystemInfo Site
 
 @*
     The sign-out control is a plain HTML form posting to a non-Blazor endpoint (Program.cs maps
@@ -8,6 +9,16 @@
 
 <header class="topbar">
     <span class="brand">Gleanvolt</span>
+    @*
+        Which installation this is (issue #111). The product name says what the software is; on a
+        second tab onto a second roof, that is the one thing you already know. Shown to anyone who can
+        reach the port, including on the sign-in page: it is a name, and the address and coordinates
+        stay behind the authorised /pv-system page.
+    *@
+    @if (!string.IsNullOrWhiteSpace(Site.Name))
+    {
+        <span class="site">@Site.Name</span>
+    }
     <nav>
         <a href="/">Dashboard</a>
         <a href="/charging-plan">Charging plan</a>

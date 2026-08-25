@@ -132,6 +132,7 @@ public static class GleanvoltApi
             .AddEndpointFilter(keys)
             .WithTags("Gleanvolt");
 
+        group.MapSite();
         group.MapStatus();
         group.MapEnergy();
         group.MapSessions();

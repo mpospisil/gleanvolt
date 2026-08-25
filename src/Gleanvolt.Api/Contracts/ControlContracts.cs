@@ -78,6 +78,8 @@ public sealed record ControlActionResponse(
 public sealed record HealthResponse(
     bool Ok,
     string Version,
+    string SystemId,
+    string SystemName,
     DateTimeOffset Now,
     string TimeZoneId,
     DateTimeOffset? LastPollAt,
