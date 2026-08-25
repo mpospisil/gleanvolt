@@ -38,6 +38,13 @@ namespace Gleanvolt.Core.Models;
 /// How long the charger has continuously reported no meaningful draw (or a car-initiated wind-down).
 /// Zero while the car is drawing. Only the fast mode acts on it, which is why both default away.
 /// </param>
+/// <param name="FastCharge">
+/// How a limited fast charge is going — the amount asked for and what has been delivered against it —
+/// when the fast mode is the one driving and a limit was set. Null both when another mode is driving
+/// and when the owner asked for <see cref="Enums.FastChargeBasis.Full"/>, which is the ordinary case:
+/// only <see cref="Strategies.FastChargingController"/> reads it, and it charges the same either way
+/// until the number is met.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -49,7 +56,8 @@ public sealed record ChargingControlInput(
     double SessionEnergyWh = 0,
     double LoanedTodayWh = 0,
     bool EvDrewPower = false,
-    TimeSpan EvIdleFor = default);
+    TimeSpan EvIdleFor = default,
+    FastChargeProgress? FastCharge = null);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
@@ -70,10 +78,15 @@ public sealed record ChargingControlInput(
 /// of it.
 /// </param>
 /// <param name="SessionComplete">
-/// The controller's one way of saying "this is over": the car has finished (or has gone away) and
-/// there is nothing left to control. Accompanies a <see cref="ChargingControlAction.Pause"/> so the
-/// charger is left idle rather than armed at the last setpoint; the orchestrator then switches the
-/// mode back to <see cref="ChargeControlMode.Off"/>. Only the fast mode ever sets it.
+/// The controller's one way of saying "this is over": what was asked for has been delivered, or the
+/// car has finished on its own (or gone away), and there is nothing left to control. Accompanies a
+/// <see cref="ChargingControlAction.Pause"/> so the charger is left idle rather than armed at the last
+/// setpoint; the orchestrator then switches the mode back to <see cref="ChargeControlMode.Off"/>,
+/// which also releases the hold the fast mode armed.
+///
+/// <para>Set by the fast and targeted modes. The solar and forecast-driven ones never do: they follow
+/// the sun for as long as they are selected, and a car that has stopped taking their surplus has not
+/// ended anything.</para>
 /// </param>
 public sealed record ChargingControlDecision(
     ChargingControlAction Action,

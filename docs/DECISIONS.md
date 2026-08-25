@@ -4,6 +4,80 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-25 — A fast charge takes an amount, and the amount is a stopping condition (issue #119)
+
+`FastNoBattery` charged until the car said stop. *"I leave in an hour and I need 20 kWh"* could only be
+expressed as `Targeted`, which needs a departure it does not have, builds a forecast plan it does not
+want, and deliberately places its grid block **as late as it can** — the exact opposite of what
+somebody pressing *fast* is asking for.
+
+So the mode takes an amount: nothing (Full, the default and the old behaviour), an amount of energy, or
+a battery target converted to energy once at activation. Three things were decided along the way.
+
+**The amount is a stopping condition, not a plan.** No planner call, no forecast dependency, no
+solar/grid split, no shortfall arithmetic, no pacing. The setpoint is at the maximum from the first
+cycle to the last, and the amount decides only when to stop. `FastChargeLimit` is therefore a separate
+record from `TargetedChargeRequest` rather than a reuse of it: everything that makes that type what it
+is — `DepartBy`, `Priority`, `TailEnergyWh`, `RestSocPercent` — would be null here forever, and a
+shared type is an invitation to make this mode plan.
+
+**The SOC → kWh conversion happens once, at activation, and is not re-derived.** The rule
+`TargetedChargeRequest.TargetSocPercent` already argues at length, applied here without a word of
+change: a parked car's cloud SOC arrives when it feels like it, and a limit already half delivered must
+not move at 02:00 because the car finally phoned home. `VehicleTargetEnergy` is reused unchanged, and
+`FastChargeLimitFactory` is the one door all three surfaces compose through — the web tab, the HTTP API
+and the Home Assistant button must not be able to disagree about what is valid.
+
+**The limit is checked before the idle dwell.** A car that stops drawing at the moment it reaches the
+number would otherwise be reported as having hit *its own* limit. Once the mode reads `Off` the two are
+indistinguishable, and only one of them is true.
+
+---
+
+## 2026-08-25 — The fast mode's hold is armed through the switch, not beside it (issue #119)
+
+The mode armed the discharge hold by returning `true` from `AutoHold`, which the poll loop OR-ed over
+the owner's switch:
+
+```csharp
+var hold = _batteryHold.Hold || AutoHold(...);
+```
+
+The OR's comment says what it defends — *"a hold the owner asked for is never released by a mode"* —
+and it is right about that direction. It says nothing about the other one, and in that direction the
+mode's `true` is a **floor**: flipping the switch off during a fast charge moved the switch in Home
+Assistant, logged nothing, and left the hold armed. A control that appears to work.
+
+**The trap underneath it is that the HA switch does not publish the owner's request.** It publishes
+`BatteryHoldActive` — what is actually armed — because a failed write should show as the switch
+springing back to `OFF`. So during a fast charge the switch reads `ON` while `IBatteryHoldSelector.Hold`
+is still `false`. The owner turns it off, the command path calls `Set(false, …)`, and `Set` is a no-op
+that raises no event when the value is unchanged. **The gesture evaporates before anything can act on
+it.** Any fix that waits on `Changed` without addressing the level mismatch reviews as correct and does
+nothing on the hardware.
+
+So the mode now arms **through** the selector on mode entry, and `AutoHold` returns false for it. The
+switch's level matches what is on screen, the owner's OFF is a real transition, and for the length of
+the charge the switch is the single input.
+
+**The release is keyed on the mode, not on the ending.** There are at least six ways a fast charge
+stops — Off from the web UI, from Home Assistant, from the API, the car's own limit, the amount, an
+unplug — and every one of them ends with this mode no longer selected. `ReleaseFastHoldIfEnded` runs
+once per cycle on that single condition, which is the arrangement `Targeted`'s hold already uses.
+Enumerating endings is how the seventh one gets missed, and the missed one leaves an armed hold on an
+inverter with nothing charging.
+
+One consequence is deliberate and documented rather than papered over: **a hold the owner had switched
+on before the charge is off when it ends.** Restoring a remembered prior value is bookkeeping a restart
+loses anyway, and it fails in the worse direction — the pack locked out of serving the house with
+nothing charging.
+
+One order matters and is easy to lose in a refactor: `AutoHold` is evaluated **before** the switch is
+read, not inlined into the `||`. Short-circuiting on a switch that is on would skip the release that
+runs inside it.
+
+---
+
 ## 2026-08-25 — The system id names the topics; the unique id stays where it is (issue #111)
 
 Two installations could not share a broker. Every topic was `solax/solax_controller/…` with both

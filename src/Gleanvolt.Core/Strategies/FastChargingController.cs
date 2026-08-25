@@ -7,14 +7,22 @@ namespace Gleanvolt.Core.Strategies;
 /// <summary>
 /// Charges the car at the maximum current the installation allows, ignoring solar surplus entirely:
 /// PV covers what it can and the grid covers the rest. The counterpart — keeping the home battery out
-/// of that draw — is the battery discharge hold, armed by the orchestrator for as long as this mode is
-/// selected; this controller only decides the current.
+/// of that draw — is the battery discharge hold, which the orchestrator arms when the mode starts and
+/// releases when it ends, and which the owner may switch off in between; this controller only decides
+/// the current.
 ///
 /// It is the simplest of the three strategies by design. There is no SOC gate, no surplus threshold,
 /// no smoothing and no dwell timer, because none of those inputs can change the answer: the setpoint
-/// is a constant. The one thing it does watch is when the car <em>stops</em> drawing, which it reports
-/// as <see cref="ChargingControlDecision.SessionComplete"/> so the expensive state (maximum current,
-/// grid import, battery locked) ends by itself rather than sitting armed until somebody notices.
+/// is a constant. What it does watch is when to <em>stop</em>, which it reports as
+/// <see cref="ChargingControlDecision.SessionComplete"/> so the expensive state (maximum current, grid
+/// import, battery locked) ends by itself rather than sitting armed until somebody notices.
+///
+/// <para>Two things can end it (#119). The car reaching its own charge limit and stopping, which is
+/// the only one this mode had before and is still what happens when nothing else is asked for; and a
+/// <see cref="FastChargeLimit"/> — an amount of energy, or a state of charge converted to one at
+/// activation — being delivered. The amount is a <b>stopping condition and nothing more</b>: it does
+/// not modulate the current, defer anything to a sunnier hour, or make this mode plan. That is what
+/// <see cref="TargetedChargingController"/> is for, and the two should not be confused.</para>
 ///
 /// Like the other controllers it only acts while the charger's own use-mode is
 /// <see cref="EvChargerMode.Fast"/> — which starting the mode wrote, and which nothing here
@@ -52,6 +60,17 @@ public sealed class FastChargingController : IChargingController
                 ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
         }
 
+        // Checked before the idle branch below, and the order is the whole of why: a car that stops
+        // drawing at the very moment it reaches the number would otherwise be reported as having hit
+        // *its own* limit. Downstream the two are indistinguishable once the mode reads Off, and this
+        // is the true one.
+        if (input.FastCharge is { IsMet: true } progress)
+        {
+            return Complete(
+                $"Fast target reached: {progress.DeliveredWh / 1000:F1}kWh of "
+                + $"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
+        }
+
         // "Has finished" is only meaningful once the car has actually started. Before that, no draw
         // means the car isn't ready yet (Preparing, or waiting on its own timer), and ending the mode
         // then would be the opposite of what was asked for.
@@ -66,14 +85,28 @@ public sealed class FastChargingController : IChargingController
 
             if (input.EvIdleFor >= _completionDwell)
             {
-                return Complete($"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached)");
+                // Said in the terms it happened in: the car reached *its* limit before ours, and how
+                // far short of the asked-for amount that left things is the first thing anyone will
+                // want to know.
+                var shortfall = input.FastCharge is { } p
+                    ? $" at {p.DeliveredWh / 1000:F1}kWh of the {p.Limit.RequiredEnergyWh / 1000:F1}kWh asked for"
+                    : string.Empty;
+
+                return Complete(
+                    $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){shortfall}");
             }
         }
+
+        var towards = input.FastCharge is { } left
+            ? $" {left.DeliveredWh / 1000:F1}kWh of {left.Limit.RequiredEnergyWh / 1000:F1}kWh delivered, "
+              + $"{left.RemainingWh / 1000:F1}kWh to go."
+            : string.Empty;
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             _chargeCurrentAmps,
-            $"Fast charge without the battery -> charge at the maximum {_chargeCurrentAmps}A (grid tops up whatever PV doesn't cover).");
+            $"Fast charge without the battery -> charge at the maximum {_chargeCurrentAmps}A "
+            + $"(grid tops up whatever PV doesn't cover).{towards}");
     }
 
     // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever

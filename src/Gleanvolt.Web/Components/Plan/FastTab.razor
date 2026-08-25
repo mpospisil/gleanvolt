@@ -1,25 +1,83 @@
+@using Gleanvolt.Core.Strategies
+@implements IDisposable
+@inject IFastChargeSelector Fast
+@inject IVehicleTelemetry Vehicle
+@inject VehicleDisplayOptions VehicleDisplay
+@inject TimeProvider Time
+
 @*
-    The mode for when the sun is beside the point. Nothing to configure either -- the maximum current
-    is an installation limit, not a runtime choice -- so this tab is the button, the warning that it
-    will import, and the four numbers that say what the car is actually taking.
+    The mode for when the sun is beside the point.
+
+    Since #119 it takes an amount as well: how much to deliver before it stops itself, asked in
+    kilowatt-hours or as a battery target, or not asked at all -- which is Full, the default, and what
+    this tab did for its whole life before now.
+
+    The amount is a *stopping condition*. It changes nothing about how the charge runs: the setpoint is
+    still pinned at the installation's maximum from the moment it starts. Anything that paces a charge,
+    waits for cheaper sun, or plans around a deadline is the targeted tab's job, and the two are next to
+    each other for exactly that reason.
+
+    Subscribes to the limit itself, because it can move without this tab's help -- Home Assistant and
+    the API set one too, and the mode clears itself once the charge ends.
 *@
 
 <p class="muted">
     Charge as fast as the installation allows and keep the home battery out of it. The setpoint is
     pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid
-    covers the rest, so expect to import. The discharge hold is armed for as long as this mode is
-    selected, and released when it ends.
+    covers the rest, so expect to import. The discharge hold is armed when the charge starts and
+    released when it ends — you can switch it off in between if you would rather the battery helped.
 </p>
+
+@*
+    The basis selector appears only when the battery target can be honoured: a capacity in
+    Vehicle:BatteryCapacityKWh and an SOC in the last reading. Without both there is no honest
+    conversion from "60%" to kilowatt-hours, so that one option is withheld -- but the other two are
+    offered regardless, unlike on the targeted tab, because "full" and "20 kWh" need nothing from the
+    car at all.
+*@
+<div class="control">
+    <label for="fast-basis">How much?</label>
+    <select id="fast-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
+        <option value="@FastChargeBasis.Full">Until the car stops</option>
+        <option value="@FastChargeBasis.Energy">Energy to add (kWh)</option>
+        @if (CanTargetSoc)
+        {
+            <option value="@FastChargeBasis.Soc">Battery target (%)</option>
+        }
+    </select>
+    <span class="hint">@BasisHint()</span>
+</div>
+
+@if (_basis == FastChargeBasis.Energy)
+{
+    <div class="control">
+        <label for="fast-energy">Energy needed (kWh)</label>
+        <input id="fast-energy" type="number" step="0.5" min="0"
+               @bind="_energyKWh" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">Measured at the charger, from the moment you press the button.</span>
+    </div>
+}
+else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
+{
+    <div class="control">
+        <label for="fast-soc">Charge to (%)</label>
+        <input id="fast-soc" type="number" step="5" min="0" max="100"
+               @bind="_targetSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">@SocConversionHint()</span>
+    </div>
+}
 
 <div class="control">
     <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
         Charge at maximum
     </button>
-    <span class="hint">
-        Ends itself: when the car stops drawing because it has reached its own charge limit, the
-        setpoint drops to the pause current and the mode returns to Off, which releases the hold.
-    </span>
+    <span class="hint">@EndsHint()</span>
 </div>
+
+@if (_error is { } error)
+{
+    <p class="error" role="alert" id="fast-error">@error</p>
+}
 
 @if (Status is { } status)
 {
@@ -32,7 +90,23 @@
               Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
         <Stat Label="Grid power" Value="@Watts(status.GridPowerWatts)"
               Hint="Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed." />
+
+        @*
+            The fifth stat exists only while there is an amount to count towards. On a Full charge there
+            is no number to be short of, and a tile reading "— of —" would be a worse answer than no
+            tile.
+        *@
+        @if (status.FastCharge is { } progress)
+        {
+            <Stat Label="Delivered" Value="@Delivered(progress)"
+                  Hint="Energy delivered against the amount asked for, metered at the charger from the moment this charge was started. The mode stops itself when it gets there." />
+        }
     </section>
+
+    @if (status.FastCharge is { } running)
+    {
+        <p class="muted" id="fast-progress">@ProgressNarrative(running)</p>
+    }
 }
 
 @code {
@@ -42,7 +116,161 @@
 
     [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
 
-    private Task StartFast() => Start(ChargeControlMode.FastNoBattery);
+    private FastChargeBasis _basis = FastChargeBasis.Full;
+    private double _energyKWh = 20;
+    private double _targetSocPercent = 80;
+    private string? _error;
+
+    private VehicleState? _vehicle;
+
+    protected override void OnInitialized()
+    {
+        _vehicle = Vehicle.GetCurrentState();
+        Fast.Changed += OnLimitChanged;
+        AdoptRunningLimit(Fast.Limit);
+    }
+
+    public void Dispose() => Fast.Changed -= OnLimitChanged;
+
+    private void OnLimitChanged(FastChargeLimit? limit) =>
+        InvokeAsync(() =>
+        {
+            AdoptRunningLimit(limit);
+            StateHasChanged();
+        });
+
+    // A limit set from Home Assistant or the API is what this charge is actually stopping at, so the
+    // form shows it rather than whatever was last typed here. Clearing does not reset the boxes: the
+    // figures are still what the owner would press again with.
+    private void AdoptRunningLimit(FastChargeLimit? limit)
+    {
+        if (limit is null)
+        {
+            return;
+        }
+
+        if (limit.TargetSocPercent is { } soc)
+        {
+            _basis = FastChargeBasis.Soc;
+            _targetSocPercent = soc;
+        }
+        else
+        {
+            _basis = FastChargeBasis.Energy;
+            _energyKWh = limit.RequiredEnergyWh / 1000;
+        }
+    }
+
+    private void OnFormEdited() => _error = null;
+
+    // The amount first, then the mode, in the order the targeted tab applies its request and for the
+    // same reason: the controller reads both in one cycle. A rejection stops here rather than starting
+    // a charge that would run to full when a number was asked for.
+    private async Task StartFast()
+    {
+        _vehicle = Vehicle.GetCurrentState();
+
+        var composed = FastChargeLimitFactory.Create(
+            basis: _basis == FastChargeBasis.Soc && !CanTargetSoc ? FastChargeBasis.Full : _basis,
+            energyWh: _energyKWh * 1000,
+            targetSocPercent: _targetSocPercent,
+            vehicleSocPercent: _vehicle?.SocPercent,
+            pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityKWh, VehicleDisplay.ChargeEfficiency),
+            now: Time.GetUtcNow());
+
+        if (!composed.Accepted)
+        {
+            _error = composed.Error;
+            return;
+        }
+
+        _error = null;
+
+        if (composed.Limit is { } limit)
+        {
+            Fast.Set(limit, "Web UI");
+        }
+        else
+        {
+            // Cleared rather than left standing: a limit from an earlier charge would otherwise end
+            // this one, which was asked to run until the car stops.
+            Fast.Clear("Web UI");
+        }
+
+        // Which also writes the charger's use-mode Fast. A charger that refuses it leaves the mode where
+        // it was, and the limit set above with nothing driving it -- so the limit is dropped again
+        // rather than left standing, ready to end somebody else's charge. The failure itself is
+        // reported by the page's own header, next to the mode it failed to move, so nothing is said
+        // about it here: _error is for what this tab refused.
+        var result = await Start(ChargeControlMode.FastNoBattery);
+
+        if (!result.Succeeded)
+        {
+            Fast.Clear("Web UI");
+        }
+    }
+
+    // The SOC basis needs both a configured capacity and a reading to measure the gap from. The same
+    // test the targeted tab makes, and for the same reason: a control that would have to guess is worse
+    // than a control that isn't offered.
+    private bool CanTargetSoc => VehicleDisplay.CanTargetSoc && _vehicle?.SocPercent is not null;
+
+    private string BasisHint() => _basis switch
+    {
+        FastChargeBasis.Energy =>
+            "The charge stops when that much has been delivered, or when the car stops first — "
+            + "whichever comes first.",
+        FastChargeBasis.Soc =>
+            "Converted to kilowatt-hours once, when you press the button. A later reading from the car "
+            + "does not move a charge that is already part delivered.",
+        _ => CanTargetSoc
+            ? "The car decides: the charge runs until it reaches its own charge limit and stops drawing."
+            : "The car decides: the charge runs until it reaches its own charge limit and stops drawing. "
+              + "A battery target needs the car's capacity in Vehicle:BatteryCapacityKWh and a reading "
+              + "from the car.",
+    };
+
+    private string EndsHint() => _basis == FastChargeBasis.Full
+        ? "Ends itself: when the car stops drawing because it has reached its own charge limit, the "
+          + "setpoint drops to the pause current and the mode returns to Off, which releases the hold."
+        : "Ends itself: at the amount above, or when the car stops drawing first. Either way the "
+          + "setpoint drops to the pause current and the mode returns to Off, which releases the hold.";
+
+    private string SocConversionHint()
+    {
+        var requiredWh = VehicleTargetEnergy.RequiredWh(
+            _vehicle?.SocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+
+        return requiredWh switch
+        {
+            null => "No usable SOC reading to measure the gap from.",
+            <= 0 => $"The car is already at {Percent(_vehicle?.SocPercent)} — nothing to do.",
+            _ => $"From {Percent(_vehicle?.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
+                + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
+                + "of what the charger meters reaching the cells.",
+        };
+    }
+
+    private static string ProgressNarrative(FastChargeProgress progress)
+    {
+        if (progress.IsMet)
+        {
+            return $"The {progress.Limit.RequiredEnergyWh / 1000:F1} kWh asked for has been delivered; "
+                + "the charge is stopping.";
+        }
+
+        var asked = progress.Limit.TargetSocPercent is { } soc
+            ? $"{progress.Limit.RequiredEnergyWh / 1000:F1} kWh, which is the {soc:F0}% asked for"
+            : $"{progress.Limit.RequiredEnergyWh / 1000:F1} kWh";
+
+        return $"{progress.DeliveredWh / 1000:F1} kWh of {asked} is in the car; "
+            + $"{progress.RemainingWh / 1000:F1} kWh to go before this stops itself.";
+    }
+
+    private static string Delivered(FastChargeProgress progress) =>
+        $"{progress.DeliveredWh / 1000:F1} / {progress.Limit.RequiredEnergyWh / 1000:F1} kWh";
+
+    private static string Percent(double? value) => value is null ? "—" : $"{value.Value:F0}%";
 
     private static string Watts(double watts) => $"{watts:F0} W";
 

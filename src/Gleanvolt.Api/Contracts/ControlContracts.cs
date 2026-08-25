@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Api.Contracts;
 
@@ -21,7 +22,15 @@ namespace Gleanvolt.Api.Contracts;
 /// preview takes, so what was quoted is what is committed: it is set as the active request before the
 /// mode is selected, and dropped again if the charger refuses.
 /// </param>
-public sealed record StartChargingRequest(ChargeControlMode Mode, TargetedChargeRequestBody? Target = null);
+/// <param name="Fast">
+/// How much to deliver before stopping, for <c>fastNoBattery</c> only, and rejected for every other
+/// mode. Optional even there: omitted means <c>full</c> — charge until the car itself stops — which is
+/// how the mode behaved before it could be given an amount.
+/// </param>
+public sealed record StartChargingRequest(
+    ChargeControlMode Mode,
+    TargetedChargeRequestBody? Target = null,
+    FastChargeLimitBody? Fast = null);
 
 /// <summary>Arm or release the battery discharge hold.</summary>
 /// <param name="Hold">
@@ -40,6 +49,11 @@ public sealed record BatteryHoldRequest(bool Hold);
 /// </param>
 /// <param name="Message">Why it failed, when it did. Null on success.</param>
 /// <param name="Target">The targeted request now in force, or null when there is none.</param>
+/// <param name="Fast">
+/// The fast charge's limit now in force, or null when the fast charge is unlimited or another mode is
+/// running. Reported with nothing delivered yet: this is the action's answer, and the meter starts on
+/// the next poll.
+/// </param>
 /// <param name="Status">
 /// The controller's state after the action. Note that the fields the poll loop owns — powers, the
 /// charger's read-back current — are from the <em>last</em> poll and will not reflect this action until
@@ -49,7 +63,8 @@ public sealed record ControlActionResponse(
     bool Succeeded,
     string? Message,
     TargetedRequestResponse? Target,
-    StatusResponse? Status);
+    StatusResponse? Status,
+    FastChargeResponse? Fast = null);
 
 /// <summary>
 /// Whether the controller is alive and what it can currently see. The endpoint to poll when the
@@ -75,6 +90,8 @@ public sealed record ControlActionResponse(
 /// <param name="VehicleStale">Whether it is past the configured maximum age — a dead feed rather than an old number.</param>
 /// <param name="EnergyHistoryAvailable">Whether the energy-interval store answered a probe query.</param>
 /// <param name="SessionHistoryAvailable">Whether the charging-session store answered a probe query.</param>
+/// <param name="SystemId">The installation's stable id — the MQTT topic segment and HA device id.</param>
+/// <param name="SystemName">What this installation is called.</param>
 public sealed record HealthResponse(
     bool Ok,
     string Version,
@@ -121,3 +138,59 @@ public sealed record ApiIndexResponse(
 /// <param name="Path">The route.</param>
 /// <param name="Summary">What it answers, in a line. The same summary the OpenAPI document carries.</param>
 public sealed record ApiOperationResponse(string Method, string Path, string? Summary);
+
+/// <summary>
+/// How much a fast charge should deliver before it stops itself (#119). A <b>stopping condition</b>,
+/// not a plan: the charger stays pinned at the installation's maximum throughout, and nothing here
+/// defers anything to a sunnier hour. That is what the targeted mode is for.
+///
+/// <para>Omitting this from a <c>fastNoBattery</c> start is the same as sending <c>full</c>, which is
+/// how the mode behaved before it could be given an amount: the car decides when it has had enough.</para>
+/// </summary>
+/// <param name="Basis">
+/// What is being aimed at. <c>full</c> needs neither figure below; <c>energy</c> reads
+/// <paramref name="EnergyKWh"/>; <c>soc</c> reads <paramref name="TargetSocPercent"/> and needs both a
+/// configured pack capacity and a reported reading from the car.
+/// </param>
+/// <param name="EnergyKWh">The energy to deliver, measured at the charger.</param>
+/// <param name="TargetSocPercent">
+/// The state of charge to stop at. Converted to energy <b>once</b>, when the mode is started, and never
+/// re-derived from a later reading — a parked car's cloud SOC arrives when it feels like it, and a
+/// limit already half delivered must not move because the car finally phoned home.
+/// </param>
+public sealed record FastChargeLimitBody(
+    FastChargeBasis Basis = FastChargeBasis.Full,
+    double? EnergyKWh = null,
+    double? TargetSocPercent = null);
+
+/// <summary>The fast charge's limit and how it is going, or absent when there is no limit.</summary>
+/// <param name="RequiredEnergyWh">The energy asked for, at the charger.</param>
+/// <param name="DeliveredEnergyWh">What has been delivered against it since it was set.</param>
+/// <param name="RemainingEnergyWh">What is still to come, floored at zero.</param>
+/// <param name="ActivatedAt">When the limit was set. Delivery is metered from here, not from when the car plugged in.</param>
+/// <param name="TargetSocPercent">The state of charge asked for, when it was asked that way round.</param>
+/// <param name="VehicleSocPercentAtRequest">What the car was reporting when the conversion was made.</param>
+public sealed record FastChargeResponse(
+    double RequiredEnergyWh,
+    double DeliveredEnergyWh,
+    double RemainingEnergyWh,
+    DateTimeOffset ActivatedAt,
+    double? TargetSocPercent,
+    double? VehicleSocPercentAtRequest)
+{
+    internal static FastChargeResponse From(FastChargeProgress progress) => new(
+        progress.Limit.RequiredEnergyWh,
+        progress.DeliveredWh,
+        progress.RemainingWh,
+        progress.Limit.ActivatedAt,
+        progress.Limit.TargetSocPercent,
+        progress.Limit.VehicleSocPercentAtRequest);
+
+    internal static FastChargeResponse From(FastChargeLimit limit) => new(
+        limit.RequiredEnergyWh,
+        0,
+        limit.RequiredEnergyWh,
+        limit.ActivatedAt,
+        limit.TargetSocPercent,
+        limit.VehicleSocPercentAtRequest);
+}

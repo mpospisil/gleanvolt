@@ -20,9 +20,14 @@ public class FastChargingControllerTests
         double surplus = 0,
         EvChargerStatus status = EvChargerStatus.Charging,
         bool evDrewPower = true,
-        TimeSpan evIdleFor = default) =>
+        TimeSpan evIdleFor = default,
+        FastChargeProgress? fastCharge = null) =>
         new(State(status, soc), surplus, new EvChargerSettings(chargerMode, 6), Charging: true,
-            EvDrewPower: evDrewPower, EvIdleFor: evIdleFor);
+            EvDrewPower: evDrewPower, EvIdleFor: evIdleFor, FastCharge: fastCharge);
+
+    /// <summary>A limit of <paramref name="requiredWh"/> with <paramref name="deliveredWh"/> against it.</summary>
+    private static FastChargeProgress Progress(double requiredWh, double deliveredWh) =>
+        new(new FastChargeLimit(requiredWh, DateTimeOffset.UnixEpoch), deliveredWh);
 
     [Theory]
     [InlineData(EvChargerMode.Green)]
@@ -140,6 +145,79 @@ public class FastChargingControllerTests
         var result = Controller.Decide(Input(status: EvChargerStatus.Available, evDrewPower: false));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.False(result.SessionComplete);
+    }
+
+    // -- The amount (#119).
+
+    [Fact]
+    public void WithoutALimitItChargesOnAndSaysNothingAboutAnAmount()
+    {
+        var result = Controller.Decide(Input());
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.False(result.SessionComplete);
+        Assert.DoesNotContain("delivered", result.Reason);
+    }
+
+    [Fact]
+    public void ShortOfTheLimitItChargesOnAndReportsHowFarAlongItIs()
+    {
+        var result = Controller.Decide(Input(fastCharge: Progress(20_000, 8_000)));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(16, result.ChargeCurrentAmps);
+        Assert.False(result.SessionComplete);
+        Assert.Contains("8.0kWh of 20.0kWh delivered", result.Reason);
+        Assert.Contains("12.0kWh to go", result.Reason);
+    }
+
+    [Fact]
+    public void TheLimitBeingMetEndsTheSession()
+    {
+        var result = Controller.Decide(Input(fastCharge: Progress(20_000, 20_100)));
+
+        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Contains("Fast target reached", result.Reason);
+        Assert.Contains("returning to Off", result.Reason);
+    }
+
+    [Fact]
+    public void TheLimitIsCheckedBeforeTheIdleDwell()
+    {
+        // A car that stops drawing at the very moment it reaches the number: both branches would fire,
+        // and only one of them is true. Downstream they are indistinguishable once the mode reads Off.
+        var result = Controller.Decide(Input(
+            status: EvChargerStatus.SuspendedEv,
+            evIdleFor: TimeSpan.FromMinutes(30),
+            fastCharge: Progress(20_000, 20_000)));
+
+        Assert.True(result.SessionComplete);
+        Assert.Contains("Fast target reached", result.Reason);
+        Assert.DoesNotContain("charge limit reached", result.Reason);
+    }
+
+    [Fact]
+    public void ACarThatStopsShortSaysHowFarShortItGot()
+    {
+        var result = Controller.Decide(Input(
+            evIdleFor: TimeSpan.FromMinutes(3),
+            fastCharge: Progress(20_000, 12_400)));
+
+        Assert.True(result.SessionComplete);
+        Assert.Contains("charge limit reached", result.Reason);
+        Assert.Contains("12.4kWh of the 20.0kWh asked for", result.Reason);
+    }
+
+    [Fact]
+    public void ALimitDoesNotOverrideTheNotFastPrecondition()
+    {
+        // A charger taken out of Fast at the wallbox is not ours to end, met limit or not.
+        var result = Controller.Decide(Input(
+            chargerMode: EvChargerMode.Green, fastCharge: Progress(20_000, 25_000)));
+
+        Assert.Equal(ChargingControlAction.None, result.Action);
         Assert.False(result.SessionComplete);
     }
 }

@@ -47,6 +47,7 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         // Vehicle telemetry (#73): hand-registered here for the same reason WebBuildInfo is -- this test
         // builds a minimal host rather than calling AddGleanvolt, so it owns the UI's dependencies.
         builder.Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
+        builder.Services.AddSingleton<IFastChargeSelector>(new FakeFastChargeSelector());
 
         // The installation (#111): the layout names it in the header, so every page needs it -- the
         // sign-in page included, which is what two of these tests are about.

@@ -27,9 +27,17 @@ public sealed record TargetedChargeRequestLimits(
     double ChargeEfficiency = 0.9,
     double DefaultRestSocPercent = 80)
 {
+    /// <summary>
+    /// The pack figures on their own, for the callers that need a capacity and an efficiency but have
+    /// no departure to speak of — <see cref="Strategies.FastChargeLimitFactory"/>. One projection
+    /// rather than two parallel records, so the two factories cannot disagree about what a capacity
+    /// means.
+    /// </summary>
+    public VehiclePackLimits Pack => new(BatteryCapacityKWh, ChargeEfficiency);
+
     /// <summary>Whether a target may be asked for as a state of charge — i.e. whether a capacity is known.</summary>
-    public bool CanTargetSoc => BatteryCapacityKWh > 0;
+    public bool CanTargetSoc => Pack.CanTargetSoc;
 
     /// <summary>The pack's usable capacity in watt-hours, which is what the conversions are stated in.</summary>
-    public double BatteryCapacityWh => BatteryCapacityKWh * 1000;
+    public double BatteryCapacityWh => Pack.BatteryCapacityWh;
 }

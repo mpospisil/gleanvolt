@@ -6,6 +6,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Monitoring;
@@ -234,13 +235,20 @@ public static class GleanvoltHostingExtensions
         });
 
         // Fast charge without the battery (issue #28): the maximum current the site allows, from PV and
-        // grid together, with the discharge hold armed for as long as the mode is selected. It needs no
-        // forecast and no surplus -- only the ceiling and how long a silent car counts as a finished one.
+        // grid together, with the discharge hold armed when the mode starts. It needs no forecast and no
+        // surplus -- only the ceiling and how long a silent car counts as a finished one.
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
             return new FastChargingController(options.MaxChargingCurrentAmps, options.CompletionDwell);
         });
+
+        // ...and how much of it to deliver before stopping (issue #119). A stopping condition, not a
+        // plan: the limit is runtime state belonging to one charge, so like the mode and the targeted
+        // request it starts empty -- which is the Full case, and the behaviour this mode had before it
+        // could be given an amount.
+        services.AddSingleton<IFastChargeSelector, FastChargeSelector>();
+        services.AddSingleton<FastChargeProvider>();
 
         // Targeted charging (issue #80): a stated amount of energy by a stated departure time, with the
         // grid block placed over the sunniest hours it can reach. The request itself is runtime state rather than

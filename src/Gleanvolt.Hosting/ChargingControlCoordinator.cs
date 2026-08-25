@@ -90,12 +90,17 @@ public sealed class ChargingControlCoordinator
     /// <param name="mode">The mode selected at runtime; picks which controller decides this cycle.</param>
     /// <param name="plan">The forecast-driven day plan, or null when the mode doesn't use one.</param>
     /// <param name="targetedPlan">The energy-by-departure plan, or null when the mode doesn't use one.</param>
+    /// <param name="fastCharge">
+    /// How a limited fast charge is going, or null when there is no limit — which covers both the other
+    /// modes and a fast charge asked for as Full.
+    /// </param>
     public async Task<ChargeControlCycleResult> RunCycleAsync(
         EnergyState state,
         ChargeControlMode mode,
         SolarDayPlan? plan,
         CancellationToken cancellationToken,
-        TargetedChargePlan? targetedPlan = null)
+        TargetedChargePlan? targetedPlan = null,
+        FastChargeProgress? fastCharge = null)
     {
         if (!_controllers.TryGetValue(mode, out var controller))
         {
@@ -125,7 +130,8 @@ public sealed class ChargingControlCoordinator
                 _sessionEnergy.EnergyWattHours,
                 _loanedToday.EnergyWattHours,
                 _evDrewPower,
-                EvIdleFor(state.Timestamp)));
+                EvIdleFor(state.Timestamp),
+                fastCharge));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "

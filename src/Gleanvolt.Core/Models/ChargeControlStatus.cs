@@ -49,13 +49,20 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="ChargeControlMode.Targeted"/> is the mode driving the charger — the same rule
 /// <paramref name="Plan"/> follows, so a different mode cannot leave a stale target on display.
 /// </param>
+/// <param name="FastCharge">
+/// How a limited fast charge is going, populated <b>only</b> while
+/// <see cref="ChargeControlMode.FastNoBattery"/> is the mode driving the charger — the same rule
+/// <paramref name="Plan"/> and <paramref name="TargetedPlan"/> follow. Null also means "no limit": the
+/// owner asked for <see cref="Enums.FastChargeBasis.Full"/> and the car decides when to stop.
+/// </param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 /// <param name="SessionCompleted">
-/// This cycle the controller reported the car had finished and the mode ended itself (only
-/// <see cref="ChargeControlMode.FastNoBattery"/> does). True for the single status that carries the
-/// transition, and the only way a later reader can tell "the car filled up" from "somebody selected
-/// Off" — by the time <see cref="Mode"/> reads <see cref="ChargeControlMode.Off"/> the two look
-/// identical. Not published to Home Assistant.
+/// This cycle the controller reported that charging was over and the mode ended itself — the fast and
+/// targeted modes both do. True for the single status that carries the transition, and the only way a
+/// later reader can tell "it finished" from "somebody selected Off": by the time <see cref="Mode"/>
+/// reads <see cref="ChargeControlMode.Off"/> the two look identical. <em>Why</em> it finished — the
+/// car reached its own limit, or the amount asked for was delivered — is in the reason recorded on the
+/// session. Not published to Home Assistant.
 /// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
@@ -85,4 +92,5 @@ public sealed record ChargeControlStatus(
     double? TomorrowForecastWh,
     DateTimeOffset Timestamp,
     TargetedChargePlan? TargetedPlan = null,
-    bool SessionCompleted = false);
+    bool SessionCompleted = false,
+    FastChargeProgress? FastCharge = null);
