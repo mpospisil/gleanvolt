@@ -46,7 +46,11 @@ public static class GleanvoltHostingExtensions
     /// </summary>
     public static IServiceCollection AddGleanvolt(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<SolaxOptions>(configuration.GetSection(SolaxOptions.SectionName));
+        // Keys that used to describe the installation and no longer do (issue #111). Checked before
+        // anything is bound, because the failure they prevent is invisible: a build that ignored
+        // Solax__Inverter__Host would run against the default address while the operator's file says
+        // otherwise -- starting, polling and charging, pointed somewhere else.
+        RetiredConfigurationKeys.Refuse(configuration);
 
         // The zone every "local" decision is made in. Registered as the app's TimeProvider rather than
         // read at each call site, so the services that already take one need no change and there is
@@ -59,12 +63,11 @@ public static class GleanvoltHostingExtensions
 
         // The installation itself (issue #111): where the array is, and what it is made of. Resolved
         // eagerly, and once, for the same reason the time zone above is — a site that cannot be
-        // described is a startup failure, not a connection error minutes later — and registered so that
-        // every surface reads one answer rather than re-deciding which configuration key won.
+        // described is a startup failure, not a connection error minutes later — and registered as one
+        // object so that every surface reads the same answer.
         services.Configure<PvSystemOptions>(configuration.GetSection(PvSystemOptions.SectionName));
-        var pvSystem = PvSystemResolver.Resolve(configuration);
-        services.AddSingleton(pvSystem);
-        services.AddSingleton(pvSystem.Site);
+        var site = PvSystemResolver.Resolve(configuration);
+        services.AddSingleton(site);
 
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
         {
@@ -75,7 +78,7 @@ public static class GleanvoltHostingExtensions
             var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
             return WriteProof(
                 provider,
-                new ModbusTcpClient(pvSystem.Site.Inverter.Connection),
+                new ModbusTcpClient(site.Inverter.Connection),
                 batteryHold.Enabled && !batteryHold.DryRun);
         });
 
@@ -84,7 +87,7 @@ public static class GleanvoltHostingExtensions
         // control logic rather than of wiring. What still cannot handle two is everything downstream —
         // one mode, one set of Home Assistant controls, one surplus to divide — which is why the
         // resolver refuses a second entry rather than this loop quietly accepting it.
-        foreach (var charger in pvSystem.Site.Chargers)
+        foreach (var charger in site.Chargers)
         {
             services.AddKeyedSingleton<IModbusClient>(charger.Id, (provider, _) =>
             {
@@ -101,7 +104,7 @@ public static class GleanvoltHostingExtensions
         // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
         // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
         // key is not — so this is an alias and never a self-reference.
-        var controlledCharger = pvSystem.Site.Chargers[0].Id;
+        var controlledCharger = site.Chargers[0].Id;
         services.AddKeyedSingleton<IModbusClient>(
             ModbusClientKeys.EvCharger,
             (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
@@ -552,12 +555,6 @@ public static class GleanvoltHostingExtensions
             // on this assembly -- and hands it over, rather than Gleanvolt.Web guessing from its own
             // attributes.
             services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
-
-            // Which deprecated keys are still supplying values (issue #111). Resolved from the same
-            // PvSystemResolution the startup log reads, so the page and the log cannot disagree; handed
-            // over rather than looked up, because Gleanvolt.Web may not reference this assembly.
-            services.AddSingleton(provider =>
-                new PvSystemNotices(provider.GetRequiredService<PvSystemResolution>().Deprecations));
 
             // Everything else -- Razor components, cookie authentication, the RequireAuthentication
             // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised

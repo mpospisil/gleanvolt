@@ -75,7 +75,7 @@ public sealed class PollingService : BackgroundService
         IBatteryDischargeControl batteryDischargeControl,
         ChargeControlStatusHolder statusHolder,
         ChargePowerConverter power,
-        IOptions<SolaxOptions> options,
+        IOptions<ControllerOptions> controllerOptions,
         IOptions<ChargeControlOptions> chargeControlOptions,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
         IOptions<ForecastChargeOptions> forecastOptions,
@@ -98,7 +98,7 @@ public sealed class PollingService : BackgroundService
         _forecastOptions = forecastOptions.Value;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
+        _pollInterval = TimeSpan.FromSeconds(controllerOptions.Value.PollIntervalSeconds);
     }
 
     // Shutdown runs with a fresh token (ExecuteAsync's is already cancelled), so the pause write can

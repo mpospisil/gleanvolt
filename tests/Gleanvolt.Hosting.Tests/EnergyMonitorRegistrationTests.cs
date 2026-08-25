@@ -22,8 +22,8 @@ public class EnergyMonitorRegistrationTests
     // service is started.
     private static readonly (string Key, string? Value)[] MinimalDevices =
     [
-        ("Solax:Inverter:Host", "127.0.0.1"),
-        ("Solax:EvCharger:Host", "127.0.0.1"),
+        ("Pv:Inverter:Host", "127.0.0.1"),
+        ("Pv:Chargers:0:Host", "127.0.0.1"),
     ];
 
     private static ServiceProvider Build(params (string Key, string? Value)[] settings)

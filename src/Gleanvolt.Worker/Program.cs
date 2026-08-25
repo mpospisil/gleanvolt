@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Serilog;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Web;
@@ -54,16 +55,8 @@ var log = host.Services.GetRequiredService<ILogger<Program>>();
 log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
 
 // What this process thinks it is: which installation, and which boxes it will be talking to (issue
-// #111). A log file that cannot answer that is a log file nobody can read six months later. The
-// warnings after it are the migration checklist -- one line per older key that is still deciding a
-// value the Pv section is meant to own.
-var pvSystem = host.Services.GetRequiredService<PvSystemResolution>();
-log.LogInformation("PV system: {System}.", pvSystem.Site.Describe());
-
-foreach (var deprecation in pvSystem.Deprecations)
-{
-    log.LogWarning("{Deprecation}", deprecation);
-}
+// #111). A log file that cannot answer that is a log file nobody can read six months later.
+log.LogInformation("PV system: {System}.", host.Services.GetRequiredService<PvSystemInfo>().Describe());
 
 // Said explicitly because nothing else says it: Kestrel's own "Now listening on" is logged under
 // Microsoft.Hosting.Lifetime, which the Serilog configuration holds at Warning. Without this line a

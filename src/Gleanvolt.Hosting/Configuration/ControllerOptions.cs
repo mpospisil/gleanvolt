@@ -24,4 +24,12 @@ public sealed class ControllerOptions
     /// about the day is precisely the bug this setting exists to prevent.</para>
     /// </summary>
     public string TimeZone { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How many seconds between poll/decide cycles. It lives here rather than beside the devices
+    /// (issue #111) because it is not a fact about the hardware: the inverter has no opinion about how
+    /// often it is asked. It is a choice about how quickly the controller reacts, which is a controller
+    /// setting — and it was the last thing left in the vendor-named section the devices moved out of.
+    /// </summary>
+    public int PollIntervalSeconds { get; init; } = 5;
 }

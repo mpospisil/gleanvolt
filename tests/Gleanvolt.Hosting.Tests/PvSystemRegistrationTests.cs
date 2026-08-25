@@ -36,9 +36,6 @@ public class PvSystemRegistrationTests
 
         Assert.Equal("home-roof", site.Id);
         Assert.Equal("Home Roof", site.Name);
-
-        // The resolution too, because UseGleanvolt logs its deprecations at startup.
-        Assert.Empty(provider.GetRequiredService<PvSystemResolution>().Deprecations);
     }
 
     [Fact]
@@ -67,19 +64,17 @@ public class PvSystemRegistrationTests
     }
 
     [Fact]
-    public async Task TheDevicesAreTheOnesTheOlderKeysNameWhenTheyAreSet()
+    public void AKeyThatHasMovedStopsTheHostBeforeAnythingIsBound()
     {
-        await using var provider = Build(
-            ("Pv:Inverter:Host", "127.0.0.9"),
-            ("Pv:Chargers:0:Host", "127.0.0.9"),
-            ("Solax:Inverter:Host", "127.0.0.1"),
-            ("Solax:EvCharger:Host", "127.0.0.2"));
+        // The check runs first in AddGleanvolt, ahead of the section it replaces, so an operator who
+        // upgraded without editing .env is told what to change rather than being pointed at a default.
+        var error = Assert.Throws<InvalidOperationException>(() => Build(
+            ("Pv:Inverter:Host", "127.0.0.1"),
+            ("Pv:Chargers:0:Host", "127.0.0.2"),
+            ("Solax:Inverter:Host", "127.0.0.9")));
 
-        var site = provider.GetRequiredService<PvSystemInfo>();
-
-        Assert.Equal("127.0.0.1", site.Inverter.Connection.Host);
-        Assert.Equal("127.0.0.2", site.Chargers[0].Connection.Host);
-        Assert.Equal(2, provider.GetRequiredService<PvSystemResolution>().Deprecations.Count);
+        Assert.Contains("Solax__Inverter", error.Message);
+        Assert.Contains("Pv__Inverter", error.Message);
     }
 
     [Fact]

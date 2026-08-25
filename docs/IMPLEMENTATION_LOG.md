@@ -4,6 +4,54 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — One section describes the installation; the old keys are refused (issue #111, phase 2)
+
+Phase 1 added the `Pv` section and let the older keys keep winning, so that an upgrade could not
+change how a running site behaved. This is the other half: the older keys are gone, and one that is
+still set stops the worker.
+
+### What changed
+
+- **`Weather:Latitude` and `Weather:Longitude` removed** from `WeatherOptions`, `appsettings.json`, the
+  compose file and both `.env.example`s. The weather section is about the *provider* now — its address,
+  key, units and timeout. Which site the sky is over is a fact about the site.
+- **The `Solax` section is gone.** `Solax:Inverter` and `Solax:EvCharger` were already replaced;
+  `Solax:PollIntervalSeconds` became **`Controller:PollIntervalSeconds`**, because the inverter has no
+  opinion about how often it is asked. `SolaxOptions` is deleted.
+- **`RetiredConfigurationKeys.Refuse`** runs first in `AddGleanvolt`, before anything is bound: a
+  retired key that is still set is a startup failure naming its replacement **in both spellings**,
+  because the one an operator has to edit is almost always the `__` form. Ignoring it would be the
+  expensive kind of quiet — a controller that starts, polls and charges against a default address while
+  the operator's file names another one.
+- **`PvSystemResolution` and `PvSystemNotices` are gone**, along with the page's *Configuration to
+  move* section. They existed to carry a deployment across the transition; with nothing left to
+  deprecate they would be machinery for a state that can no longer occur.
+- **The deploy stack keeps its variable names where it matters.** `INVERTER_HOST` and
+  `EV_CHARGER_HOST` are unchanged — compose maps them onto `Pv__Inverter__Host` and
+  `Pv__Chargers__0__Host` — and the file grows `PV_ID`, `PV_NAME`, `PV_ADDRESS`, `PV_LATITUDE`,
+  `PV_LONGITUDE`, `PV_AZIMUTH`, `PV_TILT`, `PV_CAPACITY_KWP`, `PV_INVERTER_CAPACITY_KW`,
+  `PV_LOSS_FACTOR`, `PV_INSTALL_DATE`, `PV_INVERTER_MODEL`, `PV_CHARGER_MODEL` and `PV_CHARGER_ID`.
+  `WEATHER_LATITUDE`/`WEATHER_LONGITUDE` become `PV_LATITUDE`/`PV_LONGITUDE`; `deploy/README.md` has
+  the upgrade note.
+- A decision record: *the installation is described once, and the providers read it*.
+
+### Verification performed
+
+- **948 tests pass** (new: every retired key refused and named, all of them reported at once, the keys
+  that did *not* move left alone, and an empty configuration value read as unset rather than as zero —
+  which is exactly what compose produces for a `PV_*` variable nobody filled in).
+- **Ran the worker on the reference site's real values**, supplied through the untracked `.env`:
+  `PV system: Jinacovice (jinacovice) at 49.2681,16.5335; inverter SolaX X3-HYB-G4 PRO at …`, and
+  `/pv-system` showing the address, `180° (south)` for a configured `-180`, 12.8° tilt, 8.5 kWp, loss
+  factor 0.90 and a 2026-04-01 commissioning date.
+- **Ran it with two retired keys set** and got the refusal it is there for, naming
+  `Solax__Inverter -> Pv__Inverter` and `Weather__Latitude -> Pv__Latitude`.
+- Not deployed. The Pi's `.env` needs `WEATHER_LATITUDE`/`WEATHER_LONGITUDE` renamed before it deploys
+  this, or it loses its coordinates and stops recording weather — the compose file no longer reads
+  them, so the failure would be silent rather than loud.
+
+---
+
 ## 2026-08-25 — The installation, on a page (issue #111)
 
 The startup log says which system this is and what it is talking to, once, and then buries it under a

@@ -260,12 +260,7 @@ public class TargetedModeTests
             _inverter,
             _status,
             power,
-            Options.Create(new SolaxOptions
-            {
-                Inverter = new DeviceConfig { Host = "127.0.0.1" },
-                EvCharger = new DeviceConfig { Host = "127.0.0.1" },
-                PollIntervalSeconds = 0,
-            }),
+            Options.Create(new ControllerOptions { PollIntervalSeconds = 0 }),
             Options.Create(chargeControl),
             Options.Create(new BatteryHoldOptions { Enabled = true, DryRun = true }),
             forecastOptions,
