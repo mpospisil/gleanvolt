@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
 
@@ -25,6 +26,7 @@ public class FastNoBatteryModeTests
         new(ChargeControlMode.FastNoBattery, NullLogger<ChargeControlModeSelector>.Instance);
     private readonly BatteryHoldSelector _manualHold =
         new(initialHold: false, NullLogger<BatteryHoldSelector>.Instance);
+    private readonly FastChargeSelector _fastLimit = new(NullLogger<FastChargeSelector>.Instance);
     private readonly ChargeControlStatusHolder _status = new();
 
     // The setpoint writes made while the loop was running. Snapshotted before the service is stopped,
@@ -99,14 +101,159 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
-    public async Task TheHoldTheOwnerAskedForSurvivesTheModeEnding()
+    public async Task EveryEndingReleasesTheHold_EvenOneTheOwnerAskedForFirst()
     {
+        // This asserted the opposite until #119, when it was decided that a fast charge ending must
+        // leave nothing armed. The old rule -- "a manually requested hold is never released by a mode"
+        // -- reads well until the mode is the one holding the switch: it left the pack locked out of
+        // serving the house with nothing charging, and no line in the log saying why.
         _manualHold.Set(true, "test");
 
         await RunAsync(Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4)));
 
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
-        Assert.True(_inverter.Applied[^1]); // a manually requested hold is never released by a mode
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task TheModeArmsTheHoldThroughTheSwitch_SoItsLevelMatchesWhatIsOnScreen()
+    {
+        // Home Assistant publishes what is *armed*, not what was asked for. A hold armed beside the
+        // switch shows ON there while the switch itself still reads false, and the owner's OFF is then
+        // a Set(false) that changes nothing and raises no event.
+        await RunAsync(Charging(Now), Charging(Now.AddMinutes(1)));
+
+        Assert.True(_manualHold.Hold);
+        Assert.True(_inverter.Applied[^1]);
+    }
+
+    [Fact]
+    public async Task TheOwnerCanReleaseTheHoldWhileTheChargeRuns_AndItStaysReleased()
+    {
+        // The §7 requirement of #119: armed by default, but the switch means something. Turning it off
+        // mid-charge used to move the switch in HA and change nothing at all.
+        var released = false;
+        _inverter.OnApply = _ =>
+        {
+            if (!released && _manualHold.Hold)
+            {
+                released = true;
+                _manualHold.Set(false, "owner");
+            }
+        };
+
+        await RunAsync(Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddMinutes(2)));
+
+        Assert.True(released);
+        Assert.False(_inverter.Applied[^1]);
+
+        // ...and the car is still charging flat out. Releasing the hold is not stopping the charge.
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+        Assert.Equal(16, LastTarget);
+    }
+
+    // -- The amount (#119). A stopping condition and nothing more: the current stays pinned at the
+    // maximum throughout, and the only thing the limit changes is when the mode ends itself.
+
+    [Fact]
+    public async Task TheModeEndsItselfWhenTheAmountAskedForHasBeenDelivered()
+    {
+        // 11040W for two five-minute polls is 1.84kWh, past the 1.5kWh asked for.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(5)), Charging(Now.AddMinutes(10))],
+            limit: new FastChargeLimit(1_500, Now));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Equal(0, LastTarget);
+        Assert.Contains("Fast target reached", _writes[^1].Reason);
+        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task TheCurrentStaysAtTheMaximumUntilTheAmountIsMet()
+    {
+        // The amount does not modulate anything -- that is what the targeted mode is for.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(5))],
+            limit: new FastChargeLimit(50_000, Now));
+
+        Assert.All(_writes, w => Assert.Equal(16, w.Target));
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+    }
+
+    [Fact]
+    public async Task ACarThatStopsFirstEndsTheModeAndSaysHowFarShortItGot()
+    {
+        // The car reached *its* limit before ours. Both are endings; only one of them met the number,
+        // and the log has to be able to tell them apart.
+        await RunAsync(
+            [Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4))],
+            limit: new FastChargeLimit(50_000, Now));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Contains("charge limit reached", _writes[^1].Reason);
+        Assert.Contains("of the 50.0kWh asked for", _writes[^1].Reason);
+        Assert.False(_inverter.Applied[^1]);
+    }
+
+    [Fact]
+    public async Task AnUnplugEndsTheModeAndReleasesTheHold()
+    {
+        await RunAsync(
+            [Charging(Now), Unplugged(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(50_000, Now));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Contains("unplugged", _writes[^1].Reason);
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task PressingOffReleasesTheHold()
+    {
+        // The ending the release must not be hooked to individually -- and the one most likely to be
+        // forgotten, because nothing in the fast mode's own code runs when somebody presses Off.
+        var pressed = false;
+        _inverter.OnApply = _ =>
+        {
+            if (!pressed)
+            {
+                pressed = true;
+                _mode.Set(ChargeControlMode.Off, "owner");
+            }
+        };
+
+        await RunAsync(Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddMinutes(2)));
+
+        Assert.True(pressed);
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task SwitchingStraightToAnotherModeReleasesTheHold()
+    {
+        // Targeted returns early from AutoHold, so a release written only into its catch-all branch
+        // would miss this transition entirely.
+        var switched = false;
+        _inverter.OnApply = _ =>
+        {
+            if (!switched)
+            {
+                switched = true;
+                _mode.Set(ChargeControlMode.Targeted, "owner");
+            }
+        };
+
+        await RunAsync(Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddMinutes(2)));
+
+        Assert.True(switched);
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
     }
 
     [Fact]
@@ -145,8 +292,13 @@ public class FastNoBatteryModeTests
 
     // Drives the real poll loop over a scripted telemetry sequence, then stops it. The service parks on
     // the reader once the script runs out, so exactly these polls happen -- no timing assumptions.
-    private async Task RunAsync(EnergyState[] states, bool batteryHoldEnabled)
+    private async Task RunAsync(EnergyState[] states, bool batteryHoldEnabled = true, FastChargeLimit? limit = null)
     {
+        if (limit is not null)
+        {
+            _fastLimit.Set(limit, "test");
+        }
+
         var chargeControl = new ChargeControlOptions
         {
             Phases = 3,
@@ -186,6 +338,7 @@ public class FastNoBatteryModeTests
             coordinator,
             dayPlan,
             TargetedCharge.Provider(forecast, dayPlan, power, chargeControl, forecastOptions),
+            FastCharge.Provider(_fastLimit),
             _mode,
             // The real actions over the fake charger: a mode that ends itself has to stop the charger
             // exactly as the Off button does, and that is the code path it goes through.
@@ -209,6 +362,12 @@ public class FastNoBatteryModeTests
     private static EnergyState Charging(DateTimeOffset at) =>
         new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 11040,
             EvChargerStatus.Charging, EvChargerPowerWatts: 11040);
+
+    // Positively reported as having no car, which is an ending -- unlike Unknown, which is a dropped
+    // read and must not be.
+    private static EnergyState Unplugged(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 300,
+            EvChargerStatus.Available, EvChargerPowerWatts: 0);
 
     // Plugged in, drawing nothing.
     private static EnergyState Idle(DateTimeOffset at) =>

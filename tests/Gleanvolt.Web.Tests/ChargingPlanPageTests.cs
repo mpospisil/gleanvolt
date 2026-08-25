@@ -29,6 +29,7 @@ public class ChargingPlanPageTests : PageTest
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
     private readonly FakeTargetedChargeSelector _target = new();
+    private readonly FakeFastChargeSelector _fast = new();
 
     public ChargingPlanPageTests()
     {
@@ -41,6 +42,7 @@ public class ChargingPlanPageTests : PageTest
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton<ITargetedChargeSelector>(_target);
+        Services.AddSingleton<IFastChargeSelector>(_fast);
         Services.AddSingleton<ITargetedChargePreview>(new FakeTargetedChargePreview());
         Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
         Services.AddSingleton(new TargetedDisplayOptions(TimeSpan.FromHours(36)));

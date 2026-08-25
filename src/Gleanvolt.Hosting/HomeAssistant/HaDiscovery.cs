@@ -76,10 +76,12 @@ public sealed class HaDiscovery
     public const string ResumeMarginNumber = "resume_margin";
     public const string TargetEnergyNumber = "target_energy";
     public const string TargetRestSocNumber = "target_rest_soc";
+    public const string FastEnergyNumber = "fast_energy";
+    public const string FastTargetSocNumber = "fast_target_soc";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
         [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
-         TargetRestSocNumber];
+         TargetRestSocNumber, FastEnergyNumber, FastTargetSocNumber];
 
     /// <summary>
     /// The charging-priority select. Its own platform rather than a switch, because "Cheapest" and
@@ -88,7 +90,13 @@ public sealed class HaDiscovery
     /// </summary>
     public const string TargetPrioritySelect = "target_priority";
 
-    public static readonly IReadOnlyList<string> SelectObjectIds = [TargetPrioritySelect];
+    /// <summary>
+    /// What a fast charge is aiming at (#119): Full, Energy or Soc. A select for the same reason the
+    /// priority is one — three named choices, none of which is the "off" a switch would need.
+    /// </summary>
+    public const string FastBasisSelect = "fast_basis";
+
+    public static readonly IReadOnlyList<string> SelectObjectIds = [TargetPrioritySelect, FastBasisSelect];
 
     /// <summary>Object id of the departure-time text entity, which the worker subscribes to like a number.</summary>
     public const string TargetDepartureText = "target_departure";
@@ -99,6 +107,12 @@ public sealed class HaDiscovery
     /// The strategy buttons, in the order they are published: object id -> the mode each one starts.
     /// <c>Targeted</c> is deliberately absent — it needs an amount and a departure, so its action stays
     /// on <see cref="ActivateTargetCommandTopic"/>, next to the entities that carry them.
+    ///
+    /// <para><c>FastNoBattery</c> <b>is</b> here, and keeps its object id, even though #119 gave it an
+    /// amount too. The difference from the targeted case is that its amount is optional: the press means
+    /// something on its own, and with the basis left at Full it does exactly what it always did. Moving
+    /// it to an activate-style topic would break every dashboard and automation that has this button on
+    /// it, to express something the button can express perfectly well as it is.</para>
     /// </summary>
     public static readonly IReadOnlyList<(string ObjectId, ChargeControlMode Mode, string Name, string Icon)> StartButtons =
     [
@@ -369,6 +383,26 @@ public sealed class HaDiscovery
         yield return Sensor("target_grid_start", "Charging from", template: Optional("target_grid_start"), icon: "mdi:transmission-tower-import");
         yield return Sensor("target_hold_until", "Target hold until", template: Optional("target_hold_until"), icon: "mdi:timer-sand");
 
+        // The fast charge's amount (#119). Published unconditionally, like the targeted entities above
+        // and for the same reason: the mode can be started at any moment, so the controls have to exist
+        // before it is. The basis comes first -- it decides which of the two boxes below is read -- and
+        // the button that applies all three is the existing "Charge fast", which is why none appears here.
+        yield return Select(
+            FastBasisSelect,
+            "Fast basis",
+            [nameof(FastChargeBasis.Full), nameof(FastChargeBasis.Energy), nameof(FastChargeBasis.Soc)],
+            icon: "mdi:flash-outline");
+
+        yield return Number(FastEnergyNumber, "Fast energy", min: 0, max: 100, step: 0.5, unit: "kWh", icon: "mdi:flash");
+        yield return Number(FastTargetSocNumber, "Fast target SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-charging-60");
+
+        // A pair rather than one, on the same reasoning as target_solar and target_forecast_surplus
+        // above: delivered on its own is half a story, and "8 kWh" means nothing without the number it
+        // is counting towards. Both absent while the mode runs unlimited, which is how a dashboard shows
+        // "the car decides" without a sensor saying so.
+        yield return Sensor("fast_delivered", "Fast delivered", template: Optional("fast_delivered_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("fast_target", "Fast target", template: Optional("fast_target_kwh"), unit: "kWh", deviceClass: "energy");
+
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
             ["name"] = "Car connected",
@@ -473,6 +507,15 @@ public sealed class HaDiscovery
             payload["target_hold_until"] = target.HoldUntil is { } release
                 ? $"{release.LocalDateTime:HH:mm}"
                 : "none";
+        }
+
+        // Absent, not zero, while the fast mode runs unlimited or another mode is driving: nothing was
+        // asked for, and "0.0 kWh delivered of 0.0" is a sentence about nothing. The status only carries
+        // this while FastNoBattery is the mode driving, so there is nothing here to scope again.
+        if (s.FastCharge is { } fast)
+        {
+            payload["fast_delivered_kwh"] = Math.Round(fast.DeliveredWh / 1000, 2);
+            payload["fast_target_kwh"] = Math.Round(fast.Limit.RequiredEnergyWh / 1000, 2);
         }
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so

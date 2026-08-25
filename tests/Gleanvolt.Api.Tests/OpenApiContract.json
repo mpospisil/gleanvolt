@@ -196,6 +196,7 @@
     "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|]",
     "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded]",
     "ControlActionResponse": {
+      "fast": "any",
       "message": "string? (required)",
       "status": "any (required)",
       "succeeded": "boolean (required)",
@@ -252,6 +253,20 @@
       "to": "string(date-time) (required)"
     },
     "EvChargerStatus": "enum[available|preparing|charging|finishing|faulted|unavailable|reserved|suspendedEv|suspendedEvse|update|cardActivation|startDelay|chargePaused|stopping|unknown]",
+    "FastChargeBasis": "enum[full|energy|soc]",
+    "FastChargeLimitBody": {
+      "basis": "$FastChargeBasis",
+      "energyKWh": "number|string(double)?",
+      "targetSocPercent": "number|string(double)?"
+    },
+    "FastChargeResponse": {
+      "activatedAt": "string(date-time) (required)",
+      "deliveredEnergyWh": "number|string(double) (required)",
+      "remainingEnergyWh": "number|string(double) (required)",
+      "requiredEnergyWh": "number|string(double) (required)",
+      "targetSocPercent": "number|string(double)? (required)",
+      "vehicleSocPercentAtRequest": "number|string(double)? (required)"
+    },
     "ForecastPeriodResponse": {
       "energyWh": "number|string(double) (required)",
       "estimatedPowerWatts": "number|string(double) (required)",
@@ -414,6 +429,7 @@
       "trajectorySocFloorPercent": "number|string(double) (required)"
     },
     "StartChargingRequest": {
+      "fast": "any",
       "mode": "$ChargeControlMode (required)",
       "target": "any"
     },
@@ -428,6 +444,7 @@
       "dryRun": "boolean (required)",
       "evChargerPowerWatts": "number|string(double) (required)",
       "evChargingCurrentAmps": "integer|string(int32) (required)",
+      "fastCharge": "any",
       "forecastSolarPowerWatts": "number|string(double) (required)",
       "gridPowerWatts": "number|string(double) (required)",
       "holdingControl": "boolean (required)",

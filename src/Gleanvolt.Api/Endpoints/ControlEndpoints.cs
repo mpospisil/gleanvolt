@@ -2,6 +2,7 @@ using Gleanvolt.Api.Contracts;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -21,6 +22,7 @@ internal static class ControlEndpoints
             HttpContext http,
             IChargeActions actions,
             ITargetedChargeSelector target,
+            IFastChargeSelector fast,
             IVehicleTelemetry vehicle,
             ChargeControlStatusHolder holder,
             TargetedChargeRequestLimits limits,
@@ -34,15 +36,62 @@ internal static class ControlEndpoints
                 return ApiResults.BadRequest("'off' is not a mode to start. POST /charging/stop instead.");
             }
 
-            if (body.Mode != ChargeControlMode.Targeted)
+            if (body.Target is not null && body.Mode != ChargeControlMode.Targeted)
             {
-                if (body.Target is not null)
+                return ApiResults.BadRequest(
+                    $"A target is only meaningful for the targeted mode, not for '{body.Mode}'.");
+            }
+
+            if (body.Fast is not null && body.Mode != ChargeControlMode.FastNoBattery)
+            {
+                return ApiResults.BadRequest(
+                    $"A fast charge limit is only meaningful for the fastNoBattery mode, not for '{body.Mode}'.");
+            }
+
+            if (body.Mode == ChargeControlMode.FastNoBattery)
+            {
+                // The same factory the web tab and the Home Assistant button go through: the SOC to
+                // kilowatt-hours conversion and every refusal live there, so all three doors reject the
+                // same things for the same reasons.
+                var composed = FastChargeLimitFactory.Create(
+                    basis: body.Fast?.Basis ?? FastChargeBasis.Full,
+                    energyWh: body.Fast?.EnergyKWh * 1000,
+                    targetSocPercent: body.Fast?.TargetSocPercent,
+                    vehicleSocPercent: vehicle.GetCurrentState()?.SocPercent,
+                    pack: limits.Pack,
+                    now: time.GetUtcNow());
+
+                if (!composed.Accepted)
                 {
-                    return ApiResults.BadRequest(
-                        $"A target is only meaningful for the targeted mode, not for '{body.Mode}'.");
+                    return ApiResults.BadRequest(composed.Error!);
                 }
 
-                return Respond(await actions.StartAsync(body.Mode, source, cancellationToken), target, holder);
+                // Set before the mode, like the targeted request and for the same reason: the controller
+                // reads both in the same cycle. Cleared rather than left standing on Full, so a limit
+                // from an earlier charge cannot quietly end this one.
+                if (composed.Limit is { } limit)
+                {
+                    fast.Set(limit, source);
+                }
+                else
+                {
+                    fast.Clear(source);
+                }
+
+                var started = await actions.StartAsync(body.Mode, source, cancellationToken);
+                if (!started.Succeeded)
+                {
+                    // A charger that refuses Fast leaves the mode where it was, and would leave this
+                    // limit set with nothing driving it.
+                    fast.Clear(source);
+                }
+
+                return Respond(started, target, holder, fast);
+            }
+
+            if (body.Mode != ChargeControlMode.Targeted)
+            {
+                return Respond(await actions.StartAsync(body.Mode, source, cancellationToken), target, holder, fast);
             }
 
             if (body.Target is null)
@@ -69,7 +118,7 @@ internal static class ControlEndpoints
                 target.Clear(source);
             }
 
-            return Respond(result, target, holder);
+            return Respond(result, target, holder, fast);
         })
             .WithName("startCharging")
             .WithSummary("Start controlled charging in a mode")
@@ -79,6 +128,10 @@ internal static class ControlEndpoints
                 + "hand.\n\n"
                 + "For 'targeted', pass the same target the preview took — it is set as the active "
                 + "request before the mode is selected, and dropped again if the charger refuses.\n\n"
+                + "For 'fastNoBattery', 'fast' says how much to deliver before the mode stops itself: "
+                + "an amount of energy, a state of charge, or 'full' to let the car decide (the "
+                + "default, and what you get by omitting it). It is a stopping condition and nothing "
+                + "more — the charger stays pinned at the installation's maximum either way.\n\n"
                 + "A refused hardware write is reported as 200 with succeeded=false and a message, not "
                 + "as an HTTP error: the call was understood and the controller is in a well-defined "
                 + "state (exactly the one it was in before). Read the flag, not the status code.\n\n"
@@ -91,6 +144,7 @@ internal static class ControlEndpoints
             HttpContext http,
             IChargeActions actions,
             ITargetedChargeSelector target,
+            IFastChargeSelector fast,
             ChargeControlStatusHolder holder,
             CancellationToken cancellationToken) =>
         {
@@ -102,7 +156,11 @@ internal static class ControlEndpoints
             // means what it said. Post it again to start again.
             target.Clear(source);
 
-            return Respond(await actions.StopAsync(source, cancellationToken), target, holder);
+            // A fast charge's limit on exactly the same reasoning: metered from its own activation, so
+            // there is no such thing as resuming one.
+            fast.Clear(source);
+
+            return Respond(await actions.StopAsync(source, cancellationToken), target, holder, fast);
         })
             .WithName("stopCharging")
             .WithSummary("Stop controlled charging")
@@ -110,7 +168,7 @@ internal static class ControlEndpoints
                 "Writes Stop to the charger and returns the mode to off, which releases any hold a mode "
                 + "had armed and closes the charging session. Always writes, even when the controller "
                 + "was already off and never took control — the button says stop charging, so it stops "
-                + "charging. Any standing targeted request is cleared with it.")
+                + "charging. Any standing targeted request or fast charge limit is cleared with it.")
             .Produces<ControlActionResponse>();
 
         api.MapPut("/battery-hold", (
@@ -160,10 +218,12 @@ internal static class ControlEndpoints
     private static IResult Respond(
         ChargeActionResult result,
         ITargetedChargeSelector target,
-        ChargeControlStatusHolder holder) =>
+        ChargeControlStatusHolder holder,
+        IFastChargeSelector fast) =>
         Results.Ok(new ControlActionResponse(
             result.Succeeded,
             result.Message,
             target.Request is { } request ? TargetedRequestResponse.From(request) : null,
-            holder.Current is { } status ? StatusResponse.From(status) : null));
+            holder.Current is { } status ? StatusResponse.From(status) : null,
+            fast.Limit is { } limit ? FastChargeResponse.From(limit) : null));
 }

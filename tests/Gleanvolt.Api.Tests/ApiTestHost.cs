@@ -27,6 +27,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     internal FakeTargetedChargeSelector Target { get; } = new();
 
+    internal FakeFastChargeSelector Fast { get; } = new();
+
     internal FakeBatteryHoldSelector Hold { get; } = new();
 
     internal FakeTargetedChargePreview Preview { get; } = new();
@@ -63,6 +65,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton(Status);
         builder.Services.AddSingleton<IChargeActions>(Actions);
         builder.Services.AddSingleton<ITargetedChargeSelector>(Target);
+        builder.Services.AddSingleton<IFastChargeSelector>(Fast);
         builder.Services.AddSingleton<IBatteryHoldSelector>(Hold);
         builder.Services.AddSingleton<ITargetedChargePreview>(Preview);
         builder.Services.AddSingleton<ISolarForecastService>(Forecast);

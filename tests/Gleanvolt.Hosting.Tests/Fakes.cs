@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
 
@@ -88,6 +89,15 @@ internal static class TargetedCharge
             forecastOptions,
             Options.Create(options ?? new TargetedChargeOptions()),
             NullLogger<TargetedChargeProvider>.Instance);
+}
+
+/// <summary>The fast mode's meter (#119), built over a selector the test can set a limit on.</summary>
+internal static class FastCharge
+{
+    public static FastChargeProvider Provider(IFastChargeSelector? selector = null) =>
+        new(
+            selector ?? new FastChargeSelector(NullLogger<FastChargeSelector>.Instance),
+            NullLogger<FastChargeProvider>.Instance);
 }
 
 /// <summary>

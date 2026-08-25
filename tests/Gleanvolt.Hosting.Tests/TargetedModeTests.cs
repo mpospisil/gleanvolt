@@ -252,6 +252,7 @@ public class TargetedModeTests
                 forecast, dayPlan, power, chargeControl, forecastOptions, _target,
                 // No margin, so the arithmetic in these tests is the clock and the ceiling alone.
                 new TargetedChargeOptions { SafetyMargin = TimeSpan.Zero }),
+            FastCharge.Provider(),
             _mode,
             // The real actions over the fake charger: a mode that ends itself has to stop the charger
             // exactly as the Off button does, and that is the code path it goes through.

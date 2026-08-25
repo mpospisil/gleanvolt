@@ -24,6 +24,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IBatteryHoldSelector _batteryHold;
     private readonly IForecastRuntimeSettings _forecastSettings;
     private readonly ITargetedChargeSelector _target;
+    private readonly IFastChargeSelector _fast;
     private readonly IVehicleTelemetry? _vehicle;
     private readonly VehicleOptions _vehicleOptions;
     private readonly IServiceShutdown _shutdown;
@@ -42,6 +43,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private TargetedChargePriority _pendingPriority = TargetedChargePriority.Cheapest;
     private double _pendingRestSocPercent;
 
+    // The same arrangement for the fast charge's amount (#119). Full is the default, so a dashboard
+    // nobody has touched presses the button and gets what the button has always done.
+    private FastChargeBasis _pendingFastBasis = FastChargeBasis.Full;
+    private double _pendingFastEnergyKWh;
+    private double _pendingFastSocPercent = 80;
+
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
@@ -49,6 +56,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IBatteryHoldSelector batteryHold,
         IForecastRuntimeSettings forecastSettings,
         ITargetedChargeSelector target,
+        IFastChargeSelector fast,
         IServiceShutdown shutdown,
         ChargeControlStatusHolder statusHolder,
         ILogger<HomeAssistantMqttWorker> logger,
@@ -65,6 +73,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
         _target = target;
+        _fast = fast;
         _vehicle = vehicle;
         _vehicleOptions = vehicleOptions.Value;
         _pendingRestSocPercent = targetedOptions.Value.JustInTime.RestSocPercent;
@@ -249,6 +258,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // show up here too, or the two surfaces would disagree about what the car is being charged to.
         yield return (HaDiscovery.TargetEnergyNumber, (_target.Request?.RequiredEnergyWh / 1000) ?? _pendingEnergyKWh);
         yield return (HaDiscovery.TargetRestSocNumber, _target.Request?.RestSocPercent ?? _pendingRestSocPercent);
+
+        // ...and the same rule for the fast charge's boxes: a running limit outranks whatever was last
+        // typed, so a fast charge started from the web UI shows up here too.
+        yield return (HaDiscovery.FastEnergyNumber, (_fast.Limit?.RequiredEnergyWh / 1000) ?? _pendingFastEnergyKWh);
+        yield return (HaDiscovery.FastTargetSocNumber, _fast.Limit?.TargetSocPercent ?? _pendingFastSocPercent);
     }
 
     // The departure as text, echoed back so a Home Assistant restart (or a second dashboard) sees what
@@ -302,14 +316,6 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             }
         }
 
-        foreach (var objectId in HaDiscovery.SelectObjectIds)
-        {
-            if (topic == _discovery.SelectCommandTopic(objectId))
-            {
-                return OnSelectCommandAsync(objectId, payload);
-            }
-        }
-
         foreach (var objectId in HaDiscovery.TextObjectIds)
         {
             if (topic == _discovery.TextCommandTopic(objectId))
@@ -345,10 +351,26 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
+        // The amount, before the mode and in that order, for the reason the targeted request is set
+        // first: the controller reads both in one cycle. A rejection stops the press here rather than
+        // starting a charge that would run to full when a number was asked for.
+        if (mode == ChargeControlMode.FastNoBattery && !ApplyPendingFastLimit())
+        {
+            return;
+        }
+
         var result = await _actions.StartAsync(mode, "Home Assistant").ConfigureAwait(false);
         if (!result.Succeeded)
         {
             _logger.LogWarning("Starting {Mode} from Home Assistant failed: {Message}", mode, result.Message);
+
+            // A charger that refused Fast leaves the mode where it was, and would leave the limit
+            // standing with nothing driving it -- ready to end somebody else's charge later.
+            if (mode == ChargeControlMode.FastNoBattery)
+            {
+                _fast.Clear("Home Assistant");
+            }
+
             return;
         }
 
@@ -356,6 +378,46 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // press gets, and a dashboard that shows nothing for 30 seconds reads as a button that did
         // nothing.
         await PublishStatusAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Turns the basis and whichever box it reads into the limit the mode will stop at, through the same
+    /// factory the web tab and the API use — so all three doors reject the same things for the same
+    /// reasons. Returns false when the press should not go through.
+    ///
+    /// <para>Full clears rather than leaves standing: a limit from an earlier charge, still set because
+    /// nobody thought to remove it, would otherwise quietly end a charge that was asked to run to
+    /// full.</para>
+    /// </summary>
+    private bool ApplyPendingFastLimit()
+    {
+        var composed = FastChargeLimitFactory.Create(
+            basis: _pendingFastBasis,
+            energyWh: _pendingFastEnergyKWh * 1000,
+            targetSocPercent: _pendingFastSocPercent,
+            vehicleSocPercent: _vehicle?.GetCurrentState()?.SocPercent,
+            pack: new VehiclePackLimits(_vehicleOptions.BatteryCapacityKWh, _vehicleOptions.ChargeEfficiency),
+            now: _timeProvider.GetUtcNow());
+
+        if (!composed.Accepted)
+        {
+            // Logged and dropped, like every other refused press from this surface: a button has no way
+            // to put a message in front of anybody, and starting anyway would be worse than doing
+            // nothing.
+            _logger.LogWarning("Charge fast pressed but the amount was refused: {Reason}", composed.Error);
+            return false;
+        }
+
+        if (composed.Limit is { } limit)
+        {
+            _fast.Set(limit, "Home Assistant");
+        }
+        else
+        {
+            _fast.Clear("Home Assistant");
+        }
+
+        return true;
     }
 
     private async Task OnChargeOffAsync(string? payload)
@@ -443,6 +505,14 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             case HaDiscovery.TargetRestSocNumber:
                 _pendingRestSocPercent = Math.Clamp(value, 0, 100);
                 break;
+            case HaDiscovery.FastEnergyNumber:
+                // Held like the targeted energy above: an amount typed is not a limit until the button
+                // is pressed.
+                _pendingFastEnergyKWh = Math.Max(0, value);
+                break;
+            case HaDiscovery.FastTargetSocNumber:
+                _pendingFastSocPercent = Math.Clamp(value, 0, 100);
+                break;
             default:
                 return Task.CompletedTask;
         }
@@ -454,34 +524,61 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     // The priority as text, echoed back so a Home Assistant restart sees what is actually being worked
     // to. The running request outranks whatever was last selected, exactly as the energy number does.
-    private Task PublishSelectStatesAsync(CancellationToken cancellationToken)
+    private async Task PublishSelectStatesAsync(CancellationToken cancellationToken)
     {
         var priority = _target.Request?.Priority ?? _pendingPriority;
 
-        return PublishAsync(
+        await PublishAsync(
             _discovery.SelectStateTopic(HaDiscovery.TargetPrioritySelect),
             priority.ToString(),
             retain: true,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+
+        // A running limit outranks the selection, like the numbers: it says what the charge is actually
+        // stopping at, which is not always what the box was last set to.
+        var basis = _fast.Limit is { } limit
+            ? (limit.IsSocBased ? FastChargeBasis.Soc : FastChargeBasis.Energy)
+            : _pendingFastBasis;
+
+        await PublishAsync(
+            _discovery.SelectStateTopic(HaDiscovery.FastBasisSelect),
+            basis.ToString(),
+            retain: true,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private Task OnSelectCommandAsync(string objectId, string? payload)
     {
-        if (objectId != HaDiscovery.TargetPrioritySelect)
+        switch (objectId)
         {
-            return Task.CompletedTask;
+            case HaDiscovery.TargetPrioritySelect:
+                if (!Enum.TryParse<TargetedChargePriority>(payload, ignoreCase: true, out var priority))
+                {
+                    _logger.LogWarning(
+                        "Ignoring unrecognised charge priority '{Payload}'; expected Cheapest or JustInTime.", payload);
+                    return Task.CompletedTask;
+                }
+
+                // Held like the energy and the departure: a priority chosen and not yet activated is not
+                // a request, and the button is what makes all four of them one.
+                _pendingPriority = priority;
+                break;
+
+            case HaDiscovery.FastBasisSelect:
+                if (!Enum.TryParse<FastChargeBasis>(payload, ignoreCase: true, out var basis))
+                {
+                    _logger.LogWarning(
+                        "Ignoring unrecognised fast charge basis '{Payload}'; expected Full, Energy or Soc.", payload);
+                    return Task.CompletedTask;
+                }
+
+                _pendingFastBasis = basis;
+                break;
+
+            default:
+                return Task.CompletedTask;
         }
 
-        if (!Enum.TryParse<TargetedChargePriority>(payload, ignoreCase: true, out var priority))
-        {
-            _logger.LogWarning(
-                "Ignoring unrecognised charge priority '{Payload}'; expected Cheapest or JustInTime.", payload);
-            return Task.CompletedTask;
-        }
-
-        // Held like the energy and the departure: a priority chosen and not yet activated is not a
-        // request, and the button is what makes all four of them one.
-        _pendingPriority = priority;
         return PublishSelectStatesAsync(CancellationToken.None);
     }
 

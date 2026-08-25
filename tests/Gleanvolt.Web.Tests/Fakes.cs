@@ -461,6 +461,32 @@ internal static class TestIntervals
 /// every call and raises <see cref="Changed"/> exactly like the real thing, which is what the targeted
 /// page depends on to notice a request being made or dropped from somewhere else.
 /// </summary>
+/// <summary>The fast charge's limit (#119), recording what was set and by whom.</summary>
+internal sealed class FakeFastChargeSelector(FastChargeLimit? initial = null) : IFastChargeSelector
+{
+    public FastChargeLimit? Limit { get; private set; } = initial;
+
+    public List<(FastChargeLimit Limit, string Source)> Sets { get; } = [];
+
+    public List<string> Clears { get; } = [];
+
+    public event Action<FastChargeLimit?>? Changed;
+
+    public void Set(FastChargeLimit limit, string source)
+    {
+        Sets.Add((limit, source));
+        Limit = limit;
+        Changed?.Invoke(limit);
+    }
+
+    public void Clear(string source)
+    {
+        Clears.Add(source);
+        Limit = null;
+        Changed?.Invoke(null);
+    }
+}
+
 internal sealed class FakeTargetedChargeSelector(TargetedChargeRequest? initial = null) : ITargetedChargeSelector
 {
     public TargetedChargeRequest? Request { get; private set; } = initial;

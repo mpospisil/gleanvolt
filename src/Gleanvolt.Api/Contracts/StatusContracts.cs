@@ -41,6 +41,11 @@ namespace Gleanvolt.Api.Contracts;
 /// The energy-by-departure plan, populated only while <c>Targeted</c> is the mode driving the charger,
 /// so a different mode cannot leave a stale target on display.
 /// </param>
+/// <param name="FastCharge">
+/// The fast charge's limit and how much of it has been delivered, populated only while
+/// <c>FastNoBattery</c> is the mode driving the charger — the same rule. Null also when that mode is
+/// running with no limit, which means the car decides when to stop.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -65,7 +70,8 @@ public sealed record StatusResponse(
     double? TomorrowForecastWh,
     BatteryHoldResponse BatteryHold,
     SolarDayPlanResponse? DayPlan,
-    TargetedPlanResponse? TargetedPlan)
+    TargetedPlanResponse? TargetedPlan,
+    FastChargeResponse? FastCharge = null)
 {
     internal static StatusResponse From(ChargeControlStatus status) => new(
         status.Timestamp,
@@ -95,7 +101,8 @@ public sealed record StatusResponse(
             status.BatteryHoldActive,
             status.BatteryHoldTargetWatts),
         status.Plan is { } plan ? SolarDayPlanResponse.From(plan) : null,
-        status.TargetedPlan is { } targeted ? TargetedPlanResponse.From(targeted) : null);
+        status.TargetedPlan is { } targeted ? TargetedPlanResponse.From(targeted) : null,
+        status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null);
 }
 
 /// <summary>

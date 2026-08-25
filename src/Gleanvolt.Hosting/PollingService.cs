@@ -4,6 +4,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
 
@@ -43,6 +44,7 @@ public sealed class PollingService : BackgroundService
     private readonly ChargingControlCoordinator _chargingControl;
     private readonly DayPlanProvider _dayPlan;
     private readonly TargetedChargeProvider _targetedCharge;
+    private readonly FastChargeProvider _fastCharge;
     private readonly IChargeControlModeSelector _mode;
     private readonly IChargeActions _chargeActions;
     private readonly IBatteryHoldSelector _batteryHold;
@@ -60,6 +62,15 @@ public sealed class PollingService : BackgroundService
     // than in the selector so the manual switch stays exactly what the owner set.
     private bool _autoHold;
 
+    // The fast mode's hold is the exception, and deliberately so (#119). It is armed *through* the
+    // selector rather than beside it, because the HA switch publishes what is actually armed
+    // (BatteryHoldActive) rather than what was asked for: a hold armed only in _autoHold shows ON in
+    // Home Assistant while the selector still reads false, so the owner's OFF is a Set(false) that
+    // changes nothing, fires no event, and is silently discarded. Arming through the selector keeps
+    // its level matching what the owner is looking at, which is the whole of what makes the switch
+    // work during a fast charge. This flag only records that the release is ours to perform.
+    private bool _fastHold;
+
     // The mode the previous cycle ran under, so a selection can be noticed once instead of per poll.
     private ChargeControlMode _lastMode = ChargeControlMode.Off;
 
@@ -69,6 +80,7 @@ public sealed class PollingService : BackgroundService
         ChargingControlCoordinator chargingControl,
         DayPlanProvider dayPlan,
         TargetedChargeProvider targetedCharge,
+        FastChargeProvider fastCharge,
         IChargeControlModeSelector mode,
         IChargeActions chargeActions,
         IBatteryHoldSelector batteryHold,
@@ -87,6 +99,7 @@ public sealed class PollingService : BackgroundService
         _chargingControl = chargingControl;
         _dayPlan = dayPlan;
         _targetedCharge = targetedCharge;
+        _fastCharge = fastCharge;
         _mode = mode;
         _chargeActions = chargeActions;
         _batteryHold = batteryHold;
@@ -158,14 +171,20 @@ public sealed class PollingService : BackgroundService
                 // Targeted would restart the count and re-promise energy the car already has.
                 var targetedPlan = Planned("targeted plan", () => _targetedCharge.Update(state));
 
+                // Metered in every mode too, and for the same reason as the two above: the count has to
+                // survive a mode switch, or leaving Fast and coming back would restart it and re-promise
+                // energy the car already has.
+                var fastCharge = Planned("fast charge progress", () => _fastCharge.Update(state));
+
                 var mode = _mode.Mode;
-                WarnOnModeEntry(mode);
+                OnModeEntry(mode);
 
                 ChargeControlCycleResult result;
                 if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
                     or ChargeControlMode.Targeted)
                 {
-                    result = await _chargingControl.RunCycleAsync(state, mode, plan, stoppingToken, targetedPlan);
+                    result = await _chargingControl.RunCycleAsync(
+                        state, mode, plan, stoppingToken, targetedPlan, fastCharge);
                 }
                 else
                 {
@@ -214,6 +233,11 @@ public sealed class PollingService : BackgroundService
                     BatteryHoldTargetWatts: hold.ActivePowerTargetWatts,
                     Plan: mode == ChargeControlMode.Forecasted ? plan : null,
                     TargetedPlan: mode == ChargeControlMode.Targeted ? targetedPlan : null,
+                    // The same rule the two plans above follow, so a mode that is no longer driving
+                    // cannot leave a stale amount on display. Note `mode`, not the mode at the top of
+                    // the cycle: a fast charge that has just met its limit reads Off by here, and the
+                    // amount it was working to belongs to the session that has just ended.
+                    FastCharge: mode == ChargeControlMode.FastNoBattery ? fastCharge : null,
                     LoanPowerWatts: result.LoanPowerWatts,
                     SessionEnergyWh: _chargingControl.SessionEnergyWh,
                     LoanedTodayWh: _chargingControl.LoanedTodayWh,
@@ -265,12 +289,15 @@ public sealed class PollingService : BackgroundService
     }
 
     /// <summary>
-    /// The one thing worth saying at the moment a mode is selected rather than every poll: the fast
-    /// mode's promise is that the pack stays out of the charge, and with the hold feature switched off
-    /// it cannot keep it. It still charges — a select option that silently did nothing would be worse —
-    /// but the inverter will serve the car from the battery, which is the opposite of the intent.
+    /// What happens once, at the moment a mode is selected, rather than on every poll: the warning
+    /// below, and arming the fast mode's discharge hold.
+    ///
+    /// <para>The warning is the one thing worth saying at entry — the fast mode's promise is that the
+    /// pack stays out of the charge, and with the hold feature switched off it cannot keep it. It still
+    /// charges (a button that silently did nothing would be worse), but the inverter will serve the car
+    /// from the battery, which is the opposite of the intent.</para>
     /// </summary>
-    private void WarnOnModeEntry(ChargeControlMode mode)
+    private void OnModeEntry(ChargeControlMode mode)
     {
         if (mode == _lastMode)
         {
@@ -286,6 +313,59 @@ public sealed class PollingService : BackgroundService
                 + "with no way to stop the inverter discharging the home battery into the car.",
                 mode);
         }
+
+        ArmFastHold(mode);
+    }
+
+    /// <summary>
+    /// Arms the discharge hold for a fast charge that has just started — keeping the pack out of the
+    /// fastest charge the site can deliver is the mode's entire reason for existing, so it is armed by
+    /// default and the owner never has to remember to.
+    ///
+    /// <para>Through <see cref="IBatteryHoldSelector"/> rather than beside it, which is the whole point:
+    /// the Home Assistant switch publishes what is actually armed, so a hold armed only inside this
+    /// service shows ON there while the selector still reads false — and the owner's OFF is then a
+    /// <c>Set(false)</c> that changes nothing and raises no event. Arming through the switch keeps its
+    /// level matching what is on screen, so turning it off is a real transition that really releases
+    /// the hold. That is the §7 requirement of #119: armed by default, and the switch means something.</para>
+    /// </summary>
+    private void ArmFastHold(ChargeControlMode mode)
+    {
+        if (mode != ChargeControlMode.FastNoBattery || !_batteryHoldOptions.Enabled)
+        {
+            return;
+        }
+
+        _fastHold = true;
+        _batteryHold.Set(true, "the FastNoBattery mode starting");
+    }
+
+    /// <summary>
+    /// Releases a fast charge's hold once that mode is no longer driving — <b>whatever</b> took it
+    /// there: the owner pressed Off on any of the three surfaces, the car reached its own charge limit,
+    /// the requested amount was delivered, or the car was unplugged.
+    ///
+    /// <para><b>Keyed on the mode, not on the ending.</b> There are half a dozen ways a fast charge
+    /// stops and every one of them ends with this mode no longer selected — the session-complete path
+    /// in the loop above sets it to Off itself, and the stop actions go through the mode selector. One
+    /// condition covers all of them; a list of endings is how the seventh one gets missed, and the
+    /// missed one leaves an armed hold on an inverter with nothing charging. It is the arrangement
+    /// <see cref="ChargeControlMode.Targeted"/>'s hold already uses, one branch down.</para>
+    ///
+    /// <para>A hold the owner had switched on <em>before</em> the fast charge is released along with it.
+    /// That is deliberate: the alternative is restoring a remembered prior value, which a restart loses
+    /// anyway, and which leaves the pack locked out of serving the house with nothing charging. It is
+    /// said out loud in the README.</para>
+    /// </summary>
+    private void ReleaseFastHoldIfEnded(ChargeControlMode mode)
+    {
+        if (!_fastHold || mode == ChargeControlMode.FastNoBattery)
+        {
+            return;
+        }
+
+        _fastHold = false;
+        _batteryHold.Set(false, "the FastNoBattery mode ending");
     }
 
     /// <summary>
@@ -308,7 +388,12 @@ public sealed class PollingService : BackgroundService
             return default;
         }
 
-        var hold = _batteryHold.Hold || AutoHold(state, mode, plan, targetedPlan, gridBridging);
+        // Evaluated first, and not inlined into the `||` below: that would short-circuit whenever the
+        // switch is on, and the fast mode's release runs *inside* AutoHold -- through the switch. A
+        // mode ending while its own hold was armed would then never release it, which is the one
+        // outcome this whole arrangement exists to prevent.
+        var auto = AutoHold(state, mode, plan, targetedPlan, gridBridging);
+        var hold = _batteryHold.Hold || auto;
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
         BatteryHoldState result;
@@ -356,11 +441,15 @@ public sealed class PollingService : BackgroundService
 
     /// <summary>
     /// Whether the selected mode wants the discharge hold armed right now, independently of the owner's
-    /// manual switch — which is OR-ed with this and always wins, so a hold the owner asked for is never
-    /// released by a mode.
+    /// manual switch — which is OR-ed with this, so a hold the owner asked for is never released by one
+    /// of the modes answered here.
     ///
-    /// <para><see cref="ChargeControlMode.FastNoBattery"/> wants it unconditionally: keeping the pack out
-    /// of the fastest charge the site can deliver is the mode's entire reason for existing.</para>
+    /// <para><see cref="ChargeControlMode.FastNoBattery"/> is <b>not</b> here, and that is the change
+    /// #119 made. It used to return true unconditionally, which made the mode's hold a floor: flipping
+    /// the switch off during a fast charge moved the switch in Home Assistant, logged nothing, and left
+    /// the hold armed. Its hold is now armed through the selector on mode entry and released by
+    /// <see cref="ReleaseFastHoldIfEnded"/> when the mode stops driving, so for as long as it runs the
+    /// owner's switch is the only input — off means off.</para>
     ///
     /// <para><see cref="ChargeControlMode.Forecasted"/> wants it once SOC has reached the floor the plan
     /// requires for a 100% battery by the deadline, so an estimate error cannot dig below it — the grid
@@ -374,15 +463,25 @@ public sealed class PollingService : BackgroundService
         TargetedChargePlan? targetedPlan,
         bool gridBridging)
     {
+        ReleaseFastHoldIfEnded(mode);
+
         if (mode == ChargeControlMode.FastNoBattery)
         {
-            if (!_autoHold)
+            // Nothing to add: the mode's own hold is on the switch, so returning true here would put it
+            // back to being a floor and take the switch's authority away again.
+            //
+            // An auto-hold from whatever ran before this is dropped, though. It is not this mode's, and
+            // leaving the flag set would tell the forecast mode's hysteresis it was already armed if
+            // that mode came back later.
+            if (_autoHold)
             {
-                _logger.LogInformation("Battery discharge hold armed automatically for the {Mode} mode.", mode);
-                _autoHold = true;
+                _logger.LogInformation(
+                    "The previous mode's automatic battery discharge hold is superseded by the {Mode} mode's own.",
+                    mode);
+                _autoHold = false;
             }
 
-            return true;
+            return false;
         }
 
         if (mode == ChargeControlMode.Targeted)

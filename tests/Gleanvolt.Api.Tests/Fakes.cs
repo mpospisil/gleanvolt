@@ -56,6 +56,32 @@ internal sealed class FakeTargetedChargeSelector : ITargetedChargeSelector
     public event Action<TargetedChargeRequest?>? Changed;
 }
 
+/// <summary>The fast charge's limit (#119), recording who set and cleared it.</summary>
+internal sealed class FakeFastChargeSelector : IFastChargeSelector
+{
+    public FastChargeLimit? Limit { get; private set; }
+
+    internal List<string> Sets { get; } = [];
+
+    internal List<string> Clears { get; } = [];
+
+    public void Set(FastChargeLimit limit, string source)
+    {
+        Limit = limit;
+        Sets.Add(source);
+        Changed?.Invoke(limit);
+    }
+
+    public void Clear(string source)
+    {
+        Limit = null;
+        Clears.Add(source);
+        Changed?.Invoke(null);
+    }
+
+    public event Action<FastChargeLimit?>? Changed;
+}
+
 internal sealed class FakeBatteryHoldSelector : IBatteryHoldSelector
 {
     public bool Hold { get; private set; }

@@ -4,6 +4,67 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — A fast charge takes an amount, and its hold obeys the switch (issue #119)
+
+`FastNoBattery` charged until the car said stop, and armed a discharge hold nobody could turn off.
+Both are now askable: an amount to stop at, and a switch that means something for the length of the
+charge.
+
+### What changed
+
+**The amount** — `FastChargeBasis` is `Full` (the default, and the mode's previous behaviour),
+`Energy`, or `Soc`.
+
+- `FastChargeLimit` and `FastChargeProgress` in Core, composed by `FastChargeLimitFactory` — the one
+  door the web tab, the HTTP API and the Home Assistant button all go through, so the three cannot
+  disagree about what is valid. A separate record from `TargetedChargeRequest` rather than a reuse:
+  `DepartBy`, `Priority`, `TailEnergyWh` and `RestSocPercent` would be null here forever.
+- The SOC → kWh conversion reuses `VehicleTargetEnergy` and happens **once, at activation**. The pack
+  figures moved into `VehiclePackLimits`, which `TargetedChargeRequestLimits` now projects, so the two
+  factories cannot drift on what a capacity means.
+- `IFastChargeSelector` holds the limit at runtime (not persisted, like the mode and the targeted
+  request); `FastChargeProvider` meters delivery from activation with an `EnergyIntegrator`.
+- `FastChargingController` gained one branch, checked **before** the idle dwell so a car that stops at
+  the moment it reaches the number is reported as "target reached" rather than as its own limit.
+  Nothing about the ending path changed — `SessionComplete` → `Stop` → `Off` is as it was.
+- Surfaces: a basis selector and box on the Fast tab (the SOC option withheld without a capacity *and*
+  a reading), an optional `fast` on `POST /charging/start`, and three HA entities beside the
+  **Charge fast** button, which keeps its object id.
+
+**The hold** — armed on mode entry **through** `IBatteryHoldSelector`, released whenever the mode
+stops driving.
+
+- The old arrangement returned `true` from `AutoHold`, which the loop OR-ed over the owner's switch.
+  That made the mode's hold a floor: turning the switch off mid-charge moved it in Home Assistant and
+  changed nothing. Worse, the HA switch publishes `BatteryHoldActive` rather than the request, so the
+  switch read `ON` while the selector read `false` — and the owner's OFF was a `Set(false)` no-op that
+  raised no event and was silently discarded.
+- The release is keyed on **the mode no longer being FastNoBattery**, not on a list of endings — the
+  arrangement `Targeted`'s hold already uses. That covers Off from all three surfaces, the car's own
+  limit, the amount, and an unplug, without a branch per case.
+- `AutoHold` is now evaluated **before** the switch is read rather than inlined into the `||`:
+  short-circuiting on an armed switch would skip the release that runs inside it.
+- A hold the owner had on *before* the charge is released with it. Deliberate, documented, and the
+  one existing test that asserted the opposite was rewritten with the reasoning in it.
+
+### Verification performed
+
+- **1039 tests pass** (63 new): the factory's refusals, the controller's branch ordering, the meter's
+  count-from-activation rule, and one poll-loop test per way a fast charge can end — each asserting the
+  hold is released.
+- The three surfaces are covered separately, because the point of the shared factory is that they
+  refuse the same things: the tab renders and refuses, the API returns 400 with the reason, the HA
+  button logs and starts nothing.
+- The checked-in OpenAPI contract was regenerated; the diff is `fast`, `fastCharge`,
+  `FastChargeBasis`, `FastChargeLimitBody` and `FastChargeResponse` and nothing else.
+- **Not yet deployed.** Two things only the hardware can settle: whether the released hold really lets
+  the pack serve the house again within a poll, and whether the delivered figure at the charger lands
+  where the car agrees it should. The hold's *effectiveness* on this inverter remains the separate
+  open question `ResidualDischargeWatts` and the breach warning exist for — this issue was about the
+  control being honest, not about the pack finally obeying.
+
+---
+
 ## 2026-08-25 — The departure box can say "nothing" (issue #117)
 
 Home Assistant logged an `ERROR` every time the controller reported that it had no departure to work

@@ -4,6 +4,7 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Targeting;
@@ -31,6 +32,8 @@ public class HaButtonCommandTests
 
     private readonly RecordingChargeActions _actions = new();
     private readonly TargetedChargeSelector _target = new(NullLogger<TargetedChargeSelector>.Instance);
+    private readonly FastChargeSelector _fast = new(NullLogger<FastChargeSelector>.Instance);
+    private readonly FakeVehicleTelemetry _vehicle = new();
 
     [Theory]
     [InlineData("start_solar", ChargeControlMode.Solar)]
@@ -147,7 +150,98 @@ public class HaButtonCommandTests
         Assert.Empty(_actions.Stops);
     }
 
-    private HomeAssistantMqttWorker Worker() =>
+    // -- The fast charge's amount (#119). Three entities and the button that was already there.
+
+    [Fact]
+    public async Task ChargeFastWithTheBasisLeftAloneStartsAnUnlimitedCharge()
+    {
+        // The dashboard nobody has touched: Full is the default, and the button does what it always did.
+        await Worker().HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Equal(ChargeControlMode.FastNoBattery, Assert.Single(_actions.Starts).Mode);
+        Assert.Null(_fast.Limit);
+    }
+
+    [Fact]
+    public async Task ChargeFastAppliesTheEnergyBoxUnderTheEnergyBasis()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "20");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Equal(20_000, _fast.Limit!.RequiredEnergyWh);
+        Assert.Single(_actions.Starts);
+    }
+
+    [Fact]
+    public async Task ChargeFastConvertsTheSocBoxUnderTheSocBasis()
+    {
+        _vehicle.State = new VehicleState(Now, SocPercent: 42);
+        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Soc");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastTargetSocNumber), "60");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Equal(15_400, _fast.Limit!.RequiredEnergyWh, 0);
+        Assert.Equal(60, _fast.Limit.TargetSocPercent);
+        Assert.Single(_actions.Starts);
+    }
+
+    [Fact]
+    public async Task ARefusedAmountStopsThePressRatherThanChargingToFull()
+    {
+        // No capacity configured, so the SOC basis cannot be honoured. Starting anyway would run the
+        // charge to full when a number was asked for, which is the opposite of the request.
+        _vehicle.State = new VehicleState(Now, SocPercent: 42);
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Soc");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Empty(_actions.Starts);
+        Assert.Null(_fast.Limit);
+    }
+
+    [Fact]
+    public async Task GoingBackToFullClearsAnAmountFromAnEarlierCharge()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "20");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Full");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Null(_fast.Limit);
+    }
+
+    [Fact]
+    public async Task AnUnrecognisedBasisIsIgnoredRatherThanGuessedAt()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Whatever");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "20");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        // Still Full, so still unlimited -- not silently promoted to the energy that happens to be typed.
+        Assert.Null(_fast.Limit);
+        Assert.Single(_actions.Starts);
+    }
+
+    private HomeAssistantMqttWorker Worker(VehicleOptions? vehicleOptions = null) =>
         new(
             Options.Create(HaOptions),
             Options.Create(new BatteryHoldOptions()),
@@ -156,13 +250,14 @@ public class HaButtonCommandTests
             new ForecastRuntimeSettings(
                 Options.Create(new ForecastChargeOptions()), NullLogger<ForecastRuntimeSettings>.Instance),
             _target,
+            _fast,
             new NoopShutdown(),
             new ChargeControlStatusHolder(),
             NullLogger<HomeAssistantMqttWorker>.Instance,
             Options.Create(new TargetedChargeOptions()),
-            Options.Create(new VehicleOptions()),
+            Options.Create(vehicleOptions ?? new VehicleOptions()),
             Sites.Home,
-            vehicle: null,
+            _vehicle,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>
@@ -202,5 +297,13 @@ public class HaButtonCommandTests
         public override DateTimeOffset GetUtcNow() => now;
 
         public override TimeZoneInfo LocalTimeZone { get; } = zone;
+    }
+
+    /// <summary>The car's last reading, or none at all — the two cases a SOC basis has to tell apart.</summary>
+    private sealed class FakeVehicleTelemetry : IVehicleTelemetry
+    {
+        public VehicleState? State { get; set; }
+
+        public VehicleState? GetCurrentState() => State;
     }
 }
