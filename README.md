@@ -259,13 +259,13 @@ All project notes live in the `docs/` directory. You are responsible for keeping
 ## Configuration
 
 All settings live in `src/Gleanvolt.Worker/appsettings.json`; secrets are supplied out-of-band (see
-below). Device addresses and the poll cadence sit in the `Solax` section:
+below). **The installation itself — where the array is and which boxes it is made of — is described
+in one place, the `Pv` section**, documented in [The PV system](#the-pv-system-the-pv-section) below.
+What is left in the vendor-named `Solax` section is the poll cadence:
 
 ```jsonc
 "Solax": {
-  "PollIntervalSeconds": 5,   // one poll/decide cycle per this many seconds
-  "Inverter":  { "Host": "192.168.2.10",  "Port": 502, "UnitId": 1 },
-  "EvCharger": { "Host": "192.168.2.6", "Port": 502, "UnitId": 1 }
+  "PollIntervalSeconds": 5   // one poll/decide cycle per this many seconds
 }
 ```
 
@@ -287,6 +287,83 @@ quietly reverting to UTC.
 
 The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
 are documented in the subsections that follow.
+
+### The PV system (the `Pv` section)
+
+One section describes the installation: where the array is, what it faces, what it is made of, and what
+to call it ([issue #111](https://github.com/mpospisil/gleanvolt/issues/111)). Everything that needs a
+coordinate, a device address or a name reads it from here, so there is one answer rather than one per
+feature.
+
+```jsonc
+"Pv": {
+  "Id": "home-roof",               // stable slug: the system's identity, on the broker and upstream
+  "Name": "Home Roof",             // what a human sees
+  "Address": "Krásného 12, Praha", // display only, never parsed
+  "Latitude": 50.0755,
+  "Longitude": 14.4378,
+  "AzimuthDegrees": 172,           // compass bearing: 0 = north, 90 = east, 180 = south
+  "TiltDegrees": 35,               // 0 = flat, 90 = vertical
+  "CapacityKwp": 9.2,              // peak DC capacity of the array
+  "InverterCapacityKw": 8.0,       // optional; AC side, where it clips the array
+  "LossFactor": 0.9,               // fraction of DC yield that reaches the meter
+  "InstallDate": "2024-05-01",
+
+  "Inverter": {
+    "Model": "SolaX X3-HYB-G4 PRO",
+    "Host": "192.168.2.10", "Port": 502, "UnitId": 1
+  },
+
+  "Chargers": [                    // a list; exactly one entry is supported
+    {
+      "Id": "charger",             // slug: the charger's identity within the system
+      "Name": "Garage wallbox",
+      "Model": "SolaX X1/X3-HAC",
+      "Host": "192.168.2.6", "Port": 502, "UnitId": 1
+    }
+  ]
+}
+```
+
+**`Model` is documentation, not a selector.** The register maps are compiled for the two devices in
+[Hardware targets](#hardware-targets) and are chosen by nothing, so writing another model here does not
+make the controller speak that device's dialect — it only mislabels the one it is speaking to. What it
+does do is answer "what is on the other end of 192.168.2.10?" from a log line rather than an ssh
+session. The day a second register map exists, this is the field that picks it.
+
+**`AzimuthDegrees` is stored, not sent.** Nothing computes from it today: the forecast is fetched by
+Solcast resource id, which already encodes the orientation inside your Solcast account. Before it is
+ever passed to a provider, that provider's own azimuth convention has to be checked against the compass
+bearing used here — an array described 180° from where it points still produces a plausible-looking
+forecast, which is what makes this the one field that goes silently wrong. Written as `-90` or `270`,
+it is stored the same way; the resolved value is always in `[0, 360)`.
+
+**One charger, in a shape that can hold more.** `Chargers` is a list from the start so that the
+configuration does not have to change shape the day the control logic can drive two — which it cannot
+today: there is one charge mode, one set of Home Assistant controls and one surplus to divide. A second
+entry is therefore **a startup failure**, not a silently ignored one.
+
+**What is validated at startup.** A site that cannot be described stops the worker with every problem
+listed at once, each naming its key: an id that is not a slug, a latitude without a longitude, a tilt
+outside 0–90, a loss factor outside (0, 1], an unparsable install date, a missing inverter or charger
+address, two chargers, or two chargers sharing an id.
+
+#### Keys that have moved
+
+The older keys still work and still **win wherever they are set**, so a deployment upgrades with an
+untouched `.env` and behaves exactly as it did. Each one that supplies a value is logged as a warning
+at startup — the log is the migration checklist — and they are removed in a later phase.
+
+| Deprecated | Replaced by |
+| --- | --- |
+| `Solax:Inverter` | `Pv:Inverter` |
+| `Solax:EvCharger` | `Pv:Chargers:0` |
+| `Weather:Latitude` | `Pv:Latitude` |
+| `Weather:Longitude` | `Pv:Longitude` |
+
+`Weather:ApiKey` and `Solcast:ResourceId` are **not** deprecated: a provider's key and a provider's
+handle for your roof belong beside that provider's other settings. The `Pv` section says what the array
+is; a provider section says how to reach that provider about it.
 
 ### Solcast solar forecast
 
@@ -331,14 +408,16 @@ Records **what the sky was actually doing** while a session ran, so a finished s
 ```jsonc
 "Weather": {
   "BaseUrl": "https://api.openweathermap.org/",
-  "Latitude": null,             // the site, in decimal degrees — e.g. 49.267803
-  "Longitude": null,            // e.g. 16.529486
+  "Latitude": null,             // deprecated — set Pv:Latitude instead
+  "Longitude": null,            // deprecated — set Pv:Longitude instead
   "Units": "metric",            // °C and metres; changing this changes what the stored numbers mean
   "RequestTimeout": "00:00:05"  // a slow provider is abandoned, never waited for
 }
 ```
 
-The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY`, `WEATHER_LATITUDE` and `WEATHER_LONGITUDE` in `deploy/.env`.
+**Which site the weather is fetched for is [the `Pv` section's](#the-pv-system-the-pv-section) business**, not this one's: `Pv:Latitude` and `Pv:Longitude` are where the coordinates belong. `Weather:Latitude` and `Weather:Longitude` still work and still win where they are set — with a deprecation warning at startup — and are removed in a later phase.
+
+The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY` in `deploy/.env`; `WEATHER_LATITUDE` and `WEATHER_LONGITUDE` still work there too, for as long as the keys behind them do.
 
 **Two calls per charging session**, one when it opens and one when it closes, and none in between. There is no refresh worker and no cached forecast: weather is decoration on a record, not an input to any decision, so spending the provider's quota on hours when nothing is recording would buy nothing. Any free OpenWeatherMap plan covers a few sessions a day comfortably.
 

@@ -20,13 +20,18 @@ public sealed class WeatherOptions
     public string ApiKey { get; init; } = string.Empty;
 
     /// <summary>
-    /// The site's latitude in decimal degrees. Null rather than 0 when unset: 0,0 is a real place in
-    /// the Atlantic, and a defaulted coordinate would silently record the weather in the Gulf of
-    /// Guinea rather than saying nothing.
+    /// <b>Deprecated</b> (issue #111): the site's latitude belongs to the site, and is configured as
+    /// <c>Pv:Latitude</c>. Set here it still wins, so an existing deployment upgrades unchanged — the
+    /// resolver logs a line saying so — and it is removed in the phase that unifies the keys. Nothing
+    /// reads this property but <c>PvSystemResolver</c>.
+    ///
+    /// <para>Null rather than 0 when unset: 0,0 is a real place in the Atlantic, and a defaulted
+    /// coordinate would silently record the weather in the Gulf of Guinea rather than saying
+    /// nothing.</para>
     /// </summary>
     public double? Latitude { get; init; }
 
-    /// <summary>The site's longitude in decimal degrees. Null when unset — see <see cref="Latitude"/>.</summary>
+    /// <summary><b>Deprecated</b>; use <c>Pv:Longitude</c> — see <see cref="Latitude"/>.</summary>
     public double? Longitude { get; init; }
 
     /// <summary>
