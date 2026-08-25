@@ -492,6 +492,16 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return Task.CompletedTask;
         }
 
+        // Clearing the box is a thing to mean, not a typo (issue #117): it says "no departure", which is
+        // the state the controller itself publishes whenever no target is in hand. Before the pattern
+        // admitted an empty value nobody could send one, so this arrived only as a complaint in the log.
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            _pendingDeparture = null;
+            _pendingDepartureText = string.Empty;
+            return PublishTextStatesAsync(CancellationToken.None);
+        }
+
         if (!HaDiscovery.TryParseDeparture(payload, _timeProvider.GetUtcNow(), _timeProvider.LocalTimeZone, out var departure))
         {
             _logger.LogWarning(

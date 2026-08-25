@@ -104,6 +104,23 @@ public class HaButtonCommandTests
     }
 
     [Fact]
+    public async Task ClearingTheDepartureBoxClearsTheDeparture()
+    {
+        // Issue #117: emptying the box is a thing to mean, and the entity can now express it -- so it
+        // has to do something coherent. Activating afterwards must find nothing to activate rather than
+        // the departure someone thought they had removed.
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "");
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.Null(_target.Request);
+        Assert.Empty(_actions.Starts);
+    }
+
+    [Fact]
     public async Task ActivateTargetStillRefusesADepartureAlreadyPast()
     {
         var worker = Worker();
