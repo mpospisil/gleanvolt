@@ -407,6 +407,20 @@ public static class GleanvoltHostingExtensions
         // Home Assistant integration over MQTT (issue #17). Disabled by default; broker credentials are
         // secrets supplied via .env / env var (HomeAssistant__Username / HomeAssistant__Password).
         services.Configure<HomeAssistantOptions>(configuration.GetSection(HomeAssistantOptions.SectionName));
+
+        // The system's id fills a topic segment from here on (issue #111), so this is the point at which
+        // an anonymous installation stops being a describable one. Demanded only when the integration is
+        // actually on: a controller-only deployment publishes nothing and has nothing to collide with,
+        // and failing it over a value nobody would read would be a rule for its own sake.
+        if (configuration.GetSection(HomeAssistantOptions.SectionName).GetValue<bool>(nameof(HomeAssistantOptions.Enabled))
+            && string.IsNullOrWhiteSpace(site.Id))
+        {
+            throw new InvalidOperationException(
+                "Pv:Id is required when the Home Assistant integration is enabled: it is the topic segment "
+                + "this system publishes under, and without it two installations on one broker overwrite "
+                + "each other. Set Pv__Id to a slug (for example 'home-roof').");
+        }
+
         services.AddHostedService<HomeAssistantMqttWorker>();
 
         // Vehicle telemetry read off MQTT (issue #73). Disabled by default; broker credentials are

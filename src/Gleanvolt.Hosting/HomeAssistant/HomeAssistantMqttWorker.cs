@@ -54,12 +54,13 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         ILogger<HomeAssistantMqttWorker> logger,
         IOptions<TargetedChargeOptions> targetedOptions,
         IOptions<VehicleOptions> vehicleOptions,
+        PvSystemInfo site,
         IVehicleTelemetry? vehicle = null,
         TimeProvider? timeProvider = null)
     {
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
-        _discovery = new HaDiscovery(_options, _batteryHoldEnabled);
+        _discovery = new HaDiscovery(_options, site, _batteryHoldEnabled);
         _actions = actions;
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
@@ -87,7 +88,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         var clientOptionsBuilder = new MqttClientOptionsBuilder()
             .WithTcpServer(_options.BrokerHost, _options.BrokerPort)
-            .WithClientId($"gleanvolt-controller-{_options.DeviceId}")
+            // One client id per system, not per unique-id root: two installations on one broker must not
+            // fight over a session, and the topic prefix is what already tells them apart.
+            .WithClientId($"gleanvolt-controller-{_discovery.SystemId}")
             .WithWillTopic(_discovery.AvailabilityTopic)
             .WithWillPayload(HaDiscovery.PayloadOffline)
             .WithWillRetain();
@@ -142,6 +145,13 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         // Remove any entities from older versions (e.g. the previous on/off switch).
         foreach (var topic in _discovery.RetiredDiscoveryTopics())
+        {
+            await PublishAsync(topic, string.Empty, retain: true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Retained state left under a prefix this installation no longer publishes on. Nothing reads it
+        // once the configs above point elsewhere; clearing it is what keeps the broker readable.
+        foreach (var topic in _discovery.RetiredStateTopics())
         {
             await PublishAsync(topic, string.Empty, retain: true, cancellationToken).ConfigureAwait(false);
         }

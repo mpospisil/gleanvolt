@@ -16,9 +16,9 @@ public class HaDiscoveryTests
         DiscoveryPrefix = "homeassistant",
     };
 
-    private static readonly HaDiscovery Discovery = new(Options);
+    private static readonly HaDiscovery Discovery = new(Options, Sites.Home);
 
-    private static readonly HaDiscovery DiscoveryWithBatteryHold = new(Options, batteryHoldEnabled: true);
+    private static readonly HaDiscovery DiscoveryWithBatteryHold = new(Options, Sites.Home, batteryHoldEnabled: true);
 
     private static ChargeControlStatus Status(
         ChargeControlMode mode = ChargeControlMode.Solar,
@@ -48,10 +48,10 @@ public class HaDiscoveryTests
     [Fact]
     public void Topics_FollowTheConfiguredPrefixes()
     {
-        Assert.Equal("solax/solax_controller/availability", Discovery.AvailabilityTopic);
-        Assert.Equal("solax/solax_controller/state", Discovery.StateTopic);
-        Assert.Equal("solax/solax_controller/start_solar/set", Discovery.ButtonCommandTopic("start_solar"));
-        Assert.Equal("solax/solax_controller/charge_off/set", Discovery.ChargeOffCommandTopic);
+        Assert.Equal("solax/home-roof/availability", Discovery.AvailabilityTopic);
+        Assert.Equal("solax/home-roof/state", Discovery.StateTopic);
+        Assert.Equal("solax/home-roof/start_solar/set", Discovery.ButtonCommandTopic("start_solar"));
+        Assert.Equal("solax/home-roof/charge_off/set", Discovery.ChargeOffCommandTopic);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class HaDiscoveryTests
             var config = json.RootElement;
 
             Assert.Equal(name, config.GetProperty("name").GetString());
-            Assert.Equal($"solax/solax_controller/{objectId}/set", config.GetProperty("command_topic").GetString());
+            Assert.Equal($"solax/home-roof/{objectId}/set", config.GetProperty("command_topic").GetString());
             Assert.Equal(HaDiscovery.PayloadPress, config.GetProperty("payload_press").GetString());
 
             // A button has no state; anything that claimed otherwise would give HA a topic nobody
@@ -163,8 +163,8 @@ public class HaDiscoveryTests
     [Fact]
     public void BatteryHoldTopics_FollowTheConfiguredPrefixes()
     {
-        Assert.Equal("solax/solax_controller/battery_hold/set", Discovery.BatteryHoldCommandTopic);
-        Assert.Equal("solax/solax_controller/battery_hold/state", Discovery.BatteryHoldStateTopic);
+        Assert.Equal("solax/home-roof/battery_hold/set", Discovery.BatteryHoldCommandTopic);
+        Assert.Equal("solax/home-roof/battery_hold/state", Discovery.BatteryHoldStateTopic);
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class HaDiscoveryTests
         var s = json.RootElement;
 
         Assert.Equal("solax_controller_stop_service", s.GetProperty("unique_id").GetString());
-        Assert.Equal("solax/solax_controller/stop_service/set", Discovery.StopServiceCommandTopic);
+        Assert.Equal("solax/home-roof/stop_service/set", Discovery.StopServiceCommandTopic);
         Assert.Equal(Discovery.StopServiceCommandTopic, s.GetProperty("command_topic").GetString());
         Assert.Equal("PRESS", s.GetProperty("payload_press").GetString());
 
@@ -408,8 +408,8 @@ public class HaDiscoveryTests
     [Fact]
     public void NumberTopics_FollowTheConfiguredPrefixes()
     {
-        Assert.Equal("solax/solax_controller/daily_ev_target/set", Discovery.NumberCommandTopic("daily_ev_target"));
-        Assert.Equal("solax/solax_controller/daily_ev_target/state", Discovery.NumberStateTopic("daily_ev_target"));
+        Assert.Equal("solax/home-roof/daily_ev_target/set", Discovery.NumberCommandTopic("daily_ev_target"));
+        Assert.Equal("solax/home-roof/daily_ev_target/state", Discovery.NumberStateTopic("daily_ev_target"));
     }
 
     [Fact]

@@ -4,6 +4,44 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-25 — The system id names the topics; the unique id stays where it is (issue #111)
+
+Two installations could not share a broker. Every topic was `solax/solax_controller/…` with both
+segments hard-defaulted, so the second controller to connect overwrote the first, entity for entity.
+The fix is obvious — namespace the topics by the system's id — and it is one line. What took the
+thought is what *not* to rename at the same time.
+
+**Home Assistant keys an MQTT entity to its `unique_id`, and history follows the entity id.** A
+changed `unique_id` is a new entity: Home Assistant creates `sensor.…_2`, because the old entity id is
+still taken, and every graph on the dashboard starts again. Nothing announces it. So:
+
+- **`{BaseTopic}/{Pv:Id}/…` for every topic.** Free to change: the discovery configs are republished
+  on the topics they always used, pointing at the new state topics, and Home Assistant re-subscribes.
+- **The device page is named after `Pv:Name`.** Also free: an entity id is assigned when the entity is
+  first created and is not recomputed when the device is renamed.
+- **`unique_id` stays `{HomeAssistant:DeviceId}_{objectId}`, and `DeviceId` does not follow `Pv:Id`.**
+  Empty means "take `Pv:Id`", which is right for a system being set up today; `deploy/docker-compose.yml`
+  pins `solax_controller`, which is what every deployment that already exists created its entities
+  under.
+
+The device's `identifiers` stays the unique-id root too, rather than following the system id. Moving
+an entity between devices is safe in itself, but keeping the device identity and the entity identity
+on the same value means there is one thing to reason about instead of two, and the issue's own rule —
+*the `unique_id` is the thing that must not change casually* — stays legible in the code.
+
+**A retained discovery config outlives the process that published it**, so a rename that is otherwise
+correct still leaves yesterday's device on the broker, to be re-created, permanently unavailable, at
+the next restart. `HomeAssistant:RetireDeviceIds` blanks those configs; `RetireTopicPrefixes` clears
+the retained *state* under a prefix no longer published on. Neither changes what the controller does —
+they change what someone reading `mosquitto_sub -t '#' -v` sees, which is the difference between a
+broker that can be understood and one that cannot.
+
+**`Pv:Id` is required only when the integration is on.** It fills a topic segment, so a system that
+publishes has to have one; a controller-only deployment publishes nothing and collides with nothing.
+Demanding it there would be a rule for its own sake.
+
+---
+
 ## 2026-08-25 — The installation is described once, and the providers read it (issue #111)
 
 Where the array was lived in `Weather:Latitude`. What it was made of lived in `Solax:Inverter` and

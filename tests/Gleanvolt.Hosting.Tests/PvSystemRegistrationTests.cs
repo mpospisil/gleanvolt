@@ -64,6 +64,26 @@ public class PvSystemRegistrationTests
     }
 
     [Fact]
+    public void PublishingToABrokerNeedsAnIdToPublishUnder()
+    {
+        // The id fills a topic segment from here on, so an anonymous system is one that would collide
+        // with every other anonymous system on the same broker.
+        var error = Assert.Throws<InvalidOperationException>(() => BuildWithPvDevices(("HomeAssistant:Enabled", "true")));
+
+        Assert.Contains("Pv:Id is required", error.Message);
+    }
+
+    [Fact]
+    public async Task ADeploymentThatPublishesNothingNeedsNoId()
+    {
+        // A controller-only deployment has no broker and nothing to collide with. Failing it over a
+        // value nobody would read would be a rule for its own sake.
+        await using var provider = BuildWithPvDevices(("HomeAssistant:Enabled", "false"));
+
+        Assert.Equal(string.Empty, provider.GetRequiredService<PvSystemInfo>().Id);
+    }
+
+    [Fact]
     public void AKeyThatHasMovedStopsTheHostBeforeAnythingIsBound()
     {
         // The check runs first in AddGleanvolt, ahead of the section it replaces, so an operator who

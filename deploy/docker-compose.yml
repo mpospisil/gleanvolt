@@ -117,6 +117,25 @@ services:
       HomeAssistant__Username: ${MQTT_USERNAME:-}
       HomeAssistant__Password: ${MQTT_PASSWORD:-}
 
+      # The unique-id root every Home Assistant entity is keyed by, pinned rather than defaulted
+      # (issue #111). The application's own default is "take Pv__Id", which is what a system being set
+      # up today wants; this file cannot use that default, because every deployment that already exists
+      # was created with `solax_controller` and Home Assistant would treat a new root as a new set of
+      # entities -- sensor.…_2, and every graph starting again.
+      #
+      # Topics, names and the device page all follow Pv__Id freely. This one does not, and a deployment
+      # that genuinely wants to change it sets HA_RETIRE_DEVICE_ID to the old value at the same time so
+      # the retained configs left behind are cleared. See the README's "Renaming what Home Assistant
+      # sees" for the procedure that keeps the history.
+      HomeAssistant__DeviceId: ${HA_DEVICE_ID:-solax_controller}
+      HomeAssistant__RetireDeviceIds__0: ${HA_RETIRE_DEVICE_ID:-}
+
+      # A topic prefix this installation used to publish on, cleared of its retained state on connect.
+      # Set it once after the topics move -- for a deployment that predates Pv__Id, that is
+      # "solax/solax_controller" -- and remove it again afterwards; it costs one publish per topic on
+      # every connect for as long as it is set.
+      HomeAssistant__RetireTopicPrefixes__0: ${HA_RETIRE_TOPIC_PREFIX:-}
+
       # Vehicle telemetry (issue #73). Reads the car's own SOC off MQTT; writes nothing, so there is no
       # dry-run and the worst a wrong topic can do is leave the dashboard's Vehicle card absent.
       #

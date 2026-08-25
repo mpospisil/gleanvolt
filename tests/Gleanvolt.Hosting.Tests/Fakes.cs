@@ -89,3 +89,28 @@ internal static class TargetedCharge
             Options.Create(options ?? new TargetedChargeOptions()),
             NullLogger<TargetedChargeProvider>.Instance);
 }
+
+/// <summary>
+/// Installations to publish about. The id matters more than it looks: it is the topic segment every
+/// message this controller sends is namespaced by (issue #111), so a test that uses a realistic one is
+/// a test that would notice the segment going missing.
+/// </summary>
+internal static class Sites
+{
+    public static PvSystemInfo Home { get; } = At("home-roof", "Home Roof");
+
+    public static PvSystemInfo At(string id, string name) => new(
+        Id: id,
+        Name: name,
+        Address: string.Empty,
+        Latitude: null,
+        Longitude: null,
+        AzimuthDegrees: null,
+        TiltDegrees: null,
+        CapacityKwp: null,
+        InverterCapacityKw: null,
+        LossFactor: null,
+        InstallDate: null,
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
+        Chargers: [new PvDeviceInfo("charger", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.2" })]);
+}

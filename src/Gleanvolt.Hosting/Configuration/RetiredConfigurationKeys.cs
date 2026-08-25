@@ -29,6 +29,7 @@ public static class RetiredConfigurationKeys
         ("Solax:PollIntervalSeconds", "Controller:PollIntervalSeconds"),
         ("Weather:Latitude", "Pv:Latitude"),
         ("Weather:Longitude", "Pv:Longitude"),
+        ("HomeAssistant:DeviceName", "Pv:Name"),
     ];
 
     /// <summary>
