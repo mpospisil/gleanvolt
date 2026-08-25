@@ -43,10 +43,9 @@ public class PvSystemPageTests : BunitContext
             Device("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", "192.168.2.10"),
             chargers ?? [Device("wallbox", "Garage wallbox", "SolaX X3-HAC", "192.168.2.6")]);
 
-    private IRenderedComponent<PvSystem> Render(PvSystemInfo? site = null, params string[] deprecations)
+    private IRenderedComponent<PvSystem> Render(PvSystemInfo? site = null)
     {
         Services.AddSingleton(site ?? Site());
-        Services.AddSingleton(new PvSystemNotices(deprecations));
 
         return Render<PvSystem>();
     }
@@ -146,24 +145,6 @@ public class PvSystemPageTests : BunitContext
 
         Assert.Contains("no weather is recorded", page.Markup);
         Assert.Contains("Pv__Latitude", page.Markup);
-    }
-
-    [Fact]
-    public void Lists_the_keys_that_still_need_moving()
-    {
-        // The same lines the startup log carries, on a page that does not scroll away.
-        var page = Render(null, "Solax:Inverter is deprecated and is being used instead of Pv:Inverter.");
-
-        Assert.Contains("Configuration to move", page.Markup);
-        Assert.Contains("Solax:Inverter is deprecated", page.Markup);
-    }
-
-    [Fact]
-    public void Says_nothing_about_migration_when_there_is_nothing_to_migrate()
-    {
-        var page = Render();
-
-        Assert.DoesNotContain("Configuration to move", page.Markup);
     }
 
     [Fact]

@@ -184,18 +184,21 @@ sunrise and sunset. It is what lets a finished session be read against the day i
 than only against the forecast; see
 [the weather a session ran in](../README.md#the-weather-a-session-ran-in).
 
-Three lines in `/opt/gleanvolt/.env`, and it applies to both workflows:
+One line in `/opt/gleanvolt/.env`, plus the site's coordinates if they are not already there. It
+applies to both workflows:
 
 ```bash
 WEATHER_API_KEY=<your openweathermap key>
-WEATHER_LATITUDE=49.267803     # your site, in decimal degrees
-WEATHER_LONGITUDE=16.529486
+
+# Where the array is. Not a weather setting -- see "Describing your PV system" below.
+PV_LATITUDE=49.267803          # your site, in decimal degrees
+PV_LONGITUDE=16.529486
 ```
 
 The key is free: this makes **two API calls per charging session**, a handful a day, which no
-OpenWeatherMap plan charges for. Leave any of the three out and the controller makes no weather call
-at all — sessions are simply recorded without it, which is also what every session recorded before
-this existed looks like.
+OpenWeatherMap plan charges for. Leave the key out, or the coordinates unset, and the controller makes
+no weather call at all — sessions are simply recorded without it, which is also what every session
+recorded before this existed looks like.
 
 Nothing about charge control reads any of it, so turning it on cannot change what the controller
 does to your car or your battery. A refused key or an outage costs one null column and a warning in
@@ -230,6 +233,61 @@ the inference in either direction and is rarely worth setting; the root README's
 [Authentication](../README.md#authentication) section has the full table, including the one
 combination that refuses to start (`WEB_REQUIRE_AUTHENTICATION=true` with no hash — nobody could sign
 in).
+
+## Describing your PV system
+
+The installation is described in one place: what to call it, where it is, what the array does, and
+which boxes it is made of. All of it optional, all of it in `/opt/gleanvolt/.env`:
+
+```bash
+PV_ID=home-roof                       # a slug; becomes this system's name on the broker, in a later phase
+PV_NAME=Home Roof                     # what a human sees, in the web UI
+PV_ADDRESS=Street 1, Town, Country    # display only, never parsed
+PV_LATITUDE=49.267803                 # with PV_LONGITUDE: the site the weather is fetched for
+PV_LONGITUDE=16.529486
+PV_AZIMUTH=180                        # compass bearing: 0 north, 90 east, 180 south. -180 accepted
+PV_TILT=15                            # degrees from horizontal
+PV_CAPACITY_KWP=8.5                   # peak DC capacity of the array
+PV_INVERTER_CAPACITY_KW=8             # AC side, where it is smaller than the array
+PV_LOSS_FACTOR=0.9                    # fraction of DC yield that reaches the meter
+PV_INSTALL_DATE=2026-04-01
+
+PV_INVERTER_MODEL=SolaX X3-HYB-G4 PRO # what the box is; documentation, not a selector
+PV_CHARGER_MODEL=SolaX X1/X3-HAC
+```
+
+The device **addresses** keep the names they always had — `INVERTER_HOST` and `EV_CHARGER_HOST` — and
+belong to this same description; nothing about them changes.
+
+All of it is shown, read-only, at **`/pv-system`** in the web UI. Anything left unset reads as unset
+there rather than as zero: 0,0 is a real place in the Atlantic, and it is better for the page to say
+nothing than to say something wrong.
+
+A value that cannot be used **stops the controller at startup**, with every problem named at once — a
+latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
+one is supported). That is deliberate: a site that is quietly wrong forecasts plausibly.
+
+### Upgrading a Pi deployed before the PV system had its own settings
+
+Four keys were retired when the installation moved into one place, and a retired key that is still
+set **stops the controller at startup** rather than being ignored — each one decided something real,
+and a build that ignored it would run against a default while your `.env` says otherwise.
+
+In `/opt/gleanvolt/.env`, rename:
+
+| Was | Is now |
+| --- | --- |
+| `WEATHER_LATITUDE` | `PV_LATITUDE` |
+| `WEATHER_LONGITUDE` | `PV_LONGITUDE` |
+
+`INVERTER_HOST`, `EV_CHARGER_HOST`, `WEATHER_API_KEY`, `SOLCAST_API_KEY` and `SOLCAST_RESOURCE_ID` are
+**unchanged** — the compose file maps the two addresses onto the new configuration keys for you.
+
+If you drive `docker compose` directly rather than through the deploy scripts, also drop any
+`Solax__Inverter__*`, `Solax__EvCharger__*`, `Solax__PollIntervalSeconds`, `Weather__Latitude` or
+`Weather__Longitude` you set by hand; their replacements are `Pv__Inverter__*`, `Pv__Chargers__0__*`,
+`Controller__PollIntervalSeconds`, `Pv__Latitude` and `Pv__Longitude`. The startup failure names each
+one and its replacement, so a missed key costs one restart, not a debugging session.
 
 ### Upgrading a Pi deployed before the rename to Gleanvolt
 

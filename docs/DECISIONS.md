@@ -4,6 +4,55 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-25 — The installation is described once, and the providers read it (issue #111)
+
+Where the array was lived in `Weather:Latitude`. What it was made of lived in `Solax:Inverter` and
+`Solax:EvCharger` — an address each, under a vendor's name, with no model number and a shape that
+could express exactly one charger because a single object cannot express two. What the array *is* —
+capacity, tilt, the direction it faces — lived nowhere at all: it existed only as a rooftop record
+inside Solcast's account, reachable through a resource id.
+
+Each of those is defensible on its own. Together they mean the controller cannot answer "which
+installation is this, and what is it talking to?" without someone reading three configuration
+sections and one web console.
+
+**One `Pv` section owns the installation**: identity, address, coordinates, azimuth, tilt, capacity,
+loss factor, install date, the inverter and a list of chargers. It lives in `Gleanvolt.Core`, because
+the weather client, the composition root, the API and the web UI all need it, and Core is the one
+assembly all of them may reference. It is resolved once at startup into a `PvSystemInfo` that
+everything downstream reads, so "which key won?" is a question asked in exactly one place.
+
+**A provider's handle for the roof stays with that provider.** `Solcast:ResourceId` did not move, and
+neither did `Weather:ApiKey`. The line is: the `Pv` section says what the array *is*; a provider
+section says how to reach *that provider* about it. A second forecast source added later gets its own
+section and its own handle, and reads the same geometry.
+
+**Where a device *is* moved; how often we ask it did not.** `Solax:PollIntervalSeconds` became
+`Controller:PollIntervalSeconds` and the vendor-named section went away entirely. The inverter has no
+opinion about its poll cadence — that is a controller setting, and it was the only thing keeping a
+section named after a manufacturer alive after the devices left it. This finishes what *the product is
+Gleanvolt; the vendor is still SolaX* (2026-08-16) started: a vendor's name is correct on a register
+map and on a model string, and wrong as the name of the section that configures the whole plant.
+
+**The move happened in two releases, and the second one refuses the first one's keys.** Phase 1 was
+additive: the new section existed and the older keys still won wherever they were set, so a deployment
+upgraded with an untouched `.env` and behaved identically, with one warning per key to say what to
+change. Phase 2 removed them — and a retired key that is still set is now a **startup failure naming
+its replacement**, not a silent ignore.
+
+That last choice is the one worth recording. Ignoring a key someone has set is the most expensive kind
+of quiet: the controller starts, polls, charges, and is simply pointed at a default address while the
+operator's file names another one. Nothing in the logs says so, because from the process's point of
+view nothing went wrong. A refused startup costs one restart and a message. We take the restart.
+
+**Configuration is validated at startup, all of it at once.** A latitude without a longitude, a tilt
+outside 0–90, an unparsable install date, two chargers, two chargers sharing an id: each is reported
+with its key, together, in one failure. Fixing configuration one restart per mistake is a miserable
+way to spend an evening — and a site that is *quietly* wrong forecasts plausibly, which is the failure
+mode this whole record exists to close.
+
+---
+
 ## 2026-08-23 — The API says what it is before it asks who you are (issue #103)
 
 The API shipped with every route behind the key, the OpenAPI document included, and `/api/v1/` not

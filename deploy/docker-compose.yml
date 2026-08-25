@@ -80,8 +80,33 @@ services:
       # ASP.NET Core's "__" convention maps onto appsettings.json sections, so anything in that file
       # can be overridden here without rebuilding the image.
       TZ: ${TZ:-Europe/Prague}
-      Solax__Inverter__Host: ${INVERTER_HOST:-192.168.2.10}
-      Solax__EvCharger__Host: ${EV_CHARGER_HOST:-192.168.2.6}
+
+      # The installation: where the array is, what it faces, and which boxes it is made of (issue
+      # #111). One section describes all of it, and the two device addresses keep the variable names
+      # they always had -- what changed is the configuration key they are mapped onto, which is why
+      # upgrading needs no edit to .env for them. Everything else here is optional: an unset value is
+      # unset rather than zero, because a defaulted site is a site in the Atlantic facing north.
+      Pv__Id: ${PV_ID:-}
+      Pv__Name: ${PV_NAME:-}
+      Pv__Address: ${PV_ADDRESS:-}
+      Pv__Latitude: ${PV_LATITUDE:-}
+      Pv__Longitude: ${PV_LONGITUDE:-}
+      Pv__AzimuthDegrees: ${PV_AZIMUTH:-}
+      Pv__TiltDegrees: ${PV_TILT:-}
+      Pv__CapacityKwp: ${PV_CAPACITY_KWP:-}
+      Pv__InverterCapacityKw: ${PV_INVERTER_CAPACITY_KW:-}
+      Pv__LossFactor: ${PV_LOSS_FACTOR:-}
+      Pv__InstallDate: ${PV_INSTALL_DATE:-}
+
+      Pv__Inverter__Model: ${PV_INVERTER_MODEL:-SolaX X3-HYB-G4 PRO}
+      Pv__Inverter__Host: ${INVERTER_HOST:-192.168.2.10}
+
+      # A list, of which exactly one entry is supported -- a second is refused at startup rather than
+      # silently ignored. The index is in the key rather than in .env so that an operator with one
+      # charger never has to think about arrays.
+      Pv__Chargers__0__Id: ${PV_CHARGER_ID:-charger}
+      Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
+      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-192.168.2.6}
 
       # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
@@ -122,12 +147,11 @@ services:
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
-      # The weather each charging session ran in (issue #96). Entirely optional: with no key and no
-      # coordinates the controller makes no weather calls at all and sessions are recorded without it.
-      # Two calls per session, so any free OpenWeatherMap plan covers it.
+      # The weather each charging session ran in (issue #96). Entirely optional: with no key, or a site
+      # with no coordinates, the controller makes no weather calls at all and sessions are recorded
+      # without it. Two calls per session, so any free OpenWeatherMap plan covers it. Which site it asks
+      # about is PV_LATITUDE/PV_LONGITUDE above -- where the array is is a fact about the array.
       Weather__ApiKey: ${WEATHER_API_KEY:-}
-      Weather__Latitude: ${WEATHER_LATITUDE:-}
-      Weather__Longitude: ${WEATHER_LONGITUDE:-}
 
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
       # that: the service always boots in mode Off and takes control only when a mode is selected

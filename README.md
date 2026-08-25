@@ -261,19 +261,14 @@ All project notes live in the `docs/` directory. You are responsible for keeping
 All settings live in `src/Gleanvolt.Worker/appsettings.json`; secrets are supplied out-of-band (see
 below). **The installation itself — where the array is and which boxes it is made of — is described
 in one place, the `Pv` section**, documented in [The PV system](#the-pv-system-the-pv-section) below.
-What is left in the vendor-named `Solax` section is the poll cadence:
-
-```jsonc
-"Solax": {
-  "PollIntervalSeconds": 5   // one poll/decide cycle per this many seconds
-}
-```
+The vendor-named `Solax` section is gone; the poll cadence it used to hold is a controller setting.
 
 The `Controller` section holds the settings that belong to no single feature:
 
 ```jsonc
 "Controller": {
-  "TimeZone": ""   // "" = ask the OS; an IANA or Windows zone id overrides it
+  "TimeZone": "",           // "" = ask the OS; an IANA or Windows zone id overrides it
+  "PollIntervalSeconds": 5  // one poll/decide cycle per this many seconds
 }
 ```
 
@@ -284,6 +279,10 @@ on Windows**, where .NET ignores `TZ` and the process would otherwise run in UTC
 image it must be a Windows id (`Central Europe Standard Time`), because resolving IANA ids needs ICU
 and Nano Server has none. An id that cannot be resolved stops the worker at startup rather than
 quietly reverting to UTC.
+
+`PollIntervalSeconds` is how quickly the controller reacts, not a fact about the hardware — the
+inverter has no opinion about how often it is asked — which is why it outlived the section the device
+addresses moved out of.
 
 The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
 are documented in the subsections that follow.
@@ -350,20 +349,31 @@ address, two chargers, or two chargers sharing an id.
 
 #### Keys that have moved
 
-The older keys still work and still **win wherever they are set**, so a deployment upgrades with an
-untouched `.env` and behaves exactly as it did. Each one that supplies a value is logged as a warning
-at startup — the log is the migration checklist — and they are removed in a later phase.
+The `Solax` section is gone: an inverter and a wallbox are what a PV system is made of, and the one
+setting left in it — the poll interval — is not a fact about the hardware but a choice about how often
+we ask, so it belongs to the controller.
 
-| Deprecated | Replaced by |
+**A retired key that is still set stops the worker at startup**, naming its replacement in both
+spellings. That is deliberate and it is the whole point: each of these decided something real, and a
+build that ignored the old spelling would start, poll and charge — against a default, while your
+configuration file names something else. That failure is invisible; a refused startup costs one
+restart.
+
+| Retired | Replaced by |
 | --- | --- |
 | `Solax:Inverter` | `Pv:Inverter` |
 | `Solax:EvCharger` | `Pv:Chargers:0` |
+| `Solax:PollIntervalSeconds` | `Controller:PollIntervalSeconds` |
 | `Weather:Latitude` | `Pv:Latitude` |
 | `Weather:Longitude` | `Pv:Longitude` |
 
-`Weather:ApiKey` and `Solcast:ResourceId` are **not** deprecated: a provider's key and a provider's
-handle for your roof belong beside that provider's other settings. The `Pv` section says what the array
-is; a provider section says how to reach that provider about it.
+`Weather:ApiKey` and `Solcast:ResourceId` did **not** move: a provider's key and a provider's handle
+for your roof belong beside that provider's other settings. The `Pv` section says what the array is; a
+provider section says how to reach that provider about it.
+
+Deployments are unaffected in the place it would cost most: `INVERTER_HOST` and `EV_CHARGER_HOST` keep
+their names in `deploy/.env`, and the compose file maps them onto the new keys. See
+[the upgrade note](deploy/README.md#upgrading-a-pi-deployed-before-the-pv-system-had-its-own-settings).
 
 ### Solcast solar forecast
 
@@ -408,16 +418,14 @@ Records **what the sky was actually doing** while a session ran, so a finished s
 ```jsonc
 "Weather": {
   "BaseUrl": "https://api.openweathermap.org/",
-  "Latitude": null,             // deprecated — set Pv:Latitude instead
-  "Longitude": null,            // deprecated — set Pv:Longitude instead
   "Units": "metric",            // °C and metres; changing this changes what the stored numbers mean
   "RequestTimeout": "00:00:05"  // a slow provider is abandoned, never waited for
 }
 ```
 
-**Which site the weather is fetched for is [the `Pv` section's](#the-pv-system-the-pv-section) business**, not this one's: `Pv:Latitude` and `Pv:Longitude` are where the coordinates belong. `Weather:Latitude` and `Weather:Longitude` still work and still win where they are set — with a deprecation warning at startup — and are removed in a later phase.
+**Which site the weather is fetched for is [the `Pv` section's](#the-pv-system-the-pv-section) business**, not this one's: `Pv:Latitude` and `Pv:Longitude` are where the coordinates belong. `Weather:Latitude` and `Weather:Longitude` are retired, and setting either stops the worker at startup rather than being ignored.
 
-The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY` in `deploy/.env`; `WEATHER_LATITUDE` and `WEATHER_LONGITUDE` still work there too, for as long as the keys behind them do.
+The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY` in `deploy/.env`, and the site's coordinates as `PV_LATITUDE` / `PV_LONGITUDE`.
 
 **Two calls per charging session**, one when it opens and one when it closes, and none in between. There is no refresh worker and no cached forecast: weather is decoration on a record, not an input to any decision, so spending the provider's quota on hours when nothing is recording would buy nothing. Any free OpenWeatherMap plan covers a few sessions a day comfortably.
 

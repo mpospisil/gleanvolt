@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject PvSystemInfo Site
-@inject PvSystemNotices Notices
 
 @*
     The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
@@ -13,8 +12,7 @@
     Save button.
 
     What it is for: answering "which system is this, and what is it talking to?" from a browser, the
-    question the startup log answers once and then buries. That makes it the natural home for the
-    deprecation notices too — the log line scrolls away, this does not.
+    question the startup log answers once and then buries.
 *@
 
 <PageTitle>PV system — Gleanvolt</PageTitle>
@@ -132,23 +130,6 @@
     devices in the README's hardware targets and are chosen by nothing here. One charger is supported;
     the configuration is a list so that it need not change shape the day a second one can be driven.
 </p>
-
-@if (Notices.Deprecations.Count > 0)
-{
-    @*
-        Worth a section of its own rather than a footnote: these are the values that are still coming
-        from somewhere other than where they belong, and the keys behind them go away in a later
-        release. The same lines are logged once at startup, where nobody sees them again.
-    *@
-    <h2>Configuration to move</h2>
-
-    <ul class="table-note">
-        @foreach (var deprecation in Notices.Deprecations)
-        {
-            <li>@deprecation</li>
-        }
-    </ul>
-}
 
 @code {
     private const string Missing = "—";
