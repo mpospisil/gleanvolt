@@ -1547,14 +1547,32 @@ instead of leaving a mode that quietly does nothing, and the battery-hold switch
 command that was actually written to the inverter, not what was requested — a write that fails to take
 shows the switch springing back on its own.
 
+#### `/pv-system` — the installation, read-only
+
+What this controller is and what it is talking to, from a browser rather than from the startup log:
+the system's name, id and address, its coordinates, the array's bearing (with the compass point spelled
+out, because `172°` is only checkable by someone who already thinks in degrees), tilt, capacity, loss
+factor and commissioning date, and a table of the devices — the inverter and each charger, with model,
+address and unit id. See [The PV system](#the-pv-system-the-pv-section) for what each value means.
+
+**Read-only, and not merely for now.** Every value on it is resolved once at startup — the Modbus
+clients are constructed from it, and anything unusable has already stopped the host — so a control that
+edited it would be editing a copy of a decision that has already been made. Changing it means editing
+the configuration and restarting, and the page says so rather than leaving someone hunting for a Save
+button.
+
+It is also where the **deprecation notices** live: any older key still supplying a value is listed
+under *Configuration to move*. The same lines are logged once at startup, where nobody ever sees them
+again.
+
 #### The dashboard reports; the plan page decides
 
 Those phases left the UI in three places for one question. The dashboard was fourteen telemetry tiles
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · Health.** `/forecast` and `/targeted`
-are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
+**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Health.** `/forecast` and
+`/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
 
 **`/` reports and no longer decides.** It carries no button, no input and no select at all — three
 sections, in the order the questions are actually asked:

@@ -4,6 +4,42 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — The installation, on a page (issue #111)
+
+The startup log says which system this is and what it is talking to, once, and then buries it under a
+poll line every five seconds. `/pv-system` is that same answer, in the nav beside the other pages.
+
+### What changed
+
+- **`/pv-system`, a read-only page**: name, id and address; coordinates, bearing and tilt; capacity,
+  inverter capacity, loss factor and commissioning date; and a table of the devices — the inverter and
+  each charger with model, address and unit id.
+- **The bearing carries its compass point** — `172° (south)`. Degrees alone are only checkable by
+  someone who already thinks in degrees, and this is the field that goes silently wrong: an array
+  described 180° from where it points still forecasts plausibly.
+- **Unset reads as unset.** Every missing value is an em dash, never a zero, for the same reason the
+  coordinates are nullable: a defaulted site is a site in the Atlantic facing north.
+- **Read-only is stated, not implied.** No button, no input, no select on the page, and a line saying
+  that changing any of it means editing the configuration and restarting. Everything shown was
+  resolved once at startup and the Modbus clients were built from it; a control here would edit a copy
+  of a settled decision. There is a test asserting the page offers nothing to click.
+- **The deprecation notices moved somewhere they can be seen.** `PvSystemNotices` — the same
+  arrangement `WebBuildInfo` has, because `Gleanvolt.Web` may not reference `Gleanvolt.Hosting` — hands
+  the resolver's messages to the UI, which lists them under *Configuration to move*.
+- Nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Health.
+
+### Verification performed
+
+- **945 tests pass** (14 new): the values and their units, every compass point, the unset-reads-as-unset
+  rule, the two "here is what this costs you" hints, the deprecation list appearing only when there is
+  something to move, and that the page renders no interactive control at all.
+- **Rendered against a running worker** with a full `Pv` configuration on a spare port: identity,
+  `172° (south)`, `9.2 kWp`, both devices with their models and addresses, and — because the
+  repository `.env` still sets `Weather__Latitude` — those coordinates shown together with the
+  deprecation notice that explains where they came from.
+
+---
+
 ## 2026-08-25 — The installation is described once: the `Pv` section, phase 1 (issue #111)
 
 Where the array is lived in `Weather:Latitude`. What it is made of lived in `Solax:Inverter` and

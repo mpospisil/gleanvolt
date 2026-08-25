@@ -1,0 +1,194 @@
+@page "/pv-system"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject PvSystemInfo Site
+@inject PvSystemNotices Notices
+
+@*
+    The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
+    value here is resolved once at startup — the Modbus clients are constructed from it, and the
+    resolver has already refused anything that could not be used — so a control that edited it would
+    be editing a copy of a decision that has already been made. Changing any of it means editing the
+    configuration and restarting, and the page says so rather than leaving someone hunting for a
+    Save button.
+
+    What it is for: answering "which system is this, and what is it talking to?" from a browser, the
+    question the startup log answers once and then buries. That makes it the natural home for the
+    deprecation notices too — the log line scrolls away, this does not.
+*@
+
+<PageTitle>PV system — Gleanvolt</PageTitle>
+
+<h1>PV system</h1>
+
+<p class="muted">
+    Read from the configuration at startup. Changing any of it means editing <code>.env</code> or
+    <code>appsettings.json</code> and restarting the controller.
+</p>
+
+<h2>Identity</h2>
+
+<dl class="facts">
+    <dt>Name</dt>
+    <dd>@Text(Site.Name)</dd>
+
+    <dt>Id</dt>
+    <dd>@Text(Site.Id)</dd>
+
+    <dt>Address</dt>
+    <dd>@Text(Site.Address)</dd>
+</dl>
+
+@if (string.IsNullOrWhiteSpace(Site.Id))
+{
+    <p class="table-note muted">
+        This system has no id yet. It is optional today; it becomes the name the controller publishes
+        under, so that two installations can share one MQTT broker. Set <code>Pv__Id</code> and
+        <code>Pv__Name</code> to claim one.
+    </p>
+}
+
+<h2>Location and orientation</h2>
+
+<dl class="facts">
+    <dt>Coordinates</dt>
+    <dd>
+        @if (Site.HasLocation)
+        {
+            @($"{Site.Latitude!.Value.ToString("0.####", Invariant)}, {Site.Longitude!.Value.ToString("0.####", Invariant)}")
+        }
+        else
+        {
+            <span class="muted">—</span>
+        }
+    </dd>
+
+    <dt>Azimuth</dt>
+    <dd>@Azimuth()</dd>
+
+    <dt>Tilt</dt>
+    <dd>@Degrees(Site.TiltDegrees)</dd>
+</dl>
+
+@if (!Site.HasLocation)
+{
+    <p class="table-note muted">
+        Without coordinates no weather is recorded against a charging session — the feature is off
+        rather than wrong. Set <code>Pv__Latitude</code> and <code>Pv__Longitude</code>.
+    </p>
+}
+
+<h2>Array</h2>
+
+<dl class="facts">
+    <dt>Peak DC capacity</dt>
+    <dd>@Number(Site.CapacityKwp, "kWp")</dd>
+
+    <dt>Inverter capacity</dt>
+    <dd>@Number(Site.InverterCapacityKw, "kW")</dd>
+
+    <dt>Loss factor</dt>
+    <dd>@Number(Site.LossFactor, format: "0.00")</dd>
+
+    <dt>Commissioned</dt>
+    <dd>@(Site.InstallDate is { } date ? date.ToString("yyyy-MM-dd") : Missing)</dd>
+</dl>
+
+<h2>Devices</h2>
+
+<table class="sessions">
+    <thead>
+        <tr>
+            <th>Role</th>
+            <th>Name</th>
+            <th>Model</th>
+            <th>Address</th>
+            <th>Unit</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Inverter</td>
+            <td>@Text(Site.Inverter.Name)</td>
+            <td>@Text(Site.Inverter.Model)</td>
+            <td>@Address(Site.Inverter)</td>
+            <td>@Site.Inverter.Connection.UnitId</td>
+        </tr>
+        @foreach (var charger in Site.Chargers)
+        {
+            <tr>
+                <td>Charger <span class="muted">@charger.Id</span></td>
+                <td>@Text(charger.Name)</td>
+                <td>@Text(charger.Model)</td>
+                <td>@Address(charger)</td>
+                <td>@charger.Connection.UnitId</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<p class="table-note muted">
+    A model is what the box is, not what the controller speaks: the register maps are compiled for the
+    devices in the README's hardware targets and are chosen by nothing here. One charger is supported;
+    the configuration is a list so that it need not change shape the day a second one can be driven.
+</p>
+
+@if (Notices.Deprecations.Count > 0)
+{
+    @*
+        Worth a section of its own rather than a footnote: these are the values that are still coming
+        from somewhere other than where they belong, and the keys behind them go away in a later
+        release. The same lines are logged once at startup, where nobody sees them again.
+    *@
+    <h2>Configuration to move</h2>
+
+    <ul class="table-note">
+        @foreach (var deprecation in Notices.Deprecations)
+        {
+            <li>@deprecation</li>
+        }
+    </ul>
+}
+
+@code {
+    private const string Missing = "—";
+
+    private static readonly System.Globalization.CultureInfo Invariant =
+        System.Globalization.CultureInfo.InvariantCulture;
+
+    // The eight points are enough to catch the mistake this is here to catch -- an array described as
+    // facing north when it faces south -- and more would suggest a precision the bearing does not have.
+    private static readonly string[] Compass =
+        ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+
+    private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
+
+    private static string Address(PvDeviceInfo device) => $"{device.Connection.Host}:{device.Connection.Port}";
+
+    private static string Degrees(double? value) =>
+        value is { } number ? $"{number.ToString("0.#", Invariant)}°" : Missing;
+
+    private static string Number(double? value, string? unit = null, string format = "0.##")
+    {
+        if (value is not { } number)
+        {
+            return Missing;
+        }
+
+        var text = number.ToString(format, Invariant);
+        return unit is null ? text : $"{text} {unit}";
+    }
+
+    // The bearing with the direction it means spelled out, because "172°" is only checkable by
+    // someone who already knows which way their roof faces in degrees.
+    private string Azimuth()
+    {
+        if (Site.AzimuthDegrees is not { } bearing)
+        {
+            return Missing;
+        }
+
+        var point = Compass[(int)Math.Round(bearing / 45) % Compass.Length];
+        return $"{Degrees(bearing)} ({point})";
+    }
+}

@@ -553,6 +553,12 @@ public static class GleanvoltHostingExtensions
             // attributes.
             services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
 
+            // Which deprecated keys are still supplying values (issue #111). Resolved from the same
+            // PvSystemResolution the startup log reads, so the page and the log cannot disagree; handed
+            // over rather than looked up, because Gleanvolt.Web may not reference this assembly.
+            services.AddSingleton(provider =>
+                new PvSystemNotices(provider.GetRequiredService<PvSystemResolution>().Deprecations));
+
             // Everything else -- Razor components, cookie authentication, the RequireAuthentication
             // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised
             // by a test host too (issues #46, #47).
