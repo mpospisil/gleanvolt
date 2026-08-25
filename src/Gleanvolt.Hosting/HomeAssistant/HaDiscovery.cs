@@ -329,10 +329,15 @@ public sealed class HaDiscovery
         // A text entity rather than a datetime one: MQTT discovery has no datetime platform. "07:00"
         // means the next 07:00, which is what somebody typing it at 22:00 means by it; a full
         // "2026-08-11 07:00" is there for the case where it isn't.
+        // The empty alternation is not slack in the validation, it is the state this box spends most of
+        // its life in (issue #117): with no target requested there is no departure, and the controller
+        // says so by publishing nothing. A pattern that admits only present values made Home Assistant
+        // reject that as a broken state and log an error -- on every connect, and every time a targeted
+        // session finished. Nothing typed by a person is any more permitted than it was.
         yield return Text(
             TargetDepartureText,
             "Departure time",
-            pattern: @"^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
+            pattern: @"^$|^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
             icon: "mdi:clock-outline");
 
         // The priority and its rest point (issue #101). Published beside the two halves they qualify,

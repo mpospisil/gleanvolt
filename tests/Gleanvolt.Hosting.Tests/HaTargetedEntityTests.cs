@@ -52,6 +52,40 @@ public class HaTargetedEntityTests
         Assert.Equal("Departure time", config.GetProperty("name").GetString());
     }
 
+    [Theory]
+    [InlineData("")]                    // no departure requested -- the state this box is usually in
+    [InlineData("07:00")]
+    [InlineData("7:00")]
+    [InlineData("2026-08-11 07:00")]
+    [InlineData("2026-08-11T07:00")]
+    public void ThePatternAdmitsEveryStateTheBoxCanBeIn(string value)
+    {
+        // Issue #117: the empty one is the point. Home Assistant validates the state it receives against
+        // this pattern, and the controller publishes an empty departure whenever there is no target --
+        // on connect, and every time a targeted session ends. A pattern that could not express that
+        // turned a normal state into an ERROR in somebody's log, several times a day.
+        Assert.Matches(Pattern(), value);
+    }
+
+    [Theory]
+    [InlineData("tomorrow")]
+    [InlineData("07")]
+    [InlineData("07:00 please")]
+    [InlineData(" ")]
+    public void ThePatternStillKeepsTheObviousTyposOut(string value)
+    {
+        Assert.DoesNotMatch(Pattern(), value);
+    }
+
+    private static string Pattern()
+    {
+        var message = Discovery.DiscoveryMessages()
+            .Single(m => m.Topic == "homeassistant/text/solax_controller/target_departure/config");
+
+        using var json = JsonDocument.Parse(message.Payload);
+        return json.RootElement.GetProperty("pattern").GetString()!;
+    }
+
     [Fact]
     public void TheActivateButtonTakesOnlyAPress()
     {

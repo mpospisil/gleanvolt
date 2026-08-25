@@ -4,6 +4,41 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — The departure box can say "nothing" (issue #117)
+
+Home Assistant logged an `ERROR` every time the controller reported that it had no departure to work
+to — on every connect, and every time a targeted session finished. Fourteen of them in the reference
+install's log, and it had been there since the entity was added.
+
+### What changed
+
+- **The pattern on the departure text now admits an empty value**:
+  `^$|^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$`. Not slack in the validation — the empty string is
+  the state the box spends most of its life in, because the controller publishes it whenever no target
+  is in hand. A pattern that could only express *present* values turned an ordinary state into an error
+  in somebody's log.
+- **An empty command clears the pending departure** rather than being logged as unparseable. Now that
+  the entity can express "nothing", someone can send it, and it has to mean something coherent:
+  activating afterwards finds nothing to activate.
+- Nothing was needed for the retained empty payloads already on brokers. They are republished on every
+  connect and simply stop being rejected.
+
+Dropping the pattern altogether would also have silenced it and lost the typo check in the browser for
+no gain; publishing a placeholder like `--:--` would have made the field's contents a lie about what
+was requested. `TryParseDeparture` remains what actually decides, as the comment beside it always said.
+
+### Verification performed
+
+- **976 tests pass** (10 new): every state the box can be in matches the published pattern — the empty
+  one above all — every obvious typo still does not, and clearing the box clears the departure.
+- The pattern checked under **Python's** `re.fullmatch`, which is what Home Assistant validates with
+  rather than .NET's engine: empty, `07:00`, `7:00`, `2026-08-11 07:00` and `2026-08-11T07:00` all
+  match; `tomorrow`, `07`, a bare space and `07:00 please` do not.
+- Not yet deployed. The error is only observable against a real Home Assistant, so the check that
+  settles it is the reference install's log after the next deploy.
+
+---
+
 ## 2026-08-25 — The site is reportable (issue #111, phase 4)
 
 The installation had a description and two surfaces that knew it: the startup log, and one web page.
