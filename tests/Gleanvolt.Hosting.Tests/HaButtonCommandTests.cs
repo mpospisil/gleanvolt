@@ -27,7 +27,7 @@ public class HaButtonCommandTests
         DiscoveryPrefix = "homeassistant",
     };
 
-    private static readonly HaDiscovery Discovery = new(HaOptions);
+    private static readonly HaDiscovery Discovery = new(HaOptions, Sites.Home);
 
     private readonly RecordingChargeActions _actions = new();
     private readonly TargetedChargeSelector _target = new(NullLogger<TargetedChargeSelector>.Instance);
@@ -73,7 +73,7 @@ public class HaButtonCommandTests
     {
         // A retained payload can outlive the entity that produced it, and the select's set topic is
         // exactly the kind of thing a broker keeps for months.
-        await Worker().HandleCommandAsync("solax/solax_controller/charge_mode/set", "FastNoBattery");
+        await Worker().HandleCommandAsync("solax/home-roof/charge_mode/set", "FastNoBattery");
 
         Assert.Empty(_actions.Starts);
     }
@@ -144,6 +144,7 @@ public class HaButtonCommandTests
             NullLogger<HomeAssistantMqttWorker>.Instance,
             Options.Create(new TargetedChargeOptions()),
             Options.Create(new VehicleOptions()),
+            Sites.Home,
             vehicle: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 

@@ -267,6 +267,44 @@ A value that cannot be used **stops the controller at startup**, with every prob
 latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
 one is supported). That is deliberate: a site that is quietly wrong forecasts plausibly.
 
+## Renaming what Home Assistant sees
+
+Three names reach Home Assistant, and only one of them is expensive to change.
+
+| What | Set by | Changing it |
+|---|---|---|
+| The topics everything is published on | `PV_ID` | **Free.** The discovery configs are republished pointing at the new topics and Home Assistant re-subscribes. |
+| The device page's name | `PV_NAME` | **Free.** Entity ids are assigned when an entity is first created and are not recomputed. |
+| Every entity's `unique_id` | `HA_DEVICE_ID` | **Discards the history.** |
+
+Home Assistant keys an MQTT entity to its `unique_id`. A new one is a *new entity*: it is created as
+`sensor.…_2`, because the old entity id is still taken, and every graph on your dashboard starts
+again. That is why `HA_DEVICE_ID` is pinned to `solax_controller` in `docker-compose.yml` rather than
+following `PV_ID` — every deployment that already exists created its entities under that root.
+
+If you want to change it anyway — say, to match a `PV_ID` on a system whose history you do not mind
+losing — set both in the same deploy:
+
+```bash
+HA_DEVICE_ID=home-roof
+HA_RETIRE_DEVICE_ID=solax_controller     # blanks the retained configs the old id left behind
+```
+
+Without the second line, the old device comes back from the broker's retained messages on the next
+restart, permanently unavailable, and you have two of everything.
+
+**To change it and keep the history**, the procedure is manual and worth doing carefully:
+
+1. Note the current entity ids (Settings → Devices & Services → MQTT → the device).
+2. Stop the controller, and set `HA_RETIRE_DEVICE_ID` to the old id so the retained configs go.
+3. Delete the old device from Home Assistant's registry. The recorder's rows are keyed by the entity
+   id *string* and survive this; deleting frees those ids for reuse.
+4. Deploy with the new `HA_DEVICE_ID` and let discovery create the entities.
+5. Rename each new entity's entity id back to the exact old one, accepting Home Assistant's prompt to
+   migrate long-term statistics. History and statistics then continue on the same key.
+
+Automations and dashboards reference entity ids, so if step 5 is done they need no edits.
+
 ### Upgrading a Pi deployed before the PV system had its own settings
 
 Four keys were retired when the installation moved into one place, and a retired key that is still
@@ -279,6 +317,21 @@ In `/opt/gleanvolt/.env`, rename:
 | --- | --- |
 | `WEATHER_LATITUDE` | `PV_LATITUDE` |
 | `WEATHER_LONGITUDE` | `PV_LONGITUDE` |
+
+**The MQTT topics move at the same time**, from `solax/solax_controller/…` to
+`gleanvolt/{PV_ID}/…`, so that two installations can share a broker. This costs nothing in Home
+Assistant: the discovery configs are republished on the same topics they always used, pointing at the
+new state topics, and every entity, its id and its history carry straight through — because
+`HA_DEVICE_ID` stays `solax_controller`. See [Renaming what Home Assistant sees](#renaming-what-home-assistant-sees)
+for why that one value is pinned.
+
+Two consequences worth acting on:
+
+- **`PV_ID` becomes required** when `HOMEASSISTANT_ENABLED=true`. It is the topic segment; without one
+  the controller refuses to start rather than publishing where another system might.
+- Set `HA_RETIRE_TOPIC_PREFIX=solax/solax_controller` for one deploy to clear the retained state the
+  old topics leave behind, then remove it. Nothing reads them either way; it keeps the broker
+  readable.
 
 `INVERTER_HOST`, `EV_CHARGER_HOST`, `WEATHER_API_KEY`, `SOLCAST_API_KEY` and `SOLCAST_RESOURCE_ID` are
 **unchanged** — the compose file maps the two addresses onto the new configuration keys for you.

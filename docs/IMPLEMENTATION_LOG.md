@@ -4,6 +4,46 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — The system's name reaches MQTT (issue #111, phase 3)
+
+Two installations could not share a broker: every topic was `solax/solax_controller/…` with both
+segments hard-defaulted, so the second controller to connect overwrote the first.
+
+### What changed
+
+- **Topics are namespaced by the PV system**: `{BaseTopic}/{Pv:Id}/…`, with `BaseTopic` now defaulting
+  to `gleanvolt`. `Pv:Id` is **required once `HomeAssistant:Enabled` is true** — it is the topic
+  segment — and still optional for a controller-only deployment, which publishes nothing.
+- **The Home Assistant device is named after `Pv:Name`**; `HomeAssistant:DeviceName` is retired.
+- **`unique_id` deliberately does not follow `Pv:Id`.** It stays `{HomeAssistant:DeviceId}_{objectId}`,
+  and the discovery topic keeps the same node id, so an existing installation's entities are *updated
+  in place* — new state topics, same identity, same history. `DeviceId` empty now means "take `Pv:Id`",
+  which is what a fresh system wants; `deploy/docker-compose.yml` pins `solax_controller`, which is what
+  every deployment that already exists created its entities under.
+- **`HomeAssistant:RetireDeviceIds`** blanks the retained discovery configs a former id left on the
+  broker — built by swapping the node-id segment of the configs this build publishes, so it cannot go
+  stale when an entity is added. **`HomeAssistant:RetireTopicPrefixes`** clears retained state under a
+  prefix no longer published on.
+- The MQTT client id is now per system rather than per unique-id root: two installations on one broker
+  must not fight over a session.
+- `deploy/` gains `HA_DEVICE_ID`, `HA_RETIRE_DEVICE_ID` and `HA_RETIRE_TOPIC_PREFIX`, and
+  `deploy/README.md` a *Renaming what Home Assistant sees* section — one table of which names are free
+  to change and which one costs the history, plus the manual procedure that keeps it.
+
+### Verification performed
+
+- **960 tests pass** (13 new): every topic namespaced by the system id, two systems sharing no topic at
+  all, the `unique_id` and the discovery topic *not* following the system id, an unset `DeviceId`
+  taking it, the device page named after the system, a retired id having every config it left behind
+  blanked (and nothing live blanked by mistake), retired prefixes clearing state topics but never
+  command topics, and the startup refusal when the integration is on with no id.
+- Not deployed. The Pi's `.env` needs `PV_ID` (it has one) and, for one deploy,
+  `HA_RETIRE_TOPIC_PREFIX=solax/solax_controller` to clear the old retained state. `HA_DEVICE_ID` is
+  pinned by the compose file, so its entities and their history are untouched — that is the claim to
+  check first after deploying.
+
+---
+
 ## 2026-08-25 — One section describes the installation; the old keys are refused (issue #111, phase 2)
 
 Phase 1 added the `Pv` section and let the older keys keep winning, so that an upgrade could not

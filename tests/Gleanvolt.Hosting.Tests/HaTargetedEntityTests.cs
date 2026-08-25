@@ -21,7 +21,7 @@ public class HaTargetedEntityTests
         DiscoveryPrefix = "homeassistant",
     };
 
-    private static readonly HaDiscovery Discovery = new(Options);
+    private static readonly HaDiscovery Discovery = new(Options, Sites.Home);
 
     private static readonly DateTimeOffset Now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero); // 22:00 Prague
 
@@ -47,8 +47,8 @@ public class HaTargetedEntityTests
         using var json = JsonDocument.Parse(message.Payload);
         var config = json.RootElement;
 
-        Assert.Equal("solax/solax_controller/target_departure/set", config.GetProperty("command_topic").GetString());
-        Assert.Equal("solax/solax_controller/target_departure/state", config.GetProperty("state_topic").GetString());
+        Assert.Equal("solax/home-roof/target_departure/set", config.GetProperty("command_topic").GetString());
+        Assert.Equal("solax/home-roof/target_departure/state", config.GetProperty("state_topic").GetString());
         Assert.Equal("Departure time", config.GetProperty("name").GetString());
     }
 

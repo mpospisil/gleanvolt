@@ -21,6 +21,7 @@ public class RetiredConfigurationKeysTests
     [InlineData("Solax:PollIntervalSeconds", "Controller:PollIntervalSeconds")]
     [InlineData("Weather:Latitude", "Pv:Latitude")]
     [InlineData("Weather:Longitude", "Pv:Longitude")]
+    [InlineData("HomeAssistant:DeviceName", "Pv:Name")]
     public void AKeyThatHasMovedStopsTheHostAndNamesItsReplacement(string retired, string replacement)
     {
         var error = Assert.Throws<InvalidOperationException>(() => Refuse((retired, "192.168.2.10")));

@@ -366,6 +366,7 @@ restart.
 | `Solax:PollIntervalSeconds` | `Controller:PollIntervalSeconds` |
 | `Weather:Latitude` | `Pv:Latitude` |
 | `Weather:Longitude` | `Pv:Longitude` |
+| `HomeAssistant:DeviceName` | `Pv:Name` |
 
 `Weather:ApiKey` and `Solcast:ResourceId` did **not** move: a provider's key and a provider's handle
 for your roof belong beside that provider's other settings. The `Pv` section says what the array is; a
@@ -1283,9 +1284,10 @@ Disabled by default. Non-secret settings live in `appsettings.json`:
   "BrokerHost": "localhost",
   "BrokerPort": 1883,
   "DiscoveryPrefix": "homeassistant", // HA's discovery prefix
-  "BaseTopic": "solax",
-  "DeviceId": "solax_controller",
-  "DeviceName": "Gleanvolt",
+  "BaseTopic": "gleanvolt",           // {BaseTopic}/{Pv:Id}/... is where everything is published
+  "DeviceId": "",                     // the unique-id root; "" = take Pv:Id. See the warning below
+  "RetireDeviceIds": [],              // former DeviceId values whose retained configs to blank
+  "RetireTopicPrefixes": [],          // former {BaseTopic}/{id} prefixes whose retained state to clear
   "StatusInterval": "00:00:15"
 }
 ```
@@ -1297,10 +1299,38 @@ HomeAssistant__Username=<user>
 HomeAssistant__Password=<pass>
 ```
 
+#### Two names, and only one of them is dangerous to change
+
+**The PV system's id namespaces the topics.** Everything this controller publishes hangs off
+`{BaseTopic}/{Pv:Id}` — `gleanvolt/home-roof/state`, `/availability`, `/{entity}/set` — so two
+installations can share one broker without overwriting each other, entity for entity, which is what
+they did before. `Pv:Id` is therefore **required once `HomeAssistant:Enabled` is true**; a
+controller-only deployment publishes nothing and needs none. The device page in Home Assistant is named
+after `Pv:Name`.
+
+**`HomeAssistant:DeviceId` is the unique-id root, and changing it costs the history.** Home Assistant
+keys an MQTT entity to its `unique_id`: a new one is a *new entity*, created as `sensor.…_2` because the
+old entity id is still taken, and every graph on your dashboard starts again. Nothing else here behaves
+like that — topics, the device name and the device identity can all change freely, and the entities
+follow — which is precisely why this one value does **not** follow `Pv:Id` automatically.
+
+- Empty means "take `Pv:Id`" — one id, configured once, which is what a fresh installation wants.
+- An installation that already has history **pins the id its entities were created with**.
+  `deploy/docker-compose.yml` pins `solax_controller` for exactly that reason.
+- To change it deliberately, set `RetireDeviceIds` to the old value in the same deploy, so the retained
+  discovery configs left on the broker are blanked rather than re-creating yesterday's device on the
+  next restart. The procedure that keeps the history is in
+  [the deploy README](deploy/README.md#renaming-what-home-assistant-sees).
+
+**`RetireTopicPrefixes`** clears retained *state* under a prefix you no longer publish on — set it to
+`solax/solax_controller` once after upgrading from a release that predates `Pv:Id`, then remove it. It
+changes nothing functional: it is the difference between a broker where `mosquitto_sub -t '#' -v` shows
+one of everything and one where it shows two.
+
 A ready-to-run broker + Home Assistant for local development lives in [`dev/homeassistant/`](dev/homeassistant/) (`docker compose up -d`). Watch the traffic with:
 
 ```bash
-docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'solax/#' -v
+docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'gleanvolt/#' -v
 ```
 
 ### Vehicle telemetry (the `Vehicle` section)

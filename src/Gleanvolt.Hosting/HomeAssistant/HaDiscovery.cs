@@ -18,18 +18,37 @@ public sealed class HaDiscovery
     private readonly bool _batteryHoldEnabled;
     private readonly IReadOnlyDictionary<string, object?> _device;
 
+    // The PV system's id, which is what the topics are namespaced by: two installations on one broker
+    // are two prefixes, not one prefix racing itself.
+    private readonly string _systemId;
+
+    // The unique-id root and the discovery node id, which are deliberately *not* the system id -- see
+    // HomeAssistantOptions.DeviceId for what changing this costs. Empty there means "the system id",
+    // which is what a fresh installation wants and what an existing one must not silently adopt.
+    private readonly string _deviceId;
+
+    /// <param name="site">
+    /// The installation (issue #111). Its id namespaces every topic and its name is what Home Assistant
+    /// shows on the device page — the system is the thing being controlled, so it is the thing the
+    /// device is named after.
+    /// </param>
     /// <param name="batteryHoldEnabled">
     /// Whether <c>BatteryHold:Enabled</c> is on. When it is off the feature is inert, so the switch is
     /// not published at all rather than published as a control that would do nothing.
     /// </param>
-    public HaDiscovery(HomeAssistantOptions options, bool batteryHoldEnabled = false)
+    public HaDiscovery(HomeAssistantOptions options, PvSystemInfo site, bool batteryHoldEnabled = false)
     {
         _options = options;
         _batteryHoldEnabled = batteryHoldEnabled;
+        _systemId = site.Id;
+        _deviceId = string.IsNullOrWhiteSpace(options.DeviceId) ? site.Id : options.DeviceId.Trim();
         _device = new Dictionary<string, object?>
         {
-            ["identifiers"] = new[] { options.DeviceId },
-            ["name"] = options.DeviceName,
+            // The device identity stays the unique-id root rather than following the system id: an
+            // entity that moves between devices keeps its history, but only because its unique_id did
+            // not move, and keeping the two together is what makes that easy to reason about.
+            ["identifiers"] = new[] { _deviceId },
+            ["name"] = site.Name,
             ["manufacturer"] = "gleanvolt-controller",
             ["model"] = "Live-solar charge control",
             // Shown on the device page in HA, so "which build is on the Pi?" is answerable without
@@ -38,11 +57,17 @@ public sealed class HaDiscovery
         };
     }
 
-    public string AvailabilityTopic => $"{_options.BaseTopic}/{_options.DeviceId}/availability";
-    public string StateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/state";
-    public string BatteryHoldCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/set";
-    public string BatteryHoldStateTopic => $"{_options.BaseTopic}/{_options.DeviceId}/battery_hold/state";
-    public string StopServiceCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/stop_service/set";
+    /// <summary>The PV system's id, which every topic this controller publishes is namespaced by.</summary>
+    public string SystemId => _systemId;
+
+    /// <summary>Everything this controller publishes hangs off here: <c>{BaseTopic}/{Pv:Id}</c>.</summary>
+    public string TopicPrefix => $"{_options.BaseTopic}/{_systemId}";
+
+    public string AvailabilityTopic => $"{TopicPrefix}/availability";
+    public string StateTopic => $"{TopicPrefix}/state";
+    public string BatteryHoldCommandTopic => $"{TopicPrefix}/battery_hold/set";
+    public string BatteryHoldStateTopic => $"{TopicPrefix}/battery_hold/state";
+    public string StopServiceCommandTopic => $"{TopicPrefix}/stop_service/set";
 
     /// <summary>Object ids of the settable numbers, so the worker can subscribe and publish generically.</summary>
     public const string DailyEvTargetNumber = "daily_ev_target";
@@ -88,12 +113,12 @@ public sealed class HaDiscovery
     /// </summary>
     public const string ChargeOffButton = "charge_off";
 
-    public string ButtonCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
+    public string ButtonCommandTopic(string objectId) => $"{TopicPrefix}/{objectId}/set";
 
     public string ChargeOffCommandTopic => ButtonCommandTopic(ChargeOffButton);
 
-    public string NumberCommandTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/set";
-    public string NumberStateTopic(string objectId) => $"{_options.BaseTopic}/{_options.DeviceId}/{objectId}/state";
+    public string NumberCommandTopic(string objectId) => $"{TopicPrefix}/{objectId}/set";
+    public string NumberStateTopic(string objectId) => $"{TopicPrefix}/{objectId}/state";
 
     /// <summary>Same shape as the number topics; separate methods only so call sites read as what they are.</summary>
     public string TextCommandTopic(string objectId) => NumberCommandTopic(objectId);
@@ -103,7 +128,7 @@ public sealed class HaDiscovery
     public string SelectCommandTopic(string objectId) => NumberCommandTopic(objectId);
     public string SelectStateTopic(string objectId) => NumberStateTopic(objectId);
 
-    public string ActivateTargetCommandTopic => $"{_options.BaseTopic}/{_options.DeviceId}/activate_target/set";
+    public string ActivateTargetCommandTopic => $"{TopicPrefix}/activate_target/set";
 
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
@@ -159,19 +184,60 @@ public sealed class HaDiscovery
     /// </summary>
     public IEnumerable<string> RetiredDiscoveryTopics()
     {
-        yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/charge_control/config";
+        yield return $"{_options.DiscoveryPrefix}/switch/{_deviceId}/charge_control/config";
 
         // The charge-mode select (issue #89). A mode is no longer something to pick: it is what a
         // button did, reported by the charge_mode sensor below. Retiring the config topic is what makes
         // Home Assistant delete the entity on its own, so nobody has to go and remove it by hand.
-        yield return $"{_options.DiscoveryPrefix}/select/{_options.DeviceId}/charge_mode/config";
+        yield return $"{_options.DiscoveryPrefix}/select/{_deviceId}/charge_mode/config";
 
         // Also retire the battery-hold entities while the feature is off, so turning it off actually
         // removes the switch from HA rather than leaving a retained config behind that does nothing.
         if (!_batteryHoldEnabled)
         {
-            yield return $"{_options.DiscoveryPrefix}/switch/{_options.DeviceId}/battery_hold/config";
-            yield return $"{_options.DiscoveryPrefix}/sensor/{_options.DeviceId}/battery_hold_target/config";
+            yield return $"{_options.DiscoveryPrefix}/switch/{_deviceId}/battery_hold/config";
+            yield return $"{_options.DiscoveryPrefix}/sensor/{_deviceId}/battery_hold_target/config";
+        }
+
+        // Every config a former device id left on the broker (issue #111). Retained discovery messages
+        // outlive the process that published them, so without this a renamed installation comes back as
+        // two devices after the next restart -- the live one, and yesterday's, re-created from the
+        // broker and permanently unavailable.
+        //
+        // Built by swapping the node-id segment of the configs this build publishes, rather than by a
+        // second list that would go stale the first time an entity is added: what was published under
+        // the old id is, by definition, what is published under the new one.
+        foreach (var retired in _options.RetireDeviceIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+        {
+            foreach (var topic in DiscoveryMessages().Select(message => message.Topic))
+            {
+                // {prefix}/{component}/{node}/{object}/config -- the node id is third from the end.
+                var segments = topic.Split('/');
+                segments[^3] = retired.Trim();
+                yield return string.Join('/', segments);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Retained state topics under a prefix this installation used to publish on, to be cleared on
+    /// connect. Nothing reads them once the discovery configs point elsewhere; they are cleared so that
+    /// a person reading the broker sees one of everything rather than two.
+    /// </summary>
+    public IEnumerable<string> RetiredStateTopics()
+    {
+        foreach (var prefix in _options.RetireTopicPrefixes
+            .Where(prefix => !string.IsNullOrWhiteSpace(prefix))
+            .Select(prefix => prefix.Trim().TrimEnd('/')))
+        {
+            yield return $"{prefix}/availability";
+            yield return $"{prefix}/state";
+            yield return $"{prefix}/battery_hold/state";
+
+            foreach (var objectId in NumberObjectIds.Concat(SelectObjectIds).Concat(TextObjectIds))
+            {
+                yield return $"{prefix}/{objectId}/state";
+            }
         }
     }
 
@@ -531,7 +597,7 @@ public sealed class HaDiscovery
 
     private (string Topic, string Payload) Config(string component, string objectId, Dictionary<string, object?> config)
     {
-        config["unique_id"] = $"{_options.DeviceId}_{objectId}";
+        config["unique_id"] = $"{_deviceId}_{objectId}";
         config["availability_topic"] = AvailabilityTopic;
         config["payload_available"] = PayloadOnline;
         config["payload_not_available"] = PayloadOffline;
@@ -541,7 +607,7 @@ public sealed class HaDiscovery
         // Home Assistant rejects the whole config on a null field (e.g. "icon": null). Drop them.
         var present = config.Where(kvp => kvp.Value is not null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-        var topic = $"{_options.DiscoveryPrefix}/{component}/{_options.DeviceId}/{objectId}/config";
+        var topic = $"{_options.DiscoveryPrefix}/{component}/{_deviceId}/{objectId}/config";
         return (topic, JsonSerializer.Serialize(present, Json));
     }
 }
