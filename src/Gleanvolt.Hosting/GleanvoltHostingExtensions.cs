@@ -57,27 +57,54 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(ZonedTimeProvider.Resolve(
             configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)]));
 
+        // The installation itself (issue #111): where the array is, and what it is made of. Resolved
+        // eagerly, and once, for the same reason the time zone above is — a site that cannot be
+        // described is a startup failure, not a connection error minutes later — and registered so that
+        // every surface reads one answer rather than re-deciding which configuration key won.
+        services.Configure<PvSystemOptions>(configuration.GetSection(PvSystemOptions.SectionName));
+        var pvSystem = PvSystemResolver.Resolve(configuration);
+        services.AddSingleton(pvSystem);
+        services.AddSingleton(pvSystem.Site);
+
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
         {
-            var options = provider.GetRequiredService<IOptions<SolaxOptions>>().Value;
-
             // The battery discharge hold is the only thing that ever writes to the inverter, so the
             // client is writable only while that feature is both enabled and out of dry-run. With
             // BatteryHold:Enabled false — the default — an inverter write is structurally impossible,
             // not merely skipped.
             var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
-            return WriteProof(provider, new ModbusTcpClient(options.Inverter), batteryHold.Enabled && !batteryHold.DryRun);
+            return WriteProof(
+                provider,
+                new ModbusTcpClient(pvSystem.Site.Inverter.Connection),
+                batteryHold.Enabled && !batteryHold.DryRun);
         });
 
-        services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (provider, _) =>
+        // A loop that runs once today. The composition root is what the charger list has to reach
+        // first: registering each charger under its own id is what makes a second one a matter of
+        // control logic rather than of wiring. What still cannot handle two is everything downstream —
+        // one mode, one set of Home Assistant controls, one surplus to divide — which is why the
+        // resolver refuses a second entry rather than this loop quietly accepting it.
+        foreach (var charger in pvSystem.Site.Chargers)
         {
-            var options = provider.GetRequiredService<IOptions<SolaxOptions>>().Value;
+            services.AddKeyedSingleton<IModbusClient>(charger.Id, (provider, _) =>
+            {
+                // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
+                // a controlling mode at any time, so the client has to be ready for it.
+                var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+                return WriteProof(provider, new ModbusTcpClient(charger.Connection), !chargeControl.DryRun);
+            });
+        }
 
-            // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
-            // a controlling mode at any time, so the client has to be ready for it.
-            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            return WriteProof(provider, new ModbusTcpClient(options.EvCharger), !chargeControl.DryRun);
-        });
+        // The charger the control path drives, under the fixed key, because [FromKeyedServices] takes a
+        // compile-time constant and EvChargerControl and EnergyStateReader are written against one. It
+        // resolves the registration above rather than constructing a second client: two clients would be
+        // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
+        // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
+        // key is not — so this is an alias and never a self-reference.
+        var controlledCharger = pvSystem.Site.Chargers[0].Id;
+        services.AddKeyedSingleton<IModbusClient>(
+            ModbusClientKeys.EvCharger,
+            (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 

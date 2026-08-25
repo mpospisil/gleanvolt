@@ -28,26 +28,33 @@ public sealed class OpenWeatherMapService : IWeatherService
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WeatherOptions _options;
+    private readonly PvSystemInfo _site;
     private readonly ILogger<OpenWeatherMapService> _logger;
 
     // A provider that is down is down for hours, and this is asked twice per session -- so the second
     // and later failures say nothing new. Reset on the next success, so a recovery is visible.
     private bool _failureLogged;
 
+    /// <param name="site">
+    /// The installation, for its coordinates. They come from here rather than from
+    /// <see cref="WeatherOptions"/> because where the site is is a fact about the site, not about the
+    /// weather provider — and because <c>Weather:Latitude</c> is deprecated in favour of
+    /// <c>Pv:Latitude</c> (issue #111). The resolved site already carries whichever of the two won, so
+    /// this service never has to know there were two.
+    /// </param>
     public OpenWeatherMapService(
         IHttpClientFactory httpClientFactory,
         IOptions<WeatherOptions> options,
+        PvSystemInfo site,
         ILogger<OpenWeatherMapService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
+        _site = site;
         _logger = logger;
     }
 
-    public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(_options.ApiKey)
-        && _options.Latitude is not null
-        && _options.Longitude is not null;
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ApiKey) && _site.HasLocation;
 
     public async Task<WeatherReading?> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
@@ -94,8 +101,8 @@ public sealed class OpenWeatherMapService : IWeatherService
 
     private string RequestUri()
     {
-        var lat = _options.Latitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
-        var lon = _options.Longitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
+        var lat = _site.Latitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
+        var lon = _site.Longitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
 
         return $"data/2.5/weather?lat={lat}&lon={lon}"
             + $"&units={Uri.EscapeDataString(_options.Units)}"

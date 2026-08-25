@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.OpenWeather;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -73,12 +74,7 @@ public sealed class OpenWeatherMapServiceTests
     public async Task WithoutAKeyItIsInertRatherThanFailing()
     {
         var handler = new StubHandler(HttpStatusCode.OK, SampleResponse);
-        var service = NewService(handler, options => new WeatherOptions
-        {
-            Latitude = options.Latitude,
-            Longitude = options.Longitude,
-            ApiKey = string.Empty,
-        });
+        var service = NewService(handler, options => new WeatherOptions { ApiKey = string.Empty });
 
         Assert.False(service.IsConfigured);
         Assert.Null(await service.GetCurrentAsync(Ct));
@@ -92,8 +88,9 @@ public sealed class OpenWeatherMapServiceTests
     {
         // 0,0 is a real place in the Atlantic, which is why the coordinates are nullable rather than
         // defaulted -- an unset site must record no weather, not the weather in the Gulf of Guinea.
+        // They come from the PV system now (issue #111), so "no coordinates" is a site without them.
         var handler = new StubHandler(HttpStatusCode.OK, SampleResponse);
-        var service = NewService(handler, _ => new WeatherOptions { ApiKey = "key" });
+        var service = NewService(handler, site: SiteAt(null, null));
 
         Assert.False(service.IsConfigured);
         Assert.Null(await service.GetCurrentAsync(Ct));
@@ -128,8 +125,6 @@ public sealed class OpenWeatherMapServiceTests
             options => new WeatherOptions
             {
                 ApiKey = options.ApiKey,
-                Latitude = options.Latitude,
-                Longitude = options.Longitude,
                 RequestTimeout = TimeSpan.FromMilliseconds(50),
             });
 
@@ -147,21 +142,35 @@ public sealed class OpenWeatherMapServiceTests
         Assert.Null(await service.GetCurrentAsync(Ct));
     }
 
-    private static WeatherOptions Configured() => new()
-    {
-        ApiKey = "test-key",
-        Latitude = 49.2678029,
-        Longitude = 16.5294859,
-    };
+    private static WeatherOptions Configured() => new() { ApiKey = "test-key" };
+
+    // The site the reading is about. Only its coordinates matter here -- the provider is asked about a
+    // place, and the place is a property of the PV system rather than of the weather integration.
+    private static PvSystemInfo SiteAt(double? latitude, double? longitude) => new(
+        Id: "test-site",
+        Name: "Test site",
+        Address: string.Empty,
+        Latitude: latitude,
+        Longitude: longitude,
+        AzimuthDegrees: null,
+        TiltDegrees: null,
+        CapacityKwp: null,
+        InverterCapacityKw: null,
+        LossFactor: null,
+        InstallDate: null,
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
+        Chargers: []);
 
     private static OpenWeatherMapService NewService(
         HttpMessageHandler handler,
-        Func<WeatherOptions, WeatherOptions>? configure = null)
+        Func<WeatherOptions, WeatherOptions>? configure = null,
+        PvSystemInfo? site = null)
     {
         var options = configure is null ? Configured() : configure(Configured());
         return new OpenWeatherMapService(
             new SingleClientFactory(handler, options.BaseUrl),
             Options.Create(options),
+            site ?? SiteAt(49.2678029, 16.5294859),
             NullLogger<OpenWeatherMapService>.Instance);
     }
 

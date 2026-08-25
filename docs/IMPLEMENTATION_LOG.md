@@ -4,6 +4,67 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-25 — The installation is described once: the `Pv` section, phase 1 (issue #111)
+
+Where the array is lived in `Weather:Latitude`. What it is made of lived in `Solax:Inverter` and
+`Solax:EvCharger` — an address each, under a vendor's name, with no model number and a shape that can
+express exactly one charger because a single object cannot express two. Nothing anywhere said *this is
+a 9.2 kWp array at 50.0755, 14.4378, feeding a SolaX X3-HYB-G4 PRO with one wallbox, and it is called
+Home Roof.*
+
+This is the additive phase: the new section exists, and **nothing about a running deployment
+changes**.
+
+### What changed
+
+- **`PvSystemOptions` (the `Pv` section), in `Gleanvolt.Core`** — id, name, address, coordinates,
+  azimuth, tilt, capacity, inverter capacity, loss factor, install date, the inverter, and a *list* of
+  chargers. Core because the weather client, the composition root, the API and the UI all need it, and
+  Core is the one assembly all of them may reference.
+- **`PvSystemInfo`, one resolved snapshot**, built once at startup and registered as a singleton. No
+  consumer ever asks "which key won?" — that question has one right answer per process and no place in
+  a weather client.
+- **`PvSystemResolver`**, which reconciles the two sources on one rule: **the older key wins wherever
+  it is set**. An existing `.env` therefore describes exactly the devices it described yesterday.
+  Each such win is a warning at startup, so the log is the migration checklist. The *identity* — model
+  and name — always comes from the `Pv` section, because the older keys cannot express it at all.
+- **Validation at startup, all problems at once**, each naming its key: an id that is not a slug, half a
+  pair of coordinates, a tilt outside 0–90, a loss factor outside (0, 1], an unparsable install date, a
+  missing inverter or charger, two chargers, two chargers sharing an id. One restart per mistake is a
+  miserable way to configure anything.
+- **The charger list reaches the composition root.** Modbus clients are registered in a loop, one per
+  charger, keyed by the charger's id; `ModbusClientKeys.EvCharger` is now an alias resolving the same
+  instance, because `[FromKeyedServices]` takes a compile-time constant. A second entry is refused by
+  the resolver — configuration can express two so that it need not change shape later, but one mode,
+  one set of HA controls and one surplus to divide cannot drive two.
+- **The device defaults moved** from `Solax:Inverter`/`Solax:EvCharger` in `appsettings.json` to
+  `Pv:Inverter`/`Pv:Chargers[0]`, with the models named. The deprecated keys ship unset, so a
+  deployment only sees the warning if it is actually still using them — which the Pi is, through
+  `INVERTER_HOST` and `EV_CHARGER_HOST` in compose. `Solax` is left holding `PollIntervalSeconds`.
+- **The weather client asks the site for its coordinates**, not `WeatherOptions`. Where the site is is a
+  fact about the site.
+- `Weather:Latitude`, `Weather:Longitude`, `Solax:Inverter` and `Solax:EvCharger` are documented as
+  deprecated in the README, in `.env.example` and on the properties themselves. `Solcast:ResourceId`
+  and `Weather:ApiKey` are **not** deprecated: a provider's handle for your roof belongs beside that
+  provider's other settings.
+
+### Verification performed
+
+- **931 tests pass** (29 new): the resolver's two rules and every validation message, the
+  identity-from-`Pv`-address-from-`Solax` split, azimuth normalisation (`-90` and `270` are one
+  bearing), and the composition root's keyed registrations — including that the fixed key and the
+  charger id resolve the *same* client, since two would be two sockets to one wallbox.
+- **Run against a Pv-only configuration** (`Pv__Inverter__Host`, `Pv__Chargers__0__Host`, no `Solax`
+  keys): the worker starts, polls, and announces itself —
+  `PV system: Home Roof (home-roof) at 49.2678,16.5295; inverter SolaX X3-HYB-G4 PRO at …`. With the
+  repository `.env`'s `Weather__Latitude` still set, the deprecation warning fires and those
+  coordinates win, which is the documented behaviour.
+- Not deployed to the Pi yet. Nothing about this phase changes what the Pi talks to; the visible
+  difference there will be two deprecation warnings at startup naming `Solax:Inverter` and
+  `Solax:EvCharger`.
+
+---
+
 ## 2026-08-23 — The API's base URL answers, and the document can be read (issue #103 follow-up)
 
 Deployed to the Pi, opened `http://<pi>:8090/api/v1/` in a browser, and got an empty 404 — the base
