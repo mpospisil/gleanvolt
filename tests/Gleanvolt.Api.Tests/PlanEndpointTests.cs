@@ -187,4 +187,93 @@ public sealed class PlanEndpointTests : IAsyncDisposable
         Assert.Equal(quoted.GetProperty("request").Number("tailEnergyWh"), started.TailEnergyWh, 6);
         Assert.Equal(TargetedChargePriority.JustInTime, started.Priority);
     }
+
+    // -- The round trip (#128): a quote carries what you may edit, and editing nothing changes nothing.
+
+    [Fact]
+    public async Task A_quote_carries_the_limits_you_may_edit()
+    {
+        var client = await _host.StartAsync();
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", Target())).ReadAsync();
+        var editable = body.GetProperty("editable");
+
+        // Present, and empty in the sense that matters: nothing here narrows anything yet.
+        Assert.NotEqual(JsonValueKind.Null, editable.ValueKind);
+        Assert.NotEqual(JsonValueKind.Null, editable.GetProperty("planId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, editable.GetProperty("notBefore").ValueKind);
+        Assert.Equal(JsonValueKind.Null, editable.GetProperty("maxGridEnergyWh").ValueKind);
+    }
+
+    [Fact]
+    public async Task Sending_an_unedited_quote_back_is_a_no_op()
+    {
+        // The property the whole feature rests on: round-trip what you were shown and you get what you
+        // were shown. Without it, "edit the plan" is not a thing anybody can reason about.
+        var client = await _host.StartAsync();
+
+        var first = await (await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", Target())).ReadAsync();
+
+        var again = await (await client.PostAsJsonAsync(
+            "/api/v1/plans/targeted/preview",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(17).ToString("o"),
+                editable = JsonSerializer.Deserialize<JsonElement>(first.GetProperty("editable").GetRawText()),
+            })).ReadAsync();
+
+        Assert.Equal(first.GetProperty("plan").GetRawText(), again.GetProperty("plan").GetRawText());
+        Assert.Equal(
+            first.GetProperty("request").Number("requiredEnergyWh"),
+            again.GetProperty("request").Number("requiredEnergyWh"));
+    }
+
+    [Fact]
+    public async Task An_edited_quote_reaches_the_planner_as_constraints()
+    {
+        // Re-quoting under an edit is what lets somebody change a bound, see what it costs, and change
+        // it again -- without having to start the charge to find out.
+        var client = await _host.StartAsync();
+        var notBefore = Fixtures.Now.AddHours(4);
+
+        await client.PostAsJsonAsync(
+            "/api/v1/plans/targeted/preview",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(17).ToString("o"),
+                editable = new { notBefore = notBefore.ToString("o"), maxGridEnergyWh = 5000 },
+            });
+
+        var quoted = _host.Preview.Requests[^1];
+
+        Assert.NotNull(quoted.Constraints);
+        Assert.Equal(notBefore, quoted.Constraints!.NotBefore);
+        Assert.Equal(5000, quoted.Constraints.MaxGridEnergyWh);
+    }
+
+    [Fact]
+    public async Task An_edited_quote_echoes_the_limits_back_so_the_next_edit_need_not_rebuild_them()
+    {
+        var client = await _host.StartAsync();
+        var notBefore = Fixtures.Now.AddHours(4);
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/plans/targeted/preview",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(17).ToString("o"),
+                editable = new { notBefore = notBefore.ToString("o") },
+            })).ReadAsync();
+
+        Assert.Equal(notBefore, body.GetProperty("editable").GetProperty("notBefore").GetDateTimeOffset());
+    }
+
+    private static object Target() => new
+    {
+        energyKWh = 22,
+        departBy = Fixtures.Now.AddHours(17).ToString("o"),
+    };
 }

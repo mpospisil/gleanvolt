@@ -59,12 +59,19 @@ public sealed record BatteryHoldRequest(bool Hold);
 /// charger's read-back current — are from the <em>last</em> poll and will not reflect this action until
 /// the next one completes. Null only when no poll has completed since startup.
 /// </param>
+/// <param name="ForecastMovedSinceQuote">
+/// Whether the solar forecast has been refreshed since the plan you were quoted was built — only when
+/// you sent that plan's <c>planId</c> back, and null whenever there is no way to tell. Advisory: the
+/// charge started either way, and the plan is rebuilt from the current forecast on the next poll
+/// regardless.
+/// </param>
 public sealed record ControlActionResponse(
     bool Succeeded,
     string? Message,
     TargetedRequestResponse? Target,
     StatusResponse? Status,
-    FastChargeResponse? Fast = null);
+    FastChargeResponse? Fast = null,
+    bool? ForecastMovedSinceQuote = null);
 
 /// <summary>
 /// Whether the controller is alive and what it can currently see. The endpoint to poll when the

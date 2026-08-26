@@ -375,4 +375,141 @@ public sealed class ControlEndpointTests : IAsyncDisposable
         Assert.NotEqual(JsonValueKind.Null, body.GetProperty("fast").GetProperty("departBy").ValueKind);
         Assert.Equal(JsonValueKind.Null, body.GetProperty("fast").GetProperty("schedule").ValueKind);
     }
+
+    // -- Starting under an edited plan's limits (#128).
+
+    private static object Editable(object? extra = null) => extra ?? new { };
+
+    [Fact]
+    public async Task Starts_a_targeted_charge_with_no_limits_at_all()
+    {
+        // The property everything else rests on: an absent 'editable' is the endpoint behaving exactly
+        // as /charging/start already does.
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/charging/start/targeted", Target())).ReadAsync();
+
+        Assert.True(body.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(ChargeControlMode.Targeted, Assert.Single(_host.Actions.Starts).Mode);
+        Assert.Null(_host.Target.Request!.Constraints);
+    }
+
+    [Fact]
+    public async Task Carries_the_limits_onto_the_request_the_controller_works_to()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+        var quiet = Fixtures.Now.AddHours(2);
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/charging/start/targeted",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(9).ToString("o"),
+                editable = new
+                {
+                    notBefore = quiet.ToString("o"),
+                    maxGridEnergyWh = 8000,
+                    forbiddenWindows = new[]
+                    {
+                        new { start = Fixtures.Now.AddHours(4).ToString("o"), end = Fixtures.Now.AddHours(5).ToString("o") },
+                    },
+                },
+            })).ReadAsync();
+
+        Assert.True(body.GetProperty("succeeded").GetBoolean());
+
+        var constraints = _host.Target.Request!.Constraints!;
+        Assert.Equal(quiet, constraints.NotBefore);
+        Assert.Equal(8000, constraints.MaxGridEnergyWh);
+        Assert.Single(constraints.ForbiddenWindows!);
+    }
+
+    [Fact]
+    public async Task Refuses_limits_that_leave_the_charger_no_time_at_all()
+    {
+        // Only the impossible is refused. Starting a mode that sits idle until the departure and then
+        // reports it delivered nothing is the outcome this exists to prevent.
+        var client = await _host.StartAsync();
+        _host.Preview.WindowIsEmpty = true;
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start/targeted",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(9).ToString("o"),
+                editable = new { notAfter = Fixtures.Now.AddMinutes(1).ToString("o") },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("no time for the charger to run", (await response.ReadAsync()).Text("detail"));
+        Assert.Empty(_host.Actions.Starts);
+        Assert.Null(_host.Target.Request);
+    }
+
+    [Fact]
+    public async Task Accepts_limits_that_merely_make_the_request_partial()
+    {
+        // "Buy at most 8kWh and I'll take what that gets me" is a legitimate thing to ask for. It comes
+        // back as a shortfall on the plan, not as a refusal.
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/charging/start/targeted",
+            new
+            {
+                energyKWh = 22,
+                departBy = Fixtures.Now.AddHours(9).ToString("o"),
+                editable = new { maxGridEnergyWh = 0 },
+            })).ReadAsync();
+
+        Assert.True(body.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(0, _host.Target.Request!.Constraints!.MaxGridEnergyWh);
+    }
+
+    [Fact]
+    public async Task Refuses_the_request_itself_before_it_looks_at_the_limits()
+    {
+        var client = await _host.StartAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start/targeted",
+            new { energyKWh = 22, departBy = Fixtures.Now.AddHours(-1).ToString("o") });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("in the past", (await response.ReadAsync()).Text("detail"));
+    }
+
+    [Fact]
+    public async Task A_refused_charger_leaves_no_request_standing()
+    {
+        var client = await _host.StartAsync();
+        _host.Actions.NextResult = ChargeActionResult.Failed("the charger did not accept Fast");
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/charging/start/targeted", Target())).ReadAsync();
+
+        Assert.False(body.GetProperty("succeeded").GetBoolean());
+        Assert.Null(_host.Target.Request);
+    }
+
+    [Fact]
+    public async Task Says_nothing_about_a_moved_forecast_without_a_plan_id()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/charging/start/targeted", Target())).ReadAsync();
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("forecastMovedSinceQuote").ValueKind);
+    }
+
+    private static object Target() => new
+    {
+        energyKWh = 22,
+        departBy = Fixtures.Now.AddHours(9).ToString("o"),
+    };
 }

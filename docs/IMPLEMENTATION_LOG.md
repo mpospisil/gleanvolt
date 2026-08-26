@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-26 — A quoted plan can be edited and charged to (issue #128)
+
+### What changed
+
+- `TargetedChargeConstraints` (`NotBefore`, `NotAfter`, `ForbiddenWindows`, `MaxGridEnergyWh`) on the
+  `TargetedChargeRequest`, honoured by `TargetedChargePlanner` on every poll.
+- Time limits are applied by **narrowing the slice list** the whole planner flows from, reusing the
+  `Within` proration the just-in-time hold already uses. The grid cap is a budget the pacing draws
+  down.
+- `editable` on the preview response, and the same field accepted on the request body — so the preview
+  and the start take the identical body, and `/charging/start` gains it for free.
+- `POST /charging/start/targeted`, which quotes the plan before committing so impossible limits are a
+  400 with the reason rather than a charge that quietly delivers nothing.
+- `planId`: a self-describing token carrying the quoted forecast's timestamp. No server-side basket, so
+  nothing to expire and nothing a restart loses.
+
+### Things worth knowing
+
+- **Reserve before you narrow**, or the home battery's whole claim lands in the hours the owner allowed
+  the car.
+- **Pace to the window that exists.** `hoursLeft` measured to the deadline, so a `notAfter` ending the
+  window early paced over hours the charger could not run in. Caught by a test asserting a real
+  shortfall, not by review.
+- **A grid cap must not cut solar.** The first version capped by asking for less energy overall, which
+  reduced both. Caught by the "cap of zero is sun-only" test.
+- **The additive shape was the second attempt.** The first wrapped the preview body in a new object and
+  would have broken every existing caller of `/plans/targeted/preview`.
+
+### Verification performed
+
+- **1158 tests pass** (22 new): every constraint in both directions, a slice straddling a boundary
+  trimmed rather than dropped, a window in the middle leaving a stretch either side, the pack's figures
+  untouched by the car's limits, and the round-trip no-op — quote, send it back unedited, get the same
+  plan.
+- The `OpenApiContract.json` diff is **purely additive**: one new path, and optional fields on three
+  existing schemas. Nothing existing changed shape.
+- **Not yet verified on hardware.** Nothing changes for a caller that never sends `editable`, which is
+  the first thing to confirm after a deploy.
+
+---
+
 ## 2026-08-26 — The source's comments reach the OpenAPI document, enums included (issue #126)
 
 The README claimed the XML comments were the document's descriptions. True for properties; false for

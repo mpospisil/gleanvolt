@@ -59,13 +59,15 @@ public class TargetedChargePlannerTests
         double deliveredWh = 0,
         TargetedChargePlannerOptions? options = null,
         DateTimeOffset? batteryFullBy = null,
-        double tailWh = 0) =>
+        double tailWh = 0,
+        TargetedChargeConstraints? constraints = null) =>
         TargetedChargePlanner.Plan(
             State(socPercent, now),
             new TargetedChargeRequest(requiredWh, departBy, ActivatedAt: now)
             {
                 Priority = tailWh > 0 ? TargetedChargePriority.JustInTime : TargetedChargePriority.Cheapest,
                 TailEnergyWh = tailWh,
+                Constraints = constraints,
             },
             deliveredWh,
             forecast ?? Forecast(BellDay),
@@ -639,5 +641,184 @@ public class TargetedChargePlannerTests
 
         Assert.Contains("Holding the last", plan.Reason);
         Assert.Contains("4.0kWh", plan.Reason);
+    }
+
+    // --- Constraints (#128): limits on *how* the request is met, honoured on every plan ---
+
+    [Fact]
+    public void NoConstraints_PlansExactlyAsItAlwaysDid()
+    {
+        // The property the whole feature rests on: an absent constraint set changes nothing.
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plain = Plan(requiredWh: 12_000, departBy: now.AddHours(5), now: now);
+        var empty = Plan(requiredWh: 12_000, departBy: now.AddHours(5), now: now,
+            constraints: TargetedChargeConstraints.None);
+
+        Assert.Equal(plain.ExpectedEnergyWh, empty.ExpectedEnergyWh, 1);
+        Assert.Equal(plain.GridEnergyWh, empty.GridEnergyWh, 1);
+        Assert.Equal(plain.CeilingEnergyWh, empty.CeilingEnergyWh, 1);
+        Assert.Equal(plain.Blocks.Count, empty.Blocks.Count);
+    }
+
+    [Fact]
+    public void NotBefore_LeavesNoBlockStartingEarlier()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var notBefore = now.AddHours(2);
+
+        var plan = Plan(
+            requiredWh: 12_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(NotBefore: notBefore));
+
+        Assert.NotEmpty(plan.Blocks);
+        Assert.All(plan.Blocks, block => Assert.True(block.Start >= notBefore));
+    }
+
+    [Fact]
+    public void NotAfter_LeavesNoBlockRunningPastIt()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var notAfter = now.AddHours(3);
+
+        var plan = Plan(
+            requiredWh: 12_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(NotAfter: notAfter));
+
+        Assert.NotEmpty(plan.Blocks);
+        Assert.All(plan.Blocks, block => Assert.True(block.End <= notAfter));
+    }
+
+    [Fact]
+    public void AForbiddenWindow_IsLeftIdleAndTheChargingGoesAroundIt()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var quiet = new TimeWindow(now.AddHours(1), now.AddHours(2));
+
+        var plan = Plan(
+            requiredWh: 12_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(
+                ForbiddenWindows: [quiet]));
+
+        Assert.NotEmpty(plan.Blocks);
+        Assert.All(plan.Blocks, block => Assert.False(quiet.Overlaps(block.Start, block.End)));
+    }
+
+    [Fact]
+    public void AWindowInTheMiddleLeavesAStretchEitherSideOfIt()
+    {
+        // The case that catches a naive implementation: cutting a hole out of the window has to leave
+        // two usable pieces, not truncate everything after the hole.
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plan = Plan(
+            requiredWh: 20_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(
+                ForbiddenWindows: [new TimeWindow(now.AddHours(2), now.AddHours(3))]));
+
+        Assert.Contains(plan.Blocks, block => block.End <= now.AddHours(2));
+        Assert.Contains(plan.Blocks, block => block.Start >= now.AddHours(3));
+    }
+
+    [Fact]
+    public void ANarrowedWindow_LowersTheCeilingAndSoReportsARealShortfall()
+    {
+        // A constraint may reduce what is delivered; it may never make the plan lie about what will be.
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plan = Plan(
+            requiredWh: 30_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(NotAfter: now.AddHours(1)));
+
+        // One hour at 11.04kW, whatever the departure says.
+        Assert.Equal(MaxChargePowerWatts, plan.CeilingEnergyWh, 1);
+        Assert.True(plan.HasShortfall);
+        Assert.Equal(30_000 - MaxChargePowerWatts, plan.ShortfallWh, 1);
+    }
+
+    [Fact]
+    public void ASliceStraddlingABoundary_IsTrimmedRatherThanDropped()
+    {
+        // The forecast arrives in half-hour periods and a limit lands wherever the owner put it.
+        // Dropping a slice that is three-quarters allowed quietly costs the car most of an hour.
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var onTheBoundary = Plan(
+            requiredWh: 30_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(NotAfter: now.AddHours(2)));
+
+        var midSlice = Plan(
+            requiredWh: 30_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(NotAfter: now.AddHours(2).AddMinutes(15)));
+
+        // A quarter-hour more of window is a quarter-hour more of ceiling, not nothing and not a whole
+        // slice more.
+        Assert.Equal(onTheBoundary.CeilingEnergyWh + (MaxChargePowerWatts * 0.25), midSlice.CeilingEnergyWh, 1);
+    }
+
+    [Fact]
+    public void AGridCap_BuysNoMoreThanItAndReportsTheRestAsShortfall()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        // Overnight-ish: no sun in the window, so every watt-hour would otherwise be bought.
+        var uncapped = Plan(
+            requiredWh: 20_000, departBy: now.AddHours(4), now: now, forecast: Forecast(0, 0, 0, 0, 0, 0, 0));
+
+        var capped = Plan(
+            requiredWh: 20_000, departBy: now.AddHours(4), now: now, forecast: Forecast(0, 0, 0, 0, 0, 0, 0),
+            constraints: new TargetedChargeConstraints(MaxGridEnergyWh: 8_000));
+
+        Assert.True(uncapped.GridEnergyWh > 8_000);
+        Assert.True(capped.GridEnergyWh <= 8_000 + 1);
+        Assert.Equal(20_000 - capped.ExpectedEnergyWh, capped.ShortfallWh, 1);
+        Assert.True(capped.HasShortfall);
+    }
+
+    [Fact]
+    public void AGridCapOfZero_IsSunOnlyRatherThanNothing()
+    {
+        // Zero is a real value and means "the roof or not at all".
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plan = Plan(
+            requiredWh: 20_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(MaxGridEnergyWh: 0));
+
+        Assert.True(plan.GridEnergyWh <= 1);
+        Assert.True(plan.SolarEnergyWh > 0);
+        Assert.True(plan.HasShortfall);
+    }
+
+    [Fact]
+    public void AGridCapAboveWhatIsNeeded_ChangesNothing()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plain = Plan(requiredWh: 12_000, departBy: now.AddHours(5), now: now);
+        var capped = Plan(
+            requiredWh: 12_000, departBy: now.AddHours(5), now: now,
+            constraints: new TargetedChargeConstraints(MaxGridEnergyWh: 100_000));
+
+        Assert.Equal(plain.GridEnergyWh, capped.GridEnergyWh, 1);
+        Assert.Equal(plain.ExpectedEnergyWh, capped.ExpectedEnergyWh, 1);
+    }
+
+    [Fact]
+    public void ConstraintsDoNotTakeTheHomeBatterysShareOfTheDay()
+    {
+        // The pack books against the whole window before the car's limits are applied. Reserving inside
+        // a shrunken window would concentrate the pack's entire need into the hours the owner happened
+        // to allow the car, and read as a day with no surplus in it.
+        var now = FirstPeriodEnd.AddHours(-1);
+
+        var plain = Plan(requiredWh: 6_000, departBy: now.AddHours(5), now: now, socPercent: 60);
+        var constrained = Plan(
+            requiredWh: 6_000, departBy: now.AddHours(5), now: now, socPercent: 60,
+            constraints: new TargetedChargeConstraints(NotBefore: now.AddHours(2)));
+
+        // The pack's own figures are about the pack and the day, not about the car's window.
+        Assert.Equal(plain.BatteryToFullWh, constrained.BatteryToFullWh, 1);
+        Assert.Equal(plain.SocFloorPercent, constrained.SocFloorPercent, 1);
     }
 }

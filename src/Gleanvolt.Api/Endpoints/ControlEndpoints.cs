@@ -149,6 +149,72 @@ internal static class ControlEndpoints
             .Produces<ControlActionResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
+        api.MapPost("/charging/start/targeted", async (
+            TargetedChargeRequestBody body,
+            HttpContext http,
+            IChargeActions actions,
+            ITargetedChargeSelector target,
+            IFastChargeSelector fast,
+            ITargetedChargePreview preview,
+            IVehicleTelemetry vehicle,
+            ChargeControlStatusHolder holder,
+            TargetedChargeRequestLimits limits,
+            TimeProvider time,
+            CancellationToken cancellationToken) =>
+        {
+            var source = http.Source();
+
+            if (!TargetedRequests.TryCompose(body, vehicle, limits, time, out var request, out var error))
+            {
+                return error!;
+            }
+
+            // Quoted before it is committed to, for one reason: a limit that cannot be met must be a
+            // refusal with a reason rather than a charge that quietly under-delivers. The plan is built
+            // by the same planner the poll loop uses and writes to nothing.
+            var quoted = preview.Preview(request);
+            if (quoted is null)
+            {
+                return ApiResults.NotPolled();
+            }
+
+            if (Impossible(quoted, request.Constraints) is { } refusal)
+            {
+                return ApiResults.BadRequest(refusal);
+            }
+
+            target.Set(request, source);
+
+            var result = await actions.StartAsync(ChargeControlMode.Targeted, source, cancellationToken);
+            if (!result.Succeeded)
+            {
+                target.Clear(source);
+            }
+
+            return Respond(result, target, holder, fast, Moved(body.Editable?.PlanId, quoted));
+        })
+            .WithName("startTargetedCharging")
+            .WithSummary("Start a targeted charge under the limits a quoted plan was edited into")
+            .WithDescription(
+                "Takes the same body as POST /plans/targeted/preview — quote a plan, edit its "
+                + "'editable' limits, and send the whole thing here to charge under them.\n\n"
+                + "What you edit are **limits, not a schedule**, and that is the feature rather than a "
+                + "simplification of it. The plan is rebuilt on every poll from a refreshed forecast "
+                + "and the measured delivery, which is what lets a sunnier afternoon than forecast "
+                + "shrink the grid block before any of it is bought. Replaying a list of blocks would "
+                + "give that up, and would go on buying grid for energy already in the car. So the "
+                + "planner keeps planning — inside the window you gave it.\n\n"
+                + "A limit that makes the request impossible is refused here with the reason, before "
+                + "anything starts. A limit that merely makes it expensive or partial is accepted, and "
+                + "whatever it puts out of reach is reported as shortfall: a constraint may reduce what "
+                + "is delivered, it may never make the plan lie about what will be.\n\n"
+                + "Send the quoted plan's 'planId' back and 'forecastMovedSinceQuote' says whether the "
+                + "forecast has been refreshed since you were shown it. Advisory only — nothing is "
+                + "stored server-side and a start never fails because of it.")
+            .Produces<ControlActionResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
         api.MapPost("/charging/stop", async (
             HttpContext http,
             IChargeActions actions,
@@ -228,11 +294,42 @@ internal static class ControlEndpoints
         ChargeActionResult result,
         ITargetedChargeSelector target,
         ChargeControlStatusHolder holder,
-        IFastChargeSelector fast) =>
+        IFastChargeSelector fast,
+        bool? forecastMovedSinceQuote = null) =>
         Results.Ok(new ControlActionResponse(
             result.Succeeded,
             result.Message,
             target.Request is { } request ? TargetedRequestResponse.From(request) : null,
             holder.Current is { } status ? StatusResponse.From(status) : null,
-            fast.Limit is { } limit ? FastChargeResponse.From(limit) : null));
+            fast.Limit is { } limit ? FastChargeResponse.From(limit) : null,
+            forecastMovedSinceQuote));
+
+    /// <summary>
+    /// Whether the forecast has been refreshed since the caller was shown its quote, or null when there
+    /// is no way to tell — no <c>planId</c> came back, or neither plan had a forecast behind it.
+    /// </summary>
+    private static bool? Moved(string? planId, TargetedChargePlan quoted) =>
+        PlanIdentity.ForecastAsOf(planId) is { } quotedAt && quoted.ForecastAsOf is { } now
+            ? now != quotedAt
+            : null;
+
+    /// <summary>
+    /// The reason a set of limits cannot be honoured at all, or null when they can.
+    ///
+    /// <para>Only the impossible is refused. A limit that makes the request <em>partial</em> is a
+    /// legitimate thing to ask for — "buy at most 8 kWh and I'll take what that gets me" — and comes
+    /// back as a shortfall on the plan rather than as a 400. What is refused is a window with nothing
+    /// in it: limits that leave the charger no time at all to run, which would otherwise start a mode
+    /// that sits idle until the departure and then reports it delivered nothing.</para>
+    /// </summary>
+    private static string? Impossible(TargetedChargePlan plan, TargetedChargeConstraints? constraints)
+    {
+        if (constraints is null || plan.IsComplete || plan.CeilingEnergyWh > 0)
+        {
+            return null;
+        }
+
+        return "Those limits leave no time for the charger to run before the departure. Widen the "
+            + "window, remove a forbidden stretch, or move the departure.";
+    }
 }

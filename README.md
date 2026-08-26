@@ -2078,6 +2078,7 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /vehicle` | What the car last said — SOC, range, plug and charge state — **and how old the reading is**. |
 | `POST /plans/targeted/preview` | What a targeted charge *would* do. Writes to nothing. |
 | `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount and departure. |
+| `POST /charging/start/targeted` | Start a targeted charge under an edited plan's limits. Same body as the preview. |
 | `POST /charging/stop` | Stop charging and clear any standing target. |
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
 
@@ -2104,6 +2105,55 @@ have covered it. Ask in `energyKWh` instead of `targetSocPercent` on an installa
 feed; the conversion, the horizon check and the just-in-time split are the same
 [`TargetedChargeRequestFactory`](src/Gleanvolt.Core/Strategies/TargetedChargeRequestFactory.cs) the web
 form goes through, so a quote and the promise made from it can never disagree.
+
+#### Editing a quoted plan, and charging to it
+
+Every quote carries an **`editable`** object: the parts of the plan you may change, in the shape you
+send back.
+
+```jsonc
+"editable": {
+  "planId": "…",                     // advisory; see below
+  "notBefore": null,                 // the charger may not run before this
+  "notAfter": null,                  // ...nor after it
+  "forbiddenWindows": null,          // stretches that must stay idle
+  "maxGridEnergyWh": null            // the most that may be bought
+}
+```
+
+Change a field, put the whole thing back under `editable`, and either **quote it again** (the same
+preview endpoint) or **charge to it**:
+
+```bash
+curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start/targeted   -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json'   -d '{"energyKWh": 22, "departBy": "2026-08-27T07:00:00+02:00",
+       "editable": {"notBefore": "2026-08-27T02:00:00+02:00", "maxGridEnergyWh": 8000}}'
+```
+
+The preview and the start take the **same body**, so what you quote is what you commit to — the limits
+included. Sending an unedited quote straight back is a no-op: you get the plan you were shown.
+
+> **What you edit are limits, not a schedule — and that is the feature, not a simplification of it.**
+> The plan is rebuilt on every poll from a refreshed forecast and the measured delivery, which is what
+> lets a sunnier afternoon than forecast shrink the grid block before any of it is bought. Hand back a
+> list of blocks to replay and that stops happening — and worse, the blocks go on being executed
+> against a delivered-energy figure that stopped being true the moment they were quoted, buying grid
+> for energy already in the car. So the window is yours; what happens inside it is still the
+> forecast's to decide.
+
+- **A limit may reduce what is delivered. It may never make the plan lie about what will be.** Anything
+  a limit puts out of reach comes back as `shortfallWh`, exactly as a departure that is too close
+  already does. `maxGridEnergyWh: 0` is a real value and means *sun only* — the request is met from the
+  roof or not at all, and the rest is reported rather than quietly imported.
+- **Only the impossible is refused.** Limits leaving the charger no time at all to run are a 400 with
+  the reason, before anything starts. Limits that merely make the request *partial* are accepted —
+  "buy at most 8 kWh and I'll take what that gets me" is a legitimate thing to ask for.
+- **`planId` is advisory.** Send it back and the response's `forecastMovedSinceQuote` says whether the
+  forecast has been refreshed since you were shown that plan. Nothing is stored server-side, nothing
+  expires, and a start never fails because of it.
+- **The limits follow the request's rules**: cleared by `/charging/stop`, and not surviving a restart.
+
+`POST /charging/start` with `mode: "targeted"` accepts the same `editable` inside its `target`, so an
+existing caller gains this without moving endpoints.
 
 It goes through `ITargetedChargePreview`, which **sets no request, selects no mode and writes to no
 device**, and it does not disturb a plan already running. So *"what does 80% by seven cost, and would

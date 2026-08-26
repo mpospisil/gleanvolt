@@ -34,6 +34,18 @@
         ]
       }
     },
+    "/api/v1/charging/start/targeted": {
+      "post": {
+        "operationId": "startTargetedCharging",
+        "parameters": [],
+        "requestBody": "application/json $TargetedChargeRequestBody",
+        "responses": [
+          "200 application/json $ControlActionResponse",
+          "400 application/problem\u002Bjson $ProblemDetails",
+          "503 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
     "/api/v1/charging/stop": {
       "post": {
         "operationId": "stopCharging",
@@ -197,12 +209,20 @@
     "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded]",
     "ControlActionResponse": {
       "fast": "any",
+      "forecastMovedSinceQuote": "boolean?",
       "message": "string? (required)",
       "status": "any (required)",
       "succeeded": "boolean (required)",
       "target": "any (required)"
     },
     "DayOutlook": "enum[unknown|surplus|tight|shortfall|noChargeToday]",
+    "EditablePlanBody": {
+      "forbiddenWindows": "array\u003C$TimeWindowBody\u003E?",
+      "maxGridEnergyWh": "number|string(double)?",
+      "notAfter": "string(date-time)?",
+      "notBefore": "string(date-time)?",
+      "planId": "string?"
+    },
     "EnergyDayResponse": {
       "batteryChargeKwh": "number|string(double) (required)",
       "batteryDischargeKwh": "number|string(double) (required)",
@@ -493,6 +513,7 @@
     "TargetedChargePriority": "enum[cheapest|justInTime]",
     "TargetedChargeRequestBody": {
       "departBy": "string(date-time) (required)",
+      "editable": "any",
       "energyKWh": "number|string(double)? (required)",
       "priority": "$TargetedChargePriority",
       "restSocPercent": "number|string(double)?",
@@ -528,6 +549,7 @@
     },
     "TargetedPreviewResponse": {
       "cheapestPlan": "any (required)",
+      "editable": "$EditablePlanBody (required)",
       "plan": "$TargetedPlanResponse (required)",
       "request": "$TargetedRequestResponse (required)"
     },
@@ -540,6 +562,10 @@
       "tailEnergyWh": "number|string(double) (required)",
       "targetSocPercent": "number|string(double)? (required)",
       "vehicleSocPercentAtRequest": "number|string(double)? (required)"
+    },
+    "TimeWindowBody": {
+      "end": "string(date-time) (required)",
+      "start": "string(date-time) (required)"
     },
     "VehicleChargeState": "enum[unknown|idle|charging|complete]",
     "VehiclePlugState": "enum[unknown|disconnected|connected]",

@@ -46,7 +46,8 @@ internal static class PlanEndpoints
             return Results.Ok(new TargetedPreviewResponse(
                 TargetedRequestResponse.From(request),
                 TargetedPlanResponse.From(plan),
-                cheapest is null ? null : TargetedPlanResponse.From(cheapest)));
+                cheapest is null ? null : TargetedPlanResponse.From(cheapest),
+                EditablePlanBody.From(plan, request.Constraints)));
         })
             .WithName("previewTargetedPlan")
             .WithSummary("Quote a targeted charge without starting it")
@@ -102,7 +103,9 @@ internal static class TargetedRequests
             return false;
         }
 
-        request = composedRequest;
+        // The limits ride with the request through the same door, so a plan quoted under them and a
+        // charge started under them cannot be built two different ways (#128).
+        request = composedRequest with { Constraints = body.Editable?.ToConstraints() };
         error = null;
 
         return true;

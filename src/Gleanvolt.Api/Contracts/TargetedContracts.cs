@@ -34,12 +34,21 @@ namespace Gleanvolt.Api.Contracts;
 /// Where a <c>justInTime</c> hold parks the car before the last stretch is released. Defaults to the
 /// installation's configured rest level. Means nothing under <c>cheapest</c>.
 /// </param>
+/// <param name="Editable">
+/// Limits on <em>how</em> the request may be met (issue #128): when the charger may run, and how much
+/// may be bought. Omit for none, which is what every request that says nothing gets.
+///
+/// <para>This is the field a quoted plan's <c>editable</c> goes back into — edit a bound, send the
+/// whole thing back, and quote it again or commit to it. The same body does both, which is what makes
+/// "what you quote is what you commit to" true of the limits as well as of the target.</para>
+/// </param>
 public sealed record TargetedChargeRequestBody(
     double? EnergyKWh,
     double? TargetSocPercent,
     DateTimeOffset DepartBy,
     TargetedChargePriority Priority = TargetedChargePriority.Cheapest,
-    double? RestSocPercent = null);
+    double? RestSocPercent = null,
+    EditablePlanBody? Editable = null);
 
 /// <summary>The request the controller is working to, described in the terms it was asked in.</summary>
 /// <param name="RequiredEnergyWh">The energy asked for, at the charger.</param>
@@ -198,7 +207,81 @@ public sealed record TargetedBlockResponse(
 /// The same energy by the same time under <c>cheapest</c>, present only when the request actually holds
 /// a tail back. The difference in <c>gridEnergyWh</c> between the two is what just-in-time costs.
 /// </param>
+/// <param name="Editable">
+/// The parts of this plan you may change and send back, in the shape the start endpoint takes. Round
+/// -tripping it unchanged is a no-op — you get the plan you were quoted.
+/// </param>
 public sealed record TargetedPreviewResponse(
     TargetedRequestResponse Request,
     TargetedPlanResponse Plan,
-    TargetedPlanResponse? CheapestPlan);
+    TargetedPlanResponse? CheapestPlan,
+    EditablePlanBody Editable);
+
+/// <summary>
+/// What a caller may change about a quoted plan (issue #128), and the whole of it.
+///
+/// <para><b>Limits, not a schedule</b> — and the distinction is the feature, not a simplification of
+/// it. The plan is rebuilt on every poll from a refreshed forecast and the measured delivery, which is
+/// what lets a sunnier afternoon than forecast shrink the grid block before any of it is bought. Hand
+/// back a list of blocks to replay and that stops happening; worse, the blocks go on being executed
+/// against a delivered-energy figure that stopped being true the moment they were quoted. So what you
+/// edit are the bounds, and the planner keeps planning inside them.</para>
+///
+/// <para>Every field is optional and every one of them can only ever <em>narrow</em> the plan. Sending
+/// none of them is the same as not sending this at all.</para>
+/// </summary>
+/// <param name="PlanId">
+/// Identifies the plan this was quoted from. <b>Advisory only</b>: send it back and the start response
+/// will tell you whether the forecast has moved since, which is worth knowing and is never a lock —
+/// nothing is stored server-side and a start never fails because of it.
+/// </param>
+/// <param name="NotBefore">The charger may not run before this. Null for no lower bound.</param>
+/// <param name="NotAfter">
+/// The charger may not run after this. Null for no upper bound; the deadline applies regardless, so
+/// this can only pull the window in.
+/// </param>
+/// <param name="ForbiddenWindows">
+/// Stretches that must stay idle — a tariff's peak hours, a neighbour asleep the other side of the
+/// wall. Overlapping and out-of-order entries are fine; what matters is the union.
+/// </param>
+/// <param name="MaxGridEnergyWh">
+/// The most that may be bought over the whole plan. Null for no cap. <b>Zero is a real value</b> and
+/// means sun only: the request is met from the roof or not at all, and the rest is reported as
+/// shortfall rather than quietly imported.
+/// </param>
+public sealed record EditablePlanBody(
+    string? PlanId = null,
+    DateTimeOffset? NotBefore = null,
+    DateTimeOffset? NotAfter = null,
+    IReadOnlyList<TimeWindowBody>? ForbiddenWindows = null,
+    double? MaxGridEnergyWh = null)
+{
+    /// <summary>What the planner takes, or null when nothing here narrows anything.</summary>
+    internal TargetedChargeConstraints? ToConstraints()
+    {
+        var constraints = new TargetedChargeConstraints(
+            NotBefore,
+            NotAfter,
+            ForbiddenWindows?.Select(window => new TimeWindow(window.Start, window.End)).ToList(),
+            MaxGridEnergyWh);
+
+        return constraints.IsEmpty ? null : constraints;
+    }
+
+    /// <summary>
+    /// The constraints a plan was built under, echoed back in the shape they were sent — so a caller
+    /// can change one field and return the rest untouched without reconstructing them.
+    /// </summary>
+    internal static EditablePlanBody From(TargetedChargePlan plan, TargetedChargeConstraints? constraints) => new(
+        PlanId: PlanIdentity.For(plan),
+        NotBefore: constraints?.NotBefore,
+        NotAfter: constraints?.NotAfter,
+        ForbiddenWindows: constraints?.ForbiddenWindows?
+            .Select(window => new TimeWindowBody(window.Start, window.End)).ToList(),
+        MaxGridEnergyWh: constraints?.MaxGridEnergyWh);
+}
+
+/// <summary>A stretch of time the charger must stay idle in, <c>[start, end)</c>.</summary>
+/// <param name="Start">When it begins.</param>
+/// <param name="End">When it ends. At or before <paramref name="Start"/> covers nothing.</param>
+public sealed record TimeWindowBody(DateTimeOffset Start, DateTimeOffset End);
