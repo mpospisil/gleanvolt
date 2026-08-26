@@ -1,3 +1,5 @@
+using Gleanvolt.Core.Enums;
+
 namespace Gleanvolt.Hosting.Configuration;
 
 /// <summary>
@@ -49,6 +51,29 @@ public sealed class TargetedChargeOptions
     /// deliberately no more — see <see cref="JustInTimeOptions"/>.
     /// </summary>
     public JustInTimeOptions JustInTime { get; init; } = new();
+
+    /// <summary>
+    /// Which forecast band the <b>pace</b> is computed on. P50 — the likely day — by default, unlike the
+    /// forecast-driven mode's pessimistic P10.
+    ///
+    /// <para>The bands answer different questions. P10 is right for a promise you must not break; this
+    /// mode's promise does not rest on the forecast at all — feasibility is
+    /// <c>P_max × (deadline − now)</c>, pure arithmetic about the charger and the clock. The only thing
+    /// the band decides here is <em>how much to buy</em>, and for that P10 is systematically wrong in
+    /// the expensive direction.</para>
+    ///
+    /// <para>Measured on 2026-08-27: the plan called 3.4 kWh of solar for the window and the roof
+    /// delivered 11.98 kWh — a 3.5× under-call. The pace is <c>(need − sun ahead) ÷ time left</c>, so
+    /// under-calling the sun overstates the deficit and sets the pace too high (6.7 kW here); the car
+    /// then imports hard from the first minute. The plan does self-correct as real sun arrives — the
+    /// grid share fell 26.6 → 17.8 → 11.2 kWh — but everything bought before the correction was bought
+    /// for nothing.</para>
+    ///
+    /// <para>The other direction fails safely and visibly: an over-called forecast leaves the pace to
+    /// climb on later polls, capped by the charger's ceiling, and the plan reports a shortfall honestly
+    /// if it ever cannot make the deadline. Set this to <c>P10</c> to restore the old behaviour.</para>
+    /// </summary>
+    public ForecastConfidence PaceConfidence { get; init; } = ForecastConfidence.P50;
 }
 
 /// <summary>

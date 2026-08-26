@@ -175,7 +175,10 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         MinBatterySocFloorPercent: _runtime?.MinBatterySocFloorPercent ?? _forecastOptions.MinBatterySocFloorPercent,
         SafetyMargin: _options.SafetyMargin,
         ReleaseSlack: _options.JustInTime.ReleaseSlack,
-        Confidence: _forecastOptions.ForecastConfidence);
+        // The targeted mode's own band, not the forecast mode's -- see TargetedChargeOptions.PaceConfidence.
+        // Nothing about the deadline promise depends on it: feasibility is the charger against the clock,
+        // with no forecast in it. All the band decides is how much gets bought before the sun turns up.
+        Confidence: _options.PaceConfidence);
 
     /// <summary>
     /// The next instant the home battery is required to be at 100% — today's deadline if it is still

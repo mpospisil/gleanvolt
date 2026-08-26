@@ -321,3 +321,26 @@ internal sealed class WeakSunForecastService(DateTimeOffset sunFrom, double watt
 
     public SolarForecast? GetDayForecast(DateOnly localDate) => _forecast;
 }
+
+
+/// <summary>The forecast band the pace is planned on — see <see cref="TargetedChargeOptions.PaceConfidence"/>.</summary>
+public class TargetedPaceConfidenceTests
+{
+    [Fact]
+    public void ThePaceIsPlannedOnTheLikelyDayNotThePessimisticOne()
+    {
+        // Measured on 2026-08-27: planning the pace on P10 called 3.4kWh of solar for a window that went
+        // on to deliver 11.98kWh. The pace is (need - sun ahead) / time left, so under-calling the sun
+        // overstates the deficit, and the car imported hard from the first minute against a day that was
+        // about to cover it.
+        Assert.Equal(ForecastConfidence.P50, new TargetedChargeOptions().PaceConfidence);
+    }
+
+    [Fact]
+    public void TheForecastDrivenModeKeepsItsOwnPessimism()
+    {
+        // Deliberately untouched: that mode rations the car to whatever the day offers and promises
+        // nothing, so erring low costs it nothing.
+        Assert.Equal(ForecastConfidence.P10, new ForecastChargeOptions().ForecastConfidence);
+    }
+}
