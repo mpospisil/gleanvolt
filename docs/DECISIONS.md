@@ -4,6 +4,53 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-26 — An edited plan is constraints, not a schedule to replay (issue #128)
+
+The ask was "let the caller edit the plan it was quoted and send it back". The obvious implementation —
+accept the blocks and execute them — cannot work here, and the reason is the mode's whole point.
+
+**A plan is a derived value, rebuilt on every poll.** `TargetedChargeProvider` calls the planner each
+cycle with a refreshed forecast and the measured delivery. That is what lets a sunnier afternoon than
+forecast shrink the grid block before any of it is bought. A plan quoted at 22:00 is stale by 22:05, by
+design. Replaying one gives that up — and goes silently wrong besides: the blocks were computed against
+a `deliveredEnergyWh` and a forecast that stop being true immediately, so a replayed plan keeps buying
+grid for energy already in the car, and reports no shortfall, because shortfall is *also* a computed
+field of the plan it is no longer computing.
+
+So what a caller edits becomes `TargetedChargeConstraints` and the planner keeps planning inside them.
+The window is the owner's; what happens in the window is still the forecast's to decide.
+
+**Applied by narrowing the slices, not by post-processing the answer.** Everything in the planner flows
+from one list of forecast slices — the pace, the blocks, the solar/grid split, the ceiling, and
+therefore the shortfall. Trimming that list is the whole of honouring a time constraint, which is why a
+constraint cannot make the plan lie: there is no second path that ignores it. Two things had to be got
+right around that:
+
+- **Reserve before you narrow.** The home battery books its share against the whole window, then the
+  car sees the subset it is allowed. Reserving inside a shrunken window concentrates the pack's entire
+  need into the hours the owner happened to allow the car, and reads as a day with no surplus in it.
+- **Pace to the window that exists, not the deadline.** `hoursLeft` was measured to the deadline, so a
+  `notAfter` that ended the window early computed an average over hours the charger was not allowed to
+  run in — delivering a fraction of the target and calling it paced. Now the pass clamps its horizon to
+  the last slice it was given, which is identical to the deadline whenever nothing has been cut.
+
+**The grid cap is spent as the pass goes, not subtracted from the total.** The first implementation
+capped by asking for less energy overall; that also cut the *sun's* share, which is the opposite of
+what "buy no more than this" means. It is now a budget the pacing draws down, so a cap of zero means
+sun-only rather than nothing-at-all.
+
+**Only the impossible is refused.** A limit that makes the request partial is a legitimate thing to
+ask for and comes back as a shortfall. What is refused, before anything starts, is a window with no
+time in it — which would otherwise start a mode that sits idle until the departure and then reports it
+delivered nothing.
+
+**And the shape is additive.** The limits ride on the existing request body, so the preview and the
+start take the identical body — what you quote is what you commit to, the limits included — and
+`/charging/start` gains the capability without an existing caller moving endpoints. The first attempt
+wrapped the preview body in a new object and would have broken every caller of it.
+
+---
+
 ## 2026-08-26 — Documentation that cannot be found is not documentation (issue #126)
 
 Two faults, one symptom, and the symptom was that everything looked fine.

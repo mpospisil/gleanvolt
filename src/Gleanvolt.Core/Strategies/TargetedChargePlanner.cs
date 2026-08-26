@@ -106,7 +106,18 @@ public static class TargetedChargePlanner
                 forecast, now, deadline, houseLoad, biasFactor, options.MinChargePowerWatts, options.Confidence)
             : [];
 
+        // Before the constraints are applied, and that order matters: the home battery's claim on the
+        // day is not the car's window to narrow. Reserving inside a shrunken window would concentrate
+        // the whole of the pack's need into the hours the owner happens to have allowed the car, and
+        // read as a day with no surplus in it.
         ForecastSlicer.Reserve(ReservableFor(slices, batteryFullBy), batteryToFullWh);
+
+        // ...and after it, the car sees only the stretches it is allowed to run in (#128). Everything
+        // below is computed from `slices`: the pace, the blocks, the solar/grid split, the ceiling and
+        // therefore the shortfall. Narrowing the list here is the whole of honouring a constraint, and
+        // is why a constraint cannot make the plan lie -- there is no second path that ignores it.
+        var constraints = request.Constraints ?? TargetedChargeConstraints.None;
+        slices = Allowed(slices, constraints);
 
         // Against the *pack's* horizon, not the car's. The two deadlines are unrelated: the car leaves
         // at 13:45, the battery has until evening to reach 100%, and there is a long sunny afternoon in
@@ -139,13 +150,33 @@ public static class TargetedChargePlanner
                 request, now, deadline, deliveredWh, ceilingWh, socFloor, batteryToFullWh, forecastSurplusWh, forecast);
         }
 
+        // One target in, one whole plan out, so the grid cap below can simply ask for less and get a
+        // consistent answer -- rather than trying to subtract energy from blocks after the fact.
+        var gridBudgetWh = constraints.MaxGridEnergyWh is { } cap ? Math.Max(0, cap) : (double?)null;
+
         var hold = PlanHold(request, slices, now, deadline, needWh, maxPowerWatts, options);
 
-        var paced = hold is { } held
-            ? Merge(
-                PaceOverWindow(held.FreeSlices, held.Release, needWh - held.TailWh, options.MinChargePowerWatts, maxPowerWatts),
-                PaceOverWindow(held.TailSlices, deadline, held.TailWh, options.MinChargePowerWatts, maxPowerWatts))
-            : PaceOverWindow(slices, deadline, needWh, options.MinChargePowerWatts, maxPowerWatts);
+        PacedPlan paced;
+        if (hold is { } held)
+        {
+            // The budget is one budget across both passes, so the free part spends first and the held
+            // tail gets what is left -- rather than each half quietly being allowed the whole cap.
+            var free = PaceOverWindow(
+                held.FreeSlices, held.Release, needWh - held.TailWh,
+                options.MinChargePowerWatts, maxPowerWatts, gridBudgetWh);
+
+            var tail = PaceOverWindow(
+                held.TailSlices, deadline, held.TailWh,
+                options.MinChargePowerWatts, maxPowerWatts,
+                gridBudgetWh is { } remaining ? Math.Max(0, remaining - free.GridWh) : null);
+
+            paced = Merge(free, tail);
+        }
+        else
+        {
+            paced = PaceOverWindow(
+                slices, deadline, needWh, options.MinChargePowerWatts, maxPowerWatts, gridBudgetWh);
+        }
 
         var paceWatts = paced.PaceWatts;
         var solarTakenWh = paced.SolarWh;
@@ -195,6 +226,86 @@ public static class TargetedChargePlanner
             Reason: string.Empty);
 
         return plan with { Reason = Describe(plan, usable) };
+    }
+
+    /// <summary>
+    /// The slices the car is allowed to charge in, with the parts that fall outside the owner's limits
+    /// removed (#128).
+    ///
+    /// <para>A slice straddling a boundary is <b>trimmed, not dropped</b>. The forecast arrives in
+    /// half-hour periods and a limit lands wherever the owner put it; dropping a slice that is
+    /// three-quarters allowed would quietly cost the car most of an hour of sun it is entitled to, and
+    /// dropping enough of them turns a feasible plan into a reported shortfall that is not real.</para>
+    ///
+    /// <para>Every energy on a slice is proportional to its length, so a trim scales them all by the
+    /// same fraction — including <c>ReservedWh</c>, so the pack keeps the share of this slice it had
+    /// already booked rather than gaining or losing some by the trim.</para>
+    /// </summary>
+    private static List<ForecastSlice> Allowed(List<ForecastSlice> slices, TargetedChargeConstraints constraints)
+    {
+        if (constraints.IsEmpty || slices.Count == 0)
+        {
+            return slices;
+        }
+
+        var allowed = new List<ForecastSlice>(slices.Count);
+
+        // Through Within, which already prorates a slice straddling an edge and is the same operation
+        // the just-in-time hold performs to split the window. A second implementation of it would be a
+        // second place for "energies scale, powers do not" to be got wrong.
+        foreach (var (start, end) in Permitted(slices[0].Start, slices[^1].End, constraints))
+        {
+            allowed.AddRange(Within(slices, start, end));
+        }
+
+        return [.. allowed.OrderBy(slice => slice.Start)];
+    }
+
+    /// <summary>
+    /// What is left of <c>[start, end)</c> once the bounds are applied and every forbidden window is
+    /// cut out of it — which can be nothing, one stretch, or several.
+    /// </summary>
+    private static List<(DateTimeOffset Start, DateTimeOffset End)> Permitted(
+        DateTimeOffset start, DateTimeOffset end, TargetedChargeConstraints constraints)
+    {
+        start = constraints.NotBefore is { } before && before > start ? before : start;
+        end = constraints.NotAfter is { } after && after < end ? after : end;
+
+        if (end <= start)
+        {
+            return [];
+        }
+
+        var remaining = new List<(DateTimeOffset Start, DateTimeOffset End)> { (start, end) };
+
+        foreach (var window in constraints.ForbiddenWindows ?? [])
+        {
+            var next = new List<(DateTimeOffset Start, DateTimeOffset End)>(remaining.Count + 1);
+
+            foreach (var (from, to) in remaining)
+            {
+                if (!window.Overlaps(from, to))
+                {
+                    next.Add((from, to));
+                    continue;
+                }
+
+                // A window biting the middle leaves a piece either side; one biting an end leaves one.
+                if (window.Start > from)
+                {
+                    next.Add((from, window.Start));
+                }
+
+                if (window.End < to)
+                {
+                    next.Add((window.End, to));
+                }
+            }
+
+            remaining = next;
+        }
+
+        return remaining;
     }
 
     /// <summary>
@@ -381,12 +492,19 @@ public static class TargetedChargePlanner
     /// <para>The two blocks a slice emits overlap in time on purpose: they are one charging period
     /// with two contributors, the sun supplying what it has and the grid making up the difference.</para>
     /// </summary>
+    /// <param name="gridBudgetWh">
+    /// The most that may be bought over this pass, or null for no cap (#128). Spent as the pass goes
+    /// rather than applied to the total afterwards, and deliberately so: a cap enforced by asking for
+    /// less energy overall would cut the <em>sun's</em> share too, which is the opposite of what
+    /// "buy no more than this" means.
+    /// </param>
     private static PacedPlan PaceOverWindow(
         List<ForecastSlice> slices,
         DateTimeOffset deadline,
         double needWh,
         double minPowerWatts,
-        double maxPowerWatts)
+        double maxPowerWatts,
+        double? gridBudgetWh = null)
     {
         var blocks = new List<TargetedChargeBlock>();
         var remaining = needWh;
@@ -397,6 +515,16 @@ public static class TargetedChargePlanner
         if (maxPowerWatts <= 0)
         {
             return new PacedPlan(blocks, 0, 0, null, 0);
+        }
+
+        // The pace is spread over the window that actually exists, which is not always the window that
+        // was asked for: a constraint (#128) can end the charging window well before the deadline, and
+        // pacing to the deadline then computes an average over hours the charger is not allowed to run
+        // in -- delivering a fraction of the target and calling it paced. Identical to `deadline`
+        // whenever nothing has been cut, because the slices are contiguous up to it.
+        if (slices.Count > 0 && slices[^1].End < deadline)
+        {
+            deadline = slices[^1].End;
         }
 
         // Two look-aheads, because the sun answers two different questions and conflating them gets one
@@ -468,6 +596,26 @@ public static class TargetedChargePlanner
             if (chargeWatts <= 0)
             {
                 continue;
+            }
+
+            // What is left of the grid budget, converted into a power this slice may add on top of the
+            // sun. The sun's own contribution is never reduced by it: a cap says what may be bought,
+            // not how much of the roof may be used.
+            if (gridBudgetWh is { } budget)
+            {
+                var fromSun = Math.Min(surplusWatts, chargeWatts);
+                var roomWatts = Math.Max(0, budget - gridTotalWh) / slice.Hours;
+                var capped = fromSun + Math.Min(chargeWatts - fromSun, roomWatts);
+
+                // Below the charger's floor there is no way to run this slice inside the budget at all.
+                // Skipping it is what turns the unbought energy into a reported shortfall rather than a
+                // quiet overspend.
+                if (capped + TargetToleranceWh < minPowerWatts)
+                {
+                    continue;
+                }
+
+                chargeWatts = capped;
             }
 
             // Once the sun cannot finish alone, a slice carrying any surplus at all is worth running

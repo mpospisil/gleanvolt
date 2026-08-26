@@ -110,6 +110,13 @@ internal sealed class FakeTargetedChargePreview : ITargetedChargePreview
     /// <summary>Null stands for "no poll has completed yet", which the endpoint has to report as such.</summary>
     internal bool HasTelemetry { get; set; } = true;
 
+    /// <summary>
+    /// A window with no room in it: limits that leave the charger no time at all to run (#128). The
+    /// planner decides that for real; here it is a knob, because what this suite tests is what the
+    /// endpoint does with the answer rather than how the answer was reached.
+    /// </summary>
+    internal bool WindowIsEmpty { get; set; }
+
     public TargetedChargePlan? Preview(TargetedChargeRequest request)
     {
         Requests.Add(request);
@@ -119,7 +126,11 @@ internal sealed class FakeTargetedChargePreview : ITargetedChargePreview
             return null;
         }
 
-        return Fixtures.Plan(request);
+        var plan = Fixtures.Plan(request);
+
+        return WindowIsEmpty
+            ? plan with { CeilingEnergyWh = 0, ExpectedEnergyWh = 0, ShortfallWh = plan.RequiredEnergyWh }
+            : plan;
     }
 }
 

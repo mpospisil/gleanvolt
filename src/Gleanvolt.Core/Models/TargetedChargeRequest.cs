@@ -56,6 +56,15 @@ namespace Gleanvolt.Core.Models;
 /// The state of charge the tail was measured down to, kept only so the hold can be described in the
 /// terms it was asked in ("holding at 80%"). Null when the split was not made.
 /// </param>
+/// <param name="Constraints">
+/// Limits on <em>how</em> the request may be met — when the charger may run, and how much may be
+/// bought (#128). Null for none, which is every request that does not say otherwise and is why this
+/// addition is invisible to anything that worked before it.
+///
+/// <para>Here rather than on the plan because they are part of what was <b>asked for</b>, not part of
+/// what was computed: they follow the request's rules, are set through the same seam, are cleared with
+/// it, and do not survive a restart.</para>
+/// </param>
 public sealed record TargetedChargeRequest(
     double RequiredEnergyWh,
     DateTimeOffset DepartBy,
@@ -64,7 +73,8 @@ public sealed record TargetedChargeRequest(
     double? VehicleSocPercentAtRequest = null,
     TargetedChargePriority Priority = TargetedChargePriority.Cheapest,
     double TailEnergyWh = 0,
-    double? RestSocPercent = null)
+    double? RestSocPercent = null,
+    TargetedChargeConstraints? Constraints = null)
 {
     /// <summary>
     /// Whether the owner asked in state of charge. Purely about how the request is <em>described</em>
