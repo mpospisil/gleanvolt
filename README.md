@@ -2170,9 +2170,18 @@ For a human client the OpenAPI file is documentation; for a generated MCP tool s
 
 - **The DTOs are the API's own**, not Core records serialised straight out. Core records change for
   internal reasons; the wire contract must not move when they do.
-- **The XML comments are the descriptions.** What is written next to a property in C# is what reaches
-  the document — which is why `Gleanvolt.Api` turns the documentation file on explicitly rather than
-  inheriting it.
+- **The XML comments are the descriptions.** What is written next to a type, a property or an enum
+  member in C# is what reaches the document. `Directory.Build.props` turns the documentation file on
+  for **every** project, unconditionally, because that is early enough for the SDK to act on — set in
+  `Directory.Build.targets` instead, the flag reads `true`, the compiler writes the `.xml` into `obj/`,
+  and nothing ever copies it next to the assembly. That is documentation which exists, reports itself
+  as enabled, and cannot be found. It is how every enum in `Gleanvolt.Core` reached the document with
+  no description at all (#126).
+- **Enums carry a legend**, because .NET's generator does not give them one: a hoisted enum arrives as
+  a bare list of values, and neither the type's summary nor any member's survives. A document
+  transformer reads the same XML at runtime and adds both, naming each value as it appears **on the
+  wire**. It only ever fills blanks — a description the generator produced is left untouched — so the
+  day the SDK does this itself, it quietly stops having anything to do.
 - **Units live in the names** (`...Wh`, `...Watts`, `...Percent`), because a model that has to guess
   whether a number is watts or kilowatts will guess wrong. Timestamps are ISO-8601 **with an offset**:
   a departure time here is a local-time promise.

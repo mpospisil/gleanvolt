@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-26 — Documentation that cannot be found is not documentation (issue #126)
+
+Two faults, one symptom, and the symptom was that everything looked fine.
+
+**`GenerateDocumentationFile` set in `Directory.Build.targets` does nothing.** The flag evaluates to
+`true` and the compiler writes the `.xml` — into `obj/`. The SDK turns that flag into a
+`DocumentationFile` and into the `DocFileItem` that copies it beside the assembly, and it does both
+while importing its own targets, which happens *before* `Directory.Build.targets`. So the copy has
+nothing to copy. `Gleanvolt.Api` had worked around it in its own `.csproj` for long enough that the
+workaround's comment explained the cause correctly — and `Core`, `Hosting`, `Infrastructure` and `Web`
+never got the same treatment.
+
+It now lives in `Directory.Build.props`, **unconditionally**. Not conditioned on `IsPackable`, because
+a per-project opt-in is exactly what produced the trap, and a documentation file for a test project
+costs a file nobody reads.
+
+**An `IOpenApiSchemaTransformer` cannot describe an enum.** It is never invoked for one hoisted into
+`components/schemas`; the obvious implementation compiles, registers, runs, and changes nothing at all.
+That cost an hour, and the note is here so it costs nobody else one. A **document** transformer works:
+by then the component is an ordinary object in a dictionary.
+
+**The transformer only ever adds.** The built-in generator reads the same comments at compile time and
+does describe enum *types* once their XML is findable; what it never produces is the per-value legend,
+which is the half that matters — `one of: off, solar, forecasted, fastNoBattery, targeted` is a list of
+words to guess between. So the type summary is kept exactly as the generator left it and the legend is
+appended. Two consequences: this can never silently disagree with the compile-time reading of the same
+source, and an SDK that starts doing it properly leaves this with nothing to do rather than something
+to fight.
+
+**Every failure path ends in "no description."** Missing file, malformed file, trimmed publish. A
+document without descriptions is poorer; an API that refused to serve its own schema because a comment
+file was absent would be worse.
+
+**And it is asserted, not assumed.** The whole failure mode is that it looks correct from every angle
+the build can see — so the tests read the *served document* and check the descriptions are in it. One
+trap worth knowing when writing such a test: OpenAPI 3.1 renders a nullable reference as
+`oneOf: [null, $ref]` and hangs the property's description on the branch rather than on the property,
+so the naive check reports two dozen false positives. It reported mine.
+
+---
+
 ## 2026-08-26 — The car is described once, and a car can only narrow a limit (issue #124)
 
 #111 gave the installation one description. The car never had one: its usable pack and charge

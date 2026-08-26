@@ -269,4 +269,93 @@ public sealed class OpenApiContractTests : IAsyncDisposable
                     ? $"{c.Name} {Describe(schema)}"
                     : c.Name));
     }
+
+    // -- The comments in the source are the descriptions in the document (#126).
+    //
+    // Worth testing rather than assuming, because the failure is silent in both directions: the
+    // build reports GenerateDocumentationFile as true whether or not the .xml ever reaches bin/, and
+    // a document with no descriptions is a perfectly valid document. It is only wrong to a human, or
+    // to the model on the other end of a generated tool surface.
+
+    [Fact]
+    public async Task Every_schema_property_carries_the_comment_written_beside_it()
+    {
+        var client = await _host.StartAsync();
+        var document = await (await client.GetAsync(GleanvoltApi.DocumentPath)).ReadAsync();
+
+        var undocumented = Schemas(document)
+            .SelectMany(schema => Properties(schema.Value).Select(property => (schema.Key, property)))
+            .Where(entry => !HasDescription(entry.property.Value))
+            // ASP.NET Core's own type, documented by the framework and not by us.
+            .Where(entry => entry.Key != "ProblemDetails")
+            .Select(entry => $"{entry.Key}.{entry.property.Name}")
+            .ToList();
+
+        Assert.Empty(undocumented);
+    }
+
+    [Fact]
+    public async Task Enums_carry_theirs_too()
+    {
+        // The case that was actually broken: every enum here is a Gleanvolt.Core type, and Core's
+        // .xml was being written to obj/ and never copied beside its .dll -- so the generator had
+        // nothing to read and eleven enums reached the document bare.
+        var client = await _host.StartAsync();
+        var document = await (await client.GetAsync(GleanvoltApi.DocumentPath)).ReadAsync();
+
+        var bare = Schemas(document)
+            .Where(schema => schema.Value.TryGetProperty("enum", out _))
+            .Where(schema => !HasDescription(schema.Value))
+            .Select(schema => schema.Key)
+            .ToList();
+
+        Assert.Empty(bare);
+    }
+
+    [Fact]
+    public async Task The_reasoning_survives_the_trip_and_not_only_the_first_sentence()
+    {
+        // A spot check with teeth: this paragraph is three levels down -- a Core enum member's
+        // <summary>, reached through a referenced assembly's XML file.
+        var client = await _host.StartAsync();
+        var document = await (await client.GetAsync(GleanvoltApi.DocumentPath)).ReadAsync();
+
+        var mode = Schemas(document).Single(schema => schema.Key == "ChargeControlMode").Value;
+
+        Assert.Contains("charger", mode.GetProperty("description").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<KeyValuePair<string, JsonElement>> Schemas(JsonElement document) =>
+        document.GetProperty("components").GetProperty("schemas").EnumerateObject()
+            .Select(property => new KeyValuePair<string, JsonElement>(property.Name, property.Value));
+
+    private static IEnumerable<JsonProperty> Properties(JsonElement schema) =>
+        schema.TryGetProperty("properties", out var properties)
+            ? properties.EnumerateObject()
+            : [];
+
+    /// <summary>
+    /// A description anywhere that counts. OpenAPI 3.1 renders a nullable reference as
+    /// <c>oneOf: [null, $ref]</c> and hangs the property's own description on the branch rather than
+    /// on the property, so the obvious test reports two dozen false positives.
+    /// </summary>
+    private static bool HasDescription(JsonElement schema)
+    {
+        if (schema.TryGetProperty("description", out var description)
+            && !string.IsNullOrWhiteSpace(description.GetString()))
+        {
+            return true;
+        }
+
+        foreach (var keyword in (string[])["oneOf", "allOf", "anyOf"])
+        {
+            if (schema.TryGetProperty(keyword, out var branches)
+                && branches.EnumerateArray().Any(HasDescription))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

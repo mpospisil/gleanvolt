@@ -104,6 +104,13 @@ public static class GleanvoltApi
                     },
                 ];
 
+                // Last, and after the schemas exist: the built-in generator has already put this
+                // codebase's comments on every property it could, and this fills in the enums it
+                // cannot reach (#126). Both assemblies, because the DTOs are this one's and every enum
+                // on the wire is Core's.
+                XmlDocumentationTransformer.DescribeEnums(
+                    document, typeof(GleanvoltApi).Assembly, typeof(Core.Enums.ChargeControlMode).Assembly);
+
                 return Task.CompletedTask;
             });
         });

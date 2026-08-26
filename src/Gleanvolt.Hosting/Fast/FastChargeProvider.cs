@@ -55,8 +55,9 @@ public sealed class FastChargeProvider
     // The last plan logged, so a schedule that has not moved is not restated on every poll.
     private string? _lastPlanSignature;
 
-    /// <param name="safetyMargin">
-    /// How long before the departure a deferred charge must be finished. Deliberately the targeted
+    /// <param name="targetedOptions">
+    /// Read for one figure: <c>SafetyMargin</c>, how long before the departure a deferred charge must
+    /// be finished. Deliberately the targeted
     /// mode's figure (<c>ChargeControl:Targeted:SafetyMargin</c>) rather than one of this mode's own:
     /// "ready at 07:00 must not mean still charging at 07:00" is a fact about the owner and their
     /// morning, not about which strategy happens to be running, and two settings for it would only ever
