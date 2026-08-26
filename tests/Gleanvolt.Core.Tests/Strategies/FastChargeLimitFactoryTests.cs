@@ -20,8 +20,11 @@ public class FastChargeLimitFactoryTests
         double? energyWh = null,
         double? targetSoc = null,
         double? vehicleSoc = null,
-        VehiclePackLimits? pack = null) =>
-        FastChargeLimitFactory.Create(basis, energyWh, targetSoc, vehicleSoc, pack ?? Pack, Now);
+        VehiclePackLimits? pack = null,
+        DateTimeOffset? departBy = null,
+        TimeSpan? maxHorizon = null) =>
+        FastChargeLimitFactory.Create(
+            basis, energyWh, targetSoc, vehicleSoc, pack ?? Pack, Now, departBy, maxHorizon);
 
     [Fact]
     public void Full_is_accepted_and_carries_no_limit()
@@ -151,5 +154,80 @@ public class FastChargeLimitFactoryTests
         Assert.False(limit.IsMet(19_999));
         Assert.True(limit.IsMet(20_000));
         Assert.True(limit.IsMet(21_000));
+    }
+
+    // -- The departure (#122).
+
+    [Fact]
+    public void AnAmountWithNoDepartureChargesNow()
+    {
+        var limit = Create(FastChargeBasis.Energy, energyWh: 20_000).Limit!;
+
+        Assert.Null(limit.DepartBy);
+        Assert.False(limit.IsDeferred);
+    }
+
+    [Fact]
+    public void CarriesADepartureOnAnEnergyAmount()
+    {
+        var departure = Now.AddHours(9);
+        var limit = Create(FastChargeBasis.Energy, energyWh: 30_000, departBy: departure).Limit!;
+
+        Assert.Equal(departure, limit.DepartBy);
+        Assert.True(limit.IsDeferred);
+    }
+
+    [Fact]
+    public void CarriesADepartureOnAStateOfChargeAmount()
+    {
+        var departure = Now.AddHours(9);
+        var limit = Create(FastChargeBasis.Soc, targetSoc: 90, vehicleSoc: 42, departBy: departure).Limit!;
+
+        Assert.Equal(departure, limit.DepartBy);
+        Assert.Equal(90, limit.TargetSocPercent);
+    }
+
+    [Fact]
+    public void RefusesADepartureWithNothingToTime()
+    {
+        // Full gives no duration to work back from, so there is no such thing as the latest moment it
+        // could start. Refused rather than quietly charging at once -- which is what the owner would
+        // find at 07:00.
+        var result = Create(FastChargeBasis.Full, departBy: Now.AddHours(9));
+
+        Assert.False(result.Accepted);
+        Assert.Contains("needs an amount", result.Error);
+    }
+
+    [Fact]
+    public void RefusesADepartureInThePast()
+    {
+        var result = Create(FastChargeBasis.Energy, energyWh: 30_000, departBy: Now.AddMinutes(-1));
+
+        Assert.False(result.Accepted);
+        Assert.Contains("in the past", result.Error);
+    }
+
+    [Fact]
+    public void RefusesADepartureBeyondTheHorizon()
+    {
+        var result = Create(
+            FastChargeBasis.Energy,
+            energyWh: 30_000,
+            departBy: Now.AddHours(40),
+            maxHorizon: TimeSpan.FromHours(36));
+
+        Assert.False(result.Accepted);
+        Assert.Contains("36 hours", result.Error);
+    }
+
+    [Fact]
+    public void RefusesTheDepartureBeforeItSaysAnythingAboutTheAmount()
+    {
+        // "When" is refused in its own terms rather than after the owner has been told something about
+        // kilowatt-hours they did not ask about.
+        var result = Create(FastChargeBasis.Energy, energyWh: 0, departBy: Now.AddMinutes(-1));
+
+        Assert.Contains("in the past", result.Error);
     }
 }

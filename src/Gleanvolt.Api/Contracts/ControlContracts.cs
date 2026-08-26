@@ -158,10 +158,22 @@ public sealed record ApiOperationResponse(string Method, string Path, string? Su
 /// re-derived from a later reading — a parked car's cloud SOC arrives when it feels like it, and a
 /// limit already half delivered must not move because the car finally phoned home.
 /// </param>
+/// <param name="DepartBy">
+/// When the car has to be ready, or omitted to charge from the moment the mode starts.
+///
+/// <para>With a departure the charge is <b>deferred</b>: the controller works out the latest moment it
+/// can begin and still finish in time, waits, and then charges flat out. The reason to want it is the
+/// pack — a car asked to go above 80% and charged at 22:00 sits there all night, and it is the sitting
+/// rather than the charging that ages the cells.</para>
+///
+/// <para>It needs one of the amounts above to work back from: a departure with <c>full</c> is refused,
+/// because there is no duration and so no such thing as the latest moment it could start.</para>
+/// </param>
 public sealed record FastChargeLimitBody(
     FastChargeBasis Basis = FastChargeBasis.Full,
     double? EnergyKWh = null,
-    double? TargetSocPercent = null);
+    double? TargetSocPercent = null,
+    DateTimeOffset? DepartBy = null);
 
 /// <summary>The fast charge's limit and how it is going, or absent when there is no limit.</summary>
 /// <param name="RequiredEnergyWh">The energy asked for, at the charger.</param>
@@ -170,13 +182,21 @@ public sealed record FastChargeLimitBody(
 /// <param name="ActivatedAt">When the limit was set. Delivery is metered from here, not from when the car plugged in.</param>
 /// <param name="TargetSocPercent">The state of charge asked for, when it was asked that way round.</param>
 /// <param name="VehicleSocPercentAtRequest">What the car was reporting when the conversion was made.</param>
+/// <param name="DepartBy">When the car has to be ready, when a departure was asked for. Null on a charge-now request.</param>
+/// <param name="Schedule">
+/// When the deferred charge starts, and whether it fits. Null when no departure was asked for, and
+/// null in an action's answer — the schedule is built by the poll loop, so it first appears on the
+/// status.
+/// </param>
 public sealed record FastChargeResponse(
     double RequiredEnergyWh,
     double DeliveredEnergyWh,
     double RemainingEnergyWh,
     DateTimeOffset ActivatedAt,
     double? TargetSocPercent,
-    double? VehicleSocPercentAtRequest)
+    double? VehicleSocPercentAtRequest,
+    DateTimeOffset? DepartBy = null,
+    FastChargeScheduleResponse? Schedule = null)
 {
     internal static FastChargeResponse From(FastChargeProgress progress) => new(
         progress.Limit.RequiredEnergyWh,
@@ -184,7 +204,9 @@ public sealed record FastChargeResponse(
         progress.RemainingWh,
         progress.Limit.ActivatedAt,
         progress.Limit.TargetSocPercent,
-        progress.Limit.VehicleSocPercentAtRequest);
+        progress.Limit.VehicleSocPercentAtRequest,
+        progress.Limit.DepartBy,
+        progress.Plan is { } plan ? FastChargeScheduleResponse.From(plan) : null);
 
     internal static FastChargeResponse From(FastChargeLimit limit) => new(
         limit.RequiredEnergyWh,
@@ -192,5 +214,49 @@ public sealed record FastChargeResponse(
         limit.RequiredEnergyWh,
         limit.ActivatedAt,
         limit.TargetSocPercent,
-        limit.VehicleSocPercentAtRequest);
+        limit.VehicleSocPercentAtRequest,
+        limit.DepartBy);
+}
+
+/// <summary>
+/// When a deferred fast charge starts. One division and the clock — there are no blocks here and no
+/// forecast; see the targeted plan for those.
+/// </summary>
+/// <param name="ReadyBy">When the charge must be finished: the departure less the safety margin.</param>
+/// <param name="StartNoLaterThan">
+/// The latest instant charging can begin and still reach <paramref name="ReadyBy"/>. In the past when
+/// there is already too little time, which is deliberate: a plan clamped forward would read as punctual.
+/// </param>
+/// <param name="DurationSeconds">How long the remaining energy needs at <paramref name="ChargePowerWatts"/>.</param>
+/// <param name="RemainingEnergyWh">What is still to deliver.</param>
+/// <param name="ChargePowerWatts">
+/// The power this is computed at. The car's own, once it has drawn anything; the installation's maximum
+/// before that.
+/// </param>
+/// <param name="PowerObserved">
+/// Whether that power was measured at the car (true) or assumed from configuration (false). False means
+/// the schedule is a well-founded guess — a car with a smaller on-board charger than the wallbox is not
+/// knowable until it draws.
+/// </param>
+/// <param name="ShortfallEnergyWh">
+/// How much will not fit before <paramref name="ReadyBy"/>. Zero on a feasible plan. Non-zero never
+/// stops the charge — the charger runs flat out and delivers what it can — it is a promise declined.
+/// </param>
+public sealed record FastChargeScheduleResponse(
+    DateTimeOffset ReadyBy,
+    DateTimeOffset StartNoLaterThan,
+    double DurationSeconds,
+    double RemainingEnergyWh,
+    double ChargePowerWatts,
+    bool PowerObserved,
+    double ShortfallEnergyWh)
+{
+    internal static FastChargeScheduleResponse From(FastChargePlan plan) => new(
+        plan.ReadyBy,
+        plan.StartNoLaterThan,
+        plan.Duration.TotalSeconds,
+        plan.RemainingEnergyWh,
+        plan.ChargePowerWatts,
+        plan.PowerObserved,
+        plan.ShortfallWh);
 }

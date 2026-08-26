@@ -3,6 +3,7 @@
 @inject IFastChargeSelector Fast
 @inject IVehicleTelemetry Vehicle
 @inject VehicleDisplayOptions VehicleDisplay
+@inject TargetedDisplayOptions Display
 @inject TimeProvider Time
 
 @*
@@ -67,6 +68,26 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     </div>
 }
 
+@*
+    The departure (#122). Offered only alongside an amount, because without one there is no duration to
+    work back from and so no such thing as the latest moment it could start -- the factory refuses that
+    combination, and a box that is only ever refused is worse than a box that isn't there.
+*@
+@if (_basis != FastChargeBasis.Full)
+{
+    <div class="control">
+        <label for="fast-departure">Ready by (optional)</label>
+        <input id="fast-departure" type="datetime-local" step="900"
+               @bind="_departBy" @bind:event="onchange" @bind:after="OnFormEdited" />
+        <span class="hint">
+            Leave it empty to charge straight away. With a time, the charge is held back and starts as
+            late as it can while still finishing before you go — so a car asked to go above 80% spends
+            minutes there rather than the whole night, which is what actually ages the pack. It still
+            charges flat out when it runs; only the start moves.
+        </span>
+    </div>
+}
+
 <div class="control">
     <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
         Charge at maximum
@@ -107,6 +128,11 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     {
         <p class="muted" id="fast-progress">@ProgressNarrative(running)</p>
     }
+
+    @if (status.FastCharge?.Plan is { } schedule)
+    {
+        <p class="muted" id="fast-schedule">@ScheduleNarrative(schedule, status.Timestamp)</p>
+    }
 }
 
 @code {
@@ -119,6 +145,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     private FastChargeBasis _basis = FastChargeBasis.Full;
     private double _energyKWh = 20;
     private double _targetSocPercent = 80;
+    private DateTime? _departBy;
     private string? _error;
 
     private VehicleState? _vehicle;
@@ -159,6 +186,10 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
             _basis = FastChargeBasis.Energy;
             _energyKWh = limit.RequiredEnergyWh / 1000;
         }
+
+        _departBy = limit.DepartBy is { } departure
+            ? TimeZoneInfo.ConvertTime(departure, Time.LocalTimeZone).DateTime
+            : null;
     }
 
     private void OnFormEdited() => _error = null;
@@ -176,7 +207,11 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
             targetSocPercent: _targetSocPercent,
             vehicleSocPercent: _vehicle?.SocPercent,
             pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityKWh, VehicleDisplay.ChargeEfficiency),
-            now: Time.GetUtcNow());
+            now: Time.GetUtcNow(),
+            // Only when the basis can carry one -- the box is hidden under Full, so a stale value left
+            // in it must not travel with a press that no longer means to use it.
+            departBy: _basis == FastChargeBasis.Full || _departBy is not { } local ? null : Compose(local),
+            maxHorizon: Display.MaxHorizon);
 
         if (!composed.Accepted)
         {
@@ -266,6 +301,32 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         return $"{progress.DeliveredWh / 1000:F1} kWh of {asked} is in the car; "
             + $"{progress.RemainingWh / 1000:F1} kWh to go before this stops itself.";
     }
+
+    private static string ScheduleNarrative(FastChargePlan plan, DateTimeOffset now)
+    {
+        var power = plan.PowerObserved
+            ? $"{plan.ChargePowerWatts / 1000:F1} kW (what the car is taking)"
+            : $"{plan.ChargePowerWatts / 1000:F1} kW (the installation's maximum — the car has not drawn yet)";
+
+        if (!plan.IsFeasible)
+        {
+            return $"Not enough time: about {plan.ShortfallWh / 1000:F1} kWh of this will not fit before "
+                + $"{plan.ReadyBy.LocalDateTime:HH:mm}. Charging flat out from now at {power}.";
+        }
+
+        return plan.IsWaitingAt(now)
+            ? $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm}, then charging flat out: "
+              + $"{plan.RemainingEnergyWh / 1000:F1} kWh at {power} takes about "
+              + $"{plan.Duration.TotalHours:F1} h, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}."
+            : $"Charging flat out to be ready by {plan.ReadyBy.LocalDateTime:HH:mm}: "
+              + $"{plan.RemainingEnergyWh / 1000:F1} kWh to go at {power}.";
+    }
+
+    // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock here
+    // whatever the server or the browser thinks, and a DST boundary between now and then cannot move it
+    // by an hour. The same helper, and the same reasoning, as the targeted tab's.
+    private DateTimeOffset Compose(DateTime local) =>
+        new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Time.LocalTimeZone.GetUtcOffset(local));
 
     private static string Delivered(FastChargeProgress progress) =>
         $"{progress.DeliveredWh / 1000:F1} / {progress.Limit.RequiredEnergyWh / 1000:F1} kWh";

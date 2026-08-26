@@ -99,13 +99,29 @@ internal static class TargetedCharge
             NullLogger<TargetedChargeProvider>.Instance);
 }
 
-/// <summary>The fast mode's meter (#119), built over a selector the test can set a limit on.</summary>
+/// <summary>
+/// The fast mode's meter and scheduler (#119, #122), built over a selector the test can set a limit
+/// on. The defaults are the reference install's: 16 A on three phases, ready 15 minutes before the
+/// stated departure.
+/// </summary>
 internal static class FastCharge
 {
-    public static FastChargeProvider Provider(IFastChargeSelector? selector = null) =>
-        new(
+    public static FastChargeProvider Provider(
+        IFastChargeSelector? selector = null,
+        ChargeControlOptions? chargeControl = null,
+        TargetedChargeOptions? targeted = null,
+        TimeProvider? timeProvider = null)
+    {
+        var options = chargeControl ?? new ChargeControlOptions { Phases = 3, MaxChargingCurrentAmps = 16 };
+
+        return new FastChargeProvider(
             selector ?? new FastChargeSelector(NullLogger<FastChargeSelector>.Instance),
-            NullLogger<FastChargeProvider>.Instance);
+            new ChargePowerConverter(options.NominalVoltage, options.Phases),
+            Options.Create(options),
+            Options.Create(targeted ?? new TargetedChargeOptions()),
+            NullLogger<FastChargeProvider>.Instance,
+            timeProvider);
+    }
 }
 
 /// <summary>

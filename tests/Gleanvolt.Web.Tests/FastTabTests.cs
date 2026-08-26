@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Gleanvolt.Web.Components.Pages;
 
 namespace Gleanvolt.Web.Tests;
@@ -250,6 +251,107 @@ public class FastTabTests : PageTest
 
         page.WaitForAssertion(() =>
             Assert.Contains("has been delivered", page.Find("#fast-progress").TextContent));
+    }
+
+    // -- The departure (#122).
+
+    [Fact]
+    public void Offers_no_departure_box_under_full()
+    {
+        // There is nothing to time, so the factory would refuse it -- and a box that is only ever
+        // refused is worse than a box that is not there.
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#fast-departure"));
+    }
+
+    [Fact]
+    public void Offers_the_departure_box_once_an_amount_is_chosen()
+    {
+        var page = RenderTab();
+
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Energy));
+
+        Assert.Single(page.FindAll("#fast-departure"));
+    }
+
+    [Fact]
+    public void Carries_the_departure_into_the_limit()
+    {
+        var page = RenderTab();
+
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Energy));
+        page.Find("#fast-energy").Change("30");
+        page.Find("#fast-departure").Change("2026-08-11T07:00:00");
+        page.Find("#start-fast-no-battery").Click();
+
+        var (limit, _) = Assert.Single(_fast.Sets);
+        Assert.True(limit.IsDeferred);
+        Assert.Equal(7, TimeZoneInfo.ConvertTime(limit.DepartBy!.Value, Prague).Hour);
+    }
+
+    [Fact]
+    public void An_empty_departure_charges_now()
+    {
+        var page = RenderTab();
+
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Energy));
+        page.Find("#fast-energy").Change("30");
+        page.Find("#start-fast-no-battery").Click();
+
+        var (limit, _) = Assert.Single(_fast.Sets);
+        Assert.False(limit.IsDeferred);
+    }
+
+    [Fact]
+    public void Refuses_a_departure_in_the_past_without_starting_anything()
+    {
+        var page = RenderTab();
+
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Energy));
+        page.Find("#fast-energy").Change("30");
+        page.Find("#fast-departure").Change("2026-08-10T21:00:00");
+        page.Find("#start-fast-no-battery").Click();
+
+        Assert.Contains("in the past", page.Find("#fast-error").TextContent);
+        Assert.Empty(_actions.Starts);
+    }
+
+    [Fact]
+    public void Says_what_it_is_waiting_for()
+    {
+        var page = RenderTab();
+
+        _holder.Set(Status(Deferred(deliveredWh: 0)));
+
+        page.WaitForAssertion(() =>
+        {
+            var narrative = page.Find("#fast-schedule").TextContent;
+            Assert.Contains("Waiting until", narrative);
+            Assert.Contains("the car has not drawn yet", narrative);
+        });
+    }
+
+    [Fact]
+    public void Says_when_the_time_does_not_fit()
+    {
+        var page = RenderTab();
+
+        // 30 kWh wanted in an hour: it does not fit, and saying so beats a plan that looks punctual.
+        _holder.Set(Status(Deferred(departIn: TimeSpan.FromHours(1))));
+
+        page.WaitForAssertion(() =>
+            Assert.Contains("Not enough time", page.Find("#fast-schedule").TextContent));
+    }
+
+    private static FastChargeProgress Deferred(double deliveredWh = 0, TimeSpan? departIn = null)
+    {
+        var limit = new FastChargeLimit(30_000, Now, DepartBy: Now + (departIn ?? TimeSpan.FromHours(9)));
+
+        return new FastChargeProgress(
+            limit,
+            deliveredWh,
+            FastChargePlanner.Plan(limit, deliveredWh, null, 11_040, TimeSpan.FromMinutes(15), Now));
     }
 
     private static ChargeControlStatus Status(FastChargeProgress progress) => new(

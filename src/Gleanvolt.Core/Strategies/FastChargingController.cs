@@ -24,6 +24,12 @@ namespace Gleanvolt.Core.Strategies;
 /// not modulate the current, defer anything to a sunnier hour, or make this mode plan. That is what
 /// <see cref="TargetedChargingController"/> is for, and the two should not be confused.</para>
 ///
+/// <para>One thing can defer it (#122). Given a departure, <see cref="FastChargePlanner"/> works out
+/// the latest moment the charge can begin and still be finished in time, and until then this pauses.
+/// It still changes nothing about <em>how</em> the charge runs — when it does run, it runs flat out.
+/// The reason to want it is the pack: a car asked to go above 80% and charged at 22:00 sits there all
+/// night, and it is the sitting rather than the charging that ages the cells.</para>
+///
 /// Like the other controllers it only acts while the charger's own use-mode is
 /// <see cref="EvChargerMode.Fast"/> — which starting the mode wrote, and which nothing here
 /// re-asserts — and it only ever decides the current setpoint.
@@ -79,6 +85,35 @@ public sealed class FastChargingController : IChargingController
                 + $"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
+        if (input.FastCharge?.Plan is { } plan)
+        {
+            var now = input.State.Timestamp;
+
+            // After the target check above, so a charge that lands exactly on the deadline is reported
+            // as having succeeded rather than as having run out of time.
+            if (plan.HasDepartedAt(now))
+            {
+                return Complete(
+                    $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with "
+                    + $"{input.FastCharge.DeliveredWh / 1000:F1}kWh of "
+                    + $"{input.FastCharge.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
+            }
+
+            // Before the idle and unplug branches below, and not merely for tidiness: a car that drew
+            // power earlier in this session and is now being held back draws nothing, so the completion
+            // dwell would otherwise fire and end the very charge this plan exists to schedule. A mode
+            // waiting for 04:12 keeps its appointment; it does not decide the car has finished.
+            if (plan.IsWaitingAt(now))
+            {
+                return new ChargingControlDecision(
+                    ChargingControlAction.Pause,
+                    null,
+                    $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm} to start: "
+                    + $"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs "
+                    + $"{Describe(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}.");
+            }
+        }
+
         // "Has finished" is only meaningful once the car has actually started. Before that, no draw
         // means the car isn't ready yet (Preparing, or waiting on its own timer), and ending the mode
         // then would be the opposite of what was asked for.
@@ -110,12 +145,26 @@ public sealed class FastChargingController : IChargingController
               + $"{left.RemainingWh / 1000:F1}kWh to go."
             : string.Empty;
 
+        // Said while it charges rather than only when the plan is made: a shortfall that appears
+        // mid-charge -- because the car turned out to be slower than the wallbox -- is the case nobody
+        // is watching for, and it is exactly the case this mode has no slack for.
+        if (input.FastCharge?.Plan is { IsFeasible: false } tight)
+        {
+            towards += $" Not enough time: about {tight.ShortfallWh / 1000:F1}kWh of it will not fit before "
+                + $"{tight.ReadyBy.LocalDateTime:HH:mm}.";
+        }
+
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             _chargeCurrentAmps,
             $"Fast charge without the battery -> charge at the maximum {_chargeCurrentAmps}A "
             + $"(grid tops up whatever PV doesn't cover).{towards}");
     }
+
+    /// <summary>"2 h 44 m", or "44 m" when there is no hour to report. For one log line and one web page.</summary>
+    private static string Describe(TimeSpan duration) => duration.TotalHours >= 1
+        ? $"{(int)duration.TotalHours} h {duration.Minutes} m"
+        : $"{Math.Max(1, (int)duration.TotalMinutes)} m";
 
     // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever
     // plugs in next. The orchestrator writes the pause current and then switches the mode to Off.

@@ -256,6 +256,73 @@ public class FastNoBatteryModeTests
         Assert.False(_manualHold.Hold);
     }
 
+    // -- The departure (#122). It changes when the charge runs, not how.
+
+    [Fact]
+    public async Task ADeferredChargeWaitsInsteadOfCharging()
+    {
+        // 30kWh at 11kW needs under three hours; the departure is nine hours out.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+        Assert.Equal(0, LastTarget);
+        Assert.Contains("Waiting until", _writes[^1].Reason);
+    }
+
+    [Fact]
+    public async Task ADeferredChargeDoesNotArmTheHoldWhileItWaits()
+    {
+        // The failure that costs a night of house load and shows up as nothing but a flat battery: the
+        // mode is selected at 22:00 for a charge that starts at 04:00, and #119 armed the hold on mode
+        // entry.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task TheHoldIsArmedOnceTheDeferredChargeActuallyStarts()
+    {
+        // Departure close enough that there is no time to wait: the charge runs from the first cycle,
+        // and the hold goes on with it.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(1)));
+
+        Assert.Equal(16, LastTarget);
+        Assert.True(_inverter.Applied[^1]);
+        Assert.True(_manualHold.Hold);
+    }
+
+    [Fact]
+    public async Task ADepartureAlreadyPassedEndsTheModeRatherThanChargingOn()
+    {
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddSeconds(-1)));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Contains("has passed", _writes[^1].Reason);
+        Assert.False(_inverter.Applied[^1]);
+    }
+
+    [Fact]
+    public async Task AChargeWithNoDepartureIsUnchanged()
+    {
+        // The whole "nothing moves for anyone who does not ask" promise, at the poll-loop level.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now));
+
+        Assert.Equal(16, LastTarget);
+        Assert.True(_inverter.Applied[^1]);
+    }
+
     [Fact]
     public async Task AnIdleCarThatNeverChargedDoesNotEndTheMode()
     {
@@ -342,7 +409,7 @@ public class FastNoBatteryModeTests
             coordinator,
             dayPlan,
             TargetedCharge.Provider(forecast, dayPlan, power, chargeControl, forecastOptions),
-            FastCharge.Provider(_fastLimit),
+            FastCharge.Provider(_fastLimit, chargeControl),
             _mode,
             // The real actions over the fake charger: a mode that ends itself has to stop the charger
             // exactly as the Off button does, and that is the code path it goes through.

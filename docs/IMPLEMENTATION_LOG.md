@@ -4,6 +4,57 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-26 — A fast charge can be told when you leave (issue #122)
+
+`FastNoBattery` charged the moment it was pressed, so a car asked for 90% at 22:00 sat at 90% for nine
+hours before anybody drove it. It now takes an optional departure and waits.
+
+### What changed
+
+- `FastChargePlanner` in Core — `remaining ÷ power`, subtracted from the departure, giving
+  `FastChargePlan`. No forecast, no surplus, no blocks, no pacing. It is deliberately the smallest
+  file in `Strategies`.
+- `FastChargeLimit` gained `DepartBy`; `FastChargeLimitFactory` validates it (past, beyond the
+  horizon, or with nothing to time) and refuses `Full` + a departure, since there is no duration to
+  work back from.
+- `FastChargingController` gained two branches: **waiting** (pause, checked *before* the idle dwell —
+  a car that drew earlier and is now held back draws nothing, so the completion dwell would otherwise
+  end the very charge the plan exists to schedule) and **departure passed** (end, reporting what was
+  delivered, matching `Targeted`).
+- `FastChargeProvider` builds the plan each poll and remembers the car's observed draw across the
+  pauses, which is what makes a deferred charge work at all — see the decision record.
+- The hold now arms on the first charging cycle rather than on mode entry, and is idempotent so it
+  cannot re-arm one the owner switched off.
+- Surfaces: a `datetime-local` box on the Fast tab (hidden under `Full`), `departBy` on the API's
+  `fast` body with the schedule under `fastCharge.schedule`, and a **Fast departure** text plus a
+  **Fast start** sensor in Home Assistant.
+
+### Things worth knowing
+
+- **The departure box in HA accepts an empty value from the first commit.** That is #117 on the
+  targeted entity; having been told once, shipping the same bug again would have been careless.
+- **`SafetyMargin` and `MaxHorizon` are the targeted mode's**, shared rather than duplicated: "ready
+  at 07:00 must not mean still charging at 07:00" is a fact about the owner's morning, not about which
+  strategy is running.
+- **A zero or NaN charge power yields no plan rather than a nominal one.** Dividing by something near
+  zero defers the charge to the end of time — no error, no charge, flat car. Uncertainty resolves to
+  charging.
+
+### Verification performed
+
+- **1100 tests pass** (53 new): the arithmetic and its edges, both controller branches in the right
+  order, the observed-power stickiness, the three surfaces refusing the same things, and — the one
+  that matters most — a poll-loop test asserting the hold is **not** armed while a deferred charge
+  waits.
+- The checked-in OpenAPI contract was regenerated; the diff is `departBy`, `schedule` and
+  `FastChargeScheduleResponse`.
+- **Not yet verified on hardware**, and two things need it: that a charge deferred overnight actually
+  starts on time after hours of the mode sitting armed, and that the observed-power rule reads the
+  ID.4's real draw rather than a taper. Also still open from #119's verification: with no car
+  connected the charger did not hold `Fast`.
+
+---
+
 ## 2026-08-26 — The fast mode's current is written when it is started, not a poll later (issue #119)
 
 Observed on the reference install while verifying #119: starting `FastNoBattery` wrote the use-mode

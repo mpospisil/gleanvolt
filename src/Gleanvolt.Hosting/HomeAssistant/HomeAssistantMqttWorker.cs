@@ -27,6 +27,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IFastChargeSelector _fast;
     private readonly IVehicleTelemetry? _vehicle;
     private readonly VehicleOptions _vehicleOptions;
+    private readonly TargetedChargeOptions _targetedOptions;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -48,6 +49,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private FastChargeBasis _pendingFastBasis = FastChargeBasis.Full;
     private double _pendingFastEnergyKWh;
     private double _pendingFastSocPercent = 80;
+    private DateTimeOffset? _pendingFastDeparture;
+    private string _pendingFastDepartureText = string.Empty;
 
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
@@ -76,7 +79,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _fast = fast;
         _vehicle = vehicle;
         _vehicleOptions = vehicleOptions.Value;
-        _pendingRestSocPercent = targetedOptions.Value.JustInTime.RestSocPercent;
+        _targetedOptions = targetedOptions.Value;
+        _pendingRestSocPercent = _targetedOptions.JustInTime.RestSocPercent;
         _shutdown = shutdown;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _statusHolder = statusHolder;
@@ -273,7 +277,24 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             ? TimeZoneInfo.ConvertTime(request.DepartBy, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm")
             : _pendingDepartureText;
 
-        return PublishAsync(_discovery.TextStateTopic(HaDiscovery.TargetDepartureText), text, retain: true, cancellationToken);
+        return PublishTextStatesAsync(text, cancellationToken);
+    }
+
+    private async Task PublishTextStatesAsync(string targetDeparture, CancellationToken cancellationToken)
+    {
+        await PublishAsync(
+            _discovery.TextStateTopic(HaDiscovery.TargetDepartureText), targetDeparture, retain: true, cancellationToken)
+            .ConfigureAwait(false);
+
+        // A running limit outranks whatever was last typed, like the numbers and the basis: it says what
+        // the charge is actually waiting for.
+        var fast = _fast.Limit?.DepartBy is { } departure
+            ? TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm")
+            : _pendingFastDepartureText;
+
+        await PublishAsync(
+            _discovery.TextStateTopic(HaDiscovery.FastDepartureText), fast, retain: true, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e) =>
@@ -397,7 +418,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             targetSocPercent: _pendingFastSocPercent,
             vehicleSocPercent: _vehicle?.GetCurrentState()?.SocPercent,
             pack: new VehiclePackLimits(_vehicleOptions.BatteryCapacityKWh, _vehicleOptions.ChargeEfficiency),
-            now: _timeProvider.GetUtcNow());
+            now: _timeProvider.GetUtcNow(),
+            departBy: _pendingFastDeparture,
+            maxHorizon: _targetedOptions.MaxHorizon);
 
         if (!composed.Accepted)
         {
@@ -584,6 +607,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     private Task OnTextCommandAsync(string objectId, string? payload)
     {
+        if (objectId == HaDiscovery.FastDepartureText)
+        {
+            return OnFastDepartureCommandAsync(payload);
+        }
+
         if (objectId != HaDiscovery.TargetDepartureText)
         {
             return Task.CompletedTask;
@@ -611,6 +639,31 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         // Echoed as the resolved timestamp rather than what was typed: "07:00" and "tomorrow 07:00" are
         // the same request, and only one of them can be read back a day later without ambiguity.
+        return PublishTextStatesAsync(CancellationToken.None);
+    }
+
+    // The fast charge's departure (#122), on exactly the terms the targeted one is held on: parsed the
+    // same way, echoed back as the resolved timestamp, and clearable -- an empty box says "charge now",
+    // which is this mode's default and a thing somebody will want to go back to.
+    private Task OnFastDepartureCommandAsync(string? payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            _pendingFastDeparture = null;
+            _pendingFastDepartureText = string.Empty;
+            return PublishTextStatesAsync(CancellationToken.None);
+        }
+
+        if (!HaDiscovery.TryParseDeparture(payload, _timeProvider.GetUtcNow(), _timeProvider.LocalTimeZone, out var departure))
+        {
+            _logger.LogWarning(
+                "Ignoring unparseable fast charge departure '{Payload}'; expected HH:mm or yyyy-MM-dd HH:mm.", payload);
+            return Task.CompletedTask;
+        }
+
+        _pendingFastDeparture = departure;
+        _pendingFastDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+
         return PublishTextStatesAsync(CancellationToken.None);
     }
 

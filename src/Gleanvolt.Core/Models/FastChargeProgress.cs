@@ -16,7 +16,11 @@ namespace Gleanvolt.Core.Models;
 /// Metered from activation rather than from the plug-in, so energy the car took under some earlier
 /// mode does not count towards this limit.
 /// </param>
-public sealed record FastChargeProgress(FastChargeLimit Limit, double DeliveredWh)
+/// <param name="Plan">
+/// When the charge has to start, when it was given a departure to meet. Null on the ordinary
+/// charge-now request, which has nothing to plan.
+/// </param>
+public sealed record FastChargeProgress(FastChargeLimit Limit, double DeliveredWh, FastChargePlan? Plan = null)
 {
     /// <summary>What is still to come, floored at zero — the last poll usually overshoots slightly.</summary>
     public double RemainingWh => Math.Max(0, Limit.RequiredEnergyWh - DeliveredWh);

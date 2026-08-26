@@ -29,6 +29,30 @@ public class FastChargingControllerTests
     private static FastChargeProgress Progress(double requiredWh, double deliveredWh) =>
         new(new FastChargeLimit(requiredWh, DateTimeOffset.UnixEpoch), deliveredWh);
 
+    /// <summary>A deferred charge, planned against a fixed clock so the branch under test is the only variable.</summary>
+    private static FastChargeProgress Deferred(
+        DateTimeOffset now,
+        DateTimeOffset departBy,
+        double requiredWh = 30_000,
+        double deliveredWh = 0)
+    {
+        var limit = new FastChargeLimit(requiredWh, now, DepartBy: departBy);
+
+        return new FastChargeProgress(
+            limit,
+            deliveredWh,
+            FastChargePlanner.Plan(limit, deliveredWh, null, 11_040, TimeSpan.FromMinutes(15), now));
+    }
+
+    private static ChargingControlInput At(DateTimeOffset now, FastChargeProgress progress, bool evDrewPower = true) =>
+        new(
+            new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
+            0,
+            new EvChargerSettings(EvChargerMode.Fast, 6),
+            Charging: true,
+            EvDrewPower: evDrewPower,
+            FastCharge: progress);
+
     [Theory]
     [InlineData(EvChargerMode.Green)]
     [InlineData(EvChargerMode.Eco)]
@@ -219,5 +243,98 @@ public class FastChargingControllerTests
 
         Assert.Equal(ChargingControlAction.None, result.Action);
         Assert.False(result.SessionComplete);
+    }
+
+    // -- The departure (#122). It changes when the charge runs, never how.
+
+    [Fact]
+    public void BeforeTheStartTimeItWaitsInsteadOfCharging()
+    {
+        var now = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))));
+
+        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.False(result.SessionComplete);
+        Assert.Contains("Waiting until", result.Reason);
+    }
+
+    [Fact]
+    public void WaitingIsCheckedBeforeTheIdleDwell()
+    {
+        // The bug this ordering exists to prevent: a car that drew power earlier in the session and is
+        // now being held back draws nothing, so the completion dwell would fire and end the very charge
+        // the plan exists to schedule.
+        var now = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
+
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))) with
+        {
+            State = new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.SuspendedEv, 0),
+            EvIdleFor = TimeSpan.FromHours(3),
+        });
+
+        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.False(result.SessionComplete);
+        Assert.Contains("Waiting until", result.Reason);
+    }
+
+    [Fact]
+    public void AtTheStartTimeItChargesAtTheMaximumLikeAnyOtherFastCharge()
+    {
+        var now = new DateTimeOffset(2026, 8, 11, 5, 0, 0, TimeSpan.Zero);
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(2))));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(16, result.ChargeCurrentAmps);
+    }
+
+    [Fact]
+    public void TooLittleTimeChargesNowAndSaysHowFarShortItWillFall()
+    {
+        var now = new DateTimeOffset(2026, 8, 11, 5, 0, 0, TimeSpan.Zero);
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(2))));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Contains("Not enough time", result.Reason);
+        Assert.Contains("kWh of it will not fit", result.Reason);
+    }
+
+    [Fact]
+    public void ThePassedDepartureEndsTheMode()
+    {
+        var planned = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
+        var progress = Deferred(planned, planned.AddHours(9), deliveredWh: 28_000);
+
+        var result = Controller.Decide(At(planned.AddHours(10), progress));
+
+        Assert.True(result.SessionComplete);
+        Assert.Contains("has passed", result.Reason);
+        Assert.Contains("28.0kWh of 30.0kWh", result.Reason);
+    }
+
+    [Fact]
+    public void AMetTargetBeatsAPassedDeparture()
+    {
+        // A charge that lands exactly on the deadline succeeded; it did not run out of time.
+        var planned = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
+        var progress = Deferred(planned, planned.AddHours(9), deliveredWh: 30_000);
+
+        var result = Controller.Decide(At(planned.AddHours(10), progress));
+
+        Assert.True(result.SessionComplete);
+        Assert.Contains("Fast target reached", result.Reason);
+        Assert.DoesNotContain("has passed", result.Reason);
+    }
+
+    [Fact]
+    public void ADeferredChargeStillHonoursTheNotFastPrecondition()
+    {
+        var now = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
+
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))) with
+        {
+            CurrentSettings = new EvChargerSettings(EvChargerMode.Green, 6),
+        });
+
+        Assert.Equal(ChargingControlAction.None, result.Action);
     }
 }

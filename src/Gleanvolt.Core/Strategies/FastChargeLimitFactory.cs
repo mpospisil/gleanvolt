@@ -53,15 +53,53 @@ public static class FastChargeLimitFactory
     /// <param name="vehicleSocPercent">What the car last reported, or null when there is no reading.</param>
     /// <param name="pack">The car's capacity and charge efficiency, or an unconfigured pack.</param>
     /// <param name="now">The instant the limit is being set — what delivery is metered from.</param>
+    /// <param name="departBy">
+    /// When the car has to be ready, or null to charge from the moment the mode starts. A departure
+    /// defers the charge so it finishes just in time (#122); it needs an amount to work back from, and
+    /// it needs to be in the future.
+    /// </param>
+    /// <param name="maxHorizon">
+    /// How far ahead a departure may be set. Beyond it a request that does not survive a restart cannot
+    /// honestly promise anything. Ignored when no departure is given.
+    /// </param>
     public static Result Create(
         FastChargeBasis basis,
         double? energyWh,
         double? targetSocPercent,
         double? vehicleSocPercent,
         VehiclePackLimits pack,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        DateTimeOffset? departBy = null,
+        TimeSpan? maxHorizon = null)
     {
         ArgumentNullException.ThrowIfNull(pack);
+
+        // Checked before the basis, so "when" is refused in its own terms rather than after the owner
+        // has been told something about kilowatt-hours.
+        if (departBy is { } departure)
+        {
+            if (departure <= now)
+            {
+                return Result.Rejected("The departure time is in the past.");
+            }
+
+            if (maxHorizon is { } horizon && departure - now > horizon)
+            {
+                return Result.Rejected(
+                    $"A departure more than {horizon.TotalHours:F0} hours away is further than a charge "
+                    + "that does not survive a restart can honestly promise.");
+            }
+
+            // The one combination that cannot be honoured: with no amount there is no duration to work
+            // back from, so there is no such thing as the latest moment it could start. Refused rather
+            // than quietly charging at once, which is what the owner would find at 07:00.
+            if (basis == FastChargeBasis.Full)
+            {
+                return Result.Rejected(
+                    "A departure needs an amount to work back from — say how much energy, or what state "
+                    + "of charge, the car needs. Without one there is nothing to time.");
+            }
+        }
 
         switch (basis)
         {
@@ -77,7 +115,7 @@ public static class FastChargeLimitFactory
                     return Result.Rejected("Enter how much energy the car needs.");
                 }
 
-                return Result.Ok(new FastChargeLimit(wh, now));
+                return Result.Ok(new FastChargeLimit(wh, now, DepartBy: departBy));
 
             case FastChargeBasis.Soc:
                 if (targetSocPercent is not { } target || double.IsNaN(target))
@@ -111,7 +149,7 @@ public static class FastChargeLimitFactory
                         $"The car is already at {vehicleSocPercent:F0}%, at or above the {target:F0}% asked for.");
                 }
 
-                return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, vehicleSocPercent));
+                return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, vehicleSocPercent, departBy));
 
             default:
                 return Result.Rejected($"Unknown fast charge basis '{basis}'.");
