@@ -891,7 +891,7 @@ already asks — and the answer is a **stopping condition and nothing else**:
   departure, is [`Targeted`](#targeted-charging-the-targeted-mode) — that is the whole difference
   between the two modes, and the reason both exist.
 - **A battery target is converted once**, when you press the button, using
-  `Vehicle:BatteryCapacityKWh` and `Vehicle:ChargeEfficiency`. A later reading from the car does not
+  `Ev:Vehicles:0:BatteryCapacityKWh` and `Ev:Vehicles:0:ChargeEfficiency`. A later reading does not
   move a charge that is already part delivered — the same rule, and the same reasoning, as
   [a targeted SOC request](#setting-a-target). It is offered only where it can be honoured:
   a configured capacity **and** a reading from the car. Without both, ask in kilowatt-hours.
@@ -1017,8 +1017,8 @@ selection: it cannot keep the battery out of the charge, which is half of what i
 ```
 
 The amount and the departure are not configuration — they belong to one charge — so there is nothing
-to set here for them. A battery target reads `Vehicle:BatteryCapacityKWh` and
-`Vehicle:ChargeEfficiency`, the same two figures a targeted SOC request uses; a departure reads
+to set here for them. A battery target reads `Ev:Vehicles:0:BatteryCapacityKWh` and
+`Ev:Vehicles:0:ChargeEfficiency`, the same two figures a targeted SOC request uses; a departure reads
 `ChargeControl:Targeted:SafetyMargin` and `ChargeControl:Targeted:MaxHorizon`. Those two are
 deliberately shared rather than duplicated: *"ready at 07:00 must not mean still charging at 07:00"*
 is a fact about your morning, not about which strategy happens to be running, and two settings for it
@@ -1187,7 +1187,7 @@ rest point to hold, or when holding would leave the rest of the charge more than
 can deliver. The departure was the promise; the timing was only a preference.
 
 **Offered only when it can be honoured.** The rest point is a state of charge, so it needs the car's
-reported SOC *and* `Vehicle:BatteryCapacityKWh` — the same rule the **Battery target (%)** basis
+reported SOC *and* `Ev:Vehicles:0:BatteryCapacityKWh` — the same rule the **Battery target (%)** basis
 follows. Without both, the control does not appear on the web tab, and a Home Assistant activation logs
 a warning and charges with nothing held rather than silently pretending to hold something.
 
@@ -1209,7 +1209,7 @@ that cannot be fixed afterwards: *"even flat out you get 24 of the 31 kWh you as
 that covers it is 05:40"* is worth knowing **before** the charger starts.
 
 **Two ways to say what you need.** The default, and the only one an install without a vehicle feed ever
-sees, is **Energy to add (kWh)**. With a car reporting its SOC *and* `Vehicle:BatteryCapacityKWh` set,
+sees, is **Energy to add (kWh)**. With a car reporting its SOC *and* a configured pack capacity,
 a second basis appears — **Battery target (%)** — and the kilowatt-hours are worked out for you:
 
 ```
@@ -1342,7 +1342,7 @@ description or tooltip field. The meanings live here instead.
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
 | **Fast energy** | kWh | How much to deliver before the fast charge stops itself, measured at the charger and metered from the press. Read only under the `Energy` basis. Doesn't persist across restarts. |
-| **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Vehicle:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. Doesn't persist across restarts. |
+| **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Ev:Vehicles:0:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. Doesn't persist across restarts. |
 | **Fast departure** | text | When the car has to be ready, as `HH:mm` (the next one) or `yyyy-MM-dd HH:mm`. Empty means charge straight away, which is the default. With a time the charge is held back and starts as late as it still can — see [When? (the departure)](#when-the-departure). Needs an amount to work back from, so a departure with the basis on `Full` is refused. Doesn't persist across restarts. |
 | **Fast start** | sensor | When the deferred charge will begin, as `HH:mm`, or `none` when it starts immediately. Moves later as energy goes in, and earlier if the car turns out to draw less than the charger offers. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast delivered** | kWh | Energy delivered against the fast charge's amount, since it was started. Absent unless `FastNoBattery` is driving with an amount set. |
@@ -1392,7 +1392,7 @@ same rule the forecast plan follows.
 | --- | --- | --- |
 | **Target energy** | kWh | How much energy the car needs by the departure time, measured at the charger from the moment **Activate target** is pressed. Nothing happens until it is. |
 | **Departure time** | text | When that energy has to be there. A bare `07:00` means the **next** 07:00 — which is what somebody typing it at 22:00 means by it; `2026-08-11 07:00` means exactly that. MQTT discovery has no datetime platform, which is why this is text. Read back as the resolved timestamp, so a day later it is still unambiguous. **Empty means no departure** — which is what it holds whenever no target is set, and clearing the box clears the pending departure. Anything else is refused with a warning in the log rather than guessed at. |
-| **Charge priority** | select | `Cheapest` (the default, and what every request did before this existed) or `JustInTime`. Under `JustInTime` the last stretch of the target is held back so the car finishes shortly before departure instead of hours early. Applies to the next **Activate target**, like the two above. Needs the car's SOC and `Vehicle:BatteryCapacityKWh` to find the rest point; without both, the press logs a warning and charges with nothing held. |
+| **Charge priority** | select | `Cheapest` (the default, and what every request did before this existed) or `JustInTime`. Under `JustInTime` the last stretch of the target is held back so the car finishes shortly before departure instead of hours early. Applies to the next **Activate target**, like the two above. Needs the car's SOC and `Ev:Vehicles:0:BatteryCapacityKWh` to find the rest point; without both, the press logs a warning and charges with nothing held. |
 | **Target rest SOC** | % | Where the car waits under `JustInTime` before the final stretch is released. Ignored under `Cheapest`. |
 | **Activate target** | button | Applies the two above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with either half missing, or with a departure already past, it logs a warning and does nothing. |
 | **Target plan state** | — | One line on what the plan is doing and why — the same explanation the log carries. |
@@ -1464,36 +1464,107 @@ A ready-to-run broker + Home Assistant for local development lives in [`dev/home
 docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'gleanvolt/#' -v
 ```
 
+### The car (the `Ev` section)
+
+**What the car *is*, as distinct from the feed that reports on it.** The same arrangement
+[the installation](#the-pv-system-the-pv-section) has: described in one place, validated once at
+startup, and handed to everything that needs it — so nothing has to assemble the car from settings
+that belong to something else.
+
+```jsonc
+"Ev": {
+  "Vehicles": [                          // a list from day one; exactly one entry is supported
+    {
+      "Id": "id4",                       // stable identity: a slug, like Pv:Id
+      "Name": "The ID.4",
+      "Make": "Volkswagen",
+      "Model": "ID.4 Pro",               // reported, never acted on
+      "BatteryCapacityKWh": 77,          // the car's *usable* pack; 0 = unset, see below
+      "ChargeEfficiency": 0.9,           // charger meter -> cells
+      "Phases": 3,                       // what the CAR can use -- see the warning below
+      "MinChargingCurrentAmps": 6,       // below this it will not start
+      "MaxChargingCurrentAmps": 16,      // its on-board charger's ceiling
+      "Telemetry": { "Topic": "gleanvolt/vehicle/id4/state" }
+    }
+  ]
+}
+```
+
+**Nothing here is required, and an absent section changes nothing.** Every figure falls back to the
+installation's, which is exactly how the controller behaved before this section existed.
+
+`BatteryCapacityKWh` is the **usable** capacity — the figure the car's own SOC is a percentage of, not
+the gross pack on the brochure (an ID.4 Pro is 77 usable of 82 gross). Unset by default, and it affects
+one thing: the **Battery target (%)** basis on a
+[targeted](#targeted-charging-an-amount-of-energy-by-a-time) or
+[fast](#how-much-the-amount) charge, which cannot turn "80%" into kilowatt-hours without it and is
+simply not offered until it is set. Guessing a pack size would make every such target quietly wrong
+instead of visibly unavailable, which is the worse of the two failures.
+
+`ChargeEfficiency` is the AC-side loss between the charger's meter and the cells, applied to that
+conversion because the target is metered at the charger. It is **not**
+`ChargeControl:Forecast:ChargeEfficiency`, which is the *home* battery's PV → pack figure.
+
+#### The three that are the point: phases, and the two currents
+
+`ChargeControl:Phases`, `MinChargingCurrentAmps` and `MaxChargingCurrentAmps` describe **the
+installation** — the wallbox and the supply feeding it. Until now the controller had only those and
+used them as if they described the car too.
+
+> ⚠️ **`Phases` is the one that goes wrong quietly.** Every watts↔amps conversion in the controller
+> runs through a phase count. If your car charges single-phase behind a three-phase wallbox and you do
+> not say so, **every power figure the controller reasons with is overstated threefold** — a
+> [deferred fast charge](#when-the-departure) starts hours late, and the day plan budgets energy the
+> car can never take. Nothing looks broken; the numbers are simply wrong.
+
+`MinChargingCurrentAmps` matters for a car that refuses low currents. Commanded 6 A when it needs 8, it
+draws nothing at all — and a connected car taking no power is what the fast mode's completion dwell
+reads as *finished*. A charge that never started, filed as one that completed.
+
+**The controller works to the narrower of the two, always:**
+
+```
+effective minimum = max(charger minimum, car minimum)     // whichever refuses first
+effective maximum = min(charger maximum, car maximum)     // whichever gives out first
+effective phases  = min(charger phases,  car phases)      // whichever offers fewer
+```
+
+A car can only ever **lower** a limit. An installation limited to 16 A stays limited to 16 A behind a
+car that would take 32, because that limit is the site's supply and the wiring in the wall — not a
+preference. Anything the car leaves unstated is simply the installation's figure. All three columns
+are on `/pv-system`, so "why is my 32 A car charging at 16?" is answerable in a browser.
+
+A car whose minimum is above the installation's maximum could never charge, and every symptom of that
+is silence — so it is **refused at startup** naming both keys, rather than discovered one evening as
+"I pressed the button and nothing happened".
+
 ### Vehicle telemetry (the `Vehicle` section)
 
-The controller can read the **car's own** battery state — as distinct from the home battery the
-inverter reports, and from the charger's view of what's plugged into it. Off by default:
+The **feed** that reports on the car above — as distinct from the car itself, and from the home battery
+the inverter reports. Off by default:
 
 ```jsonc
 "Vehicle": {
   "Enabled": false,
   "BrokerHost": "localhost",
   "BrokerPort": 1883,
-  "Topic": "gleanvolt/vehicle/state",   // whatever your HA automation publishes to
-  "MaxAge": "12:00:00",                 // past this, a reading is shown as stale
-  "BatteryCapacityKWh": 0,              // the car's *usable* pack; 0 = unset, see below
-  "ChargeEfficiency": 0.9               // charger meter -> cells, for a battery-target request
+  "MaxAge": "12:00:00"                  // past this, a reading is shown as stale
 }
 ```
 
-`BatteryCapacityKWh` is the **usable** capacity — the figure the car's own SOC is a percentage of, not
-the gross pack on the brochure (an ID.4 Pro is 77 usable of 82 gross). It is unset by default and
-affects exactly one thing: the [targeted plan's](#targeted-charging-an-amount-of-energy-by-a-time)
-**Battery target (%)** basis, which cannot turn "80%" into kilowatt-hours without it and is simply not
-offered until it is set. Guessing a pack size would make every such target quietly wrong instead of
-visibly unavailable, which is the worse of the two failures.
-
-`ChargeEfficiency` is the AC-side loss between the charger's meter and the cells, applied to that
-conversion because the target is metered at the charger. It is **not**
-`ChargeControl:Forecast:ChargeEfficiency`, which is the *home* battery's PV → pack figure.
+The **topic** is not here: it lives on the vehicle, as `Ev:Vehicles:0:Telemetry:Topic`, because two
+cars on one broker are two topics. The broker, the credentials and the staleness guard stay here
+because they describe the feed rather than the car — which is the whole split this section and the one
+above exist to make.
 
 `Vehicle:Username` / `Vehicle:Password` are supported for an authenticated broker and are secrets —
 supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
+
+> **Upgrading?** `Vehicle:BatteryCapacityKWh`, `Vehicle:ChargeEfficiency` and `Vehicle:Topic` have
+> moved into the `Ev` section, and a build that still finds them **refuses to start**, naming the
+> replacement. Silently ignoring one would leave a capacity your file says is set and the controller
+> has stopped reading — which makes every SOC-based target quietly wrong. If you deploy with
+> `deploy/docker-compose.yml`, the `.env` variable names are unchanged and there is nothing to do.
 
 Nothing in `ChargeControl` or `BatteryHold` consumes it, and no charge decision depends on it: a feed
 that dies changes nothing about how the charger is driven. It appears on the web UI dashboard and on
@@ -1623,7 +1694,7 @@ mode: single
 
 `alias` is the automation's name, so Home Assistant fills that in for you on save.
 
-Then set `Vehicle:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
+Then set `Ev:Vehicles:0:Telemetry:Topic` to `gleanvolt/vehicle/id4/state`. The `condition` matters: it stops a payload
 being published while the integration's entities read `unavailable`, which happens whenever its cloud
 session expires.
 
@@ -2076,7 +2147,7 @@ time:
 ```
 
 An amount that cannot be honoured is a **400 with the reason** — a battery target on an installation
-with no `Vehicle:BatteryCapacityKWh`, no reading from the car, a car already past the figure asked
+with no configured pack capacity, no reading from the car, a car already past the figure asked
 for, a departure in the past or beyond the horizon, or a departure with `full` and so nothing to time
 — and nothing is started. Progress comes back on the status as `fastCharge`, with the schedule under
 `fastCharge.schedule`, and a `full` start clears any amount left standing from an earlier charge.

@@ -173,19 +173,52 @@ public static class GleanvoltHostingExtensions
                 currentChangeThresholdAmps: options.CurrentChangeThresholdAmps);
         });
 
+        // The car, described once and resolved once (issue #124). An absent Ev section gives
+        // EvInfo.Unknown, which narrows nothing -- so an installation that has never described its car
+        // behaves exactly as it did before this existed.
+        services.AddSingleton(provider =>
+        {
+            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            return EvResolver.Resolve(
+                configuration, chargeControl.MinChargingCurrentAmps, chargeControl.MaxChargingCurrentAmps);
+        });
+
+        // What the charger and the car will BOTH accept. Every current and every phase count downstream
+        // comes from here rather than from ChargeControl directly: the installation's limits are the
+        // site's supply, the car's are a second constraint, and the two were previously the same three
+        // settings doing both jobs.
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            return new ChargePowerConverter(options.NominalVoltage, options.Phases);
+
+            return ChargingLimits.Intersect(
+                options.MinChargingCurrentAmps,
+                options.MaxChargingCurrentAmps,
+                options.Phases,
+                provider.GetRequiredService<EvInfo>());
+        });
+
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+
+            // The CAR's phase count, not the wallbox's, when the two differ. Every watts-to-amps
+            // conversion in the controller runs through this converter, so a single-phase car behind a
+            // three-phase wallbox used to have every power figure overstated threefold -- the deferred
+            // fast charge starting hours late, the day plan budgeting energy the car could never take.
+            return new ChargePowerConverter(
+                options.NominalVoltage, provider.GetRequiredService<ChargingLimits>().Phases);
         });
 
         services.AddSingleton<IChargingController>(provider =>
         {
             var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var limits = provider.GetRequiredService<ChargingLimits>();
+
             return new LiveSolarChargingController(
                 provider.GetRequiredService<ChargePowerConverter>(),
-                options.MinChargingCurrentAmps,
-                options.MaxChargingCurrentAmps,
+                limits.MinAmps,
+                limits.MaxAmps,
                 options.CurrentStepAmps,
                 options.ResumeHysteresisWatts,
                 options.BatteryFullSocPercent,
@@ -207,6 +240,7 @@ public static class GleanvoltHostingExtensions
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
             var forecast = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+            var limits = provider.GetRequiredService<ChargingLimits>();
 
             return new ForecastedChargingController(
                 provider.GetRequiredService<ChargePowerConverter>(),
@@ -214,8 +248,8 @@ public static class GleanvoltHostingExtensions
                 // controller, i.e. exactly the behaviour that shipped before this one existed.
                 provider.GetRequiredService<IChargingController>(),
                 new ForecastedChargingOptions(
-                    MinChargingCurrentAmps: chargeControl.MinChargingCurrentAmps,
-                    MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
+                    MinChargingCurrentAmps: limits.MinAmps,
+                    MaxChargingCurrentAmps: limits.MaxAmps,
                     CurrentStepAmps: chargeControl.CurrentStepAmps,
                     ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
                     // Only the fallback for a null runtime; in the host the runtime settings supply it
@@ -240,7 +274,8 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            return new FastChargingController(options.MaxChargingCurrentAmps, options.CompletionDwell);
+            return new FastChargingController(
+                provider.GetRequiredService<ChargingLimits>().MaxAmps, options.CompletionDwell);
         });
 
         // ...and how much of it to deliver before stopping (issue #119). A stopping condition, not a
@@ -269,12 +304,13 @@ public static class GleanvoltHostingExtensions
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
             var forecast = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
             var targeted = provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value;
+            var limits = provider.GetRequiredService<ChargingLimits>();
 
             return new TargetedChargingController(
                 provider.GetRequiredService<ChargePowerConverter>(),
                 new TargetedChargingOptions(
-                    MinChargingCurrentAmps: chargeControl.MinChargingCurrentAmps,
-                    MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
+                    MinChargingCurrentAmps: limits.MinAmps,
+                    MaxChargingCurrentAmps: limits.MaxAmps,
                     CurrentStepAmps: chargeControl.CurrentStepAmps,
                     ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
                     // The dwell timers are the forecast mode's: they exist to spare the contactor and
@@ -448,7 +484,11 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider =>
         {
             var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
-            return new VehicleDisplayOptions(vehicle.MaxAge, vehicle.BatteryCapacityKWh, vehicle.ChargeEfficiency);
+            var ev = provider.GetRequiredService<EvInfo>();
+
+            // MaxAge is the feed's; the pack is the car's. Two sections, and the split is the point of
+            // issue #124.
+            return new VehicleDisplayOptions(vehicle.MaxAge, ev.BatteryCapacityKWh, ev.ChargeEfficiency);
         });
 
         // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
@@ -466,12 +506,12 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider =>
         {
             var targeted = provider.GetRequiredService<IOptions<TargetedChargeOptions>>().Value;
-            var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
+            var ev = provider.GetRequiredService<EvInfo>();
 
             return new TargetedChargeRequestLimits(
                 targeted.MaxHorizon,
-                vehicle.BatteryCapacityKWh,
-                vehicle.ChargeEfficiency,
+                ev.BatteryCapacityKWh,
+                ev.ChargeEfficiency,
                 targeted.JustInTime.RestSocPercent);
         });
 

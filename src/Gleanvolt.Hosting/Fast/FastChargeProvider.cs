@@ -31,7 +31,7 @@ public sealed class FastChargeProvider
 
     private readonly IFastChargeSelector _selector;
     private readonly ChargePowerConverter _power;
-    private readonly int _maxChargingCurrentAmps;
+    private readonly ChargingLimits _limits;
     private readonly TimeSpan _safetyMargin;
     private readonly ILogger<FastChargeProvider> _logger;
     private readonly TimeProvider _timeProvider;
@@ -62,17 +62,22 @@ public sealed class FastChargeProvider
     /// morning, not about which strategy happens to be running, and two settings for it would only ever
     /// drift apart. The same reasoning the dwell timers are shared under.
     /// </param>
+    /// <param name="limits">
+    /// What the charger and the car will both accept (#124). The car's ceiling matters here more than
+    /// almost anywhere: the schedule divides by this power, so a figure the car cannot reach makes a
+    /// deferred charge start late.
+    /// </param>
     public FastChargeProvider(
         IFastChargeSelector selector,
         ChargePowerConverter power,
-        IOptions<ChargeControlOptions> chargeControlOptions,
+        ChargingLimits limits,
         IOptions<TargetedChargeOptions> targetedOptions,
         ILogger<FastChargeProvider> logger,
         TimeProvider? timeProvider = null)
     {
         _selector = selector;
         _power = power;
-        _maxChargingCurrentAmps = chargeControlOptions.Value.MaxChargingCurrentAmps;
+        _limits = limits;
         _safetyMargin = targetedOptions.Value.SafetyMargin;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -86,7 +91,7 @@ public sealed class FastChargeProvider
     /// configured figure the hardware would never accept.</para>
     /// </summary>
     public double MaxChargePowerWatts => _power.AmpsToWatts(
-        Math.Clamp(_maxChargingCurrentAmps, EvChargerLimits.MinCurrentAmps, EvChargerLimits.MaxCurrentAmps));
+        Math.Clamp(_limits.MaxAmps, EvChargerLimits.MinCurrentAmps, EvChargerLimits.MaxCurrentAmps));
 
     /// <summary>Energy the charger has delivered since the active limit was set, in watt-hours.</summary>
     public double DeliveredWh => _delivered.EnergyWattHours;

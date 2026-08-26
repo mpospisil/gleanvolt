@@ -30,6 +30,12 @@ public static class RetiredConfigurationKeys
         ("Weather:Latitude", "Pv:Latitude"),
         ("Weather:Longitude", "Pv:Longitude"),
         ("HomeAssistant:DeviceName", "Pv:Name"),
+
+        // Issue #124. The car's own facts left the feed's section. The rest of Vehicle -- Enabled, the
+        // broker, MaxAge, ReconnectInterval -- describes the feed and deliberately stays put.
+        ("Vehicle:BatteryCapacityKWh", "Ev:Vehicles:0:BatteryCapacityKWh"),
+        ("Vehicle:ChargeEfficiency", "Ev:Vehicles:0:ChargeEfficiency"),
+        ("Vehicle:Topic", "Ev:Vehicles:0:Telemetry:Topic"),
     ];
 
     /// <summary>

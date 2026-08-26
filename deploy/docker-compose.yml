@@ -153,15 +153,30 @@ services:
       Vehicle__BrokerPort: ${VEHICLE_BROKER_PORT:-1883}
       Vehicle__Username: ${MQTT_USERNAME:-}
       Vehicle__Password: ${MQTT_PASSWORD:-}
-      Vehicle__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
 
       # The car's *usable* pack, which is what its own SOC is a percentage of (issue #99). Zero means
       # unconfigured, and costs exactly one thing: the targeted plan's "Battery target (%)" basis, which
       # cannot convert 80% into kilowatt-hours without it. Efficiency is charger-meter to cells -- not
       # the home battery's Forecast__ChargeEfficiency, which describes different hardware.
-      Vehicle__BatteryCapacityKWh: ${VEHICLE_BATTERY_CAPACITY_KWH:-0}
-      Vehicle__ChargeEfficiency: ${VEHICLE_CHARGE_EFFICIENCY:-0.9}
+      # The car itself (issue #124). Separate from the Vehicle section above, which describes the
+      # *feed* -- the broker, the credentials, how stale a reading may be. These describe the car, and
+      # the last three are the ones the controller previously had to borrow from the charger's
+      # settings: a single-phase car behind a three-phase wallbox had every power figure it reasoned
+      # with overstated threefold.
+      #
+      # The .env variable names are unchanged from when these lived under Vehicle__, so an existing
+      # .env keeps working untouched -- only the configuration key they feed has moved.
+      Ev__Vehicles__0__Id: ${EV_ID:-}
+      Ev__Vehicles__0__Name: ${EV_NAME:-}
+      Ev__Vehicles__0__Make: ${EV_MAKE:-}
+      Ev__Vehicles__0__Model: ${EV_MODEL:-}
+      Ev__Vehicles__0__BatteryCapacityKWh: ${VEHICLE_BATTERY_CAPACITY_KWH:-0}
+      Ev__Vehicles__0__ChargeEfficiency: ${VEHICLE_CHARGE_EFFICIENCY:-0.9}
+      Ev__Vehicles__0__Phases: ${EV_PHASES:-}
+      Ev__Vehicles__0__MinChargingCurrentAmps: ${EV_MIN_CHARGING_CURRENT_AMPS:-}
+      Ev__Vehicles__0__MaxChargingCurrentAmps: ${EV_MAX_CHARGING_CURRENT_AMPS:-}
+      Ev__Vehicles__0__Telemetry__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
 
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}

@@ -253,6 +253,17 @@
       "to": "string(date-time) (required)"
     },
     "EvChargerStatus": "enum[available|preparing|charging|finishing|faulted|unavailable|reserved|suspendedEv|suspendedEvse|update|cardActivation|startDelay|chargePaused|stopping|unknown]",
+    "EvResponse": {
+      "batteryCapacityKWh": "number|string(double) (required)",
+      "chargeEfficiency": "number|string(double) (required)",
+      "id": "string (required)",
+      "make": "string (required)",
+      "maxChargingCurrentAmps": "integer|string(int32)? (required)",
+      "minChargingCurrentAmps": "integer|string(int32)? (required)",
+      "model": "string (required)",
+      "name": "string (required)",
+      "phases": "integer|string(int32)? (required)"
+    },
     "FastChargeBasis": "enum[full|energy|soc]",
     "FastChargeLimitBody": {
       "basis": "$FastChargeBasis",
@@ -543,7 +554,8 @@
       "rangeKm": "number|string(double)? (required)",
       "socPercent": "number|string(double)? (required)",
       "sourceId": "string? (required)",
-      "stale": "boolean (required)"
+      "stale": "boolean (required)",
+      "vehicle": "any"
     },
     "WeatherResponse": {
       "cloudsPercent": "number|string(double) (required)",

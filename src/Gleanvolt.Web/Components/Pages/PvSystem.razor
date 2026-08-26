@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject PvSystemInfo Site
+@inject EvInfo Car
+@inject ChargingLimits Limits
 
 @*
     The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
@@ -131,6 +133,77 @@
     the configuration is a list so that it need not change shape the day a second one can be driven.
 </p>
 
+<h2>The car</h2>
+
+@if (!Car.IsConfigured)
+{
+    <p class="muted" id="no-vehicle">
+        No car is described, so every charging limit is the installation's own and no target can be
+        asked for as a state of charge. Describe one under <code>Ev:Vehicles:0</code> to say what its
+        pack holds and what currents it will actually accept.
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <dt>Name</dt>
+        <dd>@Text(Car.Name)</dd>
+
+        <dt>Id</dt>
+        <dd>@Text(Car.Id)</dd>
+
+        <dt>Model</dt>
+        <dd>@Text(string.Join(" ", new[] { Car.Make, Car.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
+
+        <dt>Usable battery</dt>
+        <dd>@(Car.CanTargetSoc ? $"{Car.BatteryCapacityKWh.ToString("0.#", Invariant)} kWh" : Missing)</dd>
+
+        <dt>Charge efficiency</dt>
+        <dd>@Car.ChargeEfficiency.ToString("P0", Invariant)</dd>
+    </dl>
+
+    <h3>What it will accept</h3>
+
+    @*
+        Three columns rather than one, because the interesting number is the third: what the car says,
+        what the installation says, and which of them the controller is actually working to. A page
+        that showed only the car's figures would leave somebody wondering why a 32 A car charges at 16.
+    *@
+    <table class="grid">
+        <thead>
+            <tr><th>&nbsp;</th><th>The car</th><th>The installation</th><th>In effect</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Minimum current</td>
+                <td>@Amps(Car.MinChargingCurrentAmps)</td>
+                <td>@Amps(Limits.MinAmps == Car.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
+                <td>@Amps(Limits.MinAmps)</td>
+            </tr>
+            <tr>
+                <td>Maximum current</td>
+                <td>@Amps(Car.MaxChargingCurrentAmps)</td>
+                <td>@Amps(Limits.MaxAmps == Car.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
+                <td>@Amps(Limits.MaxAmps)</td>
+            </tr>
+            <tr>
+                <td>Phases</td>
+                <td>@Count(Car.Phases)</td>
+                <td>@Count(Limits.Phases == Car.Phases ? null : Limits.Phases)</td>
+                <td>@Count(Limits.Phases)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="table-note muted">
+        The controller works to the narrower of the two. A car can only ever <em>lower</em> a limit —
+        the installation's maximum is the site's supply and the wiring in the wall, not a preference —
+        and anything the car leaves unstated is simply the installation's figure. Phases matter more
+        than they look: every power figure the controller reasons with, including when a deferred fast
+        charge has to start, is computed from the count in the last column.
+    </p>
+}
+
 @code {
     private const string Missing = "—";
 
@@ -143,6 +216,10 @@
         ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
+
+    private static string Amps(int? value) => value is { } amps ? $"{amps} A" : Missing;
+
+    private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
 
     private static string Address(PvDeviceInfo device) => $"{device.Connection.Host}:{device.Connection.Port}";
 

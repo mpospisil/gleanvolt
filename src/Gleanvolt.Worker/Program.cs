@@ -58,6 +58,10 @@ log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
 // #111). A log file that cannot answer that is a log file nobody can read six months later.
 log.LogInformation("PV system: {System}.", host.Services.GetRequiredService<PvSystemInfo>().Describe());
 
+// And the car, on the same terms (#124): "which installation was this, and what car did it think it
+// had" should both be answerable from a `docker logs` dump with no configuration file beside it.
+log.LogInformation("Vehicle: {Vehicle}.", host.Services.GetRequiredService<EvInfo>().Describe());
+
 // Said explicitly because nothing else says it: Kestrel's own "Now listening on" is logged under
 // Microsoft.Hosting.Lifetime, which the Serilog configuration holds at Warning. Without this line a
 // log file cannot answer "was the UI up, and on which port" -- and the answer is a listening socket

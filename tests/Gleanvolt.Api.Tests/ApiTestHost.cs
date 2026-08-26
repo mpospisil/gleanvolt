@@ -43,6 +43,12 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     internal VehicleStateHolder Vehicle { get; } = new();
 
+    /// <summary>
+    /// The configured car (#124) — what it <em>is</em>, as opposed to <see cref="Vehicle"/>, which is
+    /// what it last <em>said</em>. Unknown unless a test describes one.
+    /// </summary>
+    internal EvInfo Car { get; set; } = EvInfo.Unknown;
+
     internal TimeZoneInfo Zone { get; } = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
     /// <summary>Starts the host and returns a client that already presents a valid key.</summary>
@@ -75,6 +81,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<IVehicleTelemetry>(Vehicle);
         builder.Services.AddSingleton(new ApiHostInfo("1.2.3-test", TimeSpan.FromHours(12)));
         builder.Services.AddSingleton(Fixtures.Site);
+        builder.Services.AddSingleton(Car);
         builder.Services.AddSingleton(new TargetedChargeRequestLimits(
             MaxHorizon: TimeSpan.FromHours(36),
             BatteryCapacityKWh: batteryCapacityKWh,

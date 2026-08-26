@@ -33,11 +33,20 @@ public sealed class VehicleMqttWorker : BackgroundService
     private string? _lastError;
     private bool _receivedAnything;
 
+    private readonly string _topic;
+
+    /// <param name="ev">
+    /// The car this feed reports on (#124). Only the topic comes from here: two cars on one broker are
+    /// two topics, so the topic is genuinely per-vehicle, while the broker, the credentials and the
+    /// staleness guard stay in the Vehicle section because they describe the feed rather than the car.
+    /// </param>
     public VehicleMqttWorker(
         IOptions<VehicleOptions> options,
+        EvInfo ev,
         VehicleStateHolder holder,
         ILogger<VehicleMqttWorker> logger)
     {
+        _topic = ev.TelemetryTopic;
         _options = options.Value;
         _holder = holder;
         _logger = logger;
@@ -51,9 +60,10 @@ public sealed class VehicleMqttWorker : BackgroundService
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_options.Topic))
+        if (string.IsNullOrWhiteSpace(_topic))
         {
-            _logger.LogWarning("Vehicle telemetry is enabled but Vehicle:Topic is empty; nothing to subscribe to.");
+            _logger.LogWarning(
+                "Vehicle telemetry is enabled but Ev:Vehicles:0:Telemetry:Topic is empty; nothing to subscribe to.");
             return;
         }
 
@@ -74,7 +84,7 @@ public sealed class VehicleMqttWorker : BackgroundService
 
         _logger.LogInformation(
             "Vehicle telemetry enabled; broker {Host}:{Port}, topic {Topic}, max age {MaxAge}.",
-            _options.BrokerHost, _options.BrokerPort, _options.Topic, _options.MaxAge);
+            _options.BrokerHost, _options.BrokerPort, _topic, _options.MaxAge);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -83,8 +93,8 @@ public sealed class VehicleMqttWorker : BackgroundService
                 if (!_client.IsConnected)
                 {
                     await _client.ConnectAsync(clientOptions, stoppingToken).ConfigureAwait(false);
-                    await _client.SubscribeAsync(_options.Topic, cancellationToken: stoppingToken).ConfigureAwait(false);
-                    _logger.LogInformation("Subscribed to vehicle telemetry on {Topic}.", _options.Topic);
+                    await _client.SubscribeAsync(_topic, cancellationToken: stoppingToken).ConfigureAwait(false);
+                    _logger.LogInformation("Subscribed to vehicle telemetry on {Topic}.", _topic);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
