@@ -49,6 +49,14 @@ public sealed class FastChargingController : IChargingController
         _completionDwell = completionDwell;
     }
 
+    /// <summary>
+    /// The current this mode runs at — the configured maximum, clamped into the hardware's range. A
+    /// constant, which is what makes it worth exposing: <see cref="Interfaces.IChargeActions"/> writes
+    /// it to the charger the moment the mode is started rather than leaving the first poll to do it, and
+    /// reading it from here is what stops the two disagreeing about the figure.
+    /// </summary>
+    public int ChargeCurrentAmps => _chargeCurrentAmps;
+
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
         // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote

@@ -311,11 +311,15 @@ public class FastNoBatteryModeTests
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
         var forecast = new NoForecastService();
 
+        // One instance, shared by the coordinator and the action -- the arrangement DI produces, and the
+        // whole point of the action reading its current off the controller.
+        var fastController = new FastChargingController(
+            chargeControl.MaxChargingCurrentAmps, chargeControl.CompletionDwell);
+
         var coordinator = new ChargingControlCoordinator(
             new Dictionary<ChargeControlMode, IChargingController>
             {
-                [ChargeControlMode.FastNoBattery] = new FastChargingController(
-                    chargeControl.MaxChargingCurrentAmps, chargeControl.CompletionDwell),
+                [ChargeControlMode.FastNoBattery] = fastController,
             },
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
@@ -342,7 +346,7 @@ public class FastNoBatteryModeTests
             _mode,
             // The real actions over the fake charger: a mode that ends itself has to stop the charger
             // exactly as the Off button does, and that is the code path it goes through.
-            new ChargeActions(_charger, _mode, NullLogger<ChargeActions>.Instance),
+            new ChargeActions(_charger, _mode, fastController, NullLogger<ChargeActions>.Instance),
             _manualHold,
             _inverter,
             _status,
