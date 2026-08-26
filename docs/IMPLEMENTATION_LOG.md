@@ -4,6 +4,51 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-26 — The source's comments reach the OpenAPI document, enums included (issue #126)
+
+The README claimed the XML comments were the document's descriptions. True for properties; false for
+every enum, and false for everything in `Gleanvolt.Core`.
+
+### What changed
+
+- `GenerateDocumentationFile` moved from `Directory.Build.targets` (where it silently did nothing —
+  see the decision record) to `Directory.Build.props`, unconditionally. Every `Gleanvolt.*` assembly
+  now has its `.xml` beside its `.dll`, in `bin/` **and** in `publish/`.
+- `XmlDocumentation` reads those files at runtime; `XmlDocumentationTransformer` is a **document**
+  transformer that gives each enum its type summary plus a legend naming every value as it appears on
+  the wire. It only ever fills blanks.
+- `EvChargerStatus` was documented with `//` comments, so nothing could read it at all. Now XML,
+  including the distinction that matters: `SuspendedEv` is the car stopping and counts as finished,
+  `SuspendedEvse` and `ChargePaused` are the charger's doing — usually ours — and must not.
+- Fixed the seven broken doc references the newly-enabled warnings surfaced, one of them mine from
+  #122 (a `<param>` naming a parameter that does not exist).
+- CS1591 and CS1573 are suppressed — both fire on a deliberate habit. **CS1572 and CS1574 are not**:
+  those are documentation that is *broken* rather than absent, and they put dangling references into
+  the document.
+
+### Things worth knowing
+
+- **An `IOpenApiSchemaTransformer` is never invoked for a hoisted enum component.** It registers, it
+  runs, it changes nothing. That is why this is a document transformer.
+- **The wire shape did not move.** `OpenApiContract.json` is byte-identical: this adds descriptions and
+  nothing else.
+- **The `<b>` tags in a generator-produced summary survive into the description.** Harmless — OpenAPI
+  descriptions are CommonMark, which permits inline HTML — but it is why a type summary and the legend
+  below it are not formatted identically.
+
+### Verification performed
+
+- **1136 tests pass** (5 new, of which 3 read the served document): every enum described, every schema
+  property described bar `ProblemDetails`, and a spot check that a Core enum's summary survives the
+  trip through a referenced assembly's XML.
+- A clean solution rebuild emits **zero warnings**.
+- `dotnet publish` was checked explicitly, because the alternative is a feature that works on a
+  developer's machine and not in the container.
+- **Not yet verified on hardware**, and there is little to verify: the document is generated the same
+  way in the container, and `/api/v1/openapi.json` is the check.
+
+---
+
 ## 2026-08-26 — The car is described once (issue #124)
 
 The car's facts were scattered across two sections that are about other things, and three of them were

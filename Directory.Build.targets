@@ -5,16 +5,6 @@
     conditioned on IsPackable, and a project sets that in its own body, which .props (imported above
     that body) would be too early to see.
   -->
-  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
-    <!--
-      The XML comments in this codebase carry the reasoning, not just the signature, so they belong
-      in the package. CS1591 is silenced with them: "missing documentation" on every undocumented
-      public member would bury the warnings that mean something.
-    -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
-  </PropertyGroup>
-
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
     <!--

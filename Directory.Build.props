@@ -30,6 +30,43 @@
     <Authors>Martin Pospisil</Authors>
 
     <!--
+      The XML comments in this codebase carry the reasoning, not just the signature. They belong in
+      the packages, and — the reason this is here rather than beside the packaging metadata in
+      .targets — the OpenAPI document is generated from them, so a comment that does not reach a
+      .xml file beside its .dll is a description that does not reach a generated client.
+
+      It must be set HERE, before the project body, and not in a condition on IsPackable. The SDK
+      turns this flag into a DocumentationFile and into the DocFileItem that copies it next to the
+      assembly, and it does both while importing its own targets — which happens BEFORE
+      Directory.Build.targets. Setting it there leaves GenerateDocumentationFile reading `true`, the
+      compiler writing the file into obj/, and nothing ever copying it to bin/: documentation that
+      exists, is reported as enabled, and cannot be found by anything that looks for it. That is how
+      every enum in Gleanvolt.Core reached the OpenAPI document with no description at all while the
+      build claimed otherwise.
+
+      Unconditional rather than packable-only, deliberately. A per-project opt-in is what produced
+      the trap above, and the cost of a documentation file for a test project is a file nobody reads.
+      CS1591 goes with it: "missing documentation" on every undocumented public member would bury the
+      warnings that mean something.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!--
+      CS1591 ("missing XML comment") and CS1573 ("some parameters documented, not all") are both
+      silenced, and for the same reason: they fire on a deliberate habit rather than on a mistake.
+      Plenty of records here describe their obvious parameters in the summary prose and reserve
+      <param> for the ones that need an argument made — ChargingControlDecision is the clearest
+      example — and 136 warnings about that would bury the ones that mean something.
+
+      CS1572 and CS1574 are NOT silenced, deliberately. Those are documentation that is *broken*
+      rather than absent: a <param> naming a parameter that does not exist, or a <see cref> that does
+      not resolve. Both put a dangling reference in the .xml, and therefore in the OpenAPI document
+      and in whatever generates a client from it. Seven of them were already in the tree when this
+      flag started working; the compiler should keep finding the next one.
+    -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+
+    <!--
       The file rather than a PackageLicenseExpression: the terms then live inside the artifact
       instead of in a field beside it, and the package says whatever the repository's LICENSE says
       without this line having to be kept in step with it.

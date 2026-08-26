@@ -9,13 +9,11 @@
     <PackageId>Gleanvolt.Api</PackageId>
 
     <!--
-      The XML comments are load-bearing here in a way they are nowhere else: the OpenAPI document is
-      generated from them, and a client generated from that document, an MCP tool surface especially,
-      has nothing else to go on. Said here rather than left to the IsPackable rule in
-      Directory.Build.targets, which sets the same flag too late for the SDK to turn it into a
-      documentation file: that file is imported last of all, after the SDK targets that read it.
+      GenerateDocumentationFile is not set here any more: Directory.Build.props sets it for every
+      project, which is early enough for the SDK to act on it. It used to be repeated here because
+      the shared rule lived in .targets and silently did nothing — see the comment there for what
+      that cost.
     -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>The Gleanvolt's HTTP API, described by OpenAPI: live telemetry, energy history, charging sessions, the forecast and the car, a targeted plan that can be quoted without starting it, and the actions that start one.</Description>
   </PropertyGroup>
 

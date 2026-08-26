@@ -18,7 +18,8 @@ namespace Gleanvolt.Core.Strategies;
 /// the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — written once when the target was
 /// activated, and never re-asserted from here. There is still no battery loan in this mode: the home
 /// battery keeps its priority. What the mode <em>will</em> do is bridge from the <b>grid</b> — see
-/// <see cref="GridBridgeWatts"/> — which is the same trade the plan already made, taken live.</para>
+/// <see cref="ChargingControlDecision.GridBridgeWatts"/> — which is the same trade the plan already
+/// made, taken live.</para>
 /// </summary>
 public sealed class TargetedChargingController : IChargingController
 {

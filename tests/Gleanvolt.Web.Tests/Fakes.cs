@@ -56,7 +56,7 @@ internal static class Statuses
 }
 
 /// <summary>
-/// A minimal stand-in for <see cref="ChargeControlModeSelector"/> (which lives in Gleanvolt.Worker and
+/// A minimal stand-in for <c>ChargeControlModeSelector</c> (which lives in Gleanvolt.Worker and
 /// so isn't reachable from here): records every <see cref="Set"/> call and raises
 /// <see cref="Changed"/> exactly like the real thing, which is what the dashboard's mode line depends
 /// on to notice a mode changing underneath it (e.g. FastNoBattery ending its own session).
@@ -131,7 +131,7 @@ internal sealed class FakeChargeActions(FakeChargeControlModeSelector selector) 
     }
 }
 
-/// <summary>A minimal stand-in for <see cref="BatteryHoldSelector"/>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
+/// <summary>A minimal stand-in for <c>BatteryHoldSelector</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
 internal sealed class FakeBatteryHoldSelector(bool initialHold = false) : IBatteryHoldSelector
 {
     public bool Hold { get; private set; } = initialHold;
@@ -165,7 +165,7 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
     public void RequestStop(string source) => Requests.Add(source);
 }
 
-/// <summary>A minimal stand-in for <see cref="ForecastRuntimeSettings"/>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
+/// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
 internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 {
     public double DailyEvTargetWh { get; private set; } = 15_000;
@@ -204,7 +204,7 @@ internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 }
 
 /// <summary>
-/// A minimal stand-in for <see cref="Gleanvolt.Infrastructure.Sessions.SqliteChargingSessionStore"/>
+/// A minimal stand-in for <c>SqliteChargingSessionStore</c>
 /// (which lives in Gleanvolt.Infrastructure and pulls in SQLite, neither appropriate for a Blazor
 /// component test): an in-memory list queried the same way the real store is, plus a way to make it
 /// fail like an unopened or disabled store would.
@@ -341,7 +341,7 @@ internal static class TestSessions
             PlanRequiredSocFloorPercent: null);
 }
 
-/// <summary>Plausible <see cref="SolarDayPlan"/> values for tests, standing in for <see cref="Strategies.SolarDayPlanner"/>'s output.</summary>
+/// <summary>Plausible <see cref="SolarDayPlan"/> values for tests, standing in for <c>SolarDayPlanner</c>'s output.</summary>
 internal static class TestPlans
 {
     public static SolarDayPlan Usable(
