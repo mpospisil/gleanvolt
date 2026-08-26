@@ -208,7 +208,7 @@ public sealed class PollingService : BackgroundService
                 }
 
                 var hold = await ApplyBatteryHoldAsync(
-                    state, mode, plan, targetedPlan, result.GridBridgeWatts > 0, stoppingToken);
+                    state, mode, plan, targetedPlan, fastCharge, result.GridBridgeWatts > 0, stoppingToken);
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -313,14 +313,12 @@ public sealed class PollingService : BackgroundService
                 + "with no way to stop the inverter discharging the home battery into the car.",
                 mode);
         }
-
-        ArmFastHold(mode);
     }
 
     /// <summary>
-    /// Arms the discharge hold for a fast charge that has just started — keeping the pack out of the
-    /// fastest charge the site can deliver is the mode's entire reason for existing, so it is armed by
-    /// default and the owner never has to remember to.
+    /// Arms the discharge hold for a fast charge that is actually charging — keeping the pack out of
+    /// the fastest charge the site can deliver is the mode's entire reason for existing, so it is armed
+    /// by default and the owner never has to remember to.
     ///
     /// <para>Through <see cref="IBatteryHoldSelector"/> rather than beside it, which is the whole point:
     /// the Home Assistant switch publishes what is actually armed, so a hold armed only inside this
@@ -328,16 +326,24 @@ public sealed class PollingService : BackgroundService
     /// <c>Set(false)</c> that changes nothing and raises no event. Arming through the switch keeps its
     /// level matching what is on screen, so turning it off is a real transition that really releases
     /// the hold. That is the §7 requirement of #119: armed by default, and the switch means something.</para>
+    ///
+    /// <para><b>On charging, not on mode entry</b> — the change #122 made, and it is not a nicety. A
+    /// charge deferred to 04:12 is selected at 22:00, so arming at entry would lock the pack out of
+    /// serving the house for six hours in which nothing is being charged at all. The owner would find a
+    /// battery that sat full while the grid carried the evening, and nothing in the log saying why.</para>
+    ///
+    /// <para>Idempotent, and that matters just as much: it fires on the transition only, so it can run
+    /// every cycle without re-arming a hold the owner has deliberately switched off mid-charge.</para>
     /// </summary>
-    private void ArmFastHold(ChargeControlMode mode)
+    private void ArmFastHoldWhenCharging(ChargeControlMode mode, bool waiting)
     {
-        if (mode != ChargeControlMode.FastNoBattery || !_batteryHoldOptions.Enabled)
+        if (mode != ChargeControlMode.FastNoBattery || waiting || _fastHold || !_batteryHoldOptions.Enabled)
         {
             return;
         }
 
         _fastHold = true;
-        _batteryHold.Set(true, "the FastNoBattery mode starting");
+        _batteryHold.Set(true, "the FastNoBattery mode charging");
     }
 
     /// <summary>
@@ -380,6 +386,7 @@ public sealed class PollingService : BackgroundService
         ChargeControlMode mode,
         SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
+        FastChargeProgress? fastCharge,
         bool gridBridging,
         CancellationToken cancellationToken)
     {
@@ -392,7 +399,7 @@ public sealed class PollingService : BackgroundService
         // switch is on, and the fast mode's release runs *inside* AutoHold -- through the switch. A
         // mode ending while its own hold was armed would then never release it, which is the one
         // outcome this whole arrangement exists to prevent.
-        var auto = AutoHold(state, mode, plan, targetedPlan, gridBridging);
+        var auto = AutoHold(state, mode, plan, targetedPlan, fastCharge, gridBridging);
         var hold = _batteryHold.Hold || auto;
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
@@ -461,14 +468,19 @@ public sealed class PollingService : BackgroundService
         ChargeControlMode mode,
         SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
+        FastChargeProgress? fastCharge,
         bool gridBridging)
     {
         ReleaseFastHoldIfEnded(mode);
 
         if (mode == ChargeControlMode.FastNoBattery)
         {
-            // Nothing to add: the mode's own hold is on the switch, so returning true here would put it
-            // back to being a floor and take the switch's authority away again.
+            // A deferred charge (#122) is selected hours before it runs, and holding the pack out of a
+            // charge that has not started is six hours of the house on the grid for nothing.
+            ArmFastHoldWhenCharging(mode, waiting: fastCharge?.Plan?.IsWaitingAt(state.Timestamp) == true);
+
+            // Nothing to add beyond that: the mode's own hold is on the switch, so returning true here
+            // would put it back to being a floor and take the switch's authority away again.
             //
             // An auto-hold from whatever ran before this is dropped, though. It is not this mode's, and
             // leaving the flag set would tell the forecast mode's hysteresis it was already armed if

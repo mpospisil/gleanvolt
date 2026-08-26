@@ -21,6 +21,8 @@ public class HaButtonCommandTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero); // 22:00 Prague
 
+    private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
+
     private static readonly HomeAssistantOptions HaOptions = new()
     {
         BaseTopic = "solax",
@@ -239,6 +241,68 @@ public class HaButtonCommandTests
         // Still Full, so still unlimited -- not silently promoted to the energy that happens to be typed.
         Assert.Null(_fast.Limit);
         Assert.Single(_actions.Starts);
+    }
+
+    [Fact]
+    public async Task ChargeFastCarriesTheDepartureWhenOneIsTyped()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "30");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.FastDepartureText), "07:00");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        // 22:00 Prague, so "07:00" is the next one -- tomorrow morning.
+        Assert.True(_fast.Limit!.IsDeferred);
+        Assert.Equal(7, TimeZoneInfo.ConvertTime(_fast.Limit.DepartBy!.Value, Prague).Hour);
+    }
+
+    [Fact]
+    public async Task ClearingTheFastDepartureGoesBackToChargingNow()
+    {
+        // The box spends most of its life empty, and empty has to mean something coherent -- which is
+        // what #117 was about on the targeted entity.
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "30");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.FastDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.FastDepartureText), "");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.NotNull(_fast.Limit);
+        Assert.False(_fast.Limit!.IsDeferred);
+    }
+
+    [Fact]
+    public async Task ADepartureWithTheBasisLeftOnFullIsRefused()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.FastDepartureText), "07:00");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Empty(_actions.Starts);
+        Assert.Null(_fast.Limit);
+    }
+
+    [Fact]
+    public async Task AnUnparseableFastDepartureIsIgnoredRatherThanGuessedAt()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "30");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.FastDepartureText), "tomorrow-ish");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        // Charges now rather than at a time nobody meant.
+        Assert.False(_fast.Limit!.IsDeferred);
     }
 
     private HomeAssistantMqttWorker Worker(VehicleOptions? vehicleOptions = null) =>

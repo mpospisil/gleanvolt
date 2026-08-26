@@ -59,7 +59,11 @@ internal static class ControlEndpoints
                     targetSocPercent: body.Fast?.TargetSocPercent,
                     vehicleSocPercent: vehicle.GetCurrentState()?.SocPercent,
                     pack: limits.Pack,
-                    now: time.GetUtcNow());
+                    now: time.GetUtcNow(),
+                    departBy: body.Fast?.DepartBy,
+                    // The targeted mode's horizon, and for the same reason it has one: neither can
+                    // promise anything past what a request that does not survive a restart can carry.
+                    maxHorizon: limits.MaxHorizon);
 
                 if (!composed.Accepted)
                 {
@@ -132,6 +136,11 @@ internal static class ControlEndpoints
                 + "an amount of energy, a state of charge, or 'full' to let the car decide (the "
                 + "default, and what you get by omitting it). It is a stopping condition and nothing "
                 + "more — the charger stays pinned at the installation's maximum either way.\n\n"
+                + "Add 'departBy' and the charge is deferred instead: it starts as late as it can and "
+                + "still finish in time, so a pack asked to go above 80% spends minutes there rather "
+                + "than a whole night. It needs an amount to work back from, so a departure with "
+                + "'full' is refused. Read the schedule back under fastCharge.schedule on the "
+                + "status.\n\n"
                 + "A refused hardware write is reported as 200 with succeeded=false and a message, not "
                 + "as an HTTP error: the call was understood and the controller is in a well-defined "
                 + "state (exactly the one it was in before). Read the flag, not the status code.\n\n"

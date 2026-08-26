@@ -40,12 +40,29 @@ namespace Gleanvolt.Core.Models;
 /// What the car was reporting when the conversion was made, so the limit can be read back as
 /// "42% → 60%" rather than only as a number of kilowatt-hours. Null on an energy request.
 /// </param>
+/// <param name="DepartBy">
+/// When the car has to be ready, or null to charge from the moment the mode is started — which is what
+/// this mode did before #122 and still does unless somebody says otherwise.
+///
+/// <para>With a departure the charge is <b>deferred</b>: it starts as late as it can and still finish
+/// in time, so a pack asked to go above 80% spends minutes there rather than a whole night. That is
+/// the entire reason this field exists — a lithium cell ages faster the longer it is held high, and
+/// the charge itself is the short part.</para>
+///
+/// <para>It changes <em>when</em>, never <em>how</em>: the current is still pinned at the
+/// installation's maximum from the first cycle of charging to the last. Anything that paces a charge,
+/// or spends a sunnier hour on it, is <see cref="Enums.ChargeControlMode.Targeted"/>.</para>
+/// </param>
 public sealed record FastChargeLimit(
     double RequiredEnergyWh,
     DateTimeOffset ActivatedAt,
     double? TargetSocPercent = null,
-    double? VehicleSocPercentAtRequest = null)
+    double? VehicleSocPercentAtRequest = null,
+    DateTimeOffset? DepartBy = null)
 {
+    /// <summary>Whether this charge is deferred to meet a departure rather than starting at once.</summary>
+    public bool IsDeferred => DepartBy is not null;
+
     /// <summary>
     /// Whether the owner asked in state of charge. Purely about how the limit is <em>described</em> —
     /// everything downstream reads <see cref="RequiredEnergyWh"/> either way.

@@ -30,7 +30,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Real-time polling** of PV generation, battery state of charge, grid import/export, and EV charger status over Modbus TCP.
 - **Surplus-aware EV charging** — automatically ramp EV charge current up/down based on available household energy surplus.
 - **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
-- **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full — or when the amount you asked for has been delivered, said in kilowatt-hours or as a battery target.
+- **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full — or when the amount you asked for has been delivered, said in kilowatt-hours or as a battery target. Tell it when you leave and it waits, starting as late as it can and still finish — so a car charged above 80% sits there for minutes rather than all night.
 - **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs. Ask in kilowatt-hours, or, with a car that reports its own battery, in state of charge — "80% by seven". Either way the plan is put in front of you and started only when you confirm it. Choose **just in time** instead of cheapest and the last stretch is held back so the car reaches 100% shortly before you leave rather than sitting full all night — the preview names what that costs in grid before you commit to it.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
@@ -901,10 +901,59 @@ already asks — and the answer is a **stopping condition and nothing else**:
   the mode there and says how far short it got.
 - **It does not survive a restart**, like the mode itself and the targeted request.
 
+#### When? (the departure)
+
+By default the charge starts the moment you press the button. Give it a **departure** and it starts as
+late as it can while still finishing in time:
+
+```
+start no later than  =  departure − safety margin − (energy still needed ÷ charging power)
+```
+
+30 kWh at 11 kW, wanted by 07:00, with the standard 15-minute margin: the charge waits until about
+**04:02**, then runs flat out. Until then the charger sits in `Fast` at `PauseCurrentAmps` and the
+controller says what it is waiting for.
+
+**Why you would want this: the pack.** A lithium cell ages faster the longer it is held at a high state
+of charge, so the 20 points above 80% are worth buying as late as possible. The charge itself takes two
+or three hours; it is the nine hours of *sitting* at 95% that does the damage. Pressing the button at
+22:00 for an 07:00 departure turns those nine hours into about twenty minutes.
+
+- **It changes *when*, never *how*.** When it runs, it runs at `MaxChargingCurrentAmps` exactly as it
+  always did. Nothing here paces the charge, waits for cheaper electricity, or consults a forecast —
+  that is [`Targeted`](#targeted-charging-the-targeted-mode), and the difference is the whole reason
+  both exist.
+- **It needs an amount.** With **Until the car stops** there is no duration to work back from and so
+  no such thing as the latest moment it could start; the combination is refused in words rather than
+  quietly charging at once.
+- **The schedule is rebuilt every poll**, so the start time moves *later* as energy goes in — and
+  *earlier* the moment the car turns out to draw less than the charger offers. An 11 kW wallbox in
+  front of a car with a 7.4 kW on-board charger is otherwise a plan an hour short of the time it
+  needs, and this is the mode with no slack in it.
+- **Before the car draws anything, the plan is a guess.** The car's on-board limit is not knowable
+  until it charges, so the first schedule uses the installation's maximum and says so — *"the
+  installation's maximum, not yet measured"*.
+- **Not enough time?** It charges flat out from now and reports how far short it will fall, rather
+  than pretending. The same honesty `Targeted` commits to.
+- **Plugged in after the start time?** It begins at once. The plan is a "not before" gate, never a
+  "not after" one.
+- **The departure passing ends the mode**, reporting what was delivered — the same rule `Targeted`
+  follows. A car that is not ready at the moment you said you were leaving has run out of the window
+  it was given.
+
+> ⚠️ **A deferred charge does not survive a restart.** Neither does the mode nor the amount, and the
+> reasoning is the same throughout — but this is the sharpest form of it: a charge deferred to 04:02
+> and lost to a 23:00 container restart is discovered at 07:00 with a car that never charged. If you
+> restart the stack in the evening, set it again afterwards.
+
 #### The hold, and who owns it
 
-Starting a fast charge **arms the battery discharge hold**, and ending it — for *any* reason: you
-pressed Off, the car finished, the amount was delivered, the car was unplugged — **releases it**.
+A fast charge **arms the battery discharge hold when it starts charging**, and ending it — for *any*
+reason: you pressed Off, the car finished, the amount was delivered, the car was unplugged —
+**releases it**.
+
+*When it starts charging*, not when the mode is selected: a charge deferred to 04:02 would otherwise
+lock the pack out of serving the house from 22:00, all night, with nothing being charged at all.
 
 Between those two moments the switch is yours: turn **Battery discharge hold** off in Home Assistant
 or the web UI and the pack is allowed to help, while the car goes on charging at maximum. That is a
@@ -967,9 +1016,13 @@ selection: it cannot keep the battery out of the charge, which is half of what i
 }
 ```
 
-The amount itself is not configuration — it belongs to one charge — so there is nothing to set here
-for it. A battery target reads `Vehicle:BatteryCapacityKWh` and `Vehicle:ChargeEfficiency`, the same
-two figures a targeted SOC request uses.
+The amount and the departure are not configuration — they belong to one charge — so there is nothing
+to set here for them. A battery target reads `Vehicle:BatteryCapacityKWh` and
+`Vehicle:ChargeEfficiency`, the same two figures a targeted SOC request uses; a departure reads
+`ChargeControl:Targeted:SafetyMargin` and `ChargeControl:Targeted:MaxHorizon`. Those two are
+deliberately shared rather than duplicated: *"ready at 07:00 must not mean still charging at 07:00"*
+is a fact about your morning, not about which strategy happens to be running, and two settings for it
+would only ever drift apart.
 
 ### Targeted charging (the `Targeted` mode)
 
@@ -1221,8 +1274,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
     [Fast charge without the battery](#fast-charge-without-the-battery-the-fastnobattery-mode) below.
     This is one of the two that switch *themselves* off, so **Charge mode** will change under you when
     the charge ends. The amount is optional and lives on the three entities beside the button:
-    **Fast basis**, **Fast energy** and **Fast target SOC**. Left at `Full` — the default — the button
-    does exactly what it always did.
+    **Fast basis**, **Fast energy**, **Fast target SOC** and **Fast departure**. Left at `Full` with
+    no departure — the default — the button does exactly what it always did.
   - **Activate target** — deliver a stated amount of energy by a stated departure time, sun first and
     paced across the window so the roof covers as much of it as it can. See
     [Targeted charging](#targeted-charging-the-targeted-mode) below.
@@ -1251,10 +1304,10 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
   unlimited), **Minimum battery SOC** (%) and **SOC resume margin** (%). Like the mode, changes don't
   persist across restarts.
-- the fast-charge controls — the **Fast basis** select, the **Fast energy** number and the
-  **Fast target SOC** number, applied by the **Charge fast** button that was already there — plus its
-  two progress sensors, **Fast delivered** and **Fast target**. Both are absent while the mode runs
-  with no amount, which is how a dashboard shows "the car decides". See
+- the fast-charge controls — the **Fast basis** select, the **Fast energy** and **Fast target SOC**
+  numbers and the **Fast departure** text, applied by the **Charge fast** button that was already
+  there — plus its sensors: **Fast delivered**, **Fast target** and **Fast start**. All absent while
+  the mode runs with no amount, which is how a dashboard shows "the car decides". See
   [Fast charge without the battery](#fast-charge-without-the-battery-the-fastnobattery-mode) above.
 - the targeted-charge controls — the **Target energy** number, the **Departure time** text, the
   **Charge priority** select, the **Target rest SOC** number and the
@@ -1290,6 +1343,8 @@ description or tooltip field. The meanings live here instead.
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
 | **Fast energy** | kWh | How much to deliver before the fast charge stops itself, measured at the charger and metered from the press. Read only under the `Energy` basis. Doesn't persist across restarts. |
 | **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Vehicle:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. Doesn't persist across restarts. |
+| **Fast departure** | text | When the car has to be ready, as `HH:mm` (the next one) or `yyyy-MM-dd HH:mm`. Empty means charge straight away, which is the default. With a time the charge is held back and starts as late as it still can — see [When? (the departure)](#when-the-departure). Needs an amount to work back from, so a departure with the basis on `Full` is refused. Doesn't persist across restarts. |
+| **Fast start** | sensor | When the deferred charge will begin, as `HH:mm`, or `none` when it starts immediately. Moves later as energy goes in, and earlier if the car turns out to draw less than the charger offers. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast delivered** | kWh | Energy delivered against the fast charge's amount, since it was started. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast target** | kWh | The amount that fast charge is working to — the number **Fast delivered** is counting towards. Absent on the same terms. |
 | **Control state** | — | What charge control is doing right now. `Disabled`: nothing is running, the charger is the owner's. `Idle`: a strategy is running but not acting — most often because the charger has been taken out of Fast at the wallbox since it was started. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
@@ -1723,7 +1778,7 @@ other:
 | --- | --- | --- |
 | **Solar** | Charge from surplus | Nothing to configure — the current is whatever the sun leaves over. The surplus, the battery SOC that gates it, and what the car is drawing. |
 | **Forecasted** | Charge to the forecast | The four runtime numbers the plan reads, then the day plan itself and the timeline chart. |
-| **Fast (no battery)** | Charge at maximum | How much to deliver before it stops — until the car stops, an amount in kWh, or a battery target — then what the speed costs: the car's actual draw and current, the setpoint read back, grid power, and the amount delivered so far when there is one. |
+| **Fast (no battery)** | Charge at maximum | How much to deliver before it stops — until the car stops, an amount in kWh, or a battery target — and optionally when you need it, which holds the charge back so it finishes just in time. Then what the speed costs: the car's actual draw and current, the setpoint read back, grid power, and the amount delivered so far when there is one. |
 | **Targeted** | Preview plan → Start charging / Cancel | What the car says about itself, then what you want — kilowatt-hours or a battery target — the charging priority and its rest level, the departure, the minimum battery SOC the planner works to, and the plan in words and figures *before* the charger moves. |
 
 The tab is in the URL (`/charging-plan/forecasted`), so a bookmark and a refresh come back to the same
@@ -1951,7 +2006,7 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /forecast` | Today and tomorrow period by period, from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. |
 | `GET /vehicle` | What the car last said — SOC, range, plug and charge state — **and how old the reading is**. |
 | `POST /plans/targeted/preview` | What a targeted charge *would* do. Writes to nothing. |
-| `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount. |
+| `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount and departure. |
 | `POST /charging/stop` | Stop charging and clear any standing target. |
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
 
@@ -2012,10 +2067,19 @@ refuses. It says **when to stop**, not how to charge:
 -d '{"mode": "fastNoBattery"}'
 ```
 
+Add `departBy` and the charge is deferred instead — it starts as late as it can and still finish in
+time:
+
+```bash
+-d '{"mode": "fastNoBattery", "fast": {"basis": "soc", "targetSocPercent": 90,
+     "departBy": "2026-08-27T07:00:00+02:00"}}'
+```
+
 An amount that cannot be honoured is a **400 with the reason** — a battery target on an installation
-with no `Vehicle:BatteryCapacityKWh`, no reading from the car, or a car already past the figure asked
-for — and nothing is started. Progress comes back on the status as `fastCharge`, and a `full` start
-clears any amount left standing from an earlier charge.
+with no `Vehicle:BatteryCapacityKWh`, no reading from the car, a car already past the figure asked
+for, a departure in the past or beyond the horizon, or a departure with `full` and so nothing to time
+— and nothing is started. Progress comes back on the status as `fastCharge`, with the schedule under
+`fastCharge.schedule`, and a `full` start clears any amount left standing from an earlier charge.
 
 Every action returns what it did *and the controller's state afterwards*, so a caller never has to
 poll to find out what happened. A refused hardware write comes back as **200 with

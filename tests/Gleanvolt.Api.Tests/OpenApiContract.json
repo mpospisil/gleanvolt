@@ -256,16 +256,28 @@
     "FastChargeBasis": "enum[full|energy|soc]",
     "FastChargeLimitBody": {
       "basis": "$FastChargeBasis",
+      "departBy": "string(date-time)?",
       "energyKWh": "number|string(double)?",
       "targetSocPercent": "number|string(double)?"
     },
     "FastChargeResponse": {
       "activatedAt": "string(date-time) (required)",
       "deliveredEnergyWh": "number|string(double) (required)",
+      "departBy": "string(date-time)?",
       "remainingEnergyWh": "number|string(double) (required)",
       "requiredEnergyWh": "number|string(double) (required)",
+      "schedule": "any",
       "targetSocPercent": "number|string(double)? (required)",
       "vehicleSocPercentAtRequest": "number|string(double)? (required)"
+    },
+    "FastChargeScheduleResponse": {
+      "chargePowerWatts": "number|string(double) (required)",
+      "durationSeconds": "number|string(double) (required)",
+      "powerObserved": "boolean (required)",
+      "readyBy": "string(date-time) (required)",
+      "remainingEnergyWh": "number|string(double) (required)",
+      "shortfallEnergyWh": "number|string(double) (required)",
+      "startNoLaterThan": "string(date-time) (required)"
     },
     "ForecastPeriodResponse": {
       "energyWh": "number|string(double) (required)",

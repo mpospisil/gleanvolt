@@ -4,6 +4,70 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-26 — A fast charge can be deferred, and deferring is not planning (issue #122)
+
+The pack, not the price, is the reason. A lithium cell ages faster the longer it is held high, so the
+20 points above 80% are worth buying as late as possible — and a fast charge pressed at 22:00 for an
+07:00 departure spends nine hours at 95% to do two hours of work.
+
+**The obvious objection first: `Targeted` with `JustInTime` already does most of this.** It holds a
+tail back to land at the deadline, measured down from a rest SOC that defaults to 80%, and on a sunny
+day it is strictly better because it buys the first 80% from the roof. That was raised in the issue
+before anything was written, and the answer that carried was that the two are different tools: this is
+arithmetic on one line, forecast-free, works in December at 03:00, and lives on the tab somebody
+reaching for a fast charge is already looking at. If it ever grows blocks, or a forecast, or pacing,
+it has become the targeted mode and should be deleted rather than maintained.
+
+So `FastChargePlanner` is deliberately trivial: `remaining ÷ power`, subtracted from the departure. No
+surplus, no house load, no battery, no blocks.
+
+**Two things in it are not trivial, and both are about the power it divides by.**
+
+*It must be the car's, not the installation's.* An 11 kW wallbox in front of a car with a 7.4 kW
+on-board charger is a plan an hour short of the time it needs — and this is the mode with no slack by
+construction, because arriving *just* in time is the whole point. So the plan uses the observed draw
+once the car has drawn anything, and says (`PowerObserved`) which of the two figures it used, because
+presenting an estimate as a measurement is how somebody ends up trusting the first schedule.
+
+*And it must be remembered across the pauses.* While a deferred charge waits, the car draws nothing.
+A power read fresh each cycle would fall back to the installation's maximum every poll and forget,
+continuously, that this car only does 7.4 kW. That is a start time an hour late, arrived at by a
+component that looks correct in isolation.
+
+**Anything uncertain resolves to charging, never to waiting.** A zero or NaN power returns *no plan*
+rather than a nominal figure: dividing by something near zero defers the charge to the end of time,
+which produces no error, no charge, and a flat car at 07:00. The failure directions here are not
+symmetric and the code says so.
+
+**The start time is left in the past when there is not enough time**, rather than clamped forward. A
+plan clamped to now reads as punctual; a start time an hour ago is true and is what the shortfall is
+computed from.
+
+---
+
+## 2026-08-26 — The fast mode's hold arms on charging, not on mode entry (issue #122)
+
+#119 armed the discharge hold when `FastNoBattery` was selected. That was right when selecting the
+mode and charging were the same instant. With a departure they are hours apart, and arming at entry
+would lock the pack out of serving the house from 22:00 to 04:02 — six hours of the evening carried by
+the grid, nothing charging, and no line in the log connecting the two.
+
+So the arm moved to the first cycle that actually charges. Three properties had to survive the move:
+
+- **Still armed by default.** Keeping the pack out of the fastest charge the site can deliver is the
+  mode's entire reason for existing; the owner never has to remember to.
+- **Still armed *through* the switch**, for the reason #119's record sets out at length: the HA switch
+  publishes what is armed, not what was asked for, so a hold armed beside the selector leaves the
+  owner's OFF as a `Set(false)` no-op that raises no event.
+- **Idempotent.** It now runs on every cycle rather than once, so it fires only on the transition —
+  otherwise it would re-arm, every poll, a hold the owner had deliberately switched off mid-charge,
+  and #119's central promise would be quietly undone by #122.
+
+The release did not move: it is still keyed on the mode no longer being `FastNoBattery`, which covers
+every ending without enumerating any of them.
+
+---
+
 ## 2026-08-25 — A fast charge takes an amount, and the amount is a stopping condition (issue #119)
 
 `FastNoBattery` charged until the car said stop. *"I leave in an hour and I need 20 kWh"* could only be

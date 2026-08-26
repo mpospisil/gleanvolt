@@ -284,4 +284,95 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
         Assert.Null(_host.Fast.Limit);
     }
+
+    // -- The departure (#122).
+
+    [Fact]
+    public async Task Takes_a_departure_beside_an_amount()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+        var departure = Fixtures.Now.AddHours(9);
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new
+            {
+                mode = "fastNoBattery",
+                fast = new { basis = "energy", energyKWh = 30, departBy = departure.ToString("o") },
+            })).ReadAsync();
+
+        Assert.True(body.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(departure, _host.Fast.Limit!.DepartBy);
+        Assert.True(_host.Fast.Limit.IsDeferred);
+    }
+
+    [Fact]
+    public async Task Refuses_a_departure_with_nothing_to_time()
+    {
+        var client = await _host.StartAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new { mode = "fastNoBattery", fast = new { basis = "full", departBy = Fixtures.Now.AddHours(9).ToString("o") } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("needs an amount", (await response.ReadAsync()).Text("detail"));
+        Assert.Empty(_host.Actions.Starts);
+    }
+
+    [Fact]
+    public async Task Refuses_a_departure_in_the_past()
+    {
+        var client = await _host.StartAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new
+            {
+                mode = "fastNoBattery",
+                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(-1).ToString("o") },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("in the past", (await response.ReadAsync()).Text("detail"));
+        Assert.Empty(_host.Actions.Starts);
+    }
+
+    [Fact]
+    public async Task Refuses_a_departure_past_the_horizon()
+    {
+        var client = await _host.StartAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new
+            {
+                mode = "fastNoBattery",
+                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(40).ToString("o") },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_host.Actions.Starts);
+    }
+
+    [Fact]
+    public async Task An_action_reports_the_departure_but_not_yet_a_schedule()
+    {
+        // The schedule is built by the poll loop, so it first appears on the status rather than in the
+        // answer to the press.
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new
+            {
+                mode = "fastNoBattery",
+                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(9).ToString("o") },
+            })).ReadAsync();
+
+        Assert.NotEqual(JsonValueKind.Null, body.GetProperty("fast").GetProperty("departBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("fast").GetProperty("schedule").ValueKind);
+    }
 }

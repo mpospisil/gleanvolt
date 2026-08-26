@@ -101,7 +101,13 @@ public sealed class HaDiscovery
     /// <summary>Object id of the departure-time text entity, which the worker subscribes to like a number.</summary>
     public const string TargetDepartureText = "target_departure";
 
-    public static readonly IReadOnlyList<string> TextObjectIds = [TargetDepartureText];
+    /// <summary>
+    /// The fast charge's departure (#122). A text entity for the same reason the targeted one is:
+    /// MQTT discovery has no datetime platform.
+    /// </summary>
+    public const string FastDepartureText = "fast_departure";
+
+    public static readonly IReadOnlyList<string> TextObjectIds = [TargetDepartureText, FastDepartureText];
 
     /// <summary>
     /// The strategy buttons, in the order they are published: object id -> the mode each one starts.
@@ -396,12 +402,26 @@ public sealed class HaDiscovery
         yield return Number(FastEnergyNumber, "Fast energy", min: 0, max: 100, step: 0.5, unit: "kWh", icon: "mdi:flash");
         yield return Number(FastTargetSocNumber, "Fast target SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-charging-60");
 
+        // The departure, which defers the charge so it finishes just in time (#122). Same shape and
+        // same parser as the targeted one above -- including the empty alternation, which is the state
+        // this box spends most of its life in. That was issue #117 on the other entity; repeating it
+        // here, having been told once, would be careless.
+        yield return Text(
+            FastDepartureText,
+            "Fast departure",
+            pattern: @"^$|^(\d{4}-\d{2}-\d{2}[ T])?\d{1,2}:\d{2}$",
+            icon: "mdi:clock-fast");
+
         // A pair rather than one, on the same reasoning as target_solar and target_forecast_surplus
         // above: delivered on its own is half a story, and "8 kWh" means nothing without the number it
         // is counting towards. Both absent while the mode runs unlimited, which is how a dashboard shows
         // "the car decides" without a sensor saying so.
         yield return Sensor("fast_delivered", "Fast delivered", template: Optional("fast_delivered_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("fast_target", "Fast target", template: Optional("fast_target_kwh"), unit: "kWh", deviceClass: "energy");
+
+        // When a deferred charge starts, which is the one thing somebody looking at a car that is
+        // plugged in and doing nothing at 23:00 actually wants to know.
+        yield return Sensor("fast_start", "Fast start", template: Optional("fast_start"), icon: "mdi:clock-start");
 
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
@@ -516,6 +536,13 @@ public sealed class HaDiscovery
         {
             payload["fast_delivered_kwh"] = Math.Round(fast.DeliveredWh / 1000, 2);
             payload["fast_target_kwh"] = Math.Round(fast.Limit.RequiredEnergyWh / 1000, 2);
+
+            // "none" rather than absent once a charge is running, so a dashboard shows that this one
+            // starts immediately rather than an unavailable entity that reads like a broken feed. The
+            // same choice target_grid_start makes just above.
+            payload["fast_start"] = fast.Plan is { } schedule
+                ? $"{schedule.StartNoLaterThan.LocalDateTime:HH:mm}"
+                : "none";
         }
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so
