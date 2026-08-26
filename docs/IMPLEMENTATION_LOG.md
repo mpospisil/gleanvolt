@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-26 — The fast mode's current is written when it is started, not a poll later (issue #119)
+
+Observed on the reference install while verifying #119: starting `FastNoBattery` wrote the use-mode
+and then commanded nothing, because the charger's read-back said `Stop` rather than `Fast` (no car was
+plugged in). That precondition is correct and stays. But it exposed a second thing worth fixing on its
+own: **the setpoint was only ever written by the control loop.**
+
+### What changed
+
+- `ChargeActions.StartAsync` now writes the fast mode's current straight after the use-mode write, for
+  `FastNoBattery` only. Every other mode computes its setpoint from surplus or from a plan, and
+  writing the maximum ahead of them would charge flat out for a poll interval.
+- The figure comes from `FastChargingController.ChargeCurrentAmps` — the already-clamped constant the
+  controller commands on every cycle — rather than being re-derived from configuration, so the value
+  written at the press and the value commanded afterwards cannot be two different numbers.
+- The device's own current is **read** before the write, so `EvChargerControl`'s existing hysteresis
+  can skip a write that would not move the setpoint. "If it is not set" is decided there, where it
+  already was.
+- A failed setpoint write logs a warning and the start still succeeds: the use-mode is written, the
+  mode is selected, and the control loop commands the same current seconds later. A failed *use-mode*
+  write still stops everything, and the setpoint is then never touched.
+
+The gap this closes is easiest to see after a completed charge. The mode ends by writing
+`PauseCurrentAmps` — 0 A on this install — so the next fast charge began at the pause current and
+stayed there until a poll completed: the charger in `Fast`, the car told to take nothing.
+
+### Verification performed
+
+- **1047 tests pass** (8 new): the write happens for `FastNoBattery` and for no other mode, the
+  use-mode goes first, a refused `Fast` leaves the setpoint untouched, and a refused setpoint still
+  starts the mode.
+- One test was reworked rather than written as intended: asserting "leaves a charger already at the
+  maximum alone" through `FakeEvChargerControl` would have meant teaching that fake the real control's
+  hysteresis, and the fake documents that it deliberately records every write. It now asserts what
+  this layer actually owes the one below — the device's measured current handed over as `active` —
+  with the skip itself left to `EvChargerControlTests`, which already covers it.
+- **Not yet verified on hardware.** The observation that prompted this is still open: with no car
+  connected the charger did not hold `Fast`. This change does not address that and does not claim to.
+
+---
+
 ## 2026-08-25 — A fast charge takes an amount, and its hold obeys the switch (issue #119)
 
 `FastNoBattery` charged until the car said stop, and armed a discharge hold nobody could turn off.

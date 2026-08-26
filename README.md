@@ -856,8 +856,16 @@ battery out of it.** While it is selected:
 1. The **battery discharge hold is armed** — the pack does not serve the car (see
    [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) for the mechanism). You
    can switch it off while the charge runs; see [The hold, and who owns it](#the-hold-and-who-owns-it).
-2. The charger is pinned at **`MaxChargingCurrentAmps`**, every cycle, whatever the sun, the SOC, the
-   forecast or the time of day. PV covers what it can and the **grid covers the rest**.
+2. The charger is pinned at **`MaxChargingCurrentAmps`** — written by the start action itself, before
+   the first poll, and then re-commanded every cycle whatever the sun, the SOC, the forecast or the
+   time of day. PV covers what it can and the **grid covers the rest**.
+
+   Writing it at the press rather than leaving it to the poll loop closes a real gap: a finished
+   charge ends by writing `PauseCurrentAmps` (0 A here), so without this the next fast charge spends
+   up to a poll interval sitting in `Fast` with the car told to take nothing. A charger already at
+   the maximum is left alone — the setpoint write is skipped when it would not move anything — and a
+   setpoint write that fails does **not** fail the start, because the control loop commands the same
+   current seconds later.
 3. When the charge is over — the **amount you asked for** has been delivered, or the car stopped at
    **its own** charge limit — the setpoint drops to `PauseCurrentAmps`, the charger is written `Stop`,
    the mode returns itself to **`Off`**, and the hold is released — exactly the end state the **Off**
@@ -943,6 +951,10 @@ charger's own doing, which is exactly what our pause write produces.
   lapses within `BatteryHold:Duration`.
 - **It doesn't change the charger's use-mode while it runs.** Starting it wrote `Fast` once and
   ending it writes `Stop`; in between, like every other mode, it only moves the current setpoint.
+- **It doesn't act on a charger that isn't in `Fast`.** If the read-back says anything else — someone
+  moved it at the wallbox, or the charger did not hold the write — every cycle logs
+  *"Charger use-mode is X, not Fast; leaving it untouched"* and **no current is commanded**. That line
+  in the log is the first thing to check when a fast charge appears to do nothing.
 
 With `BatteryHold:Enabled` false the mode still charges at maximum current, and logs a warning once on
 selection: it cannot keep the battery out of the charge, which is half of what it promises.

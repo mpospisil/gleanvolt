@@ -25,6 +25,9 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     /// <summary>Makes every use-mode write fail, the way a charger that has stopped answering does.</summary>
     public string? ModeWriteFailure { get; set; }
 
+    /// <summary>The same for the current setpoint, which fails independently of the use-mode.</summary>
+    public string? CurrentWriteFailure { get; set; }
+
     /// <summary>The target amps of the last write, or null if none.</summary>
     public int? LastTarget => CurrentWrites.Count == 0 ? null : CurrentWrites[^1].Target;
 
@@ -33,6 +36,11 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
 
     public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
     {
+        if (CurrentWriteFailure is { } failure)
+        {
+            return Task.FromException(new InvalidOperationException(failure));
+        }
+
         CurrentWrites.Add((activeAmps, targetAmps, reason));
         CurrentSettings = CurrentSettings with { ChargeCurrentAmps = targetAmps };
         return Task.CompletedTask;

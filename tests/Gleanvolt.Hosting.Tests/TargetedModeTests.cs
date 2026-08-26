@@ -256,7 +256,7 @@ public class TargetedModeTests
             _mode,
             // The real actions over the fake charger: a mode that ends itself has to stop the charger
             // exactly as the Off button does, and that is the code path it goes through.
-            new ChargeActions(_charger, _mode, NullLogger<ChargeActions>.Instance),
+            new ChargeActions(_charger, _mode, new FastChargingController(16, TimeSpan.FromMinutes(2)), NullLogger<ChargeActions>.Instance),
             _manualHold,
             _inverter,
             _status,
