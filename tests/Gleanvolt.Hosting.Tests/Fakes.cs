@@ -110,14 +110,20 @@ internal static class FastCharge
         IFastChargeSelector? selector = null,
         ChargeControlOptions? chargeControl = null,
         TargetedChargeOptions? targeted = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        EvInfo? ev = null)
     {
         var options = chargeControl ?? new ChargeControlOptions { Phases = 3, MaxChargingCurrentAmps = 16 };
 
+        // Assembled the way the host assembles it (#124): the effective band is the intersection of the
+        // installation's limits and the car's, and the converter is built from the phases they share.
+        var limits = ChargingLimits.Intersect(
+            options.MinChargingCurrentAmps, options.MaxChargingCurrentAmps, options.Phases, ev ?? EvInfo.Unknown);
+
         return new FastChargeProvider(
             selector ?? new FastChargeSelector(NullLogger<FastChargeSelector>.Instance),
-            new ChargePowerConverter(options.NominalVoltage, options.Phases),
-            Options.Create(options),
+            new ChargePowerConverter(options.NominalVoltage, limits.Phases),
+            limits,
             Options.Create(targeted ?? new TargetedChargeOptions()),
             NullLogger<FastChargeProvider>.Instance,
             timeProvider);

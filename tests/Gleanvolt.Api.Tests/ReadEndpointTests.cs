@@ -295,4 +295,42 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         Assert.Equal(2500, period.Number("estimatedPowerWattsP10"));
         Assert.Equal(2000, period.Number("energyWh"));
     }
+
+    [Fact]
+    public async Task The_vehicle_endpoint_reports_the_car_as_configured_not_only_as_reported()
+    {
+        _host.Car = EvInfo.Unknown with
+        {
+            Id = "id4",
+            Name = "The ID.4",
+            Make = "Volkswagen",
+            Model = "ID.4 Pro",
+            BatteryCapacityKWh = 77,
+            Phases = 3,
+            MinChargingCurrentAmps = 6,
+            MaxChargingCurrentAmps = 16,
+        };
+
+        var client = await _host.StartAsync();
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now, SocPercent: 42));
+
+        var body = (await (await client.GetAsync("/api/v1/vehicle")).ReadAsync()).GetProperty("vehicle");
+
+        Assert.Equal("id4", body.Text("id"));
+        Assert.Equal("Volkswagen", body.Text("make"));
+        Assert.Equal(77, body.Number("batteryCapacityKWh"));
+        Assert.Equal(3, body.GetProperty("phases").GetInt32());
+    }
+
+    [Fact]
+    public async Task The_vehicle_endpoint_says_nothing_about_a_car_nobody_described()
+    {
+        var client = await _host.StartAsync();
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now, SocPercent: 42));
+
+        var body = await (await client.GetAsync("/api/v1/vehicle")).ReadAsync();
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("vehicle").ValueKind);
+        Assert.True(body.GetProperty("available").GetBoolean());
+    }
 }

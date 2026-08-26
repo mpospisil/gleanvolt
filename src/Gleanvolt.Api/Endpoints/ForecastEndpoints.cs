@@ -67,13 +67,14 @@ internal static class ForecastEndpoints
             IVehicleTelemetry telemetry,
             ApiHostInfo host,
             Core.Models.TargetedChargeRequestLimits limits,
+            Core.Models.EvInfo ev,
             TimeProvider time) =>
         {
             var state = telemetry.GetCurrentState();
 
             return Results.Ok(state is null
-                ? VehicleResponse.Unavailable()
-                : VehicleResponse.From(state, time.GetUtcNow(), host.VehicleMaxAge, limits.CanTargetSoc));
+                ? VehicleResponse.Unavailable(ev)
+                : VehicleResponse.From(state, time.GetUtcNow(), host.VehicleMaxAge, limits.CanTargetSoc, ev));
         })
             .WithName("getVehicle")
             .WithSummary("What the car last said about itself")
@@ -83,7 +84,11 @@ internal static class ForecastEndpoints
                 + "so use 'ageSeconds' and 'stale' before drawing any conclusion from the number beside "
                 + "them. Nothing about how the charger is driven depends on this feed: it shapes what "
                 + "can be asked for, never how it is delivered. 'available' is false when no feed is "
-                + "configured or nothing has arrived, which is a supported installation, not a fault.")
+                + "configured or nothing has arrived, which is a supported installation, not a fault.\n\n"
+                + "'vehicle' is a different kind of thing from the rest: what the car *is* rather than "
+                + "what it last said — its pack, and the currents and phases it will accept. That is "
+                + "configuration, so it changes only across a restart, and it is null when no car has "
+                + "been described.")
             .Produces<VehicleResponse>();
     }
 }

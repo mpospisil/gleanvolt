@@ -103,6 +103,10 @@ public sealed record WeatherResponse(
 /// <param name="ChargeState">What the car says it is doing.</param>
 /// <param name="PlugState">Whether the car says a cable is connected. The charger's own view is <c>carConnected</c> on the status.</param>
 /// <param name="SourceId">Which feed this came from, for diagnostics.</param>
+/// <param name="Vehicle">
+/// What the car <b>is</b>, as configured — as opposed to everything above, which is what it last
+/// <em>said</em>. Null when no car has been described, which is a supported installation.
+/// </param>
 /// <param name="CanTargetSoc">
 /// Whether a targeted charge may be asked for as a state of charge: a reported SOC and a configured
 /// pack size (<c>Vehicle:BatteryCapacityKWh</c>). False means ask in kilowatt-hours.
@@ -118,13 +122,16 @@ public sealed record VehicleResponse(
     VehicleChargeState ChargeState,
     VehiclePlugState PlugState,
     string? SourceId,
-    bool CanTargetSoc)
+    bool CanTargetSoc,
+    EvResponse? Vehicle = null)
 {
-    internal static VehicleResponse Unavailable() => new(
+    internal static VehicleResponse Unavailable(EvInfo? ev = null) => new(
         false, null, null, false, null, null, null,
-        VehicleChargeState.Unknown, VehiclePlugState.Unknown, null, false);
+        VehicleChargeState.Unknown, VehiclePlugState.Unknown, null, false,
+        ev is { IsConfigured: true } ? EvResponse.From(ev) : null);
 
-    internal static VehicleResponse From(VehicleState state, DateTimeOffset now, TimeSpan maxAge, bool capacityConfigured)
+    internal static VehicleResponse From(
+        VehicleState state, DateTimeOffset now, TimeSpan maxAge, bool capacityConfigured, EvInfo? ev = null)
     {
         var age = state.AgeAt(now);
 
@@ -139,6 +146,46 @@ public sealed record VehicleResponse(
             state.ChargeState,
             state.PlugState,
             state.SourceId,
-            capacityConfigured && state.SocPercent is not null);
+            capacityConfigured && state.SocPercent is not null,
+            ev is { IsConfigured: true } ? EvResponse.From(ev) : null);
     }
+}
+
+/// <summary>
+/// The car itself (issue #124): what it is and what it will accept, as distinct from the reading it
+/// last sent. Configuration, so it changes only across a restart.
+/// </summary>
+/// <param name="Id">Its stable identity, or empty when unnamed.</param>
+/// <param name="Name">What a human calls it.</param>
+/// <param name="Make">The manufacturer. Reported, never acted on.</param>
+/// <param name="Model">The model. Reported, never acted on.</param>
+/// <param name="BatteryCapacityKWh">Usable capacity — the figure its SOC is a percentage of. Zero when unconfigured.</param>
+/// <param name="ChargeEfficiency">Charger-meter → cells efficiency, applied to SOC-based targets.</param>
+/// <param name="Phases">
+/// Phases the <b>car</b> can charge on, or null when unstated. Where this differs from the charger's,
+/// this is the one every power figure is computed from.
+/// </param>
+/// <param name="MinChargingCurrentAmps">The lowest current it will start on, or null when unstated.</param>
+/// <param name="MaxChargingCurrentAmps">Its on-board ceiling, or null when unstated.</param>
+public sealed record EvResponse(
+    string Id,
+    string Name,
+    string Make,
+    string Model,
+    double BatteryCapacityKWh,
+    double ChargeEfficiency,
+    int? Phases,
+    int? MinChargingCurrentAmps,
+    int? MaxChargingCurrentAmps)
+{
+    internal static EvResponse From(EvInfo ev) => new(
+        ev.Id,
+        ev.Name,
+        ev.Make,
+        ev.Model,
+        ev.BatteryCapacityKWh,
+        ev.ChargeEfficiency,
+        ev.Phases,
+        ev.MinChargingCurrentAmps,
+        ev.MaxChargingCurrentAmps);
 }

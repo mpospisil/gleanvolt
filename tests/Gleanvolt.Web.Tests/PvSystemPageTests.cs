@@ -43,9 +43,20 @@ public class PvSystemPageTests : BunitContext
             Device("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", "192.168.2.10"),
             chargers ?? [Device("wallbox", "Garage wallbox", "SolaX X3-HAC", "192.168.2.6")]);
 
-    private IRenderedComponent<PvSystem> Render(PvSystemInfo? site = null)
+    /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
+    private static EvInfo Car(int? phases = 3, int? minAmps = 6, int? maxAmps = 16) => new(
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, phases, minAmps, maxAmps, "gleanvolt/vehicle/id4/state");
+
+    private IRenderedComponent<PvSystem> Render(PvSystemInfo? site = null, EvInfo? car = null)
     {
         Services.AddSingleton(site ?? Site());
+
+        var ev = car ?? EvInfo.Unknown;
+        Services.AddSingleton(ev);
+
+        // Composed exactly as the host composes it: the reference install's 6-16 A on three phases,
+        // narrowed by whatever the car says.
+        Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, ev));
 
         return Render<PvSystem>();
     }
@@ -158,5 +169,50 @@ public class PvSystemPageTests : BunitContext
         Assert.Empty(page.FindAll("input"));
         Assert.Empty(page.FindAll("select"));
         Assert.Contains("restarting the controller", page.Markup);
+    }
+
+    // -- The car (#124).
+
+    [Fact]
+    public void Says_plainly_when_no_car_has_been_described()
+    {
+        var page = Render();
+
+        Assert.Contains("No car is described", page.Find("#no-vehicle").TextContent);
+        Assert.Contains("Ev:Vehicles:0", page.Find("#no-vehicle").TextContent);
+    }
+
+    [Fact]
+    public void Shows_what_the_car_is_and_what_its_pack_holds()
+    {
+        var page = Render(car: Car());
+
+        Assert.Contains("The ID.4", page.Markup);
+        Assert.Contains("Volkswagen ID.4 Pro", page.Markup);
+        Assert.Contains("77 kWh", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_the_car_the_installation_and_which_of_them_is_in_effect()
+    {
+        // The third column is the interesting one: a page showing only the car's figures would leave
+        // somebody wondering why a 32 A car charges at 16.
+        var page = Render(car: Car(phases: 1, minAmps: 8, maxAmps: 32));
+        var markup = page.Markup;
+
+        Assert.Contains("In effect", markup);
+
+        // The car refuses below 8; the installation gives out at 16; the car can only use one phase.
+        var row = page.FindAll("table.grid tbody tr").Last();
+        Assert.Contains("1", row.TextContent);
+    }
+
+    [Fact]
+    public void Explains_that_a_car_can_only_ever_lower_a_limit()
+    {
+        var page = Render(car: Car());
+
+        Assert.Contains("narrower of the two", page.Markup);
+        Assert.Contains("only ever", page.Markup);
     }
 }

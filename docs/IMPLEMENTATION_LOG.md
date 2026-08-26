@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-08-26 — The car is described once (issue #124)
+
+The car's facts were scattered across two sections that are about other things, and three of them were
+not the car's at all — they were the charger's, borrowed.
+
+### What changed
+
+- `EvOptions` / `EvInfo` in Core, `EvResolver` in Hosting: the `PvSystemInfo` pattern applied to the
+  vehicle. One section, validated at startup, every problem collected and reported together.
+- `ChargingLimits.Intersect` — the higher floor, the lower ceiling, the fewer phases — in **one**
+  place, and the six call sites that used to read `ChargeControl` directly now read it: the power
+  converter, the live-solar, forecast, targeted and fast controllers, and the fast charge's scheduler.
+- `Vehicle:BatteryCapacityKWh`, `Vehicle:ChargeEfficiency` and `Vehicle:Topic` moved into `Ev`, and are
+  **refused at startup** through `RetiredConfigurationKeys` naming the replacement.
+- Surfaces: `/pv-system` gained a car section with a three-column table (the car / the installation /
+  in effect), `/api/v1/vehicle` gained `vehicle` beside the reading, and the startup log now says which
+  car it thinks it has, the way it already says which installation.
+
+### Things worth knowing
+
+- **`.env` variable names are unchanged.** `deploy/docker-compose.yml` maps `VEHICLE_BATTERY_CAPACITY_KWH`
+  and friends to the new keys, so an existing `.env` needs no edit — only the compose file the deploy
+  script copies. New `EV_PHASES`, `EV_MIN_CHARGING_CURRENT_AMPS` and `EV_MAX_CHARGING_CURRENT_AMPS` are
+  available and default to unset.
+- **Empty strings bind to `null` for `int?`**, which the compose defaults rely on. Verified with a test
+  rather than assumed — if it threw, every default deployment would fail to start, and only on the Pi.
+- **`EvInfo.Unknown` is a value, not a null.** `IsConfigured` is judged on the values, because the
+  shipped `appsettings.json` produces an all-empty entry and that must read as "no car described".
+
+### Verification performed
+
+- **1133 tests pass** (33 new): the intersection in every direction, the resolver's refusals, that an
+  absent section leaves the composed band untouched, that a retired key is refused, and that the
+  registered `ChargePowerConverter` is built on the car's phases rather than the wallbox's.
+- The checked-in OpenAPI contract was regenerated; the diff is `EvResponse` and `vehicle`.
+- **Not yet verified on hardware.** The reference install's car matches its wallbox, so nothing there
+  will change — which is itself the thing to check: the deploy should be a no-op behaviourally, with
+  the new startup line naming the car and `/pv-system` showing the band.
+
+---
+
 ## 2026-08-26 — A fast charge can be told when you leave (issue #122)
 
 `FastNoBattery` charged the moment it was pressed, so a car asked for 90% at 22:00 sat at 90% for nine

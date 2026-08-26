@@ -4,6 +4,45 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-08-26 — The car is described once, and a car can only narrow a limit (issue #124)
+
+#111 gave the installation one description. The car never had one: its usable pack and charge
+efficiency sat in the `Vehicle` section — which is about an **MQTT feed** — and the three settings that
+actually decide how it is charged were the *charger's*, borrowed and used as though they were the
+car's.
+
+That last part is the reason this was not a tidy-up. `ChargePowerConverter` is built from
+`ChargeControl:Phases`, documented as the number of phases **the charger** charges on, and every
+watts↔amps conversion in the controller runs through it. A single-phase car behind a three-phase
+wallbox therefore had every power figure overstated threefold — #122's deferred charge starting hours
+late, the day plan budgeting energy the car could never take. Invisible on the reference install only
+because its car happens to match its wallbox. That is luck, not design.
+
+**The rule that took the most care is that a car can only ever *narrow* a limit.** The installation's
+maximum is the site's supply and the wiring in the wall; the car's is a second constraint, never a
+replacement. So `ChargingLimits.Intersect` takes the higher floor, the lower ceiling and the fewer
+phases — and lives in **one** place. That last part is not fastidiousness: the rule is three lines, it
+would be entirely reasonable to write inline at each of the six call sites, and that is precisely how
+six call sites come to disagree about whether "the maximum" means the wallbox's or the car's.
+
+**An unstated figure narrows nothing, and an absent section changes nothing.** `EvInfo.Unknown` is a
+first-class state rather than a null, so every consumer reads a car whether or not one was described.
+`IsConfigured` is judged on the values rather than on reference identity, because the two ways of
+saying nothing — no section at all, and one entry with every field defaulted — must read the same. The
+second is what the shipped `appsettings.json` produces, so it is the case every default install runs.
+
+**A band that inverts is a startup failure.** A car whose floor is above the installation's ceiling can
+never charge, and every symptom of that is silence: press the button, nothing happens, no error
+anywhere. Caught in the resolver naming both keys, which is the same posture `PvSystemResolver` takes
+and for the same reason.
+
+**The feed keeps its section.** `Enabled`, the broker, the credentials, `MaxAge` and
+`ReconnectInterval` describe the *feed*; only `Topic` moved onto the vehicle, because two cars on one
+broker are two topics. Moving the rest would have repeated the mistake being fixed — filing a thing's
+properties under whatever happens to report on it.
+
+---
+
 ## 2026-08-26 — A fast charge can be deferred, and deferring is not planning (issue #122)
 
 The pack, not the price, is the reason. A lithium cell ages faster the longer it is held high, so the

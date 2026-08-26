@@ -1,5 +1,6 @@
 using Gleanvolt.Api;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.Extensions.Configuration;
@@ -88,7 +89,7 @@ public class ApiSurfaceRegistrationTests
         await using var provider = Build(
             ("Api:Enabled", "true"),
             ("Api:Keys:mcp", "a-key"),
-            ("Vehicle:BatteryCapacityKWh", "77"),
+            ("Ev:Vehicles:0:BatteryCapacityKWh", "77"),
             ("ChargeControl:Targeted:MaxHorizon", "20:00:00"));
 
         var limits = provider.GetRequiredService<TargetedChargeRequestLimits>();
@@ -96,5 +97,58 @@ public class ApiSurfaceRegistrationTests
         Assert.Equal(77, limits.BatteryCapacityKWh);
         Assert.True(limits.CanTargetSoc);
         Assert.Equal(TimeSpan.FromHours(20), limits.MaxHorizon);
+    }
+
+    [Fact]
+    public async Task TheCarNarrowsTheBandTheControllersAreBuiltOn()
+    {
+        // The whole point of #124: a single-phase car behind a three-phase wallbox, and a car that will
+        // not start below 8A. Asserted on the composed band rather than on any one controller, because
+        // this is the value they are all built from.
+        await using var provider = Build(
+            ("ChargeControl:Phases", "3"),
+            ("ChargeControl:MinChargingCurrentAmps", "6"),
+            ("ChargeControl:MaxChargingCurrentAmps", "16"),
+            ("Ev:Vehicles:0:Id", "id4"),
+            ("Ev:Vehicles:0:Phases", "1"),
+            ("Ev:Vehicles:0:MinChargingCurrentAmps", "8"),
+            ("Ev:Vehicles:0:MaxChargingCurrentAmps", "32"));
+
+        var limits = provider.GetRequiredService<ChargingLimits>();
+
+        Assert.Equal(8, limits.MinAmps);    // the car refuses first
+        Assert.Equal(16, limits.MaxAmps);   // the installation gives out first
+        Assert.Equal(1, limits.Phases);     // the car can only use one
+
+        // And the converter every power figure runs through is built on those phases, not the wallbox's.
+        Assert.Equal(230, provider.GetRequiredService<ChargePowerConverter>().AmpsToWatts(1));
+    }
+
+    [Fact]
+    public async Task AnUndescribedCarLeavesEverythingExactlyAsItWas()
+    {
+        await using var provider = Build(
+            ("ChargeControl:Phases", "3"),
+            ("ChargeControl:MinChargingCurrentAmps", "6"),
+            ("ChargeControl:MaxChargingCurrentAmps", "16"));
+
+        var limits = provider.GetRequiredService<ChargingLimits>();
+
+        Assert.Equal(6, limits.MinAmps);
+        Assert.Equal(16, limits.MaxAmps);
+        Assert.Equal(3, limits.Phases);
+        Assert.False(provider.GetRequiredService<EvInfo>().IsConfigured);
+    }
+
+    [Fact]
+    public void ACarsFactsLeftInTheOldSectionAreRefused()
+    {
+        // Silently ignoring it would leave a capacity the operator's file says is set and the
+        // controller has stopped reading -- which makes every SOC-based target quietly wrong.
+        var error = Assert.Throws<InvalidOperationException>(
+            () => Build(("Vehicle:BatteryCapacityKWh", "77")));
+
+        Assert.Contains("Vehicle:BatteryCapacityKWh", error.Message);
+        Assert.Contains("Ev:Vehicles:0:BatteryCapacityKWh", error.Message);
     }
 }
