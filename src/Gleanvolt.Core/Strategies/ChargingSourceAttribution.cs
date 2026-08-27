@@ -14,9 +14,12 @@ namespace Gleanvolt.Core.Strategies;
 /// <para>The rule, in priority order:</para>
 /// <list type="number">
 /// <item>PV serves the rest of the house first; what is left is the solar surplus, and the charger may
-/// take up to that much of it. This is the same definition the Solar and Forecasted modes decide on
+/// take up to that much of it -- but never more than the panels are producing at that moment. This is
+/// the same definition the Solar and Forecasted modes decide on
 /// (<see cref="EnergyState.SolarSurplusPowerWatts"/>), so the recorded solar share is measured against
-/// exactly what the controller was aiming at.</item>
+/// exactly what the controller was aiming at; the PV ceiling is the one place the two deliberately
+/// part company, because a derived surplus can outrun the roof when the meters disagree and a
+/// <em>recorded</em> share must not.</item>
 /// <item>Draw beyond the surplus comes from the battery, up to what the battery is actually
 /// discharging. Battery before grid, because that is the inverter's own priority: a hybrid inverter
 /// serves house load from the pack before it imports.</item>
@@ -57,7 +60,16 @@ public static class ChargingSourceAttribution
         // Clamped into [0, evPower]: a surplus larger than the car is taking doesn't make the solar
         // share exceed the draw, and a negative surplus (the house is already importing) contributes
         // nothing rather than subtracting.
-        var fromSolar = Math.Clamp(surplus, 0, evPower);
+        //
+        // Also clamped by the PV reading itself, which is not the same guard and is not redundant.
+        // The surplus above is derived, not measured: it is only as sound as the identity it comes
+        // from, and that identity assumes every load the charger draws is also seen by the grid
+        // meter. On an installation where it isn't -- a CT that misses one phase of a three-phase
+        // charger, say -- OtherLoads goes *negative* while the car charges, and a negative subtrahend
+        // turns into surplus that the roof never made. Without this line a 10.8 kW charge at midnight
+        // books a third of itself as sun. The roof is the ceiling: whatever the arithmetic says, the
+        // solar share cannot exceed what the panels are actually producing at that moment.
+        var fromSolar = Math.Clamp(surplus, 0, Math.Min(evPower, Math.Max(0, solarPowerWatts)));
 
         var remainder = evPower - fromSolar;
         var discharging = Math.Max(0, -batteryPowerWatts);
