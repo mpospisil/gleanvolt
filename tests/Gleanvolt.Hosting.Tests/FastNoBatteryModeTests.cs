@@ -49,6 +49,28 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task AChargeWaitingForItsStartTimeDoesNotLockThePackOut()
+    {
+        // Observed on 2026-08-28. The opening poll measures the charge rate before the car has spun up,
+        // so the first plan reads "not enough time" -- not waiting -- and arms the hold. The corrected
+        // plan arrives moments later with a deferred start, and the hold has to come back off: for as
+        // long as the mode is only waiting, nothing is being charged and the pack should be free to
+        // serve the house. On the day it stayed armed for 41 minutes.
+        // The day's figures: 5kWh wanted, leaving in 84 minutes, so ready-by is 69 minutes out. At the
+        // trickle the first poll sees the charge cannot fit and the plan says start now; at the real
+        // rate it needs 27 minutes and defers.
+        var limit = new FastChargeLimit(5000, Now, DepartBy: Now.AddMinutes(84));
+
+        await RunAsync(
+            [Trickling(Now), Charging(Now.AddMinutes(1)), Idle(Now.AddMinutes(2))],
+            limit: limit);
+
+        Assert.Contains(true, _inverter.Applied);
+        Assert.False(_inverter.Applied[^1]);
+        Assert.False(_manualHold.Hold);
+    }
+
+    [Fact]
     public async Task TheChargerIsPinnedAtTheConfiguredMaximum()
     {
         await RunAsync(Charging(Now), Charging(Now.AddMinutes(1)));
@@ -439,6 +461,12 @@ public class FastNoBatteryModeTests
     private static EnergyState Unplugged(DateTimeOffset at) =>
         new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 300,
             EvChargerStatus.Available, EvChargerPowerWatts: 0);
+
+    // Drawing only a trickle, as a car does in the seconds after the charger is told to start: enough
+    // for the planner to measure a rate, far too little for that rate to be the real one.
+    private static EnergyState Trickling(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 400,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 400);
 
     // Plugged in, drawing nothing.
     private static EnergyState Idle(DateTimeOffset at) =>
