@@ -44,14 +44,60 @@ public class FastChargingControllerTests
             FastChargePlanner.Plan(limit, deliveredWh, null, 11_040, TimeSpan.FromMinutes(15), now));
     }
 
-    private static ChargingControlInput At(DateTimeOffset now, FastChargeProgress progress, bool evDrewPower = true) =>
+    private static ChargingControlInput At(
+        DateTimeOffset now,
+        FastChargeProgress progress,
+        bool evDrewPower = true,
+        bool charging = true,
+        TimeSpan evIdleFor = default) =>
         new(
             new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
             new EvChargerSettings(EvChargerMode.Fast, 6),
-            Charging: true,
+            Charging: charging,
             EvDrewPower: evDrewPower,
+            EvIdleFor: evIdleFor,
             FastCharge: progress);
+
+    [Fact]
+    public void TheMomentAWaitedStartArrives_TheCarIsNotMistakenForAFinishedOne()
+    {
+        // Observed on 2026-08-28: 5kWh asked for at 07:06 to be ready by 08:15, planned to start at
+        // 07:47. The car drew for a few seconds at activation, the plan then held it at the pause
+        // current for 41 minutes, and on the poll that ended the wait the mode reported "car stopped
+        // drawing for 41 min (charge limit reached) at 0.0kWh of the 5.0kWh asked for" and returned to
+        // Off -- ending itself at the exact second it was due to begin. Nothing was delivered.
+        //
+        // The idle clock ran through a pause we commanded, so it must not be read as the car's verdict:
+        // Charging is false for every one of those polls, because pausing is what set it false.
+        // Departing 08:30 gives ready-by 08:15, and 5kWh at the wallbox needs about half an hour, so
+        // the plan defers the start to roughly 07:47 -- the figures the controller logged on the day.
+        var planned = new DateTimeOffset(2026, 8, 28, 7, 6, 30, TimeSpan.FromHours(2));
+        var deferred = Deferred(planned, departBy: planned.AddMinutes(84), requiredWh: 5000);
+
+        // Evaluated once the appointment has arrived, which is the poll that used to end the mode.
+        var appointment = deferred.Plan!.StartNoLaterThan.AddSeconds(30);
+        var waited = appointment - planned;
+
+        var result = Controller.Decide(
+            At(appointment, deferred, charging: false, evIdleFor: waited));
+
+        Assert.False(result.SessionComplete);
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+    }
+
+    [Fact]
+    public void ACarThatStopsWhileWeAreOfferingPower_StillEndsTheCharge()
+    {
+        // The guard must not cost the mode its actual purpose: while we are charging, a car idle past
+        // the dwell has reached its own limit and the session is over.
+        var result = Controller.Decide(Input(
+            evDrewPower: true,
+            evIdleFor: TimeSpan.FromMinutes(3),
+            fastCharge: Progress(requiredWh: 30_000, deliveredWh: 12_000)));
+
+        Assert.True(result.SessionComplete);
+    }
 
     [Theory]
     [InlineData(EvChargerMode.Green)]

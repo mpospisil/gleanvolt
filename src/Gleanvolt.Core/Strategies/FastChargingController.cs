@@ -114,10 +114,16 @@ public sealed class FastChargingController : IChargingController
             }
         }
 
-        // "Has finished" is only meaningful once the car has actually started. Before that, no draw
-        // means the car isn't ready yet (Preparing, or waiting on its own timer), and ending the mode
-        // then would be the opposite of what was asked for.
-        if (input.EvDrewPower)
+        // "Has finished" is only meaningful once the car has actually started *and* while we are still
+        // asking it to charge. Before it starts, no draw means the car isn't ready yet (Preparing, or
+        // waiting on its own timer). While a plan holds it at the pause current, no draw is our own
+        // doing -- and the idle clock runs through that wait, so on the poll the appointment arrives
+        // the dwell is already long expired and the mode would end itself at the exact moment it was
+        // due to begin. A 07:47 start observed ending as "car stopped drawing for 41 min" is what this
+        // guard is for. <see cref="TargetedChargingController"/> has always tested Charging here, for
+        // the same reason between its blocks; the departure plan gave this mode the same waiting state
+        // without the same guard.
+        if (input.Charging && input.EvDrewPower)
         {
             // Known-disconnected, not merely "not connected": a charger that has stopped answering
             // reports Unknown, and a dropped read is not a car that has gone away.

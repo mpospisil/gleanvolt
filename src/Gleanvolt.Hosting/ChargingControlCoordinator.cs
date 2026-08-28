@@ -313,6 +313,21 @@ public sealed class ChargingControlCoordinator
             _stateChangedAt = now;
         }
 
+        // Resuming restarts the idle window. The clock measures how long the car has declined power we
+        // were actually offering, so time spent at the pause current -- between a targeted mode's
+        // blocks, or through a fast charge's wait for its scheduled start -- must not be carried into
+        // the judgement. Without this the controllers' Charging guard only moves the failure one poll
+        // later: the decision to resume is made while still paused, and the very next poll finds the
+        // car not yet drawing with a dwell inherited from the wait. The car gets a fresh dwell to spin
+        // up, which is exactly what the dwell is for.
+        // Only ever rebased, never started here: a null clock means this poll saw the car drawing, and
+        // manufacturing an idle window for a car that is charging is what the test for a winding-down
+        // car catches.
+        if (charging && !_charging && _evIdleSince is not null)
+        {
+            _evIdleSince = now;
+        }
+
         _charging = charging;
     }
 }
