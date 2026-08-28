@@ -279,6 +279,33 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task ResumingAfterACommandedPauseDoesNotInheritTheWaitsIdleTime()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+
+        // The car draws once, so "has drawn" is armed -- as it is a few seconds into any fast charge
+        // that is then deferred to a scheduled start.
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // Then we hold it at the pause current for 40 minutes, waiting for the appointment. The car
+        // draws nothing because we are the ones stopping it.
+        _controller.NextDecision = new(ChargingControlAction.Pause, null, "waiting until 07:47");
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(40)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(TimeSpan.FromMinutes(39), _controller.LastInput!.EvIdleFor);
+
+        // The appointment arrives and we resume. The car takes a moment to wake up, and that moment
+        // must be judged on its own: inheriting the 40-minute wait would end the charge immediately.
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "starting");
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(41)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(42)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.True(_controller.LastInput!.EvDrewPower);
+        Assert.Equal(TimeSpan.FromMinutes(1), _controller.LastInput.EvIdleFor);
+    }
+
+    [Fact]
     public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
