@@ -332,12 +332,40 @@ public sealed class PollingService : BackgroundService
     /// serving the house for six hours in which nothing is being charged at all. The owner would find a
     /// battery that sat full while the grid carried the evening, and nothing in the log saying why.</para>
     ///
-    /// <para>Idempotent, and that matters just as much: it fires on the transition only, so it can run
-    /// every cycle without re-arming a hold the owner has deliberately switched off mid-charge.</para>
+    /// <para><b>And released again when the plan goes back to waiting</b>, which is the half that was
+    /// missing. Refusing to arm while waiting is not enough, because the wait is not always the first
+    /// thing that happens: the opening poll measures the charge rate before the car has spun up, so the
+    /// first plan can read "0.4kW, 14 hours, not enough time" — not waiting — and arm, and the plan that
+    /// corrects it to a deferred start arrives seconds later with the hold already on. Observed on
+    /// 2026-08-28: armed 07:06:24, start deferred to 07:47 at 07:06:30, pack locked out of serving the
+    /// house for 41 minutes with nothing charging. The hold has to track the charging state in both
+    /// directions or it is a one-way latch that only the mode ending can clear.</para>
+    ///
+    /// <para>Idempotent in both directions, and that matters just as much: each fires on its transition
+    /// only, so this can run every cycle without re-arming a hold the owner has deliberately switched
+    /// off mid-charge. The release is guarded on <c>_fastHold</c> for the same reason
+    /// <see cref="ReleaseFastHoldIfEnded"/> is — a hold this mode did not arm is not this mode's to
+    /// release.</para>
     /// </summary>
-    private void ArmFastHoldWhenCharging(ChargeControlMode mode, bool waiting)
+    private void SetFastHoldForCharging(ChargeControlMode mode, bool waiting)
     {
-        if (mode != ChargeControlMode.FastNoBattery || waiting || _fastHold || !_batteryHoldOptions.Enabled)
+        if (mode != ChargeControlMode.FastNoBattery || !_batteryHoldOptions.Enabled)
+        {
+            return;
+        }
+
+        if (waiting)
+        {
+            if (_fastHold)
+            {
+                _fastHold = false;
+                _batteryHold.Set(false, "the FastNoBattery mode waiting for its start time");
+            }
+
+            return;
+        }
+
+        if (_fastHold)
         {
             return;
         }
@@ -477,7 +505,7 @@ public sealed class PollingService : BackgroundService
         {
             // A deferred charge (#122) is selected hours before it runs, and holding the pack out of a
             // charge that has not started is six hours of the house on the grid for nothing.
-            ArmFastHoldWhenCharging(mode, waiting: fastCharge?.Plan?.IsWaitingAt(state.Timestamp) == true);
+            SetFastHoldForCharging(mode, waiting: fastCharge?.Plan?.IsWaitingAt(state.Timestamp) == true);
 
             // Nothing to add beyond that: the mode's own hold is on the switch, so returning true here
             // would put it back to being a floor and take the switch's authority away again.
