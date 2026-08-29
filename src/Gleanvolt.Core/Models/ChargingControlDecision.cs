@@ -45,6 +45,18 @@ namespace Gleanvolt.Core.Models;
 /// only <see cref="Strategies.FastChargingController"/> reads it, and it charges the same either way
 /// until the number is met.
 /// </param>
+/// <param name="ChargerStoodDown">
+/// Whether the charger's use-mode reads Stop because <em>we</em> put it there for a long wait
+/// (<see cref="Enums.ChargingControlAction.StandDown"/>), rather than because its owner did.
+///
+/// <para>Every controller refuses to touch a charger whose use-mode is not Fast, and must: a wallbox
+/// the owner has set to Eco, Green or Stop is not ours to drive. But a deferred charge that stands the
+/// charger down would then be locked out of the very charger it is waiting to arm, and would sit inert
+/// until somebody noticed. This says "that Stop is ours", and it is tracked from what the coordinator
+/// commanded, never inferred from the register: this installation's charger drops its Modbus link about
+/// 45 times a day and reports transient junk use-modes on recovery (Eco has been observed), so a
+/// reading is not a statement of intent.</para>
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -57,7 +69,8 @@ public sealed record ChargingControlInput(
     double LoanedTodayWh = 0,
     bool EvDrewPower = false,
     TimeSpan EvIdleFor = default,
-    FastChargeProgress? FastCharge = null);
+    FastChargeProgress? FastCharge = null,
+    bool ChargerStoodDown = false);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for

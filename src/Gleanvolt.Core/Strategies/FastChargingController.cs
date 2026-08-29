@@ -68,7 +68,13 @@ public sealed class FastChargingController : IChargingController
         // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote
         // Fast once; if the charger has left it since, somebody changed it at the wallbox and we don't
         // control it at all -- and we don't end the session either, since we were never driving it.
-        if (input.CurrentSettings.Mode != EvChargerMode.Fast)
+        // Unless the Stop it is showing is our own: a deferred charge stands the charger down for the
+        // wait (ChargingControlAction.StandDown), and a guard that could not tell that from the owner's
+        // Stop would lock this mode out of the charger it is waiting to arm. That is not hypothetical --
+        // before the stand-down existed the wallbox reverted to Stop by itself after ~7 minutes at 0A,
+        // and this branch then returned None every poll for 8.5 hours while a 19.7kWh overnight charge
+        // was due. The flag comes from what we commanded, never from the register.
+        if (input.CurrentSettings.Mode != EvChargerMode.Fast && !input.ChargerStoodDown)
         {
             return new ChargingControlDecision(
                 ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
@@ -105,8 +111,12 @@ public sealed class FastChargingController : IChargingController
             // waiting for 04:12 keeps its appointment; it does not decide the car has finished.
             if (plan.IsWaitingAt(now))
             {
+                // Stood down rather than paused, and the difference is the whole of #135: a pause holds
+                // the charger in Fast at 0A, which this wallbox tolerates for minutes and not for hours.
+                // A wait that can be most of a night has to be expressed as Stop, the state the hardware
+                // actually has for it.
                 return new ChargingControlDecision(
-                    ChargingControlAction.Pause,
+                    ChargingControlAction.StandDown,
                     null,
                     $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm} to start: "
                     + $"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs "

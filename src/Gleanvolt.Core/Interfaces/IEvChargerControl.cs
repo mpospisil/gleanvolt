@@ -28,10 +28,16 @@ public interface IEvChargerControl
 
     /// <summary>
     /// Writes the charger's use-mode. Unconditional — unlike <see cref="SetCurrentAsync"/> there is no
-    /// hysteresis and no read-back comparison, because this is only ever called from an action the
-    /// owner just took, and "stop charging" has to stop charging whatever the register already said.
-    /// Throws if the charger does not accept the write; the caller reports that rather than pretending
-    /// the mode was entered.
+    /// hysteresis and no read-back comparison, because "stop charging" has to stop charging whatever the
+    /// register already said. Throws if the charger does not accept the write; the caller reports that
+    /// rather than pretending the mode was entered.
+    ///
+    /// <para><b>Callers must write on a transition, not on every poll.</b> This was once reached only
+    /// from an action the owner had just taken, which made that free; the control loop now calls it too,
+    /// to stand a charger down for a deferred charge's wait
+    /// (<see cref="Enums.ChargingControlAction.StandDown"/>) and to arm it again at the appointment.
+    /// With no read-back to make a repeat cheap, re-writing the same mode each cycle would be steady
+    /// traffic on a link that is not always healthy.</para>
     /// </summary>
     Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default);
 }
