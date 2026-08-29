@@ -74,10 +74,9 @@ public sealed class FastChargingController : IChargingController
         // before the stand-down existed the wallbox reverted to Stop by itself after ~7 minutes at 0A,
         // and this branch then returned None every poll for 8.5 hours while a 19.7kWh overnight charge
         // was due. The flag comes from what we commanded, never from the register.
-        if (input.CurrentSettings.Mode != EvChargerMode.Fast && !input.ChargerStoodDown)
+        if (ChargerOwnership.NotOurs(input) is { } notOurs)
         {
-            return new ChargingControlDecision(
-                ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
+            return notOurs;
         }
 
         // Checked before the idle branch below, and the order is the whole of why: a car that stops

@@ -462,7 +462,9 @@ public class TargetedChargingControllerTests
 
         var decision = Controller().Decide(Input(plan, surplusWatts: 9_000, socPercent: 95));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        // Stood down rather than paused: this hold is six hours, and the wallbox abandons a Fast-at-0A
+        // session in minutes.
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("Holding the last", decision.Reason);
     }
 

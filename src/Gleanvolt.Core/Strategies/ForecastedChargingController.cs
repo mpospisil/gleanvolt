@@ -86,10 +86,9 @@ public sealed class ForecastedChargingController : IChargingController
 
         // Precondition, unchanged from live-solar control: the charger is in Fast (starting the mode
         // wrote it) and we only modulate the current under it.
-        if (input.CurrentSettings.Mode != EvChargerMode.Fast)
+        if (ChargerOwnership.NotOurs(input) is { } notOurs)
         {
-            return new ChargingControlDecision(
-                ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
+            return notOurs;
         }
 
         var plan = input.Plan;

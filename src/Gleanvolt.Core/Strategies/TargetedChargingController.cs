@@ -70,10 +70,9 @@ public sealed class TargetedChargingController : IChargingController
 
         // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
         // wrote it) and we only modulate the current under it.
-        if (input.CurrentSettings.Mode != EvChargerMode.Fast)
+        if (ChargerOwnership.NotOurs(input) is { } notOurs)
         {
-            return new ChargingControlDecision(
-                ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
+            return notOurs;
         }
 
         if (plan is null)
@@ -126,7 +125,12 @@ public sealed class TargetedChargingController : IChargingController
         // pace is zero here and the sun would otherwise walk straight through DecideFromPace.
         if (plan.IsHoldingAt(now))
         {
-            return SoftPause(
+            // Stood down, not paused. This hold is measured in hours by design -- its own reason says
+            // "rather than sitting full overnight" -- and hours is exactly what a SolaX HAC will not
+            // spend in Fast at 0A: it abandons the session and reverts to Stop, after which this mode is
+            // locked out of its own charger. Same reasoning, same mechanism, as the fast mode's deferred
+            // start.
+            return StandDown(
                 input,
                 $"Holding the last {plan.TailEnergyWh / 1000:F1}kWh until "
                 + $"{plan.HoldUntil?.LocalDateTime:HH:mm} so the car reaches its target just before "
@@ -341,6 +345,24 @@ public sealed class TargetedChargingController : IChargingController
     /// unexpired the session is held at the minimum current instead: stopping and restarting a charge
     /// costs a contactor cycle and a vehicle wake, and a few minutes at 6 A is the cheaper trade.
     /// </summary>
+    /// <summary>
+    /// A <see cref="SoftPause"/> for waits the plan intends to last hours: it writes the charger's Stop
+    /// use-mode instead of holding it at the pause current. The minimum-run-time courtesy is kept --
+    /// a charge that has just started still finishes its minute before anything stands it down.
+    /// </summary>
+    private ChargingControlDecision StandDown(ChargingControlInput input, string reason)
+    {
+        if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)
+        {
+            return new ChargingControlDecision(
+                ChargingControlAction.Charge,
+                _minAmps,
+                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.");
+        }
+
+        return new ChargingControlDecision(ChargingControlAction.StandDown, null, reason);
+    }
+
     private ChargingControlDecision SoftPause(ChargingControlInput input, string reason)
     {
         if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)

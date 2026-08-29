@@ -306,6 +306,31 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task TheTimeSpentOutOfFastIsMeasuredAndResetOnReturn()
+    {
+        // What lets a two-minute-old Stop be believed and an eight-second one ignored. Timed rather than
+        // counted, because polls are not evenly spaced.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(TimeSpan.FromMinutes(3), _controller.LastInput!.ChargerNotFastFor);
+
+        // Back in Fast: the clock is not merely paused, it is forgotten, so a later blip starts afresh
+        // rather than inheriting a stretch that has already been recovered from.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+    }
+
+    [Fact]
     public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);

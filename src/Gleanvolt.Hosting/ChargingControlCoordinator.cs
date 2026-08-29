@@ -55,6 +55,7 @@ public sealed class ChargingControlCoordinator
     // tells "finished charging" from "hasn't started yet" -- the two are identical on power alone.
     private bool _evDrewPower;
     private bool _stoodDown;
+    private DateTimeOffset? _chargerNotFastSince;
     private DateTimeOffset? _evIdleSince;
 
     /// <param name="idlePowerThresholdWatts">
@@ -115,6 +116,17 @@ public sealed class ChargingControlCoordinator
         {
             var settings = await _chargerControl.ReadSettingsAsync(cancellationToken).ConfigureAwait(false);
 
+            // Timed rather than counted, because polls are not evenly spaced and a stretch of failed
+            // reads must not look like a short one.
+            if (settings.Mode == EvChargerMode.Fast)
+            {
+                _chargerNotFastSince = null;
+            }
+            else
+            {
+                _chargerNotFastSince ??= state.Timestamp;
+            }
+
             // Decide on the smoothed surplus, not the instantaneous value, so a passing cloud can't
             // interrupt a long charging session.
             var rawSurplus = state.SolarSurplusPowerWatts;
@@ -133,7 +145,8 @@ public sealed class ChargingControlCoordinator
                 _evDrewPower,
                 EvIdleFor(state.Timestamp),
                 fastCharge,
-                _stoodDown));
+                _stoodDown,
+                ChargerNotFastFor(state.Timestamp)));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -241,6 +254,7 @@ public sealed class ChargingControlCoordinator
         // through ChargeActions, and a stale claim would let that mode drive a charger its owner had
         // since stopped by hand.
         _stoodDown = false;
+        _chargerNotFastSince = null;
     }
 
     /// <summary>
@@ -331,6 +345,9 @@ public sealed class ChargingControlCoordinator
             _loanedToday.Reset();
         }
     }
+
+    private TimeSpan ChargerNotFastFor(DateTimeOffset now) =>
+        _chargerNotFastSince is { } since && now > since ? now - since : TimeSpan.Zero;
 
     private TimeSpan EvIdleFor(DateTimeOffset now) =>
         _evIdleSince is { } since && now > since ? now - since : TimeSpan.Zero;

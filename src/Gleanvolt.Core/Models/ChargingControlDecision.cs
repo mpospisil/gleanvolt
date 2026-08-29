@@ -57,6 +57,12 @@ namespace Gleanvolt.Core.Models;
 /// 45 times a day and reports transient junk use-modes on recovery (Eco has been observed), so a
 /// reading is not a statement of intent.</para>
 /// </param>
+/// <param name="ChargerNotFastFor">
+/// How long the charger's use-mode has read something other than Fast, without interruption. Zero
+/// while it reads Fast. Lets <see cref="Strategies.ChargerOwnership"/> tell a charger that has really
+/// left our control from the seconds-long junk values this installation's charger emits when its
+/// Modbus link recovers.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -70,7 +76,8 @@ public sealed record ChargingControlInput(
     bool EvDrewPower = false,
     TimeSpan EvIdleFor = default,
     FastChargeProgress? FastCharge = null,
-    bool ChargerStoodDown = false);
+    bool ChargerStoodDown = false,
+    TimeSpan ChargerNotFastFor = default);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
