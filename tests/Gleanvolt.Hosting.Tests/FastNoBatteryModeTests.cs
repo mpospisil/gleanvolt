@@ -289,8 +289,62 @@ public class FastNoBatteryModeTests
             limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
 
         Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
-        Assert.Equal(0, LastTarget);
-        Assert.Contains("Waiting until", _writes[^1].Reason);
+
+        // Stood down, not held at 0A: the wait is expressed as the charger's own Stop use-mode, which is
+        // the state it will actually sit in for hours. The mode stays selected throughout.
+        Assert.Equal((EvChargerMode.Stop, true), (_charger.ModeWrites[^1].Mode, _charger.ModeWrites[^1].Reason.Contains("Waiting until")));
+    }
+
+    [Fact]
+    public async Task TheStandDownIsWrittenOnceForTheWholeWait()
+    {
+        // SetModeAsync has no read-back and no hysteresis, so a mode rewritten every cycle is steady
+        // traffic on a link this installation already loses about 45 times a day.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddMinutes(2)), Charging(Now.AddMinutes(3))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        Assert.Equal(1, _charger.ModeWrites.Count(w => w.Mode == EvChargerMode.Stop));
+    }
+
+    [Fact]
+    public async Task TheChargerIsArmedBackIntoFastWhenTheWaitEnds()
+    {
+        // End to end, through the real poll loop, over the shape that failed on 2026-08-28: the wait
+        // stands the charger down, and the appointment has to bring it back. The polls straddle the
+        // start time, so the last one is past it.
+        await RunAsync(
+            [Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddHours(8)), Charging(Now.AddHours(8).AddMinutes(1))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        // Stop for the wait, then Fast again -- and Fast is the last word, not a charger left standing
+        // down through its own appointment.
+        var useModes = _charger.ModeWrites.Select(w => w.Mode).ToList();
+        Assert.Contains(EvChargerMode.Stop, useModes);
+        Assert.Equal(EvChargerMode.Fast, useModes[^1]);
+
+        // And a real current behind it: arming the use-mode without a setpoint charges nothing.
+        Assert.Equal(16, LastTarget);
+    }
+
+    [Fact]
+    public async Task AStoodDownChargerIsNotMistakenForAnUnpluggedCar()
+    {
+        // A charger in Stop reports Available with a car plugged into it exactly as it does with none --
+        // seen on 2026-08-28 at 22:19:04, EvCharger=Available EvMode=Stop, eight seconds before the same
+        // car drew 10966W. Believing that during a wait files the session as CarUnplugged and resets the
+        // session energy when the appointment re-arms.
+        await RunAsync(
+            [Charging(Now), Unplugged(Now.AddMinutes(1)), Unplugged(Now.AddMinutes(2))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        // The published status still says a car is connected, which is what keeps the charging-session
+        // store from closing the waiting session and filing it as CarUnplugged.
+        Assert.True(_status.Current!.CarConnected);
+
+        // And the mode is still selected and still standing down.
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
     }
 
     [Fact]

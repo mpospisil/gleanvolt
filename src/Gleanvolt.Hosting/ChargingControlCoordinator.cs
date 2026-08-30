@@ -54,6 +54,8 @@ public sealed class ChargingControlCoordinator
     // this session, and since when it has been drawing nothing. Together they are how the fast mode
     // tells "finished charging" from "hasn't started yet" -- the two are identical on power alone.
     private bool _evDrewPower;
+    private bool _stoodDown;
+    private DateTimeOffset? _chargerNotFastSince;
     private DateTimeOffset? _evIdleSince;
 
     /// <param name="idlePowerThresholdWatts">
@@ -114,6 +116,17 @@ public sealed class ChargingControlCoordinator
         {
             var settings = await _chargerControl.ReadSettingsAsync(cancellationToken).ConfigureAwait(false);
 
+            // Timed rather than counted, because polls are not evenly spaced and a stretch of failed
+            // reads must not look like a short one.
+            if (settings.Mode == EvChargerMode.Fast)
+            {
+                _chargerNotFastSince = null;
+            }
+            else
+            {
+                _chargerNotFastSince ??= state.Timestamp;
+            }
+
             // Decide on the smoothed surplus, not the instantaneous value, so a passing cloud can't
             // interrupt a long charging session.
             var rawSurplus = state.SolarSurplusPowerWatts;
@@ -131,7 +144,9 @@ public sealed class ChargingControlCoordinator
                 _loanedToday.EnergyWattHours,
                 _evDrewPower,
                 EvIdleFor(state.Timestamp),
-                fastCharge));
+                fastCharge,
+                _stoodDown,
+                ChargerNotFastFor(state.Timestamp)));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -154,8 +169,31 @@ public sealed class ChargingControlCoordinator
             switch (decision.Action)
             {
                 case ChargingControlAction.Charge:
+                    // Re-arm first if we had stood the charger down: it is in Stop, and a current
+                    // written to a stopped wallbox charges nothing. Use-mode before setpoint, the same
+                    // order ChargeActions.StartAsync uses, so the charger is never briefly Fast at a
+                    // stale current.
+                    if (_stoodDown)
+                    {
+                        await _chargerControl.SetModeAsync(EvChargerMode.Fast, decision.Reason, cancellationToken).ConfigureAwait(false);
+                        _stoodDown = false;
+                    }
+
                     await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, decision.ChargeCurrentAmps!.Value, decision.Reason, cancellationToken).ConfigureAwait(false);
                     SetCharging(true, state.Timestamp);
+                    break;
+
+                case ChargingControlAction.StandDown:
+                    // Idempotent: written once on the transition, not every poll for the whole wait.
+                    // SetModeAsync has no read-back and no hysteresis, so re-writing Stop hourly would
+                    // be pure noise on a Modbus link that is already dropping ~45 times a day.
+                    if (!_stoodDown)
+                    {
+                        await _chargerControl.SetModeAsync(EvChargerMode.Stop, decision.Reason, cancellationToken).ConfigureAwait(false);
+                        _stoodDown = true;
+                    }
+
+                    SetCharging(false, state.Timestamp);
                     break;
 
                 case ChargingControlAction.Pause:
@@ -177,12 +215,13 @@ public sealed class ChargingControlCoordinator
             {
                 ChargingControlAction.Charge => ChargeControlState.Charging,
                 ChargingControlAction.Pause => ChargeControlState.Paused,
+                ChargingControlAction.StandDown => ChargeControlState.Paused,
                 _ => ChargeControlState.Idle,
             };
 
             return new ChargeControlCycleResult(
                 reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
-                decision.SessionComplete, decision.GridBridgeWatts);
+                decision.SessionComplete, decision.GridBridgeWatts, _stoodDown);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -209,6 +248,13 @@ public sealed class ChargingControlCoordinator
         // "the car has already charged" verdict to the next one selected on the same plugged-in car.
         _evDrewPower = false;
         _evIdleSince = null;
+
+        // Not a command to the charger -- ReleaseControl deliberately leaves the hardware exactly as it
+        // is -- only our claim on the Stop we wrote. Whoever selects the next mode arms the charger
+        // through ChargeActions, and a stale claim would let that mode drive a charger its owner had
+        // since stopped by hand.
+        _stoodDown = false;
+        _chargerNotFastSince = null;
     }
 
     /// <summary>
@@ -263,7 +309,12 @@ public sealed class ChargingControlCoordinator
         // A charger that isn't answering reports Unknown, which is no news about the plug. Carrying the
         // last known state through it keeps a blink from reading as unplug-and-replug -- which would
         // reset the session's energy and its "the car has drawn power" verdict half way through a charge.
-        if (state.EvChargerStatus.IsConnectionKnown())
+        // ...and not while we have stood the charger down either. A charger in Stop reports Available
+        // or Finishing with a car plugged into it exactly as it does with none, so the reading stops
+        // being about the plug at all. Believing it would mark the car gone during the wait and then
+        // read the appointment's re-arm as a fresh car -- resetting the session's energy and its "has
+        // drawn power" verdict in the middle of the very charge the wait was scheduling.
+        if (state.EvChargerStatus.IsConnectionKnown() && !_stoodDown)
         {
             var connected = state.EvChargerStatus.IsCarConnected();
             if (connected && !_carWasConnected)
@@ -299,6 +350,9 @@ public sealed class ChargingControlCoordinator
             _loanedToday.Reset();
         }
     }
+
+    private TimeSpan ChargerNotFastFor(DateTimeOffset now) =>
+        _chargerNotFastSince is { } since && now > since ? now - since : TimeSpan.Zero;
 
     private TimeSpan EvIdleFor(DateTimeOffset now) =>
         _evIdleSince is { } since && now > since ? now - since : TimeSpan.Zero;

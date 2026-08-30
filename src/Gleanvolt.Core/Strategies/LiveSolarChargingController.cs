@@ -64,10 +64,9 @@ public sealed class LiveSolarChargingController : IChargingController
         // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote
         // Fast once; if the charger has left it since, somebody changed it at the wallbox and we don't
         // control it at all -- nothing here writes Fast back.
-        if (input.CurrentSettings.Mode != EvChargerMode.Fast)
+        if (ChargerOwnership.NotOurs(input) is { } notOurs)
         {
-            return new ChargingControlDecision(
-                ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
+            return notOurs;
         }
 
         // "Are we charging?" for the hysteresis is our own state (driven by the HA mode), not a read of

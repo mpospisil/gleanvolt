@@ -49,15 +49,56 @@ public class FastChargingControllerTests
         FastChargeProgress progress,
         bool evDrewPower = true,
         bool charging = true,
-        TimeSpan evIdleFor = default) =>
+        TimeSpan evIdleFor = default,
+        EvChargerMode chargerMode = EvChargerMode.Fast,
+        bool stoodDown = false) =>
         new(
             new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
-            new EvChargerSettings(EvChargerMode.Fast, 6),
+            new EvChargerSettings(chargerMode, 6),
             Charging: charging,
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
-            FastCharge: progress);
+            FastCharge: progress,
+            ChargerStoodDown: stoodDown);
+
+    [Fact]
+    public void AChargerWeStoodDownIsArmedAgainWhenTheAppointmentArrives()
+    {
+        // 2026-08-28: a 19.7kWh charge deferred to 05:27 found the wallbox in Stop -- it had reverted
+        // there itself after ~7 minutes at 0A -- and the use-mode guard answered "not Fast; leaving it
+        // untouched" every poll for 8 hours 31 minutes. The charge never started. Now the wait puts the
+        // charger in Stop deliberately, so the guard has to know that Stop is ours and arm through it.
+        var planned = new DateTimeOffset(2026, 8, 28, 22, 11, 0, TimeSpan.FromHours(2));
+        var deferred = Deferred(planned, departBy: planned.AddHours(9), requiredWh: 19_700);
+        var appointment = deferred.Plan!.StartNoLaterThan.AddSeconds(30);
+
+        var result = Controller.Decide(At(
+            appointment, deferred, charging: false, chargerMode: EvChargerMode.Stop, stoodDown: true));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(16, result.ChargeCurrentAmps);
+    }
+
+    [Theory]
+    [InlineData(EvChargerMode.Stop)]
+    [InlineData(EvChargerMode.Eco)]
+    [InlineData(EvChargerMode.Green)]
+    public void AChargerWeDidNotStandDownIsStillLeftAlone(EvChargerMode ownersMode)
+    {
+        // The guard keeps every case it was written for. Only a Stop this mode commanded is arguable;
+        // anything else is the owner's, and a use-mode read is never treated as intent -- this charger
+        // reports transient junk modes when its Modbus link recovers, which it does ~45 times a day.
+        var planned = new DateTimeOffset(2026, 8, 28, 22, 11, 0, TimeSpan.FromHours(2));
+        var deferred = Deferred(planned, departBy: planned.AddHours(9), requiredWh: 19_700);
+        var appointment = deferred.Plan!.StartNoLaterThan.AddSeconds(30);
+
+        var result = Controller.Decide(At(
+            appointment, deferred, charging: false, chargerMode: ownersMode, stoodDown: false));
+
+        Assert.Equal(ChargingControlAction.None, result.Action);
+        Assert.Contains("leaving it untouched", result.Reason);
+    }
 
     [Fact]
     public void TheMomentAWaitedStartArrives_TheCarIsNotMistakenForAFinishedOne()
@@ -296,10 +337,12 @@ public class FastChargingControllerTests
     [Fact]
     public void BeforeTheStartTimeItWaitsInsteadOfCharging()
     {
+        // Stood down rather than paused: a nine-hour wait cannot be spent in Fast at 0A, which this
+        // wallbox abandons after minutes.
         var now = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
         var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
         Assert.False(result.SessionComplete);
         Assert.Contains("Waiting until", result.Reason);
     }
@@ -318,7 +361,7 @@ public class FastChargingControllerTests
             EvIdleFor = TimeSpan.FromHours(3),
         });
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
         Assert.False(result.SessionComplete);
         Assert.Contains("Waiting until", result.Reason);
     }
