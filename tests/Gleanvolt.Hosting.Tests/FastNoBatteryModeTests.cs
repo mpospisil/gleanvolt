@@ -328,6 +328,26 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task AStoodDownChargerIsNotMistakenForAnUnpluggedCar()
+    {
+        // A charger in Stop reports Available with a car plugged into it exactly as it does with none --
+        // seen on 2026-08-28 at 22:19:04, EvCharger=Available EvMode=Stop, eight seconds before the same
+        // car drew 10966W. Believing that during a wait files the session as CarUnplugged and resets the
+        // session energy when the appointment re-arms.
+        await RunAsync(
+            [Charging(Now), Unplugged(Now.AddMinutes(1)), Unplugged(Now.AddMinutes(2))],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        // The published status still says a car is connected, which is what keeps the charging-session
+        // store from closing the waiting session and filing it as CarUnplugged.
+        Assert.True(_status.Current!.CarConnected);
+
+        // And the mode is still selected and still standing down.
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+    }
+
+    [Fact]
     public async Task ADeferredChargeDoesNotArmTheHoldWhileItWaits()
     {
         // The failure that costs a night of house load and shows up as nothing but a flat battery: the

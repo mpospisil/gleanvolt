@@ -221,7 +221,7 @@ public sealed class ChargingControlCoordinator
 
             return new ChargeControlCycleResult(
                 reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
-                decision.SessionComplete, decision.GridBridgeWatts);
+                decision.SessionComplete, decision.GridBridgeWatts, _stoodDown);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -309,7 +309,12 @@ public sealed class ChargingControlCoordinator
         // A charger that isn't answering reports Unknown, which is no news about the plug. Carrying the
         // last known state through it keeps a blink from reading as unplug-and-replug -- which would
         // reset the session's energy and its "the car has drawn power" verdict half way through a charge.
-        if (state.EvChargerStatus.IsConnectionKnown())
+        // ...and not while we have stood the charger down either. A charger in Stop reports Available
+        // or Finishing with a car plugged into it exactly as it does with none, so the reading stops
+        // being about the plug at all. Believing it would mark the car gone during the wait and then
+        // read the appointment's re-arm as a fresh car -- resetting the session's energy and its "has
+        // drawn power" verdict in the middle of the very charge the wait was scheduling.
+        if (state.EvChargerStatus.IsConnectionKnown() && !_stoodDown)
         {
             var connected = state.EvChargerStatus.IsCarConnected();
             if (connected && !_carWasConnected)

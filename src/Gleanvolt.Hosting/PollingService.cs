@@ -220,7 +220,13 @@ public sealed class PollingService : BackgroundService
                     ActiveCurrentAmps: state.ChargeCurrentAmps,
                     BatterySocPercent: state.BatterySocPercent,
                     ChargerStatus: state.EvChargerStatus,
-                    CarConnected: state.EvChargerStatus.IsCarConnected(),
+                    // Held true through a stand-down: the charger is in Stop because a deferred charge
+                    // put it there, and its status then reads Available or Finishing regardless of the
+                    // plug. Reporting "not connected" would file the waiting session as CarUnplugged.
+                    // The same trade the session store already makes for a charger answering Unknown --
+                    // a car genuinely unplugged mid-wait is noticed at the appointment instead of
+                    // immediately, which is the cheaper of the two errors by a wide margin.
+                    CarConnected: state.EvChargerStatus.IsCarConnected() || result.ChargerStoodDown,
                     SolarPowerWatts: state.SolarPowerWatts,
                     ForecastSolarPowerWatts: ForecastSolarPowerWatts(state.Timestamp),
                     EvChargerPowerWatts: state.EvChargerPowerWatts,

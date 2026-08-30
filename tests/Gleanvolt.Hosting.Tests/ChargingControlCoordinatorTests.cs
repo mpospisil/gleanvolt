@@ -331,6 +331,37 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task AStandDownIsNotReadAsTheCarLeavingAndComingBack()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+
+        // The car charges, so there is session energy and a "has drawn power" verdict worth losing.
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        var energyBefore = _coordinator.SessionEnergyWh;
+        Assert.True(energyBefore > 0);
+
+        // The plan defers, so the charger is stood down and now reports Available with the car still
+        // attached -- a reading that is about the use-mode, not the plug.
+        // The poll that decides to stand down still reads the charger as it was -- the Stop write happens
+        // after the decision -- so the Available readings begin on the cycle after.
+        _controller.NextDecision = new(ChargingControlAction.StandDown, null, "waiting until 05:27");
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        await _coordinator.RunCycleAsync(StoodDownWithCarAttached(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(StoodDownWithCarAttached(Now.AddHours(7)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // The appointment arrives and the charger is armed again. This must not look like a fresh car.
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "starting");
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(7).AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.True(_controller.LastInput!.EvDrewPower);
+        Assert.True(_coordinator.SessionEnergyWh >= energyBefore);
+    }
+
+    [Fact]
     public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
@@ -423,6 +454,12 @@ public class ChargingControlCoordinatorTests
     private static EnergyState Unreachable(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Unknown, EvChargerPowerWatts: 0);
+
+    // What a charger in Stop reports with a car plugged into it -- indistinguishable from an empty
+    // socket. Seen on 2026-08-28 at 22:19:04, eight seconds before the same car drew 10966W.
+    private static EnergyState StoodDownWithCarAttached(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Available, EvChargerPowerWatts: 0);
 
     // Plugged in, drawing nothing.
     private static EnergyState Connected(DateTimeOffset at) =>
