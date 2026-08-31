@@ -348,6 +348,33 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task AnArmedChargerIsNotStoodDownAgainWhenTheRateImproves()
+    {
+        // The 2026-08-31 flap, end to end. The rate comes from the car's actual draw and rises once it is
+        // properly charging -- 10.5kW became 10.9kW on the night. Faster means less time needed, which
+        // moves the latest safe start *forward*, back past the clock, so the plan says "wait" again and
+        // stands down the charger it armed seconds earlier. 30kWh needs 2h51m at 10.5kW and 2h43m at
+        // 11.04kW, so the start jumps about eight minutes the moment the faster reading lands.
+        await RunAsync(
+            [
+                ChargingSlowly(Now),                             // the activation burst: rate measured at 10.5kW
+                Idle(Now.AddSeconds(10)),                        // stood down for the wait: drawing nothing
+                Idle(Now.AddHours(5).AddMinutes(50)),
+                Idle(Now.AddHours(5).AddMinutes(54)),            // past the 10.5kW start: arm
+                Charging(Now.AddHours(5).AddMinutes(55)),        // faster reading pushes the start ahead
+                Charging(Now.AddHours(5).AddMinutes(56)),
+            ],
+            limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
+
+        var useModes = _charger.ModeWrites.Select(w => w.Mode).ToList();
+
+        // One Stop for the wait and no second one: the appointment is a gate, not a condition rechecked
+        // on every poll.
+        Assert.Equal(1, useModes.Count(m => m == EvChargerMode.Stop));
+        Assert.Equal(EvChargerMode.Fast, useModes[^1]);
+    }
+
+    [Fact]
     public async Task ADeferredChargeDoesNotArmTheHoldWhileItWaits()
     {
         // The failure that costs a night of house load and shows up as nothing but a flat battery: the
@@ -521,6 +548,12 @@ public class FastNoBatteryModeTests
     private static EnergyState Trickling(DateTimeOffset at) =>
         new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 400,
             EvChargerStatus.Charging, EvChargerPowerWatts: 400);
+
+    // Drawing, but under the installation's maximum -- what the car reports in the first seconds before
+    // it settles at its real rate.
+    private static EnergyState ChargingSlowly(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 10_500,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 10_500);
 
     // Plugged in, drawing nothing.
     private static EnergyState Idle(DateTimeOffset at) =>

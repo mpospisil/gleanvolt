@@ -63,6 +63,17 @@ namespace Gleanvolt.Core.Models;
 /// left our control from the seconds-long junk values this installation's charger emits when its
 /// Modbus link recovers.
 /// </param>
+/// <param name="WaitAlreadyReleased">
+/// Whether a wait this mode was standing the charger down for has already been released -- the
+/// charger was armed out of a stand-down and the car started drawing.
+///
+/// <para>An appointment is a one-way gate, and this is what makes it one. The start time is recomputed
+/// every poll from the measured charge rate, and the rate <em>rises</em> once the car is actually
+/// drawing: 10.5kW became 10.9kW on 2026-08-31, which cut the estimate from 28 minutes to 27 and so
+/// moved the latest safe start from 04:16 to 04:17 -- back into the future. The mode stood the charger
+/// down again seventeen seconds after starting it, and only got going for good a minute later. Once a
+/// wait has been released it stays released.</para>
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -77,7 +88,8 @@ public sealed record ChargingControlInput(
     TimeSpan EvIdleFor = default,
     FastChargeProgress? FastCharge = null,
     bool ChargerStoodDown = false,
-    TimeSpan ChargerNotFastFor = default);
+    TimeSpan ChargerNotFastFor = default,
+    bool WaitAlreadyReleased = false);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
