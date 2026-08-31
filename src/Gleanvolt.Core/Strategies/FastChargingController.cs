@@ -108,7 +108,7 @@ public sealed class FastChargingController : IChargingController
             // power earlier in this session and is now being held back draws nothing, so the completion
             // dwell would otherwise fire and end the very charge this plan exists to schedule. A mode
             // waiting for 04:12 keeps its appointment; it does not decide the car has finished.
-            if (plan.IsWaitingAt(now))
+            if (plan.IsWaitingAt(now) && !input.WaitAlreadyReleased)
             {
                 // Stood down rather than paused, and the difference is the whole of #135: a pause holds
                 // the charger in Fast at 0A, which this wallbox tolerates for minutes and not for hours.

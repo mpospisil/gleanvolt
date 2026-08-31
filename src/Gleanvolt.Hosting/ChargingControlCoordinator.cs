@@ -56,6 +56,7 @@ public sealed class ChargingControlCoordinator
     private bool _evDrewPower;
     private bool _stoodDown;
     private DateTimeOffset? _chargerNotFastSince;
+    private bool _waitReleased;
     private DateTimeOffset? _evIdleSince;
 
     /// <param name="idlePowerThresholdWatts">
@@ -146,7 +147,8 @@ public sealed class ChargingControlCoordinator
                 EvIdleFor(state.Timestamp),
                 fastCharge,
                 _stoodDown,
-                ChargerNotFastFor(state.Timestamp)));
+                ChargerNotFastFor(state.Timestamp),
+                _waitReleased));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -177,6 +179,11 @@ public sealed class ChargingControlCoordinator
                     {
                         await _chargerControl.SetModeAsync(EvChargerMode.Fast, decision.Reason, cancellationToken).ConfigureAwait(false);
                         _stoodDown = false;
+
+                        // Latched here rather than on any Charge at all, and that is what keeps a
+                        // targeted charge's day-then-hold-then-tail shape working: only leaving a
+                        // stand-down counts, and the day's charging never enters one.
+                        _waitReleased = true;
                     }
 
                     await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, decision.ChargeCurrentAmps!.Value, decision.Reason, cancellationToken).ConfigureAwait(false);
@@ -255,6 +262,7 @@ public sealed class ChargingControlCoordinator
         // since stopped by hand.
         _stoodDown = false;
         _chargerNotFastSince = null;
+        _waitReleased = false;
     }
 
     /// <summary>

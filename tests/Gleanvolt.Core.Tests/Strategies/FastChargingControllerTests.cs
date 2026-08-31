@@ -51,7 +51,8 @@ public class FastChargingControllerTests
         bool charging = true,
         TimeSpan evIdleFor = default,
         EvChargerMode chargerMode = EvChargerMode.Fast,
-        bool stoodDown = false) =>
+        bool stoodDown = false,
+        bool waitReleased = false) =>
         new(
             new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
@@ -60,7 +61,33 @@ public class FastChargingControllerTests
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
             FastCharge: progress,
-            ChargerStoodDown: stoodDown);
+            ChargerStoodDown: stoodDown,
+            WaitAlreadyReleased: waitReleased);
+
+    [Fact]
+    public void AReleasedWaitIsNotReEnteredWhenTheRateImproves()
+    {
+        // 2026-08-31, observed on hardware. The charge started at 04:16:33 and the car drew 10.9kW
+        // rather than the 10.5kW the plan had measured while idle. Faster means less time needed, which
+        // moves the latest safe start *forward* -- 04:16 became 04:17 -- so the plan said "wait" again
+        // and the mode stood the charger down seventeen seconds after starting it, restarting a minute
+        // later. Two extra use-mode writes, an extra inverter hold cycle, and the car cut off mid-charge.
+        var planned = new DateTimeOffset(2026, 8, 30, 23, 34, 0, TimeSpan.FromHours(2));
+        var deferred = Deferred(planned, departBy: planned.AddMinutes(86), requiredWh: 5000);
+
+        // A moment before the plan's own start time: without the latch this is a wait.
+        var justBefore = deferred.Plan!.StartNoLaterThan.AddSeconds(-30);
+
+        Assert.Equal(
+            ChargingControlAction.StandDown,
+            Controller.Decide(At(justBefore, deferred, charging: false)).Action);
+
+        // With the wait already released, the same instant charges instead.
+        var result = Controller.Decide(At(justBefore, deferred, charging: true, waitReleased: true));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(16, result.ChargeCurrentAmps);
+    }
 
     [Fact]
     public void AChargerWeStoodDownIsArmedAgainWhenTheAppointmentArrives()

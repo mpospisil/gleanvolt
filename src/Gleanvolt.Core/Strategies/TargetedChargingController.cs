@@ -123,7 +123,11 @@ public sealed class TargetedChargingController : IChargingController
         // so charging now -- on sun or on anything else -- would put the car at its target hours early,
         // which is the single thing the priority exists to prevent. Checked before the pace, because the
         // pace is zero here and the sun would otherwise walk straight through DecideFromPace.
-        if (plan.IsHoldingAt(now))
+        // Not re-entered once released, for the same reason the fast mode's start time is not
+        // re-evaluated: the plan is rebuilt every poll and the tail's release can move forward under
+        // its own recomputation. The hold before the tail is unaffected -- the latch is set by leaving a
+        // stand-down, and the day's charging never enters one.
+        if (plan.IsHoldingAt(now) && !input.WaitAlreadyReleased)
         {
             // Stood down, not paused. This hold is measured in hours by design -- its own reason says
             // "rather than sitting full overnight" -- and hours is exactly what a SolaX HAC will not
