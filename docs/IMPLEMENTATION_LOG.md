@@ -4,6 +4,45 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-01 — The API is readable in the browser too (issue #142)
+
+### What changed
+
+- An **API** section on `/pv-system`, after MQTT: whether the API is on, the base URL, links to the
+  index and the OpenAPI document, the keys by name, and a pasteable `curl` with this installation's
+  own address and key already in it.
+- `ApiDisplayOptions` in `Gleanvolt.Web`, composed by the host from `ApiOptions` + `WebOptions` and
+  registered **whenever the UI is enabled** — not inside the existing `if (api.Enabled)` block, since
+  "the API is off" is what the section most often has to say.
+- `GleanvoltApi.BasePath`, so the group, the index endpoint and the page all name `/api/v1` once.
+- `Secret.razor` gained `Before`/`After`: the example call masks the key *inside* the command, and
+  Copy still hands over the whole line.
+
+### Things worth knowing
+
+- **The gate was already built.** #143 put the "a secret reaches the UI only when a login is enforced"
+  decision in the host; this reuses it verbatim — `web.AuthenticationRequired ? key.Value : null` —
+  along with `Secret.razor`. Two surfaces, one rule, one component.
+- **The address comes from the browser, not from `Web:Port`.** A hostname or a reverse proxy in front
+  means the configured port is not necessarily the one that works, while the address that just
+  delivered the page demonstrably is. `Web:Port` is still stated beside it when that address carries no
+  port of its own, because the direct LAN address is `host:8090` whatever the proxy is doing.
+- **`Uri.TryCreate(path, UriKind.Absolute, …)` succeeds on Unix**, as a *file* URI — so an unparsable
+  base URI would have put `file:///api/v1` on the page. The scheme is checked explicitly. Caught by the
+  fallback test, not by review.
+- **The key table lists only real keys**, in name order: a configured-but-empty `Api__Keys__x` is not a
+  key (`HasKeys` ignores it), and the order must not reshuffle between restarts.
+
+### Verification performed
+
+- **1239 tests pass** (21 new): the address derivation in five shapes including the file-URI trap; the
+  composition's key gate in both directions, the paths coming from `GleanvoltApi`'s constants, several
+  clients in a stable order, and nothing registered when the UI is off; and on the page — off, one key,
+  several keys, the masked key revealing on click, and no key in the markup of an unauthenticated
+  render.
+
+---
+
 ## 2026-09-01 — The MQTT links are readable in the browser (issue #143)
 
 ### What changed
@@ -45,7 +84,7 @@ Reverse-chronological. Newest entry at the top.
 
 ### Verification performed
 
-- **1247 tests pass** (29 new): the composition's password gate in both directions, an anonymous broker
+- **1218 tests pass** (29 new): the composition's password gate in both directions, an anonymous broker
   not reading as a withheld one, the topics being `HaDiscovery`'s, the device id fallback, the vehicle
   topic's provenance, a feed with no topic, one broker versus two — and on the page: both links off,
   battery hold on and off, the masked secret revealing on click, and no secret in the markup of an

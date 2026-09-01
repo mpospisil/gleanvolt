@@ -20,8 +20,14 @@ public static class GleanvoltApi
     /// <summary>The OpenAPI document's name, and the version segment every route sits under.</summary>
     public const string DocumentName = "v1";
 
+    /// <summary>
+    /// Where every route sits, and what the index answers on. One owner rather than a literal repeated
+    /// at the group, the index and the configuration page that prints it (issue #142).
+    /// </summary>
+    public const string BasePath = "/api/" + DocumentName;
+
     /// <summary>Where the document is served, once the API is enabled.</summary>
-    public const string DocumentPath = "/api/v1/openapi.json";
+    public const string DocumentPath = BasePath + "/openapi.json";
 
     private const string SecuritySchemeName = "apiKey";
 
@@ -135,7 +141,7 @@ public static class GleanvoltApi
         app.MapIndex(DocumentPath);
 
         var group = app
-            .MapGroup("/api/v1")
+            .MapGroup(BasePath)
             .AddEndpointFilter(keys)
             .WithTags("Gleanvolt");
 

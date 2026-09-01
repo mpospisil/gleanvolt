@@ -18,7 +18,7 @@ internal static class IndexEndpoint
 {
     internal static void MapIndex(this IEndpointRouteBuilder app, string documentPath)
     {
-        app.MapGet("/api/v1", (EndpointDataSource endpoints, ApiHostInfo host) => Results.Ok(
+        app.MapGet(GleanvoltApi.BasePath, (EndpointDataSource endpoints, ApiHostInfo host) => Results.Ok(
             new ApiIndexResponse(
                 Name: "Gleanvolt",
                 Version: GleanvoltApi.DocumentName,

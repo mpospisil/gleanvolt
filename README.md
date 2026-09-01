@@ -1844,6 +1844,14 @@ login is not a closed door, and a shoulder or a screenshot is a different threat
 None of it says whether either link is **up**: every value is read once at startup. That is a
 different question, and no page answers it yet.
 
+**And the API.** An **API** section states whether it is on — off is the default, so it says what turns
+it on and that a key is part of that — the base URL built from the address *this page* arrived on
+rather than from `Web:Port` (a proxy or a hostname in front means the configured port is not
+necessarily the one that works, while the address that just delivered the page demonstrably is), links
+to the index and the OpenAPI document, the configured keys by name, and the `curl` from the README with
+this installation's address and key already in it. The keys are shown on the same terms as the broker
+password: only behind a login, masked, with *Reveal* and *Copy*.
+
 #### The dashboard reports; the plan page decides
 
 Those phases left the UI in three places for one question. The dashboard was fourteen telemetry tiles
@@ -2082,6 +2090,12 @@ Present one as a bearer token on every call that does anything:
 curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and what it serves
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
+
+All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-read-only), including
+that second line with this installation's own address and key already substituted in. The key itself is
+shown only when the UI is behind a [login](#authentication); without one the page shows the names and
+says what makes the secrets readable, because a key is bearer-equivalent to the stop button on the
+wallbox and the UI is open on the LAN by default.
 
 **Why the API defaults off when the UI defaults on.** Two of these endpoints write to hardware, and
 the project's rule for anything that writes is that an operator switches it on knowingly. The UI can

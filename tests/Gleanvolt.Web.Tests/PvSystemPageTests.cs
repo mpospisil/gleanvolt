@@ -102,23 +102,43 @@ public class PvSystemPageTests : BunitContext
                 ReconnectInterval: TimeSpan.FromSeconds(30)));
     }
 
-    private IRenderedComponent<PvSystem> Render(
-        PvSystemInfo? site = null, EvInfo? car = null, MqttDisplayOptions? mqtt = null)
+    /// <summary>The API as the host composes it once it is switched on, with the keys it was given.</summary>
+    private static ApiDisplayOptions Api(params ApiKeyDisplay[] keys) =>
+        new(Enabled: true, "/api/v1", "/api/v1/openapi.json", 8090, keys);
+
+    /// <summary>
+    /// Renders the page into a given context. Static and context-taking because bUnit registers
+    /// services once per context, so a test that compares two configurations needs two of them.
+    /// </summary>
+    private static IRenderedComponent<PvSystem> RenderIn(
+        BunitContext context,
+        PvSystemInfo? site = null,
+        EvInfo? car = null,
+        MqttDisplayOptions? mqtt = null,
+        ApiDisplayOptions? api = null)
     {
-        Services.AddSingleton(site ?? Site());
+        context.Services.AddSingleton(site ?? Site());
 
         var ev = car ?? EvInfo.Unknown;
-        Services.AddSingleton(ev);
+        context.Services.AddSingleton(ev);
 
         // Composed exactly as the host composes it: the reference install's 6-16 A on three phases,
         // narrowed by whatever the car says.
-        Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, ev));
+        context.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, ev));
 
-        // Both links off is the default an installation that speaks no MQTT is handed.
-        Services.AddSingleton(mqtt ?? MqttDisplayOptions.None);
+        // Off is the default for every one of the three control surfaces.
+        context.Services.AddSingleton(mqtt ?? MqttDisplayOptions.None);
+        context.Services.AddSingleton(api ?? ApiDisplayOptions.Off);
 
-        return Render<PvSystem>();
+        return context.Render<PvSystem>();
     }
+
+    private IRenderedComponent<PvSystem> Render(
+        PvSystemInfo? site = null,
+        EvInfo? car = null,
+        MqttDisplayOptions? mqtt = null,
+        ApiDisplayOptions? api = null) =>
+        RenderIn(this, site, car, mqtt, api);
 
     [Fact]
     public void Shows_what_the_system_is_called_and_where_it_is()
@@ -324,12 +344,9 @@ public class PvSystemPageTests : BunitContext
 
         // A fresh context per render: bUnit registers services once.
         using var withHold = new BunitContext();
-        withHold.Services.AddSingleton(Site());
-        withHold.Services.AddSingleton(EvInfo.Unknown);
-        withHold.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
-        withHold.Services.AddSingleton(Mqtt(homeAssistant: Link(), batteryHold: true));
+        var withHoldPage = RenderIn(withHold, mqtt: Mqtt(homeAssistant: Link(), batteryHold: true));
 
-        Assert.Contains("gleanvolt/home-roof/battery_hold/set", withHold.Render<PvSystem>().Markup);
+        Assert.Contains("gleanvolt/home-roof/battery_hold/set", withHoldPage.Markup);
     }
 
     [Fact]
@@ -360,12 +377,9 @@ public class PvSystemPageTests : BunitContext
         Assert.Empty(Render(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
 
         using var retiring = new BunitContext();
-        retiring.Services.AddSingleton(Site());
-        retiring.Services.AddSingleton(EvInfo.Unknown);
-        retiring.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
-        retiring.Services.AddSingleton(Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+        var retiringPage = RenderIn(retiring, mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
 
-        Assert.Contains("old_controller", retiring.Render<PvSystem>().Find("#ha-mqtt-retiring").TextContent);
+        Assert.Contains("old_controller", retiringPage.Find("#ha-mqtt-retiring").TextContent);
     }
 
     [Fact]
@@ -397,14 +411,10 @@ public class PvSystemPageTests : BunitContext
         Assert.Contains("mosquitto:1883", page.Find("#mqtt-one-broker").TextContent);
 
         using var separate = new BunitContext();
-        separate.Services.AddSingleton(Site());
-        separate.Services.AddSingleton(EvInfo.Unknown);
-        separate.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
-        separate.Services.AddSingleton(Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
+        var separatePage = RenderIn(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
 
-        var rendered = separate.Render<PvSystem>();
-        Assert.Empty(rendered.FindAll("#mqtt-one-broker"));
-        Assert.Contains("192.168.2.4:1883", rendered.Markup);
+        Assert.Empty(separatePage.FindAll("#mqtt-one-broker"));
+        Assert.Contains("192.168.2.4:1883", separatePage.Markup);
     }
 
     [Fact]
@@ -453,5 +463,103 @@ public class PvSystemPageTests : BunitContext
         var page = Render(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("whether either link is", page.Markup);
+    }
+
+    // -- The API (#142).
+
+    [Fact]
+    public void Says_plainly_when_the_api_is_off()
+    {
+        // Off is the default, so it must read as a deliberate one -- and say what turns it on, keys
+        // included, since enabled without a key does not start at all.
+        var page = Render();
+
+        var off = page.Find("#api-off").TextContent;
+        Assert.Contains("Api__Enabled=true", off);
+        Assert.Contains("openssl rand -hex 32", off);
+
+        // And nothing else: no key table and no example call to a surface that is not there.
+        Assert.Empty(page.FindAll("p.code-line"));
+        Assert.DoesNotContain("openapi.json", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_where_the_api_is_and_links_to_what_answers_without_a_key()
+    {
+        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+
+        // Absolute, built from the address the browser used -- bUnit's is http://localhost/.
+        Assert.Contains("http://localhost/api/v1", page.Markup);
+
+        var links = page.FindAll("a").Select(link => link.GetAttribute("href")).ToList();
+        Assert.Contains("http://localhost/api/v1", links);
+        Assert.Contains("http://localhost/api/v1/openapi.json", links);
+    }
+
+    [Fact]
+    public void States_the_configured_port_when_the_address_it_arrived_on_carries_none()
+    {
+        // A proxy answering on 80 leaves no port in the URL, and the direct LAN address is still
+        // host:8090. bUnit's base URI has no port, which is exactly that case.
+        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+
+        Assert.Contains("host:8090", page.Markup);
+    }
+
+    [Fact]
+    public void Lists_every_key_by_name()
+    {
+        // The name is the column that earns its place: it is what the log and the recorded session
+        // attribute an action to.
+        var page = Render(api: Api(
+            new ApiKeyDisplay("claude-mcp", null),
+            new ApiKeyDisplay("dashboard", null)));
+
+        Assert.Contains("claude-mcp", page.Markup);
+        Assert.Contains("dashboard", page.Markup);
+    }
+
+    [Fact]
+    public void No_api_key_reaches_an_unauthenticated_page()
+    {
+        // The host withholds the secret when no login is enforced. Nothing secret may be in the markup
+        // at all -- not masked, not in an attribute, not in the example call.
+        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+
+        Assert.DoesNotContain("a-real-key", page.Markup);
+        Assert.Contains("Web__PasswordHash", page.Find("#api-keys-withheld").TextContent);
+        Assert.Empty(page.FindAll("button"));
+
+        // The example call still has to be useful, so the key is a placeholder rather than absent.
+        Assert.Contains("Bearer &lt;key&gt;", page.Markup);
+    }
+
+    [Fact]
+    public void An_api_key_renders_masked_until_it_is_asked_for()
+    {
+        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+
+        Assert.DoesNotContain("a-real-key", page.Markup);
+        Assert.Contains("•", page.Markup);
+        Assert.Empty(page.FindAll("#api-keys-withheld"));
+
+        page.FindAll("button").First(button => button.TextContent == "Reveal").Click();
+
+        Assert.Contains("a-real-key", page.Markup);
+    }
+
+    [Fact]
+    public void The_example_call_carries_this_installations_own_address()
+    {
+        // The task the section exists to serve: a line that can be pasted into a terminal on another
+        // machine and work, rather than one with placeholders to fill in.
+        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+
+        var call = page.Find("p.code-line").TextContent;
+        Assert.Contains("curl -H \"Authorization: Bearer", call);
+        Assert.Contains("http://localhost/api/v1/status", call);
+
+        // Masked in the line, whole when copied -- so the command stays a command.
+        Assert.DoesNotContain("a-real-key", call);
     }
 }

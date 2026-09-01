@@ -623,6 +623,24 @@ h3 {
     word-break: break-all;
 }
 
+/*
+    A line meant to be copied and pasted somewhere else -- the API section's example call (#142). It is
+    long, it must not be reflowed into something that no longer runs, and it must not push the page
+    sideways, so it scrolls inside its own box.
+*/
+.code-line {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.code-line code {
+    white-space: pre;
+}
+
 button.link {
     background: none;
     border: none;
