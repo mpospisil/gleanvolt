@@ -25,6 +25,7 @@
   -->
   <ItemGroup>
     <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\**\*.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

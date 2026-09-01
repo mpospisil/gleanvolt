@@ -103,9 +103,9 @@ public static class VwGroupVehicleStateMapper
             return new VwGroupMappingResult(null, $"range was {range} km, beyond {MaxRangeKm} km");
         }
 
-        if (!TryNumber(
-                ordered, VwGroupFieldNames.ChargeTimeRemainingMinutes,
-                0, MaxChargeTimeRemainingMinutes, out var minutes, out error))
+        if (!TryDurationMinutes(
+                ordered, VwGroupFieldNames.ChargeTimeRemaining,
+                MaxChargeTimeRemainingMinutes, out var minutes, out error))
         {
             return new VwGroupMappingResult(null, $"remaining charging time {error}");
         }
@@ -139,6 +139,68 @@ public static class VwGroupVehicleStateMapper
     /// sentinel, and still cannot be believed. Absent returns true with a null, which is a supported
     /// configuration rather than a fault.</para>
     /// </summary>
+    /// <summary>
+    /// A duration in minutes, from a value that names its own unit.
+    ///
+    /// <para>The portal writes <c>"9900s"</c> — seconds, with the unit stuck to the digits — where the
+    /// dictionary documents <c>remaining_charging_time</c> in minutes. Both spellings are real and
+    /// they differ by sixty, so guessing is not an option. A bare number is minutes, which is what the
+    /// documented field is.</para>
+    ///
+    /// <para>This matters more than it looks: a plain numeric parse rejects <c>"9900s"</c> as
+    /// unusable, and #73's rule then throws away <b>the whole bundle</b> — every field lost to one
+    /// suffix.</para>
+    /// </summary>
+    private static bool TryDurationMinutes(
+        List<VwGroupSnapshot> snapshots, string[] candidates,
+        double maximumMinutes, out double? minutes, out string? error)
+    {
+        minutes = null;
+        error = null;
+
+        if (Latest(snapshots, candidates) is not { } raw)
+        {
+            return true;
+        }
+
+        var text = raw.Value.Trim();
+        var factor = 1.0;
+
+        if (text.EndsWith("min", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[..^3];
+        }
+        else if (text.EndsWith('s') || text.EndsWith('S'))
+        {
+            text = text[..^1];
+            factor = 1.0 / 60;
+        }
+        else if (text.EndsWith('h') || text.EndsWith('H'))
+        {
+            text = text[..^1];
+            factor = 60;
+        }
+
+        if (!double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            || double.IsNaN(parsed))
+        {
+            error = $"was '{raw.Value}' on {raw.Field}, which is not a duration";
+            return false;
+        }
+
+        var value = parsed * factor;
+
+        if (value < 0 || value > maximumMinutes)
+        {
+            error = $"was {raw.Value} on {raw.Field}, outside 0-"
+                + $"{maximumMinutes.ToString(CultureInfo.InvariantCulture)} minutes";
+            return false;
+        }
+
+        minutes = value;
+        return true;
+    }
+
     private static bool TryNumber(
         List<VwGroupSnapshot> snapshots, string[] candidates,
         double minimum, double maximum, out double? number, out string? error)
@@ -251,7 +313,7 @@ public static class VwGroupVehicleStateMapper
         string[][] known =
         [
             VwGroupFieldNames.StateOfCharge, VwGroupFieldNames.RangeKm,
-            VwGroupFieldNames.ChargeTimeRemainingMinutes, VwGroupFieldNames.ChargeState,
+            VwGroupFieldNames.ChargeTimeRemaining, VwGroupFieldNames.ChargeState,
             VwGroupFieldNames.PlugState, .. VwGroupFieldNames.KnownButUnused,
         ];
 

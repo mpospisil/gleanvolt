@@ -56,6 +56,9 @@ public static class VwGroupReportBundle
     /// </summary>
     public static readonly string[] TimestampProperties =
     [
+        // car_captured_time is what a real ID.4 bundle carries, and it is the car's clock rather
+        // than the portal's -- which is the whole point of CapturedAt.
+        "car_captured_time", "car_captured_utc_timestamp",
         "capturedAt", "captured_at", "timestamp", "collectedAt", "collected_at",
         "createdAt", "created_at", "measurementTime", "recordDate",
     ];

@@ -25,17 +25,30 @@ public sealed class VwGroupPortalOptions
     public string IdentityBaseUrl { get; init; } = "https://identity.vwgroup.io";
 
     /// <summary>
-    /// The locale segment the portal's own paths carry. It decides which language the identity
-    /// provider renders its forms in, and nothing else — but the forms are what get parsed, so it is
-    /// worth being able to pin it.
+    /// Which brand's portal to sign in to — <c>vw</c>, <c>audi</c>, <c>skoda</c>, <c>seat</c>,
+    /// <c>cupra</c> or <c>bentley</c>. The ordinary way to configure this, because an owner knows what
+    /// they drive and does not know a GUID.
+    ///
+    /// <para>Resolved through <see cref="VwGroupBrands"/> into <see cref="ResolvedClientId"/>.
+    /// Ignored when <see cref="ClientId"/> is set explicitly.</para>
     /// </summary>
-    public string Locale { get; init; } = "de/en";
+    public string Brand { get; init; } = string.Empty;
 
     /// <summary>
-    /// The brand's OIDC client id. No default: a wrong one fails in a way that looks like a broken
-    /// password, and a guessed one would be worse than an empty one that says what is missing.
+    /// The brand's OIDC client id, stated outright. Overrides <see cref="Brand"/>, and exists for the
+    /// two cases the table cannot serve: a brand it does not list, and one whose id has changed.
+    ///
+    /// <para>No default, and no guessing: a wrong id fails in a way that looks exactly like a broken
+    /// password, so an empty one that says what is missing is worth more than a hopeful one.</para>
     /// </summary>
     public string ClientId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The client id actually used: <see cref="ClientId"/> when stated, otherwise whatever
+    /// <see cref="Brand"/> resolves to, otherwise empty.
+    /// </summary>
+    public string ResolvedClientId =>
+        !string.IsNullOrWhiteSpace(ClientId) ? ClientId.Trim() : VwGroupBrands.Resolve(Brand) ?? string.Empty;
 
     /// <summary>The VW ID the portal is entered with. A secret in the same sense the password is not.</summary>
     public string Username { get; init; } = string.Empty;
@@ -65,12 +78,42 @@ public sealed class VwGroupPortalOptions
     /// </summary>
     public string Scope { get; init; } = "openid cars profile";
 
-    /// <summary>Where the identity provider is told to come back to. The portal's own login route.</summary>
-    public string RedirectUri => $"{PortalBaseUrl.TrimEnd('/')}/{Locale.Trim('/')}/login";
+    /// <summary>
+    /// The portal locale the session belongs to. Travels in the OIDC <c>state</c>, which the portal
+    /// decodes on the callback — it is not a nonce.
+    /// </summary>
+    public string Country { get; init; } = "de";
+
+    /// <summary>The language half of the same pair. See <see cref="Country"/>.</summary>
+    public string Language { get; init; } = "en";
+
+    /// <summary>
+    /// The <c>state</c> the portal expects: <c>country__language__BRAND</c>.
+    ///
+    /// <para><b>Not opaque, and not random.</b> The portal's <c>/services/callbacklogin</c> reads it to
+    /// decide which brand and locale the returning code belongs to. Verified live: with a random state
+    /// the callback bounces to the login page and every <c>proxy_api</c> call answers 401; with this
+    /// one it lands on <c>/de/en/user.html</c> and the API answers.</para>
+    /// </summary>
+    public string State =>
+        $"{Country}__{Language}__{VwGroupBrands.PortalKey(Brand) ?? "VOLKSWAGEN_PASSENGER_CARS"}";
+
+    /// <summary>
+    /// Where the identity provider is told to come back to: the portal's own login route, and
+    /// <b>exactly</b> that.
+    ///
+    /// <para>The client id is registered against this one string, so it is not ours to decorate. A
+    /// locale segment used to be spliced in here — <c>/de/en/login</c>, matching the paths the portal
+    /// itself serves pages under — and the identity provider answered every such request with
+    /// <c>400 invalid_request: Mismatching redirection URI</c> before any credential was sent. Verified
+    /// against the live provider: with the segment 400 and no form, without it 200 and the sign-in
+    /// form. Nothing may be appended to it.</para>
+    /// </summary>
+    public string RedirectUri => $"{PortalBaseUrl.TrimEnd('/')}/login";
 
     /// <summary>Whether enough is configured to attempt a sign-in at all.</summary>
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(ClientId)
+        !string.IsNullOrWhiteSpace(ResolvedClientId)
         && !string.IsNullOrWhiteSpace(Username)
         && !string.IsNullOrWhiteSpace(Password);
 
@@ -79,9 +122,15 @@ public sealed class VwGroupPortalOptions
     {
         var missing = new List<string>();
 
-        if (string.IsNullOrWhiteSpace(ClientId))
+        if (string.IsNullOrWhiteSpace(ResolvedClientId))
         {
-            missing.Add("a brand client id");
+            // A misspelt brand and an absent one want different fixes, so they are not the same
+            // sentence: one is a typo to correct, the other is a setting never supplied.
+            missing.Add(
+                string.IsNullOrWhiteSpace(Brand)
+                    ? $"a brand (one of {VwGroupBrands.Known}) or an explicit client id"
+                    : $"a known brand -- '{Brand.Trim()}' is not one of {VwGroupBrands.Known}; "
+                      + "set an explicit client id if yours is missing");
         }
 
         if (string.IsNullOrWhiteSpace(Username))

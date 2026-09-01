@@ -25,7 +25,8 @@ public sealed record VwGroupLoginForm(
     string? Action,
     string Method,
     IReadOnlyDictionary<string, string> Fields,
-    IReadOnlyDictionary<string, string> FieldTypes)
+    IReadOnlyDictionary<string, string> FieldTypes,
+    string? PostAction = null)
 {
     private static readonly RegexOptions Options =
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant;
@@ -33,8 +34,27 @@ public sealed record VwGroupLoginForm(
     private static readonly Regex FormTag = new("<form\\b[^>]*>", Options);
     private static readonly Regex InputTag = new("<input\\b[^>]*>", Options);
     private static readonly Regex Attribute = new("([\\w:-]+)\\s*=\\s*(\"([^\"]*)\"|'([^']*)')", Options);
-    private static readonly Regex TemplateModel =
-        new("templateModel\\s*[:=]\\s*(\\{.*?\\})\\s*[,;<]", Options);
+    private static readonly Regex Scripts =
+        new("<(script|style)\\b.*?</\\1>", Options);
+
+    /// <summary>
+    /// The CSRF token, which the identity provider ships as a <b>JavaScript variable</b> rather than
+    /// in the template model or (on a client-rendered page) as a hidden input:
+    /// <c>csrf_parameterName: '_csrf', csrf_token: '...'</c>, single-quoted.
+    ///
+    /// <para>The identifier page renders <c>_csrf</c> as a hidden input as well, so step one worked
+    /// without this and hid the gap. The password page renders no inputs at all, so posting without
+    /// the token is answered <c>400</c> with a <c>generalErrorBranded</c> page — no form on it, which
+    /// surfaced as "a page with no form to post" and looked like a refused password.</para>
+    /// </summary>
+    private static readonly Regex CsrfToken =
+        new("csrf_token\\s*[:=]\\s*['\"]([^'\"]+)['\"]", Options);
+
+    private static readonly Regex CsrfParameterName =
+        new("csrf_parameterName\\s*[:=]\\s*['\"]([^'\"]+)['\"]", Options);
+
+    private static readonly Regex TemplateModelStart =
+        new("templateModel\\s*[:=]\\s*\\{", Options);
 
     /// <summary>
     /// Words that mean a human is required. Matched against the whole page, lower-cased.
@@ -53,8 +73,57 @@ public sealed record VwGroupLoginForm(
         ("terms to accept", ["terms and conditions", "accept the terms", "nutzungsbedingungen"]),
     ];
 
-    /// <summary>Whether there is a form here at all to post.</summary>
-    public bool IsPostable => !string.IsNullOrWhiteSpace(Action);
+    /// <summary>
+    /// The identity provider's own explanation, when it answered with an OAuth error object rather
+    /// than a page — <c>{"error":"invalid_request","error_description":"Mismatching redirection URI"}</c>
+    /// and its like. Null when the body is not one.
+    ///
+    /// <para>Worth a method of its own because of what it replaces. Such a body has no form in it, so
+    /// it used to surface as "the identity provider returned a page with no form to post" — true, and
+    /// useless: it points at the sign-in when the request was rejected before sign-in began. The
+    /// provider had already said exactly what was wrong and nothing read it.</para>
+    /// </summary>
+    public static string? OAuthError(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body) || body.TrimStart().FirstOrDefault() != '{')
+        {
+            return null;
+        }
+
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+
+            if (json.RootElement.ValueKind is not JsonValueKind.Object
+                || !json.RootElement.TryGetProperty("error", out var error))
+            {
+                return null;
+            }
+
+            var description = json.RootElement.TryGetProperty("error_description", out var text)
+                ? text.GetString()
+                : null;
+
+            return string.IsNullOrWhiteSpace(description)
+                ? error.GetString()
+                : $"{error.GetString()} -- {description}";
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Whether there is anywhere to post at all — an HTML form's action, or the template model's
+    /// <c>postAction</c> when the page renders its form in the browser and ships none in the markup.
+    ///
+    /// <para>The password page is the second kind: <c>useClientRendering: true</c>, zero
+    /// <c>&lt;form&gt;</c> tags, zero <c>&lt;input&gt;</c> tags, and everything needed sitting in the
+    /// template model instead. Treating "no form tag" as "no way in" stopped the flow one step short
+    /// of signing in.</para>
+    /// </summary>
+    public bool IsPostable => !string.IsNullOrWhiteSpace(Action) || !string.IsNullOrWhiteSpace(PostAction);
 
     /// <summary>
     /// The first form on the page, with every input it carries and everything the template model
@@ -103,18 +172,74 @@ public sealed record VwGroupLoginForm(
             }
         }
 
-        foreach (var (name, value) in ReadTemplateModel(html))
+        string? postAction = null;
+
+        if (ReadTemplateModel(html) is { } model)
         {
             // Only what the markup left out. A hidden input the page actually renders is the value
             // the browser would have posted, and that is the one to replay.
-            if (!fields.TryGetValue(name, out var existing) || string.IsNullOrEmpty(existing))
+            foreach (var name in CarriedByTemplateModel)
             {
-                fields[name] = value;
+                if (model.TryGetProperty(name, out var carried)
+                    && carried.ValueKind == JsonValueKind.String
+                    && (!fields.TryGetValue(name, out var existing) || string.IsNullOrEmpty(existing)))
+                {
+                    fields[name] = carried.GetString() ?? string.Empty;
+                    types.TryAdd(name, "hidden");
+                }
+            }
+
+            if (model.TryGetProperty("postAction", out var post) && post.ValueKind == JsonValueKind.String)
+            {
+                postAction = post.GetString();
+            }
+
+            // The credential fields themselves, and ONLY on a page that renders none of them in
+            // markup.
+            //
+            // The model carries the same emailPasswordForm on both steps, so taking its names
+            // unconditionally would find a "password" field on the identifier page -- where the
+            // markup asks for an email -- and the caller prefers a password wherever it finds one.
+            // The result would be the password posted to login/identifier: the wrong endpoint, and
+            // the credential sent a step early. Markup wins where markup exists.
+            var markupAsksForACredential = types.Any(field =>
+                CredentialNames.Contains(field.Key, StringComparer.OrdinalIgnoreCase)
+                || CredentialNames.Contains(field.Value, StringComparer.OrdinalIgnoreCase));
+
+            if (!markupAsksForACredential
+                && model.TryGetProperty("emailPasswordForm", out var credentials)
+                && credentials.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in credentials.EnumerateObject())
+                {
+                    if (property.Name.StartsWith('@'))
+                    {
+                        continue;
+                    }
+
+                    fields.TryAdd(property.Name, property.Value.ValueKind == JsonValueKind.String
+                        ? property.Value.GetString() ?? string.Empty
+                        : string.Empty);
+                    types.TryAdd(property.Name, property.Name);
+                }
+            }
+        }
+
+        if (CsrfToken.Match(html) is { Success: true } csrf)
+        {
+            var name = CsrfParameterName.Match(html) is { Success: true } parameter
+                ? parameter.Groups[1].Value
+                : "_csrf";
+
+            // A hidden input the page actually rendered wins, as everywhere else here.
+            if (!fields.TryGetValue(name, out var already) || string.IsNullOrEmpty(already))
+            {
+                fields[name] = csrf.Groups[1].Value;
                 types.TryAdd(name, "hidden");
             }
         }
 
-        return new VwGroupLoginForm(action, method, fields, types);
+        return new VwGroupLoginForm(action, method, fields, types, postAction);
     }
 
     /// <summary>
@@ -145,6 +270,15 @@ public sealed record VwGroupLoginForm(
     public string? PasswordField => FieldFor("password");
 
     /// <summary>
+    /// Whether this page has somewhere to put a credential — an identifier, an email or a password.
+    ///
+    /// <para>The guard that keeps <see cref="OwnerActionReason"/> honest: <b>a page you can sign in
+    /// on is a sign-in page</b>, whatever words are printed on it. A real consent screen has no
+    /// password box, so this distinguishes them structurally rather than by vocabulary.</para>
+    /// </summary>
+    public bool CanSignIn => IdentifierField is not null || PasswordField is not null;
+
+    /// <summary>
     /// Why a human is needed on this page, or null when it is one a program can answer.
     ///
     /// <para>Checked <b>before</b> the form is posted, not after it fails: posting a password into a
@@ -157,7 +291,10 @@ public sealed record VwGroupLoginForm(
             return null;
         }
 
-        var lowered = html.ToLowerInvariant();
+        // Scripts first: the identity provider ships a templateModel blob naming the client
+        // application, and matching prose needles against machine data is how a page gets called a
+        // consent screen for containing its own configuration.
+        var lowered = Scripts.Replace(html, " ").ToLowerInvariant();
 
         foreach (var (reason, needles) in OwnerActionNeedles)
         {
@@ -186,39 +323,100 @@ public sealed record VwGroupLoginForm(
     // The identity provider's own state, as a JSON object inside a script tag. Only string values are
     // taken: everything replayed goes into a form post, and a nested object has no representation
     // there.
-    private static IEnumerable<KeyValuePair<string, string>> ReadTemplateModel(string html)
+    /// <summary>
+    /// The identity provider's <c>templateModel</c> blob, parsed — or null when there is none, or it
+    /// cannot be read.
+    ///
+    /// <para><b>Brace-balanced rather than regex-matched.</b> A lazy <c>\{.*?\}</c> stops at the first
+    /// closing brace, which on every real page lands inside the nested
+    /// <c>clientLegalEntityModel</c> — 514 characters of truncated, unparseable JSON that was then
+    /// silently discarded. The blob has nested objects; only counting braces reads it.</para>
+    /// </summary>
+    private static JsonElement? ReadTemplateModel(string html)
     {
-        var match = TemplateModel.Match(html);
+        var match = TemplateModelStart.Match(html);
 
         if (!match.Success)
         {
-            yield break;
+            return null;
         }
 
-        JsonElement root;
+        var opening = html.IndexOf('{', match.Index);
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
 
-        try
+        for (var i = opening; i < html.Length; i++)
         {
-            root = JsonDocument.Parse(match.Groups[1].Value).RootElement;
-        }
-        catch (JsonException)
-        {
-            // A blob we cannot read is not a failure: the hidden inputs are the primary source, and
-            // this was only ever the fallback.
-            yield break;
-        }
+            var c = html[i];
 
-        if (root.ValueKind != JsonValueKind.Object)
-        {
-            yield break;
-        }
-
-        foreach (var property in root.EnumerateObject())
-        {
-            if (property.Value.ValueKind == JsonValueKind.String)
+            if (escaped)
             {
-                yield return new KeyValuePair<string, string>(property.Name, property.Value.GetString() ?? string.Empty);
+                escaped = false;
+                continue;
+            }
+
+            if (inString)
+            {
+                if (c == '\\')
+                {
+                    escaped = true;
+                }
+                else if (c == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                    inString = true;
+                    break;
+                case '{':
+                    depth++;
+                    break;
+                case '}':
+                    depth--;
+
+                    if (depth == 0)
+                    {
+                        try
+                        {
+                            // Cloned: the document is disposed on the way out and the element must
+                            // outlive it.
+                            using var json = JsonDocument.Parse(html[opening..(i + 1)]);
+                            return json.RootElement.ValueKind == JsonValueKind.Object
+                                ? json.RootElement.Clone()
+                                : null;
+                        }
+                        catch (JsonException)
+                        {
+                            // Unreadable is not a failure: hidden inputs are the primary source and
+                            // this was only ever the fallback.
+                            return null;
+                        }
+                    }
+
+                    break;
             }
         }
+
+        return null;
     }
+
+    /// <summary>
+    /// What the template model contributes to the post body.
+    ///
+    /// <para><b>Named rather than swept up.</b> The blob is a view model, not a form: it also carries
+    /// <c>template</c>, <c>titleKey</c>, <c>postAction</c> and <c>identifierUrl</c>, none of which the
+    /// browser posts. Taking every string in it would put four junk fields into the credential POST.
+    /// These four are what the identity provider actually wants carried back.</para>
+    /// </summary>
+    private static readonly string[] CarriedByTemplateModel = ["hmac", "relayState", "_csrf", "csrf_token"];
+
+    /// <summary>What a credential field is called, by name or by input type. See the guard in Parse.</summary>
+    private static readonly string[] CredentialNames = ["identifier", "email", "username", "password"];
 }

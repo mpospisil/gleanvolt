@@ -17,17 +17,6 @@ if (args is ["hash-password", var plainPassword])
     return 0;
 }
 
-// The console harness for the VW Group portal client (issue #139): sign in, download, print a
-// VehicleState, and say which of the portal's fields nothing here reads yet. Offline in the same
-// sense as hash-password -- no configuration is built and no socket is opened -- so it cannot
-// disturb a controller that is running. Phase 2 (#140) is what turns the client into a service; this
-// is how Phase 1 is proved against the real car.
-if (args is [ "vw-probe", .. var probeArgs ])
-{
-    DotEnv.Load(Directory.GetCurrentDirectory());
-    return await VwProbe.RunAsync(probeArgs);
-}
-
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
 // the VS Code debugger -- without living in any committed file. Real env vars still take priority.

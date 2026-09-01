@@ -1,0 +1,74 @@
+
+
+<!DOCTYPE html>
+    <html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport"
+          content="width=device-width, height=device-height, initial-scale=1"/>
+    <meta name="identitykit" content="loginAuthenticate"/>
+        <meta name="robots" content="nofollow"/>
+
+        <title>Log in – Enter password</title>
+
+    <link href="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/styles/volkswagen_d6_dark-theme.css"
+          rel="stylesheet"/>
+    <link rel="apple-touch-icon" sizes="180x180"
+          href="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/favicons/volkswagen_d6_dark/apple-touch-icon.png"/>
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/favicons/volkswagen_d6_dark/favicon-32x32.png"/>
+    <link rel="icon" type="image/png" sizes="16x16"
+          href="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/favicons/volkswagen_d6_dark/favicon-16x16.png"/>
+<script src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/jquery-3.5.0.min.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/PasswordRevealer.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/InputFieldSessionPersistence.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/OnDocumentLoaded.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/TimeElapsedCounter.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/consent.js"></script>
+<script type="application/javascript"
+        src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/javascripts/base/InputFieldsButtonEnabler.js"></script>
+
+<script type="application/javascript">
+//<![CDATA[
+    new OnDocumentLoaded(document, callback);
+
+    function callback() {
+        new PasswordRevealer(document, document.querySelector('[type="password"]'), '#input_password_revealer');
+        new InputFieldSessionPersistence(document.getElementById("input_email"), window);
+    }
+
+//]]>
+</script>
+    <script>
+        window._IDK = {
+            templateModel: {"clientLegalEntityModel":{"clientId":"9b58543e-1c15-4193-91d5-8a14145bebb0@apps_vw-dilab_com","clientAppName":"GIS Consent Portal","clientAppDisplayName":"Consent Portal - Volkswagen Group Info Services AG","legalEntityInfo":{"name":"Volkswagen","shortName":"VOLKSWAGEN","productName":"Volkswagen ID","theme":"volkswagen_d6_dark","defaultLanguage":"en","termAndConditionsType":"DEFAULT","legalProperties":{"revokeDataContact":"info-datenschutz@volkswagen.de","imprintText":"IMPRINT","countryOfJurisdiction":"DE"}},"informalLanguage":false,"legalEntityCode":"volkswagen","imprintTextKey":"imprint.link.text"},"template":"loginAuthenticate","hmac":"HMAC-REDACTED","useClientRendering":true,"titleKey":"title.login.password","title":null,"emailPasswordForm":{"@class":"com.volkswagen.identitykit.signin.domain.model.dto.EmailPasswordForm","email":"owner@example.com","password":null},"error":null,"relayState":"RELAY-STATE-REDACTED","nextButtonDisabled":false,"enableNextButtonAfterSeconds":0,"postAction":"login/authenticate","identifierUrl":"login/identifier"},
+            disabledFeatures: {
+                isRTLEnabled: false,
+            },
+            currentLocale: 'en',
+            csrf_parameterName: '_csrf',
+            csrf_token: 'CSRF-JS-TOKEN-REDACTED',
+            userSession: {
+                userId: '',
+                countryOfResidence: ''
+            },
+            baseUrl: 'https://identity.vwgroup.io',
+            consentBaseUrl: 'http://consentapi-service.idk-peu.svc.cluster.local:8080',
+            cancelContractUrl: 'https://www.myvolkswagen.net/cz/cs/myvolkswagen/cic/termination.html',
+            withdrawContractUrl: '',
+            footerDocuments: ["imprint","termsOfUse","dataPrivacy","cookiePolicy","europeanAccessibilityAct"]
+        }
+    </script>
+</head>
+<body>
+
+    <div id="idk-react-loginAuthenticate"></div>
+    <div id="idk-react-app"></div>
+<script type="text/javascript" src="https://identity-cdn.vwgroup.io/assets/6f578647eba34f3350b8f548140b194b9287e37e/signIn.bundle.js"></script>
+</body>
+</html>

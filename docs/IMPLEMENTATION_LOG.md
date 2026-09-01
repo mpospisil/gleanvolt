@@ -19,6 +19,10 @@ Reverse-chronological. Newest entry at the top.
 - `dotnet run --project src/Gleanvolt.Worker -- vw-probe`: the console harness. Prints a
   `VehicleState`, prints **every field the mapper did not recognise**, and with `--save-fixture`
   writes a sanitised bundle.
+  > **Superseded.** The harness was removed once the web UI's `/vehicle-portal` page took over
+  > proving a sign-in — a button beat four environment variables and a launch profile. The page
+  > carries the unrecognised-field list; the `--save-fixture` sanitiser did not survive and is in
+  > git history if it is wanted back.
 
 ### Things worth knowing
 
@@ -53,7 +57,8 @@ Reverse-chronological. Newest entry at the top.
   choosing the intervals stays where #137 puts it — the update service, in Phase 2.
 - **The fixtures are synthetic**, and `Fixtures/VwGroup/README.md` says so rather than implying a
   capture. The structure they exercise is real; the spellings are what the first genuine download
-  settles, and `vw-probe --save-fixture` is how they get replaced.
+  settles. `vw-probe --save-fixture` was how they were to be replaced; with the harness gone, that
+  route needs restoring before a real capture can be committed.
 
 ### Verification performed
 

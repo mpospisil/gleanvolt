@@ -34,10 +34,21 @@ public enum VwGroupFailure
     VehicleNotFound,
 
     /// <summary>
-    /// Signed in, but the portal has no dataset to give. Usually means nobody has enabled a
-    /// <i>continuous data request</i> in the portal by hand, which is a browser step no client can do.
+    /// Signed in, the car has a continuous data request, and it has simply not delivered anything
+    /// yet. Ordinary and self-clearing: a newly created request can take hours to fill.
     /// </summary>
     NoDataAvailable,
+
+    /// <summary>
+    /// Signed in, but the car has <b>no continuous data request at all</b> — and one cannot be
+    /// created except by the owner, in a browser, in the portal.
+    ///
+    /// <para>Separate from <see cref="NoDataAvailable"/> precisely because the advice is opposite.
+    /// "None exists" is not fixed by asking again, however many times; "one exists and is empty" is
+    /// fixed by waiting. Reporting both as retryable told an owner to keep pressing a button that
+    /// could never work.</para>
+    /// </summary>
+    NoDataRequest,
 
     /// <summary>
     /// The bundle arrived and could not be believed: not a ZIP, no readings, or values that are

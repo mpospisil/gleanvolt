@@ -1,0 +1,176 @@
+@page "/vehicle-portal"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IVehiclePortalReader Portal
+@inject EvInfo Car
+
+@*
+    Reading the car from the manufacturer's own portal, on demand (issues #137/#139).
+
+    A button rather than a console harness with four environment variables, because proving that a
+    sign-in works and that the mapping recognises this car's fields is something an owner does — and
+    an owner should not have to run `dotnet run -- vw-probe` to do it.
+
+    Deliberately manual. Nothing polls this and the reading is NOT written into IVehicleTelemetry:
+    the dashboard's car still comes from whatever feed is configured. Turning this into a service
+    with its own clock, a health state and a place in the holder is issue #140, and doing half of it
+    here would mean the controller reasoning about a car from data fetched behind the owner's back.
+*@
+
+<SiteTitle Page="Vehicle portal" />
+
+<h1>Vehicle portal</h1>
+
+<p class="muted">
+    Asks @Portal.PortalName for @(string.IsNullOrWhiteSpace(Car.Name) ? "the car" : Car.Name), once,
+    when you press the button. Nothing here runs on a schedule, and the reading is not fed to the
+    dashboard or to any charging decision — this is how you check that the credentials work and that
+    the portal's fields are understood.
+</p>
+
+@if (!Portal.IsConfigured)
+{
+    <p class="error">
+        Not configured: needs @Portal.DescribeWhatIsMissing().
+    </p>
+
+    <p class="hint">
+        Set <code>VW_BRAND</code>, <code>VW_USERNAME</code> and <code>VW_PASSWORD</code> in
+        <code>.env</code> (or <code>Vehicle__DataAct__Brand</code> and friends) and restart. The
+        portal also needs a <em>continuous data request</em> enabling by hand before it delivers
+        anything — see <code>docs/VW_PORTAL_SETUP.md</code>.
+    </p>
+}
+else
+{
+    <div class="actions">
+        <button type="button" class="secondary" id="portal-read" disabled="@_busy" @onclick="ReadAsync">
+            @(_busy ? "Reading…" : "Read the car now")
+        </button>
+    </div>
+
+    <p class="hint">
+        Each press signs in afresh. That is fine by hand and is why this is not a poll: repeatedly
+        replaying a password at a real identity provider is how accounts get locked.
+    </p>
+}
+
+@if (_reading is { Succeeded: false } failed)
+{
+    <p class="error">
+        <strong>@failed.FailureKind</strong> — @failed.Message
+    </p>
+
+    <p class="hint">
+        @(failed.IsWorthRetrying
+            ? "Worth pressing again — this one is expected and usually clears itself."
+            : "Pressing again will not help. This one needs something changed, or a browser.")
+    </p>
+}
+else if (_reading is { Succeeded: true, State: { } state })
+{
+    <h2>What the car said</h2>
+
+    <dl class="facts">
+        <dt>Captured</dt>
+        <dd>@state.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss zzz")</dd>
+
+        <dt>Battery</dt>
+        <dd>@Show(state.SocPercent, "%")</dd>
+
+        <dt>Range</dt>
+        <dd>@Show(state.RangeKm, " km")</dd>
+
+        <dt>Charging</dt>
+        <dd>@state.ChargeState</dd>
+
+        <dt>Plug</dt>
+        <dd>@state.PlugState</dd>
+
+        <dt>Time left</dt>
+        <dd>@(state.ChargeTimeRemaining is { } left ? $"{left.TotalMinutes:N0} min" : "—")</dd>
+    </dl>
+
+    <p class="muted table-note">
+        The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago is
+        normal and not a fault — its state of charge does not drift.
+    </p>
+
+    <h2>The delivery</h2>
+
+    <dl class="facts">
+        <dt>Vehicle</dt>
+        <dd>@_reading.Vehicle</dd>
+
+        <dt>Snapshots</dt>
+        <dd>
+            @_reading.SnapshotCount
+            @if (_reading.OldestSnapshot is { } oldest && _reading.NewestSnapshot is { } newest)
+            {
+                <span class="muted"> (@oldest.ToString("HH:mm") – @newest.ToString("HH:mm"))</span>
+            }
+        </dd>
+
+        <dt>Target SOC</dt>
+        <dd>@Show(_reading.TargetSocPercent, "%")</dd>
+
+        <dt>Odometer</dt>
+        <dd>@Show(_reading.OdometerKm, " km")</dd>
+    </dl>
+
+    <p class="muted table-note">
+        Target SOC and the odometer are carried but nothing reads them yet. The first is what would
+        let a plan refuse an impossible battery target, deferred on
+        <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
+    </p>
+
+    @if (_reading.Unmapped.Count > 0)
+    {
+        <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+
+        <p class="muted">
+            If a value above is missing, its real name is probably in this list — the portal's
+            vocabulary was written down from a description rather than from a capture, so this is
+            expected on a first run rather than a fault.
+        </p>
+
+        <ul class="sessions">
+            @foreach (var field in _reading.Unmapped)
+            {
+                <li><code>@field</code></li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p class="muted">Every field in the bundle was recognised.</p>
+    }
+}
+
+@code {
+    private VehiclePortalReading? _reading;
+    private bool _busy;
+
+    private async Task ReadAsync()
+    {
+        _busy = true;
+        _reading = null;
+        StateHasChanged();
+
+        try
+        {
+            // The reader does not throw for an expected failure -- a refused password, a consent
+            // screen, a portal with nothing to give all come back as an unsuccessful reading. Only a
+            // genuine bug would escape, and swallowing that here would hide it.
+            _reading = await Portal.ReadAsync();
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string Show(double? value, string unit) =>
+        value is { } number ? $"{number:0.#}{unit}" : "—";
+}

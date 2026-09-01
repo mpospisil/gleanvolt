@@ -127,7 +127,8 @@ Gleanvolt.slnx
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
-└── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md (see below)
+└── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md (see below),
+                                    # VW_PORTAL_SETUP.md (reading the car from VW's portal)
 ```
 
 ### Layering rules
@@ -1498,6 +1499,28 @@ that belong to something else.
 **Nothing here is required, and an absent section changes nothing.** Every figure falls back to the
 installation's, which is exactly how the controller behaved before this section existed.
 
+#### Where to put it
+
+Three routes, and which one you want depends on where the controller is running. All of them end at
+the same `Ev:Vehicles:0:*` keys, so nothing behaves differently depending on how you got there.
+
+| Running | File | Notes |
+|---|---|---|
+| **A deployed Pi** (the compose stack) | `deploy/.env` | Set `EV_ID`, `EV_NAME`, `EV_MAKE`, `EV_MODEL`, `EV_PHASES`, `EV_MIN_CHARGING_CURRENT_AMPS`, `EV_MAX_CHARGING_CURRENT_AMPS` — plus `VEHICLE_BATTERY_CAPACITY_KWH` and `VEHICLE_CHARGE_EFFICIENCY`, which keep their old names so an existing `.env` goes on working. `deploy/.env.example` documents each one; `docker-compose.yml` maps them onto the keys above. |
+| **Locally, from your IDE or `dotnet run`** | `src/Gleanvolt.Worker/appsettings.Development.json` | The launch profile sets `DOTNET_ENVIRONMENT=Development`, so this file is read on a development machine and **never** by the deployed container. The right place for a car you only want configured while debugging. |
+| **A plain, non-Development run** | `src/Gleanvolt.Worker/appsettings.json` | The shipped defaults, where the section exists with every field blank. |
+
+Any single value can also be overridden by an environment variable using the double-underscore form —
+`Ev__Vehicles__0__BatteryCapacityKWh=77` — which is what the compose file does under the covers, and
+what to reach for when you want to change one figure without editing a file.
+
+A car that is described but has **no telemetry feed** is a perfectly ordinary installation: the car
+shows on the dashboard with its pack and its limits, no reading appears, and every kilowatt-hour
+target works exactly as it always did. The `Ev` section says what the controller is charging; the
+[`Vehicle` section](#vehicle-telemetry-the-vehicle-section) below is a separate, optional convenience
+that reports on it.
+
+
 `BatteryCapacityKWh` is the **usable** capacity — the figure the car's own SOC is a percentage of, not
 the gross pack on the brochure (an ID.4 Pro is 77 usable of 82 gross). Unset by default, and it affects
 one thing: the **Battery target (%)** basis on a
@@ -1802,6 +1825,21 @@ The header carries the installation's name beside the product's, and so does the
 `Dashboard — Home Roof` rather than `Dashboard — Gleanvolt`. Two tabs onto two roofs is the case this
 is for; the product name is the one thing both of them already agree on. The sign-in page is the
 exception, and keeps the product name: it is reached before anyone has signed in.
+
+#### `/vehicle-portal` — the car from the manufacturer, on demand
+
+A button that asks VW's own [EU Data Act portal](docs/VW_PORTAL_SETUP.md) for the car and shows what
+came back: battery, range, charge state, plug state and the *car's* capture time; then the delivery it
+arrived in; then every field in it that nothing here recognises yet.
+
+**A diagnostic, not a feed.** Nothing polls it, and the reading is not written into the dashboard's
+vehicle card or into any charging decision — it is how you check that the credentials work and that
+this car's fields are understood, before anything reasons about a car with data fetched behind your
+back. Each press signs in afresh, which is fine by hand and is exactly why it is not a poll.
+
+Setup — the credentials and the browser steps the portal needs first — is
+[docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md). Turning it into a service with its own clock and a
+visible sign-in health state is [issue #140](https://github.com/mpospisil/gleanvolt/issues/140).
 
 #### `/pv-system` — the installation, read-only
 

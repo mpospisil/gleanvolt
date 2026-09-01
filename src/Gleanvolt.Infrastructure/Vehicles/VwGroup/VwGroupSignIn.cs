@@ -79,21 +79,23 @@ public sealed class VwGroupSignIn
                 $"the VW portal client needs {_options.DescribeWhatIsMissing()}");
         }
 
+        // The portal first, and its answer is discarded. It sets the AEM cookies its own
+        // /services/callbacklogin needs; without them the code comes back to a session that does not
+        // exist. Failure here is not fatal -- the flow may still work -- so it is logged, not thrown.
+        try
+        {
+            await GetAsync(_options.PortalBaseUrl.TrimEnd('/') + "/", cancellationToken).ConfigureAwait(false);
+        }
+        catch (VwGroupPortalException failure)
+        {
+            _logger.LogDebug("Priming the portal failed, continuing anyway: {Reason}", failure.Message);
+        }
+
         var page = await GetAsync(AuthorizeUrl(), cancellationToken).ConfigureAwait(false);
 
         for (var attempt = 0; attempt < MaxPages; attempt++)
         {
-            // Checked before posting rather than after failing: putting a password into a consent
-            // screen tells the identity provider nothing and tells us nothing either.
-            if (VwGroupLoginForm.OwnerActionReason(page.Body) is { } reason)
-            {
-                throw new VwGroupPortalException(
-                    VwGroupFailure.OwnerActionRequired,
-                    $"the portal is showing {reason}, which only the owner can answer in a browser at "
-                    + $"{_options.PortalBaseUrl}. Nothing here will retry until it has been.");
-            }
-
-            if (IsPortal(page.Url) && !IsLoginPath(page.Url))
+            if (IsPortal(page.Url))
             {
                 _logger.LogInformation("Signed in to the VW portal after {Pages} form page(s).", attempt);
                 return;
@@ -101,8 +103,34 @@ public sealed class VwGroupSignIn
 
             var form = VwGroupLoginForm.Parse(page.Body);
 
+            // Checked before posting rather than after failing: putting a password into a consent
+            // screen tells the identity provider nothing and tells us nothing either.
+            //
+            // But only when there is nothing to fill. A page we can sign in on is a sign-in page,
+            // whatever words are printed on it -- and this client is named "Consent Portal", so its
+            // ordinary email form says "consent" six times: in the client id's app name, in the
+            // templateModel, and in the visible subtitle "Welcome to Consent Portal". Reading that as
+            // a consent screen aborted every sign-in before the first field was filled.
+            if (!form.CanSignIn && VwGroupLoginForm.OwnerActionReason(page.Body) is { } reason)
+            {
+                throw new VwGroupPortalException(
+                    VwGroupFailure.OwnerActionRequired,
+                    $"the portal is showing {reason}, which only the owner can answer in a browser at "
+                    + $"{_options.PortalBaseUrl}. Nothing here will retry until it has been.");
+            }
+
             if (!form.IsPostable)
             {
+                // The provider often says exactly what it objected to, and the request can be refused
+                // before sign-in ever begins -- a redirect_uri it does not recognise, an unknown client
+                // id. Quoting it beats reporting the absence of a form we were never going to get.
+                if (VwGroupLoginForm.OAuthError(page.Body) is { } refusal)
+                {
+                    throw new VwGroupPortalException(
+                        VwGroupFailure.SignInRejected,
+                        $"the identity provider refused the request at {Where(page.Url)}: {refusal}");
+                }
+
                 throw new VwGroupPortalException(
                     VwGroupFailure.SignInRejected,
                     $"the identity provider returned a page with no form to post at {Where(page.Url)}");
@@ -134,14 +162,13 @@ public sealed class VwGroupSignIn
             // The hidden fields -- hmac, _csrf, relayState and whatever else the identity provider's
             // templateModel carried -- go back verbatim. Names are logged, values never: one of them
             // is a CSRF token and the rest are session state.
+            var target = TargetFor(form, page.Url);
+
             _logger.LogDebug(
                 "Posting the {Which} form to {Target} with {Fields}.",
-                filled, Where(new Uri(new Uri(page.Url), form.Action!).ToString()),
-                string.Join(", ", form.Fields.Keys));
+                filled, Where(target), string.Join(", ", form.Fields.Keys));
 
-            page = await PostAsync(
-                new Uri(new Uri(page.Url), form.Action!).ToString(), fields, page.Url, cancellationToken)
-                .ConfigureAwait(false);
+            page = await PostAsync(target, fields, page.Url, cancellationToken).ConfigureAwait(false);
         }
 
         throw new VwGroupPortalException(
@@ -151,6 +178,21 @@ public sealed class VwGroupSignIn
     }
 
     /// <summary>
+    /// Where this page's credentials go.
+    ///
+    /// <para>An HTML form's <c>action</c> is resolved against the page, as a browser would. The
+    /// template model's <c>postAction</c> is <b>not</b>: it is relative to the sign-in service's own
+    /// client root, and resolving <c>login/authenticate</c> against a page already at
+    /// <c>.../login/authenticate</c> yields <c>.../login/login/authenticate</c> — a 404 dressed up as
+    /// a refused password.</para>
+    /// </summary>
+    public string TargetFor(VwGroupLoginForm form, string pageUrl) =>
+        form.Action is { Length: > 0 } action
+            ? new Uri(new Uri(pageUrl), action).ToString()
+            : $"{_options.IdentityBaseUrl.TrimEnd('/')}/signin-service/v1/"
+              + $"{_options.ResolvedClientId}/{form.PostAction!.TrimStart('/')}";
+
+    /// <summary>
     /// The authorize URL, as the portal's own client builds it. No <c>code_challenge</c>: this flow
     /// has no PKCE, and adding one changes what the identity provider expects back.
     /// </summary>
@@ -158,15 +200,17 @@ public sealed class VwGroupSignIn
     {
         var query = new Dictionary<string, string?>
         {
-            ["client_id"] = _options.ClientId,
+            ["client_id"] = _options.ResolvedClientId,
             ["scope"] = _options.Scope,
             ["response_type"] = "code",
             ["redirect_uri"] = _options.RedirectUri,
-            // Opaque and per-attempt, as the specification requires. Nothing here reads them back --
-            // the portal is what consumes the code -- but an identity provider is entitled to reject
-            // a request that omits them.
-            ["state"] = Guid.NewGuid().ToString("N"),
-            ["nonce"] = Guid.NewGuid().ToString("N"),
+            // NOT a nonce, despite what the specification would allow: the portal decodes this to
+            // route the callback, and a random one leaves it with nothing to match -- verified live as
+            // a bounce back to the login page and 401 on every API call afterwards.
+            ["state"] = _options.State,
+
+            // The portal's own client sends this, and sending what it sends is the whole strategy.
+            ["prompt"] = "login",
         };
 
         var encoded = string.Join("&", query.Select(pair =>
@@ -183,10 +227,6 @@ public sealed class VwGroupSignIn
         Uri.TryCreate(url, UriKind.Absolute, out var parsed)
         && Uri.TryCreate(_options.PortalBaseUrl, UriKind.Absolute, out var portal)
         && string.Equals(parsed.Authority, portal.Authority, StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsLoginPath(string url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var parsed)
-        && parsed.AbsolutePath.Contains("/login", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Host and path only. A sign-in URL's query carries state that has no business in a log.</summary>
     internal static string Where(string url) =>

@@ -70,8 +70,10 @@ public class VwGroupPortalClientTests
         Assert.Contains("consent screen", error.Message);
         Assert.Contains(Portal, error.Message);
 
-        // And it stopped at once: posting a password into a consent screen tells nobody anything.
-        Assert.Single(handler.Requests);
+        // And it stopped before posting anything: putting a password into a consent screen tells
+        // nobody anything. (The portal is primed with a GET first, so "stopped at once" is now "made
+        // no POST" rather than "made one request".)
+        Assert.DoesNotContain(handler.Requests, request => request.StartsWith("POST", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -122,8 +124,10 @@ public class VwGroupPortalClientTests
         using var http = new HttpClient(handler);
         await new VwGroupSignIn(http, Options()).SignInAsync();
 
+        // The leading GET is the portal being primed: it sets the AEM cookies the portal's own
+        // callback needs before it will turn the returning code into a session.
         Assert.Equal(
-            ["GET /oidc/v1/authorize", "POST /login/identifier", "POST /login/authenticate"],
+            ["GET /", "GET /oidc/v1/authorize", "POST /login/identifier", "POST /login/authenticate"],
             handler.Requests);
     }
 
@@ -136,7 +140,11 @@ public class VwGroupPortalClientTests
             () => new VwGroupSignIn(http, new VwGroupPortalOptions()).SignInAsync());
 
         Assert.Equal(VwGroupFailure.NotConfigured, error.Failure);
-        Assert.Contains("brand client id", error.Message);
+        // Names all three, and offers the brand first: it is the one an owner can answer without
+        // opening developer tools. See VwGroupBrandsTests for the resolution rules themselves.
+        Assert.Contains("a brand", error.Message);
+        Assert.Contains("a VW ID", error.Message);
+        Assert.Contains("a password", error.Message);
     }
 
     [Fact]
@@ -266,17 +274,27 @@ public class VwGroupPortalClientTests
     public async Task ACarWithNoDataRequestSaysWhoHasToCreateOne()
     {
         // Nobody can create a continuous data request from here -- it is a browser step in the portal
-        // -- so this must not read like a bug.
-        var handler = new StubHandler(_ => Json("[{\"vin\":\"WVWZZZE2ZMP012345\"}]"));
+        // -- so this must not read like a bug. The identifier lives on its own endpoint, and a
+        // metadata response without one is what "none exists" looks like.
+        var handler = new StubHandler(request =>
+            request.RequestUri!.AbsolutePath.Contains("datarequest", StringComparison.Ordinal)
+                ? Json("{}")
+                : Json("[{\"vin\":\"WVWZZZE2ZMP012345\"}]"));
 
         using var http = new HttpClient(handler);
         var client = new VwGroupPortalClient(http, Options());
 
         var error = await Assert.ThrowsAsync<VwGroupPortalException>(async () =>
-            await client.GetNewestDatasetUrlAsync(await client.GetVehicleAsync()));
+            await client.GetNewestDatasetAsync(await client.GetVehicleAsync()));
 
-        Assert.Equal(VwGroupFailure.NoDataAvailable, error.Failure);
-        Assert.Contains("by hand", error.Message);
+        // NoDataRequest, not NoDataAvailable: no amount of pressing the button creates one, so the
+        // page must not offer that as the remedy. Its sibling -- a request that exists and has not
+        // filled yet -- is the retryable one.
+        Assert.Equal(VwGroupFailure.NoDataRequest, error.Failure);
+        Assert.False(error.IsWorthRetrying);
+        // Names the steps, not just the obstacle: an owner reading this should not need the docs open.
+        Assert.Contains("continuous data request", error.Message);
+        Assert.Contains("Data clusters", error.Message);
     }
 
     [Fact]
@@ -289,7 +307,12 @@ public class VwGroupPortalClientTests
         Assert.Contains("client_id=brand-client-id", url);
         Assert.Contains("scope=openid%20cars%20profile", url);
         Assert.Contains("response_type=code", url);
-        Assert.Contains(Uri.EscapeDataString($"{Portal}/de/en/login"), url);
+        // The portal's login route exactly, with no locale segment. This assertion used to demand
+        // "/de/en/login" and so pinned the bug in place: against the live provider that redirect_uri
+        // is answered with 400 invalid_request, "Mismatching redirection URI", before a credential is
+        // ever sent. The client id is registered against one string and it is not ours to decorate.
+        Assert.Contains(Uri.EscapeDataString($"{Portal}/login"), url);
+        Assert.DoesNotContain("de%2Fen", url);
 
         // No PKCE in this flow: adding a challenge changes what the identity provider expects back.
         Assert.DoesNotContain("code_challenge", url);

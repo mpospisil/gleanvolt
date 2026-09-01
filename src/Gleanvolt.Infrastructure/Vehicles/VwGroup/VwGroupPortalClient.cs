@@ -35,7 +35,10 @@ public sealed record VwGroupVehicle(string Vin, string RequestId)
 /// </summary>
 public sealed class VwGroupPortalClient
 {
-    private const string VehiclesPath = "/proxy_api/consent/me/vehicles";
+    // viewPosition is mandatory: without it the portal answers 400 "Required request parameter
+    // 'viewPosition' ... is not present". It selects which photo of the car comes back, which nothing
+    // here wants -- but the endpoint will not answer without one.
+    private const string VehiclesPath = "/proxy_api/consent/me/vehicles?viewPosition=FRONT_LEFT";
 
     /// <summary>Where a VIN might be spelled, across the two layouts.</summary>
     private static readonly string[] VinProperties = ["vin", "vehicleIdentificationNumber", "vehicleId"];
@@ -73,8 +76,8 @@ public sealed class VwGroupPortalClient
     public async Task<VwGroupMappingResult> GetVehicleStateAsync(CancellationToken cancellationToken = default)
     {
         var vehicle = await GetVehicleAsync(cancellationToken).ConfigureAwait(false);
-        var download = await GetNewestDatasetUrlAsync(vehicle, cancellationToken).ConfigureAwait(false);
-        var archive = await DownloadAsync(download, cancellationToken).ConfigureAwait(false);
+        var (requestId, name) = await GetNewestDatasetAsync(vehicle, cancellationToken).ConfigureAwait(false);
+        var archive = await DownloadAsync(vehicle.Vin, requestId, name, cancellationToken).ConfigureAwait(false);
 
         if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var error))
         {
@@ -100,6 +103,43 @@ public sealed class VwGroupPortalClient
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The identifier of this car's continuous data request, which every delivery URL hangs off.
+    ///
+    /// <para><b>Its own endpoint.</b> The vehicle list does not carry it — reading it from there
+    /// produced an empty identifier and so "no data request" for a car that had had one since
+    /// August. A 404, or a response without an <c>Identifier</c>, is what "none exists" really looks
+    /// like.</para>
+    /// </summary>
+    public async Task<string> GetDataRequestIdAsync(string vin, CancellationToken cancellationToken = default)
+    {
+        var url = $"{_options.PortalBaseUrl.TrimEnd('/')}/proxy_api/euda-apim/datarequest/vehicles/"
+            + $"{Uri.EscapeDataString(vin)}/metadata/partial";
+
+        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
+
+        var root = document.RootElement;
+
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            root = root.GetArrayLength() > 0 ? root[0] : default;
+        }
+
+        if (root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("Identifier", out var identifier)
+            && identifier.GetString() is { Length: > 0 } value)
+        {
+            return value;
+        }
+
+        throw new VwGroupPortalException(
+            VwGroupFailure.NoDataRequest,
+            $"vehicle ...{vin[^4..]} has no continuous data request. Create one in the portal: "
+            + "Data clusters -> Vehicle overview -> Get customised data, \"All data\", every 15 "
+            + "minutes. Only the owner can, in a browser, and it can take hours before the first "
+            + "dataset appears.");
     }
 
     /// <summary>The car this client is for: the configured VIN, or the only one on the account.</summary>
@@ -155,43 +195,67 @@ public sealed class VwGroupPortalClient
         return vehicles;
     }
 
-    /// <summary>The newest dataset's download link for this car.</summary>
-    public async Task<string> GetNewestDatasetUrlAsync(
+    /// <summary>
+    /// The newest dataset's <b>name</b> for this car, and the data request it belongs to.
+    ///
+    /// <para>A name, not a link: the list returns <c>{name, createdOn, size}</c> objects and no URL
+    /// at all. The download is a separate call that takes the name as a request header.</para>
+    /// </summary>
+    public async Task<(string RequestId, string Name)> GetNewestDatasetAsync(
         VwGroupVehicle vehicle, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(vehicle.RequestId))
-        {
-            throw new VwGroupPortalException(
-                VwGroupFailure.NoDataAvailable,
-                $"vehicle {vehicle.MaskedVin} has no data request. One has to be created in the portal "
-                + "by hand -- a continuous data request -- and no client can do it for you.");
-        }
+        var requestId = string.IsNullOrWhiteSpace(vehicle.RequestId)
+            ? await GetDataRequestIdAsync(vehicle.Vin, cancellationToken).ConfigureAwait(false)
+            : vehicle.RequestId;
 
         var url = $"{_options.PortalBaseUrl.TrimEnd('/')}/proxy_api/euda-apim/datadelivery/vehicles/"
-            + $"{Uri.EscapeDataString(vehicle.Vin)}/{Uri.EscapeDataString(vehicle.RequestId)}/list";
+            + $"{Uri.EscapeDataString(vehicle.Vin)}/{Uri.EscapeDataString(requestId)}/list";
 
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
+        using var document = await GetJsonAsync(url, cancellationToken, PartialHeaders)
+            .ConfigureAwait(false);
+
+        string? newest = null;
+        string? newestAt = null;
 
         // Listed newest-first by the portal, but ordering is not something to inherit on trust when a
-        // wrong choice silently ages every reading. The first entry that carries a link is taken, and
-        // the snapshots inside it are dated individually anyway.
+        // wrong choice silently ages every reading. createdOn is ISO-8601 and sorts as text.
         foreach (var element in Objects(document.RootElement))
         {
-            if (Text(element, DownloadProperties) is { } link && !string.IsNullOrWhiteSpace(link))
+            if (Text(element, ["name"]) is not { Length: > 0 } name)
             {
-                return new Uri(new Uri(_options.PortalBaseUrl), link).ToString();
+                continue;
+            }
+
+            var createdAt = Text(element, ["createdOn", "created_on", "createdAt"]) ?? string.Empty;
+
+            if (newest is null || string.CompareOrdinal(createdAt, newestAt) > 0)
+            {
+                newest = name;
+                newestAt = createdAt;
             }
         }
 
-        throw new VwGroupPortalException(
-            VwGroupFailure.NoDataAvailable,
-            $"vehicle {vehicle.MaskedVin} has a data request but no dataset to download yet");
+        if (newest is null)
+        {
+            throw new VwGroupPortalException(
+                VwGroupFailure.NoDataAvailable,
+                $"vehicle {vehicle.MaskedVin} has a data request but no dataset to download yet");
+        }
+
+        return (requestId, newest);
     }
 
     /// <summary>The bundle itself. Bytes, because what to make of them is the pure mapper's business.</summary>
-    public async Task<byte[]> DownloadAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<byte[]> DownloadAsync(
+        string vin, string requestId, string name, CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync(url, cancellationToken).ConfigureAwait(false);
+        var url = $"{_options.PortalBaseUrl.TrimEnd('/')}/proxy_api/euda-apim/datadelivery/vehicles/"
+            + $"{Uri.EscapeDataString(vin)}/{Uri.EscapeDataString(requestId)}/download";
+
+        // The dataset is chosen by header, not by path or query -- the URL is the same for every one.
+        var headers = new Dictionary<string, string>(PartialHeaders) { ["filename"] = name };
+
+        var response = await SendAsync(url, cancellationToken, headers).ConfigureAwait(false);
 
         using (response)
         {
@@ -200,11 +264,15 @@ public sealed class VwGroupPortalClient
         }
     }
 
+    /// <summary>What the delivery endpoints want on every call. "partial" is the only value in use.</summary>
+    private static readonly Dictionary<string, string> PartialHeaders = new() { ["type"] = "partial" };
+
     // One re-sign-in per call, never a loop: a refused password must fail rather than hammer the
     // account, and a session that will not stick is a fault to report rather than to work around.
-    private async Task<JsonDocument> GetJsonAsync(string url, CancellationToken cancellationToken)
+    private async Task<JsonDocument> GetJsonAsync(
+        string url, CancellationToken cancellationToken, IReadOnlyDictionary<string, string>? headers = null)
     {
-        var response = await SendAsync(url, cancellationToken).ConfigureAwait(false);
+        var response = await SendAsync(url, cancellationToken, headers).ConfigureAwait(false);
 
         if (IsSessionGone(response, url))
         {
@@ -212,7 +280,7 @@ public sealed class VwGroupPortalClient
             _logger.LogInformation("The VW portal bounced us; signing in again.");
 
             await _signIn.SignInAsync(cancellationToken).ConfigureAwait(false);
-            response = await SendAsync(url, cancellationToken).ConfigureAwait(false);
+            response = await SendAsync(url, cancellationToken, headers).ConfigureAwait(false);
         }
 
         using (response)
@@ -281,7 +349,8 @@ public sealed class VwGroupPortalClient
         }
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string url, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendAsync(
+        string url, CancellationToken cancellationToken, IReadOnlyDictionary<string, string>? headers = null)
     {
         try
         {
@@ -290,6 +359,13 @@ public sealed class VwGroupPortalClient
 
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Accept.ParseAdd("application/json");
+
+            // The delivery endpoints take their arguments as headers rather than query parameters --
+            // "type: partial" on the list, and the dataset's own name as "filename" on the download.
+            foreach (var (name, value) in headers ?? new Dictionary<string, string>())
+            {
+                request.Headers.TryAddWithoutValidation(name, value);
+            }
 
             return await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
         }
