@@ -18,6 +18,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!--
+    The VW portal fixtures (#139). Copied rather than embedded so a failing test can be diffed against
+    the file a reviewer already read; see Fixtures/VwGroup/README.md for why they are JSON rather than
+    committed ZIPs.
+  -->
+  <ItemGroup>
+    <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
   </ItemGroup>

@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-08-31T19:05:00Z",
+  "Data": [
+    { "key": "soc", "dataFieldName": "stateOfChargeInPercent", "value": 37 },
+    { "key": "range", "dataFieldName": "electricRange", "value": 41 },
+    { "key": "state", "dataFieldName": "chargeState", "value": "readyForCharging" },
+    { "key": "plug", "dataFieldName": "plugState", "value": "disconnected" },
+    { "key": "odo", "dataFieldName": "mileage", "value": 92140 }
+  ]
+}

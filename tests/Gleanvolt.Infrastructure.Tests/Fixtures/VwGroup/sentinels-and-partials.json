@@ -1,0 +1,28 @@
+{
+  "reports": [
+    {
+      "capturedAt": "2026-08-31T20:00:00+02:00",
+      "Data": [
+        { "dataFieldName": "battery.stateOfChargeInPercent", "value": "44" },
+        { "dataFieldName": "vehicle.mileageInKm", "value": "18240" },
+        { "dataFieldName": "charging.chargingState", "value": "CHARGE_STATE_CHARGING_HV_BATTERY" }
+      ]
+    },
+    {
+      "capturedAt": "2026-08-31T20:15:00+02:00",
+      "Data": [
+        { "dataFieldName": "battery.stateOfChargeInPercent", "value": "" },
+        { "dataFieldName": "vehicle.mileageInKm", "value": "18239" },
+        { "dataFieldName": "charging.chargingState", "value": "unavailable" }
+      ]
+    },
+    {
+      "capturedAt": "2026-08-31T20:30:00+02:00",
+      "Data": [
+        { "dataFieldName": "battery.stateOfChargeInPercent", "value": "null" },
+        { "dataFieldName": "vehicle.mileageInKm", "value": "n/a" },
+        { "dataFieldName": "charging.chargingState", "value": "CHARGE_STATE_SOMETHING_NEW" }
+      ]
+    }
+  ]
+}
