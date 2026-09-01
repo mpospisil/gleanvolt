@@ -320,7 +320,7 @@ public class HaButtonCommandTests
             NullLogger<HomeAssistantMqttWorker>.Instance,
             Options.Create(new TargetedChargeOptions()),
             Options.Create(vehicleOptions ?? new VehicleOptions()),
-            Sites.Home,
+            Discovery,
             _vehicle,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 

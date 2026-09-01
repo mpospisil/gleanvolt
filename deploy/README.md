@@ -263,6 +263,12 @@ All of it is shown, read-only, at **`/pv-system`** in the web UI. Anything left 
 there rather than as zero: 0,0 is a real place in the Atlantic, and it is better for the page to say
 nothing than to say something wrong.
 
+The same page carries an **MQTT** section: the broker each of the two links dials, the username and
+client id it connects with, the topic prefix everything is published under — `gleanvolt/$PV_ID`, which
+no single setting spells out — and the topics themselves. The broker password appears there too, but
+only once `WEB_PASSWORD_HASH` is set: without a login the UI is open on the LAN, and that password is
+the account that can publish to the `.../set` topics.
+
 A value that cannot be used **stops the controller at startup**, with every problem named at once — a
 latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
 one is supported). That is deliberate: a site that is quietly wrong forecasts plausibly.
@@ -1141,7 +1147,10 @@ independent, so that's a compose edit, not a redesign.
 
 **Nothing connects to the broker.** `docker compose logs mosquitto` shows the rejected connections.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
-being readable by uid 1883.
+being readable by uid 1883. `/pv-system` in the web UI shows what the controller is dialling and as
+whom — including the client id to search the broker's log for — so the two sides can be compared
+without an ssh session; with a `Web__PasswordHash` configured it will show the password it is actually
+using, which is the half of that comparison `.env` cannot settle on its own.
 
 **Can't reach the web UI at `:8090`.** Nothing has to be configured for it to work, so this is a
 fault rather than a missing setting. Start with what the container says about itself:

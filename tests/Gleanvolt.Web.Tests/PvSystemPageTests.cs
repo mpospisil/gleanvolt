@@ -47,7 +47,63 @@ public class PvSystemPageTests : BunitContext
     private static EvInfo Car(int? phases = 3, int? minAmps = 6, int? maxAmps = 16) => new(
         "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, phases, minAmps, maxAmps, "gleanvolt/vehicle/id4/state");
 
-    private IRenderedComponent<PvSystem> Render(PvSystemInfo? site = null, EvInfo? car = null)
+    /// <summary>
+    /// A configured MQTT link, as the host composes one. <paramref name="password"/> is what the host
+    /// decides: null stands for "a password is set and this page may not print it", which is what an
+    /// unauthenticated UI is handed.
+    /// </summary>
+    private static MqttConnectionDisplay Link(
+        string host = "mosquitto",
+        int port = 1883,
+        string username = "solax",
+        string? password = null,
+        bool hasPassword = true,
+        string clientId = "gleanvolt-controller-home-roof") =>
+        new(Enabled: true, host, port, username, password, hasPassword, clientId);
+
+    private static MqttDisplayOptions Mqtt(
+        MqttConnectionDisplay? homeAssistant = null,
+        MqttConnectionDisplay? vehicle = null,
+        string topicPrefix = "gleanvolt/home-roof",
+        bool batteryHold = false,
+        string vehicleTopic = "gleanvolt/vehicle/id4/state",
+        IReadOnlyList<string>? retiredDeviceIds = null)
+    {
+        // The same shape HaDiscovery.WellKnownTopics() produces, battery hold included only when the
+        // feature is on -- which is the one thing about the list that varies.
+        List<MqttTopicDisplay> topics =
+        [
+            new("Availability", $"{topicPrefix}/availability", false),
+            new("Status, as one JSON payload", $"{topicPrefix}/state", false),
+        ];
+
+        if (batteryHold)
+        {
+            topics.Add(new("Battery hold", $"{topicPrefix}/battery_hold/state", false));
+            topics.Add(new("Battery hold, set", $"{topicPrefix}/battery_hold/set", true));
+        }
+
+        topics.Add(new("Start a targeted charge", $"{topicPrefix}/activate_target/set", true));
+        topics.Add(new("Stop the controller", $"{topicPrefix}/stop_service/set", true));
+
+        return new MqttDisplayOptions(
+            new HomeAssistantMqttDisplay(
+                homeAssistant ?? MqttConnectionDisplay.Off,
+                DiscoveryPrefix: "homeassistant",
+                DeviceId: "solax_controller",
+                TopicPrefix: topicPrefix,
+                Topics: homeAssistant is null ? [] : topics,
+                StatusInterval: TimeSpan.FromSeconds(15),
+                RetiredDeviceIds: retiredDeviceIds),
+            new VehicleMqttDisplay(
+                vehicle ?? MqttConnectionDisplay.Off,
+                Topic: vehicleTopic,
+                MaxAge: TimeSpan.FromHours(12),
+                ReconnectInterval: TimeSpan.FromSeconds(30)));
+    }
+
+    private IRenderedComponent<PvSystem> Render(
+        PvSystemInfo? site = null, EvInfo? car = null, MqttDisplayOptions? mqtt = null)
     {
         Services.AddSingleton(site ?? Site());
 
@@ -57,6 +113,9 @@ public class PvSystemPageTests : BunitContext
         // Composed exactly as the host composes it: the reference install's 6-16 A on three phases,
         // narrowed by whatever the car says.
         Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, ev));
+
+        // Both links off is the default an installation that speaks no MQTT is handed.
+        Services.AddSingleton(mqtt ?? MqttDisplayOptions.None);
 
         return Render<PvSystem>();
     }
@@ -214,5 +273,185 @@ public class PvSystemPageTests : BunitContext
 
         Assert.Contains("narrower of the two", page.Markup);
         Assert.Contains("only ever", page.Markup);
+    }
+
+    // -- MQTT (#143).
+
+    [Fact]
+    public void Says_plainly_when_neither_link_is_configured()
+    {
+        // Off is the default for both, so it has to read as a deliberate default rather than a fault --
+        // and the page has to say what turns each one on.
+        var page = Render();
+
+        Assert.Contains("HomeAssistant__Enabled", page.Find("#ha-mqtt-off").TextContent);
+        Assert.Contains("Vehicle__Enabled", page.Find("#vehicle-mqtt-off").TextContent);
+        Assert.Empty(page.FindAll("table.topics"));
+    }
+
+    [Fact]
+    public void Shows_the_prefix_every_topic_hangs_off()
+    {
+        // The one string nothing else prints: it is composed at startup from BaseTopic and Pv:Id, so it
+        // is not guessable from either setting on its own.
+        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+
+        Assert.Contains("gleanvolt/home-roof", page.Markup);
+        Assert.Contains("gleanvolt/home-roof/availability", page.Markup);
+        Assert.Contains("gleanvolt/home-roof/activate_target/set", page.Markup);
+
+        // And the pattern for everything it does not list, or the table would read as the whole surface.
+        Assert.Contains("{object_id}", page.Markup);
+    }
+
+    [Fact]
+    public void Marks_the_topics_that_can_change_what_the_charger_is_doing()
+    {
+        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+
+        var rows = page.FindAll("table.topics tbody tr");
+        var state = rows.Single(row => row.TextContent.Contains("gleanvolt/home-roof/state"));
+        var activate = rows.Single(row => row.TextContent.Contains("activate_target/set"));
+
+        Assert.Contains("out", state.TextContent);
+        Assert.Contains("in", activate.TextContent);
+    }
+
+    [Fact]
+    public void Lists_the_battery_hold_topics_only_when_the_feature_is_on()
+    {
+        Assert.DoesNotContain("battery_hold", Render(mqtt: Mqtt(homeAssistant: Link())).Markup);
+
+        // A fresh context per render: bUnit registers services once.
+        using var withHold = new BunitContext();
+        withHold.Services.AddSingleton(Site());
+        withHold.Services.AddSingleton(EvInfo.Unknown);
+        withHold.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
+        withHold.Services.AddSingleton(Mqtt(homeAssistant: Link(), batteryHold: true));
+
+        Assert.Contains("gleanvolt/home-roof/battery_hold/set", withHold.Render<PvSystem>().Markup);
+    }
+
+    [Fact]
+    public void Warns_what_changing_the_device_id_costs()
+    {
+        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+
+        Assert.Contains("solax_controller", page.Markup);
+        Assert.Contains("every graph starts again", page.Markup);
+    }
+
+    [Fact]
+    public void Names_the_client_id_the_broker_knows_this_controller_by()
+    {
+        // What the broker's connection log and its ACL file call us -- the string to search for when
+        // the broker is the suspect.
+        var page = Render(mqtt: Mqtt(
+            homeAssistant: Link(),
+            vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+
+        Assert.Contains("gleanvolt-controller-home-roof", page.Markup);
+        Assert.Contains("gleanvolt-vehicle-raspberrypi", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_the_retirement_lists_only_when_an_installation_carries_one()
+    {
+        Assert.Empty(Render(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
+
+        using var retiring = new BunitContext();
+        retiring.Services.AddSingleton(Site());
+        retiring.Services.AddSingleton(EvInfo.Unknown);
+        retiring.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
+        retiring.Services.AddSingleton(Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+
+        Assert.Contains("old_controller", retiring.Render<PvSystem>().Find("#ha-mqtt-retiring").TextContent);
+    }
+
+    [Fact]
+    public void Shows_the_topic_the_vehicle_feed_actually_subscribed_to()
+    {
+        var page = Render(car: Car(), mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+
+        Assert.Contains("gleanvolt/vehicle/id4/state", page.Markup);
+        Assert.Contains("12 h", page.Markup);
+        Assert.Contains("30 s", page.Markup);
+    }
+
+    [Fact]
+    public void Says_when_the_vehicle_feed_is_on_with_nothing_to_subscribe_to()
+    {
+        // The exact case the worker warns about once and then does nothing -- which from the dashboard
+        // is indistinguishable from a car that never reports.
+        var page = Render(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
+
+        Assert.Contains(
+            "Ev__Vehicles__0__Telemetry__Topic", page.Find("#vehicle-mqtt-no-topic").TextContent);
+    }
+
+    [Fact]
+    public void Says_when_the_two_links_share_one_broker_and_stays_quiet_when_they_do_not()
+    {
+        var page = Render(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
+
+        Assert.Contains("mosquitto:1883", page.Find("#mqtt-one-broker").TextContent);
+
+        using var separate = new BunitContext();
+        separate.Services.AddSingleton(Site());
+        separate.Services.AddSingleton(EvInfo.Unknown);
+        separate.Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, EvInfo.Unknown));
+        separate.Services.AddSingleton(Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
+
+        var rendered = separate.Render<PvSystem>();
+        Assert.Empty(rendered.FindAll("#mqtt-one-broker"));
+        Assert.Contains("192.168.2.4:1883", rendered.Markup);
+    }
+
+    [Fact]
+    public void No_broker_password_reaches_an_unauthenticated_page()
+    {
+        // The structural half of the guarantee is the host's: with no login enforced it hands over a
+        // null. This is the other half -- that a null renders as an explanation rather than as blank,
+        // and that nothing secret is in the markup to be revealed by a view-source.
+        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
+
+        Assert.DoesNotContain("broker-secret", page.Markup);
+        Assert.Contains("Web__PasswordHash", page.Markup);
+        Assert.Empty(page.FindAll("button"));
+    }
+
+    [Fact]
+    public void A_broker_password_renders_masked_until_it_is_asked_for()
+    {
+        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: "broker-secret")));
+
+        // Behind a login is not behind a closed door: a shoulder and a screenshot are a different
+        // threat from the network, so it starts hidden.
+        Assert.DoesNotContain("broker-secret", page.Markup);
+        Assert.Contains("•", page.Markup);
+
+        page.FindAll("button").Single(button => button.TextContent == "Reveal").Click();
+
+        Assert.Contains("broker-secret", page.Markup);
+        Assert.Contains("Copy", page.Markup);
+    }
+
+    [Fact]
+    public void An_anonymous_broker_does_not_read_as_a_withheld_password()
+    {
+        var page = Render(mqtt: Mqtt(
+            homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
+
+        Assert.DoesNotContain("Web__PasswordHash", page.Markup);
+        Assert.Contains("anonymous", page.Markup);
+    }
+
+    [Fact]
+    public void Does_not_claim_that_a_configured_link_is_a_working_one()
+    {
+        // Everything here was read at startup; nothing on this page knows whether the broker answered.
+        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+
+        Assert.Contains("whether either link is", page.Markup);
     }
 }

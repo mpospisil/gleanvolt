@@ -4,6 +4,7 @@
 @inject PvSystemInfo Site
 @inject EvInfo Car
 @inject ChargingLimits Limits
+@inject MqttDisplayOptions Mqtt
 
 @*
     The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
@@ -204,6 +205,182 @@ else
     </p>
 }
 
+<h2>MQTT</h2>
+
+@*
+    The third and fourth things this controller is talking to (issue #143). The Devices table above is
+    what it drives; this is what it talks through, and unlike a Modbus address none of it is guessable:
+    the prefix everything is published under is composed at startup from two separate settings.
+
+    Two links rather than one broker, kept apart on purpose. They are separately optional -- you can
+    publish to Home Assistant without reading the car, or the reverse -- and they may well be two
+    different brokers, so a single row saying "the broker" would be wrong on any installation that
+    took that up.
+*@
+
+<p class="muted">
+    Home Assistant is a <em>control</em> surface: the topics ending <code>/set</code> can start and
+    stop charging. Vehicle telemetry only listens, and the worst a wrong setting there can do is leave
+    the car's card empty.
+</p>
+
+<h3>Home Assistant</h3>
+
+@if (!Mqtt.HomeAssistant.Connection.Enabled)
+{
+    <p class="muted" id="ha-mqtt-off">
+        Off, which is the default: nothing is published and no command is accepted. Set
+        <code>HomeAssistant__Enabled</code> to <code>true</code>, give it
+        <code>HomeAssistant__Username</code> and <code>HomeAssistant__Password</code> for the broker,
+        and claim a <code>Pv__Id</code> — the id is the topic segment two installations on one broker
+        would otherwise overwrite each other on, so the controller refuses to start without it.
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <MqttConnection Connection="Mqtt.HomeAssistant.Connection" />
+
+        <dt>Discovery prefix</dt>
+        <dd><code>@Mqtt.HomeAssistant.DiscoveryPrefix</code></dd>
+
+        <dt>Device id</dt>
+        <dd><code>@Mqtt.HomeAssistant.DeviceId</code></dd>
+
+        <dt>Topic prefix</dt>
+        <dd><code>@Mqtt.HomeAssistant.TopicPrefix</code></dd>
+
+        <dt>Status interval</dt>
+        <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
+    </dl>
+
+    <p class="table-note muted">
+        The device id is the root of every entity's <code>unique_id</code>, and it is the one value
+        here that is expensive to change: Home Assistant keys an entity to its <code>unique_id</code>,
+        so a new one is a new entity, created beside the old one, and every graph starts again. The
+        topics and the names can be changed freely. The status interval is how often the state topic
+        is republished, which is usually the answer to "why is the dashboard behind?".
+    </p>
+
+    <table class="sessions topics">
+        <thead>
+            <tr>
+                <th>Carries</th>
+                <th>Topic</th>
+                <th>Direction</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var topic in Mqtt.HomeAssistant.Topics)
+            {
+                <tr>
+                    <td>@topic.Purpose</td>
+                    <td class="topic"><code>@topic.Topic</code></td>
+                    <td class="flow">@(topic.Inbound ? "in" : "out")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="table-note muted">
+        Every other entity — each number, select, text and button — follows the same pattern:
+        <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code> for what it reports and
+        <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code> for what it accepts. The
+        retained discovery configs Home Assistant reads them from live under
+        <code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>.
+        Anything marked <em>in</em> can change what the charger is doing.
+    </p>
+
+    @if (Mqtt.HomeAssistant.IsRetiringAnything)
+    {
+        <p class="table-note muted" id="ha-mqtt-retiring">
+            On every connect this installation also <strong>blanks</strong> the retained messages left
+            by a name it used to publish under:
+            @if (Mqtt.HomeAssistant.RetiredDeviceIds.Count > 0)
+            {
+                <text>discovery configs for
+                    @string.Join(", ", Mqtt.HomeAssistant.RetiredDeviceIds)</text>
+                @(Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? "; " : ". ")
+            }
+            @if (Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0)
+            {
+                <text>retained state under
+                    @string.Join(", ", Mqtt.HomeAssistant.RetiredTopicPrefixes). </text>
+            }
+            Set after a rename, and safe to remove once it has run.
+        </p>
+    }
+}
+
+<h3>Vehicle telemetry</h3>
+
+@if (!Mqtt.Vehicle.Connection.Enabled)
+{
+    <p class="muted" id="vehicle-mqtt-off">
+        Off, which is the default: the car's own state of charge is not read, and the dashboard shows
+        only what the charger can see. Set <code>Vehicle__Enabled</code> to <code>true</code> and name
+        the topic your publisher writes to under
+        <code>Ev__Vehicles__0__Telemetry__Topic</code>.
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <MqttConnection Connection="Mqtt.Vehicle.Connection" />
+
+        <dt>Subscribed to</dt>
+        <dd>
+            @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
+            {
+                <span class="muted">nothing</span>
+            }
+            else
+            {
+                <code>@Mqtt.Vehicle.Topic</code>
+            }
+        </dd>
+
+        <dt>Stale after</dt>
+        <dd>@Interval(Mqtt.Vehicle.MaxAge)</dd>
+
+        <dt>Retry every</dt>
+        <dd>@Interval(Mqtt.Vehicle.ReconnectInterval)</dd>
+    </dl>
+
+    @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
+    {
+        <p class="table-note muted" id="vehicle-mqtt-no-topic">
+            The feed is on with nothing to subscribe to, so it connects to no broker and reads nothing
+            — which from the dashboard is indistinguishable from a car that never reports. Set
+            <code>Ev__Vehicles__0__Telemetry__Topic</code> to the topic your publisher writes to.
+        </p>
+    }
+
+    <p class="table-note muted">
+        One concrete topic, not a wildcard: this phase tracks one car, and a <code>+</code> across
+        several would quietly let the newest message win whichever car it described. The messages are
+        expected to be <strong>retained</strong>, so a restart is handed the last reading straight
+        away instead of waiting for a cloud-fed car's next update. Note that this client id is not
+        namespaced by the system's id, so two controllers on one machine would collide on the broker.
+    </p>
+
+    @if (Mqtt.SharesOneBroker)
+    {
+        <p class="table-note muted" id="mqtt-one-broker">
+            Both links use the same broker, <code>@Mqtt.Vehicle.Connection.Broker</code>. They are still
+            two connections with two client ids, and either can be pointed elsewhere without touching
+            the other.
+        </p>
+    }
+}
+
+<p class="table-note muted">
+    None of this says whether either link is <em>up</em>. Everything on this page was read once at
+    startup; <a href="/health">Health</a> reports the polling loop rather than the broker, so until it
+    reports this too, the broker's own log — or Home Assistant showing the device as unavailable — is
+    what answers that.
+</p>
+
 @code {
     private const string Missing = "—";
 
@@ -222,6 +399,31 @@ else
     private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
 
     private static string Address(PvDeviceInfo device) => $"{device.Connection.Host}:{device.Connection.Port}";
+
+    // Intervals here run from fifteen seconds to twelve hours, so a single format would print either
+    // "0h 0m" for the status interval or "12h 0m" for the staleness guard. Each is shown in the unit
+    // it was configured in.
+    private static string Interval(TimeSpan value)
+    {
+        if (value <= TimeSpan.Zero)
+        {
+            return Missing;
+        }
+
+        if (value < TimeSpan.FromMinutes(1))
+        {
+            return $"{value.TotalSeconds.ToString("0.#", Invariant)} s";
+        }
+
+        if (value < TimeSpan.FromHours(1))
+        {
+            return $"{value.TotalMinutes.ToString("0.#", Invariant)} min";
+        }
+
+        return value.Minutes == 0
+            ? $"{(int)value.TotalHours} h"
+            : $"{(int)value.TotalHours} h {value.Minutes} min";
+    }
 
     private static string Degrees(double? value) =>
         value is { } number ? $"{number.ToString("0.#", Invariant)}°" : Missing;

@@ -4,6 +4,42 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-01 — A configured secret reaches the UI only when the host has decided a login is enforced (issue #143)
+
+`/pv-system` had to show the MQTT broker credentials, and the same question is queued for the API key
+(issue #142). The web UI is an **open LAN dashboard by default**: no `Web:PasswordHash` means
+`WebOptions.AuthenticationRequired` is false, the default policy admits everyone, and the `[Authorize]`
+on the page permits an anonymous visitor. `MQTT_PASSWORD` is not a read-only credential — it is the
+account that publishes to the `.../set` topics, which start and stop the car. Rendering it on an
+unauthenticated page would hand the wallbox to anything that can reach port 8090, which is the outcome
+`HomeAssistant:Enabled = false` and the API's fail-fast on a missing key both exist to prevent. A page
+cannot be the reason a surface that defaults to closed ends up open.
+
+**So the decision is not shown in the markup.** The composition root knows both `WebOptions` and the
+secret; it builds the display record with a `null` secret unless a login is actually enforced, and the
+page renders what it was given. That is the same shape as `ReadOnlyModbusClient`, and for the same
+reason: a component that *cannot* do the wrong thing beats one that remembers not to. An `@if` in a
+Razor file is a rule someone deletes while rearranging markup, and its failure mode is silent and
+network-wide.
+
+Three consequences worth stating:
+
+- **Withheld and absent must not render alike.** "A password is set and you may not see it" and "the
+  broker is anonymous" are different facts about the installation, so the record carries both the
+  nullable secret and a `HasPassword` flag, and the withheld case names `Web__PasswordHash` as what
+  makes it readable.
+- **Masked even when permitted.** A login is not a closed door; a shoulder and a screenshot are a
+  different threat from the network. The value renders behind *Reveal*, with *Copy* beside it so the
+  common task — pasting it into a config file — never requires putting it on screen.
+- **The name is not the secret.** Usernames, client ids and topics stay visible unconditionally. They
+  are what makes the section useful for the "why is the broker refusing us?" question, and none of
+  them is a credential.
+
+The next surface that has to print a secret should reuse this rather than re-deciding it: build the
+record in the host, gate it on `AuthenticationRequired`, and hand the page a value or a null.
+
+---
+
 ## 2026-08-26 — An edited plan is constraints, not a schedule to replay (issue #128)
 
 The ask was "let the caller edit the plan it was quoted and send it back". The obvious implementation —

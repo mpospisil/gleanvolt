@@ -52,6 +52,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private DateTimeOffset? _pendingFastDeparture;
     private string _pendingFastDepartureText = string.Empty;
 
+    /// <param name="discovery">
+    /// The topic layout and the discovery payloads. Resolved rather than constructed here since
+    /// issue #143: the configuration page has to show the same topics this publishes on, and one owner
+    /// of the layout is the whole reason <see cref="HaDiscovery"/> exists.
+    /// </param>
     public HomeAssistantMqttWorker(
         IOptions<HomeAssistantOptions> options,
         IOptions<BatteryHoldOptions> batteryHoldOptions,
@@ -65,13 +70,13 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         ILogger<HomeAssistantMqttWorker> logger,
         IOptions<TargetedChargeOptions> targetedOptions,
         IOptions<VehicleOptions> vehicleOptions,
-        PvSystemInfo site,
+        HaDiscovery discovery,
         IVehicleTelemetry? vehicle = null,
         TimeProvider? timeProvider = null)
     {
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
-        _discovery = new HaDiscovery(_options, site, _batteryHoldEnabled);
+        _discovery = discovery;
         _actions = actions;
         _batteryHold = batteryHold;
         _forecastSettings = forecastSettings;
@@ -101,9 +106,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         var clientOptionsBuilder = new MqttClientOptionsBuilder()
             .WithTcpServer(_options.BrokerHost, _options.BrokerPort)
-            // One client id per system, not per unique-id root: two installations on one broker must not
-            // fight over a session, and the topic prefix is what already tells them apart.
-            .WithClientId($"gleanvolt-controller-{_discovery.SystemId}")
+            .WithClientId(_discovery.ClientId)
             .WithWillTopic(_discovery.AvailabilityTopic)
             .WithWillPayload(HaDiscovery.PayloadOffline)
             .WithWillRetain();
