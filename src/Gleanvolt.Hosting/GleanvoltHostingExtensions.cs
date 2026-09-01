@@ -465,6 +465,16 @@ public static class GleanvoltHostingExtensions
                 + "each other. Set Pv__Id to a slug (for example 'home-roof').");
         }
 
+        // The topic layout, as a singleton rather than something the worker builds for itself: the
+        // configuration page shows the same topics the worker publishes on (issue #143), and a second
+        // copy of "{prefix}/battery_hold/set" anywhere else is a bug waiting for the next rename.
+        // Constructible whether or not the integration is on -- with it off nothing resolves it -- so
+        // it is registered unconditionally, like everything else the UI may have to describe.
+        services.AddSingleton(provider => new HaDiscovery(
+            provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value,
+            provider.GetRequiredService<PvSystemInfo>(),
+            provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled));
+
         services.AddHostedService<HomeAssistantMqttWorker>();
 
         // Vehicle telemetry read off MQTT (issue #73). Disabled by default; broker credentials are
@@ -617,6 +627,60 @@ public static class GleanvoltHostingExtensions
             // on this assembly -- and hands it over, rather than Gleanvolt.Web guessing from its own
             // attributes.
             services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
+
+            // What the two MQTT links are configured to do (issue #143). Registered whenever the UI is
+            // enabled rather than inside a check on either link, because "MQTT is off" is the thing the
+            // section most often has to say -- and it is off by default.
+            //
+            // The broker password is the one real decision here, and the host is what makes it: the UI
+            // is an open LAN dashboard unless a password is configured, and MQTT_PASSWORD is the account
+            // that publishes to the .../set topics -- so handing it out would be handing out the stop
+            // button on the wallbox by another route. The record is therefore built with a null password
+            // unless a login is actually enforced, which is a structural guarantee in the spirit of
+            // ReadOnlyModbusClient: the page cannot disclose what it was never given.
+            services.AddSingleton(provider =>
+            {
+                var ha = provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value;
+                var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
+                var discovery = provider.GetRequiredService<HaDiscovery>();
+                var ev = provider.GetRequiredService<EvInfo>();
+
+                return new MqttDisplayOptions(
+                    new HomeAssistantMqttDisplay(
+                        Connection(
+                            ha.Enabled, ha.BrokerHost, ha.BrokerPort, ha.Username, ha.Password, discovery.ClientId),
+                        ha.DiscoveryPrefix,
+                        // The id in force, not the configured blank that may have produced it: empty
+                        // means "take Pv:Id", and HaDiscovery is where that rule lives.
+                        discovery.DeviceId,
+                        discovery.TopicPrefix,
+                        [.. discovery.WellKnownTopics().Select(topic =>
+                            new MqttTopicDisplay(topic.Purpose, topic.Topic, topic.Inbound))],
+                        ha.StatusInterval,
+                        ha.RetireDeviceIds,
+                        ha.RetireTopicPrefixes),
+                    new VehicleMqttDisplay(
+                        Connection(
+                            vehicle.Enabled, vehicle.BrokerHost, vehicle.BrokerPort, vehicle.Username,
+                            vehicle.Password, VehicleMqttWorker.ClientId),
+                        // The topic the worker actually subscribed to, which comes from the car (#124)
+                        // and not from Vehicle:Topic -- showing the latter would display a setting that
+                        // is being ignored.
+                        ev.TelemetryTopic,
+                        vehicle.MaxAge,
+                        vehicle.ReconnectInterval));
+
+                MqttConnectionDisplay Connection(
+                    bool enabled, string host, int port, string? username, string? password, string clientId) =>
+                    new(
+                        enabled,
+                        host,
+                        port,
+                        username ?? string.Empty,
+                        web.AuthenticationRequired && !string.IsNullOrEmpty(password) ? password : null,
+                        !string.IsNullOrEmpty(password),
+                        clientId);
+            });
 
             // Everything else -- Razor components, cookie authentication, the RequireAuthentication
             // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised

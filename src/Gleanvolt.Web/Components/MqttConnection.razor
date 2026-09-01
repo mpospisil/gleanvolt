@@ -1,0 +1,54 @@
+@*
+    What every MQTT link has in common (issue #143), rendered as rows of the caller's
+    <dl class="facts"> — a component rather than duplicated markup, because the two links must render
+    identically or a reader comparing them will read the difference as meaningful.
+
+    The password is a value or it is nothing: whether it may be shown at all was decided by the host,
+    which withholds it unless a login is enforced, so there is no policy here to get wrong.
+*@
+
+<dt>Broker</dt>
+<dd>
+    <code>@Connection.Broker</code>
+    <span class="muted">— what the controller dials, which is not necessarily reachable from here.</span>
+</dd>
+
+<dt>Username</dt>
+<dd>
+    @if (string.IsNullOrWhiteSpace(Connection.Username))
+    {
+        <span class="muted">none (anonymous)</span>
+    }
+    else
+    {
+        <code>@Connection.Username</code>
+    }
+</dd>
+
+<dt>Password</dt>
+<dd>
+    @if (Connection.Password is { } secret)
+    {
+        <Secret Value="@secret" />
+    }
+    else if (Connection.PasswordWithheld)
+    {
+        <span class="muted">
+            set, and not shown here — this UI has no login, so anyone on the network could read it.
+            Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) to make it readable.
+        </span>
+    }
+    else
+    {
+        <span class="muted">none</span>
+    }
+</dd>
+
+<dt>Client id</dt>
+<dd><code>@Connection.ClientId</code></dd>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public MqttConnectionDisplay Connection { get; set; } = MqttConnectionDisplay.Off;
+}

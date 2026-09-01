@@ -1430,6 +1430,11 @@ HomeAssistant__Username=<user>
 HomeAssistant__Password=<pass>
 ```
 
+All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-read-only) — including
+the topic prefix, which no single setting spells out — so "what is this controller publishing, and
+where?" does not need an ssh session and a `grep` of `.env`. The password itself is shown there only
+when the UI is behind a login.
+
 #### Two names, and only one of them is dangerous to change
 
 **The PV system's id namespaces the topics.** Everything this controller publishes hangs off
@@ -1559,6 +1564,10 @@ above exist to make.
 
 `Vehicle:Username` / `Vehicle:Password` are supported for an authenticated broker and are secrets —
 supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
+
+The feed as configured — broker, username, client id, and the topic it actually subscribed to — is
+shown at [`/pv-system`](#pv-system--the-installation-read-only), which is also where a feed switched on
+with no topic reads as the misconfiguration it is rather than as a car that never reports.
 
 > **Upgrading?** `Vehicle:BatteryCapacityKWh`, `Vehicle:ChargeEfficiency` and `Vehicle:Topic` have
 > moved into the `Ev` section, and a build that still finds them **refuses to start**, naming the
@@ -1811,6 +1820,29 @@ button.
 It is also where the **deprecation notices** live: any older key still supplying a value is listed
 under *Configuration to move*. The same lines are logged once at startup, where nobody ever sees them
 again.
+
+**And the MQTT links.** The Devices table is what the controller *drives*; the **MQTT** section below
+it is what the controller *talks through* — the two links kept apart, because they are separately
+optional and may well be two different brokers. For [Home Assistant](#home-assistant-mqtt): the broker
+it dials and as whom, the client id the broker's own log and ACL file know this controller by, the
+discovery prefix, the unique-id root actually in force, the **topic prefix** — `gleanvolt/home-roof`,
+composed at startup from `HomeAssistant:BaseTopic` and `Pv:Id`, and therefore guessable from neither —
+the well-known topics under it (battery hold appearing only when the feature is on) with the
+`{prefix}/{object_id}/state|set` pattern for everything else, the status interval, and the retirement
+lists when an installation carries one. For [vehicle telemetry](#vehicle-telemetry-the-vehicle-section):
+the same connection details, the topic the worker *actually subscribed to* (which comes from the car,
+not from the feed), the staleness guard and the retry interval. Each link off reads as the default it
+is, and says which key turns it on.
+
+**The broker password is shown only when a login is enforced.** `MQTT_PASSWORD` is the account that
+publishes to the `…/set` topics — the stop button on the wallbox by another route — and this UI is an
+open LAN dashboard until a [`Web:PasswordHash`](#authentication) is configured. So the host hands the
+page a null unless one is: the section cannot disclose what it was never given, and says that setting
+a password is what makes it readable. Even then it renders masked, behind *Reveal* and *Copy* — a
+login is not a closed door, and a shoulder or a screenshot is a different threat from the network.
+
+None of it says whether either link is **up**: every value is read once at startup. That is a
+different question, and no page answers it yet.
 
 #### The dashboard reports; the plan page decides
 

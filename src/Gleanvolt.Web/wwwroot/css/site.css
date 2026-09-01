@@ -526,6 +526,16 @@ h2 {
 }
 
 /*
+    A subheading inside one of those sections -- the car's limits, and one per link in the MQTT
+    section (#143). Left to the browser an h3 renders *larger* than the h2 above it, so the hierarchy
+    reads backwards on the one page that has both.
+*/
+h3 {
+    font-size: 0.95rem;
+    margin: 1.5rem 0 0.5rem;
+}
+
+/*
     The charging-plan tabs. Links rather than buttons, because each one is a real URL: a bookmark and
     a refresh come back to the same mode, and the browser's back button walks the modes.
 
@@ -593,4 +603,50 @@ h2 {
 
 .tab-panel h2 {
     margin-top: 1.5rem;
+}
+
+/*
+    A configured secret on the PV system page (#143): masked text with two small controls beside it.
+    Deliberately quiet -- these are not actions on the installation, they are ways of reading one
+    field -- so they sit at the weight of a link rather than of a button, on a page whose whole point
+    is that nothing on it can be changed.
+*/
+.secret {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.secret code {
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
+}
+
+button.link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+button.link:hover {
+    color: var(--accent);
+}
+
+/*
+    The topic table. Topics are long, single-token strings that must stay copyable, so they get the
+    full width and are allowed to wrap inside their cell rather than pushing the page sideways.
+*/
+.topics td.topic {
+    width: 100%;
+    word-break: break-all;
+}
+
+.topics td.flow {
+    color: var(--muted);
+    white-space: nowrap;
 }

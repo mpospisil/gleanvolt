@@ -35,6 +35,14 @@ public sealed class VehicleMqttWorker : BackgroundService
 
     private readonly string _topic;
 
+    /// <summary>
+    /// The client id this worker connects with. Not namespaced by <c>Pv:Id</c> the way the Home
+    /// Assistant worker's is — the machine is what distinguishes one subscriber here — so two
+    /// controllers on one machine would collide. Shown on <c>/pv-system</c> (issue #143), which is how
+    /// anyone ever finds that out.
+    /// </summary>
+    public static string ClientId => $"gleanvolt-vehicle-{Environment.MachineName}";
+
     /// <param name="ev">
     /// The car this feed reports on (#124). Only the topic comes from here: two cars on one broker are
     /// two topics, so the topic is genuinely per-vehicle, while the broker, the credentials and the
@@ -73,7 +81,7 @@ public sealed class VehicleMqttWorker : BackgroundService
 
         var clientOptionsBuilder = new MqttClientOptionsBuilder()
             .WithTcpServer(_options.BrokerHost, _options.BrokerPort)
-            .WithClientId($"gleanvolt-vehicle-{Environment.MachineName}");
+            .WithClientId(ClientId);
 
         if (!string.IsNullOrWhiteSpace(_options.Username))
         {

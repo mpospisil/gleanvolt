@@ -4,6 +4,55 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-01 — The MQTT links are readable in the browser (issue #143)
+
+### What changed
+
+- An **MQTT** section on `/pv-system`, below Devices and The car: two links, kept apart, because
+  `HomeAssistant` and `Vehicle` are separately optional and may be two different brokers.
+- Home Assistant: broker, username, password, client id, discovery prefix, the device id **in force**,
+  the topic prefix, the well-known topics with an in/out column, the status interval, and the
+  retirement lists when an installation carries one. Battery hold's topics appear only when the
+  feature does.
+- Vehicle: the same connection block, plus the topic the worker *actually subscribed to*
+  (`EvInfo.TelemetryTopic`), the staleness guard and the retry interval — and a plain statement when
+  the feed is on with no topic, which is otherwise indistinguishable from a car that never reports.
+- `MqttDisplayOptions` in `Gleanvolt.Web`, composed by the host from `HomeAssistantOptions`,
+  `VehicleOptions`, `HaDiscovery`, `EvInfo` and `WebOptions`, and registered whenever the UI is
+  enabled — "MQTT is off" being the thing the section most often has to say.
+- `HaDiscovery` is now a **singleton the worker resolves** rather than one it constructs, and gained
+  `ClientId`, `DeviceId` and `WellKnownTopics()`. `VehicleMqttWorker.ClientId` likewise.
+- `Secret.razor` — masked, with Reveal and Copy — and `wwwroot/js/clipboard.js` behind it.
+
+### Things worth knowing
+
+- **The password gate is the host's, not the markup's.** `MQTT_PASSWORD` is the account that publishes
+  to the `.../set` topics, and the UI is an open LAN dashboard until a `Web:PasswordHash` exists. So
+  the record is built with a null password unless a login is enforced: the page cannot disclose what
+  it was never given. See the decision record of the same date.
+- **The topic strings have one owner.** Composing `{prefix}/battery_hold/set` in the host would have
+  passed every test written against literals and rotted at the next rename, so the page is fed
+  `HaDiscovery`'s own output and a test asserts they are the same strings rather than equal-looking
+  ones.
+- **The vehicle topic is the car's, not the feed's.** `VehicleOptions.Topic` still exists as a
+  property but its configuration key is retired and refused at startup; reading it would have put a
+  value on the page that nothing acts on.
+- **The device id shown is the one in force.** Empty means "take `Pv:Id`", and that rule stayed in
+  `HaDiscovery` rather than being re-derived by the composition.
+- **Liveness is deliberately absent.** Every value here was read at startup, and nothing on the page
+  knows whether the broker answered. The section says so rather than letting a correct configuration
+  read as a working link; surfacing `IMqttClient.IsConnected` on `/health` is its own issue.
+
+### Verification performed
+
+- **1247 tests pass** (29 new): the composition's password gate in both directions, an anonymous broker
+  not reading as a withheld one, the topics being `HaDiscovery`'s, the device id fallback, the vehicle
+  topic's provenance, a feed with no topic, one broker versus two — and on the page: both links off,
+  battery hold on and off, the masked secret revealing on click, and no secret in the markup of an
+  unauthenticated render.
+
+---
+
 ## 2026-08-26 — A quoted plan can be edited and charged to (issue #128)
 
 ### What changed

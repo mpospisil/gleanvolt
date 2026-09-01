@@ -467,5 +467,60 @@ public class HaDiscoveryTests
             Assert.Equal(mode.ToString(), json.RootElement.GetProperty("mode").GetString());
         }
     }
-}
 
+    // -- What a configuration page is allowed to say about the topics (#143).
+
+    [Fact]
+    public void WellKnownTopics_AreTheOnesThatAreNotGuessableFromAnObjectId()
+    {
+        // The list is deliberately short: everything derived from an object id follows the pattern the
+        // page states beside it, and printing all forty would turn a reference into a dump.
+        var topics = Discovery.WellKnownTopics().ToList();
+
+        Assert.Contains(topics, topic => topic.Topic == Discovery.AvailabilityTopic);
+        Assert.Contains(topics, topic => topic.Topic == Discovery.StateTopic);
+        Assert.Contains(topics, topic => topic.Topic == Discovery.ActivateTargetCommandTopic);
+        Assert.Contains(topics, topic => topic.Topic == Discovery.StopServiceCommandTopic);
+        Assert.DoesNotContain(topics, topic => topic.Topic == Discovery.ChargeOffCommandTopic);
+
+        // Every one of them hangs off the prefix, which is the string the page exists to print.
+        Assert.All(topics, topic => Assert.StartsWith(Discovery.TopicPrefix, topic.Topic, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WellKnownTopics_MarkTheOnesThatCanChangeWhatTheChargerIsDoing()
+    {
+        var topics = Discovery.WellKnownTopics().ToList();
+
+        Assert.False(Assert.Single(topics, topic => topic.Topic == Discovery.StateTopic).Inbound);
+        Assert.True(Assert.Single(topics, topic => topic.Topic == Discovery.ActivateTargetCommandTopic).Inbound);
+    }
+
+    [Fact]
+    public void WellKnownTopics_NameBatteryHoldOnlyWhenTheFeatureIsOn()
+    {
+        // With the feature off the switch is not published at all, so a page listing its topics would
+        // be describing an entity that does not exist.
+        Assert.DoesNotContain(
+            Discovery.WellKnownTopics(), topic => topic.Topic.Contains("battery_hold", StringComparison.Ordinal));
+
+        Assert.Contains(
+            DiscoveryWithBatteryHold.WellKnownTopics(),
+            topic => topic.Topic == DiscoveryWithBatteryHold.BatteryHoldCommandTopic);
+    }
+
+    [Fact]
+    public void TheClientIdIsPerSystemRatherThanPerUniqueIdRoot()
+    {
+        // Two installations on one broker must not fight over a session. The unique-id root is pinned
+        // to something else here, and the client id must not follow it.
+        Assert.Equal("gleanvolt-controller-home-roof", Discovery.ClientId);
+    }
+
+    [Fact]
+    public void TheDeviceIdInForceFallsBackToTheSystemId()
+    {
+        Assert.Equal("solax_controller", Discovery.DeviceId);
+        Assert.Equal(Sites.Home.Id, new HaDiscovery(new HomeAssistantOptions(), Sites.Home).DeviceId);
+    }
+}

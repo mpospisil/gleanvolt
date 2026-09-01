@@ -60,6 +60,24 @@ public sealed class HaDiscovery
     /// <summary>The PV system's id, which every topic this controller publishes is namespaced by.</summary>
     public string SystemId => _systemId;
 
+    /// <summary>
+    /// The client id the worker connects to the broker with. One per system, not per unique-id root:
+    /// two installations on one broker must not fight over a session, and the topic prefix is what
+    /// already tells them apart.
+    ///
+    /// <para>It lives here rather than in the worker because it is the name the broker's connection
+    /// log and its ACL file know this controller by, which makes it something a configuration page has
+    /// to be able to show (issue #143) — and there should be exactly one place that decides it.</para>
+    /// </summary>
+    public string ClientId => $"gleanvolt-controller-{_systemId}";
+
+    /// <summary>
+    /// The unique-id root actually in force: <c>HomeAssistant:DeviceId</c>, or the system's id when
+    /// that is empty. The page shows this rather than the blank that produced it (issue #143), and the
+    /// rule for reading it lives here, where the entities are built from it.
+    /// </summary>
+    public string DeviceId => _deviceId;
+
     /// <summary>Everything this controller publishes hangs off here: <c>{BaseTopic}/{Pv:Id}</c>.</summary>
     public string TopicPrefix => $"{_options.BaseTopic}/{_systemId}";
 
@@ -149,6 +167,37 @@ public sealed class HaDiscovery
     public string SelectStateTopic(string objectId) => NumberStateTopic(objectId);
 
     public string ActivateTargetCommandTopic => $"{TopicPrefix}/activate_target/set";
+
+    /// <summary>
+    /// The topics worth naming on a configuration page (issue #143): the ones that are not derived
+    /// from an object id, and are therefore not guessable from the pattern the page states beside
+    /// them. Everything else — every number, select, text and button — is
+    /// <c>{TopicPrefix}/{object_id}/state</c> and <c>{TopicPrefix}/{object_id}/set</c>, and listing all
+    /// forty of them would turn a reference into a dump.
+    ///
+    /// <para>Battery hold appears only when the feature is on, for the same reason its discovery config
+    /// does: when it is off the switch is not published at all, so a page that listed its topics would
+    /// be describing an entity that does not exist.</para>
+    /// </summary>
+    /// <returns>
+    /// What each topic carries, the topic itself, and whether the controller <em>subscribes</em> to it
+    /// — which is the difference between a topic that reports and one that can change what the charger
+    /// is doing.
+    /// </returns>
+    public IEnumerable<(string Purpose, string Topic, bool Inbound)> WellKnownTopics()
+    {
+        yield return ("Availability", AvailabilityTopic, false);
+        yield return ("Status, as one JSON payload", StateTopic, false);
+
+        if (_batteryHoldEnabled)
+        {
+            yield return ("Battery hold", BatteryHoldStateTopic, false);
+            yield return ("Battery hold, set", BatteryHoldCommandTopic, true);
+        }
+
+        yield return ("Start a targeted charge", ActivateTargetCommandTopic, true);
+        yield return ("Stop the controller", StopServiceCommandTopic, true);
+    }
 
     public const string PayloadOnline = "online";
     public const string PayloadOffline = "offline";
