@@ -1,0 +1,4 @@
+# A live session credential and a run log that mentions a real car. Both are produced beside the
+# script, neither belongs in the repository, and both go when the folder does (#138).
+cookies.txt
+probe.jsonl
