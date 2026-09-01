@@ -1,4 +1,5 @@
 using Gleanvolt.Api;
+using Gleanvolt.Web;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
@@ -150,5 +151,81 @@ public class ApiSurfaceRegistrationTests
 
         Assert.Contains("Vehicle:BatteryCapacityKWh", error.Message);
         Assert.Contains("Ev:Vehicles:0:BatteryCapacityKWh", error.Message);
+    }
+
+    // -- What the configuration page is handed (#142).
+
+    [Fact]
+    public async Task TheSectionIsRegisteredEvenWithTheApiOff()
+    {
+        // "The API is off" is what the section most often has to say, so it cannot be registered behind
+        // the API being on -- unlike ApiHostInfo above, which only an enabled API needs.
+        await using var provider = Build();
+
+        var api = provider.GetRequiredService<ApiDisplayOptions>();
+
+        Assert.False(api.Enabled);
+        Assert.Empty(api.Keys);
+    }
+
+    [Fact]
+    public async Task NothingIsRegisteredForAPageThatWillNotBeServed()
+    {
+        await using var provider = Build(("Web:Enabled", "false"), ("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"));
+
+        Assert.Null(provider.GetService<ApiDisplayOptions>());
+    }
+
+    [Fact]
+    public async Task ThePathsComeFromTheRoutesRatherThanFromLiterals()
+    {
+        await using var provider = Build(("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"));
+
+        var api = provider.GetRequiredService<ApiDisplayOptions>();
+
+        Assert.Equal(GleanvoltApi.BasePath, api.BasePath);
+        Assert.Equal(GleanvoltApi.DocumentPath, api.DocumentPath);
+
+        // Web:Port, for the case where the address the page arrived on carries no port of its own.
+        Assert.Equal(provider.GetRequiredService<IOptions<WebOptions>>().Value.Port, api.Port);
+    }
+
+    [Fact]
+    public async Task TheKeyIsWithheldFromAnOpenUi()
+    {
+        // A key is bearer-equivalent to the stop button on the wallbox, and with no password the UI
+        // admits anyone on the network. The page cannot disclose what it was never given.
+        await using var provider = Build(("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"));
+
+        var key = Assert.Single(provider.GetRequiredService<ApiDisplayOptions>().Keys);
+
+        Assert.Equal("mcp", key.Name);
+        Assert.Null(key.Secret);
+    }
+
+    [Fact]
+    public async Task TheKeyIsHandedOverOnceALoginIsEnforced()
+    {
+        await using var provider = Build(
+            ("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"), ("Web:PasswordHash", "a-hash"));
+
+        Assert.Equal("a-key", Assert.Single(provider.GetRequiredService<ApiDisplayOptions>().Keys).Secret);
+    }
+
+    [Fact]
+    public async Task SeveralClientsAreListedByNameInAStableOrder()
+    {
+        // Several keys is the configuration that makes the name worth showing at all -- it is what the
+        // log attributes an action to -- and the table must not reshuffle itself between restarts.
+        await using var provider = Build(
+            ("Api:Enabled", "true"),
+            ("Api:Keys:dashboard", "b-key"),
+            ("Api:Keys:claude-mcp", "a-key"),
+            ("Api:Keys:unused", ""));
+
+        var keys = provider.GetRequiredService<ApiDisplayOptions>().Keys;
+
+        // The empty one is not a key: HasKeys ignores it, so the page must not list it as one.
+        Assert.Equal(["claude-mcp", "dashboard"], keys.Select(key => key.Name));
     }
 }

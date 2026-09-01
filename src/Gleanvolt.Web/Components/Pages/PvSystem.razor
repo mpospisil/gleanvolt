@@ -5,6 +5,8 @@
 @inject EvInfo Car
 @inject ChargingLimits Limits
 @inject MqttDisplayOptions Mqtt
+@inject ApiDisplayOptions Api
+@inject NavigationManager Nav
 
 @*
     The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
@@ -381,8 +383,139 @@ else
     what answers that.
 </p>
 
+<h2>API</h2>
+
+@*
+    The third control surface (issue #142), and the one whose whole configuration lives in a file on
+    the Pi. Turning it on is a line in .env and a key from `openssl rand -hex 32`; after that the only
+    confirmation it worked is a line in the startup log, and the only place the key exists is that
+    file. Anyone pointing an MCP server, a script or a dashboard at this installation needs exactly two
+    things -- the base URL and a key -- and used to get them by ssh'ing to the Pi and grepping .env.
+
+    Read-only for the same reason as everything above: ApiOptions is bound once at startup, the
+    keyless-API check has already refused what could not be honoured, and the routes are mapped -- or
+    not mapped -- from it. A control that generated a key here would be editing a copy of a settled
+    decision.
+*@
+
+@if (!Api.Enabled)
+{
+    <p class="muted" id="api-off">
+        Off, which is the default: no route is mapped and no document is served, so there is nothing to
+        find rather than something that answers 401. Two of its endpoints write to hardware, which is
+        why it is switched on knowingly — with <code>Api__Enabled=true</code> and at least one key,
+        <code>Api__Keys__&lt;name&gt;=$(openssl rand -hex 32)</code>. Enabled with no key is a startup
+        failure rather than an open control surface.
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <dt>Base URL</dt>
+        <dd>
+            <code>@_api.BaseUrl</code>
+            @if (_api.PortIsImplicit)
+            {
+                <span class="muted">
+                    — this page arrived on the default port, so the direct LAN address is
+                    <code>host:@Api.Port</code> whatever is in front of it.
+                </span>
+            }
+        </dd>
+
+        <dt>Index</dt>
+        <dd><a href="@_api.BaseUrl">@Api.BasePath</a></dd>
+
+        <dt>OpenAPI document</dt>
+        <dd><a href="@_api.DocumentUrl">@Api.DocumentPath</a></dd>
+    </dl>
+
+    <p class="table-note muted">
+        The address is built from the one this page arrived on rather than from <code>Web:Port</code>:
+        a hostname or a reverse proxy in front means the configured port is not necessarily the one
+        that works, while the address that just delivered this page demonstrably does. Both links
+        answer without a key by design — a browser cannot send one, and neither carries anything to act
+        on — so opening either is the quickest proof that the API is up.
+    </p>
+
+    <h3>Keys</h3>
+
+    <table class="sessions">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Key</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var key in Api.Keys)
+            {
+                <tr>
+                    <td><code>@key.Name</code></td>
+                    <td>
+                        @if (key.Secret is { } secret)
+                        {
+                            <Secret Value="@secret" />
+                        }
+                        else
+                        {
+                            <span class="muted">configured</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="table-note muted">
+        The name is not a credential — it is what reaches the log and the recorded charging session as
+        the source of an action, so a charge started through this API is filed against the name that
+        started it rather than anonymously. Which is the whole reason several clients get several keys.
+    </p>
+
+    @if (Api.SecretsWithheld)
+    {
+        <p class="table-note muted" id="api-keys-withheld">
+            The keys themselves are not shown, because this UI has no login: anyone who can reach it
+            could read them, and a key is bearer-equivalent to the stop button on the wallbox.
+            Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and they become
+            readable here.
+        </p>
+    }
+
+    <h3>Calling it</h3>
+
+    <p class="code-line">
+        @if (Api.Keys[0].Secret is { } example)
+        {
+            <Secret Value="@example" Before="@CurlPrefix" After="@CurlSuffix" />
+        }
+        else
+        {
+            <code>@CurlPrefix&lt;key&gt;@CurlSuffix</code>
+        }
+    </p>
+
+    <p class="table-note muted">
+        The first key, this installation's own address and the endpoint worth trying first. Everything
+        else is under the same base URL and takes the same header; the document above is the list.
+    </p>
+}
+
 @code {
     private const string Missing = "—";
+
+    // The example call the section exists to serve, split around the key so the secret can be masked
+    // inside it while Copy still hands over the whole command.
+    private const string CurlPrefix = "curl -H \"Authorization: Bearer ";
+
+    private string CurlSuffix => $"\" {_api.BaseUrl}/status";
+
+    // Where the API is, as seen from the browser that fetched this page -- resolved once, since the
+    // address cannot change under a rendered page.
+    private ApiAddressDisplay _api = new(string.Empty, string.Empty, PortIsImplicit: true);
+
+    protected override void OnInitialized() => _api = Api.AddressFrom(Nav.BaseUri);
 
     private static readonly System.Globalization.CultureInfo Invariant =
         System.Globalization.CultureInfo.InvariantCulture;

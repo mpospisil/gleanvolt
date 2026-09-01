@@ -628,6 +628,31 @@ public static class GleanvoltHostingExtensions
             // attributes.
             services.AddSingleton(new WebBuildInfo(BuildInfo.Describe()));
 
+            // The third control surface (issue #142), on the same terms as the MQTT links below and for
+            // the same reason: registered whenever the UI is enabled rather than inside the
+            // `if (api.Enabled)` block further down, because "the API is off" is what the section most
+            // often has to say -- and it is off by default.
+            //
+            // The key is gated exactly as the broker password is, and the gate is the host's: a key is
+            // bearer-equivalent to the stop button on the wallbox, and rendering it on a UI that has no
+            // login would hand the control API to anything that can reach port 8090 -- which is what
+            // Api:Enabled defaulting to false and the fail-fast on a keyless API exist to prevent.
+            //
+            // The paths are GleanvoltApi's own constants rather than literals, so a route that moves
+            // cannot leave the page pointing at where it used to be.
+            services.AddSingleton(new ApiDisplayOptions(
+                api.Enabled,
+                GleanvoltApi.BasePath,
+                GleanvoltApi.DocumentPath,
+                web.Port,
+                [.. api.Keys
+                    .Where(key => !string.IsNullOrWhiteSpace(key.Value))
+                    // By name, so the table does not reorder itself between restarts on an installation
+                    // with several clients.
+                    .OrderBy(key => key.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(key => new ApiKeyDisplay(
+                        key.Key, web.AuthenticationRequired ? key.Value : null))]));
+
             // What the two MQTT links are configured to do (issue #143). Registered whenever the UI is
             // enabled rather than inside a check on either link, because "MQTT is off" is the thing the
             // section most often has to say -- and it is off by default.

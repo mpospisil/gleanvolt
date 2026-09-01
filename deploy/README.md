@@ -428,6 +428,13 @@ The name on the key matters operationally: `docker-compose.yml` passes `API_KEY`
 `Api__Keys__client`, and *"API (client) started Targeted"* is what the log and the recorded charging
 session will say. Rename it, or add more `Api__Keys__<name>` lines, if more than one thing calls it.
 
+`/pv-system` in the web UI carries all of it: whether the API is on, the base URL **with the port**,
+links to the index and the document (both answer without a key, so opening either is the quickest proof
+it is up), the key names, and a `curl` line with this installation's own address already in it. The key
+itself appears there only once `WEB_PASSWORD_HASH` is set — without a login the UI admits anyone on the
+LAN, and a key is bearer-equivalent to the stop button on the wallbox — so with a password configured
+the key can be read back in the browser rather than only out of `.env`.
+
 ## Prepare the Pi (once)
 
 **1. Passwordless SSH.** Either deploy script opens close to a dozen separate SSH connections — with
