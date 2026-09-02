@@ -89,6 +89,7 @@ else
                 <th>Feed</th>
                 <th class="num">Deliveries</th>
                 <th class="num">Repeats</th>
+                <th class="num">Went back</th>
                 <th class="num">Superseded</th>
                 <th class="num">Shortest</th>
                 <th class="num">Mean</th>
@@ -103,6 +104,13 @@ else
                     <td>@source.SourceId</td>
                     <td class="num">@source.Captures</td>
                     <td class="num">@source.Repeats</td>
+                    <td class="num @(source.HasRegressed ? "error" : null)">
+                        @source.Regressions
+                        @if (source.WorstRegression is { } worst)
+                        {
+                            <span class="muted"> (−@Duration(worst))</span>
+                        }
+                    </td>
                     <td class="num">@source.Superseded</td>
                     <td class="num">@Gap(source.ShortestGap)</td>
                     <td class="num">@Gap(source.MeanGap)</td>
@@ -125,9 +133,14 @@ else
 
     <p class="muted table-note">
         A <em>repeat</em> is a reading whose capture time this feed had already produced — the same
-        bundle again, or a retained message replayed. <em>Superseded</em> counts the readings the
-        holder declined because the other feed was already ahead: a feed that is nearly always
-        superseded is one the dashboard is not showing, however healthy its own page looks.
+        bundle again, or a retained message replayed. Ordinary: a feed with nothing new to say.
+        <em>Went back</em> is not ordinary, and is counted apart from it for that reason: the feed
+        produced a capture time <strong>older</strong> than one it had already shown us, with the worst
+        step backwards beside the count. A portal whose continuous data request has stopped filling
+        looks exactly like this and like nothing else — from every other angle it is a quiet car.
+        <em>Superseded</em> counts the readings the holder declined because the other feed was already
+        ahead: a feed that is nearly always superseded is one the dashboard is not showing, however
+        healthy its own page looks.
     </p>
 
     @*

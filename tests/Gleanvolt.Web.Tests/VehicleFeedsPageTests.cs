@@ -80,6 +80,35 @@ public class VehicleFeedsPageTests : PageTest
     }
 
     [Fact]
+    public void Marks_a_feed_whose_account_of_the_car_went_backwards()
+    {
+        // The reference install's case, and the one a "Repeats" column on its own would have hidden:
+        // the portal answered every time and reached back four hours past a snapshot it had already
+        // shown us, which is a data request that has stopped filling rather than a quiet car.
+        Deliver(TimeSpan.FromHours(4), "vw-group", 78);
+        Deliver(TimeSpan.Zero, "vw-group", 78);
+        Deliver(TimeSpan.FromMinutes(3), "vw-group", 78);
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.Contains("Went back", page.Markup);
+        Assert.Contains("−4 h 00 m", page.Markup);
+        Assert.Contains("stopped filling", page.Markup);
+    }
+
+    [Fact]
+    public void Leaves_the_step_backwards_blank_for_a_feed_that_only_repeats_itself()
+    {
+        Deliver(TimeSpan.Zero, "mqtt", 60);
+        Deliver(TimeSpan.Zero, "mqtt", 60);
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.Contains("Went back", page.Markup);
+        Assert.DoesNotContain("−", page.Markup);
+    }
+
+    [Fact]
     public void Reports_the_window_it_was_measured_over_before_anything_else()
     {
         // Every number on the page is worth exactly as much as the time behind it, and a restart puts

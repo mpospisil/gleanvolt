@@ -1992,11 +1992,15 @@ the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md)
 Two feeds may run at once, and this is the page that decides between them on numbers rather than on
 which one sounded better. It reports and changes nothing.
 
-- **Cadence.** Per feed: deliveries, repeats, superseded, and the shortest, mean and longest interval
-  between deliveries, with the intervals also counted into bands. A *delivery* is a reading carrying a
-  capture time that feed had not produced before; asking the portal every quarter of an hour and being
-  handed the same bundle back is a **repeat**, and so is a retained MQTT message replayed on
-  reconnect — counting those would report a cadence the car never had. **Superseded** counts the
+- **Cadence.** Per feed: deliveries, repeats, steps backwards, superseded, and the shortest, mean and
+  longest interval between deliveries, with the intervals also counted into bands. A *delivery* is a
+  reading carrying a capture time that feed had not produced before; asking the portal every quarter of
+  an hour and being handed the same bundle back is a **repeat**, and so is a retained MQTT message
+  replayed on reconnect — counting those would report a cadence the car never had. **Went back** is
+  counted separately and is not ordinary: the feed produced a capture time *older* than one it had
+  already shown us, with the worst step backwards beside the count. A portal whose continuous data
+  request has stopped filling looks exactly like that and like nothing else — from every other angle it
+  is a quiet car — which is why it does not share a column with repeats. **Superseded** counts the
   readings the holder declined because the other feed was already ahead: a feed that is nearly always
   superseded is one the dashboard is not showing, however healthy its own page looks.
 - **Agreement.** Where the two feeds' capture times land within half an hour of each other, their

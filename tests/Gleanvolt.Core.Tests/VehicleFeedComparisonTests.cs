@@ -75,11 +75,13 @@ public class VehicleFeedComparisonTests
         Assert.Equal(3, source.Offered);
         Assert.Equal(1, source.Captures);
         Assert.Equal(2, source.Repeats);
+        Assert.Equal(0, source.Regressions);
+        Assert.False(source.HasRegressed);
         Assert.Equal(0, source.GapCount);
     }
 
     [Fact]
-    public void An_older_reading_is_a_repeat_too_and_never_moves_the_cadence_backwards()
+    public void An_older_reading_never_moves_the_cadence_backwards()
     {
         var comparison = new VehicleFeedComparison(new TestClock(Noon));
 
@@ -91,6 +93,71 @@ public class VehicleFeedComparisonTests
         Assert.Equal(1, source.Captures);
         Assert.Null(source.MeanGap);
         Assert.Equal(Noon.AddMinutes(30), source.LastCapturedAt);
+    }
+
+    [Fact]
+    public void A_feed_reaching_back_past_a_snapshot_it_already_showed_us_is_not_a_repeat()
+    {
+        // The reference install's portal did exactly this: 14:51 on two reads, then 10:29 on the
+        // seven after it. Counted as repeats -- which is what this did at first -- it reads as a feed
+        // with nothing new to say, which is precisely what a data request that has stopped filling
+        // wants you to think.
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+
+        comparison.Record(Reading(TimeSpan.FromHours(4), soc: 78), taken: true);
+        comparison.Record(Reading(TimeSpan.FromHours(4), soc: 78), taken: false);
+        comparison.Record(Reading(TimeSpan.Zero, soc: 78), taken: false);
+        comparison.Record(Reading(TimeSpan.FromMinutes(3), soc: 78), taken: false);
+
+        var source = Assert.Single(comparison.Report().Sources);
+
+        Assert.Equal(1, source.Captures);
+        Assert.Equal(1, source.Repeats);
+        Assert.Equal(2, source.Regressions);
+        Assert.True(source.HasRegressed);
+    }
+
+    [Fact]
+    public void The_worst_step_backwards_is_kept_because_a_minute_and_a_morning_are_not_alike()
+    {
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+
+        comparison.Record(Reading(TimeSpan.FromHours(4)), taken: true);
+        comparison.Record(Reading(TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1)), taken: false);
+        comparison.Record(Reading(TimeSpan.Zero), taken: false);
+        comparison.Record(Reading(TimeSpan.FromHours(3)), taken: false);
+
+        Assert.Equal(TimeSpan.FromHours(4), Assert.Single(comparison.Report().Sources).WorstRegression);
+    }
+
+    [Fact]
+    public void A_feed_that_has_never_gone_backwards_reports_no_worst_step()
+    {
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+
+        comparison.Record(Reading(TimeSpan.Zero), taken: true);
+        comparison.Record(Reading(TimeSpan.FromMinutes(15)), taken: true);
+
+        var source = Assert.Single(comparison.Report().Sources);
+
+        Assert.Equal(0, source.Regressions);
+        Assert.Null(source.WorstRegression);
+    }
+
+    [Fact]
+    public void Every_reading_is_a_delivery_a_repeat_or_a_step_backwards_and_nothing_else()
+    {
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+
+        comparison.Record(Reading(TimeSpan.Zero), taken: true);
+        comparison.Record(Reading(TimeSpan.FromMinutes(15)), taken: true);
+        comparison.Record(Reading(TimeSpan.FromMinutes(15)), taken: false);
+        comparison.Record(Reading(TimeSpan.FromMinutes(2)), taken: false);
+
+        var source = Assert.Single(comparison.Report().Sources);
+
+        Assert.Equal(source.Offered, source.Captures + source.NotNews);
+        Assert.Equal(source.NotNews, source.Repeats + source.Regressions);
     }
 
     [Fact]
@@ -178,8 +245,15 @@ public class VehicleFeedComparisonTests
     [Fact]
     public void Coverage_is_null_rather_than_zero_before_there_is_anything_to_divide_by()
     {
-        Assert.Null(new VehicleFeedTally(
-            "vw-group", 0, 0, 0, null, null, 0, null, null, null, [], 0, 0, 0, 0, 0).Coverage(0));
+        // Derived from a real tally rather than constructed field by field: this record is a long
+        // positional list that keeps growing, and a test spelling all of it out would break on every
+        // addition while testing none of them.
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+        comparison.Record(Reading(TimeSpan.Zero), taken: true);
+
+        var nothingYet = Assert.Single(comparison.Report().Sources) with { Captures = 0 };
+
+        Assert.Null(nothingYet.Coverage(0));
     }
 
     [Fact]
