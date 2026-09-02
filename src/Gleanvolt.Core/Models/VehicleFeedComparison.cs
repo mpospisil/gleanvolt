@@ -190,6 +190,10 @@ public sealed class VehicleFeedComparison
     /// <summary>One feed's running totals. Mutable, and only ever touched under the lock.</summary>
     private sealed class Tally(string sourceId)
     {
+        private int _repeats;
+        private int _regressions;
+        private TimeSpan _worstRegression;
+
         private readonly int[] _buckets = new int[GapBucketEdges.Count + 1];
         private TimeSpan _gapTotal;
 
@@ -223,11 +227,36 @@ public sealed class VehicleFeedComparison
                 Superseded++;
             }
 
-            // Not newer than what this feed last said is a re-delivery, not news: the portal handing
-            // back the same bundle, or a retained MQTT message replayed on reconnect. Counted, and
-            // deliberately not allowed to shorten the measured cadence.
+            // Not newer than what this feed last said is not news, and there are two ways of not
+            // being news which want telling apart.
+            //
+            // A REPEAT is the same capture time again: the portal handing back the bundle it handed
+            // back last time, or a retained MQTT message replayed on reconnect. Ordinary, and the
+            // reason cadence is measured on capture times at all.
+            //
+            // A REGRESSION is an OLDER capture time than this feed has already produced -- the feed's
+            // own account of the car going backwards. That is a different and more serious thing: a
+            // portal whose delivery reaches back past a snapshot it has already shown us has a
+            // continuous data request that has stopped filling, and it looks exactly like a quiet car
+            // until somebody notices the timestamp. Lumping the two together, which this did at
+            // first, hides it behind a column that reads as harmless.
             if (Last is { } previous && state.CapturedAt <= previous.CapturedAt)
             {
+                if (state.CapturedAt == previous.CapturedAt)
+                {
+                    _repeats++;
+                }
+                else
+                {
+                    _regressions++;
+
+                    var backwards = previous.CapturedAt - state.CapturedAt;
+                    if (backwards > _worstRegression)
+                    {
+                        _worstRegression = backwards;
+                    }
+                }
+
                 return false;
             }
 
@@ -261,6 +290,9 @@ public sealed class VehicleFeedComparison
             SourceId,
             Offered,
             Captures,
+            _repeats,
+            _regressions,
+            _regressions == 0 ? null : _worstRegression,
             Superseded,
             _firstCapturedAt,
             Last?.CapturedAt,
@@ -273,7 +305,8 @@ public sealed class VehicleFeedComparison
             _range,
             _chargeTime,
             _chargeState,
-            _plugState);
+            _plugState,
+            Last);
 
         private static int BucketFor(TimeSpan gap)
         {

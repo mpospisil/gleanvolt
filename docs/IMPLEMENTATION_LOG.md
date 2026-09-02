@@ -4,6 +4,92 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-02 — A feed going backwards is not a feed repeating itself (issue #141, follow-up)
+
+The reference install's first evening: the portal answered all ten reads and produced **one** new
+capture time. `14:51Z` on the first two reads, then `10:29Z` on the seven after — four hours further
+back than a snapshot it had already shown us, and then `10:32Z`.
+
+The tally called all nine of those **repeats**, because it counted "not newer than this feed's last"
+as one thing. Repeats read as harmless, and the column's own note said "the same bundle again, or a
+retained message replayed" — which was not what had happened.
+
+### What changed
+
+- `VehicleFeedTally` splits `Repeats` from `Regressions`, and carries `WorstRegression`, the largest
+  step backwards seen. `Repeats` stops being `Offered - Captures` and becomes a counted field;
+  `NotNews` is the sum, and `Offered = Captures + NotNews` is asserted.
+- `/vehicle-feeds` gains a **Went back** column — the count, the worst step beside it in parentheses,
+  and the cell marked when it is non-zero.
+
+### Things worth knowing
+
+- **The two failures want opposite reactions.** A repeat is a feed with nothing new to say, which for
+  a batch portal and a parked car is the expected state. A regression is a feed reaching back past
+  something it has already delivered, which is what a continuous data request that has stopped filling
+  looks like — and from every other angle (health, session, read count, HTTP status) it is
+  indistinguishable from a quiet car.
+- **The worst step is kept, not the last.** A timestamp jittering by a minute and a feed stuck on this
+  morning are the same event count and different problems.
+- **The high-water mark is still what ages.** A regression does not move the feed's last reading, so
+  `LastCapturedAt` and the dashboard's per-feed age stay on the newest thing that feed ever produced —
+  which is the honest answer to "how good is this feed's best account of the car".
+
+### Verification performed
+
+- **1487 tests pass** (7 new): the reference install's exact sequence classified one delivery, one
+  repeat and two regressions; the worst step kept across a small one and a large one; no worst step at
+  all for a feed that has never gone backwards; and the invariant that every reading is a delivery, a
+  repeat or a step backwards and nothing else.
+- The page is asserted to show the column, the worst step, and to leave it blank for a feed that only
+  repeats itself.
+- One existing test built a `VehicleFeedTally` field by field and broke on the new parameters. It now
+  derives one from a real tally with `with`, since this record is a long positional list that keeps
+  growing.
+
+---
+
+## 2026-09-02 — Each feed's own account, on the card (issue #141, follow-up)
+
+The first two hours of running both feeds on the reference install produced the case this is for: the
+portal signed in, answered every time, reported one session and no errors — and handed back the same
+16:51 delivery nine times running. On Health it read as a healthy feed. On the dashboard it was
+invisible, because `VehicleStateHolder` keeps one reading and the MQTT feed was ahead of it all
+afternoon.
+
+### What changed
+
+- `VehicleFeedTally.LastReading`: each feed's own most recent reading, which the tally already tracked
+  privately in order to measure cadence and was throwing away on the way out.
+- The dashboard gains **What each feed says** — one section per feed, headed by the name that feed
+  puts on its readings, with battery, age, range, time left, charge state and plug state. The section
+  for the feed the card above is quoting says so; the other says how many readings it has had held
+  back as older.
+- Shown once two feeds have been seen, and **kept** shown afterwards even if one goes quiet.
+
+### Things worth knowing
+
+- **Healthy and delivering are different questions.** A feed can sign in, answer, and report nothing
+  new for hours. The four-state card (#140) answers the first; only a per-feed reading answers the
+  second, and until now nothing on any surface did.
+- **A feed that stops keeps its section.** Its last reading sits there with a visibly growing age
+  beside the other feed's fresh one, which is the whole point of looking. A section that vanished
+  would take the evidence with it.
+- **Single-feed installations gain nothing and see nothing.** With one feed the card above already is
+  that feed, so a section would be the dashboard saying the same thing twice.
+- **The reading everything else uses is unchanged.** These sections are display; no plan, no charge
+  decision and no Home Assistant entity reads them, and the holder still keeps exactly one state.
+
+### Verification performed
+
+- **1478 tests pass** (7 new): the sections absent with one feed and present with two, both accounts
+  on the page including the one the holder discarded, the quoted feed named, a nine-hour-old feed
+  keeping its section with its age growing, and a field one feed carries and the other does not.
+- The tally is asserted to keep the losing reading, and to not let a re-delivered older bundle replace
+  a newer one.
+
+---
+
 ## 2026-09-02 — Two feeds, counted, and a handover made by configuration (issue #141)
 
 Phase 3 of #137, and the only phase whose deliverable is a measurement rather than a feature. What

@@ -1992,11 +1992,15 @@ the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md)
 Two feeds may run at once, and this is the page that decides between them on numbers rather than on
 which one sounded better. It reports and changes nothing.
 
-- **Cadence.** Per feed: deliveries, repeats, superseded, and the shortest, mean and longest interval
-  between deliveries, with the intervals also counted into bands. A *delivery* is a reading carrying a
-  capture time that feed had not produced before; asking the portal every quarter of an hour and being
-  handed the same bundle back is a **repeat**, and so is a retained MQTT message replayed on
-  reconnect — counting those would report a cadence the car never had. **Superseded** counts the
+- **Cadence.** Per feed: deliveries, repeats, steps backwards, superseded, and the shortest, mean and
+  longest interval between deliveries, with the intervals also counted into bands. A *delivery* is a
+  reading carrying a capture time that feed had not produced before; asking the portal every quarter of
+  an hour and being handed the same bundle back is a **repeat**, and so is a retained MQTT message
+  replayed on reconnect — counting those would report a cadence the car never had. **Went back** is
+  counted separately and is not ordinary: the feed produced a capture time *older* than one it had
+  already shown us, with the worst step backwards beside the count. A portal whose continuous data
+  request has stopped filling looks exactly like that and like nothing else — from every other angle it
+  is a quiet car — which is why it does not share a column with repeats. **Superseded** counts the
   readings the holder declined because the other feed was already ahead: a feed that is nearly always
   superseded is one the dashboard is not showing, however healthy its own page looks.
 - **Agreement.** Where the two feeds' capture times land within half an hour of each other, their
@@ -2091,6 +2095,15 @@ sections, in the order the questions are actually asked:
   age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying which
   screen to open. The last two must never look alike: *stale* clears itself and *sign-in required* never
   will. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
+- **What each feed says** — appears only once **two** feeds have reported, and then stays. The card
+  above quotes whichever feed saw the car most recently; this is each feed's own account beside the
+  other's, headed by the name it puts on its readings, with the section for the one being quoted
+  marked as such and the other saying how many of its readings were held back as older. It exists
+  because the holder keeps a single reading, so the feed that came second otherwise leaves nothing
+  behind but a count — and *the portal is healthy* and *the portal is delivering* are then
+  indistinguishable. On the reference install those had different answers within two hours of both
+  feeds being switched on. Counted over time on
+  [`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered).
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the

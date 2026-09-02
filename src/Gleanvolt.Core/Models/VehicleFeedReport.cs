@@ -46,6 +46,25 @@ public sealed record VehicleFeedReport(
 /// Readings carrying a capture time this feed had not produced before. <b>This is the delivery
 /// count</b>, and the one the cadence is measured over.
 /// </param>
+/// <param name="Repeats">
+/// Readings whose capture time this feed had <i>already</i> produced — the portal handing back the
+/// bundle it handed back last time, or a retained MQTT message replayed on reconnect. Ordinary, and
+/// the reason cadence is measured on capture times rather than on fetches.
+/// </param>
+/// <param name="Regressions">
+/// Readings carrying a capture time <b>older</b> than one this feed has already produced: the feed's
+/// own account of the car going backwards.
+///
+/// <para><b>Counted apart from <paramref name="Repeats"/> because it is a different fault.</b> A
+/// repeat is a feed with nothing new to say. A regression is a feed reaching back past a snapshot it
+/// has already shown us, which is what a portal whose continuous data request has stopped filling
+/// looks like — and from every other angle it is indistinguishable from a quiet car. Counted together,
+/// as they were at first, it hides behind a column that reads as harmless.</para>
+/// </param>
+/// <param name="WorstRegression">
+/// The largest step backwards seen, or null if there has been none. The figure that separates a
+/// timestamp jittering by a minute from a feed stuck on this morning.
+/// </param>
 /// <param name="Superseded">
 /// Readings the holder declined because another feed was already holding something at least as fresh.
 /// A feed that is nearly always superseded is a feed the dashboard is not showing, however healthy it
@@ -69,10 +88,25 @@ public sealed record VehicleFeedReport(
 /// </param>
 /// <param name="ChargeStateReadings">Deliveries whose charge state was something other than Unknown.</param>
 /// <param name="PlugStateReadings">Deliveries whose plug state was something other than Unknown.</param>
+/// <param name="LastReading">
+/// This feed's own most recent reading, whatever became of it.
+///
+/// <para><b>The only place a losing reading survives.</b> <see cref="VehicleStateHolder"/> keeps one
+/// state — the newest — so the feed that came second leaves nothing behind but a count. While two
+/// feeds are being compared, each one's own account of the car is worth showing beside the other's:
+/// the dashboard's card can then say which feed it is quoting <i>and</i> what the other one would
+/// have said, which is the difference between "the portal is healthy" and "the portal is delivering".</para>
+///
+/// <para>Never null once <paramref name="Captures"/> is non-zero, and display only — nothing plans on
+/// it, and the reading the rest of the controller uses is still whatever the holder holds.</para>
+/// </param>
 public sealed record VehicleFeedTally(
     string SourceId,
     int Offered,
     int Captures,
+    int Repeats,
+    int Regressions,
+    TimeSpan? WorstRegression,
     int Superseded,
     DateTimeOffset? FirstCapturedAt,
     DateTimeOffset? LastCapturedAt,
@@ -85,13 +119,17 @@ public sealed record VehicleFeedTally(
     int RangeReadings,
     int ChargeTimeReadings,
     int ChargeStateReadings,
-    int PlugStateReadings)
+    int PlugStateReadings,
+    VehicleState? LastReading = null)
 {
     /// <summary>
-    /// Readings that told us nothing new — the portal handing back a bundle it had already delivered,
-    /// or a retained MQTT message replayed on reconnect. Not a fault, and not a delivery either.
+    /// Every reading that was not a delivery, however it failed to be one. <see cref="Offered"/> is
+    /// this plus <see cref="Captures"/>, always.
     /// </summary>
-    public int Repeats => Offered - Captures;
+    public int NotNews => Repeats + Regressions;
+
+    /// <summary>Whether this feed's account of the car has ever gone backwards.</summary>
+    public bool HasRegressed => Regressions > 0;
 
     /// <summary>
     /// How often a field arrived, as a fraction of deliveries, or null before there is anything to

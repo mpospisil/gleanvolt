@@ -46,7 +46,9 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
 
         // Vehicle telemetry (#73): hand-registered here for the same reason WebBuildInfo is -- this test
         // builds a minimal host rather than calling AddGleanvolt, so it owns the UI's dependencies.
-        builder.Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
+        var vehicle = new VehicleStateHolder();
+        builder.Services.AddSingleton<IVehicleTelemetry>(vehicle);
+        builder.Services.AddSingleton(vehicle.Comparison);
 
         // The car itself (#124), which the dashboard's vehicle card now names whether or not anything
         // reports on it (#140). Unknown is the install that has never described one.
