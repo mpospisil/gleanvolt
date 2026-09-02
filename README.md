@@ -1855,7 +1855,11 @@ been filled yet — are `Degraded` instead: they back off (to at most an hour) a
 - A band across the top of **every page** of the web UI: *Sign-in required*, the service's sentence, and
   a link to the portal page. It follows the poll, so a browser left open overnight grows one.
 - The dashboard's vehicle card, next to the reading it explains.
-- **Health**, where "is anything wrong?" is actually asked, as a `Car feed` row.
+- **Health**, where "is anything wrong?" is actually asked, as a `Car feed` row — beside three that
+  say whether the feed is *running*: **Feed reads** (readings of attempts, and how long ago the last
+  one landed), **Portal session** (its age, and how many sign-ins there have been — *one* is the
+  healthy answer however long the controller has been up, and more says sessions are expiring), and
+  **Next read**, which reads `never — the feed has stopped` when it is blocked.
 - The log, as a **warning** — repeated every six hours for as long as it lasts, because a warning
   written once has scrolled out of `docker logs --tail` by the time anybody reads it, and a silent
   stopped feed is indistinguishable from a parked car. The reminder is a log line and never a request:

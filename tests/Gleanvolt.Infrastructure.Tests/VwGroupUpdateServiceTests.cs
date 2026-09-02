@@ -367,4 +367,54 @@ public class VwGroupUpdateServiceTests
         Assert.Null(await service.FetchAsync(CancellationToken.None));
         Assert.Empty(portal.Requests);
     }
+    [Fact]
+    public async Task It_reports_how_its_own_running_is_going()
+    {
+        // The two questions a log grep was the only way to answer: is it reading on its clock, and is
+        // it holding one session? One sign-in across many reads is the healthy answer, and the page
+        // that shows this says so.
+        var clock = new TestClock(new DateTimeOffset(2026, 9, 2, 6, 0, 0, TimeSpan.Zero));
+
+        using var portal = new FakePortal();
+        using var service = Service(portal, clock);
+
+        await service.FetchAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromMinutes(15));
+        await service.FetchAsync(CancellationToken.None);
+
+        var diagnostics = service.Diagnostics;
+
+        Assert.Equal(2, diagnostics.Attempts);
+        Assert.Equal(2, diagnostics.Readings);
+        Assert.Equal(1, diagnostics.Sessions);
+        Assert.Equal(TimeSpan.FromMinutes(15), diagnostics.SessionAge);
+
+        // Due one interval after the last attempt, which is what the worker will actually wait.
+        Assert.Equal(clock.GetUtcNow() + VwGroupUpdateService.Interval, diagnostics.NextDueAt);
+    }
+
+    [Fact]
+    public async Task A_blocked_feed_has_no_next_read_rather_than_a_distant_one()
+    {
+        using var portal = new FakePortal
+        {
+            Intercept = _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "<html><body>Please give consent to continue</body></html>", Encoding.UTF8, "text/html"),
+            },
+        };
+
+        using var service = Service(portal);
+
+        await service.FetchAsync(CancellationToken.None);
+
+        var diagnostics = service.Diagnostics;
+
+        Assert.Equal(1, diagnostics.Attempts);
+        Assert.Equal(0, diagnostics.Readings);
+        Assert.Null(diagnostics.NextDueAt);
+    }
+
+
 }

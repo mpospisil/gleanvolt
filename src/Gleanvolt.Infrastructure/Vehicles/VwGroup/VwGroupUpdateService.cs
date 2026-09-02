@@ -35,7 +35,7 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// dashboard says <i>sign-in required</i>. The /vehicle-portal button is what re-tests it once the
 /// owner has done their part, and a restart is what puts the feed back on its clock.</para>
 /// </summary>
-public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
+public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDiagnostics, IDisposable
 {
     /// <summary>The name this feed answers to. Display and diagnostics; nothing dispatches on it.</summary>
     public const string ManufacturerName = "vw-group";
@@ -65,6 +65,10 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
     private int _sessionCount;
 
     private int _consecutiveFailures;
+    private int _attempts;
+    private int _readings;
+    private DateTimeOffset? _lastAttemptAt;
+    private DateTimeOffset? _lastReadingAt;
 
     // Written by the fetch loop, read by a Blazor render and by the Home Assistant publish tick, so
     // the reference is published rather than left to a cache. Same reasoning as VehicleStateHolder's.
@@ -124,6 +128,17 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
         _sessionStartedAt is { } started ? _time.GetUtcNow() - started : null;
 
     /// <inheritdoc />
+    public VehicleFeedDiagnostics Diagnostics => new(
+        _attempts,
+        _readings,
+        _lastAttemptAt,
+        _lastReadingAt,
+        // Null while blocked, which is the state that has no next time rather than a distant one.
+        NextDelay < TimeSpan.Zero || _lastAttemptAt is null ? null : _lastAttemptAt + NextDelay,
+        _sessionCount,
+        SessionAge);
+
+    /// <inheritdoc />
     public async Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
     {
         if (Health.IsBlocked)
@@ -134,11 +149,16 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
             return null;
         }
 
+        _attempts++;
+        _lastAttemptAt = _time.GetUtcNow();
+
         try
         {
             var result = await Client().GetVehicleStateAsync(cancellationToken).ConfigureAwait(false);
             var state = result.State!;
 
+            _readings++;
+            _lastReadingAt = _lastAttemptAt;
             _consecutiveFailures = 0;
             NextDelay = Interval;
             Health = VehicleSourceHealth.Ok(

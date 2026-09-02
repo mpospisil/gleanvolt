@@ -36,6 +36,9 @@ Reverse-chronological. Newest entry at the top.
 - A reading is dated by the newest snapshot that **contributed** to it, not by the newest downloaded.
 - Both surfaces report what was recognised *and* its raw value, the reports dropped as undated with
   their field names, and the delivery's own facts on a failure as well as on a success.
+- **Health carries the feed's own running**: reads of attempts, session age and sign-in count, next
+  read due. Through `IVehicleFeedDiagnostics`, a *second* interface — `IVehicleUpdateService` stays at
+  five members, because a push-based feed has neither a session to age nor a next-due time.
 
 ### Things worth knowing
 
