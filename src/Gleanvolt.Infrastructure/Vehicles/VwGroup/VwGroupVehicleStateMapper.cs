@@ -427,13 +427,26 @@ public static class VwGroupVehicleStateMapper
     private static (string Field, string Value, DateTimeOffset At)? Latest(
         List<VwGroupSnapshot> snapshots, string[] candidates)
     {
+        // Newest snapshot first, and WITHIN a snapshot the candidates in the order they are listed.
+        //
+        // The second half was missing and the order was the dictionary's -- whichever name the portal
+        // happened to serialise first won, and the preference the candidate lists spell out ("both
+        // confirmed present in a real ID.4 bundle, agreeing at 57: battery_level_HV.value comes with
+        // its own .state") decided nothing at all. It cost nothing on a bundle carrying one of them,
+        // which is every bundle seen so far, and would have been unreproducible on the first one that
+        // carried two.
         for (var index = snapshots.Count - 1; index >= 0; index--)
         {
-            foreach (var (field, value) in snapshots[index].Values)
+            var snapshot = snapshots[index];
+
+            foreach (var candidate in candidates)
             {
-                if (VwGroupFieldNames.Matches(field, candidates) && !VwGroupFieldNames.IsSentinel(value))
+                foreach (var (field, value) in snapshot.Values)
                 {
-                    return (field, value, snapshots[index].CapturedAt);
+                    if (VwGroupFieldNames.Matches(field, [candidate]) && !VwGroupFieldNames.IsSentinel(value))
+                    {
+                        return (field, value, snapshot.CapturedAt);
+                    }
                 }
             }
         }

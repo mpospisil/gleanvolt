@@ -291,4 +291,26 @@ public class VwGroupVehicleStateMapperTests
     }
 
 
+    [Fact]
+    public void WhereASnapshotCarriesTwoSpellingsTheListedPreferenceDecides()
+    {
+        // The candidate lists are ordered on purpose -- battery_level_HV.value leads because a real
+        // bundle carries it with its own .state beside it. That order used to decide nothing: within
+        // one snapshot the winner was whichever name the portal serialised first, which is the
+        // dictionary's business and not a preference at all.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                // Listed second in the vocabulary, and first here, which is the whole trap.
+                ["battery_state_report.soc"] = "60",
+                ["battery_level_HV.value"] = "69",
+            },
+            "report.json");
+
+        Assert.Equal(69, VwGroupVehicleStateMapper.Map([snapshot], "id4").State!.SocPercent);
+    }
+
+
 }
