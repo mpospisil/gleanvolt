@@ -152,13 +152,24 @@ else if (_reading is { Succeeded: true, State: { } state })
 {
     <h2>@_reading.Matched.Count field(s) this build recognised</h2>
 
+    <p class="muted">
+        Each with the moment the <em>car</em> reported it. A read merges several deliveries, so two
+        figures here can be hours apart — and comparing them without that is how a coarse reading and
+        a stale one get mistaken for each other.
+    </p>
+
     @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
        column sized to fit its own content. *@
     <dl class="fields">
-        @foreach (var (field, value) in _reading.Matched)
+        @foreach (var (field, reading) in _reading.Matched.OrderByDescending(entry => entry.Value.At))
         {
             <dt><code>@Breakable(field)</code></dt>
-            <dd>@(string.IsNullOrWhiteSpace(value) ? (MarkupString)"(empty)" : Breakable($"\"{value}\""))</dd>
+            <dd>
+                @(string.IsNullOrWhiteSpace(reading.Value)
+                    ? (MarkupString)"(empty)"
+                    : Breakable($"\"{reading.Value}\""))
+                <span class="muted">@reading.At.ToString("yyyy-MM-dd HH:mm")</span>
+            </dd>
         }
     </dl>
 }

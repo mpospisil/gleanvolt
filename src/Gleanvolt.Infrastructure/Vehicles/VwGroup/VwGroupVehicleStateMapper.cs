@@ -29,7 +29,7 @@ public sealed record VwGroupMappingResult(
     double? TargetSocPercent = null,
     double? OdometerKm = null,
     IReadOnlyList<string>? UnmappedFields = null,
-    IReadOnlyDictionary<string, string>? MatchedFields = null)
+    IReadOnlyDictionary<string, VehicleFieldReading>? MatchedFields = null)
 {
     public IReadOnlyList<string> UnmappedFields { get; init; } = UnmappedFields ?? [];
 
@@ -43,8 +43,8 @@ public sealed record VwGroupMappingResult(
     /// and the unmapped list alone cannot tell them apart, which is a week of wondering of exactly the
     /// kind that list exists to prevent.</para>
     /// </summary>
-    public IReadOnlyDictionary<string, string> MatchedFields { get; init; } =
-        MatchedFields ?? new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, VehicleFieldReading> MatchedFields { get; init; } =
+        MatchedFields ?? new Dictionary<string, VehicleFieldReading>();
 }
 
 /// <summary>
@@ -230,7 +230,7 @@ public static class VwGroupVehicleStateMapper
     /// value — sentinels included, verbatim and untouched, because a value of <c>""</c> or
     /// <c>"invalid"</c> is precisely what this is here to show.
     /// </summary>
-    private static Dictionary<string, string> Matched(List<VwGroupSnapshot> snapshots)
+    private static Dictionary<string, VehicleFieldReading> Matched(List<VwGroupSnapshot> snapshots)
     {
         string[][] known =
         [
@@ -239,7 +239,7 @@ public static class VwGroupVehicleStateMapper
             VwGroupFieldNames.PlugState, .. VwGroupFieldNames.KnownButUnused,
         ];
 
-        var matched = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var matched = new Dictionary<string, VehicleFieldReading>(StringComparer.OrdinalIgnoreCase);
 
         // Oldest first, so the last write per name is the newest value -- the same rule the readings
         // themselves follow.
@@ -249,7 +249,7 @@ public static class VwGroupVehicleStateMapper
             {
                 if (known.Any(candidates => VwGroupFieldNames.Matches(field, candidates)))
                 {
-                    matched[field] = value;
+                    matched[field] = new VehicleFieldReading(value, snapshot.CapturedAt);
                 }
             }
         }

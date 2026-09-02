@@ -56,10 +56,9 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly bool _mqttFeedConfigured;
 
     /// <param name="vehicleOptions">
-    /// The MQTT feed's settings, read for one line of log and nothing else. With a manufacturer
-    /// service running, the composition root does not subscribe the MQTT worker at all -- so an
-    /// installation whose <c>Vehicle:Enabled</c> is still true has a feed that has silently stopped
-    /// being used, and silence is the one way that must not be reported.
+    /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
+    /// both feeds should be told so at startup, because "two sources, newest wins" is worth knowing
+    /// before you wonder why the card sometimes moves between readings.
     /// </param>
     public VehicleUpdateWorker(
         IEnumerable<IVehicleUpdateService> services,
@@ -88,9 +87,9 @@ public sealed class VehicleUpdateWorker : BackgroundService
         if (_mqttFeedConfigured)
         {
             _logger.LogInformation(
-                "Vehicle:Enabled is on and the MQTT vehicle feed is not subscribed: a manufacturer "
-                + "update service is configured and owns the reading. Two sources writing to one "
-                + "holder is a race, so the manufacturer's wins.");
+                "Both vehicle feeds are on: the MQTT topic and the manufacturer's own service. They "
+                + "write to one holder and the newest reading wins, so whichever saw the car most "
+                + "recently is what the dashboard shows.");
         }
 
         await Task.WhenAll(_services.Select(service => RunAsync(service, stoppingToken))).ConfigureAwait(false);
@@ -115,13 +114,16 @@ public sealed class VehicleUpdateWorker : BackgroundService
                     // A rejected fetch deliberately leaves the previous reading in place: "the reading
                     // is getting older" is diagnosable, whereas blanking it looks exactly like having
                     // no car at all. Same rule the MQTT feed follows (#73).
-                    _holder.Set(state);
+                    var taken = _holder.Set(state);
 
                     _logger.LogInformation(
                         "{Manufacturer} read {Vehicle}: SOC={Soc}% charge={ChargeState} plug={PlugState} "
-                        + "captured {CapturedAt:O}.",
+                        + "captured {CapturedAt:O}.{Ignored}",
                         service.Manufacturer, service.VehicleId, state.SocPercent, state.ChargeState,
-                        state.PlugState, state.CapturedAt);
+                        state.PlugState, state.CapturedAt,
+                        // Not a fault and worth saying: on an installation running both feeds this is
+                        // the line that explains why the card did not move.
+                        taken ? string.Empty : " Another feed holds a newer reading, so this one stands.");
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

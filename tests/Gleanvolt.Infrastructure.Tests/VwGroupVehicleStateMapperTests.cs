@@ -255,8 +255,8 @@ public class VwGroupVehicleStateMapperTests
         // Recognised by leaf, and its value shown raw: "invalid" is a sentinel, which is why nothing
         // came of it, and seeing the word is the difference between adding a name and accepting that
         // the car sent nothing.
-        Assert.Equal("invalid", result.MatchedFields["charging_state_report.charging_state"]);
-        Assert.Equal("24680", result.MatchedFields["mileage.value"]);
+        Assert.Equal("invalid", result.MatchedFields["charging_state_report.charging_state"].Value);
+        Assert.Equal("24680", result.MatchedFields["mileage.value"].Value);
 
         // And the two lists stay disjoint: a field is either recognised or listed as unrecognised.
         Assert.Contains("settings.auto_unlock_ac", result.UnmappedFields);
@@ -283,7 +283,7 @@ public class VwGroupVehicleStateMapperTests
 
         var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
 
-        Assert.Equal("41.2", result.MatchedFields["energy_contents.current_energy_content.physical_value"]);
+        Assert.Equal("41.2", result.MatchedFields["energy_contents.current_energy_content.physical_value"].Value);
         Assert.DoesNotContain("energy_contents.current_energy_content.physical_value", result.UnmappedFields);
 
         // Seen, and still not read: nothing here invents a state of charge out of them yet.

@@ -75,12 +75,17 @@ public class VehicleFeedRegistrationTests
     }
 
     [Fact]
-    public async Task Switched_on_it_serves_the_configured_car_and_the_MQTT_feed_stands_down()
+    public async Task Switched_on_it_serves_the_configured_car_and_the_MQTT_feed_keeps_running()
     {
+        // Both feeds run, and VehicleStateHolder keeps whichever reading is newest. This used to
+        // exclude the MQTT worker outright, on the issue's "the manufacturer service wins" -- until
+        // the reference install showed the portal's state of charge to be coarser and later than the
+        // same manufacturer's app API arriving over MQTT. Which source is better is a fact about a car
+        // and a moment, not something a registration can be right about once.
         var services = Services(
             Credentials.Concat(TheCar).Concat([("Vehicle:DataAct:Enabled", "true")]).ToArray());
 
-        Assert.False(Registers<VehicleMqttWorker>(services));
+        Assert.True(Registers<VehicleMqttWorker>(services));
 
         await using var provider = services.BuildServiceProvider();
         var feed = provider.GetRequiredService<IVehicleUpdateService>();
@@ -104,7 +109,6 @@ public class VehicleFeedRegistrationTests
         {
             var services = Services(Credentials.Concat(TheCar).ToArray());
 
-            Assert.False(Registers<VehicleMqttWorker>(services));
             Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
         }
         finally

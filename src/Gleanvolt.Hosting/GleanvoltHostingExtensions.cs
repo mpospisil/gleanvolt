@@ -493,15 +493,19 @@ public static class GleanvoltHostingExtensions
         // anything is registered, because it is what settles which of two feeds owns the holder.
         var manufacturerFeed = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration);
 
-        // "If both sources are on, the manufacturer service wins" -- and the only honest way to make one
-        // win over a last-write-wins holder is for the other not to be subscribed at all. Neither worker
-        // is changed to know about the other: precedence between two sources is a composition decision,
-        // so it is taken once, here. VehicleUpdateWorker says so in the log at startup, which is where
-        // an operator whose MQTT feed has gone quiet will look.
-        if (!manufacturerFeed)
-        {
-            services.AddHostedService<VehicleMqttWorker>();
-        }
+        // Both feeds may run, and the freshest reading wins.
+        //
+        // This started as "the manufacturer service wins, so do not subscribe the other at all" --
+        // the only way to make one win over a holder that took whatever arrived last. The reference
+        // install then showed why picking a winner in advance is the wrong shape: the portal's state
+        // of charge for that car is coarser and lags, while the same manufacturer's app API through
+        // Home Assistant is live to the percent. Whichever source is better is a fact about a car and
+        // a moment, not something a configuration file can be right about once.
+        //
+        // So VehicleStateHolder keeps the reading with the newest capture time and both workers write
+        // to it. A feed that stops stops advancing, so the other takes over within one reading and
+        // precedence corrects itself.
+        services.AddHostedService<VehicleMqttWorker>();
 
         // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
         // (issues #137/#139). Registered unconditionally, like the holder above and for the same

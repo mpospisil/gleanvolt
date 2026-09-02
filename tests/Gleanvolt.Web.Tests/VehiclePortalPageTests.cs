@@ -15,6 +15,9 @@ namespace Gleanvolt.Web.Tests;
 /// </summary>
 public class VehiclePortalPageTests : PageTest
 {
+    /// <summary>When the car reported a diagnostic field, for the tests that show one.</summary>
+    private static readonly DateTimeOffset Reported = new(2026, 9, 2, 10, 29, 46, TimeSpan.Zero);
+
     private static EvInfo Car() => new(
         "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
 
@@ -171,10 +174,10 @@ public class VehiclePortalPageTests : PageTest
             "the bundle was read and none of its 47 field(s) are ones this build recognises",
             worthRetrying: false,
             unmapped: ["settings.auto_unlock_ac"],
-            matched: new Dictionary<string, string>
+            matched: new Dictionary<string, VehicleFieldReading>
             {
-                ["charging_state_report.charging_state"] = "invalid",
-                ["mileage.value"] = "24680",
+                ["charging_state_report.charging_state"] = new("invalid", Reported),
+                ["mileage.value"] = new("24680", Reported),
             })));
 
         page.Find("#portal-read").Click();
@@ -241,9 +244,9 @@ public class VehiclePortalPageTests : PageTest
         // a joint instead of mid-word.
         var page = Render(new StubReader(VehiclePortalReading.Failed(
             "UnusableData", "nothing recognised", worthRetrying: false,
-            matched: new Dictionary<string, string>
+            matched: new Dictionary<string, VehicleFieldReading>
             {
-                ["energy_contents.maximal_energy_content.physical_value"] = "738.0",
+                ["energy_contents.maximal_energy_content.physical_value"] = new("738.0", Reported),
             })));
 
         page.Find("#portal-read").Click();
@@ -260,7 +263,10 @@ public class VehiclePortalPageTests : PageTest
         // text, so the encoding is pinned rather than assumed.
         var page = Render(new StubReader(VehiclePortalReading.Failed(
             "UnusableData", "nothing recognised", worthRetrying: false,
-            matched: new Dictionary<string, string> { ["<script>alert(1)</script>"] = "<b>x</b>" })));
+            matched: new Dictionary<string, VehicleFieldReading>
+            {
+                ["<script>alert(1)</script>"] = new("<b>x</b>", Reported),
+            })));
 
         page.Find("#portal-read").Click();
 
