@@ -97,7 +97,15 @@ else if (_reading is { Succeeded: true, State: { } state })
         The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago is
         normal and not a fault — its state of charge does not drift.
     </p>
+}
 
+@*
+    The delivery itself, shown whether the mapping succeeded or not: how many snapshots arrived and
+    what they span is how "this quarter-hour said nothing" is told apart from "the portal handed us
+    one report type and the battery is in another delivery". On a failure it is half the diagnosis.
+*@
+@if (_reading is { SnapshotCount: > 0 })
+{
     <h2>The delivery</h2>
 
     <dl class="facts">
@@ -125,7 +133,6 @@ else if (_reading is { Succeeded: true, State: { } state })
         let a plan refuse an impossible battery target, deferred on
         <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
     </p>
-
 }
 
 @*

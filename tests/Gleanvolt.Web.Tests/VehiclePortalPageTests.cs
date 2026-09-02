@@ -202,4 +202,30 @@ public class VehiclePortalPageTests : PageTest
     }
 
 
+    [Fact]
+    public void The_delivery_is_described_even_when_nothing_could_be_mapped_out_of_it()
+    {
+        // How many snapshots arrived and what they span is how "this quarter-hour said nothing" is
+        // told apart from "the portal handed us one report type and the battery is in another
+        // delivery". On a failure that is half the diagnosis, so it cannot live in the success branch.
+        var page = Render(new StubReader(new VehiclePortalReading(
+            Succeeded: false,
+            Vehicle: "…1234",
+            SnapshotCount: 3,
+            OldestSnapshot: new DateTimeOffset(2026, 9, 2, 9, 59, 0, TimeSpan.Zero),
+            NewestSnapshot: new DateTimeOffset(2026, 9, 2, 10, 29, 0, TimeSpan.Zero),
+            OdometerKm: 53065,
+            TargetSocPercent: 80,
+            FailureKind: "UnusableData",
+            Message: "none of its 47 field(s) are ones this build recognises")));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("The delivery", page.Markup);
+        Assert.Contains("…1234", page.Markup);
+        Assert.Contains("53065", page.Markup);
+        Assert.Contains("80%", page.Markup);
+    }
+
+
 }

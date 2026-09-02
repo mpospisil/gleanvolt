@@ -264,4 +264,31 @@ public class VwGroupVehicleStateMapperTests
     }
 
 
+    [Fact]
+    public void TheBatterysEnergyContentIsRecognisedSoItCanBeSeen()
+    {
+        // The reference ID.4's delivery carries no state of charge at all; these two are the only
+        // battery figures in it. Recognised rather than read: whether a percentage should be divided
+        // out of them is a decision about what SocPercent means, and it wants the numbers in front of
+        // somebody first.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["energy_contents.current_energy_content.physical_value"] = "41.2",
+                ["energy_contents.maximal_energy_content.physical_value"] = "77",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.Equal("41.2", result.MatchedFields["energy_contents.current_energy_content.physical_value"]);
+        Assert.DoesNotContain("energy_contents.current_energy_content.physical_value", result.UnmappedFields);
+
+        // Seen, and still not read: nothing here invents a state of charge out of them yet.
+        Assert.Null(result.State);
+    }
+
+
 }

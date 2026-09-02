@@ -74,11 +74,22 @@ public sealed class VwGroupPortalReader(
                     "The VW portal read of {Vehicle} produced no usable reading: {Reason}",
                     vehicle.MaskedVin, mapped.Error);
 
+                // The delivery's own facts travel with the failure too: how many snapshots arrived and
+                // what they span is how you tell "this quarter-hour said nothing" from "the portal is
+                // handing us one report type and the battery is in another delivery".
                 return VehiclePortalReading.Failed(
                     nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false,
                     unmapped: mapped.UnmappedFields,
                     matched: mapped.MatchedFields,
-                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields);
+                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields) with
+                {
+                    Vehicle = vehicle.MaskedVin,
+                    SnapshotCount = snapshots.Count,
+                    OldestSnapshot = snapshots[0].CapturedAt,
+                    NewestSnapshot = snapshots[^1].CapturedAt,
+                    TargetSocPercent = mapped.TargetSocPercent,
+                    OdometerKm = mapped.OdometerKm,
+                };
             }
 
             _logger.LogInformation(

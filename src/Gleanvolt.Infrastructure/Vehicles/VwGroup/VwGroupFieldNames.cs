@@ -108,10 +108,28 @@ public static class VwGroupFieldNames
     ];
 
     /// <summary>
+    /// The HV battery's energy content, as the portal reports it — what is in the pack now, and what
+    /// the pack holds full.
+    ///
+    /// <para><b>Recognised so it can be seen, not yet read.</b> The reference ID.4's delivery carries
+    /// no state of charge at all, and these two are the only battery figures in it: a percentage
+    /// follows from the pair by division, and nothing else in the bundle offers one. Whether to make
+    /// that division is a decision about what <c>SocPercent</c> means — the car's own number against
+    /// one we computed — and it wants the values in front of somebody first, which is exactly what
+    /// listing them here achieves.</para>
+    /// </summary>
+    public static readonly string[] EnergyContentKWh =
+    [
+        "energy_contents.current_energy_content.physical_value",
+        "energy_contents.maximal_energy_content.physical_value",
+        "current_energy_content", "maximal_energy_content",
+    ];
+
+    /// <summary>
     /// Fields the mapper knows about but does not put on a <c>VehicleState</c>. Listed so that
     /// "unmapped" means "nobody has looked at this" rather than "we chose not to".
     /// </summary>
-    public static readonly string[][] KnownButUnused = [Odometer, TargetSoc];
+    public static readonly string[][] KnownButUnused = [Odometer, TargetSoc, EnergyContentKWh];
 
     /// <summary>
     /// Values that mean "no reading", whatever field they appear in.
