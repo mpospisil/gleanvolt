@@ -1821,6 +1821,21 @@ faster achieves precisely nothing. No figure the host could pick would be right 
 that has to be woken up to answer, which is the reason the number lives in the service rather than in
 your file.
 
+**One reading is assembled from as many deliveries as it takes.** The portal sends *partial*
+deliveries — each carries the reports that changed — so the newest one on its own is a coin toss over
+which report type arrives. On the reference ID.4 it held the odometer, the charge target, the doors and
+the climate, and no state of charge at all, while the car's SOC was perfectly well known elsewhere at
+that moment. So a read takes the newest delivery and keeps merging older ones **only while the reading
+still has no state of charge**, up to four (`Vehicle:DataAct:MaxDatasetsPerRead`, an hour of a
+fifteen-minute request). A car whose newest delivery carries the battery costs exactly one download, as
+it always did.
+
+The merge needs no new rules — several snapshots, sentinels filtered first, newest real value wins is
+what the mapper already does — but it does make one thing load-bearing: a reading is dated by **the
+newest snapshot that actually contributed to it**, not by the newest one downloaded. A state of charge
+from 10:14 stamped with a 10:29 status report's clock would be a stale reading wearing a fresh face,
+and how fresh a reading is is the one thing this feed exists to let you judge.
+
 **It holds one session rather than replaying a password.** The button signs in afresh on every press,
 which is right by hand and wrong on a schedule — repeatedly replaying a password at a real identity
 provider is how accounts get locked. The feed keeps one session and signs in again only when the portal

@@ -20,6 +20,30 @@ public sealed record VwGroupVehicle(string Vin, string RequestId)
 }
 
 /// <summary>
+/// One completed read of the portal: the reading, and everything a page or a log line needs to
+/// explain it.
+/// </summary>
+/// <param name="Vehicle">Which car answered.</param>
+/// <param name="Mapping">The reading, or the reason there is none.</param>
+/// <param name="Snapshots">Every snapshot merged into it, oldest first.</param>
+/// <param name="Bundle">What the deliveries held that never became a snapshot.</param>
+/// <param name="DatasetsRead">How many deliveries were downloaded — one, unless merging was needed.</param>
+/// <param name="DatasetsAvailable">How many the portal was offering.</param>
+public sealed record VwGroupRead(
+    VwGroupVehicle Vehicle,
+    VwGroupMappingResult Mapping,
+    IReadOnlyList<VwGroupSnapshot> Snapshots,
+    VwGroupBundleReport Bundle,
+    int DatasetsRead,
+    int DatasetsAvailable);
+
+/// <summary>One delivery on offer: what to ask for, and when the portal made it.</summary>
+/// <param name="RequestId">The continuous data request it belongs to.</param>
+/// <param name="Name">The dataset's name, which the download takes as a header rather than a path.</param>
+/// <param name="CreatedOn">When the portal produced it, ISO-8601 and therefore sortable as text.</param>
+public sealed record VwGroupDataset(string RequestId, string Name, string CreatedOn);
+
+/// <summary>
 /// The second of the two classes that touch the network: find the car, find the data, fetch it
 /// (issue #139, steps 2–4), and hand the bytes to the pure mapper.
 ///
@@ -92,35 +116,125 @@ public sealed class VwGroupPortalClient
     /// </summary>
     public async Task<VwGroupMappingResult> GetVehicleStateAsync(CancellationToken cancellationToken = default)
     {
+        var read = await ReadAsync(cancellationToken).ConfigureAwait(false);
+
+        if (read.Mapping.State is null)
+        {
+            throw new VwGroupPortalException(VwGroupFailure.UnusableData, read.Mapping.Error!);
+        }
+
+        return read.Mapping;
+    }
+
+    /// <summary>
+    /// The whole read, with everything a diagnostic surface needs beside the reading itself: which
+    /// car answered, how many deliveries were merged to get here, what the bundles held that never
+    /// became a snapshot.
+    ///
+    /// <para><b>It merges deliveries, oldest values losing to newer ones.</b> A <c>partial</c>
+    /// delivery carries the reports that changed, so the newest one alone is a coin toss over which
+    /// report type arrives — the reference ID.4's newest delivery held doors, climate and settings and
+    /// no state of charge at all. Merging is free of new rules: the mapper already takes several
+    /// snapshots, filters sentinels first and lets the newest real value win, which is exactly what
+    /// assembling one car out of several deliveries requires.</para>
+    ///
+    /// <para><b>Adaptive, so the common case still costs one download.</b> Older deliveries are pulled
+    /// only while the merged reading still has no state of charge, and never more than
+    /// <see cref="VwGroupPortalOptions.MaxDatasetsPerRead"/> of them. A car whose newest delivery
+    /// carries the battery is one ZIP, exactly as before; a car like this one pays for as many as it
+    /// takes, up to the budget, and no more.</para>
+    ///
+    /// <para>Nothing here throws for an unmappable bundle: the reading comes back with its
+    /// <see cref="VwGroupMappingResult.Error"/> and the diagnostics that explain it, because the
+    /// surface that shows a failure is the surface that most needs the field lists.</para>
+    /// </summary>
+    public async Task<VwGroupRead> ReadAsync(CancellationToken cancellationToken = default)
+    {
         var vehicle = await GetVehicleAsync(cancellationToken).ConfigureAwait(false);
-        var (requestId, name) = await GetNewestDatasetAsync(vehicle, cancellationToken).ConfigureAwait(false);
-        var archive = await DownloadAsync(vehicle.Vin, requestId, name, cancellationToken).ConfigureAwait(false);
+        var datasets = await GetDatasetsAsync(vehicle, cancellationToken).ConfigureAwait(false);
 
-        if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var error))
+        var budget = Math.Max(1, _options.MaxDatasetsPerRead);
+        var snapshots = new List<VwGroupSnapshot>();
+        var bundles = new List<VwGroupBundleReport>();
+
+        VwGroupMappingResult? mapping = null;
+        string? firstError = null;
+        var read = 0;
+
+        foreach (var dataset in datasets.Take(budget))
         {
-            // #73's rule: present-but-unusable is a rejection, so the holder keeps its last good
-            // reading and its age visibly grows -- a diagnosable state rather than half-trusted junk.
-            throw new VwGroupPortalException(VwGroupFailure.UnusableData, error!);
+            var archive = await DownloadAsync(vehicle.Vin, dataset.RequestId, dataset.Name, cancellationToken)
+                .ConfigureAwait(false);
+
+            read++;
+
+            if (!VwGroupReportBundle.TryRead(archive, out var found, out var error, out var bundle))
+            {
+                // One unreadable delivery does not end the read: the next one down may be the whole
+                // answer, and a bundle that is not a ZIP is exactly the sort of thing a portal in its
+                // first year does once.
+                firstError ??= error;
+                bundles.Add(bundle);
+                continue;
+            }
+
+            bundles.Add(bundle);
+            snapshots.AddRange(found);
+
+            mapping = VwGroupVehicleStateMapper.Map(
+                [.. snapshots.OrderBy(snapshot => snapshot.CapturedAt)], vehicle.MaskedVin);
+
+            if (mapping.State is { SocPercent: not null })
+            {
+                // The reading the feed exists for. Everything else is welcome and none of it is worth
+                // another ZIP over a domestic uplink.
+                break;
+            }
+
+            if (read < Math.Min(budget, datasets.Count))
+            {
+                _logger.LogDebug(
+                    "The VW portal's delivery {Read} of {Available} carried no state of charge; "
+                    + "merging the one before it.",
+                    read, datasets.Count);
+            }
         }
 
-        var result = VwGroupVehicleStateMapper.Map(snapshots, vehicle.MaskedVin);
+        mapping ??= new VwGroupMappingResult(
+            null,
+            firstError ?? "the delivery held nothing that could be read");
 
-        if (result.State is null)
-        {
-            throw new VwGroupPortalException(VwGroupFailure.UnusableData, result.Error!);
-        }
-
-        if (result.UnmappedFields.Count > 0)
+        if (mapping.UnmappedFields.Count > 0)
         {
             // Not a failure, and worth one line: the portal's vocabulary was written down from a
             // description rather than a capture, and this is how the gap announces itself.
             _logger.LogDebug(
                 "The VW portal sent {Count} field(s) nothing here reads: {Fields}.",
-                result.UnmappedFields.Count, string.Join(", ", result.UnmappedFields));
+                mapping.UnmappedFields.Count, string.Join(", ", mapping.UnmappedFields));
         }
 
-        return result;
+        return new VwGroupRead(
+            vehicle,
+            mapping,
+            [.. snapshots.OrderBy(snapshot => snapshot.CapturedAt)],
+            Merge(bundles),
+            read,
+            datasets.Count);
     }
+
+    /// <summary>One report out of several bundles', because a merged read has several.</summary>
+    private static VwGroupBundleReport Merge(List<VwGroupBundleReport> bundles) =>
+        bundles.Count == 0
+            ? VwGroupBundleReport.None
+            : new VwGroupBundleReport(
+                bundles.Sum(bundle => bundle.Members),
+                bundles.Sum(bundle => bundle.Reports),
+                bundles.Sum(bundle => bundle.Undated),
+                bundles.Sum(bundle => bundle.Empty),
+                [.. bundles.SelectMany(bundle => bundle.UndatedFields)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .Take(60)]);
 
     /// <summary>
     /// The identifier of this car's continuous data request, which every delivery URL hangs off.
@@ -221,6 +335,23 @@ public sealed class VwGroupPortalClient
     public async Task<(string RequestId, string Name)> GetNewestDatasetAsync(
         VwGroupVehicle vehicle, CancellationToken cancellationToken = default)
     {
+        var datasets = await GetDatasetsAsync(vehicle, cancellationToken).ConfigureAwait(false);
+
+        return (datasets[0].RequestId, datasets[0].Name);
+    }
+
+    /// <summary>
+    /// Every dataset on offer for this car, <b>newest first</b>.
+    ///
+    /// <para>Plural because a delivery is not a snapshot of the car: the portal sends <c>partial</c>
+    /// deliveries, and a given quarter-hour's may carry the doors, the climate and the settings and
+    /// no battery at all. Taking only the newest is then a coin toss over which report type you get,
+    /// which is exactly what the reference ID.4 produced — 47 fields, a real odometer and target SOC,
+    /// and no state of charge anywhere in it.</para>
+    /// </summary>
+    public async Task<IReadOnlyList<VwGroupDataset>> GetDatasetsAsync(
+        VwGroupVehicle vehicle, CancellationToken cancellationToken = default)
+    {
         var requestId = string.IsNullOrWhiteSpace(vehicle.RequestId)
             ? await GetDataRequestIdAsync(vehicle.Vin, cancellationToken).ConfigureAwait(false)
             : vehicle.RequestId;
@@ -231,8 +362,7 @@ public sealed class VwGroupPortalClient
         using var document = await GetJsonAsync(url, cancellationToken, PartialHeaders)
             .ConfigureAwait(false);
 
-        string? newest = null;
-        string? newestAt = null;
+        var datasets = new List<VwGroupDataset>();
 
         // Listed newest-first by the portal, but ordering is not something to inherit on trust when a
         // wrong choice silently ages every reading. createdOn is ISO-8601 and sorts as text.
@@ -243,23 +373,18 @@ public sealed class VwGroupPortalClient
                 continue;
             }
 
-            var createdAt = Text(element, ["createdOn", "created_on", "createdAt"]) ?? string.Empty;
-
-            if (newest is null || string.CompareOrdinal(createdAt, newestAt) > 0)
-            {
-                newest = name;
-                newestAt = createdAt;
-            }
+            datasets.Add(new VwGroupDataset(
+                requestId, name, Text(element, ["createdOn", "created_on", "createdAt"]) ?? string.Empty));
         }
 
-        if (newest is null)
+        if (datasets.Count == 0)
         {
             throw new VwGroupPortalException(
                 VwGroupFailure.NoDataAvailable,
                 $"vehicle {vehicle.MaskedVin} has a data request but no dataset to download yet");
         }
 
-        return (requestId, newest);
+        return [.. datasets.OrderByDescending(dataset => dataset.CreatedOn, StringComparer.Ordinal)];
     }
 
     /// <summary>The bundle itself. Bytes, because what to make of them is the pure mapper's business.</summary>

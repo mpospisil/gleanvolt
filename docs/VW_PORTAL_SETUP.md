@@ -57,6 +57,10 @@ Two things to expect:
   the feed stays `Degraded`, which is correct and not a bug.
 - **Fifteen minutes is the floor.** The portal is a batch delivery, not a live API. Polling more
   often than the request's own frequency achieves nothing whatsoever.
+- **A delivery is not a snapshot of the whole car.** These are *partial* deliveries: each carries the
+  reports that changed, so one may hold the doors, the climate and the settings and no battery at all.
+  The controller therefore merges the newest few — see [step 7](#step-7--switch-the-feed-on) — and
+  nothing you configure here changes that.
 
 ## Step 3 — Say which brand you drive
 
@@ -167,6 +171,14 @@ dashboard's vehicle card.
 It **holds one session** rather than signing in on every read, and signs in again only when the portal
 bounces it. It also times each session and logs how long it lasted, which is a question nobody could
 answer before: nothing had ever kept one.
+
+Each read takes the newest delivery and, **only if that one carries no state of charge**, merges the
+one before it, and so on up to four (an hour of a fifteen-minute request). That is not belt-and-braces:
+the reference car's newest delivery really did arrive with the odometer, the charge target, the doors
+and the climate in it and no battery reading at all. A delivery that does carry the battery costs
+exactly one download. A reading assembled this way is dated by the newest report that actually
+contributed to it, so a state of charge from forty minutes ago is shown as forty minutes old rather
+than as fresh.
 
 > **This stops the MQTT vehicle feed being subscribed.** Two sources writing one reading is a race, so
 > the manufacturer's service takes it and the controller says so in its startup log. If a Home

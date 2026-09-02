@@ -58,6 +58,40 @@ would abort a working sign-in — worse than the false negative it prevents.
 `NoDataAvailable` is deliberately on the other side of the line and does not even back off: a newly
 created data request takes hours to fill, and backing off would take hours more to notice that it had.
 
+### A reading is assembled from several deliveries, and dated by what contributed to it
+
+The first live read settled a question the fixtures could not. The portal's newest delivery for the
+reference ID.4 carried 47 fields — a real odometer (53,065), a real charge target (80), doors, windows,
+parking lights, climate consumption, charge-mode settings, error codes — and **no state of charge, no
+range, no plug state and no charging state**. Nothing was a sentinel and nothing was misspelled: the
+vocabulary matched what was there. The battery simply was not in that delivery.
+
+That is what `type: partial` means, and it had been read as "the newest delivery is the car". It is
+not: each delivery carries the reports that changed, so which report type you get is a coin toss.
+
+**So a read merges deliveries, and does it adaptively.** The newest first; older ones only while the
+merged reading still has no state of charge; never more than four, which is an hour of a fifteen-minute
+request and the span over which a parked car's SOC does not meaningfully move. A car whose newest
+delivery carries the battery downloads exactly one ZIP, as before — the budget is a ceiling, not a cost.
+Merging itself needed no new rules: several snapshots, sentinels filtered first, newest real value wins
+is what the mapper was already built to do, which is the whole reason #139 wrote those tie-breaks
+before anything needed them.
+
+**What merging did make load-bearing is the dating.** The mapper used to stamp a reading with the
+newest snapshot in the pile. Within one delivery that is minutes of slack and pedantic to argue about;
+across merged deliveries it is the difference between honest and not — a state of charge from 10:14
+carrying a 10:29 status report's clock is a stale reading wearing a fresh face, and freshness is the
+one thing this feed exists to let an owner judge. A reading is now dated by the newest snapshot that
+actually **contributed a value** to it.
+
+**And the diagnostics grew the half they were missing.** The unrecognised-names list answers "what did
+you not read", and on its own it cannot distinguish "the bundle never carried that field" from "it
+carried it and the value was a sentinel" — opposite problems with opposite fixes. Both surfaces now
+also report what *was* recognised, with each field's raw value, quoted. The same reasoning applies to a
+report dropped for having no timestamp: it used to vanish whole, taking its field names out of the
+unrecognised list too, so a battery report under an unfamiliar timestamp spelling looked exactly like a
+bundle that never carried a battery.
+
 ### The session is held — reversing #139's "sign in afresh every time"
 
 The on-demand reader builds a cookie jar per press, and #139 recorded why: a held session that has

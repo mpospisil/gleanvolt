@@ -67,6 +67,19 @@ public sealed class VwGroupPortalOptions
     public string Vin { get; init; } = string.Empty;
 
     /// <summary>
+    /// How many deliveries one read may merge before it gives up on finding a state of charge.
+    ///
+    /// <para><b>Four is an hour of a fifteen-minute request</b>, which is the span over which a
+    /// parked car's SOC does not meaningfully move — so a value assembled from within it is worth
+    /// having, and one from further back is a number better left absent than quoted fresh.</para>
+    ///
+    /// <para>It is a ceiling, not a cost: deliveries are pulled only while the merged reading still
+    /// lacks a state of charge, so a car whose newest delivery carries the battery downloads exactly
+    /// one ZIP, as it always did.</para>
+    /// </summary>
+    public int MaxDatasetsPerRead { get; init; } = 4;
+
+    /// <summary>
     /// How long any single HTTP exchange may take. The portal is a batch delivery rather than a live
     /// API, and a download is a ZIP over a domestic uplink, so this is generous by the standards of
     /// the rest of this codebase.

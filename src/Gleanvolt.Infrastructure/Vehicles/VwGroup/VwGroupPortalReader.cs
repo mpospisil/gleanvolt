@@ -49,20 +49,22 @@ public sealed class VwGroupPortalReader(
 
         try
         {
-            var vehicle = await client.GetVehicleAsync(cancellationToken).ConfigureAwait(false);
-            var (requestId, name) = await client.GetNewestDatasetAsync(vehicle, cancellationToken)
-                .ConfigureAwait(false);
-            var archive = await client.DownloadAsync(vehicle.Vin, requestId, name, cancellationToken)
-                .ConfigureAwait(false);
+            // The same read the feed makes, merge and all: one code path, so the button cannot prove
+            // something the service does differently. What this adds is the reporting.
+            var read = await client.ReadAsync(cancellationToken).ConfigureAwait(false);
+            var mapped = read.Mapping;
 
-            if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var bundleError, out var bundle))
+            var notes = new List<string>();
+
+            if (read.DatasetsRead > 1)
             {
-                return VehiclePortalReading.Failed(
-                    nameof(VwGroupFailure.UnusableData), bundleError!, worthRetrying: false,
-                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields);
+                notes.Add(
+                    $"{read.DatasetsRead} of the portal's {read.DatasetsAvailable} deliveries were "
+                    + "merged: a partial delivery carries only the reports that changed, so the newest "
+                    + "one alone need not hold the battery.");
             }
 
-            var mapped = VwGroupVehicleStateMapper.Map(snapshots, vehicle.MaskedVin);
+            notes.AddRange(Notes(read.Bundle));
 
             if (mapped.State is null)
             {
@@ -70,45 +72,49 @@ public sealed class VwGroupPortalReader(
                 // and the reason is the diagnosis. The unrecognised names travel with it, because the
                 // commonest reason to be here is a vocabulary that matched nothing -- and then the
                 // list *is* the fix.
+                //
+                // The delivery's own facts travel too: how many snapshots arrived and what they span
+                // is how you tell "this quarter-hour said nothing" from "the battery is in another
+                // delivery".
                 _logger.LogWarning(
                     "The VW portal read of {Vehicle} produced no usable reading: {Reason}",
-                    vehicle.MaskedVin, mapped.Error);
+                    read.Vehicle.MaskedVin, mapped.Error);
 
-                // The delivery's own facts travel with the failure too: how many snapshots arrived and
-                // what they span is how you tell "this quarter-hour said nothing" from "the portal is
-                // handing us one report type and the battery is in another delivery".
                 return VehiclePortalReading.Failed(
                     nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false,
                     unmapped: mapped.UnmappedFields,
                     matched: mapped.MatchedFields,
-                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields) with
+                    diagnostics: notes,
+                    dropped: read.Bundle.UndatedFields) with
                 {
-                    Vehicle = vehicle.MaskedVin,
-                    SnapshotCount = snapshots.Count,
-                    OldestSnapshot = snapshots[0].CapturedAt,
-                    NewestSnapshot = snapshots[^1].CapturedAt,
+                    Vehicle = read.Vehicle.MaskedVin,
+                    SnapshotCount = read.Snapshots.Count,
+                    OldestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[0].CapturedAt : null,
+                    NewestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[^1].CapturedAt : null,
                     TargetSocPercent = mapped.TargetSocPercent,
                     OdometerKm = mapped.OdometerKm,
                 };
             }
 
             _logger.LogInformation(
-                "Read {Vehicle} from the VW portal: {Snapshots} snapshot(s), {Unmapped} unrecognised field(s).",
-                vehicle.MaskedVin, snapshots.Count, mapped.UnmappedFields.Count);
+                "Read {Vehicle} from the VW portal: {Datasets} delivery/deliveries, {Snapshots} "
+                + "snapshot(s), {Unmapped} unrecognised field(s).",
+                read.Vehicle.MaskedVin, read.DatasetsRead, read.Snapshots.Count,
+                mapped.UnmappedFields.Count);
 
             return new VehiclePortalReading(
                 Succeeded: true,
                 State: mapped.State,
-                Vehicle: vehicle.MaskedVin,
-                SnapshotCount: snapshots.Count,
-                OldestSnapshot: snapshots[0].CapturedAt,
-                NewestSnapshot: snapshots[^1].CapturedAt,
+                Vehicle: read.Vehicle.MaskedVin,
+                SnapshotCount: read.Snapshots.Count,
+                OldestSnapshot: read.Snapshots[0].CapturedAt,
+                NewestSnapshot: read.Snapshots[^1].CapturedAt,
                 TargetSocPercent: mapped.TargetSocPercent,
                 OdometerKm: mapped.OdometerKm,
                 UnmappedFields: mapped.UnmappedFields,
                 MatchedFields: mapped.MatchedFields,
-                Diagnostics: Notes(bundle),
-                DroppedFields: bundle.UndatedFields);
+                Diagnostics: notes,
+                DroppedFields: read.Bundle.UndatedFields);
         }
         catch (VwGroupPortalException failure)
         {

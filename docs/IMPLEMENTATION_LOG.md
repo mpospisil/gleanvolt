@@ -30,6 +30,12 @@ Reverse-chronological. Newest entry at the top.
   card, a `Car feed` row on **Health**, and a **warning** repeated every six hours in the log.
 - A one-time-code page is recognised **structurally** as well as by its prose: `OneTimeCodeField` on
   the login form, checked before the prose needles.
+- **A read merges deliveries** (`VwGroupPortalClient.ReadAsync`): newest first, older ones only while
+  the reading still has no SOC, capped by `Vehicle:DataAct:MaxDatasetsPerRead` (4). The button and the
+  feed share the one path.
+- A reading is dated by the newest snapshot that **contributed** to it, not by the newest downloaded.
+- Both surfaces report what was recognised *and* its raw value, the reports dropped as undated with
+  their field names, and the delivery's own facts on a failure as well as on a success.
 
 ### Things worth knowing
 
@@ -78,6 +84,18 @@ Reverse-chronological. Newest entry at the top.
   did before this existed — with a test that says so.
 - **A blocked feed does not resume without a restart.** Deliberate: the thing that would make it resume
   is a human clearing a screen, and the button is how that is checked.
+
+### What the first live read settled
+
+- The reference ID.4's newest delivery: **47 fields, 2 recognised** — `mileage.value` 53,065 and
+  `settings.target_soc` 80, both real values, neither a sentinel. No SOC, no range, no plug state, no
+  charging state anywhere in it. The vocabulary was not the problem; the *delivery* was.
+- The four fields in neither list are `car_captured_time` per report section, which the unrecognised
+  list excludes by design. Everything is accounted for.
+- `energy_contents.current_energy_content` and its maximal sibling are the only battery figures such a
+  delivery carries. They are now **recognised so their values show, and deliberately not read**:
+  dividing one by the other puts a number we computed where the car's own belongs, and that decision
+  wants the two figures in front of somebody first.
 
 ### Verification performed
 

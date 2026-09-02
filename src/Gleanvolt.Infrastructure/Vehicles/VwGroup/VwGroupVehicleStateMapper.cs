@@ -134,8 +134,25 @@ public static class VwGroupVehicleStateMapper
         // populated -- either way the bigger number is the true one.
         var odometer = Largest(ordered, VwGroupFieldNames.Odometer);
 
+        // Dated by the newest snapshot that actually CONTRIBUTED a value, not by the newest snapshot
+        // in the pile.
+        //
+        // Within one delivery the two are minutes apart and the distinction is pedantic. Across
+        // merged deliveries it is the difference between honest and not: a state of charge assembled
+        // from an hour-old report, stamped with a two-minute-old status report's clock, is a stale
+        // reading wearing a fresh face -- and freshness is the one thing this feed exists to let
+        // somebody judge. Falls back to the newest snapshot only when nothing contributed at all,
+        // which is the rejection path below.
+        var contributedAt = NewestContribution(
+            ordered,
+            soc is not null ? VwGroupFieldNames.StateOfCharge : null,
+            range is not null ? VwGroupFieldNames.RangeKm : null,
+            minutes is not null ? VwGroupFieldNames.ChargeTimeRemaining : null,
+            VwGroupFieldNames.ChargeState,
+            VwGroupFieldNames.PlugState);
+
         var state = new VehicleState(
-            capturedAt,
+            contributedAt ?? capturedAt,
             soc,
             range,
             minutes is { } value ? TimeSpan.FromMinutes(value) : null,
@@ -174,6 +191,27 @@ public static class VwGroupVehicleStateMapper
         }
 
         return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped, matched);
+    }
+
+    /// <summary>
+    /// When the newest of these fields was actually reported. Nulls are skipped, so a field that
+    /// produced nothing cannot date a reading it did not contribute to.
+    /// </summary>
+    private static DateTimeOffset? NewestContribution(List<VwGroupSnapshot> ordered, params string[]?[] groups)
+    {
+        DateTimeOffset? newest = null;
+
+        foreach (var candidates in groups)
+        {
+            if (candidates is not null
+                && Latest(ordered, candidates) is { } found
+                && (newest is null || found.At > newest))
+            {
+                newest = found.At;
+            }
+        }
+
+        return newest;
     }
 
     /// <summary>
@@ -371,8 +409,12 @@ public static class VwGroupVehicleStateMapper
         return fallback;
     }
 
-    /// <summary>The newest snapshot in which one of these names carried something that is not a sentinel.</summary>
-    private static (string Field, string Value)? Latest(List<VwGroupSnapshot> snapshots, string[] candidates)
+    /// <summary>
+    /// The newest snapshot in which one of these names carried something that is not a sentinel, with
+    /// <b>when that snapshot was taken</b> — which is what the reading has to be dated by.
+    /// </summary>
+    private static (string Field, string Value, DateTimeOffset At)? Latest(
+        List<VwGroupSnapshot> snapshots, string[] candidates)
     {
         for (var index = snapshots.Count - 1; index >= 0; index--)
         {
@@ -380,7 +422,7 @@ public static class VwGroupVehicleStateMapper
             {
                 if (VwGroupFieldNames.Matches(field, candidates) && !VwGroupFieldNames.IsSentinel(value))
                 {
-                    return (field, value);
+                    return (field, value, snapshots[index].CapturedAt);
                 }
             }
         }
