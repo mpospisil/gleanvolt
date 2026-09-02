@@ -180,10 +180,52 @@ exactly one download. A reading assembled this way is dated by the newest report
 contributed to it, so a state of charge from forty minutes ago is shown as forty minutes old rather
 than as fresh.
 
-> **This stops the MQTT vehicle feed being subscribed.** Two sources writing one reading is a race, so
-> the manufacturer's service takes it and the controller says so in its startup log. If a Home
-> Assistant automation was publishing to the vehicle topic, it is now doing nothing — stop it, or leave
-> it and know which one is live.
+> **Both feeds now run, and the freshest reading wins.** This used to stop the MQTT feed being
+> subscribed at all — one holder, one writer, no race — until the reference install showed the portal's
+> state of charge for that car to be coarser and later than the same manufacturer's app API arriving
+> through Home Assistant. Which source is better is a fact about a car and a moment, not something a
+> configuration file can settle once. So both write to one reading, whichever saw the car most recently
+> is kept, and the controller says at startup when both are on. The dashboard names which feed the
+> reading on screen came from.
+
+## Step 8 — Leave both on for a week, then hand over
+
+Do not switch the old feed off on the day you switch this one on. Run them together and decide on what
+they actually delivered.
+
+Open **`/vehicle-feeds`** in the web UI. It counts, per feed:
+
+- **Cadence** — deliveries (a reading whose capture time that feed had not produced before), repeats,
+  and the shortest, mean and longest interval between them, with the intervals also counted into bands.
+  Does the portal hold the fifteen minutes it claims, or does it drop out?
+- **Agreement** — where the two feeds' capture times land within half an hour of each other, the signed
+  difference between their states of charge. Read the **parked** row: a parked car's SOC does not
+  drift, so a difference there means one of the two is being read wrong. A difference measured across
+  twenty minutes of charging is just the car charging.
+- **Coverage** — the share of deliveries carrying each field. A field that never arrives is a
+  supported answer, not a fault, but it is an answer worth having written down.
+- **Survival** — reads of attempts, and **sign-ins**: one, however long the controller has been up, is
+  the healthy answer. More means portal sessions are expiring. Also whether the car's own **target
+  SOC** ever arrives.
+
+Everything on that page is **since the controller started**, on purpose: it is measuring an unattended
+run, and a gap that spans a restart is the restart rather than the feed. A week means a week without
+redeploying.
+
+When the week is boring, the handover is a setting:
+
+```bash
+VW_ENABLED=true          # leave the portal feed on
+Vehicle__Enabled=false   # stop subscribing to the MQTT topic
+```
+
+…and stop the Home Assistant automation that was publishing to it. **Nothing is deleted.** The MQTT
+worker, its payload contract and its settings all stay, so if the portal disappoints next month the old
+feed is one line away — and it remains the answer for any car nobody has written a service for.
+
+If the week is *not* boring — sessions expiring daily, gaps of hours, a state of charge that disagrees
+with Home Assistant's by a steady margin — that is a result too. Write it down, stay on MQTT, and do
+not hand over because a document said to.
 
 ### When it needs you
 

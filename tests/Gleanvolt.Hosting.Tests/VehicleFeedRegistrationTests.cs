@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -96,6 +97,41 @@ public class VehicleFeedRegistrationTests
         // The portal button is untouched by any of this: it is what proves the credentials before the
         // feed is switched on, so it stays available on exactly the same terms.
         Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
+    }
+
+    [Fact]
+    public void The_week_is_counted_on_the_holder_the_feeds_write_to()
+    {
+        // Issue #141 measures both feeds against each other, and the readings the holder *discards*
+        // are half the measurement -- so the comparison has to be the holder's own, not a second one
+        // registered beside it that would never see them.
+        var services = Services(TheCar);
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Same(
+            provider.GetRequiredService<VehicleStateHolder>().Comparison,
+            provider.GetRequiredService<VehicleFeedComparison>());
+    }
+
+    [Fact]
+    public void An_unnamed_MQTT_reading_is_given_this_feed_s_name()
+    {
+        // The payload's "source" is optional (#73). Left unnamed, a reading would be filed under
+        // "unnamed" in the week's tally and the dashboard's "via ..." would stay blank for the feed
+        // that has been working since then.
+        var reading = VehicleMqttWorker.Label(new VehicleState(DateTimeOffset.UnixEpoch, SocPercent: 60));
+
+        Assert.Equal(VehicleMqttWorker.DefaultSourceId, reading.SourceId);
+    }
+
+    [Fact]
+    public void A_publisher_that_named_itself_keeps_its_name()
+    {
+        var reading = VehicleMqttWorker.Label(
+            new VehicleState(DateTimeOffset.UnixEpoch, SocPercent: 60, SourceId: "id4"));
+
+        Assert.Equal("id4", reading.SourceId);
     }
 
     [Fact]

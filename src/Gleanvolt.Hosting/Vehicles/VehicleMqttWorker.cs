@@ -36,6 +36,27 @@ public sealed class VehicleMqttWorker : BackgroundService
     private readonly string _topic;
 
     /// <summary>
+    /// What a reading off this topic is called when the publisher did not name it (issue #141).
+    ///
+    /// <para>The payload's <c>source</c> field is optional and the reference install fills it in, so
+    /// this is the fallback rather than the usual answer. It exists because the week of running both
+    /// feeds is counted <b>per source id</b>: an unnamed reading would be filed under "unnamed", which
+    /// says nothing about which of the two feeds it came from — and the dashboard's "via ..." would
+    /// stay blank for the one feed that has been working since #73.</para>
+    ///
+    /// <para>A label, and nothing more. Nothing dispatches on it, the parser is untouched, and the
+    /// MQTT path keeps working exactly as it did.</para>
+    /// </summary>
+    public const string DefaultSourceId = "mqtt";
+
+    /// <summary>
+    /// Gives a reading this feed's name when the publisher did not give it one. Nothing else about the
+    /// reading is touched; a payload that named itself keeps the name it chose.
+    /// </summary>
+    internal static VehicleState Label(VehicleState state) =>
+        string.IsNullOrWhiteSpace(state.SourceId) ? state with { SourceId = DefaultSourceId } : state;
+
+    /// <summary>
     /// The client id this worker connects with. Not namespaced by <c>Pv:Id</c> the way the Home
     /// Assistant worker's is — the machine is what distinguishes one subscriber here — so two
     /// controllers on one machine would collide. Shown on <c>/pv-system</c> (issue #143), which is how
@@ -148,20 +169,25 @@ public sealed class VehicleMqttWorker : BackgroundService
         }
 
         _lastError = null;
-        _holder.Set(state!);
+
+        // Named if the publisher did not name it, so that the reading can be told apart from the
+        // manufacturer feed's on the dashboard and in the week's tally (#141).
+        state = Label(state!);
+
+        _holder.Set(state);
 
         if (!_receivedAnything)
         {
             _receivedAnything = true;
             _logger.LogInformation(
                 "First vehicle reading from {Topic}: SOC={Soc}% charge={ChargeState} plug={PlugState} captured {CapturedAt:O}.",
-                e.ApplicationMessage.Topic, state!.SocPercent, state.ChargeState, state.PlugState, state.CapturedAt);
+                e.ApplicationMessage.Topic, state.SocPercent, state.ChargeState, state.PlugState, state.CapturedAt);
         }
         else
         {
             _logger.LogDebug(
                 "Vehicle reading: SOC={Soc}% charge={ChargeState} plug={PlugState} captured {CapturedAt:O}.",
-                state!.SocPercent, state.ChargeState, state.PlugState, state.CapturedAt);
+                state.SocPercent, state.ChargeState, state.PlugState, state.CapturedAt);
         }
 
         return Task.CompletedTask;

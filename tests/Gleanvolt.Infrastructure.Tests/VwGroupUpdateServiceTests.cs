@@ -200,6 +200,21 @@ public class VwGroupUpdateServiceTests
     }
 
     [Fact]
+    public async Task The_car_s_own_charge_limit_is_kept_even_though_the_reading_cannot_carry_it()
+    {
+        // VehicleState is exactly what #73 defined and target SOC is not one of its fields -- but #141
+        // has to answer whether settings.target_soc arrives at all, and this feed is the only thing
+        // that ever sees it. #101's impossible-target gate is what would eventually read it.
+        using var portal = new FakePortal();
+        using var service = Service(portal);
+
+        await service.FetchAsync(CancellationToken.None);
+
+        Assert.Equal(80, service.Diagnostics.TargetSocPercent);
+        Assert.Equal(1, service.Diagnostics.TargetSocReadings);
+    }
+
+    [Fact]
     public async Task The_session_is_held_across_fetches_rather_than_replayed()
     {
         // The change from the on-demand reader, and the reason this class exists: three reads, one

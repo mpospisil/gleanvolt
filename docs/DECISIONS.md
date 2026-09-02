@@ -4,6 +4,114 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-02 — Two feeds run together, the week is counted, and the handover is a setting (issue #141)
+
+Phase 3 of #137, and the only phase whose deliverable is a measurement. The MQTT source and
+`VwGroupUpdateService` run side by side on the reference install; nothing is decided until a week of
+real data exists; and whatever is decided, **no code is deleted**.
+
+### The measurement is instrumented rather than eyeballed
+
+`VehicleFeedComparison` counts what each feed actually delivered, and `/vehicle-feeds` is where the
+figures are read off. Four questions, four sets of numbers: cadence, agreement, coverage, survival.
+
+Three decisions inside it are not obvious.
+
+**It lives inside `VehicleStateHolder` rather than beside it.** The holder keeps the newest reading and
+discards an older one — so a feed that is consistently *second* leaves no trace anywhere else in the
+process, and "consistently second" is exactly the finding that would decide the handover. The only
+place a losing reading is still visible is the method that throws it away. Owning it there also means
+it cannot be missed by being resolved out of the container after the first readings have gone past.
+
+**A reading is not a delivery.** The portal is asked every fifteen minutes and will hand back the
+bundle it handed back last time; a retained MQTT message is replayed on every reconnect. Counting those
+as deliveries would report a cadence the car never had, so the cadence is measured between *distinct*
+capture times and a re-delivery is counted separately as a repeat. This is the difference between
+measuring the car and measuring our own polling loop.
+
+**Everything is since the process started.** The temptation was to persist it, so that a week survives
+a redeployment. It was refused, and the reason is that it would make the measurement *worse*: a gap
+that spans a restart is the restart, and folding the two together turns a deploy into evidence against
+a portal. The claim being tested is an unattended week — the session count is already per-process for
+the same reason — so a week means a week of one process, and the page says how long it has been
+counting before it says anything else.
+
+### Agreement is reported twice, and the parked half is the one that answers
+
+Where two feeds' capture times land within half an hour of each other, their states of charge are
+compared, and the mean keeps its **sign**: the finding is not that two numbers differ but that one
+differs the same way every time, and an unsigned average would hide precisely that.
+
+The pairing window is deliberately wide — the portal is a quarter-hour batch and the integration behind
+the topic has a lag of its own, so a narrow window would mostly measure which feed happened to land
+first. The cost is paid back by reporting the mean separation beside every figure, and by splitting out
+the readings where **neither feed said the car was charging**. A parked car's SOC does not drift, so a
+difference there is one of the two feeds being read wrong; a difference measured across twenty minutes
+of charging is the car doing its job. Without the split the second would be reported as the first.
+
+### The handover is performed by configuration, and there is no irreversible step
+
+`Vehicle__Enabled=false`, stop the Home Assistant vehicle automation, leave
+`Vehicle__DataAct__Enabled=true`. That is the whole of it. `VehicleMqttWorker`,
+`VehicleTelemetryPayload`, `Vehicle__Broker*`, `Vehicle__Topic` and the per-car `Telemetry:Topic` stay
+in the tree and keep working, and are covered by tests that do not know the portal exists.
+
+Nothing is retired, for two reasons that outlive this site. If the portal disappoints in month two, the
+old feed is one setting away. And it remains the answer for every car nobody has written a service
+for — which is still most of them.
+
+One change was needed to make the week countable at all: a reading published to the MQTT topic without
+a `source` is now labelled `mqtt`. The payload contract is untouched — `source` was optional and stays
+optional — but a feed that names itself nothing cannot be told from another feed that names itself
+nothing, and the tally is grouped by that name.
+
+### "Own a schema, not a client" is partly walked back, for one manufacturer
+
+Worth stating plainly rather than leaving in the diff. #73 set the rule: this codebase owns a
+*schema* — `captured_at`, `soc_percent`, and the rest — and every car's adaptation happens in Home
+Assistant, so a second car costs no code. `VwGroupUpdateService` is a client. It has credentials, a
+session, its own failure modes and a form flow that VW can change without notice, and it is exactly the
+kind of thing that rule existed to keep out.
+
+The justification is narrow and does not generalise: the EU Data Act portal is the **documented
+statutory interface**, not a reverse-engineered app API. It is the owner's own data by law, free of
+charge, and if it breaks it breaks in public with a regulator's attention on it — which is a different
+risk from an undocumented endpoint that can be withdrawn in a release note, as VW's WeConnect OAuth
+client was in May–June 2026.
+
+The rule still governs everything else. A manufacturer with no statutory portal, or one whose portal we
+have not written, is a Home Assistant automation publishing to a topic — and that path is still here,
+still tested, and still one setting away.
+
+### What the week has to answer, and where the numbers go
+
+The instrument exists; the figures are the reference install's to produce. **This section is finished
+when the table below is filled in**, and an empty table is not a formality — it is the difference
+between recording a measurement and recording an intention.
+
+| | MQTT (`volkswagen_connect` → HA) | VW portal (`vw-group`) |
+|---|---|---|
+| Days observed, one process | | |
+| Deliveries / repeats | | |
+| Mean gap, longest gap | | |
+| Gaps over 45 min | | |
+| SOC coverage | | |
+| Charge-time-remaining coverage | | |
+| Target SOC seen | n/a | |
+| Sign-ins over the week | n/a | |
+
+| | |
+|---|---|
+| SOC agreement, car parked (mean signed / worst) | |
+| Mean separation of compared captures | |
+
+**And the decision, with its reason:** _(handover performed / declined — record which, and why)_
+
+If the week is not boring, that is a result too: record it, stay on MQTT, and do not perform the
+handover because an issue said so.
+
+---
+
 ## 2026-09-02 — The interval belongs to the service, and "needs you" is not a slower retry (issue #140)
 
 The VW portal now feeds the dashboard on its own clock. Three decisions in it are not obvious, and one

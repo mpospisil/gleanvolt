@@ -1624,7 +1624,7 @@ JSON schema**, and each car is adapted onto that schema by a template or automat
   "charge_time_remaining_minutes": 95,           // optional: the CAR's own estimate
   "charge_state": "charging",                    // optional: idle | charging | complete | unknown
   "plug_state":   "connected",                   // optional: connected | disconnected | unknown
-  "source":       "id4"                          // optional, for display
+  "source":       "id4"                          // optional, for display; defaults to "mqtt"
 }
 ```
 
@@ -1644,6 +1644,11 @@ own failure modes has to earn a place here one manufacturer at a time.
 Everything except `captured_at` is optional, and absent is a supported configuration rather than an
 error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
 without it staleness cannot be judged.
+
+`source` names the feed on the dashboard (*"reported by the car 12 min ago via id4"*) and is what
+[`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) groups a week's tally by. It is
+still optional: a payload that omits it is labelled `mqtt`, so a reading off this topic can always be
+told apart from the manufacturer feed's.
 
 `range_km` is the car's own estimate off its own recent consumption — nothing here could compute it, and
 it is the figure that actually answers *"is 80% enough for the trip?"* while you are setting a target.
@@ -1883,10 +1888,30 @@ only an email and a password, no code and no CAPTCHA — but the *first* sign-in
 consent screen, and holding one session rather than signing in ninety-six times a day is partly there to
 keep new-device challenges rare.
 
-> **With this on, the MQTT vehicle feed is not subscribed.** Two sources writing one reading is a race
-> whoever wins it, so the manufacturer's service takes the holder and the MQTT worker is not started at
-> all; the controller says so in its startup log. If you were publishing from a Home Assistant
-> automation, that automation is now doing nothing — stop it, or leave it and know which one is live.
+> **With this on, both feeds run and the freshest reading wins.** This used to exclude the MQTT worker
+> outright — one holder, one writer, no race — until the reference install showed why picking a winner
+> in advance is the wrong shape: the portal's state of charge for that car is coarser and lags, while
+> the same manufacturer's app API through Home Assistant is live to the percent. Which source is better
+> is a fact about a car and a moment, not something a configuration file can be right about once. So
+> both write to one reading, whichever saw the car most recently is kept, and a feed that stops stops
+> advancing — so the other takes over within one reading rather than by being configured. The
+> controller says at startup when both are on, and the dashboard names which feed the reading on screen
+> came from.
+
+**Running both is the point, for a while.** [#141](https://github.com/mpospisil/gleanvolt/issues/141)
+is a measurement rather than a feature: leave the two side by side for a week and decide between them
+on what they actually delivered.
+[`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) is where those numbers are — how
+often each one produced a *fresh* reading, whether the two agree about the same battery, which fields
+either of them carries, and how many times the portal session had to be re-established.
+
+**The handover is a setting, and nothing is deleted.** When the week is boring: set
+`Vehicle__Enabled=false`, stop the Home Assistant vehicle automation, and leave
+`Vehicle__DataAct__Enabled=true`. `VehicleMqttWorker`, the payload contract, `Vehicle__Broker*`,
+`Vehicle__Topic` and the per-car `Telemetry:Topic` all stay in the tree and keep working — if the
+portal disappoints in month two the old feed is one setting away, and it remains the answer for every
+car nobody has written a service for. If the week is *not* boring, that is a result too: record it and
+stay on MQTT.
 
 Everything else about the feed is unchanged: `MaxAge` still judges staleness, nothing in `ChargeControl`
 or `BatteryHold` reads it, and an installation with `Enabled: false` behaves exactly as it did before
@@ -1962,6 +1987,41 @@ The feed with its own clock is a separate switch,
 it holds a session rather than replaying the password. Setup — the credentials and the browser steps
 the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md).
 
+#### `/vehicle-feeds` — what each feed actually delivered
+
+Two feeds may run at once, and this is the page that decides between them on numbers rather than on
+which one sounded better. It reports and changes nothing.
+
+- **Cadence.** Per feed: deliveries, repeats, superseded, and the shortest, mean and longest interval
+  between deliveries, with the intervals also counted into bands. A *delivery* is a reading carrying a
+  capture time that feed had not produced before; asking the portal every quarter of an hour and being
+  handed the same bundle back is a **repeat**, and so is a retained MQTT message replayed on
+  reconnect — counting those would report a cadence the car never had. **Superseded** counts the
+  readings the holder declined because the other feed was already ahead: a feed that is nearly always
+  superseded is one the dashboard is not showing, however healthy its own page looks.
+- **Agreement.** Where the two feeds' capture times land within half an hour of each other, their
+  states of charge are compared: the mean *signed* difference (the systematic offset — the direction is
+  the finding), its mean size, the worst one, and how far apart in time the two captures typically
+  were. Shown twice, and the **parked** row is the one that answers the question: a parked car's SOC
+  does not drift, so a difference there is one of the two feeds being read wrong, whereas a difference
+  measured across twenty minutes of charging is the car doing its job.
+- **Coverage.** The share of deliveries that carried each field. A missing field is a supported answer
+  rather than a fault — but *time left* is worth reading: nothing has ever established whether the
+  reference car reports a charge-time-remaining at all, and a week of zero is that answer.
+- **Survival.** For the manufacturer feed: reads of attempts, **sign-ins** (one, however long the
+  controller has been up, is the healthy answer), the current session's age, and whether the car's own
+  **target SOC** ever arrives — the field that is not part of a reading, and the one whose absence
+  deferred [#101](https://github.com/mpospisil/gleanvolt/issues/101).
+
+**Everything on it is since the controller started, and that is deliberate.** It measures an
+*unattended run*: a gap that spans a restart is the restart rather than the feed, and folding the two
+together would turn a redeployment into evidence against a portal. A week means a week of one process,
+and the page says how long it has been counting before it says anything else.
+
+Feeds are grouped by the name they put on their readings. The MQTT payload's `source` is optional, so a
+reading that arrives without one is labelled `mqtt`; the manufacturer feed labels its own
+`vw-group …1234`.
+
 #### `/pv-system` — the installation, read-only
 
 What this controller is and what it is talking to, from a browser rather than from the startup log:
@@ -2017,7 +2077,7 @@ Those phases left the UI in three places for one question. The dashboard was fou
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Health.** `/forecast` and
+**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Vehicle portal · Vehicle feeds · Health.** `/forecast` and
 `/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
 
 **`/` reports and no longer decides.** It carries no button, no input and no select at all — three

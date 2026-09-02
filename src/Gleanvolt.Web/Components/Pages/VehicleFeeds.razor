@@ -1,0 +1,445 @@
+@page "/vehicle-feeds"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject VehicleFeedComparison Comparison
+@inject ChargeControlStatusHolder StatusHolder
+@inject TimeProvider Time
+@inject IEnumerable<IVehicleUpdateService> Feeds
+
+@*
+    The week of running both feeds, as numbers (issue #141).
+
+    Phase 3 of #137 is a measurement rather than a feature: the Home Assistant topic and the
+    manufacturer's own portal run side by side, and the handover between them is decided on what they
+    actually delivered instead of on which one sounded better. This page is where those figures are
+    read off -- cadence, agreement, coverage and survival, the four #141 asks for -- and it is the
+    thing to copy into docs/DECISIONS.md when the week is up.
+
+    Observation only. Nothing here is read by a charging decision, and a feed comparison that said
+    nothing at all would change no register.
+*@
+
+<SiteTitle Page="Vehicle feeds" />
+
+<h1>Vehicle feeds</h1>
+
+<p class="muted">
+    What each feed has actually delivered, counted rather than eyeballed. Two feeds may run at once —
+    the car's own portal and whatever publishes to the MQTT topic — and the holder keeps whichever saw
+    the car most recently, so this is also the only place a reading that <em>lost</em> is still
+    visible.
+</p>
+
+@*
+    The window first, because every number below is worth exactly as much as the time it was measured
+    over -- and because a restart puts it back to zero, which is a fact about the measurement that has
+    to be visible rather than discovered.
+*@
+<dl class="facts">
+    <dt>Measuring for</dt>
+    <dd>
+        @Duration(_report.ObservedFor)
+        <span class="muted">
+            (since @TimeZoneInfo.ConvertTime(_report.ObservingSince, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm"))
+        </span>
+    </dd>
+
+    <dt>Feeds seen</dt>
+    <dd>
+        @if (_report.Sources.Count == 0)
+        {
+            <span class="muted">none has offered a reading yet</span>
+        }
+        else
+        {
+            @string.Join(", ", _report.Sources.Select(source => source.SourceId))
+        }
+    </dd>
+</dl>
+
+<p class="muted table-note">
+    Everything on this page is since the controller started. That is deliberate: this measures an
+    <em>unattended run</em>, and a gap that spans a restart is the restart rather than the feed —
+    folding the two together would turn a redeployment into evidence against a portal. A week means a
+    week of one process.
+</p>
+
+@if (_report.Sources.Count == 0)
+{
+    <p class="muted">
+        Nothing has been offered yet. The MQTT feed is on when <code>Vehicle__Enabled</code> says so;
+        the manufacturer's own feed is on when <code>Vehicle__DataAct__Enabled</code> does. With
+        neither, the car is still shown from its configuration and charging works in kilowatt-hours —
+        which is a supported installation, not a broken one.
+    </p>
+}
+else
+{
+    @*
+        Cadence. Deliveries, not readings: the portal is asked every fifteen minutes and will hand back
+        the bundle it handed back last time, and a retained MQTT message is replayed on every
+        reconnect. Counting those as deliveries would report a cadence the car never had.
+    *@
+    <h2>Cadence</h2>
+
+    <table class="sessions energy">
+        <thead>
+            <tr>
+                <th>Feed</th>
+                <th class="num">Deliveries</th>
+                <th class="num">Repeats</th>
+                <th class="num">Superseded</th>
+                <th class="num">Shortest</th>
+                <th class="num">Mean</th>
+                <th class="num">Longest</th>
+                <th>Last capture</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var source in _report.Sources)
+            {
+                <tr>
+                    <td>@source.SourceId</td>
+                    <td class="num">@source.Captures</td>
+                    <td class="num">@source.Repeats</td>
+                    <td class="num">@source.Superseded</td>
+                    <td class="num">@Gap(source.ShortestGap)</td>
+                    <td class="num">@Gap(source.MeanGap)</td>
+                    <td class="num">@Gap(source.LongestGap)</td>
+                    <td>
+                        @if (source.LastCapturedAt is { } last)
+                        {
+                            @TimeZoneInfo.ConvertTime(last, Time.LocalTimeZone).ToString("MM-dd HH:mm")
+                            <span class="muted"> (@Age(last) ago)</span>
+                        }
+                        else
+                        {
+                            <span class="muted">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="muted table-note">
+        A <em>repeat</em> is a reading whose capture time this feed had already produced — the same
+        bundle again, or a retained message replayed. <em>Superseded</em> counts the readings the
+        holder declined because the other feed was already ahead: a feed that is nearly always
+        superseded is one the dashboard is not showing, however healthy its own page looks.
+    </p>
+
+    @*
+        And the distribution behind that mean, because one bad night and a bad week look identical in
+        a mean and a maximum. The bands are placed around the claim being tested: the portal says a
+        quarter of an hour, so the second column is "it kept its word" and the third is "it missed
+        one".
+    *@
+    <h3>Gaps between deliveries</h3>
+
+    <table class="sessions energy">
+        <thead>
+            <tr>
+                <th>Feed</th>
+                @foreach (var label in BucketLabels)
+                {
+                    <th class="num">@label</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var source in _report.Sources)
+            {
+                <tr>
+                    <td>@source.SourceId</td>
+                    @foreach (var count in source.GapBuckets)
+                    {
+                        <td class="num">@count</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @*
+        Coverage. "Absent is fine, present-but-unusable is not" (#73) means a missing field is a
+        supported answer rather than a failure -- so these are coverage figures, and a column of zeroes
+        is a finding and not a fault.
+    *@
+    <h2>Coverage</h2>
+
+    <table class="sessions energy">
+        <thead>
+            <tr>
+                <th>Feed</th>
+                <th class="num">SOC</th>
+                <th class="num">Range</th>
+                <th class="num">Time left</th>
+                <th class="num">Charge state</th>
+                <th class="num">Plug state</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var source in _report.Sources)
+            {
+                <tr>
+                    <td>@source.SourceId</td>
+                    <td class="num">@Coverage(source, source.SocReadings)</td>
+                    <td class="num">@Coverage(source, source.RangeReadings)</td>
+                    <td class="num">@Coverage(source, source.ChargeTimeReadings)</td>
+                    <td class="num">@Coverage(source, source.ChargeStateReadings)</td>
+                    <td class="num">@Coverage(source, source.PlugStateReadings)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="muted table-note">
+        The share of deliveries that carried each field. A missing field is a supported answer, not a
+        fault — but <em>time left</em> is worth reading closely: nothing has ever established whether
+        this car reports a charge-time-remaining at all, and a week of zero is that answer.
+    </p>
+}
+
+@*
+    Agreement. The question is not "do the two numbers differ" -- they will -- but whether one of them
+    differs the same way every time, which is what a systematic offset looks like and what would mean
+    one of the two is being read wrong.
+*@
+@if (_report.Pairs.Count > 0)
+{
+    <h2>Agreement</h2>
+
+    @foreach (var pair in _report.Pairs)
+    {
+        <h3>@pair.First against @pair.Second</h3>
+
+        <table class="sessions energy">
+            <thead>
+                <tr>
+                    <th>Comparisons</th>
+                    <th class="num">Samples</th>
+                    <th class="num">Mean difference</th>
+                    <th class="num">Mean size</th>
+                    <th class="num">Worst</th>
+                    <th class="num">Captures apart</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Car parked</td>
+                    <td class="num">@pair.Quiet.Samples</td>
+                    <td class="num">@Delta(pair.Quiet)</td>
+                    <td class="num">@Points(pair.Quiet.Samples, pair.Quiet.MeanAbsDelta)</td>
+                    <td class="num">@Points(pair.Quiet.Samples, pair.Quiet.MaxAbsDelta)</td>
+                    <td class="num">@Separation(pair.Quiet)</td>
+                </tr>
+                <tr>
+                    <td>All</td>
+                    <td class="num">@pair.All.Samples</td>
+                    <td class="num">@Delta(pair.All)</td>
+                    <td class="num">@Points(pair.All.Samples, pair.All.MeanAbsDelta)</td>
+                    <td class="num">@Points(pair.All.Samples, pair.All.MaxAbsDelta)</td>
+                    <td class="num">@Separation(pair.All)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p class="muted table-note">
+            Positive means <strong>@pair.First</strong> reads higher than <strong>@pair.Second</strong>.
+            Read the parked row: a charging car really does change between two capture times, so a
+            difference measured across that is the car moving on rather than the feeds disagreeing. A
+            mean near zero with a non-trivial mean size is noise; a mean that stays a few points off is
+            the systematic offset, and it matters which of the two is wrong.
+        </p>
+    }
+}
+else if (_report.Sources.Count > 1)
+{
+    <h2>Agreement</h2>
+
+    <p class="muted">
+        Both feeds have delivered, but no two of their capture times have yet landed within
+        @Duration(VehicleFeedComparison.PairingWindow) of each other with a state of charge on both —
+        so there is nothing to compare. That is itself worth knowing: two feeds this far apart in time
+        describe the same battery at different moments, not the same reading twice.
+    </p>
+}
+
+@*
+    Survival, which is the feed's own business and stays on the feed: how many times it has had to
+    sign in again. One, however long the controller has been up, is the healthy answer -- the
+    measurement #138 could not make because nothing kept a session.
+*@
+@if (_diagnostics is { Attempts: > 0 } diagnostics && _service is not null)
+{
+    <h2>Survival</h2>
+
+    <dl class="facts">
+        <dt>Feed</dt>
+        <dd>@_service.Manufacturer <span class="muted">for @_service.VehicleId</span></dd>
+
+        <dt>Reads</dt>
+        <dd>
+            @diagnostics.Readings of @diagnostics.Attempts
+            @if (diagnostics.LastReadingAt is { } lastRead)
+            {
+                <span class="muted">— last @Age(lastRead) ago</span>
+            }
+        </dd>
+
+        <dt>Sign-ins</dt>
+        <dd class="@(diagnostics.Sessions > 1 ? "error" : null)">
+            @diagnostics.Sessions
+            <span class="muted">
+                @(diagnostics.Sessions <= 1
+                    ? "— one session has covered the whole run"
+                    : "— sessions are expiring and the feed is re-logging in")
+            </span>
+        </dd>
+
+        <dt>Session age</dt>
+        <dd>@(diagnostics.SessionAge is { } age ? Duration(age) : "none")</dd>
+
+        @*
+            The one field #137 promised that VehicleState deliberately does not carry. Whether it
+            arrives at all is a Phase 3 question, and this feed is the only thing that ever sees it.
+        *@
+        <dt>Target SOC</dt>
+        <dd>
+            @if (diagnostics.TargetSocReadings == 0)
+            {
+                <span class="muted">never reported — the portal carries the field, this car has not</span>
+            }
+            else
+            {
+                @(diagnostics.TargetSocPercent is { } target ? $"{target:0.#}%" : "—")
+                <span class="muted">
+                    (on @diagnostics.TargetSocReadings of @diagnostics.Readings read@(diagnostics.Readings == 1 ? "" : "s"))
+                </span>
+            }
+        </dd>
+    </dl>
+
+    <p class="muted table-note">
+        Nothing reads the target SOC yet. It is the figure that would let a plan refuse an impossible
+        battery target, deferred on
+        <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a> because no feed carried it
+        reliably — which is the question this row exists to answer.
+    </p>
+}
+
+<h2>When the week is boring</h2>
+
+<p class="muted">
+    The handover is a setting, not a deletion. Switch <code>Vehicle__Enabled</code> to
+    <code>false</code>, stop the Home Assistant vehicle automation, and leave
+    <code>Vehicle__DataAct__Enabled</code> on. No code goes away: if the portal disappoints in month
+    two, the old feed is one setting away, and it stays the answer for any car nobody has written a
+    service for. If the week is <em>not</em> boring, that is a result too — record it and stay on
+    MQTT.
+</p>
+
+@code {
+    private VehicleFeedReport _report = VehicleFeedReport.Empty;
+
+    // The manufacturer feed, when one is configured: the survival figures are its own and are asked
+    // for with a type test, because a feed whose API pushes has neither a session nor a next-due time.
+    private IVehicleUpdateService? _service;
+    private VehicleFeedDiagnostics? _diagnostics;
+
+    private static readonly string[] BucketLabels = BuildBucketLabels();
+
+    protected override void OnInitialized()
+    {
+        _service = Feeds.FirstOrDefault();
+        Refresh();
+
+        // Refreshed on the control loop's cadence rather than on a timer of its own. The figures here
+        // move on the feeds' clocks -- a quarter of an hour at best -- so anything faster would be
+        // re-rendering a page that has not changed.
+        StatusHolder.Updated += OnStatusUpdated;
+    }
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        Refresh();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Refresh()
+    {
+        _report = Comparison.Report();
+        _diagnostics = (_service as IVehicleFeedDiagnostics)?.Diagnostics;
+    }
+
+    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+
+    private static string[] BuildBucketLabels()
+    {
+        var edges = VehicleFeedComparison.GapBucketEdges;
+        var labels = new string[edges.Count + 1];
+
+        for (var index = 0; index < edges.Count; index++)
+        {
+            labels[index] = $"≤ {Short(edges[index])}";
+        }
+
+        labels[edges.Count] = $"> {Short(edges[^1])}";
+        return labels;
+    }
+
+    // Bucket edges are round figures by construction, so this is allowed to be terse in a way the
+    // measured durations below are not.
+    private static string Short(TimeSpan span) =>
+        span < TimeSpan.FromHours(1) ? $"{span.TotalMinutes:0} min" : $"{span.TotalHours:0} h";
+
+    private static string Gap(TimeSpan? gap) => gap is { } span ? Duration(span) : "—";
+
+    /// <summary>
+    /// A duration at the accuracy the thing being measured actually has. Minutes for anything under
+    /// an hour, because a feed's cadence is a matter of minutes; days and hours above that, because
+    /// "measuring for 4 d 6 h" is the sentence, and "4 d 6 h 13 m" is not.
+    /// </summary>
+    private static string Duration(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero)
+        {
+            span = TimeSpan.Zero;
+        }
+
+        if (span < TimeSpan.FromMinutes(1))
+        {
+            return $"{span.TotalSeconds:0} s";
+        }
+
+        if (span < TimeSpan.FromHours(1))
+        {
+            return $"{span.TotalMinutes:0} min";
+        }
+
+        if (span < TimeSpan.FromDays(1))
+        {
+            return $"{span.Hours} h {span.Minutes:00} m";
+        }
+
+        return $"{(int)span.TotalDays} d {span.Hours} h";
+    }
+
+    private string Age(DateTimeOffset at) => Duration(Time.GetUtcNow() - at);
+
+    private static string Coverage(VehicleFeedTally source, int readings) =>
+        source.Coverage(readings) is { } share ? $"{share:P0}" : "—";
+
+    // Signed on purpose: the direction is the finding, and dropping it would average a systematic
+    // offset away to nothing.
+    private static string Delta(VehicleSocAgreement agreement) =>
+        agreement.Samples == 0 ? "—" : $"{agreement.MeanDelta:+0.0;-0.0;0.0} pt";
+
+    private static string Points(int samples, double value) =>
+        samples == 0 ? "—" : $"{value:0.0} pt";
+
+    private static string Separation(VehicleSocAgreement agreement) =>
+        agreement.Samples == 0 ? "—" : Duration(agreement.MeanSeparation);
+}
