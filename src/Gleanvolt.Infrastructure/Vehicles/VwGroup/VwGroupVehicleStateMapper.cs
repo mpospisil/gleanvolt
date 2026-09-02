@@ -28,9 +28,23 @@ public sealed record VwGroupMappingResult(
     string? Error = null,
     double? TargetSocPercent = null,
     double? OdometerKm = null,
-    IReadOnlyList<string>? UnmappedFields = null)
+    IReadOnlyList<string>? UnmappedFields = null,
+    IReadOnlyDictionary<string, VehicleFieldReading>? MatchedFields = null)
 {
     public IReadOnlyList<string> UnmappedFields { get; init; } = UnmappedFields ?? [];
+
+    /// <summary>
+    /// The fields that <b>were</b> recognised, with the newest raw value read out of each — the other
+    /// half of the diagnostic, and the half that was missing when it was first needed.
+    ///
+    /// <para>A name absent from <see cref="UnmappedFields"/> means one of two opposite things: the
+    /// bundle did not carry it, or it carried it and the value was a sentinel that filtering threw
+    /// away. Those want opposite fixes — a name to add, against a car that reports the field empty —
+    /// and the unmapped list alone cannot tell them apart, which is a week of wondering of exactly the
+    /// kind that list exists to prevent.</para>
+    /// </summary>
+    public IReadOnlyDictionary<string, VehicleFieldReading> MatchedFields { get; init; } =
+        MatchedFields ?? new Dictionary<string, VehicleFieldReading>();
 }
 
 /// <summary>
@@ -120,8 +134,29 @@ public static class VwGroupVehicleStateMapper
         // populated -- either way the bigger number is the true one.
         var odometer = Largest(ordered, VwGroupFieldNames.Odometer);
 
+        // Dated by the STATE OF CHARGE's own snapshot, and only otherwise by the newest field that
+        // contributed anything.
+        //
+        // Within one delivery every field shares a clock and this is pedantry. Across merged
+        // deliveries it decides whether the number on the dashboard is honest: the reference car's
+        // deliveries are not a tidy quarter-hour apart -- thirty were on offer and the newest four
+        // spanned most of a day -- so a state of charge can easily be hours older than the status
+        // report merged beside it. Dating the pair by the newer of them would show an old percentage
+        // as minutes fresh, and how old the percentage is, is the entire question this feed exists to
+        // answer. Everything else on a VehicleState is display; the percentage is what a target is
+        // computed from and what MaxAge is judged against, so it is the field the timestamp belongs to.
+        //
+        // Falls back to the newest snapshot only when nothing contributed at all, which is the
+        // rejection path below.
+        var contributedAt = SocAt(ordered, soc) ?? NewestContribution(
+            ordered,
+            range is not null ? VwGroupFieldNames.RangeKm : null,
+            minutes is not null ? VwGroupFieldNames.ChargeTimeRemaining : null,
+            VwGroupFieldNames.ChargeState,
+            VwGroupFieldNames.PlugState);
+
         var state = new VehicleState(
-            capturedAt,
+            contributedAt ?? capturedAt,
             soc,
             range,
             minutes is { } value ? TimeSpan.FromMinutes(value) : null,
@@ -129,8 +164,102 @@ public static class VwGroupVehicleStateMapper
             MapEnum(ordered, VwGroupFieldNames.PlugState, VwGroupFieldNames.PlugStates, VehiclePlugState.Unknown),
             sourceId);
 
-        return new VwGroupMappingResult(state, null, targetSoc, odometer, Unmapped(ordered));
+        var unmapped = Unmapped(ordered);
+        var matched = Matched(ordered);
+
+        // A timestamp and nothing else is not a reading, and must not be handed on as one.
+        //
+        // "Absent is fine" (#73) means a source that does not report a field; it was never meant to
+        // cover a bundle in which *every* field is absent, which is not a car that said nothing --
+        // it is a vocabulary that matched nothing. Two things go wrong if this is called a success:
+        // the page shows a row of dashes under a fresh capture time and looks like a working feed,
+        // and the update service writes it to the holder, replacing a good reading with an empty one
+        // whose age then reads as brand new. The dashboard would show a car that had just reported
+        // and knows nothing about itself.
+        //
+        // Reported with the count rather than silently, because the field names are the fix and they
+        // are already in hand: both surfaces list them.
+        if (state is { SocPercent: null, RangeKm: null, ChargeTimeRemaining: null }
+            and { ChargeState: VehicleChargeState.Unknown, PlugState: VehiclePlugState.Unknown })
+        {
+            return new VwGroupMappingResult(
+                null,
+                $"the bundle was read and none of its {Counted(ordered)} field(s) are ones this build "
+                + "recognises -- the state of charge, range, charging state, plug state and remaining "
+                + "time are all missing rather than absent. The unrecognised names are listed below, "
+                + "and adding them to VwGroupFieldNames is the fix",
+                targetSoc,
+                odometer,
+                unmapped,
+                matched);
+        }
+
+        return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped, matched);
     }
+
+    /// <summary>
+    /// When the state of charge was reported, or null when there is none. The reading's own clock:
+    /// see the note where it is used.
+    /// </summary>
+    private static DateTimeOffset? SocAt(List<VwGroupSnapshot> ordered, double? soc) =>
+        soc is null ? null : Latest(ordered, VwGroupFieldNames.StateOfCharge)?.At;
+
+    /// <summary>
+    /// When the newest of these fields was actually reported. Nulls are skipped, so a field that
+    /// produced nothing cannot date a reading it did not contribute to.
+    /// </summary>
+    private static DateTimeOffset? NewestContribution(List<VwGroupSnapshot> ordered, params string[]?[] groups)
+    {
+        DateTimeOffset? newest = null;
+
+        foreach (var candidates in groups)
+        {
+            if (candidates is not null
+                && Latest(ordered, candidates) is { } found
+                && (newest is null || found.At > newest))
+            {
+                newest = found.At;
+            }
+        }
+
+        return newest;
+    }
+
+    /// <summary>
+    /// Every field the vocabulary recognises that the bundle actually carried, with its newest raw
+    /// value — sentinels included, verbatim and untouched, because a value of <c>""</c> or
+    /// <c>"invalid"</c> is precisely what this is here to show.
+    /// </summary>
+    private static Dictionary<string, VehicleFieldReading> Matched(List<VwGroupSnapshot> snapshots)
+    {
+        string[][] known =
+        [
+            VwGroupFieldNames.StateOfCharge, VwGroupFieldNames.RangeKm,
+            VwGroupFieldNames.ChargeTimeRemaining, VwGroupFieldNames.ChargeState,
+            VwGroupFieldNames.PlugState, .. VwGroupFieldNames.KnownButUnused,
+        ];
+
+        var matched = new Dictionary<string, VehicleFieldReading>(StringComparer.OrdinalIgnoreCase);
+
+        // Oldest first, so the last write per name is the newest value -- the same rule the readings
+        // themselves follow.
+        foreach (var snapshot in snapshots)
+        {
+            foreach (var (field, value) in snapshot.Values)
+            {
+                if (known.Any(candidates => VwGroupFieldNames.Matches(field, candidates)))
+                {
+                    matched[field] = new VehicleFieldReading(value, snapshot.CapturedAt);
+                }
+            }
+        }
+
+        return matched;
+    }
+
+    /// <summary>How many distinct field names the bundle carried, recognised or not.</summary>
+    private static int Counted(List<VwGroupSnapshot> snapshots) =>
+        snapshots.SelectMany(snapshot => snapshot.Values.Keys).Distinct(StringComparer.OrdinalIgnoreCase).Count();
 
     /// <summary>
     /// The newest non-sentinel value of whichever field name matched, parsed as a number.
@@ -291,16 +420,33 @@ public static class VwGroupVehicleStateMapper
         return fallback;
     }
 
-    /// <summary>The newest snapshot in which one of these names carried something that is not a sentinel.</summary>
-    private static (string Field, string Value)? Latest(List<VwGroupSnapshot> snapshots, string[] candidates)
+    /// <summary>
+    /// The newest snapshot in which one of these names carried something that is not a sentinel, with
+    /// <b>when that snapshot was taken</b> — which is what the reading has to be dated by.
+    /// </summary>
+    private static (string Field, string Value, DateTimeOffset At)? Latest(
+        List<VwGroupSnapshot> snapshots, string[] candidates)
     {
+        // Newest snapshot first, and WITHIN a snapshot the candidates in the order they are listed.
+        //
+        // The second half was missing and the order was the dictionary's -- whichever name the portal
+        // happened to serialise first won, and the preference the candidate lists spell out ("both
+        // confirmed present in a real ID.4 bundle, agreeing at 57: battery_level_HV.value comes with
+        // its own .state") decided nothing at all. It cost nothing on a bundle carrying one of them,
+        // which is every bundle seen so far, and would have been unreproducible on the first one that
+        // carried two.
         for (var index = snapshots.Count - 1; index >= 0; index--)
         {
-            foreach (var (field, value) in snapshots[index].Values)
+            var snapshot = snapshots[index];
+
+            foreach (var candidate in candidates)
             {
-                if (VwGroupFieldNames.Matches(field, candidates) && !VwGroupFieldNames.IsSentinel(value))
+                foreach (var (field, value) in snapshot.Values)
                 {
-                    return (field, value);
+                    if (VwGroupFieldNames.Matches(field, [candidate]) && !VwGroupFieldNames.IsSentinel(value))
+                    {
+                        return (field, value, snapshot.CapturedAt);
+                    }
                 }
             }
         }

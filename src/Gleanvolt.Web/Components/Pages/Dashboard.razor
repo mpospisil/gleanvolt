@@ -5,6 +5,8 @@
 @inject ChargeControlStatusHolder StatusHolder
 @inject IVehicleTelemetry Vehicle
 @inject VehicleDisplayOptions VehicleDisplay
+@inject EvInfo Car
+@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
 @inject TimeProvider Time
 
 @*
@@ -18,7 +20,7 @@
       Energy          -- the house: what the roof is making, what the battery and the grid are doing.
                          True whatever is or isn't plugged in, which is why it comes first.
       Vehicle         -- the car: the charger's own view of whether one is connected, plus whatever
-                         the car's cloud integration last said about itself (#73). Read-only, and
+                         the car's own feed last said about itself (#73, #140). Read-only, and
                          nothing in the control logic consumes the cloud half yet.
       Charging session-- what is happening at the charger right now, shown only while something is
                          happening: a mode is driving, or the car is drawing power under nobody's
@@ -67,12 +69,46 @@ else
     <h2>Vehicle</h2>
 
     @*
+        The car is configuration; the feed is an attachment (#140). This section shows the car because
+        it is *defined*, and then says which of four situations its feed is in -- because the card used
+        to hide entirely until a reading arrived, which made three different situations look identical.
+
+          no feed configured  -- the car and its pack, no reading. Nothing is wrong.
+          healthy             -- the reading and its age.
+          reading old         -- the same, marked stale past MaxAge.
+          sign-in required    -- the feed is blocked on the owner, with the service's sentence.
+
+        The last two must never look alike. *Stale* clears itself; *sign-in required* never will, and
+        a charger sitting idle is already the most convincing impersonation of a fault this controller
+        can produce -- so the one piece of information the owner can act on has to be the one that
+        stands out.
+
         The age is shown next to the SOC rather than tucked into a hint because it is the number that
-        decides whether the SOC means anything: this data comes from a cloud integration whose
-        readings are routinely hours old while the car sleeps, and whose upstream session expires on
-        its own. An install with Vehicle:Enabled=false has no such reading at all, and gets the
-        charger's own view of the socket without an empty card beneath it.
+        decides whether the SOC means anything: readings are routinely hours old while the car sleeps.
     *@
+    @if (Car.IsConfigured)
+    {
+        <p class="muted">@CarDescription()</p>
+    }
+
+    @if (_feed is { IsBlocked: true } blocked)
+    {
+        <p class="error">
+            <strong>Sign-in required</strong> — @blocked.Message
+        </p>
+    }
+    else if (_vehicle is null && _feed is not null)
+    {
+        <p class="muted">@FeedName has not delivered a reading yet — @_feed.Message</p>
+    }
+    else if (_vehicle is null && Car.IsConfigured)
+    {
+        <p class="muted">
+            No feed is configured for this car, so there is no reading — nothing is wrong. Charging
+            works in kilowatt-hours either way; a feed only adds the car's own view of itself.
+        </p>
+    }
+
     @if (_vehicle is not null)
     {
         <p class="muted">
@@ -145,10 +181,21 @@ else
     private VehicleState? _vehicle;
     private bool _vehicleStale;
 
+    // The manufacturer feed's health, or null when no update service is configured -- which is itself
+    // one of the four states, and the one that must read as "nothing is wrong".
+    private VehicleSourceHealth? _feed;
+
+    private IVehicleUpdateService? _service;
+
     protected override void OnInitialized()
     {
         _status = StatusHolder.Current;
         StatusHolder.Updated += OnStatusUpdated;
+
+        // One service today, and the contract says the manufacturer is never dispatched on -- so the
+        // page takes the first rather than choosing, and a second car is the phase that gives this
+        // page a card each.
+        _service = VehicleFeeds.FirstOrDefault();
 
         RefreshVehicle();
     }
@@ -178,6 +225,34 @@ else
         _vehicle = Vehicle.GetCurrentState();
         _vehicleStale = _vehicle is not null
             && _vehicle.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
+
+        // Read on the poll's cadence like the reading itself: Health is a cheap property by contract,
+        // and a feed whose state changed a few seconds ago changed nothing anyone can act on sooner.
+        _feed = _service?.Health;
+    }
+
+    /// <summary>Which feed is being waited on, named the way its log lines name it.</summary>
+    private string FeedName => _service is null ? "The feed" : $"The {_service.Manufacturer} feed";
+
+    // The car, because it is configured -- shown whether or not anything reports on it. Name first
+    // (an owner's own word for it), then what it is, then the pack, since the pack is what decides
+    // whether a target can be asked for as a percentage at all.
+    private string CarDescription()
+    {
+        var model = string.Join(" ", new[] { Car.Make, Car.Model }.Where(part => part.Length > 0));
+        var name = string.IsNullOrWhiteSpace(Car.Name) ? model : Car.Name;
+        var described = name == model || model.Length == 0 ? name : $"{name} — {model}";
+
+        // A car described by its pack alone is a supported configuration (#124): everything else in
+        // the Ev section is optional, so this must not render as a leading comma.
+        if (described.Length == 0)
+        {
+            described = "The car";
+        }
+
+        return Car.BatteryCapacityKWh > 0
+            ? $"{described}, {Car.BatteryCapacityKWh:0.#} kWh usable"
+            : described;
     }
 
     // Coarse on purpose: this data is hours old routinely, so minutes of precision would imply an

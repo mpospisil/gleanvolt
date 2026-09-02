@@ -15,6 +15,9 @@ namespace Gleanvolt.Web.Tests;
 /// </summary>
 public class VehiclePortalPageTests : PageTest
 {
+    /// <summary>When the car reported a diagnostic field, for the tests that show one.</summary>
+    private static readonly DateTimeOffset Reported = new(2026, 9, 2, 10, 29, 46, TimeSpan.Zero);
+
     private static EvInfo Car() => new(
         "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
 
@@ -139,4 +142,138 @@ public class VehiclePortalPageTests : PageTest
         Assert.Contains("some.unknown.field", page.Markup);
         Assert.Contains("another_one", page.Markup);
     }
+    [Fact]
+    public void A_bundle_nothing_matched_lists_the_names_it_did_not_match()
+    {
+        // The case observed live: the portal answered, the capture time was minutes old, and every
+        // value was blank. It is a failure rather than a reading of dashes -- and it is exactly the
+        // failure whose field list is the whole answer, so the page must not withhold it.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle was read and none of its 14 field(s) are ones this build recognises",
+            worthRetrying: false,
+            unmapped: ["odometer_km_v2", "battery.soc_pct"])));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("UnusableData", page.Markup);
+        Assert.Contains("odometer_km_v2", page.Markup);
+        Assert.Contains("battery.soc_pct", page.Markup);
+        Assert.Contains("VwGroupFieldNames", page.Markup);
+    }
+
+
+    [Fact]
+    public void It_shows_what_matched_and_what_each_of_those_fields_said()
+    {
+        // The two lists answer different questions and the page needs both: a name missing from the
+        // unrecognised list means either "never carried" or "carried empty", and only the values
+        // below say which.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle was read and none of its 47 field(s) are ones this build recognises",
+            worthRetrying: false,
+            unmapped: ["settings.auto_unlock_ac"],
+            matched: new Dictionary<string, VehicleFieldReading>
+            {
+                ["charging_state_report.charging_state"] = new("invalid", Reported),
+                ["mileage.value"] = new("24680", Reported),
+            })));
+
+        page.Find("#portal-read").Click();
+
+        // Read as text rather than as markup: the names carry <wbr> break opportunities between their
+        // segments, which is a layout detail and not something every assertion should know about.
+        var recognised = page.Find("dl.fields").TextContent;
+
+        Assert.Contains("charging_state_report.charging_state", recognised);
+        Assert.Contains("invalid", recognised);
+        Assert.Contains("24680", recognised);
+        Assert.Contains("settings.auto_unlock_ac", page.Markup);
+    }
+
+    [Fact]
+    public void A_report_dropped_for_want_of_a_timestamp_is_named_with_the_fields_it_took_with_it()
+    {
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle held no dated report with any readings in it",
+            worthRetrying: false,
+            diagnostics: ["1 of 3 report(s) were dropped for carrying no timestamp this build recognises."],
+            dropped: ["battery_level_HV.value"])));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("dropped for carrying no timestamp", page.Markup);
+        Assert.Contains("battery_level_HV.value", page.Markup);
+    }
+
+
+    [Fact]
+    public void The_delivery_is_described_even_when_nothing_could_be_mapped_out_of_it()
+    {
+        // How many snapshots arrived and what they span is how "this quarter-hour said nothing" is
+        // told apart from "the portal handed us one report type and the battery is in another
+        // delivery". On a failure that is half the diagnosis, so it cannot live in the success branch.
+        var page = Render(new StubReader(new VehiclePortalReading(
+            Succeeded: false,
+            Vehicle: "…1234",
+            SnapshotCount: 3,
+            OldestSnapshot: new DateTimeOffset(2026, 9, 2, 9, 59, 0, TimeSpan.Zero),
+            NewestSnapshot: new DateTimeOffset(2026, 9, 2, 10, 29, 0, TimeSpan.Zero),
+            OdometerKm: 53065,
+            TargetSocPercent: 80,
+            FailureKind: "UnusableData",
+            Message: "none of its 47 field(s) are ones this build recognises")));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("The delivery", page.Markup);
+        Assert.Contains("…1234", page.Markup);
+        Assert.Contains("53065", page.Markup);
+        Assert.Contains("80%", page.Markup);
+    }
+
+
+    [Fact]
+    public void Long_field_names_are_given_joints_to_break_at_and_a_column_that_can_shrink()
+    {
+        // A fifty-character dotted path in a column sized to its own content overran the value beside
+        // it -- reported from the live page as text overlapping text. The list is .fields rather than
+        // .facts for that reason, and each separator carries a break opportunity so the wrap lands on
+        // a joint instead of mid-word.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData", "nothing recognised", worthRetrying: false,
+            matched: new Dictionary<string, VehicleFieldReading>
+            {
+                ["energy_contents.maximal_energy_content.physical_value"] = new("738.0", Reported),
+            })));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("class=\"fields\"", page.Markup);
+        Assert.Contains("energy_<wbr>contents.<wbr>maximal_<wbr>energy_<wbr>content.<wbr>physical_<wbr>value",
+            page.Markup);
+    }
+
+    [Fact]
+    public void A_field_name_from_the_portal_cannot_smuggle_markup_onto_the_page()
+    {
+        // These strings come from outside and this is the one place the page emits markup rather than
+        // text, so the encoding is pinned rather than assumed.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData", "nothing recognised", worthRetrying: false,
+            matched: new Dictionary<string, VehicleFieldReading>
+            {
+                ["<script>alert(1)</script>"] = new("<b>x</b>", Reported),
+            })));
+
+        page.Find("#portal-read").Click();
+
+        Assert.DoesNotContain("<script>alert(1)</script>", page.Markup);
+        Assert.DoesNotContain("<b>x</b>", page.Markup);
+        Assert.Contains("&lt;script&gt;", page.Markup);
+    }
+
+
 }

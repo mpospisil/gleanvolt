@@ -27,6 +27,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IFastChargeSelector _fast;
     private readonly IVehicleTelemetry? _vehicle;
     private readonly VehicleOptions _vehicleOptions;
+
+    // The manufacturer feed whose health the Car feed entity carries (issue #140), or null when none
+    // is configured -- in which case the entity is not published and this is never read.
+    private readonly IVehicleUpdateService? _vehicleFeed;
     private readonly TargetedChargeOptions _targetedOptions;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
@@ -72,6 +76,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IOptions<VehicleOptions> vehicleOptions,
         HaDiscovery discovery,
         IVehicleTelemetry? vehicle = null,
+        IEnumerable<IVehicleUpdateService>? vehicleFeeds = null,
         TimeProvider? timeProvider = null)
     {
         _options = options.Value;
@@ -83,6 +88,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _target = target;
         _fast = fast;
         _vehicle = vehicle;
+        _vehicleFeed = vehicleFeeds?.FirstOrDefault();
         _vehicleOptions = vehicleOptions.Value;
         _targetedOptions = targetedOptions.Value;
         _pendingRestSocPercent = _targetedOptions.JustInTime.RestSocPercent;
@@ -236,7 +242,14 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         if (status is not null)
         {
-            await PublishAsync(_discovery.StateTopic, _discovery.StateJson(status), retain: true, cancellationToken).ConfigureAwait(false);
+            // Read on the publish tick rather than pushed on change: Health is a cheap property by
+            // contract, and a feed whose state changes between two status intervals has changed
+            // nothing an automation could act on any sooner.
+            await PublishAsync(
+                _discovery.StateTopic,
+                _discovery.StateJson(status, _vehicleFeed?.Health),
+                retain: true,
+                cancellationToken).ConfigureAwait(false);
         }
     }
 

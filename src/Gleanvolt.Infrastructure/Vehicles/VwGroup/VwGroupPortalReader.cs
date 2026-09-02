@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 
@@ -12,10 +13,10 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 ///
 /// <para><b>A fresh session per press.</b> Each read builds its own cookie jar and signs in again,
 /// rather than holding a session between presses. That is the right trade for a button pressed by
-/// hand a few times a day: session lifetime is exactly what the Phase 0 spike has not yet measured,
-/// and a held session that has quietly expired fails in a way that looks like bad credentials. Issue
-/// #140, which polls on a clock, is where keeping one starts to pay and where it gets measured
-/// first.</para>
+/// hand a few times a day: a held session that has quietly expired fails in a way that looks like bad
+/// credentials, and a button pressed twice costs two sign-ins rather than ninety-six a day.
+/// <see cref="VwGroupUpdateService"/> is where holding one starts to pay, and where a session's real
+/// lifetime is measured.</para>
 ///
 /// <para><b>Nothing here throws for an expected failure.</b> A refused password, a consent screen, a
 /// portal with nothing to give — each becomes an unsuccessful reading carrying its kind, because the
@@ -49,42 +50,96 @@ public sealed class VwGroupPortalReader(
 
         try
         {
-            var vehicle = await client.GetVehicleAsync(cancellationToken).ConfigureAwait(false);
-            var (requestId, name) = await client.GetNewestDatasetAsync(vehicle, cancellationToken)
-                .ConfigureAwait(false);
-            var archive = await client.DownloadAsync(vehicle.Vin, requestId, name, cancellationToken)
-                .ConfigureAwait(false);
+            // The same read the feed makes, merge and all: one code path, so the button cannot prove
+            // something the service does differently. What this adds is the reporting.
+            var read = await client.ReadAsync(cancellationToken).ConfigureAwait(false);
+            var mapped = read.Mapping;
 
-            if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var bundleError))
+            var notes = new List<string>();
+
+            if (read.DatasetsRead > 1)
             {
-                return VehiclePortalReading.Failed(
-                    nameof(VwGroupFailure.UnusableData), bundleError!, worthRetrying: false);
+                notes.Add(
+                    $"{read.DatasetsRead} of the portal's {read.DatasetsAvailable} deliveries were "
+                    + "merged: a partial delivery carries only the reports that changed, so the newest "
+                    + "one alone need not hold the battery.");
             }
 
-            var mapped = VwGroupVehicleStateMapper.Map(snapshots, vehicle.MaskedVin);
+            if (read.StoppedEarly is { Length: > 0 } stopped)
+            {
+                notes.Add(
+                    $"The merge stopped before its budget: {stopped}. What is above is what had been "
+                    + "assembled by then, which is a real reading and not a partial one — a delivery "
+                    + "that never arrived can only have added to it.");
+            }
+
+            if (VwGroupPortalClient.ReportTypes(read.Snapshots) is { Count: > 0 } types)
+            {
+                notes.Add(
+                    $"Report types in what was merged: {string.Join(", ", types)}. The portal splits a "
+                    + "car across types and delivers them separately, so a field that is still missing "
+                    + "is either in none of these or in a type this read did not reach.");
+            }
+
+            if (Absent(mapped.State) is { Length: > 0 } absent)
+            {
+                notes.Add(
+                    $"Still no {absent} after {read.DatasetsRead} of {read.DatasetsAvailable} "
+                    + "deliveries. Raising Vehicle:DataAct:MaxDatasetsPerRead reaches further back; if "
+                    + "a wider read never finds them, this car does not send them here.");
+            }
+
+            notes.AddRange(Notes(read.Bundle));
 
             if (mapped.State is null)
             {
                 // #73's rule, surfaced rather than swallowed: present-but-unusable is rejected whole,
-                // and the reason is the diagnosis.
+                // and the reason is the diagnosis. The unrecognised names travel with it, because the
+                // commonest reason to be here is a vocabulary that matched nothing -- and then the
+                // list *is* the fix.
+                //
+                // The delivery's own facts travel too: how many snapshots arrived and what they span
+                // is how you tell "this quarter-hour said nothing" from "the battery is in another
+                // delivery".
+                _logger.LogWarning(
+                    "The VW portal read of {Vehicle} produced no usable reading: {Reason}",
+                    read.Vehicle.MaskedVin, mapped.Error);
+
                 return VehiclePortalReading.Failed(
-                    nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false);
+                    nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false,
+                    unmapped: mapped.UnmappedFields,
+                    matched: mapped.MatchedFields,
+                    diagnostics: notes,
+                    dropped: read.Bundle.UndatedFields) with
+                {
+                    Vehicle = read.Vehicle.MaskedVin,
+                    SnapshotCount = read.Snapshots.Count,
+                    OldestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[0].CapturedAt : null,
+                    NewestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[^1].CapturedAt : null,
+                    TargetSocPercent = mapped.TargetSocPercent,
+                    OdometerKm = mapped.OdometerKm,
+                };
             }
 
             _logger.LogInformation(
-                "Read {Vehicle} from the VW portal: {Snapshots} snapshot(s), {Unmapped} unrecognised field(s).",
-                vehicle.MaskedVin, snapshots.Count, mapped.UnmappedFields.Count);
+                "Read {Vehicle} from the VW portal: {Datasets} delivery/deliveries, {Snapshots} "
+                + "snapshot(s), {Unmapped} unrecognised field(s).",
+                read.Vehicle.MaskedVin, read.DatasetsRead, read.Snapshots.Count,
+                mapped.UnmappedFields.Count);
 
             return new VehiclePortalReading(
                 Succeeded: true,
                 State: mapped.State,
-                Vehicle: vehicle.MaskedVin,
-                SnapshotCount: snapshots.Count,
-                OldestSnapshot: snapshots[0].CapturedAt,
-                NewestSnapshot: snapshots[^1].CapturedAt,
+                Vehicle: read.Vehicle.MaskedVin,
+                SnapshotCount: read.Snapshots.Count,
+                OldestSnapshot: read.Snapshots[0].CapturedAt,
+                NewestSnapshot: read.Snapshots[^1].CapturedAt,
                 TargetSocPercent: mapped.TargetSocPercent,
                 OdometerKm: mapped.OdometerKm,
-                UnmappedFields: mapped.UnmappedFields);
+                UnmappedFields: mapped.UnmappedFields,
+                MatchedFields: mapped.MatchedFields,
+                Diagnostics: notes,
+                DroppedFields: read.Bundle.UndatedFields);
         }
         catch (VwGroupPortalException failure)
         {
@@ -101,5 +156,50 @@ public sealed class VwGroupPortalReader(
         {
             throw;
         }
+    }
+
+    /// <summary>What a reading is still short of, named for the page. Empty when it holds everything.</summary>
+    private static string Absent(VehicleState? state)
+    {
+        if (state is null)
+        {
+            return string.Empty;
+        }
+
+        var missing = new List<string>();
+
+        if (state.SocPercent is null) missing.Add("state of charge");
+        if (state.RangeKm is null) missing.Add("range");
+        if (state.ChargeTimeRemaining is null) missing.Add("remaining time");
+        if (state.ChargeState == VehicleChargeState.Unknown) missing.Add("charging state");
+        if (state.PlugState == VehiclePlugState.Unknown) missing.Add("plug state");
+
+        return string.Join(", ", missing);
+    }
+
+    /// <summary>
+    /// What the bundle held that never became a reading, in sentences a page can show. Empty when
+    /// every report in it became a snapshot, which is the ordinary case and deserves no words.
+    /// </summary>
+    private static IReadOnlyList<string> Notes(VwGroupBundleReport bundle)
+    {
+        var notes = new List<string>();
+
+        if (bundle.Undated > 0)
+        {
+            // The one that hides a battery report: dropped whole, and its field names dropped with it,
+            // so the unrecognised list cannot show what was in there.
+            notes.Add(
+                $"{bundle.Undated} of {bundle.Reports} report(s) were dropped for carrying no "
+                + "timestamp this build recognises. Their fields are listed below and are invisible "
+                + "everywhere else — a timestamp spelled a new way costs the whole report.");
+        }
+
+        if (bundle.Empty > 0)
+        {
+            notes.Add($"{bundle.Empty} report(s) carried no named values at all.");
+        }
+
+        return notes;
     }
 }

@@ -22,6 +22,19 @@ namespace Gleanvolt.Core.Models;
 /// <param name="TargetSocPercent">The car's own charge limit, when the portal carried one. Nothing reads it yet.</param>
 /// <param name="OdometerKm">The odometer, when carried. Nothing reads it yet.</param>
 /// <param name="UnmappedFields">Field names in the bundle that nothing here recognises.</param>
+/// <param name="MatchedFields">
+/// The fields that <b>were</b> recognised, with the raw value read out of each. The other half of
+/// <paramref name="UnmappedFields"/>, and the half that decides between the two opposite readings of
+/// a name's absence from that list: never carried, or carried empty.
+/// </param>
+/// <param name="Diagnostics">
+/// What the bundle held that never became a reading, in sentences. Empty when there is nothing to say.
+/// </param>
+/// <param name="DroppedFields">
+/// Field names carried by reports that were dropped whole — kept apart from
+/// <paramref name="UnmappedFields"/> because these are not names the vocabulary failed to recognise:
+/// they never reached it. A recognised name can appear here, and that is the point.
+/// </param>
 /// <param name="FailureKind">A short name for what went wrong, or null on success.</param>
 /// <param name="Message">The failure in a sentence, or null on success.</param>
 /// <param name="IsWorthRetrying">
@@ -40,11 +53,38 @@ public sealed record VehiclePortalReading(
     IReadOnlyList<string>? UnmappedFields = null,
     string? FailureKind = null,
     string? Message = null,
-    bool IsWorthRetrying = false)
+    bool IsWorthRetrying = false,
+    IReadOnlyDictionary<string, VehicleFieldReading>? MatchedFields = null,
+    IReadOnlyList<string>? Diagnostics = null,
+    IReadOnlyList<string>? DroppedFields = null)
 {
     /// <summary>The unrecognised field names, never null.</summary>
     public IReadOnlyList<string> Unmapped => UnmappedFields ?? [];
 
-    public static VehiclePortalReading Failed(string kind, string message, bool worthRetrying) =>
-        new(false, FailureKind: kind, Message: message, IsWorthRetrying: worthRetrying);
+    /// <summary>The recognised fields and their raw values, never null.</summary>
+    public IReadOnlyDictionary<string, VehicleFieldReading> Matched =>
+        MatchedFields ?? new Dictionary<string, VehicleFieldReading>();
+
+    /// <summary>What the bundle held that never became a reading, in sentences. Never null.</summary>
+    public IReadOnlyList<string> Notes => Diagnostics ?? [];
+
+    /// <summary>Field names from reports that were dropped whole, never null.</summary>
+    public IReadOnlyList<string> Dropped => DroppedFields ?? [];
+
+    /// <param name="unmapped">
+    /// The field names nothing recognised, when the failure <b>is</b> that nothing was recognised.
+    /// A failed read is exactly when this list is most worth having, and dropping it here is what
+    /// used to leave the page saying "unusable data" while holding the answer in its hand.
+    /// </param>
+    public static VehiclePortalReading Failed(
+        string kind,
+        string message,
+        bool worthRetrying,
+        IReadOnlyList<string>? unmapped = null,
+        IReadOnlyDictionary<string, VehicleFieldReading>? matched = null,
+        IReadOnlyList<string>? diagnostics = null,
+        IReadOnlyList<string>? dropped = null) =>
+        new(false, FailureKind: kind, Message: message, IsWorthRetrying: worthRetrying,
+            UnmappedFields: unmapped, MatchedFields: matched, Diagnostics: diagnostics,
+            DroppedFields: dropped);
 }

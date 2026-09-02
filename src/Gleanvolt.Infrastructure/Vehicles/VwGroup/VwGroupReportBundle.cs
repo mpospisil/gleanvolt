@@ -24,6 +24,33 @@ public sealed record VwGroupSnapshot(
     string Source);
 
 /// <summary>
+/// What a bundle held that never became a snapshot — the reports this parser dropped, and why.
+///
+/// <para><b>Silently dropped is the failure mode worth naming.</b> A report with no timestamp this
+/// parser recognises is discarded whole, and every field in it disappears with it — including from
+/// the unrecognised-names list, which is the one place somebody would go looking. A bundle can
+/// therefore look as though it simply does not carry the battery, when it carries it under a
+/// timestamp spelled a way nothing here reads.</para>
+/// </summary>
+/// <param name="Members">JSON members in the ZIP.</param>
+/// <param name="Reports">Report objects found across them.</param>
+/// <param name="Undated">Reports dropped for having no recognised timestamp.</param>
+/// <param name="Empty">Reports dropped for carrying no named values at all.</param>
+/// <param name="UndatedFields">
+/// The field names those undated reports carried, so a name missing everywhere else can still be
+/// found. Sorted, and capped: this is a diagnostic, not a dump.
+/// </param>
+public sealed record VwGroupBundleReport(
+    int Members,
+    int Reports,
+    int Undated,
+    int Empty,
+    IReadOnlyList<string> UndatedFields)
+{
+    public static VwGroupBundleReport None { get; } = new(0, 0, 0, 0, []);
+}
+
+/// <summary>
 /// Turns a downloaded ZIP into report snapshots (issue #139, step 5's input).
 ///
 /// <para>Pure and static: bytes in, snapshots out, no HTTP anywhere near it — the discipline
@@ -70,9 +97,21 @@ public static class VwGroupReportBundle
     /// <param name="snapshots">What was found, or empty when this returns false.</param>
     /// <param name="error">Why nothing usable came back, or null on success.</param>
     public static bool TryRead(
-        byte[]? archive, out IReadOnlyList<VwGroupSnapshot> snapshots, out string? error)
+        byte[]? archive, out IReadOnlyList<VwGroupSnapshot> snapshots, out string? error) =>
+        TryRead(archive, out snapshots, out error, out _);
+
+    /// <summary>
+    /// The same read, plus what it threw away (issue #140's diagnostics). An overload rather than a
+    /// changed signature: every existing caller wants the snapshots and nothing else.
+    /// </summary>
+    public static bool TryRead(
+        byte[]? archive,
+        out IReadOnlyList<VwGroupSnapshot> snapshots,
+        out string? error,
+        out VwGroupBundleReport report)
     {
         snapshots = [];
+        report = VwGroupBundleReport.None;
 
         if (archive is null || archive.Length == 0)
         {
@@ -96,6 +135,11 @@ public static class VwGroupReportBundle
         }
 
         var found = new List<VwGroupSnapshot>();
+        var members = 0;
+        var reports = 0;
+        var undated = 0;
+        var empty = 0;
+        var undatedFields = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
         using (zip)
         {
@@ -107,9 +151,32 @@ public static class VwGroupReportBundle
                     continue;
                 }
 
-                found.AddRange(ReadEntry(entry));
+                members++;
+
+                foreach (var read in ReadEntry(entry))
+                {
+                    reports++;
+
+                    if (read.Snapshot is { } snapshot)
+                    {
+                        found.Add(snapshot);
+                        continue;
+                    }
+
+                    if (read.Undated)
+                    {
+                        undated++;
+                        undatedFields.UnionWith(read.Fields);
+                    }
+                    else
+                    {
+                        empty++;
+                    }
+                }
             }
         }
+
+        report = new VwGroupBundleReport(members, reports, undated, empty, [.. undatedFields.Take(60)]);
 
         if (found.Count == 0)
         {
@@ -122,7 +189,11 @@ public static class VwGroupReportBundle
         return true;
     }
 
-    private static IEnumerable<VwGroupSnapshot> ReadEntry(ZipArchiveEntry entry)
+    /// <summary>One report object's fate: the snapshot it became, or why it did not become one.</summary>
+    private readonly record struct ReadReport(
+        VwGroupSnapshot? Snapshot, bool Undated, IReadOnlyCollection<string> Fields);
+
+    private static IEnumerable<ReadReport> ReadEntry(ZipArchiveEntry entry)
     {
         JsonDocument document;
 
@@ -146,6 +217,7 @@ public static class VwGroupReportBundle
 
                 if (values.Count == 0)
                 {
+                    yield return new ReadReport(null, Undated: false, []);
                     continue;
                 }
 
@@ -154,10 +226,16 @@ public static class VwGroupReportBundle
                     // Undated, and therefore unusable: CapturedAt is the *car's* capture time, and
                     // substituting the download time would silently make every stale reading look
                     // fresh -- which is the one failure this whole feed exists to make visible.
+                    //
+                    // Its field names still travel, because dropping the report used to drop them from
+                    // the unrecognised list as well: a battery report under an unfamiliar timestamp
+                    // spelling then looked exactly like a bundle that carried no battery at all.
+                    yield return new ReadReport(null, Undated: true, values.Keys);
                     continue;
                 }
 
-                yield return new VwGroupSnapshot(capturedAt, values, entry.FullName);
+                yield return new ReadReport(
+                    new VwGroupSnapshot(capturedAt, values, entry.FullName), Undated: false, values.Keys);
             }
         }
     }

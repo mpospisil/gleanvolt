@@ -16,6 +16,7 @@ public sealed class HaDiscovery
 
     private readonly HomeAssistantOptions _options;
     private readonly bool _batteryHoldEnabled;
+    private readonly bool _vehicleFeedConfigured;
     private readonly IReadOnlyDictionary<string, object?> _device;
 
     // The PV system's id, which is what the topics are namespaced by: two installations on one broker
@@ -36,10 +37,20 @@ public sealed class HaDiscovery
     /// Whether <c>BatteryHold:Enabled</c> is on. When it is off the feature is inert, so the switch is
     /// not published at all rather than published as a control that would do nothing.
     /// </param>
-    public HaDiscovery(HomeAssistantOptions options, PvSystemInfo site, bool batteryHoldEnabled = false)
+    /// <param name="vehicleFeedConfigured">
+    /// Whether a manufacturer vehicle update service is configured (issue #140). With none there is no
+    /// feed whose health could be reported, so <b>Car feed</b> is not published at all rather than
+    /// published as an entity that would say nothing — the same rule the battery-hold switch follows.
+    /// </param>
+    public HaDiscovery(
+        HomeAssistantOptions options,
+        PvSystemInfo site,
+        bool batteryHoldEnabled = false,
+        bool vehicleFeedConfigured = false)
     {
         _options = options;
         _batteryHoldEnabled = batteryHoldEnabled;
+        _vehicleFeedConfigured = vehicleFeedConfigured;
         _systemId = site.Id;
         _deviceId = string.IsNullOrWhiteSpace(options.DeviceId) ? site.Id : options.DeviceId.Trim();
         _device = new Dictionary<string, object?>
@@ -480,6 +491,26 @@ public sealed class HaDiscovery
             ["device_class"] = "plug",
         });
 
+        // The vehicle feed's health (issue #140). Its whole reason for existing is that "the reading is
+        // old" and "the portal wants you in a browser" need different things from the owner, and only
+        // the second one is worth a notification at two in the morning -- so the state is the enum,
+        // compared by an automation, and the sentence rides along as an attribute for the message body.
+        //
+        // Published only when a feed exists: an installation with no manufacturer service has nothing
+        // to report and gets no entity, rather than one stuck on a value that means nothing.
+        if (_vehicleFeedConfigured)
+        {
+            yield return Config("sensor", "car_feed", new Dictionary<string, object?>
+            {
+                ["name"] = "Car feed",
+                ["state_topic"] = StateTopic,
+                ["value_template"] = "{{ value_json.car_feed }}",
+                ["json_attributes_topic"] = StateTopic,
+                ["json_attributes_template"] = "{{ {'reason': value_json.car_feed_reason} | to_json }}",
+                ["icon"] = "mdi:car-connected",
+            });
+        }
+
         yield return Config("binary_sensor", "holding_control", new Dictionary<string, object?>
         {
             ["name"] = "Charging now",
@@ -509,7 +540,13 @@ public sealed class HaDiscovery
     }
 
     /// <summary>The JSON state payload the sensors read from (via value_template). Null metrics are omitted.</summary>
-    public string StateJson(ChargeControlStatus s)
+    /// <param name="s">The last completed poll.</param>
+    /// <param name="vehicleFeed">
+    /// The manufacturer feed's health (issue #140), or null when none is configured. It rides on this
+    /// payload rather than on a topic of its own because the <b>Car feed</b> sensor reads its state and
+    /// its attribute from one message, and two topics could disagree for a status interval.
+    /// </param>
+    public string StateJson(ChargeControlStatus s, VehicleSourceHealth? vehicleFeed = null)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -536,6 +573,8 @@ public sealed class HaDiscovery
             ["session_kwh"] = Math.Round(s.SessionEnergyWh / 1000, 2),
             ["loaned_kwh"] = Math.Round(s.LoanedTodayWh / 1000, 2),
             ["tomorrow_kwh"] = s.TomorrowForecastWh is null ? null : Math.Round(s.TomorrowForecastWh.Value / 1000, 1),
+            ["car_feed"] = vehicleFeed?.State.ToString(),
+            ["car_feed_reason"] = vehicleFeed?.Message,
         };
 
         // The plan block is present only in the forecast-driven mode; in the others the entities go

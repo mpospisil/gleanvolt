@@ -108,10 +108,31 @@ public static class VwGroupFieldNames
     ];
 
     /// <summary>
+    /// The HV battery's energy content, as the portal reports it — what is in the pack now, and what
+    /// the pack holds full.
+    ///
+    /// <para><b>Recognised, seen, and deliberately not read — the measurement settled it.</b> They
+    /// were surfaced to answer whether a state of charge could be divided out of them when a delivery
+    /// carried no SOC of its own. The reference ID.4 answered no: <c>328.5</c> of <c>738.0</c> is
+    /// 44.5%, against the <c>50</c> the same car's <c>battery_state_report.soc</c> reported. The units
+    /// are not kilowatt-hours and the pair does not describe the same quantity the percentage does —
+    /// a reserve below the usable window, most likely — so a percentage computed here would have been
+    /// confidently wrong by five and a half points, in the number every kWh target is derived from.
+    /// They stay listed because they are real readings that nothing yet uses, which is what
+    /// <see cref="KnownButUnused"/> is for.</para>
+    /// </summary>
+    public static readonly string[] EnergyContentKWh =
+    [
+        "energy_contents.current_energy_content.physical_value",
+        "energy_contents.maximal_energy_content.physical_value",
+        "current_energy_content", "maximal_energy_content",
+    ];
+
+    /// <summary>
     /// Fields the mapper knows about but does not put on a <c>VehicleState</c>. Listed so that
     /// "unmapped" means "nobody has looked at this" rather than "we chose not to".
     /// </summary>
-    public static readonly string[][] KnownButUnused = [Odometer, TargetSoc];
+    public static readonly string[][] KnownButUnused = [Odometer, TargetSoc, EnergyContentKWh];
 
     /// <summary>
     /// Values that mean "no reading", whatever field they appear in.

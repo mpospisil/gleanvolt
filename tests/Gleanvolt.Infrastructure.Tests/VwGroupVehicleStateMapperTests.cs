@@ -180,4 +180,137 @@ public class VwGroupVehicleStateMapperTests
     {
         Assert.Contains("no snapshots", VwGroupVehicleStateMapper.Map([]).Error);
     }
+    [Fact]
+    public void ABundleWhoseFieldsAreAllStrangeIsRejectedRatherThanCalledAReading()
+    {
+        // Observed live: the portal answered, the bundle parsed, the capture time was minutes old --
+        // and every value was blank, because not one field name matched. Called a success, that is a
+        // page of dashes under a fresh timestamp, and an update service writing an empty reading over
+        // a good one and resetting its age. "Absent is fine" was about a source that does not report a
+        // field, never about a bundle in which everything is absent at once.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["some_field_nobody_wrote_down"] = "42",
+                ["another.one"] = "VALID",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.Null(result.State);
+        Assert.NotNull(result.Error);
+        Assert.Contains("recognises", result.Error);
+
+        // And the names travel with the rejection, because they are the fix.
+        Assert.Contains("some_field_nobody_wrote_down", result.UnmappedFields);
+        Assert.Contains("another.one", result.UnmappedFields);
+    }
+
+    [Fact]
+    public void OneRecognisedFieldIsStillAReading()
+    {
+        // The guard must not become "everything or nothing": an OBD-shaped source that reports only a
+        // state of charge is a supported feed, and #73's "absent is fine" still holds for the rest.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["battery_level_HV.value"] = "57",
+                ["some_field_nobody_wrote_down"] = "42",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.NotNull(result.State);
+        Assert.Equal(57, result.State.SocPercent);
+        Assert.Contains("some_field_nobody_wrote_down", result.UnmappedFields);
+    }
+
+
+    [Fact]
+    public void TheFieldsItDidRecogniseAreReportedWithWhatTheySaid()
+    {
+        // The half that was missing the first time this was needed in anger. A recognised name that
+        // came back empty is invisible in the unmapped list -- it is not unmapped -- so an empty
+        // reading looked identical whether the bundle lacked the field or carried it blank. Those
+        // want opposite fixes.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["charging_state_report.charging_state"] = "invalid",
+                ["mileage.value"] = "24680",
+                ["settings.auto_unlock_ac"] = "true",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        // Recognised by leaf, and its value shown raw: "invalid" is a sentinel, which is why nothing
+        // came of it, and seeing the word is the difference between adding a name and accepting that
+        // the car sent nothing.
+        Assert.Equal("invalid", result.MatchedFields["charging_state_report.charging_state"].Value);
+        Assert.Equal("24680", result.MatchedFields["mileage.value"].Value);
+
+        // And the two lists stay disjoint: a field is either recognised or listed as unrecognised.
+        Assert.Contains("settings.auto_unlock_ac", result.UnmappedFields);
+        Assert.DoesNotContain("mileage.value", result.UnmappedFields);
+    }
+
+
+    [Fact]
+    public void TheBatterysEnergyContentIsRecognisedSoItCanBeSeen()
+    {
+        // The reference ID.4's delivery carries no state of charge at all; these two are the only
+        // battery figures in it. Recognised rather than read: whether a percentage should be divided
+        // out of them is a decision about what SocPercent means, and it wants the numbers in front of
+        // somebody first.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["energy_contents.current_energy_content.physical_value"] = "41.2",
+                ["energy_contents.maximal_energy_content.physical_value"] = "77",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.Equal("41.2", result.MatchedFields["energy_contents.current_energy_content.physical_value"].Value);
+        Assert.DoesNotContain("energy_contents.current_energy_content.physical_value", result.UnmappedFields);
+
+        // Seen, and still not read: nothing here invents a state of charge out of them yet.
+        Assert.Null(result.State);
+    }
+
+
+    [Fact]
+    public void WhereASnapshotCarriesTwoSpellingsTheListedPreferenceDecides()
+    {
+        // The candidate lists are ordered on purpose -- battery_level_HV.value leads because a real
+        // bundle carries it with its own .state beside it. That order used to decide nothing: within
+        // one snapshot the winner was whichever name the portal serialised first, which is the
+        // dictionary's business and not a preference at all.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                // Listed second in the vocabulary, and first here, which is the whole trap.
+                ["battery_state_report.soc"] = "60",
+                ["battery_level_HV.value"] = "69",
+            },
+            "report.json");
+
+        Assert.Equal(69, VwGroupVehicleStateMapper.Map([snapshot], "id4").State!.SocPercent);
+    }
+
+
 }

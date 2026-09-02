@@ -111,4 +111,25 @@ public class VwGroupReportBundleTests
         Assert.False(VwGroupReportBundle.TryRead([], out _, out var error));
         Assert.Contains("empty", error);
     }
+    [Fact]
+    public void AReportDroppedForHavingNoTimestampSaysSoAndKeepsItsFieldNames()
+    {
+        // The invisible failure. An undated report is discarded whole and every field in it goes with
+        // it -- including out of the unrecognised-names list, which is the one place anybody looks. A
+        // battery report under a timestamp spelled a new way then looks exactly like a bundle that
+        // never carried a battery at all.
+        var undated = """
+            { "Data": [ { "dataFieldName": "battery_level_HV.value", "value": "57" } ] }
+            """;
+
+        var bundle = VwGroupFixtures.BundleOf(("undated-report.json", undated));
+
+        Assert.False(VwGroupReportBundle.TryRead(bundle, out _, out var error, out var report));
+
+        Assert.Equal(1, report.Undated);
+        Assert.Contains("battery_level_HV.value", report.UndatedFields);
+        Assert.NotNull(error);
+    }
+
+
 }

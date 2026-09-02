@@ -20,6 +20,9 @@ public class HaDiscoveryTests
 
     private static readonly HaDiscovery DiscoveryWithBatteryHold = new(Options, Sites.Home, batteryHoldEnabled: true);
 
+    private static readonly HaDiscovery DiscoveryWithVehicleFeed =
+        new(Options, Sites.Home, vehicleFeedConfigured: true);
+
     private static ChargeControlStatus Status(
         ChargeControlMode mode = ChargeControlMode.Solar,
         ChargeControlState state = ChargeControlState.Charging,
@@ -308,6 +311,56 @@ public class HaDiscoveryTests
                 Assert.Contains("| default(", template);
             }
         }
+    }
+
+    [Fact]
+    public void NoVehicleFeed_PublishesNoCarFeedEntity()
+    {
+        // An installation with no manufacturer update service has nothing to report, and an entity
+        // stuck on a value that means nothing is worse than no entity -- the same rule the battery
+        // hold switch follows when its feature is off.
+        Assert.DoesNotContain(
+            Discovery.DiscoveryMessages(),
+            m => m.Topic == "homeassistant/sensor/solax_controller/car_feed/config");
+    }
+
+    [Fact]
+    public void TheCarFeedCarriesTheStateForAnAutomationAndTheSentenceForTheMessage()
+    {
+        // Issue #140: "stale" and "sign-in required" need different things from the owner, and only
+        // the second is worth a notification at two in the morning. So the state is the thing an
+        // automation compares, and the sentence rides along as an attribute for the body of it.
+        var message = DiscoveryWithVehicleFeed.DiscoveryMessages()
+            .Single(m => m.Topic == "homeassistant/sensor/solax_controller/car_feed/config");
+
+        using var json = JsonDocument.Parse(message.Payload);
+        var config = json.RootElement;
+
+        Assert.Equal("Car feed", config.GetProperty("name").GetString());
+        Assert.Equal("solax/home-roof/state", config.GetProperty("state_topic").GetString());
+        Assert.Equal("{{ value_json.car_feed }}", config.GetProperty("value_template").GetString());
+        Assert.Equal("solax/home-roof/state", config.GetProperty("json_attributes_topic").GetString());
+        Assert.Contains("car_feed_reason", config.GetProperty("json_attributes_template").GetString());
+    }
+
+    [Fact]
+    public void StateJson_CarriesTheFeedsHealthAndItsSentence()
+    {
+        using var json = JsonDocument.Parse(DiscoveryWithVehicleFeed.StateJson(
+            Status(),
+            VehicleSourceHealth.NeedsOwner("The portal is showing a consent screen; open it in a browser.")));
+
+        Assert.Equal("NeedsOwner", json.RootElement.GetProperty("car_feed").GetString());
+        Assert.Contains("consent screen", json.RootElement.GetProperty("car_feed_reason").GetString());
+    }
+
+    [Fact]
+    public void StateJson_OmitsTheFeedEntirelyWhenNoneIsConfigured()
+    {
+        using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
+
+        Assert.False(json.RootElement.TryGetProperty("car_feed", out _));
+        Assert.False(json.RootElement.TryGetProperty("car_feed_reason", out _));
     }
 
     [Fact]

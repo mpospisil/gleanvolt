@@ -128,6 +128,73 @@ public class VwGroupLoginFormTests
         Assert.Null(VwGroupLoginForm.OwnerActionReason(PasswordPage));
     }
 
+    [Theory]
+    [InlineData("otp")]
+    [InlineData("emailOtp")]
+    [InlineData("email_otp")]
+    [InlineData("otpCode")]
+    [InlineData("smsCode")]
+    [InlineData("securityCode")]
+    [InlineData("verification-code")]
+    public void AFieldForACodeOutOfSomebodysInboxIsRecognisedWhateverItIsCalled(string name)
+    {
+        var page = $"<html><body><form action=\"/login\" method=\"post\">"
+            + $"<input type=\"text\" name=\"{name}\"></form></body></html>";
+
+        Assert.Equal(name, VwGroupLoginForm.Parse(page).OneTimeCodeField);
+    }
+
+    [Fact]
+    public void AnOtpPageCarryingAHiddenEmailIsStillNotAPageWeCanSignInOn()
+    {
+        // The regression this exists for. Every rendered input counts towards CanSignIn, hidden ones
+        // included -- so an OTP page that re-renders the address in a hidden field used to read as an
+        // ordinary sign-in page, and the identifier was posted into a form that wanted six digits. It
+        // failed five pages later as a refused password: stopped, correctly, and for the wrong stated
+        // reason, which sends the owner to their password instead of to their mailbox.
+        const string page = """
+            <html><body><form action="/login/authenticate" method="post">
+              <input type="hidden" name="email" value="owner@example.com">
+              <input type="hidden" name="_csrf" value="token">
+              <input type="text" name="emailOtp">
+            </form></body></html>
+            """;
+
+        var form = VwGroupLoginForm.Parse(page);
+
+        Assert.Equal("emailOtp", form.OneTimeCodeField);
+        Assert.False(form.CanSignIn);
+    }
+
+    [Fact]
+    public void TheOrdinaryPagesAskForNoCode()
+    {
+        // The other half: a false positive here would abort a sign-in that was working and report
+        // "sign-in required" when nothing is wrong at all.
+        Assert.Null(VwGroupLoginForm.Parse(IdentifierPage).OneTimeCodeField);
+        Assert.Null(VwGroupLoginForm.Parse(PasswordPage).OneTimeCodeField);
+        Assert.True(VwGroupLoginForm.Parse(IdentifierPage).CanSignIn);
+        Assert.True(VwGroupLoginForm.Parse(PasswordPage).CanSignIn);
+    }
+
+    [Fact]
+    public void OAuthsOwnCodeParameterIsNotMistakenForOne()
+    {
+        // "code" is deliberately not in the list: it is OAuth's own parameter name, and a hidden one
+        // on a sign-in page must not stop a flow that is working.
+        const string page = """
+            <html><body><form action="/login" method="post">
+              <input type="hidden" name="code" value="abc123">
+              <input type="email" name="email">
+            </form></body></html>
+            """;
+
+        var form = VwGroupLoginForm.Parse(page);
+
+        Assert.Null(form.OneTimeCodeField);
+        Assert.True(form.CanSignIn);
+    }
+
     [Fact]
     public void APageWithNoFormIsNotPostable()
     {

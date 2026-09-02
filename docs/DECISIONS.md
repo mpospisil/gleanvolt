@@ -4,6 +4,162 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-02 — The interval belongs to the service, and "needs you" is not a slower retry (issue #140)
+
+The VW portal now feeds the dashboard on its own clock. Three decisions in it are not obvious, and one
+of them reverses a smaller one from #139.
+
+### The cadence is the service's, and is not configurable
+
+The host asks a service how long to wait and honours the answer. It does not own an interval and
+neither does the configuration file.
+
+The reason is that no single figure is right twice. VW's portal is a fifteen-minute batch delivery, so
+asking faster achieves literally nothing; polling a sleeping Tesla wakes it and costs its owner range,
+so asking *at all* has a price. A host-level `PollInterval` would have to be wrong for one of them, and
+whoever set it would have no way of knowing which. `NextDelay` is re-read after every fetch, so a
+backoff is the service moving its own number rather than the host inventing a policy for an API it
+knows nothing about.
+
+Not exposing it as a setting is the other half. An owner who shortens the interval to five minutes gets
+the same data three times and three times the sign-ins; the number is a fact about the portal, and the
+place to change a fact about the portal is the file that knows about the portal.
+
+### A failure the owner must fix stops the feed, rather than retrying more slowly
+
+`SignInRejected`, `OwnerActionRequired` and `NoDataRequest` set `NextDelay` to
+`Timeout.InfiniteTimeSpan`, and the worker ends that service's loop until the process restarts.
+
+The tempting alternative — retry once an hour, or once a day — is worse in both directions. A refused
+password replayed on any schedule is how an account gets locked, and the schedule only decides how long
+that takes. A consent screen is a legal act that no number of retries answers. And the state that
+*deserves* the owner's attention is precisely the one a quiet hourly retry would keep looking like
+weather.
+
+What makes the full stop affordable is that a retry already exists and costs nothing: the
+`/vehicle-portal` button, with its own fresh session. Clear the screen, press the button, restart.
+
+**A state that never clears itself has to be said until it is fixed**, so it is said in four places: a
+band in the web UI's layout — every page, not only the dashboard card it belongs to — a `Car feed` row
+on Health, the `Car feed` entity for an automation to notify on, and a warning in the log **repeated
+every six hours**. The repetition is the part worth defending: a warning written once has scrolled out
+of `docker logs --tail` by the time anybody looks, and a stopped feed is otherwise silent in a way
+indistinguishable from a parked car. It is a log line and never a request, so "it stopped asking"
+remains literally true.
+
+An emailed one-time code is this case exactly, and it is also detected **structurally** rather than only
+by prose. `CanSignIn` — the guard that stops the word "consent" aborting a sign-in on a client literally
+named "GIS Consent Portal" — counts every rendered input, hidden ones included, so an OTP page carrying
+the address in a hidden `email` would have read as an ordinary sign-in page and been posted to. A field
+named `otp` or `emailOtp` says "a person is required" in every language a needle list would have to be
+translated into. `code` is deliberately excluded: it is OAuth's own parameter name, and a false positive
+would abort a working sign-in — worse than the false negative it prevents.
+
+`NoDataAvailable` is deliberately on the other side of the line and does not even back off: a newly
+created data request takes hours to fill, and backing off would take hours more to notice that it had.
+
+### A reading is assembled from several deliveries, and dated by what contributed to it
+
+The first live read settled a question the fixtures could not. The portal's newest delivery for the
+reference ID.4 carried 47 fields — a real odometer (53,065), a real charge target (80), doors, windows,
+parking lights, climate consumption, charge-mode settings, error codes — and **no state of charge, no
+range, no plug state and no charging state**. Nothing was a sentinel and nothing was misspelled: the
+vocabulary matched what was there. The battery simply was not in that delivery.
+
+That is what `type: partial` means, and it had been read as "the newest delivery is the car". It is
+not: each delivery carries the reports that changed, so which report type you get is a coin toss.
+
+**So a read merges deliveries, and does it adaptively.** The newest first; older ones only while the
+merged reading still has no state of charge; never more than four, which is an hour of a fifteen-minute
+request and the span over which a parked car's SOC does not meaningfully move. A car whose newest
+delivery carries the battery downloads exactly one ZIP, as before — the budget is a ceiling, not a cost.
+Merging itself needed no new rules: several snapshots, sentinels filtered first, newest real value wins
+is what the mapper was already built to do, which is the whole reason #139 wrote those tie-breaks
+before anything needed them.
+
+**What merging did make load-bearing is the dating.** The mapper used to stamp a reading with the
+newest snapshot in the pile. Within one delivery that is minutes of slack and pedantic to argue about;
+across merged deliveries it is the difference between honest and not — a state of charge from 10:14
+carrying a 10:29 status report's clock is a stale reading wearing a fresh face, and freshness is the
+one thing this feed exists to let an owner judge. A reading is now dated by the newest snapshot that
+actually **contributed a value** to it.
+
+**And the diagnostics grew the half they were missing.** The unrecognised-names list answers "what did
+you not read", and on its own it cannot distinguish "the bundle never carried that field" from "it
+carried it and the value was a sentinel" — opposite problems with opposite fixes. Both surfaces now
+also report what *was* recognised, with each field's raw value, quoted. The same reasoning applies to a
+report dropped for having no timestamp: it used to vanish whole, taking its field names out of the
+unrecognised list too, so a battery report under an unfamiliar timestamp spelling looked exactly like a
+bundle that never carried a battery.
+
+### The energy contents are not a state of charge, and the measurement is why we know
+
+They were surfaced precisely to answer whether a percentage could be divided out of them for a
+delivery that carried no SOC. The live read answered it: `328.5` of `738.0` is **44.5%**, against the
+**50** the same car's `battery_state_report.soc` reported in the same read. The units are not
+kilowatt-hours and the pair plainly does not describe the same quantity the percentage does — a reserve
+below the usable window would explain it.
+
+Had that division shipped on the plausibility of the names alone, it would have been wrong by five and
+a half points in the one number every kilowatt-hour target is computed from, and wrong *silently*. The
+fields stay recognised and unread, which is what `KnownButUnused` is for.
+
+### A merged reading is dated by its state of charge
+
+The merge budget was justified as "four deliveries is an hour of a fifteen-minute request". The live
+portal then offered **thirty** deliveries whose newest four spanned most of a day: it delivers when the
+car reports, not on a clock. So a state of charge can be hours older than the status report merged
+beside it, and dating the pair by the newer of them would show an old percentage as minutes fresh.
+
+The reading is therefore dated by the **state of charge's own snapshot**, falling back to the newest
+contributing field only when there is no SOC at all. Everything else on a `VehicleState` is display;
+the percentage is what a target is computed from and what `MaxAge` is judged against, so it is the
+field the timestamp belongs to. The budget bounds what a read costs over a domestic uplink and says
+nothing about how old the answer is — the answer says that itself.
+
+### The session is held — reversing #139's "sign in afresh every time"
+
+The on-demand reader builds a cookie jar per press, and #139 recorded why: a held session that has
+quietly expired fails in a way that looks like bad credentials, and nobody knew how long one lived.
+
+On a clock that trade inverts. Signing in afresh every fifteen minutes means ninety-six password
+replays a day at a real identity provider, which is the thing #137 was most careful about. So the feed
+holds one session, and the client's existing "sign in when bounced" behaviour — already exactly once
+per call — handles expiry.
+
+**And it measures.** Nobody could answer #138's session-lifetime question because nothing had ever kept
+a session; the first thing that keeps one is the first thing that can measure one, so
+`VwGroupPortalClient` gained a `SignedIn` event and the service times the gaps. It is a lower bound by
+construction: a session is discovered dead only when it is next used. The client got no clock — it says
+*that* it signed in, and whoever cares what time it is timestamps it.
+
+### Precedence between two sources belongs to the composition root
+
+`VehicleStateHolder` is last-write-wins, so "if both feeds are on, the manufacturer's wins" cannot be
+expressed inside either worker without one of them learning about the other. It is decided where both
+are registered: with `Vehicle:DataAct:Enabled` on, `VehicleMqttWorker` is not registered at all.
+
+Silence is the failure mode that mattered here, so `VehicleUpdateWorker` logs at startup when
+`Vehicle:Enabled` is still true — an MQTT automation that is publishing to a topic nobody subscribes to
+otherwise looks exactly like a working feed.
+
+### The card shows the car because it is defined
+
+The vehicle section used to hide until a reading arrived, which made three situations identical: no
+feed, a feed that has not spoken yet, and a feed that has stopped. The car is configuration and the
+feed is an attachment, so the card shows the car and then names the feed's state — with *stale* and
+*sign-in required* rendered differently, because they need opposite things from the owner and a charger
+sitting idle is already the most convincing impersonation of a fault this controller can produce.
+
+### What was kept small on purpose
+
+`IVehicleUpdateService` has five members and no credential abstraction, no capability taxonomy and no
+auth-model enum. What it exposes about authentication is not *how* a service authenticates but whether
+it currently can. One implementation cannot tell you what a second one wants, and the second one — a
+car that must be woken to answer — is the argument that should shape any of that.
+
+---
+
 ## 2026-09-01 — The VW portal is reachable headlessly, and five of our assumptions about it were wrong (issues #137/#139)
 
 The EU Data Act client now signs in and reads the reference ID.4 from a button on `/vehicle-portal`.

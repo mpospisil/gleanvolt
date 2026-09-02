@@ -3,9 +3,10 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <summary>
 /// What the VW Group portal client needs to know to sign in and find a car (issue #139).
 ///
-/// <para>A plain object constructed by the caller, <b>not</b> bound from configuration here: Phase 1
-/// is the client and nothing that knows it is running inside a controller. Phase 2 (#140) binds it,
-/// and that is also where it acquires an <c>.env</c> name.</para>
+/// <para>A plain object constructed by the caller, <b>not</b> bound from configuration here: this
+/// assembly is the client and nothing in it knows it is running inside a controller.
+/// <c>VwGroupPortalOptionsResolver</c> in the host binds it from <c>Vehicle:DataAct:*</c>, with the
+/// shorter <c>VW_*</c> environment names honoured beside it.</para>
 ///
 /// <para><b>The brand client id is a setting, not a constant.</b> VW passenger and commercial
 /// vehicles share one; Audi, Škoda, SEAT/Cupra and Bentley each have their own, and they belong to
@@ -64,6 +65,37 @@ public sealed class VwGroupPortalOptions
     /// there is a choice to be made rather than picking for the owner.
     /// </summary>
     public string Vin { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How many deliveries one read may merge before it gives up on finding a state of charge.
+    ///
+    /// <para><b>A count of downloads, not a span of time.</b> Four was picked as an hour of a
+    /// fifteen-minute request; the reference car then offered <i>thirty</i> deliveries whose newest
+    /// four covered most of a day, because the portal delivers when the car reports rather than on a
+    /// tidy clock. So this bounds what a read costs over a domestic uplink and nothing else — how old
+    /// the resulting reading is, is said by the reading's own capture time, and judged by
+    /// <c>Vehicle:MaxAge</c> exactly as every other source is.</para>
+    ///
+    /// <para>It is a ceiling, not a fixed cost: deliveries are pulled only while the reading is still
+    /// short of something — the battery, the range, the charging state, the plug, the remaining time —
+    /// so a delivery that carries a whole car is one ZIP. On a car whose reports are split across
+    /// deliveries, expect a read to spend most of this budget, and expect the last of it to be spent
+    /// on a field the car may simply never send. Lower it to 1 to have the newest delivery and nothing
+    /// else; the log says what a read is still short of, which is how to tell whether raising it would
+    /// buy anything.</para>
+    /// </summary>
+    public int MaxDatasetsPerRead { get; init; } = 4;
+
+    /// <summary>
+    /// How long to wait between the downloads of one merged read.
+    ///
+    /// <para><b>Measured, not guessed:</b> a twelve-deep read against the live portal was answered
+    /// with <c>429 Too Many Requests</c> on the delivery endpoint. The deliveries are the only place
+    /// this client makes a burst of requests, and spacing them is the difference between asking for a
+    /// lot and asking rudely. A second costs three seconds on a four-deep read that happens every
+    /// fifteen minutes, and nothing at all on the common one-delivery case.</para>
+    /// </summary>
+    public TimeSpan PauseBetweenDownloads { get; init; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// How long any single HTTP exchange may take. The portal is a batch delivery rather than a live

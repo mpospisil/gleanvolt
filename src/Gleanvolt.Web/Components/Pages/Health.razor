@@ -6,6 +6,7 @@
 @inject WebBuildInfo Build
 @inject TimeProvider Time
 @inject IServiceShutdown Shutdown
+@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
 
 @*
     The whole of phase 0's user interface. It exists to prove the two things no unit test can: that a
@@ -45,6 +46,64 @@
 
     <dt>Charge mode</dt>
     <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+
+    @*
+        The manufacturer feed (#140), on the page where "is anything wrong?" is actually asked. A feed
+        blocked on its owner is the one thing here that no amount of waiting fixes, so it says which
+        state it is in and quotes the service's own sentence rather than paraphrasing it.
+    *@
+    @if (_feed is not null)
+    {
+        <dt>Car feed</dt>
+        <dd class="@(_feed.IsBlocked ? "error" : null)">
+            @_feed.State — @_feed.Message
+            @if (_feed.IsBlocked)
+            {
+                <a href="/vehicle-portal">Check the portal</a>
+            }
+        </dd>
+    }
+
+    @*
+        How the feed's own running is going (#140), for the two questions a log grep was the only way
+        to answer: is it actually reading on its clock, and is it holding one session?
+
+        "Sessions" is the one to read first. One, however long the controller has been up, is the
+        healthy answer -- more means portal sessions are expiring, which is the figure nobody had
+        before this feed existed.
+    *@
+    @if (_diagnostics is { Attempts: > 0 } diagnostics)
+    {
+        <dt>Feed reads</dt>
+        <dd>
+            @diagnostics.Readings of @diagnostics.Attempts
+            @if (diagnostics.LastReadingAt is { } lastRead)
+            {
+                <span class="muted">— last @Age(lastRead) ago</span>
+            }
+        </dd>
+
+        <dt>Portal session</dt>
+        <dd>
+            @(diagnostics.SessionAge is { } age ? Duration(age) : "none")
+            <span class="muted">
+                (@diagnostics.Sessions sign-in@(diagnostics.Sessions == 1 ? "" : "s") since start@(diagnostics.Sessions > 1 ? " — sessions are expiring" : ""))
+            </span>
+        </dd>
+
+        <dt>Next read</dt>
+        <dd>
+            @if (diagnostics.NextDueAt is { } due)
+            {
+                @TimeZoneInfo.ConvertTime(due, Time.LocalTimeZone).ToString("HH:mm:ss")
+                <span class="muted">(@Until(due))</span>
+            }
+            else
+            {
+                <span class="error">never — the feed has stopped</span>
+            }
+        </dd>
+    }
 </dl>
 
 @*
@@ -110,11 +169,20 @@
         Shutdown.RequestStop("Web UI");
     }
 
+    // The manufacturer feed's health, or null when no update service is configured (#140).
+    private VehicleSourceHealth? _feed;
+
+    // And how its running is going, when the service offers that -- a polling feed with a held session
+    // has a session age and a next-due time; one whose API pushes has neither, which is why this is a
+    // separate interface rather than more members on IVehicleUpdateService.
+    private VehicleFeedDiagnostics? _diagnostics;
+
     protected override void OnInitialized()
     {
         // Seeded before subscribing, so a browser that arrives between two polls still sees the last
         // one rather than an empty page until the next.
         _status = StatusHolder.Current;
+        RefreshFeed();
         StatusHolder.Updated += OnStatusUpdated;
     }
 
@@ -123,7 +191,20 @@
     private void OnStatusUpdated(ChargeControlStatus status)
     {
         _status = status;
+
+        // Re-read on the poll's cadence, like everything else on this page: Health is a cheap property
+        // by contract, and a page left open is exactly where a feed's state changing has to show up.
+        RefreshFeed();
+
         InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshFeed()
+    {
+        var service = VehicleFeeds.FirstOrDefault();
+
+        _feed = service?.Health;
+        _diagnostics = (service as IVehicleFeedDiagnostics)?.Diagnostics;
     }
 
     // The holder is a singleton and outlives every circuit, so an unsubscribed component would be
@@ -142,5 +223,31 @@
         return age.TotalSeconds < 90
             ? $"{age.TotalSeconds:F0} s"
             : $"{age.TotalMinutes:F0} min";
+    }
+
+    /// <summary>
+    /// A span in the coarsest unit that still says something. A portal session is the thing this is
+    /// for, and "1.4 h" answers "is it holding one?" better than 84 minutes does.
+    /// </summary>
+    private static string Duration(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero)
+        {
+            span = TimeSpan.Zero;
+        }
+
+        return span.TotalMinutes < 90
+            ? $"{span.TotalMinutes:F0} min"
+            : span.TotalHours < 48
+                ? $"{span.TotalHours:F1} h"
+                : $"{span.TotalDays:F1} days";
+    }
+
+    /// <summary>How long until a moment, or "due" once it has passed and the fetch has not landed.</summary>
+    private string Until(DateTimeOffset moment)
+    {
+        var remaining = moment - Time.GetUtcNow();
+
+        return remaining <= TimeSpan.Zero ? "due" : $"in {Duration(remaining)}";
     }
 }

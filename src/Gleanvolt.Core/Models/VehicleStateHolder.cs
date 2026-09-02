@@ -26,13 +26,34 @@ public sealed class VehicleStateHolder : IVehicleTelemetry
     public event Action<VehicleState>? Updated;
 
     /// <summary>
-    /// Replaces the current state. Called only for a message that parsed into something usable —
-    /// a rejected payload leaves the previous state in place rather than blanking it, so a momentarily
-    /// broken feed degrades into "the reading is getting older" instead of "there is no car".
+    /// Offers a reading. Called only for a message that parsed into something usable — a rejected
+    /// payload leaves the previous state in place rather than blanking it, so a momentarily broken
+    /// feed degrades into "the reading is getting older" instead of "there is no car".
+    ///
+    /// <para><b>The newest reading wins, whoever produced it</b>, and one older than what is already
+    /// held is ignored. That is what lets two sources feed one car without a race: a Home Assistant
+    /// integration polling the manufacturer's app API and this controller reading the same
+    /// manufacturer's EU Data Act portal describe the same battery at different resolutions and
+    /// different lags, and the right answer is simply whichever saw the car most recently. It also
+    /// fixes a smaller thing that was always there: a retained MQTT message replayed on reconnect no
+    /// longer overwrites a fresher reading with a stale one.</para>
+    ///
+    /// <para>A feed that stops does not block the other, because its readings stop advancing while
+    /// the other's keep arriving — so precedence corrects itself within one reading rather than being
+    /// configured.</para>
     /// </summary>
-    public void Set(VehicleState state)
+    /// <returns>Whether this reading was taken, i.e. whether it was newer than the one held.</returns>
+    public bool Set(VehicleState state)
     {
+        var current = _current;
+
+        if (current is not null && state.CapturedAt < current.CapturedAt)
+        {
+            return false;
+        }
+
         _current = state;
         Updated?.Invoke(state);
+        return true;
     }
 }

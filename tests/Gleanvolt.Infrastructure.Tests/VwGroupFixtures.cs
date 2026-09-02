@@ -41,6 +41,24 @@ internal static class VwGroupFixtures
         return buffer.ToArray();
     }
 
+    /// <summary>A bundle of members written here rather than committed, for a shape a fixture would overstate.</summary>
+    public static byte[] BundleOf(params (string Name, string Json)[] members)
+    {
+        using var buffer = new MemoryStream();
+
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, json) in members)
+            {
+                var entry = archive.CreateEntry(name);
+                using var writer = new StreamWriter(entry.Open());
+                writer.Write(json);
+            }
+        }
+
+        return buffer.ToArray();
+    }
+
     /// <summary>A bundle with one member that is not readable JSON, to prove one bad file costs nothing.</summary>
     public static byte[] BundleWithBrokenMember(string name)
     {

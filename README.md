@@ -40,10 +40,12 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
   car, ask what a targeted charge *would* do without starting one, and start it when the answer is
   right. Built so that an **MCP server** can hand the lot to an LLM as generated tools — see
   [HTTP API](#http-api-the-api-section).
-- **Vehicle telemetry** — optionally reads the **car's own** battery SOC and range from MQTT, normalised
-  so any vehicle Home Assistant can see becomes a source without new code. It shapes what you *ask* for
-  — a targeted charge can be stated as a battery percentage — and never how it is delivered: no control
-  decision depends on it, and a feed that dies changes nothing about how the charger is driven.
+- **Vehicle telemetry** — optionally reads the **car's own** battery SOC and range, either from MQTT
+  (normalised, so any vehicle Home Assistant can see becomes a source without new code) or, for a VW
+  Group car, from the manufacturer's **EU Data Act portal** on the controller's own schedule. It shapes
+  what you *ask* for — a targeted charge can be stated as a battery percentage — and never how it is
+  delivered: no control decision depends on it, and a feed that dies changes nothing about how the
+  charger is driven.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on, with a
   day-at-a-time viewer in the web UI.
@@ -1316,6 +1318,10 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   **Target grid energy**, **Target expected**, **Target shortfall** and **Grid top-up start**. See
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
 - binary sensors: **Car connected** and **Charging now**.
+- **Car feed** — only on an installation with a
+  [manufacturer vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section)
+  configured. `Ok`, `Degraded` or `NeedsOwner`, with the reason as an attribute: the entity a
+  "the car feed wants me in a browser" notification keys off.
 - an availability topic, so HA marks the device unavailable if the controller stops.
 
 The device also carries the running build as its **software version** (`1.0.0 (31bf347)`), shown on
@@ -1362,6 +1368,7 @@ description or tooltip field. The meanings live here instead.
 | **Grid power** | W | Positive while importing from the grid, negative while exporting. This is the opposite of the sign the SolaX register uses; it's negated on read so positive always means power flowing into the house. |
 | **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. `Unknown` when no hold is armed. |
 | **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
+| **Car feed** | — | How the [manufacturer's vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) is doing, with the sentence as a `reason` attribute. `Ok`: the last read produced a reading. `Degraded`: it is trying and not currently succeeding — a 5xx, a timeout, an expired session, or a delivery not filled yet; it backs off and clears itself. `NeedsOwner`: a refused password, a consent screen, an OTP or a portal setting only you can make — **the feed has stopped asking** and will not resume until you have cleared it and restarted the controller. That last state is the one worth a notification; the other two are not. Absent entirely on an installation with no such feed. |
 | **Charging now** | on/off | `ON` while *the controller* is commanding a charging current, as opposed to having paused or never taken control. This is our own decision, not the car's behaviour — a car can be plugged in and idle while this is `ON`. See **EV charging power** for what's actually flowing. |
 | **Stop service** | button | Shuts the controller down gracefully: the charger is returned to its pause current, the open session is closed and written, and the store is flushed — none of which happens if the process is killed. **One-way from here.** The service is what speaks MQTT, so this device goes unavailable and nothing in Home Assistant can start it again; that needs a shell on the Pi (`docker compose start gleanvolt-controller`). Lives in the device's *Configuration* section rather than on the dashboard card, and only an exact `PRESS` on its topic triggers it. See [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller). |
 
@@ -1606,9 +1613,8 @@ It is not republished to Home Assistant, since Home Assistant is where it comes 
 
 #### It reads MQTT, not a car API
 
-There is no integration with Volkswagen, Škoda, Tesla or anyone else in this codebase, deliberately.
-Instead the controller subscribes to **one topic with one JSON schema**, and each car is adapted onto
-that schema by a template or automation in Home Assistant:
+The default source is a topic, not a manufacturer. The controller subscribes to **one topic with one
+JSON schema**, and each car is adapted onto that schema by a template or automation in Home Assistant:
 
 ```jsonc
 {
@@ -1627,6 +1633,13 @@ Every source spells things differently — the VW EU Data Act portal emits
 emits raw CAN. Doing that mapping in Home Assistant rather than here means **a second car costs no
 code**: a Škoda Elroq, a Tesla, a Kia — anything Home Assistant can see becomes a source by copying
 one automation.
+
+There is exactly one manufacturer integration in the codebase, and it is
+[the VW Group portal below](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section). It
+exists because the EU Data Act gives the *owner* their car's data directly, with no Home Assistant in
+the middle — and it writes the same `VehicleState` this schema produces, through the same holder. It is
+the exception, not the new default: anything that needs its own credentials, its own session and its
+own failure modes has to earn a place here one manufacturer at a time.
 
 Everything except `captured_at` is optional, and absent is a supported configuration rather than an
 error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
@@ -1773,6 +1786,112 @@ stays a Gleanvolt setting rather than something read from the car. Anything that
 must behave identically when this feed is absent, stale, or gone — which in this phase is trivially
 true, because nothing consumes it yet.
 
+#### The car from the manufacturer, on a clock (the `Vehicle:DataAct` section)
+
+The second way to feed the same card: the controller signs in to VW's own **EU Data Act portal** on a
+schedule and writes what it finds into the same reading everything else reads. One car, one
+manufacturer, and **off by default**:
+
+```jsonc
+"Vehicle": {
+  "DataAct": {
+    "Enabled": false          // read the portal on a clock, as opposed to only when the button is pressed
+  }
+}
+```
+
+The credentials are the four from
+[docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md) — `Vehicle__DataAct__Username`,
+`__Password`, `__Brand` and, with more than one car on the account, `__Vin`. Secrets, supplied via
+`.env` or an environment variable exactly as `Solcast__ApiKey` is; the shorter `VW_*` names are honoured
+beside them and the sectioned form wins where both are set. Being *blunt about that password*: it is
+not a read-only credential. The same account that reads the car's state also unlocks and locates it,
+there is no scoped token to use instead, and what protects it here is that `.env` is gitignored and the
+client never logs or renders it. That is genuinely all the protection a LAN appliance offers, and
+[#137](https://github.com/mpospisil/gleanvolt/issues/137) took the trade knowingly rather than casually.
+
+**Having credentials is not switching it on.** The [`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand)
+button works as soon as they are set; reading the portal *on a clock* waits for `Enabled`. Press the
+button first — that is what proves the credentials and that this car's fields are understood — and
+switch the feed on afterwards.
+
+**The interval belongs to the service, and is not a setting.** It asks every fifteen minutes, because
+the portal is a batch delivery whose own continuous data request runs at that frequency and asking
+faster achieves precisely nothing. No figure the host could pick would be right for both this and a car
+that has to be woken up to answer, which is the reason the number lives in the service rather than in
+your file.
+
+**One reading is assembled from as many deliveries as it takes.** The portal sends *partial*
+deliveries — each carries the reports that changed — so the newest one on its own is a coin toss over
+which report type arrives. On the reference ID.4 it held the odometer, the charge target, the doors and
+the climate, and no state of charge at all, while the car's SOC was perfectly well known elsewhere at
+that moment. So a read takes the newest delivery and keeps merging older ones **while the reading is still short
+of something** — the battery, the range, the charging state, the plug, the remaining time — up to four
+(`Vehicle:DataAct:MaxDatasetsPerRead`, or `VW_MAX_DATASETS`). Stopping at the first state of charge was the first attempt and
+was wrong: the reports are split by type, so it produced a card with a battery and four dashes. A delivery that carries a whole car costs exactly one
+download; a car whose reports are split will spend most of the budget, and the last of it on a field
+the car may simply never send — the log says what a read is still short of, which is how to tell
+whether raising the number would buy anything. It bounds what a read costs over a domestic uplink and
+nothing else: the portal delivers when the car reports rather
+than on a clock — the reference install was offered thirty deliveries whose newest four covered most of
+a day — so how old the answer is, is said by the reading's own capture time and judged by `MaxAge`.
+
+The merge needs no new rules — several snapshots, sentinels filtered first, newest real value wins is
+what the mapper already does — but it does make one thing load-bearing: a reading is dated by **its
+state of charge's own snapshot**, not by the newest report downloaded. Everything else on the card is
+display; the percentage is what a kWh target is computed from and what `MaxAge` is judged against, so
+a battery reading from yesterday afternoon merged beside this morning's odometer reads as yesterday
+afternoon — which is the only answer that lets you decide whether to trust it.
+
+**It holds one session rather than replaying a password.** The button signs in afresh on every press,
+which is right by hand and wrong on a schedule — repeatedly replaying a password at a real identity
+provider is how accounts get locked. The feed keeps one session and signs in again only when the portal
+bounces it, and it **times how long each session lasted** and logs it: nobody knows what a portal
+session's life is, because until this nothing had ever kept one.
+
+**A failure the owner has to fix stops the feed rather than slowing it.** A refused password, a consent
+screen, an emailed one-time code, a CAPTCHA, or an account with no continuous data request at all: the
+service stops asking. Ordinary failures — a 5xx, a timeout, an expired session, a delivery that has not
+been filled yet — are `Degraded` instead: they back off (to at most an hour) and clear themselves.
+
+**A stopped feed is said four ways, because it does not clear itself.**
+
+- A band across the top of **every page** of the web UI: *Sign-in required*, the service's sentence, and
+  a link to the portal page. It follows the poll, so a browser left open overnight grows one.
+- The dashboard's vehicle card, next to the reading it explains.
+- **Health**, where "is anything wrong?" is actually asked, as a `Car feed` row — beside three that
+  say whether the feed is *running*: **Feed reads** (readings of attempts, and how long ago the last
+  one landed), **Portal session** (its age, and how many sign-ins there have been — *one* is the
+  healthy answer however long the controller has been up, and more says sessions are expiring), and
+  **Next read**, which reads `never — the feed has stopped` when it is blocked.
+- The log, as a **warning** — repeated every six hours for as long as it lasts, because a warning
+  written once has scrolled out of `docker logs --tail` by the time anybody reads it, and a silent
+  stopped feed is indistinguishable from a parked car. The reminder is a log line and never a request:
+  nothing is fetched while the feed is blocked.
+
+Plus the [**Car feed**](#what-each-entity-means) entity going to `NeedsOwner`, which is what a Home
+Assistant notification keys off. Clear it in a browser, press the portal button to check, and restart
+the controller to put the feed back on its clock.
+
+**About that emailed code.** If the portal ever answers with a one-time code, a CAPTCHA or an
+authenticator prompt, the client recognises it *before* posting anything and never retries — a password
+put into a code form tells nobody anything, and a screen a program cannot answer is not made answerable
+by asking again. It is recognised two ways: by the words on the page, and by a field asking for a code
+(`otp`, `emailOtp`, `securityCode` and their like), which is what still works on a page in a language
+the word list does not cover. On the reference account this has not appeared — six cold sign-ins with
+only an email and a password, no code and no CAPTCHA — but the *first* sign-in in a browser does show a
+consent screen, and holding one session rather than signing in ninety-six times a day is partly there to
+keep new-device challenges rare.
+
+> **With this on, the MQTT vehicle feed is not subscribed.** Two sources writing one reading is a race
+> whoever wins it, so the manufacturer's service takes the holder and the MQTT worker is not started at
+> all; the controller says so in its startup log. If you were publishing from a Home Assistant
+> automation, that automation is now doing nothing — stop it, or leave it and know which one is live.
+
+Everything else about the feed is unchanged: `MaxAge` still judges staleness, nothing in `ChargeControl`
+or `BatteryHold` reads it, and an installation with `Enabled: false` behaves exactly as it did before
+any of this existed.
+
 ### Self-hosted web UI (the `Web` section)
 
 The controller can serve its own UI, as an alternative to Home Assistant or alongside it. It exists
@@ -1832,14 +1951,16 @@ A button that asks VW's own [EU Data Act portal](docs/VW_PORTAL_SETUP.md) for th
 came back: battery, range, charge state, plug state and the *car's* capture time; then the delivery it
 arrived in; then every field in it that nothing here recognises yet.
 
-**A diagnostic, not a feed.** Nothing polls it, and the reading is not written into the dashboard's
-vehicle card or into any charging decision — it is how you check that the credentials work and that
-this car's fields are understood, before anything reasons about a car with data fetched behind your
-back. Each press signs in afresh, which is fine by hand and is exactly why it is not a poll.
+**A diagnostic, and the way you prove the credentials.** Nothing polls *this*: each press signs in
+afresh, with its own session, and the reading it shows is not written into the dashboard's vehicle card
+or into any charging decision. That is what makes it the right thing to press before switching the feed
+on — and the right thing to press again after clearing a consent screen, since it costs nothing and
+answers the same question.
 
-Setup — the credentials and the browser steps the portal needs first — is
-[docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md). Turning it into a service with its own clock and a
-visible sign-in health state is [issue #140](https://github.com/mpospisil/gleanvolt/issues/140).
+The feed with its own clock is a separate switch,
+[`Vehicle:DataAct:Enabled`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section), and
+it holds a session rather than replaying the password. Setup — the credentials and the browser steps
+the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md).
 
 #### `/pv-system` — the installation, read-only
 
@@ -1904,9 +2025,12 @@ sections, in the order the questions are actually asked:
 
 - **Energy** — solar power against what the forecast expected of this instant, solar surplus, battery
   SOC and power, grid power. True whatever is or isn't plugged in, which is why it comes first.
-- **Vehicle** — the charger's own view of whether a car is connected, plus, on an install with
-  [Vehicle telemetry](#vehicle-telemetry-the-vehicle-section) configured, what the car last said about
-  itself — battery, range, charge and plug state — and how long ago it said it.
+- **Vehicle** — the car, because it is *configured*: its name and pack, then the charger's own view of
+  whether one is connected, then whatever feed reports on it. The feed is an attachment, and the card
+  names which of four situations it is in — no feed configured (nothing is wrong), a reading and its
+  age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying which
+  screen to open. The last two must never look alike: *stale* clears itself and *sign-in required* never
+  will. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the

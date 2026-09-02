@@ -13,8 +13,12 @@ namespace Gleanvolt.Core.Interfaces;
 /// <para><b>Deliberately on demand, and deliberately not a feed.</b> Nothing polls this, nothing
 /// schedules it, and a reading it returns is not written into
 /// <see cref="IVehicleTelemetry"/>: a manual button proves the credentials and the mapping, which is
-/// what is wanted before anything reasons about a car with data fetched behind the owner's back.
-/// Issue #140 is what turns it into a service with its own clock and a health state.</para>
+/// what is wanted before anything reasons about a car with data fetched behind the owner's back.</para>
+///
+/// <para>The feed with its own clock is <see cref="IVehicleUpdateService"/> (#140), and the two stay
+/// separate on purpose. This one signs in afresh per press with its own session, so it is what an
+/// owner uses to prove credentials before switching a feed on — and what they press again after
+/// clearing a consent screen, since a blocked feed stops asking by design.</para>
 /// </summary>
 public interface IVehiclePortalReader
 {

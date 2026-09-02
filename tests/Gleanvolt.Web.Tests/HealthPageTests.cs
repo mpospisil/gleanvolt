@@ -28,6 +28,55 @@ public class HealthPageTests : PageTest
         Services.AddSingleton<IServiceShutdown>(_shutdown);
     }
 
+    /// <summary>A feed that only ever reports how it is; the page must never make it fetch.</summary>
+    private sealed class StubFeed(VehicleSourceHealth health) : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-group";
+
+        public VehicleSourceHealth Health => health;
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    [Fact]
+    public void Says_nothing_about_a_car_feed_that_is_not_configured()
+    {
+        // "Is anything wrong?" must not grow a row saying "no" for a feature nobody has turned on.
+        Assert.DoesNotContain("Car feed", Render<Health>().Markup);
+    }
+
+    [Fact]
+    public void Reports_a_feed_that_needs_the_owner_as_the_thing_that_will_not_fix_itself()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
+            VehicleSourceHealth.NeedsOwner("The portal is showing a consent screen; open it in a browser.")));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Car feed", page.Markup);
+        Assert.Contains("NeedsOwner", page.Markup);
+        Assert.Contains("consent screen", page.Markup);
+        Assert.Contains("/vehicle-portal", page.Markup);
+    }
+
+    [Fact]
+    public void Reports_a_healthy_feed_without_offering_a_remedy()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
+            VehicleSourceHealth.Ok("The portal answered; the car reported at 09:45.")));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Car feed", page.Markup);
+        Assert.Contains("reported at 09:45", page.Markup);
+        Assert.DoesNotContain("/vehicle-portal", page.Markup);
+    }
+
     [Fact]
     public void Reports_the_build_the_host_handed_it()
     {
@@ -170,4 +219,83 @@ public class HealthPageTests : PageTest
         Assert.Contains("docker compose start gleanvolt-controller", page.Markup);
         Assert.Empty(page.FindAll("button.danger"));
     }
+    /// <summary>A feed that also reports how its running is going.</summary>
+    private sealed class StubFeedWithDiagnostics(VehicleSourceHealth health, VehicleFeedDiagnostics diagnostics)
+        : IVehicleUpdateService, IVehicleFeedDiagnostics
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-group";
+
+        public VehicleSourceHealth Health => health;
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
+
+        public VehicleFeedDiagnostics Diagnostics => diagnostics;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    [Fact]
+    public void Reports_whether_the_feed_is_reading_on_its_clock_and_holding_one_session()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeedWithDiagnostics(
+            VehicleSourceHealth.Ok("The portal answered."),
+            new VehicleFeedDiagnostics(
+                Attempts: 9,
+                Readings: 8,
+                LastAttemptAt: _time.Now.AddMinutes(-2),
+                LastReadingAt: _time.Now.AddMinutes(-2),
+                NextDueAt: _time.Now.AddMinutes(13),
+                Sessions: 1,
+                SessionAge: TimeSpan.FromHours(2.4))));
+
+        var page = Render<Health>();
+
+        Assert.Contains("8 of 9", page.Markup);
+        Assert.Contains("2.4 h", page.Markup);
+        Assert.Contains("1 sign-in", page.Markup);
+        Assert.Contains("in 13 min", page.Markup);
+
+        // One session is the healthy answer, so nothing shouts about it.
+        Assert.DoesNotContain("sessions are expiring", page.Markup);
+    }
+
+    [Fact]
+    public void Says_outright_when_sessions_are_expiring()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeedWithDiagnostics(
+            VehicleSourceHealth.Ok("The portal answered."),
+            VehicleFeedDiagnostics.None with { Attempts = 20, Readings = 20, Sessions = 6 }));
+
+        Assert.Contains("sessions are expiring", Render<Health>().Markup);
+    }
+
+    [Fact]
+    public void A_stopped_feed_has_no_next_read()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeedWithDiagnostics(
+            VehicleSourceHealth.NeedsOwner("The portal wants you in a browser."),
+            VehicleFeedDiagnostics.None with { Attempts = 1, NextDueAt = null }));
+
+        var page = Render<Health>();
+
+        Assert.Contains("never — the feed has stopped", page.Markup);
+    }
+
+    [Fact]
+    public void A_feed_that_offers_no_diagnostics_is_not_described_with_zeroes()
+    {
+        // The contract stays five members: a service that reports none of this is not a broken one,
+        // and a row of zeroes would read as a feed that has never run.
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(VehicleSourceHealth.Ok("Fine.")));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Car feed", page.Markup);
+        Assert.DoesNotContain("Portal session", page.Markup);
+    }
+
+
 }

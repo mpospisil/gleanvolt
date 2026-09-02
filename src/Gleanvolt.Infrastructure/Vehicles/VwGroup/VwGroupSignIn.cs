@@ -18,14 +18,14 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <para><b>The consent screen is not handled here and never will be.</b> If one appears — or an OTP,
 /// or a CAPTCHA — this fails as <see cref="VwGroupFailure.OwnerActionRequired"/> and does not retry.
 /// A program cannot answer it, and looping on it risks the account for nothing. That failure is what
-/// Phase 2's "sign-in required" is built on: a distinct state, not a stale reading.</para>
+/// the dashboard's "sign-in required" is built on: a distinct state, not a stale reading.</para>
 ///
 /// <para>All the judgement lives in <see cref="VwGroupLoginForm"/>, which is pure and tested. What is
 /// here is transport and the order of the steps.</para>
 /// </summary>
 public sealed class VwGroupSignIn
 {
-    /// <summary>Name of the configured <see cref="HttpClient"/> Phase 2 will register.</summary>
+    /// <summary>Name a configured <see cref="HttpClient"/> would be registered under.</summary>
     public const string HttpClientName = "VwGroupPortal";
 
     /// <summary>
@@ -111,6 +111,18 @@ public sealed class VwGroupSignIn
             // ordinary email form says "consent" six times: in the client id's app name, in the
             // templateModel, and in the visible subtitle "Welcome to Consent Portal". Reading that as
             // a consent screen aborted every sign-in before the first field was filled.
+            // A box for a code that arrives in somebody's inbox is decisive on its own, before the
+            // prose is read: the field name says the same thing in every language the identity
+            // provider might render, and there is no answer to it here at any price.
+            if (form.OneTimeCodeField is { } codeField)
+            {
+                throw new VwGroupPortalException(
+                    VwGroupFailure.OwnerActionRequired,
+                    $"the portal is asking for a one-time code (the '{codeField}' field), which only "
+                    + $"the owner can answer in a browser at {_options.PortalBaseUrl}. Nothing here "
+                    + "will retry until it has been.");
+            }
+
             if (!form.CanSignIn && VwGroupLoginForm.OwnerActionReason(page.Body) is { } reason)
             {
                 throw new VwGroupPortalException(

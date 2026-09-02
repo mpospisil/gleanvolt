@@ -474,7 +474,8 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider => new HaDiscovery(
             provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value,
             provider.GetRequiredService<PvSystemInfo>(),
-            provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled));
+            provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled,
+            provider.GetServices<IVehicleUpdateService>().Any()));
 
         services.AddHostedService<HomeAssistantMqttWorker>();
 
@@ -487,6 +488,23 @@ public static class GleanvoltHostingExtensions
         services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
         services.AddSingleton<VehicleStateHolder>();
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
+
+        // Whether the manufacturer's own portal is read on a clock (issue #140). Decided here, before
+        // anything is registered, because it is what settles which of two feeds owns the holder.
+        var manufacturerFeed = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration);
+
+        // Both feeds may run, and the freshest reading wins.
+        //
+        // This started as "the manufacturer service wins, so do not subscribe the other at all" --
+        // the only way to make one win over a holder that took whatever arrived last. The reference
+        // install then showed why picking a winner in advance is the wrong shape: the portal's state
+        // of charge for that car is coarser and lags, while the same manufacturer's app API through
+        // Home Assistant is live to the percent. Whichever source is better is a fact about a car and
+        // a moment, not something a configuration file can be right about once.
+        //
+        // So VehicleStateHolder keeps the reading with the newest capture time and both workers write
+        // to it. A feed that stops stops advancing, so the other takes over within one reading and
+        // precedence corrects itself.
         services.AddHostedService<VehicleMqttWorker>();
 
         // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
@@ -500,6 +518,26 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IVehiclePortalReader>(provider => new VwGroupPortalReader(
             VwGroupPortalOptionsResolver.Resolve(configuration),
             provider.GetService<ILogger<VwGroupPortalReader>>()));
+
+        // The same portal on its own clock (issue #140), which is a different thing from the button
+        // above and is registered on different terms: only when Vehicle:DataAct:Enabled says so.
+        // Credentials being present is not consent to replay them at an identity provider every
+        // quarter of an hour -- pressing the button is how they are proved, and this is how a feed is
+        // asked for.
+        //
+        // The service, not the host, owns the cadence: nothing here states an interval.
+        if (manufacturerFeed)
+        {
+            services.AddSingleton<IVehicleUpdateService>(provider => new VwGroupUpdateService(
+                provider.GetRequiredService<EvInfo>().Id,
+                VwGroupPortalOptionsResolver.Resolve(configuration),
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetService<ILogger<VwGroupUpdateService>>()));
+        }
+
+        // Registered whether or not a service exists: with none it logs that fact once and stops, which
+        // is a supported installation rather than a misconfigured one.
+        services.AddHostedService<VehicleUpdateWorker>();
 
         // The UI needs MaxAge to mark a reading stale and the pack's size to offer a target in state of
         // charge, but Gleanvolt.Web cannot see this assembly's options classes. Hand it the values,

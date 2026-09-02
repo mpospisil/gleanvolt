@@ -11,10 +11,11 @@
     sign-in works and that the mapping recognises this car's fields is something an owner does — and
     an owner should not have to run `dotnet run -- vw-probe` to do it.
 
-    Deliberately manual. Nothing polls this and the reading is NOT written into IVehicleTelemetry:
-    the dashboard's car still comes from whatever feed is configured. Turning this into a service
-    with its own clock, a health state and a place in the holder is issue #140, and doing half of it
-    here would mean the controller reasoning about a car from data fetched behind the owner's back.
+    Deliberately manual, and it stayed that way after #140 built the feed. Nothing polls THIS page,
+    and the reading it shows is not written into IVehicleTelemetry: the dashboard's car comes from
+    whatever feed is configured. Pressing the button is how the credentials and the mapping are proved
+    before anything signs in unattended -- and how they are re-checked afterwards, since a feed blocked
+    on a consent screen stops asking by design.
 *@
 
 <SiteTitle Page="Vehicle portal" />
@@ -23,9 +24,10 @@
 
 <p class="muted">
     Asks @Portal.PortalName for @(string.IsNullOrWhiteSpace(Car.Name) ? "the car" : Car.Name), once,
-    when you press the button. Nothing here runs on a schedule, and the reading is not fed to the
-    dashboard or to any charging decision — this is how you check that the credentials work and that
-    the portal's fields are understood.
+    when you press the button. <em>This press</em> runs on no schedule and what it shows is fed to
+    nothing — not the dashboard's card, not any charging decision — so it is how you check that the
+    credentials work and that the portal's fields are understood, whether or not the feed on its own
+    clock is switched on.
 </p>
 
 @if (!Portal.IsConfigured)
@@ -95,7 +97,15 @@ else if (_reading is { Succeeded: true, State: { } state })
         The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago is
         normal and not a fault — its state of charge does not drift.
     </p>
+}
 
+@*
+    The delivery itself, shown whether the mapping succeeded or not: how many snapshots arrived and
+    what they span is how "this quarter-hour said nothing" is told apart from "the portal handed us
+    one report type and the battery is in another delivery". On a failure it is half the diagnosis.
+*@
+@if (_reading is { SnapshotCount: > 0 })
+{
     <h2>The delivery</h2>
 
     <dl class="facts">
@@ -107,7 +117,11 @@ else if (_reading is { Succeeded: true, State: { } state })
             @_reading.SnapshotCount
             @if (_reading.OldestSnapshot is { } oldest && _reading.NewestSnapshot is { } newest)
             {
-                <span class="muted"> (@oldest.ToString("HH:mm") – @newest.ToString("HH:mm"))</span>
+                @* A merged read reaches back as far as it has to, and the reference car's deliveries
+                   are not a tidy quarter-hour apart -- the first live merge spanned most of a day. As
+                   bare clock times that read as "16:30 - 10:29", which looks like a fault rather than
+                   a span. The date appears exactly when the two ends disagree about it. *@
+                <span class="muted"> (@Span(oldest, newest))</span>
             }
         </dd>
 
@@ -123,28 +137,99 @@ else if (_reading is { Succeeded: true, State: { } state })
         let a plan refuse an impossible battery target, deferred on
         <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
     </p>
+}
 
-    @if (_reading.Unmapped.Count > 0)
+@*
+    What the vocabulary DID match, and what each of those fields actually said.
+
+    The half that was missing the first time this page was needed in anger. A name absent from the
+    unrecognised list below means one of two opposite things -- the bundle never carried it, or it
+    carried it and the value was a sentinel that filtering threw away -- and those want opposite
+    fixes: a name to add, against a car that reports the field empty. Values are shown raw, quoted
+    and untouched, because "" and "invalid" are exactly what this exists to reveal.
+*@
+@if (_reading is not null && _reading.Matched.Count > 0)
+{
+    <h2>@_reading.Matched.Count field(s) this build recognised</h2>
+
+    <p class="muted">
+        Each with the moment the <em>car</em> reported it. A read merges several deliveries, so two
+        figures here can be hours apart — and comparing them without that is how a coarse reading and
+        a stale one get mistaken for each other.
+    </p>
+
+    @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
+       column sized to fit its own content. *@
+    <dl class="fields">
+        @foreach (var (field, reading) in _reading.Matched.OrderByDescending(entry => entry.Value.At))
+        {
+            <dt><code>@Breakable(field)</code></dt>
+            <dd>
+                @(string.IsNullOrWhiteSpace(reading.Value)
+                    ? (MarkupString)"(empty)"
+                    : Breakable($"\"{reading.Value}\""))
+                <span class="muted">@reading.At.ToString("yyyy-MM-dd HH:mm")</span>
+            </dd>
+        }
+    </dl>
+}
+else if (_reading is not null && (_reading.Succeeded || _reading.Unmapped.Count > 0))
+{
+    <p class="muted">
+        Not one field in the bundle is in the vocabulary at all — so this is a set of names to add
+        rather than a car reporting empty values.
+    </p>
+}
+
+@if (_reading is not null && _reading.Notes.Count > 0)
+{
+    <h2>What the bundle held that never became a reading</h2>
+
+    @foreach (var note in _reading.Notes)
     {
-        <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+        <p class="muted">@note</p>
+    }
 
-        <p class="muted">
-            If a value above is missing, its real name is probably in this list — the portal's
-            vocabulary was written down from a description rather than from a capture, so this is
-            expected on a first run rather than a fault.
-        </p>
-
+    @if (_reading.Dropped.Count > 0)
+    {
         <ul class="sessions">
-            @foreach (var field in _reading.Unmapped)
+            @foreach (var field in _reading.Dropped)
             {
                 <li><code>@field</code></li>
             }
         </ul>
     }
-    else
-    {
-        <p class="muted">Every field in the bundle was recognised.</p>
-    }
+}
+
+@*
+    The unrecognised names, shown whether the read succeeded or not.
+
+    They used to hang off the success branch, which put them exactly where they were least needed: a
+    bundle in which *nothing* matched is now a failure, and that is precisely the case where this list
+    is the whole answer. Reporting "unusable data" while holding the field names back would be a page
+    keeping the diagnosis to itself.
+*@
+@if (_reading is not null && _reading.Unmapped.Count > 0)
+{
+    <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+
+    <p class="muted">
+        If a value above is missing, its real name is probably in this list — the portal's vocabulary
+        was written down from VW's data dictionary rather than from your car, so this is expected on a
+        first run rather than a fault. Adding the right names to <code>VwGroupFieldNames</code> is the
+        fix; pasting this list into an issue is enough for somebody else to do it.
+    </p>
+
+    <ul class="sessions">
+        @foreach (var field in _reading.Unmapped)
+        {
+            <li><code>@field</code></li>
+        }
+    </ul>
+}
+else if (_reading is { Succeeded: true })
+{
+    <p class="muted">Every field in the bundle was recognised.</p>
 }
 
 @code {
@@ -173,4 +258,38 @@ else if (_reading is { Succeeded: true, State: { } state })
 
     private static string Show(double? value, string unit) =>
         value is { } number ? $"{number:0.#}{unit}" : "—";
+
+    /// <summary>
+    /// A portal field name with break opportunities marked after its separators.
+    ///
+    /// <para>These names run to fifty characters of dotted path and the values to
+    /// <c>CHARGE_STATE_NOT_READY_FOR_CHARGING</c>. Left to itself a browser breaks such a token at
+    /// whatever character reaches the edge — <c>current_charge_st / ate</c> — which is legible only
+    /// just. A <c>&lt;wbr&gt;</c> after each dot and underscore gives it the joints to break at
+    /// instead, and it falls back to breaking anywhere when even a segment does not fit.</para>
+    ///
+    /// <para>Every segment is HTML-encoded on the way through: these strings come from the portal, and
+    /// this is the one place in the page that emits markup rather than text.</para>
+    /// </summary>
+    private static MarkupString Breakable(string text)
+    {
+        var builder = new System.Text.StringBuilder(text.Length + 32);
+
+        foreach (var character in text)
+        {
+            builder.Append(System.Net.WebUtility.HtmlEncode(character.ToString()));
+
+            if (character is '.' or '_')
+            {
+                builder.Append("<wbr>");
+            }
+        }
+
+        return (MarkupString)builder.ToString();
+    }
+
+    private static string Span(DateTimeOffset oldest, DateTimeOffset newest) =>
+        oldest.Date == newest.Date
+            ? $"{oldest:HH:mm} – {newest:HH:mm}"
+            : $"{oldest:yyyy-MM-dd HH:mm} – {newest:yyyy-MM-dd HH:mm}";
 }
