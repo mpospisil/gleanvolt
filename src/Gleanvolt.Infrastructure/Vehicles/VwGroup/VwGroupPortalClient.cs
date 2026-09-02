@@ -269,6 +269,26 @@ public sealed class VwGroupPortalClient
         return missing.Count == 0 ? "nothing" : string.Join(", ", missing);
     }
 
+    /// <summary>
+    /// The report types the merged snapshots came from, taken from the bundles' own <c>report_type</c>
+    /// field.
+    ///
+    /// <para>The portal splits a car across report types and delivers them separately, so "which have
+    /// I actually seen?" is the question behind every field that is still missing. Naming them turns
+    /// "the range is absent" into either "no report I have carries one" or "the report that would is
+    /// one I have not reached", and those want opposite responses — a wider budget, against accepting
+    /// that this car does not send it.</para>
+    /// </summary>
+    public static IReadOnlyList<string> ReportTypes(IReadOnlyList<VwGroupSnapshot> snapshots) =>
+        [.. snapshots
+            .SelectMany(snapshot => snapshot.Values)
+            .Where(value => string.Equals(
+                VwGroupFieldNames.Leaf(value.Key), "report_type", StringComparison.OrdinalIgnoreCase))
+            .Select(value => value.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>One report out of several bundles', because a merged read has several.</summary>
     private static VwGroupBundleReport Merge(List<VwGroupBundleReport> bundles) =>
         bundles.Count == 0

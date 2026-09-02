@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 
@@ -62,6 +63,22 @@ public sealed class VwGroupPortalReader(
                     $"{read.DatasetsRead} of the portal's {read.DatasetsAvailable} deliveries were "
                     + "merged: a partial delivery carries only the reports that changed, so the newest "
                     + "one alone need not hold the battery.");
+            }
+
+            if (VwGroupPortalClient.ReportTypes(read.Snapshots) is { Count: > 0 } types)
+            {
+                notes.Add(
+                    $"Report types in what was merged: {string.Join(", ", types)}. The portal splits a "
+                    + "car across types and delivers them separately, so a field that is still missing "
+                    + "is either in none of these or in a type this read did not reach.");
+            }
+
+            if (Absent(mapped.State) is { Length: > 0 } absent)
+            {
+                notes.Add(
+                    $"Still no {absent} after {read.DatasetsRead} of {read.DatasetsAvailable} "
+                    + "deliveries. Raising Vehicle:DataAct:MaxDatasetsPerRead reaches further back; if "
+                    + "a wider read never finds them, this car does not send them here.");
             }
 
             notes.AddRange(Notes(read.Bundle));
@@ -131,6 +148,25 @@ public sealed class VwGroupPortalReader(
         {
             throw;
         }
+    }
+
+    /// <summary>What a reading is still short of, named for the page. Empty when it holds everything.</summary>
+    private static string Absent(VehicleState? state)
+    {
+        if (state is null)
+        {
+            return string.Empty;
+        }
+
+        var missing = new List<string>();
+
+        if (state.SocPercent is null) missing.Add("state of charge");
+        if (state.RangeKm is null) missing.Add("range");
+        if (state.ChargeTimeRemaining is null) missing.Add("remaining time");
+        if (state.ChargeState == VehicleChargeState.Unknown) missing.Add("charging state");
+        if (state.PlugState == VehiclePlugState.Unknown) missing.Add("plug state");
+
+        return string.Join(", ", missing);
     }
 
     /// <summary>

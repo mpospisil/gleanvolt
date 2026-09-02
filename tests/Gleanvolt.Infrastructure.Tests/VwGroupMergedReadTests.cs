@@ -259,4 +259,35 @@ public class VwGroupMergedReadTests
     }
 
 
+    [Fact]
+    public async Task It_names_the_report_types_it_merged_and_what_is_still_absent()
+    {
+        // "The range is absent" is two different problems: no report I have carries one, or the report
+        // that would is one I did not reach. Naming the types tells them apart, and only one of them
+        // is fixed by a wider budget.
+        using var portal = new Deliveries(
+            ("battery.zip", "2026-09-02T10:30:00Z", Delivery(
+                "2026-09-02T10:29:46Z",
+                ("report_type", "battery_state_report"),
+                ("battery_level_HV.value", "70"))),
+            ("charging.zip", "2026-09-02T10:15:00Z", Delivery(
+                "2026-09-02T10:14:12Z",
+                ("report_type", "charging_state_report"),
+                ("charging_state_report.current_charge_state", "CHARGE_STATE_CHARGING_HV_BATTERY"),
+                ("remaining_charging_time", "120"))));
+
+        var read = await Client(portal, Options()).ReadAsync();
+
+        Assert.Equal(
+            ["battery_state_report", "charging_state_report"],
+            VwGroupPortalClient.ReportTypes(read.Snapshots));
+
+        // Charging and time left arrived; range and plug did not, and neither delivery carries them.
+        Assert.Equal(70, read.Mapping.State!.SocPercent);
+        Assert.Equal(VehicleChargeState.Charging, read.Mapping.State.ChargeState);
+        Assert.Null(read.Mapping.State.RangeKm);
+        Assert.Equal(VehiclePlugState.Unknown, read.Mapping.State.PlugState);
+    }
+
+
 }
