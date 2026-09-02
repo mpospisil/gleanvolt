@@ -4,6 +4,86 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-02 — Two feeds, counted, and a handover made by configuration (issue #141)
+
+Phase 3 of #137, and the only phase whose deliverable is a measurement rather than a feature. What
+ships here is the instrument and the handover path; the numbers are the reference install's to produce
+over a week, and `docs/DECISIONS.md` carries the table they go into.
+
+### What changed
+
+- `VehicleFeedComparison` (Core): counts every reading offered to `VehicleStateHolder`, grouped by the
+  name the feed put on it. Per feed — deliveries, repeats, superseded, the shortest/mean/longest
+  interval between deliveries and those intervals bucketed, plus per-field coverage. Across feeds — the
+  signed difference between their states of charge where two captures land within half an hour.
+- `VehicleFeedReport`, `VehicleFeedTally`, `VehicleFeedPair`, `VehicleSocAgreement`: the snapshot it
+  hands out, immutable and safe to render.
+- `VehicleStateHolder` **owns** the comparison and records into it on every `Set`, taken or not.
+- `/vehicle-feeds` (Web): the page those figures are read off, and the one to copy into `DECISIONS.md`.
+  Nav gains it; **Health** links to it.
+- `VehicleMqttWorker.DefaultSourceId` = `"mqtt"`: a payload that did not name itself is labelled, so a
+  reading off the topic can be told from the manufacturer feed's. The payload contract is untouched.
+- `VehicleFeedDiagnostics` gains `TargetSocReadings` and `TargetSocPercent`, and
+  `VwGroupUpdateService` records them: the car's own charge limit is not part of a `VehicleState` and
+  #141 still has to say whether it arrives.
+- README, `docs/VW_PORTAL_SETUP.md` (a new *Step 8*) and `docs/DECISIONS.md`: the week, the four
+  questions, and the handover as two settings and a stopped automation.
+
+### Things worth knowing
+
+- **The comparison lives inside the holder, not beside it.** The holder discards a reading older than
+  the one it has and returns false — so a feed that is consistently *second* leaves no trace anywhere
+  else, and that is exactly the finding that would decide the handover. Owning it there also means it
+  cannot miss the first readings by being resolved out of the container too late.
+- **A reading is not a delivery.** The portal is asked every fifteen minutes and will hand back the
+  bundle it handed back last time; a retained MQTT message is replayed on every reconnect. Cadence is
+  measured between *distinct* capture times, and a re-delivery is counted as a repeat — otherwise the
+  page would be reporting our polling loop rather than the car.
+- **Everything is since the process started, deliberately.** Persisting it would make the measurement
+  worse, not better: a gap that spans a restart is the restart, and folding the two together turns a
+  deploy into evidence against the portal. The claim under test is an unattended week.
+- **Agreement is reported twice and the parked half is the one that answers.** A parked car's SOC does
+  not drift, so a difference there is one of the two feeds being read wrong; the same difference across
+  twenty minutes of charging is the car charging. Without the split the second reads as the first. The
+  mean keeps its sign, because a systematic offset is the finding and an unsigned average hides it.
+- **The pairing window is wide (30 min) on purpose**, and the mean separation is printed beside every
+  figure so a difference measured across twenty minutes is never mistaken for one measured at an
+  instant.
+- **The handover is `Vehicle__Enabled=false` and a stopped Home Assistant automation.** No code is
+  deleted, no option retired, no test removed. There is no irreversible step anywhere in #137.
+
+### Deliberately not done
+
+- **The week itself.** Seven consecutive days of both feeds on the reference install is the
+  measurement, and it cannot be produced by a commit. The `DECISIONS.md` table is left empty rather
+  than filled with plausible numbers.
+- **No persistence for the tally.** See above: per-process is the honest window, not a limitation to be
+  engineered away.
+- **No new Home Assistant entity.** This is a question asked while deciding, not a thing to alert on.
+- **No `settings.target_soc` gate.** #101 keeps its own trigger; this only records whether the field
+  arrives.
+- **No change to what consumes a reading.** Still advisory, still guarded by `MaxAge`, still on no
+  hardware path.
+
+### Verification performed
+
+- **1473 tests pass** (31 new). The comparison is tested on the things that would quietly ruin the
+  measurement: a re-delivered bundle counted as a repeat rather than a delivery, an older reading not
+  dragging the cadence backwards, the superseded count attributed to the feed that lost, a systematic
+  offset keeping its sign whichever feed arrived second, and a charging car kept out of the parked
+  subset.
+- The page is rendered through the real holder: two feeds delivering, an offset shown with its
+  direction, sign-ins called out past one, a never-reported target SOC said outright, and the
+  "nothing has been offered yet" state naming both switches.
+- `VwGroupUpdateService` is asserted to keep the target SOC from a live-capture fixture (80%) that the
+  reading itself cannot carry.
+- The composition root is asserted to hand out **the holder's own** comparison rather than a second one
+  that would see nothing.
+- **Not yet run for a week on the reference install.** That is the deliverable this enables, not one it
+  contains.
+
+---
+
 ## 2026-09-02 — The car arrives on its own clock, and the card names which of four states the feed is in (issue #140)
 
 ### What changed

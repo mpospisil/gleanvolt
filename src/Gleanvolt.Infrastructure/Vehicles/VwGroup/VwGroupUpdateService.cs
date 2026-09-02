@@ -67,6 +67,12 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
     private int _consecutiveFailures;
     private int _attempts;
     private int _readings;
+
+    // The car's own charge limit, which VehicleState deliberately does not carry (#73). Kept because
+    // #141 has to say whether settings.target_soc actually arrives on this car -- the reason #101's
+    // impossible-target gate was dropped in the first place. Nothing reads it but a diagnostic.
+    private int _targetSocReadings;
+    private double? _targetSocPercent;
     private DateTimeOffset? _lastAttemptAt;
     private DateTimeOffset? _lastReadingAt;
 
@@ -136,7 +142,9 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
         // Null while blocked, which is the state that has no next time rather than a distant one.
         NextDelay < TimeSpan.Zero || _lastAttemptAt is null ? null : _lastAttemptAt + NextDelay,
         _sessionCount,
-        SessionAge);
+        SessionAge,
+        _targetSocReadings,
+        _targetSocPercent);
 
     /// <inheritdoc />
     public async Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
@@ -163,6 +171,12 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
             NextDelay = Interval;
             Health = VehicleSourceHealth.Ok(
                 $"The portal answered; the car reported at {state.CapturedAt.LocalDateTime:HH:mm}.");
+
+            if (result.TargetSocPercent is { } targetSoc)
+            {
+                _targetSocReadings++;
+                _targetSocPercent = targetSoc;
+            }
 
             if (result.UnmappedFields.Count > 0)
             {

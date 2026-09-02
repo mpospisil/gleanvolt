@@ -107,6 +107,19 @@
 </dl>
 
 @*
+    The week's tally lives on its own page (#141): this one answers "is anything wrong right now",
+    and that one answers "which of the two feeds should this site keep", which is a different
+    question and a much slower one.
+*@
+@if (_diagnostics is { Attempts: > 0 } || _feed is not null)
+{
+    <p class="muted">
+        <a href="/vehicle-feeds">What each feed has delivered</a> — cadence, agreement and coverage
+        counted since the controller started.
+    </p>
+}
+
+@*
     Stopping the service belongs on this page rather than the dashboard: it is not a charging
     decision, it is the process itself, alongside the build and the poll it reports on.
 

@@ -486,8 +486,13 @@ public static class GleanvoltHostingExtensions
         // UI can inject the read side unconditionally and render "no reading" rather than having to know
         // about the configuration. Only the worker checks Enabled.
         services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
-        services.AddSingleton<VehicleStateHolder>();
+        services.AddSingleton(provider => new VehicleStateHolder(provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
+
+        // What the two feeds have each delivered, counted (issue #141). Taken from the holder rather
+        // than constructed here: it has to see every reading offered, including the ones the holder
+        // discards for being older than what it already has, and only the holder is on that path.
+        services.AddSingleton(provider => provider.GetRequiredService<VehicleStateHolder>().Comparison);
 
         // Whether the manufacturer's own portal is read on a clock (issue #140). Decided here, before
         // anything is registered, because it is what settles which of two feeds owns the holder.

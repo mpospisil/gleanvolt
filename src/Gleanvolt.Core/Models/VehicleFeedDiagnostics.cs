@@ -29,6 +29,17 @@ namespace Gleanvolt.Core.Models;
 /// issue #138 could not make.
 /// </param>
 /// <param name="SessionAge">How long the current session has been alive, or null when there is none.</param>
+/// <param name="TargetSocReadings">
+/// How many readings carried the car's <b>own</b> charge limit. Here rather than on
+/// <see cref="VehicleState"/> because that record is exactly what #73 defined and this is not one of
+/// its fields — but #141 has to answer whether the limit arrives at all, and this feed is the only
+/// thing that ever sees it. Zero after a week of readings is a real answer: the portal carries the
+/// field for this manufacturer and not necessarily for this car.
+/// </param>
+/// <param name="TargetSocPercent">
+/// The last limit seen, or null if none ever was. Read by nothing: #101's impossible-target gate is
+/// what would eventually use it, and it stays deferred on its own terms.
+/// </param>
 public sealed record VehicleFeedDiagnostics(
     int Attempts,
     int Readings,
@@ -36,7 +47,9 @@ public sealed record VehicleFeedDiagnostics(
     DateTimeOffset? LastReadingAt,
     DateTimeOffset? NextDueAt,
     int Sessions,
-    TimeSpan? SessionAge)
+    TimeSpan? SessionAge,
+    int TargetSocReadings = 0,
+    double? TargetSocPercent = null)
 {
     /// <summary>Nothing has happened yet.</summary>
     public static VehicleFeedDiagnostics None { get; } = new(0, 0, null, null, null, 0, null);
