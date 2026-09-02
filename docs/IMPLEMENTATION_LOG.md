@@ -4,6 +4,51 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-02 — A feed going backwards is not a feed repeating itself (issue #141, follow-up)
+
+The reference install's first evening: the portal answered all ten reads and produced **one** new
+capture time. `14:51Z` on the first two reads, then `10:29Z` on the seven after — four hours further
+back than a snapshot it had already shown us, and then `10:32Z`.
+
+The tally called all nine of those **repeats**, because it counted "not newer than this feed's last"
+as one thing. Repeats read as harmless, and the column's own note said "the same bundle again, or a
+retained message replayed" — which was not what had happened.
+
+### What changed
+
+- `VehicleFeedTally` splits `Repeats` from `Regressions`, and carries `WorstRegression`, the largest
+  step backwards seen. `Repeats` stops being `Offered - Captures` and becomes a counted field;
+  `NotNews` is the sum, and `Offered = Captures + NotNews` is asserted.
+- `/vehicle-feeds` gains a **Went back** column — the count, the worst step beside it in parentheses,
+  and the cell marked when it is non-zero.
+
+### Things worth knowing
+
+- **The two failures want opposite reactions.** A repeat is a feed with nothing new to say, which for
+  a batch portal and a parked car is the expected state. A regression is a feed reaching back past
+  something it has already delivered, which is what a continuous data request that has stopped filling
+  looks like — and from every other angle (health, session, read count, HTTP status) it is
+  indistinguishable from a quiet car.
+- **The worst step is kept, not the last.** A timestamp jittering by a minute and a feed stuck on this
+  morning are the same event count and different problems.
+- **The high-water mark is still what ages.** A regression does not move the feed's last reading, so
+  `LastCapturedAt` and the dashboard's per-feed age stay on the newest thing that feed ever produced —
+  which is the honest answer to "how good is this feed's best account of the car".
+
+### Verification performed
+
+- **1487 tests pass** (7 new): the reference install's exact sequence classified one delivery, one
+  repeat and two regressions; the worst step kept across a small one and a large one; no worst step at
+  all for a feed that has never gone backwards; and the invariant that every reading is a delivery, a
+  repeat or a step backwards and nothing else.
+- The page is asserted to show the column, the worst step, and to leave it blank for a feed that only
+  repeats itself.
+- One existing test built a `VehicleFeedTally` field by field and broke on the new parameters. It now
+  derives one from a real tally with `with`, since this record is a long positional list that keeps
+  growing.
+
+---
+
 ## 2026-09-02 — Each feed's own account, on the card (issue #141, follow-up)
 
 The first two hours of running both feeds on the reference install produced the case this is for: the
