@@ -4,6 +4,86 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-01 — The VW portal is reachable headlessly, and five of our assumptions about it were wrong (issues #137/#139)
+
+The EU Data Act client now signs in and reads the reference ID.4 from a button on `/vehicle-portal`.
+Getting there took a live trace of the whole flow, and almost every failure was ours rather than the
+portal's. Recorded because each one is invisible from the outside and expensive to rediscover.
+
+### The sign-in
+
+- **`redirect_uri` is exactly `{portal}/login`.** A locale segment spliced in — `/de/en/login`,
+  matching the paths the portal serves pages under — is answered `400 invalid_request, "Mismatching
+  redirection URI"` before any credential is sent. The client id is registered against one string.
+- **`state` is not a nonce.** It is `country__language__BRAND` (e.g.
+  `de__en__VOLKSWAGEN_PASSENGER_CARS`), and the portal's `/services/callbacklogin` decodes it to route
+  the callback. With a random state the flow completes at the identity provider, lands back on the
+  portal, and every `proxy_api` call then answers 401 with no session cookie set — a failure that
+  looks like anything except a malformed request.
+- **The portal must be primed** with a `GET /` on the same cookie jar first; its callback needs the
+  AEM cookies that sets. `prompt=login` is sent too, because the portal's own client sends it.
+- **The CSRF token is a JavaScript variable**, single-quoted, named by `csrf_parameterName` — not a
+  hidden input and not in the template model. The identifier page *also* renders `_csrf` as an input,
+  so step one works without reading it and hides the gap; the password page renders no inputs at all
+  and answers `400` with a `generalErrorBranded` page.
+- **The password page ships no `<form>` and no `<input>`.** `useClientRendering: true`, and everything
+  is in `templateModel` — which a lazy `{.*?}` regex truncates at the first `}`, inside the nested
+  `clientLegalEntityModel`. Its `postAction` is relative to the sign-in service's *client root*, not
+  to the page.
+- **"Signed in" is a question of host, not path.** The landing page is `/de/en/user.html`; a check for
+  `/login` in the path gets it wrong in both directions.
+- **This client is named "GIS Consent Portal".** Its ordinary email form therefore says "consent" six
+  times — in the app name, the template model and the visible subtitle *"Welcome to Consent
+  Portal"*. A consent-screen detector that searches page text aborted every sign-in before the first
+  field was filled. The rule that replaced it: **a page you can sign in on is a sign-in page**,
+  whatever words are printed on it.
+
+### The delivery
+
+- The data request identifier lives on `/datarequest/vehicles/{vin}/metadata/partial` as
+  `Identifier`. **It is not on the vehicle list**, and reading it from there reported "no data
+  request" for a car that had had one since August.
+- The dataset list returns `{name, createdOn, size}` and **no download URL**. The download is a
+  separate call whose dataset is chosen by a **`filename` request header**; `type: partial` is
+  required on both.
+- `/proxy_api/consent/me/vehicles` requires `?viewPosition=FRONT_LEFT` or answers 400.
+
+### The vocabulary, from a real bundle
+
+Ours was written from a description and was camelCase; the portal's is snake_case, so essentially
+nothing matched. A live capture (committed, sanitised, as `id4-live-capture.json`) corrected it:
+
+| | Real |
+|---|---|
+| State of charge | `battery_level_HV.value` — **not** the documented `hv_soc`, which this car does not send |
+| Odometer | `mileage.value` |
+| Charge state | `charging_state_report.current_charge_state` |
+| Target SOC | `settings.target_soc` |
+| Captured at | `car_captured_time` |
+
+**`remaining_charging_time_complete` is `"9900s"`** — seconds, unit attached to the digits, where the
+dictionary documents minutes. A plain numeric parse rejects it, and #73's present-but-unusable rule
+then discards **the whole bundle**: one suffix costing every field. Durations are now parsed
+unit-aware.
+
+VW's own Data Dictionary V5.0 (1,142 fields) is the authority, and evcc keeps a transcription at
+`vehicle/vw/eudataact/datadictionary.json`. It is worth consulting before guessing a field name —
+though note it documents what the *programme* can emit, not what a given car does.
+
+### What this says about the bet in #137
+
+**Unattended re-login works.** Six sign-ins from a cold cookie jar with only an email and a password,
+no OTP and no CAPTCHA. That is the fact the stored-credentials decision was resting on, and it holds
+— which also means the ~15 h expiry recorded in #73 is a property of how the session was kept, not of
+what the portal demands.
+
+Against that: five undocumented behaviours in one sign-in flow, none discoverable without a live
+trace, all of which VW can change without notice. The "own a schema, not a client" rule was walked
+back for this one manufacturer on the grounds that it is the statutory interface. That reasoning
+stands, and so does its price — this file is now part of the maintenance cost.
+
+---
+
 ## 2026-09-01 — A configured secret reaches the UI only when the host has decided a login is enforced (issue #143)
 
 `/pv-system` had to show the MQTT broker credentials, and the same question is queued for the API key

@@ -1,0 +1,183 @@
+using Gleanvolt.Core.Enums;
+using Gleanvolt.Infrastructure.Vehicles.VwGroup;
+
+namespace Gleanvolt.Infrastructure.Tests;
+
+/// <summary>
+/// The actual work of issue #139: a download holds several snapshots, so "take the last row" is
+/// wrong, and three rules decide what a field is worth — sentinel filtering, largest-wins for
+/// monotonic fields, last occurrence otherwise.
+///
+/// <para>#73's rules carry over unrenegotiated and are pinned here: absent is fine,
+/// present-but-unusable is not, and an unrecognised enum value is the single exception that maps to
+/// <c>Unknown</c> rather than costing us the state of charge.</para>
+/// </summary>
+public class VwGroupVehicleStateMapperTests
+{
+    private static IReadOnlyList<VwGroupSnapshot> Snapshots(params string[] fixtures)
+    {
+        Assert.True(VwGroupReportBundle.TryRead(VwGroupFixtures.Bundle(fixtures), out var snapshots, out _));
+        return snapshots;
+    }
+
+    [Fact]
+    public void MapsTheDottedIdxLayout()
+    {
+        var result = VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json"), "id4");
+        var state = Assert.IsType<Core.Models.VehicleState>(result.State);
+
+        Assert.Equal(61, state.SocPercent);
+        Assert.Equal(VehicleChargeState.Charging, state.ChargeState);
+        Assert.Equal(VehiclePlugState.Connected, state.PlugState);
+        Assert.Equal(TimeSpan.FromMinutes(70), state.ChargeTimeRemaining);
+        Assert.Equal("id4", state.SourceId);
+    }
+
+    [Fact]
+    public void MapsTheFlatPhevLayoutOntoTheSameShape()
+    {
+        // One vocabulary serves both, because a candidate is matched on the last dotted segment as
+        // well as on the whole name. Two tables for two layouts would be two things to keep in step.
+        var state = VwGroupVehicleStateMapper.Map(Snapshots("phev-flat.json")).State;
+
+        Assert.NotNull(state);
+        Assert.Equal(37, state.SocPercent);
+        Assert.Equal(41, state.RangeKm);
+        Assert.Equal(VehicleChargeState.Idle, state.ChargeState);
+        Assert.Equal(VehiclePlugState.Disconnected, state.PlugState);
+    }
+
+    [Fact]
+    public void ConvertsARangeTheFieldNameSaysIsInMetres()
+    {
+        // The portal states the unit in the field name, which is the only reason this can be
+        // converted rather than guessed at from magnitude.
+        Assert.Equal(348, VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).State!.RangeKm);
+    }
+
+    [Fact]
+    public void DatesTheReadingByTheNewestSnapshotThatContributed()
+    {
+        // Never the download time, and the offset survives.
+        var state = VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).State!;
+
+        Assert.Equal(new DateTimeOffset(2026, 8, 31, 21, 29, 11, TimeSpan.FromHours(2)), state.CapturedAt);
+    }
+
+    [Fact]
+    public void ABlankInTheNewestSnapshotDoesNotBeatARealReadingBehindIt()
+    {
+        // Sentinel filtering, the first tie-break and the one that matters most: without it the
+        // newest snapshot wins by being newest even when it says nothing at all.
+        var state = VwGroupVehicleStateMapper.Map(Snapshots("sentinels-and-partials.json")).State!;
+
+        Assert.Equal(44, state.SocPercent);
+    }
+
+    [Fact]
+    public void AMonotonicFieldTakesTheLargestValueRatherThanTheLast()
+    {
+        // An odometer cannot go backwards, so a smaller later value is a partial snapshot rather than
+        // news -- and the last one in this bundle is a sentinel anyway.
+        var result = VwGroupVehicleStateMapper.Map(Snapshots("sentinels-and-partials.json"));
+
+        Assert.Equal(18240, result.OdometerKm);
+    }
+
+    [Fact]
+    public void TheDefaultIsTheLastOccurrence()
+    {
+        // Two snapshots, both populated: the newer SOC is the reading. This is the rule everything
+        // that genuinely moves both ways needs.
+        Assert.Equal(61, VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).State!.SocPercent);
+    }
+
+    [Fact]
+    public void AMissingSocIsAReadingWithoutOneRatherThanAFailure()
+    {
+        // Absent is a supported configuration: no two sources report the same set, and a car that
+        // reports a plug state and nothing else is still worth having.
+        var snapshots = new[]
+        {
+            new VwGroupSnapshot(
+                DateTimeOffset.Parse("2026-08-31T21:00:00+02:00"),
+                new Dictionary<string, string> { ["charging.plugConnectionState"] = "PLUG_CONNECTION_STATE_CONNECTED" },
+                "test"),
+        };
+
+        var state = VwGroupVehicleStateMapper.Map(snapshots).State;
+
+        Assert.NotNull(state);
+        Assert.Null(state.SocPercent);
+        Assert.Equal(VehiclePlugState.Connected, state.PlugState);
+    }
+
+    [Fact]
+    public void AnUnrecognisedChargeStateCostsTheStateAndNothingElse()
+    {
+        // The single exception to "present-but-unusable is a rejection". These vocabularies are
+        // open-ended by nature, and an unfamiliar word must not cost us the SOC.
+        var result = VwGroupVehicleStateMapper.Map(Snapshots("sentinels-and-partials.json"));
+
+        Assert.NotNull(result.State);
+        Assert.Equal(VehicleChargeState.Unknown, result.State.ChargeState);
+        Assert.Equal(44, result.State.SocPercent);
+    }
+
+    [Fact]
+    public void APresentButUnusableValueRejectsTheWholeBundle()
+    {
+        // #73's rule: the holder then keeps its last good reading and its age visibly grows, which is
+        // a diagnosable state. Half-trusting junk is not.
+        var result = VwGroupVehicleStateMapper.Map(Snapshots("unusable-soc.json"));
+
+        Assert.Null(result.State);
+        Assert.Contains("state of charge", result.Error);
+        Assert.Contains("error", result.Error);
+    }
+
+    [Fact]
+    public void AnOutOfRangeValueIsUnusableToo()
+    {
+        var snapshots = new[]
+        {
+            new VwGroupSnapshot(
+                DateTimeOffset.Parse("2026-08-31T21:00:00+02:00"),
+                new Dictionary<string, string> { ["battery.stateOfChargeInPercent"] = "127" },
+                "test"),
+        };
+
+        Assert.Contains("outside 0-100", VwGroupVehicleStateMapper.Map(snapshots).Error);
+    }
+
+    [Fact]
+    public void ReportsTheFieldsNothingHereReads()
+    {
+        // The portal's vocabulary was written down from a description rather than a capture, so the
+        // first real download has to be able to say what is missing. Silence would cost a week of
+        // wondering why the SOC is null.
+        var result = VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json"));
+
+        Assert.Contains("climate.outsideTemperatureInCelsius", result.UnmappedFields);
+
+        // And nothing it does read, including the two it reads but deliberately does not publish.
+        Assert.DoesNotContain("battery.stateOfChargeInPercent", result.UnmappedFields);
+        Assert.DoesNotContain("settings.target_soc", result.UnmappedFields);
+        Assert.DoesNotContain("vehicle.mileageInKm", result.UnmappedFields);
+    }
+
+    [Fact]
+    public void CarriesTheCarsOwnTargetWithoutActingOnIt()
+    {
+        // #101's impossible-target gate stays deferred. This exists so that "does it actually arrive
+        // for this car?" is answerable without a code change -- which is #137's whole point about
+        // what the portal gives that the MQTT feed never could.
+        Assert.Equal(80, VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).TargetSocPercent);
+    }
+
+    [Fact]
+    public void NoSnapshotsIsAFailureWithAReason()
+    {
+        Assert.Contains("no snapshots", VwGroupVehicleStateMapper.Map([]).Error);
+    }
+}

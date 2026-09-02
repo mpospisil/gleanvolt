@@ -4,6 +4,74 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-01 — The VW Group portal client (issue #139, Phase 1 of #137)
+
+### What changed
+
+- `src/Gleanvolt.Infrastructure/Vehicles/VwGroup/`: sign in, find the car, find the data, fetch the
+  ZIP, and turn it into a `VehicleState`. Nothing that knows it is running inside a controller — no
+  hosted service, no configuration binding, no dashboard. Those are Phase 2 (#140).
+- Two classes touch the network (`VwGroupSignIn`, `VwGroupPortalClient`); everything else is pure and
+  runs against committed fixtures. **No network in the test suite.**
+- `VwGroupFailure`: `OwnerActionRequired`, `SessionExpired`, `SignInRejected`, `NoDataAvailable`,
+  `UnusableData`, `Transient`, `VehicleNotFound`, `NotConfigured` — so a caller responds without
+  parsing a message.
+- `dotnet run --project src/Gleanvolt.Worker -- vw-probe`: the console harness. Prints a
+  `VehicleState`, prints **every field the mapper did not recognise**, and with `--save-fixture`
+  writes a sanitised bundle.
+  > **Superseded.** The harness was removed once the web UI's `/vehicle-portal` page took over
+  > proving a sign-in — a button beat four environment variables and a launch profile. The page
+  > carries the unrecognised-field list; the `--save-fixture` sanitiser did not survive and is in
+  > git history if it is wanted back.
+
+### Things worth knowing
+
+- **The tie-breaks are the work.** A download holds several snapshots, so "take the last row" is
+  wrong. Sentinel filtering first — without it the newest snapshot wins by being newest even when it
+  says nothing, throwing away a real value from an hour earlier. Largest-wins for the odometer, since
+  a smaller later value is a partial snapshot rather than news. Last occurrence for everything else.
+- **One vocabulary reads both layouts**, because a candidate name is matched on the last dotted
+  segment as well as the whole name: `battery.stateOfChargeInPercent` and `stateOfChargeInPercent`
+  need no separate tables, and two tables would be two things to keep in step.
+- **The field names in `VwGroupFieldNames` are inference, and the code is built around admitting it.**
+  They were written from what #137 and #139 record plus the one value already written down in this
+  codebase (`CHARGE_STATE_CHARGING_HV_BATTERY`). The mapper therefore *reports what it did not
+  recognise* and the harness prints it, so the first real download says what is missing in one glance
+  instead of a week of wondering why the SOC is null.
+- **Origin, not host.** `IsPortal` compares host *and* port. Against the real pair either would do —
+  the portal and the identity provider are different hosts — but a stub that puts both on localhost is
+  how this flow gets exercised without a car, and host-only matching declared victory on the authorize
+  page. Found by running the harness end to end, not by review.
+- **The sanitiser judges a reading by its `dataFieldName`, not by the property its value sits under.**
+  The first version redacted `dataFieldName` itself, because the word "name" is in it — producing a
+  fixture that proved nothing. The vocabulary is the thing the capture exists to record.
+- **Sign-in is on demand, exactly once per call.** Not on a schedule: what a session's real lifetime
+  is, is what the Phase 0 spike (#138) exists to measure, and "sign in when bounced" is the only
+  policy that is right whatever the answer turns out to be. Once per call, so a refused password
+  cannot become a loop.
+
+### Deliberately not done
+
+- **"Backoff matches what Phase 0 observed"** cannot be ticked: #138 has not been run, so there is
+  nothing to match. Phase 1 classifies failures into kinds a backoff can be written against, and
+  choosing the intervals stays where #137 puts it — the update service, in Phase 2.
+- **The fixtures are synthetic**, and `Fixtures/VwGroup/README.md` says so rather than implying a
+  capture. The structure they exercise is real; the spellings are what the first genuine download
+  settles. `vw-probe --save-fixture` was how they were to be replaced; with the harness gone, that
+  route needs restoring before a real capture can be committed.
+
+### Verification performed
+
+- **1286 tests pass** (47 new): both layouts, every tie-break, a missing SOC, an unrecognised charge
+  state, a present-but-unusable value, an undated snapshot, one unreadable member of a bundle, a
+  download that is not a ZIP; and on the transport side the consent screen, a CAPTCHA, an expired
+  session signing in again exactly once, HTML where JSON was expected, a 5xx, and an account with two
+  cars refusing to pick one.
+- The harness was driven end to end against a stub portal and identity provider: two form pages, a
+  401 recovered by re-signing in, five snapshots across two files, and the mapped state printed.
+
+---
+
 ## 2026-09-01 — The API is readable in the browser too (issue #142)
 
 ### What changed

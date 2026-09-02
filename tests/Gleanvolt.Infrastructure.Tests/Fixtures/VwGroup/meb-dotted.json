@@ -1,0 +1,29 @@
+{
+  "vehicleData": [
+    {
+      "capturedAt": "2026-08-31T21:14:07+02:00",
+      "Data": [
+        { "key": "0x0301FFFFFF", "dataFieldName": "battery.stateOfChargeInPercent", "value": "54" },
+        { "key": "0x0301010002", "dataFieldName": "battery.cruisingRangeElectricInMeters", "value": "312000" },
+        { "key": "0x0301020001", "dataFieldName": "charging.chargingState", "value": "CHARGE_STATE_CHARGING_HV_BATTERY" },
+        { "key": "0x0301020002", "dataFieldName": "charging.plugConnectionState", "value": "PLUG_CONNECTION_STATE_CONNECTED" },
+        { "key": "0x0301020003", "dataFieldName": "charging.remainingChargingTimeToCompleteInMinutes", "value": "95" },
+        { "key": "0x0101010002", "dataFieldName": "vehicle.mileageInKm", "value": "18234" },
+        { "key": "0x0301020009", "dataFieldName": "settings.target_soc", "value": "80" },
+        { "key": "0x0000000000", "dataFieldName": "climate.outsideTemperatureInCelsius", "value": "14.5" }
+      ]
+    },
+    {
+      "capturedAt": "2026-08-31T21:29:11+02:00",
+      "Data": [
+        { "key": "0x0301FFFFFF", "dataFieldName": "battery.stateOfChargeInPercent", "value": "61" },
+        { "key": "0x0301010002", "dataFieldName": "battery.cruisingRangeElectricInMeters", "value": "348000" },
+        { "key": "0x0301020001", "dataFieldName": "charging.chargingState", "value": "CHARGE_STATE_CHARGING_HV_BATTERY" },
+        { "key": "0x0301020002", "dataFieldName": "charging.plugConnectionState", "value": "PLUG_CONNECTION_STATE_CONNECTED" },
+        { "key": "0x0301020003", "dataFieldName": "charging.remainingChargingTimeToCompleteInMinutes", "value": "70" },
+        { "key": "0x0101010002", "dataFieldName": "vehicle.mileageInKm", "value": "18234" },
+        { "key": "0x0301020009", "dataFieldName": "settings.target_soc", "value": "80" }
+      ]
+    }
+  ]
+}

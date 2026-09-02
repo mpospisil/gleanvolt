@@ -13,6 +13,7 @@ using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Vehicles;
+using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
@@ -487,6 +488,18 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<VehicleStateHolder>();
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
         services.AddHostedService<VehicleMqttWorker>();
+
+        // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
+        // (issues #137/#139). Registered unconditionally, like the holder above and for the same
+        // reason: the page injects it and renders "not configured" itself, rather than the container
+        // deciding whether a page may exist.
+        //
+        // Configuration is Vehicle:DataAct:*, and falls back to the VW_* environment variables the
+        // console harness reads -- one .env then serves both, which is the whole point of having
+        // documented those names.
+        services.AddSingleton<IVehiclePortalReader>(provider => new VwGroupPortalReader(
+            VwGroupPortalOptionsResolver.Resolve(configuration),
+            provider.GetService<ILogger<VwGroupPortalReader>>()));
 
         // The UI needs MaxAge to mark a reading stale and the pack's size to offer a target in state of
         // charge, but Gleanvolt.Web cannot see this assembly's options classes. Hand it the values,
