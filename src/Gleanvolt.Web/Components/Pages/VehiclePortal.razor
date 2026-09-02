@@ -152,11 +152,13 @@ else if (_reading is { Succeeded: true, State: { } state })
 {
     <h2>@_reading.Matched.Count field(s) this build recognised</h2>
 
-    <dl class="facts">
+    @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
+       column sized to fit its own content. *@
+    <dl class="fields">
         @foreach (var (field, value) in _reading.Matched)
         {
-            <dt><code>@field</code></dt>
-            <dd>@(string.IsNullOrWhiteSpace(value) ? "(empty)" : $"\"{value}\"")</dd>
+            <dt><code>@Breakable(field)</code></dt>
+            <dd>@(string.IsNullOrWhiteSpace(value) ? (MarkupString)"(empty)" : Breakable($"\"{value}\""))</dd>
         }
     </dl>
 }
@@ -245,6 +247,35 @@ else if (_reading is { Succeeded: true })
 
     private static string Show(double? value, string unit) =>
         value is { } number ? $"{number:0.#}{unit}" : "—";
+
+    /// <summary>
+    /// A portal field name with break opportunities marked after its separators.
+    ///
+    /// <para>These names run to fifty characters of dotted path and the values to
+    /// <c>CHARGE_STATE_NOT_READY_FOR_CHARGING</c>. Left to itself a browser breaks such a token at
+    /// whatever character reaches the edge — <c>current_charge_st / ate</c> — which is legible only
+    /// just. A <c>&lt;wbr&gt;</c> after each dot and underscore gives it the joints to break at
+    /// instead, and it falls back to breaking anywhere when even a segment does not fit.</para>
+    ///
+    /// <para>Every segment is HTML-encoded on the way through: these strings come from the portal, and
+    /// this is the one place in the page that emits markup rather than text.</para>
+    /// </summary>
+    private static MarkupString Breakable(string text)
+    {
+        var builder = new System.Text.StringBuilder(text.Length + 32);
+
+        foreach (var character in text)
+        {
+            builder.Append(System.Net.WebUtility.HtmlEncode(character.ToString()));
+
+            if (character is '.' or '_')
+            {
+                builder.Append("<wbr>");
+            }
+        }
+
+        return (MarkupString)builder.ToString();
+    }
 
     private static string Span(DateTimeOffset oldest, DateTimeOffset newest) =>
         oldest.Date == newest.Date

@@ -179,9 +179,13 @@ public class VehiclePortalPageTests : PageTest
 
         page.Find("#portal-read").Click();
 
-        Assert.Contains("charging_state_report.charging_state", page.Markup);
-        Assert.Contains("invalid", page.Markup);
-        Assert.Contains("24680", page.Markup);
+        // Read as text rather than as markup: the names carry <wbr> break opportunities between their
+        // segments, which is a layout detail and not something every assertion should know about.
+        var recognised = page.Find("dl.fields").TextContent;
+
+        Assert.Contains("charging_state_report.charging_state", recognised);
+        Assert.Contains("invalid", recognised);
+        Assert.Contains("24680", recognised);
         Assert.Contains("settings.auto_unlock_ac", page.Markup);
     }
 
@@ -225,6 +229,44 @@ public class VehiclePortalPageTests : PageTest
         Assert.Contains("…1234", page.Markup);
         Assert.Contains("53065", page.Markup);
         Assert.Contains("80%", page.Markup);
+    }
+
+
+    [Fact]
+    public void Long_field_names_are_given_joints_to_break_at_and_a_column_that_can_shrink()
+    {
+        // A fifty-character dotted path in a column sized to its own content overran the value beside
+        // it -- reported from the live page as text overlapping text. The list is .fields rather than
+        // .facts for that reason, and each separator carries a break opportunity so the wrap lands on
+        // a joint instead of mid-word.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData", "nothing recognised", worthRetrying: false,
+            matched: new Dictionary<string, string>
+            {
+                ["energy_contents.maximal_energy_content.physical_value"] = "738.0",
+            })));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("class=\"fields\"", page.Markup);
+        Assert.Contains("energy_<wbr>contents.<wbr>maximal_<wbr>energy_<wbr>content.<wbr>physical_<wbr>value",
+            page.Markup);
+    }
+
+    [Fact]
+    public void A_field_name_from_the_portal_cannot_smuggle_markup_onto_the_page()
+    {
+        // These strings come from outside and this is the one place the page emits markup rather than
+        // text, so the encoding is pinned rather than assumed.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData", "nothing recognised", worthRetrying: false,
+            matched: new Dictionary<string, string> { ["<script>alert(1)</script>"] = "<b>x</b>" })));
+
+        page.Find("#portal-read").Click();
+
+        Assert.DoesNotContain("<script>alert(1)</script>", page.Markup);
+        Assert.DoesNotContain("<b>x</b>", page.Markup);
+        Assert.Contains("&lt;script&gt;", page.Markup);
     }
 
 

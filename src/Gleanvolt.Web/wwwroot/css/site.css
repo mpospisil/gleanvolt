@@ -127,6 +127,52 @@ h1 {
     font-variant-numeric: tabular-nums;
 }
 
+/* Field name -> raw value, for the vehicle portal's diagnostics (#140).
+
+   A separate shape from .facts because here the LABEL is the data: a portal field name runs to
+   `energy_contents.maximal_energy_content.physical_value`, and .facts sizes its first column to
+   max-content, which such a name blows straight through and over the value beside it. Grid items
+   default to min-width:auto, so an unbreakable dotted path cannot shrink -- min-width:0 plus
+   overflow-wrap is what actually lets it wrap rather than overlap. */
+.fields {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 0.4rem 1.5rem;
+    margin: 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+}
+
+.fields dt,
+.fields dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.fields dt {
+    color: var(--muted);
+}
+
+.fields dd {
+    font-variant-numeric: tabular-nums;
+}
+
+/* On a phone two columns of dotted paths is unreadable whatever the wrapping does, so the pair
+   stacks: name, then value under it. */
+@media (max-width: 40rem) {
+    .fields {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .fields dd {
+        margin-bottom: 0.6rem;
+    }
+}
+
 .muted {
     color: var(--muted);
 }
