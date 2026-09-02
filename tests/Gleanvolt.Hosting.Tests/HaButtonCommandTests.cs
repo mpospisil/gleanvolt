@@ -322,6 +322,9 @@ public class HaButtonCommandTests
             Options.Create(vehicleOptions ?? new VehicleOptions()),
             Discovery,
             _vehicle,
+            // No manufacturer update service (#140): this suite is about the buttons, and the Car feed
+            // entity is not published at all without one.
+            vehicleFeeds: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>

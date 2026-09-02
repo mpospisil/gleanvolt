@@ -11,10 +11,11 @@
     sign-in works and that the mapping recognises this car's fields is something an owner does — and
     an owner should not have to run `dotnet run -- vw-probe` to do it.
 
-    Deliberately manual. Nothing polls this and the reading is NOT written into IVehicleTelemetry:
-    the dashboard's car still comes from whatever feed is configured. Turning this into a service
-    with its own clock, a health state and a place in the holder is issue #140, and doing half of it
-    here would mean the controller reasoning about a car from data fetched behind the owner's back.
+    Deliberately manual, and it stayed that way after #140 built the feed. Nothing polls THIS page,
+    and the reading it shows is not written into IVehicleTelemetry: the dashboard's car comes from
+    whatever feed is configured. Pressing the button is how the credentials and the mapping are proved
+    before anything signs in unattended -- and how they are re-checked afterwards, since a feed blocked
+    on a consent screen stops asking by design.
 *@
 
 <SiteTitle Page="Vehicle portal" />
@@ -23,9 +24,10 @@
 
 <p class="muted">
     Asks @Portal.PortalName for @(string.IsNullOrWhiteSpace(Car.Name) ? "the car" : Car.Name), once,
-    when you press the button. Nothing here runs on a schedule, and the reading is not fed to the
-    dashboard or to any charging decision — this is how you check that the credentials work and that
-    the portal's fields are understood.
+    when you press the button. <em>This press</em> runs on no schedule and what it shows is fed to
+    nothing — not the dashboard's card, not any charging decision — so it is how you check that the
+    credentials work and that the portal's fields are understood, whether or not the feed on its own
+    clock is switched on.
 </p>
 
 @if (!Portal.IsConfigured)

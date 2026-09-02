@@ -4,6 +4,88 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-02 — The interval belongs to the service, and "needs you" is not a slower retry (issue #140)
+
+The VW portal now feeds the dashboard on its own clock. Three decisions in it are not obvious, and one
+of them reverses a smaller one from #139.
+
+### The cadence is the service's, and is not configurable
+
+The host asks a service how long to wait and honours the answer. It does not own an interval and
+neither does the configuration file.
+
+The reason is that no single figure is right twice. VW's portal is a fifteen-minute batch delivery, so
+asking faster achieves literally nothing; polling a sleeping Tesla wakes it and costs its owner range,
+so asking *at all* has a price. A host-level `PollInterval` would have to be wrong for one of them, and
+whoever set it would have no way of knowing which. `NextDelay` is re-read after every fetch, so a
+backoff is the service moving its own number rather than the host inventing a policy for an API it
+knows nothing about.
+
+Not exposing it as a setting is the other half. An owner who shortens the interval to five minutes gets
+the same data three times and three times the sign-ins; the number is a fact about the portal, and the
+place to change a fact about the portal is the file that knows about the portal.
+
+### A failure the owner must fix stops the feed, rather than retrying more slowly
+
+`SignInRejected`, `OwnerActionRequired` and `NoDataRequest` set `NextDelay` to
+`Timeout.InfiniteTimeSpan`, and the worker ends that service's loop until the process restarts.
+
+The tempting alternative — retry once an hour, or once a day — is worse in both directions. A refused
+password replayed on any schedule is how an account gets locked, and the schedule only decides how long
+that takes. A consent screen is a legal act that no number of retries answers. And the state that
+*deserves* the owner's attention is precisely the one a quiet hourly retry would keep looking like
+weather.
+
+What makes the full stop affordable is that a retry already exists and costs nothing: the
+`/vehicle-portal` button, with its own fresh session. Clear the screen, press the button, restart. The
+dashboard says exactly that, in the service's own sentence.
+
+`NoDataAvailable` is deliberately on the other side of the line and does not even back off: a newly
+created data request takes hours to fill, and backing off would take hours more to notice that it had.
+
+### The session is held — reversing #139's "sign in afresh every time"
+
+The on-demand reader builds a cookie jar per press, and #139 recorded why: a held session that has
+quietly expired fails in a way that looks like bad credentials, and nobody knew how long one lived.
+
+On a clock that trade inverts. Signing in afresh every fifteen minutes means ninety-six password
+replays a day at a real identity provider, which is the thing #137 was most careful about. So the feed
+holds one session, and the client's existing "sign in when bounced" behaviour — already exactly once
+per call — handles expiry.
+
+**And it measures.** Nobody could answer #138's session-lifetime question because nothing had ever kept
+a session; the first thing that keeps one is the first thing that can measure one, so
+`VwGroupPortalClient` gained a `SignedIn` event and the service times the gaps. It is a lower bound by
+construction: a session is discovered dead only when it is next used. The client got no clock — it says
+*that* it signed in, and whoever cares what time it is timestamps it.
+
+### Precedence between two sources belongs to the composition root
+
+`VehicleStateHolder` is last-write-wins, so "if both feeds are on, the manufacturer's wins" cannot be
+expressed inside either worker without one of them learning about the other. It is decided where both
+are registered: with `Vehicle:DataAct:Enabled` on, `VehicleMqttWorker` is not registered at all.
+
+Silence is the failure mode that mattered here, so `VehicleUpdateWorker` logs at startup when
+`Vehicle:Enabled` is still true — an MQTT automation that is publishing to a topic nobody subscribes to
+otherwise looks exactly like a working feed.
+
+### The card shows the car because it is defined
+
+The vehicle section used to hide until a reading arrived, which made three situations identical: no
+feed, a feed that has not spoken yet, and a feed that has stopped. The car is configuration and the
+feed is an attachment, so the card shows the car and then names the feed's state — with *stale* and
+*sign-in required* rendered differently, because they need opposite things from the owner and a charger
+sitting idle is already the most convincing impersonation of a fault this controller can produce.
+
+### What was kept small on purpose
+
+`IVehicleUpdateService` has five members and no credential abstraction, no capability taxonomy and no
+auth-model enum. What it exposes about authentication is not *how* a service authenticates but whether
+it currently can. One implementation cannot tell you what a second one wants, and the second one — a
+car that must be woken to answer — is the argument that should shape any of that.
+
+---
+
 ## 2026-09-01 — The VW portal is reachable headlessly, and five of our assumptions about it were wrong (issues #137/#139)
 
 The EU Data Act client now signs in and reads the reference ID.4 from a button on `/vehicle-portal`.

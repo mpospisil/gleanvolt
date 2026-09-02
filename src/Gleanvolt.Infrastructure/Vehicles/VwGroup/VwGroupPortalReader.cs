@@ -12,10 +12,10 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 ///
 /// <para><b>A fresh session per press.</b> Each read builds its own cookie jar and signs in again,
 /// rather than holding a session between presses. That is the right trade for a button pressed by
-/// hand a few times a day: session lifetime is exactly what the Phase 0 spike has not yet measured,
-/// and a held session that has quietly expired fails in a way that looks like bad credentials. Issue
-/// #140, which polls on a clock, is where keeping one starts to pay and where it gets measured
-/// first.</para>
+/// hand a few times a day: a held session that has quietly expired fails in a way that looks like bad
+/// credentials, and a button pressed twice costs two sign-ins rather than ninety-six a day.
+/// <see cref="VwGroupUpdateService"/> is where holding one starts to pay, and where a session's real
+/// lifetime is measured.</para>
 ///
 /// <para><b>Nothing here throws for an expected failure.</b> A refused password, a consent screen, a
 /// portal with nothing to give — each becomes an unsuccessful reading carrying its kind, because the

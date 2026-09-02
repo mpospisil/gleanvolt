@@ -25,12 +25,154 @@ public class DashboardPageTests : PageTest
     // Vehicle:Enabled=false looks like.
     private readonly VehicleStateHolder _vehicle = new();
 
+    // The car the section is about (#124/#140). Unknown by default, which is the install that has
+    // never described one; a test that is about the card sets it before rendering.
+    private EvInfo _car = EvInfo.Unknown;
+
     public DashboardPageTests()
     {
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
+        Services.AddSingleton(_ => _car);
+    }
+
+    private static EvInfo Id4() => new(
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
+
+    /// <summary>
+    /// A manufacturer feed that only ever answers "here is how I am". Fetching throws on purpose: the
+    /// dashboard reads <see cref="IVehicleUpdateService.Health"/> on a render and must never do I/O
+    /// on one.
+    /// </summary>
+    private sealed class StubFeed(VehicleSourceHealth health) : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-group";
+
+        public VehicleSourceHealth Health => health;
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    private void Feed(VehicleSourceHealth health) =>
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(health));
+
+    [Fact]
+    public void Shows_the_car_and_its_pack_with_no_feed_configured_and_says_nothing_is_wrong()
+    {
+        // State one of four (#140): the car is configuration, so the card shows it because it is
+        // *defined* -- not because something reported on it.
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("The ID.4", page.Markup);
+        Assert.Contains("77 kWh usable", page.Markup);
+        Assert.Contains("No feed is configured", page.Markup);
+        Assert.DoesNotContain("Car battery", page.Markup);
+        Assert.DoesNotContain("Sign-in required", page.Markup);
+    }
+
+    [Fact]
+    public void A_car_described_by_its_pack_alone_still_reads_as_a_sentence()
+    {
+        // Everything in the Ev section except the pack is optional (#124), and a car with no name and
+        // no model must not render as a leading comma.
+        _car = EvInfo.Unknown with { BatteryCapacityKWh = 77 };
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("The car, 77 kWh usable", page.Markup);
+    }
+
+    [Fact]
+    public void Says_sign_in_is_required_rather_than_stale_when_the_feed_is_blocked()
+    {
+        // The row this whole card exists for. "Stale" clears itself and "sign-in required" never
+        // will, so the two must not read alike -- and the sentence is what says which screen to open.
+        _car = Id4();
+        Feed(VehicleSourceHealth.NeedsOwner(
+            "The portal is showing something only you can answer (consent) -- open it in a browser."));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Sign-in required", page.Markup);
+        Assert.Contains("open it in a browser", page.Markup);
+        Assert.DoesNotContain("stale", page.Markup);
+    }
+
+    [Fact]
+    public void Keeps_the_ageing_reading_beside_a_sign_in_that_is_required()
+    {
+        // Blocked with a reading already in hand: both facts are worth having, and the actionable one
+        // is the one that has to stand out.
+        _car = Id4();
+        Feed(VehicleSourceHealth.NeedsOwner("The portal refused the sign-in: check the password."));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-20), SocPercent: 41, SourceId: "vw-group ...1234"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Sign-in required", page.Markup);
+        Assert.Contains("check the password", page.Markup);
+        Assert.Contains("41%", page.Markup);
+        Assert.Contains("stale", page.Markup);
+    }
+
+    [Fact]
+    public void Says_it_is_waiting_when_a_feed_is_configured_and_has_not_delivered()
+    {
+        _car = Id4();
+        Feed(VehicleSourceHealth.Starting);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("has not delivered a reading yet", page.Markup);
+        Assert.Contains("vw-group", page.Markup);
+        Assert.DoesNotContain("No feed is configured", page.Markup);
+        Assert.DoesNotContain("Sign-in required", page.Markup);
+    }
+
+    [Fact]
+    public void A_healthy_feed_reads_exactly_as_it_did_before_the_card_had_states()
+    {
+        _car = Id4();
+        Feed(VehicleSourceHealth.Ok("The portal answered."));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-20), SocPercent: 62, SourceId: "vw-group ...1234"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("62%", page.Markup);
+        Assert.Contains("20 min", page.Markup);
+        Assert.DoesNotContain("Sign-in required", page.Markup);
+        Assert.DoesNotContain("No feed is configured", page.Markup);
+        Assert.DoesNotContain("has not delivered", page.Markup);
+    }
+
+    [Fact]
+    public void An_install_that_has_described_no_car_at_all_gains_no_new_text()
+    {
+        // The guarantee (#140): a car with no update service configured -- here, no car either --
+        // behaves exactly as it did before any of this existed. Not one sentence about a feed.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { CarConnected = true });
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Car connected", page.Markup);
+        Assert.DoesNotContain("No feed is configured", page.Markup);
+        Assert.DoesNotContain("has not delivered", page.Markup);
+        Assert.DoesNotContain("Sign-in required", page.Markup);
     }
 
     [Fact]

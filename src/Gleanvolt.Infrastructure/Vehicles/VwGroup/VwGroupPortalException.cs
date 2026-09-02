@@ -57,7 +57,8 @@ public enum VwGroupFailure
     UnusableData,
 
     /// <summary>
-    /// A 5xx, a timeout, a dropped connection. Try again later; how much later is Phase 2's business.
+    /// A 5xx, a timeout, a dropped connection. Try again later; how much later is the update
+    /// service's business — it doubles its own interval to a cap of an hour.
     /// </summary>
     Transient,
 }

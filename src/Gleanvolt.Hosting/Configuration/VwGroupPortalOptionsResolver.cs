@@ -19,6 +19,26 @@ public static class VwGroupPortalOptionsResolver
     /// <summary>The configuration section, on the same terms as every other feature's.</summary>
     public const string SectionName = "Vehicle:DataAct";
 
+    /// <summary>
+    /// Whether the portal is allowed to be read <b>on a clock</b> — <c>Vehicle:DataAct:Enabled</c>, or
+    /// <c>VW_ENABLED</c> beside it.
+    ///
+    /// <para><b>Off by default, like everything that leaves the LAN</b>, and separate from having
+    /// credentials on purpose: a <c>.env</c> that carries a VW ID because somebody pressed the
+    /// <i>Vehicle portal</i> button once must not become an unattended feed at the next restart.
+    /// Signing in on a schedule with an owner's real password is a decision, and this is where it is
+    /// taken.</para>
+    ///
+    /// <para>It does not gate the button. The on-demand reader stays available whenever credentials
+    /// are configured, which is what proves them before this is switched on.</para>
+    /// </summary>
+    public static bool IsFeedEnabled(IConfiguration configuration)
+    {
+        var stated = Pick(configuration.GetSection(SectionName)["Enabled"], "VW_ENABLED");
+
+        return bool.TryParse(stated, out var enabled) && enabled;
+    }
+
     public static VwGroupPortalOptions Resolve(IConfiguration configuration)
     {
         var section = configuration.GetSection(SectionName);

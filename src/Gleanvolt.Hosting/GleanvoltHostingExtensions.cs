@@ -474,7 +474,8 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton(provider => new HaDiscovery(
             provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value,
             provider.GetRequiredService<PvSystemInfo>(),
-            provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled));
+            provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled,
+            provider.GetServices<IVehicleUpdateService>().Any()));
 
         services.AddHostedService<HomeAssistantMqttWorker>();
 
@@ -487,7 +488,20 @@ public static class GleanvoltHostingExtensions
         services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
         services.AddSingleton<VehicleStateHolder>();
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
-        services.AddHostedService<VehicleMqttWorker>();
+
+        // Whether the manufacturer's own portal is read on a clock (issue #140). Decided here, before
+        // anything is registered, because it is what settles which of two feeds owns the holder.
+        var manufacturerFeed = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration);
+
+        // "If both sources are on, the manufacturer service wins" -- and the only honest way to make one
+        // win over a last-write-wins holder is for the other not to be subscribed at all. Neither worker
+        // is changed to know about the other: precedence between two sources is a composition decision,
+        // so it is taken once, here. VehicleUpdateWorker says so in the log at startup, which is where
+        // an operator whose MQTT feed has gone quiet will look.
+        if (!manufacturerFeed)
+        {
+            services.AddHostedService<VehicleMqttWorker>();
+        }
 
         // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
         // (issues #137/#139). Registered unconditionally, like the holder above and for the same
@@ -500,6 +514,26 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IVehiclePortalReader>(provider => new VwGroupPortalReader(
             VwGroupPortalOptionsResolver.Resolve(configuration),
             provider.GetService<ILogger<VwGroupPortalReader>>()));
+
+        // The same portal on its own clock (issue #140), which is a different thing from the button
+        // above and is registered on different terms: only when Vehicle:DataAct:Enabled says so.
+        // Credentials being present is not consent to replay them at an identity provider every
+        // quarter of an hour -- pressing the button is how they are proved, and this is how a feed is
+        // asked for.
+        //
+        // The service, not the host, owns the cadence: nothing here states an interval.
+        if (manufacturerFeed)
+        {
+            services.AddSingleton<IVehicleUpdateService>(provider => new VwGroupUpdateService(
+                provider.GetRequiredService<EvInfo>().Id,
+                VwGroupPortalOptionsResolver.Resolve(configuration),
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetService<ILogger<VwGroupUpdateService>>()));
+        }
+
+        // Registered whether or not a service exists: with none it logs that fact once and stops, which
+        // is a supported installation rather than a misconfigured one.
+        services.AddHostedService<VehicleUpdateWorker>();
 
         // The UI needs MaxAge to mark a reading stale and the pack's size to offer a target in state of
         // charge, but Gleanvolt.Web cannot see this assembly's options classes. Hand it the values,

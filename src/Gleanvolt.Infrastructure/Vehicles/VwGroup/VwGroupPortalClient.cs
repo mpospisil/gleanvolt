@@ -24,14 +24,16 @@ public sealed record VwGroupVehicle(string Vin, string RequestId)
 /// (issue #139, steps 2–4), and hand the bytes to the pure mapper.
 ///
 /// <para>Nothing here knows it is running inside a controller — no hosted service, no configuration
-/// binding, no dashboard. Those are Phase 2 (#140). What this offers is one call that produces a
-/// <see cref="VehicleState"/> and a set of failures a caller can act on without reading a
-/// message.</para>
+/// binding, no dashboard. Those belong to whoever holds one of these: the on-demand
+/// <see cref="VwGroupPortalReader"/> or the <see cref="VwGroupUpdateService"/> feed. What this offers
+/// is one call that produces a <see cref="VehicleState"/> and a set of failures a caller can act on
+/// without reading a message.</para>
 ///
 /// <para><b>The portal is a batch delivery, not a live API.</b> Datasets appear about every fifteen
 /// minutes and only when the owner has enabled a continuous data request by hand; polling faster
-/// achieves nothing at all. How often to ask is deliberately not decided here — it is the update
-/// service's, in Phase 2, informed by what the Phase 0 spike (#138) measured.</para>
+/// achieves nothing at all. How often to ask is deliberately not decided here — it belongs to
+/// <see cref="VwGroupUpdateService"/>, because a second manufacturer's answer would be different and
+/// neither of them is a fact about this transport.</para>
 /// </summary>
 public sealed class VwGroupPortalClient
 {
@@ -63,6 +65,21 @@ public sealed class VwGroupPortalClient
         _logger = logger ?? NullLogger.Instance;
         _signIn = signIn ?? new VwGroupSignIn(http, options, _logger);
     }
+
+    /// <summary>
+    /// Raised each time this client has signed in — the first time, and again whenever the portal
+    /// bounced an established session.
+    ///
+    /// <para><b>It exists to be measured.</b> Nobody knows how long a portal session lives, because
+    /// until #140 nothing ever kept one: the on-demand reader discards its cookie jar on every press.
+    /// A caller that holds one client across many fetches learns the answer by timing the gaps between
+    /// these, so the instrumentation is built in rather than added after the question is asked again.
+    /// The figure is a lower bound — we find out a session died only when we next use it.</para>
+    ///
+    /// <para>No clock here on purpose: this class has none and does not want one. It says
+    /// <i>that</i> it signed in; whoever cares what time it is timestamps it.</para>
+    /// </summary>
+    public event Action? SignedIn;
 
     /// <summary>
     /// The whole of #139 in one call: sign in if the session is gone, find the car, take the newest
@@ -280,6 +297,7 @@ public sealed class VwGroupPortalClient
             _logger.LogInformation("The VW portal bounced us; signing in again.");
 
             await _signIn.SignInAsync(cancellationToken).ConfigureAwait(false);
+            SignedIn?.Invoke();
             response = await SendAsync(url, cancellationToken, headers).ConfigureAwait(false);
         }
 

@@ -3,9 +3,10 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <summary>
 /// What the VW Group portal client needs to know to sign in and find a car (issue #139).
 ///
-/// <para>A plain object constructed by the caller, <b>not</b> bound from configuration here: Phase 1
-/// is the client and nothing that knows it is running inside a controller. Phase 2 (#140) binds it,
-/// and that is also where it acquires an <c>.env</c> name.</para>
+/// <para>A plain object constructed by the caller, <b>not</b> bound from configuration here: this
+/// assembly is the client and nothing in it knows it is running inside a controller.
+/// <c>VwGroupPortalOptionsResolver</c> in the host binds it from <c>Vehicle:DataAct:*</c>, with the
+/// shorter <c>VW_*</c> environment names honoured beside it.</para>
 ///
 /// <para><b>The brand client id is a setting, not a constant.</b> VW passenger and commercial
 /// vehicles share one; Audi, Škoda, SEAT/Cupra and Bentley each have their own, and they belong to

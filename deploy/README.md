@@ -102,6 +102,11 @@ Assistant automation that feeds it in the main README's
 `MQTT_USERNAME`/`MQTT_PASSWORD`, writes to nothing, and no charge decision depends on it, so it is safe
 to leave off and safe to turn on later.
 
+For a **VW Group car** there is a second route that needs no automation at all: `VW_ENABLED` and the
+credentials beside it read VW's own EU Data Act portal directly, every fifteen minutes — see
+[docs/VW_PORTAL_SETUP.md](../docs/VW_PORTAL_SETUP.md). Switching it on stops the MQTT feed above being
+subscribed, deliberately: two sources writing one reading is a race.
+
 ### Workflow B — controller and its web UI only
 
 For a Pi with **1 GB of RAM**, or any board where you simply don't want Home Assistant. The

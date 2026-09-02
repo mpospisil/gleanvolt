@@ -4,6 +4,82 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-02 — The car arrives on its own clock, and the card names which of four states the feed is in (issue #140)
+
+### What changed
+
+- `IVehicleUpdateService` (Core): one manufacturer feed for one configured car — `VehicleId`,
+  `Manufacturer`, `Health`, `NextDelay`, `FetchAsync`. Nothing more. No credential abstraction, no
+  capability taxonomy, no auth-model enum: one implementation exists and cannot tell you what a second
+  one wants.
+- `VehicleSourceHealth` + `VehicleSourceState` (`Ok | Degraded | NeedsOwner`) with a sentence: the
+  state for an automation to compare, the sentence for a person to read.
+- `VwGroupUpdateService` (Infrastructure): Phase 1's client behind the contract. Holds one
+  `HttpClient`, one cookie jar and one session for the life of the process; signs in again only when
+  the portal bounces it; asks every fifteen minutes.
+- `VehicleUpdateWorker` (Hosting): one loop per service on the delay that service asks for, writing to
+  `VehicleStateHolder`. Owns cancellation, the log line, a one-minute floor under any delay, and the
+  rule that a blocked service is stopped rather than slowed.
+- `Vehicle:DataAct:Enabled` (`VW_ENABLED` beside it), off by default. With it on, `VehicleMqttWorker`
+  is **not registered**: two sources writing one holder is a race whoever wins it.
+- The dashboard's vehicle card shows the car because it is *defined*, then which of four states the
+  feed is in. `/vehicle-portal` and `VehicleMqttWorker` are untouched.
+- Home Assistant gains **Car feed**: state `Ok`/`Degraded`/`NeedsOwner`, the sentence as a `reason`
+  attribute, published only where a feed exists.
+
+### Things worth knowing
+
+- **The interval is the service's, and that is the whole shape of the contract.** Fifteen minutes is
+  the portal's own delivery frequency; a Tesla that has to be woken to answer would want something
+  else entirely, and no figure in the host could be right for both. `NextDelay` is re-read after every
+  fetch, so a backoff is the service raising its own number rather than the host inventing one.
+- **The session is held, and it is the first thing that can be measured.** #138 could not answer how
+  long a portal session lives because nothing had ever kept one — the on-demand reader discards its
+  cookie jar on every press. Every sign-in is timed against the previous one and logged. The figure is
+  a lower bound by construction: we learn a session died only when we next use it.
+- **Blocked is a full stop, not a longer interval.** `SignInRejected`, `OwnerActionRequired` and
+  `NoDataRequest` set `NextDelay` to `Timeout.InfiniteTimeSpan` and the worker ends that loop. A
+  password replayed at a real identity provider on a clock is how accounts get locked, and a consent
+  screen polled forever is answered by nobody. The `/vehicle-portal` button is the retry.
+- **`NoDataAvailable` deliberately does not back off.** A newly created data request takes hours to
+  fill, and that is not a fault; backing off would then take hours more to notice that it had. The
+  faults worth waiting out are the ones asking again makes worse.
+- **Precedence lives in the composition root, not in either worker.** "The manufacturer service wins"
+  cannot be expressed against a last-write-wins holder except by not subscribing the other source, so
+  the decision is taken once where both are registered. `VehicleUpdateWorker` logs it at startup, since
+  an MQTT feed that is configured and no longer used is otherwise silent.
+- **The card's fourth row is the point.** *Stale* and *sign-in required* need opposite things from the
+  owner, and a charger sitting idle is already the most convincing impersonation of a fault this
+  controller can produce.
+- **`VwGroupPortalClient` gained one event and no clock.** `SignedIn` says *that* it signed in;
+  whoever cares what time it is timestamps it. That kept the measurement out of the transport.
+
+### Deliberately not done
+
+- **No credential store, no second manufacturer, no interval setting.** The contract stays internal and
+  unfrozen until there is a second service to argue with it.
+- **Nothing on a hardware path reads the feed.** It reaches the holder, the dashboard and what an owner
+  *asks* for; no charge decision sees it, and an installation with the feed off behaves exactly as it
+  did before this existed — with a test that says so.
+- **A blocked feed does not resume without a restart.** Deliberate: the thing that would make it resume
+  is a human clearing a screen, and the button is how that is checked.
+
+### Verification performed
+
+- **1384 tests pass** (32 new). The service is driven against a fake portal that models a *session* —
+  the identity provider's two forms, the vehicle list, the data request, the delivery list and a real
+  ZIP built from the committed fixtures — so three fetches produce one sign-in, an expired session
+  produces a second one with `lasted at least 03:00:00` in the log, a consent screen stops it asking
+  and reaches no network on the next call, and a 502 backs off 15 → 30 → 60 minutes and no further.
+- The worker's pacing is asserted on the delays it *asked* for, through a `TimeProvider` whose timers
+  fire at once: no test waits fifteen minutes for anything.
+- All four card states render, and the two that must not look alike do not.
+- **Not yet run against the live portal on a clock.** The session-lifetime line is what the reference
+  install will answer, and it is the reason the instrumentation shipped with the feature rather than
+  after it.
+
+---
+
 ## 2026-09-01 — The VW Group portal client (issue #139, Phase 1 of #137)
 
 ### What changed

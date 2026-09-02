@@ -18,14 +18,14 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <para><b>The consent screen is not handled here and never will be.</b> If one appears — or an OTP,
 /// or a CAPTCHA — this fails as <see cref="VwGroupFailure.OwnerActionRequired"/> and does not retry.
 /// A program cannot answer it, and looping on it risks the account for nothing. That failure is what
-/// Phase 2's "sign-in required" is built on: a distinct state, not a stale reading.</para>
+/// the dashboard's "sign-in required" is built on: a distinct state, not a stale reading.</para>
 ///
 /// <para>All the judgement lives in <see cref="VwGroupLoginForm"/>, which is pure and tested. What is
 /// here is transport and the order of the steps.</para>
 /// </summary>
 public sealed class VwGroupSignIn
 {
-    /// <summary>Name of the configured <see cref="HttpClient"/> Phase 2 will register.</summary>
+    /// <summary>Name a configured <see cref="HttpClient"/> would be registered under.</summary>
     public const string HttpClientName = "VwGroupPortal";
 
     /// <summary>
