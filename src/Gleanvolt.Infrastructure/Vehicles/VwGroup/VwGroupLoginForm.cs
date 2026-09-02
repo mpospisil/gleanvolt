@@ -270,13 +270,67 @@ public sealed record VwGroupLoginForm(
     public string? PasswordField => FieldFor("password");
 
     /// <summary>
+    /// Names that mean the box in front of us wants a code out of somebody's inbox or phone. Short and
+    /// unambiguous ones are matched whole; the rest are matched as fragments of a normalised name, so
+    /// <c>email_otp</c>, <c>emailOtp</c> and <c>otpCode</c> are one entry rather than three.
+    /// </summary>
+    private static readonly string[] OneTimeCodeNames = ["otp", "tan"];
+
+    /// <summary>
+    /// <b><c>code</c> is deliberately absent.</b> It is OAuth's own parameter name, and a hidden
+    /// <c>code</c> on a sign-in page would make this abort a flow that was working — a false positive
+    /// here costs a feed that says "sign-in required" when nothing is wrong, which is worse than the
+    /// false negative it would prevent.
+    /// </summary>
+    private static readonly string[] OneTimeCodeFragments =
+    [
+        "onetimepassword", "onetimecode", "smscode", "emailcode", "emailotp", "otpcode",
+        "securitycode", "verificationcode", "mfacode",
+    ];
+
+    /// <summary>
+    /// The field asking for a one-time code, or null when the page asks for no such thing.
+    ///
+    /// <para><b>Structural, and that is the point.</b> <see cref="OwnerActionReason"/> reads the prose,
+    /// which fails on a page in a language its needle list does not cover; a field named
+    /// <c>emailOtp</c> says the same thing in every language. It is also what makes the
+    /// <see cref="CanSignIn"/> guard safe: every rendered input counts towards that guard, hidden ones
+    /// included, so an OTP page carrying a hidden <c>email</c> would otherwise read as an ordinary
+    /// sign-in page and be posted to — the identifier replayed into a form that wanted six digits,
+    /// failing five pages later as a refused password rather than as the mailbox it is.</para>
+    /// </summary>
+    public string? OneTimeCodeField
+    {
+        get
+        {
+            foreach (var (name, _) in FieldTypes)
+            {
+                var normalised = name.Replace("-", string.Empty).Replace("_", string.Empty).ToLowerInvariant();
+
+                if (OneTimeCodeNames.Contains(normalised, StringComparer.Ordinal)
+                    || OneTimeCodeFragments.Any(fragment => normalised.Contains(fragment, StringComparison.Ordinal)))
+                {
+                    return name;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Whether this page has somewhere to put a credential — an identifier, an email or a password.
     ///
     /// <para>The guard that keeps <see cref="OwnerActionReason"/> honest: <b>a page you can sign in
     /// on is a sign-in page</b>, whatever words are printed on it. A real consent screen has no
     /// password box, so this distinguishes them structurally rather than by vocabulary.</para>
+    ///
+    /// <para>A page also asking for a <see cref="OneTimeCodeField"/> is not one of them, whatever else
+    /// it renders: there is a credential we do not have, and the identifier we do have belongs in
+    /// neither that box nor that request.</para>
     /// </summary>
-    public bool CanSignIn => IdentifierField is not null || PasswordField is not null;
+    public bool CanSignIn =>
+        (IdentifierField is not null || PasswordField is not null) && OneTimeCodeField is null;
 
     /// <summary>
     /// Why a human is needed on this page, or null when it is one a program can answer.

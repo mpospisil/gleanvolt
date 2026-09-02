@@ -38,6 +38,17 @@ public sealed class VehicleUpdateWorker : BackgroundService
     /// </summary>
     public static readonly TimeSpan MinimumDelay = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// How often a feed that is blocked on its owner says so again in the log.
+    ///
+    /// <para>Saying it once, at the moment it happens, is not saying it: a container's log is read
+    /// hours or days later, most often with <c>--tail</c>, and by then the one warning has scrolled
+    /// out of reach and the feed is silent in a way indistinguishable from a car that is parked. This
+    /// costs four lines a day and no network traffic at all — <b>nothing</b> is fetched while blocked,
+    /// which is the entire point of stopping.</para>
+    /// </summary>
+    public static readonly TimeSpan BlockedReminder = TimeSpan.FromHours(6);
+
     private readonly IReadOnlyList<IVehicleUpdateService> _services;
     private readonly VehicleStateHolder _holder;
     private readonly ILogger<VehicleUpdateWorker> _logger;
@@ -133,10 +144,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
 
             if (service.Health.IsBlocked || delay < TimeSpan.Zero)
             {
-                _logger.LogWarning(
-                    "The {Manufacturer} feed for {Vehicle} has stopped: {Reason} It will not be asked "
-                    + "again until the controller is restarted.",
-                    service.Manufacturer, service.VehicleId, service.Health.Message);
+                await WaitOnTheOwnerAsync(service, stoppingToken).ConfigureAwait(false);
                 break;
             }
 
@@ -147,6 +155,36 @@ public sealed class VehicleUpdateWorker : BackgroundService
             catch (OperationCanceledException)
             {
                 break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// What a stopped feed does for the rest of the process's life: nothing, loudly.
+    ///
+    /// <para>It never fetches again — a password replayed on a clock is how accounts get locked, and a
+    /// consent screen is answered by nobody here. But it repeats the reason on
+    /// <see cref="BlockedReminder"/> so that the log of a controller that has been sitting blocked for
+    /// three days says so, rather than saying nothing at all. The web UI carries the same sentence on
+    /// every page for as long as this is true.</para>
+    /// </summary>
+    private async Task WaitOnTheOwnerAsync(IVehicleUpdateService service, CancellationToken stoppingToken)
+    {
+        while (true)
+        {
+            _logger.LogWarning(
+                "The {Manufacturer} feed for {Vehicle} has stopped and needs you: {Reason} It will not "
+                + "be asked again until you have cleared it and restarted the controller — press "
+                + "\"Read the car now\" on the Vehicle portal page to check.",
+                service.Manufacturer, service.VehicleId, service.Health.Message);
+
+            try
+            {
+                await Task.Delay(BlockedReminder, _time, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
             }
         }
     }

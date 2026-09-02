@@ -37,8 +37,23 @@ that takes. A consent screen is a legal act that no number of retries answers. A
 weather.
 
 What makes the full stop affordable is that a retry already exists and costs nothing: the
-`/vehicle-portal` button, with its own fresh session. Clear the screen, press the button, restart. The
-dashboard says exactly that, in the service's own sentence.
+`/vehicle-portal` button, with its own fresh session. Clear the screen, press the button, restart.
+
+**A state that never clears itself has to be said until it is fixed**, so it is said in four places: a
+band in the web UI's layout — every page, not only the dashboard card it belongs to — a `Car feed` row
+on Health, the `Car feed` entity for an automation to notify on, and a warning in the log **repeated
+every six hours**. The repetition is the part worth defending: a warning written once has scrolled out
+of `docker logs --tail` by the time anybody looks, and a stopped feed is otherwise silent in a way
+indistinguishable from a parked car. It is a log line and never a request, so "it stopped asking"
+remains literally true.
+
+An emailed one-time code is this case exactly, and it is also detected **structurally** rather than only
+by prose. `CanSignIn` — the guard that stops the word "consent" aborting a sign-in on a client literally
+named "GIS Consent Portal" — counts every rendered input, hidden ones included, so an OTP page carrying
+the address in a hidden `email` would have read as an ordinary sign-in page and been posted to. A field
+named `otp` or `emailOtp` says "a person is required" in every language a needle list would have to be
+translated into. `code` is deliberately excluded: it is OAuth's own parameter name, and a false positive
+would abort a working sign-in — worse than the false negative it prevents.
 
 `NoDataAvailable` is deliberately on the other side of the line and does not even back off: a newly
 created data request takes hours to fill, and backing off would take hours more to notice that it had.

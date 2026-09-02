@@ -184,9 +184,30 @@ Two states, and they are deliberately not alike:
 
 **Sign-in required stops the feed asking.** That is the point rather than a limitation: a password
 replayed at an identity provider on a clock is how accounts get locked, and a consent screen polled
-forever is answered by nobody. The **Car feed** entity carries the same three states — `Ok`,
-`Degraded`, `NeedsOwner` — with the sentence as a `reason` attribute, so a notification can be raised
-on the one that needs you.
+forever is answered by nobody.
+
+You will not miss it. While it lasts, the web UI carries a band across the top of **every** page with
+the reason and a link to this portal page, the **Health** page shows it as a `Car feed` row, and the
+controller logs it as a **warning** every six hours — a log line, never another request. The
+**Car feed** entity carries the same three states (`Ok`, `Degraded`, `NeedsOwner`) with the sentence as
+a `reason` attribute, which is what a Home Assistant notification keys off.
+
+### If it asks for a code from your email
+
+It is treated exactly as the consent screen is: `OwnerActionRequired`, reported, and **never retried**.
+There is no way around this and there is not meant to be — a one-time code is a person's mailbox, and a
+client that kept trying would only be replaying your password at VW's identity provider on a schedule.
+
+The code page is recognised before anything is posted, two ways: by the words on it (`verification
+code`, `security code`, `one-time password`, `Einmalcode`) and by a field asking for one (`otp`,
+`emailOtp`, `securityCode` and their like). The second is what still works on a page in a language the
+first does not cover, and it is also what stops the client mistaking a code page for a login page when
+the page happens to carry your address in a hidden field.
+
+Enter the code once in a browser, press **Read the car now** to confirm the sign-in works, and restart
+the controller. On the reference account this has not come up — six cold sign-ins with only an email
+and a password — and holding one session rather than signing in ninety-six times a day is partly there
+to keep new-device challenges rare.
 
 ### About the unrecognised fields
 

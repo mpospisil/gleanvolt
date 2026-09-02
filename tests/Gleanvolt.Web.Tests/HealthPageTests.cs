@@ -28,6 +28,55 @@ public class HealthPageTests : PageTest
         Services.AddSingleton<IServiceShutdown>(_shutdown);
     }
 
+    /// <summary>A feed that only ever reports how it is; the page must never make it fetch.</summary>
+    private sealed class StubFeed(VehicleSourceHealth health) : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-group";
+
+        public VehicleSourceHealth Health => health;
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    [Fact]
+    public void Says_nothing_about_a_car_feed_that_is_not_configured()
+    {
+        // "Is anything wrong?" must not grow a row saying "no" for a feature nobody has turned on.
+        Assert.DoesNotContain("Car feed", Render<Health>().Markup);
+    }
+
+    [Fact]
+    public void Reports_a_feed_that_needs_the_owner_as_the_thing_that_will_not_fix_itself()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
+            VehicleSourceHealth.NeedsOwner("The portal is showing a consent screen; open it in a browser.")));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Car feed", page.Markup);
+        Assert.Contains("NeedsOwner", page.Markup);
+        Assert.Contains("consent screen", page.Markup);
+        Assert.Contains("/vehicle-portal", page.Markup);
+    }
+
+    [Fact]
+    public void Reports_a_healthy_feed_without_offering_a_remedy()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
+            VehicleSourceHealth.Ok("The portal answered; the car reported at 09:45.")));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Car feed", page.Markup);
+        Assert.Contains("reported at 09:45", page.Markup);
+        Assert.DoesNotContain("/vehicle-portal", page.Markup);
+    }
+
     [Fact]
     public void Reports_the_build_the_host_handed_it()
     {

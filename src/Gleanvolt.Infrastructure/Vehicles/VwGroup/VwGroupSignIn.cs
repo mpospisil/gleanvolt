@@ -111,6 +111,18 @@ public sealed class VwGroupSignIn
             // ordinary email form says "consent" six times: in the client id's app name, in the
             // templateModel, and in the visible subtitle "Welcome to Consent Portal". Reading that as
             // a consent screen aborted every sign-in before the first field was filled.
+            // A box for a code that arrives in somebody's inbox is decisive on its own, before the
+            // prose is read: the field name says the same thing in every language the identity
+            // provider might render, and there is no answer to it here at any price.
+            if (form.OneTimeCodeField is { } codeField)
+            {
+                throw new VwGroupPortalException(
+                    VwGroupFailure.OwnerActionRequired,
+                    $"the portal is asking for a one-time code (the '{codeField}' field), which only "
+                    + $"the owner can answer in a browser at {_options.PortalBaseUrl}. Nothing here "
+                    + "will retry until it has been.");
+            }
+
             if (!form.CanSignIn && VwGroupLoginForm.OwnerActionReason(page.Body) is { } reason)
             {
                 throw new VwGroupPortalException(

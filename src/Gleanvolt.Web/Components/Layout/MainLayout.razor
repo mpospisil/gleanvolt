@@ -41,5 +41,20 @@
 </header>
 
 <main class="content">
+    @*
+        A feed that has stopped and needs a person (#140) is worth saying on every page, not only on
+        the dashboard card it belongs to: it does not clear itself, and a car that has quietly stopped
+        reporting looks exactly like a car that is parked.
+
+        Inside AuthorizeView on the default policy -- which is the audience of every page except the
+        sign-in one, whether or not Web:RequireAuthentication is on. The sign-in page keeps saying only
+        what it said before: the product, and the installation's name.
+    *@
+    <AuthorizeView>
+        <Authorized>
+            <VehicleFeedAlert />
+        </Authorized>
+    </AuthorizeView>
+
     @Body
 </main>

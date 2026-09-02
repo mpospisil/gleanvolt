@@ -1828,12 +1828,34 @@ bounces it, and it **times how long each session lasted** and logs it: nobody kn
 session's life is, because until this nothing had ever kept one.
 
 **A failure the owner has to fix stops the feed rather than slowing it.** A refused password, a consent
-screen, an OTP, a CAPTCHA, or an account with no continuous data request at all: the service stops
-asking, the dashboard says **sign-in required** with the sentence naming what to do, and the
-[**Car feed**](#what-each-entity-means) entity goes to `NeedsOwner` so an automation can raise it. Clear
-it in a browser, press the portal button to check, and restart the controller to put the feed back on
-its clock. Ordinary failures — a 5xx, a timeout, an expired session, a delivery that has not been filled
-yet — are `Degraded` instead: they back off (to at most an hour) and clear themselves.
+screen, an emailed one-time code, a CAPTCHA, or an account with no continuous data request at all: the
+service stops asking. Ordinary failures — a 5xx, a timeout, an expired session, a delivery that has not
+been filled yet — are `Degraded` instead: they back off (to at most an hour) and clear themselves.
+
+**A stopped feed is said four ways, because it does not clear itself.**
+
+- A band across the top of **every page** of the web UI: *Sign-in required*, the service's sentence, and
+  a link to the portal page. It follows the poll, so a browser left open overnight grows one.
+- The dashboard's vehicle card, next to the reading it explains.
+- **Health**, where "is anything wrong?" is actually asked, as a `Car feed` row.
+- The log, as a **warning** — repeated every six hours for as long as it lasts, because a warning
+  written once has scrolled out of `docker logs --tail` by the time anybody reads it, and a silent
+  stopped feed is indistinguishable from a parked car. The reminder is a log line and never a request:
+  nothing is fetched while the feed is blocked.
+
+Plus the [**Car feed**](#what-each-entity-means) entity going to `NeedsOwner`, which is what a Home
+Assistant notification keys off. Clear it in a browser, press the portal button to check, and restart
+the controller to put the feed back on its clock.
+
+**About that emailed code.** If the portal ever answers with a one-time code, a CAPTCHA or an
+authenticator prompt, the client recognises it *before* posting anything and never retries — a password
+put into a code form tells nobody anything, and a screen a program cannot answer is not made answerable
+by asking again. It is recognised two ways: by the words on the page, and by a field asking for a code
+(`otp`, `emailOtp`, `securityCode` and their like), which is what still works on a page in a language
+the word list does not cover. On the reference account this has not appeared — six cold sign-ins with
+only an email and a password, no code and no CAPTCHA — but the *first* sign-in in a browser does show a
+consent screen, and holding one session rather than signing in ninety-six times a day is partly there to
+keep new-device challenges rare.
 
 > **With this on, the MQTT vehicle feed is not subscribed.** Two sources writing one reading is a race
 > whoever wins it, so the manufacturer's service takes the holder and the MQTT worker is not started at

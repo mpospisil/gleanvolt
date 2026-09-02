@@ -204,6 +204,24 @@ h1 {
     color: #d64545;
 }
 
+/* The one feed state that needs a person (#140). A band rather than a line of red text: it is shown
+   above whatever page you are on, and it has to survive being scrolled past on the dashboard, where
+   the same sentence already sits inside the vehicle card. */
+.alert {
+    margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--panel);
+    border: 1px solid #d64545;
+    border-left-width: 4px;
+    border-radius: 6px;
+    color: var(--ink);
+}
+
+.alert a {
+    margin-left: 0.5rem;
+    color: var(--accent);
+}
+
 .controls {
     margin-top: 1.5rem;
     background: var(--panel);

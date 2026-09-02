@@ -26,6 +26,10 @@ Reverse-chronological. Newest entry at the top.
   feed is in. `/vehicle-portal` and `VehicleMqttWorker` are untouched.
 - Home Assistant gains **Car feed**: state `Ok`/`Degraded`/`NeedsOwner`, the sentence as a `reason`
   attribute, published only where a feed exists.
+- A blocked feed is surfaced four ways: a band in the web UI's layout on every page, the dashboard
+  card, a `Car feed` row on **Health**, and a **warning** repeated every six hours in the log.
+- A one-time-code page is recognised **structurally** as well as by its prose: `OneTimeCodeField` on
+  the login form, checked before the prose needles.
 
 ### Things worth knowing
 
@@ -53,6 +57,17 @@ Reverse-chronological. Newest entry at the top.
   controller can produce.
 - **`VwGroupPortalClient` gained one event and no clock.** `SignedIn` says *that* it signed in;
   whoever cares what time it is timestamps it. That kept the measurement out of the transport.
+- **The OTP guard had a hole worth closing.** `CanSignIn` exists because this client is named "GIS
+  Consent Portal", so its ordinary email form says "consent" six times — but *every* rendered input
+  counts towards it, hidden ones included. An OTP page re-rendering the address in a hidden `email`
+  would therefore have read as an ordinary sign-in page: the identifier posted into a form wanting six
+  digits, failing five pages later as a refused password. Stopped correctly, for the wrong stated
+  reason, which sends the owner to their password instead of their mailbox. `OneTimeCodeField` closes
+  it structurally. `code` is deliberately **not** in the list — it is OAuth's own parameter name, and a
+  false positive would abort a working sign-in, which is worse than the false negative it prevents.
+- **Warning once is not warning.** A container log is read days later with `--tail`. The blocked feed
+  repeats its reason every six hours; it is a log line and never a request, so "it stopped asking"
+  stays literally true.
 
 ### Deliberately not done
 
@@ -73,7 +88,12 @@ Reverse-chronological. Newest entry at the top.
   and reaches no network on the next call, and a 502 backs off 15 → 30 → 60 minutes and no further.
 - The worker's pacing is asserted on the delays it *asked* for, through a `TimeProvider` whose timers
   fire at once: no test waits fifteen minutes for anything.
-- All four card states render, and the two that must not look alike do not.
+- All four card states render, and the two that must not look alike do not. The layout band appears on
+  a page that was already open (health changing between two polls), and stays absent for every state
+  that clears itself.
+- **1403 tests pass** after the follow-up: the code-field detection across seven spellings, an OTP page
+  with a hidden `email`, OAuth's own `code` parameter left alone, and a blocked feed logging its reason
+  three times while fetching exactly once.
 - **Not yet run against the live portal on a clock.** The session-lifetime line is what the reference
   install will answer, and it is the reason the instrumentation shipped with the feature rather than
   after it.

@@ -1,0 +1,56 @@
+@implements IDisposable
+@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
+@inject ChargeControlStatusHolder StatusHolder
+
+@*
+    The one vehicle-feed state worth interrupting somebody for: the feed has stopped, and it will not
+    start again until a person opens a browser (#140).
+
+    In the layout rather than on the dashboard's card, and only for this state. Everything else the
+    feed can be -- old, degraded, waiting for its first delivery -- clears itself and belongs where it
+    already is, next to the reading it qualifies. This one does not clear itself, and the longer it
+    goes unseen the more the card above it looks like a car that is simply parked.
+
+    It follows the poll's own event so a browser left open overnight learns about it, rather than
+    reading Health once at first render and then lying by omission until somebody navigates.
+*@
+
+@if (_blocked is not null)
+{
+    <div class="alert" role="alert">
+        <strong>Sign-in required</strong> — @_blocked.Message
+        <a href="/vehicle-portal">Check the portal</a>
+    </div>
+}
+
+@code {
+    private IVehicleUpdateService? _service;
+    private VehicleSourceHealth? _blocked;
+
+    protected override void OnInitialized()
+    {
+        _service = VehicleFeeds.FirstOrDefault();
+
+        Refresh();
+        StatusHolder.Updated += OnStatusUpdated;
+    }
+
+    private void OnStatusUpdated(ChargeControlStatus status)
+    {
+        var was = _blocked;
+
+        Refresh();
+
+        // Re-rendering the whole layout on every poll would be wasteful and pointless: this banner
+        // changes about once a month, and nothing else in it moves.
+        if (!Equals(was, _blocked))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Refresh() =>
+        _blocked = _service?.Health is { IsBlocked: true } health ? health : null;
+
+    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+}

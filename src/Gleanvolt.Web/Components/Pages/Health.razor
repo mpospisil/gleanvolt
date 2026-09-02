@@ -6,6 +6,7 @@
 @inject WebBuildInfo Build
 @inject TimeProvider Time
 @inject IServiceShutdown Shutdown
+@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
 
 @*
     The whole of phase 0's user interface. It exists to prove the two things no unit test can: that a
@@ -45,6 +46,23 @@
 
     <dt>Charge mode</dt>
     <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+
+    @*
+        The manufacturer feed (#140), on the page where "is anything wrong?" is actually asked. A feed
+        blocked on its owner is the one thing here that no amount of waiting fixes, so it says which
+        state it is in and quotes the service's own sentence rather than paraphrasing it.
+    *@
+    @if (_feed is not null)
+    {
+        <dt>Car feed</dt>
+        <dd class="@(_feed.IsBlocked ? "error" : null)">
+            @_feed.State — @_feed.Message
+            @if (_feed.IsBlocked)
+            {
+                <a href="/vehicle-portal">Check the portal</a>
+            }
+        </dd>
+    }
 </dl>
 
 @*
@@ -110,11 +128,15 @@
         Shutdown.RequestStop("Web UI");
     }
 
+    // The manufacturer feed's health, or null when no update service is configured (#140).
+    private VehicleSourceHealth? _feed;
+
     protected override void OnInitialized()
     {
         // Seeded before subscribing, so a browser that arrives between two polls still sees the last
         // one rather than an empty page until the next.
         _status = StatusHolder.Current;
+        _feed = VehicleFeeds.FirstOrDefault()?.Health;
         StatusHolder.Updated += OnStatusUpdated;
     }
 
@@ -123,6 +145,11 @@
     private void OnStatusUpdated(ChargeControlStatus status)
     {
         _status = status;
+
+        // Re-read on the poll's cadence, like everything else on this page: Health is a cheap property
+        // by contract, and a page left open is exactly where a feed's state changing has to show up.
+        _feed = VehicleFeeds.FirstOrDefault()?.Health;
+
         InvokeAsync(StateHasChanged);
     }
 

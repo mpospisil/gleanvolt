@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
@@ -20,6 +21,14 @@ public class VehicleUpdateWorkerTests
     private sealed class ImmediateTimeProvider : TimeProvider
     {
         private readonly List<TimeSpan> _delays = [];
+        private int _fired;
+
+        /// <summary>
+        /// How many timers actually fire before the rest are merely recorded and left pending. The
+        /// blocked feed's reminder is an endless loop by design, so a test that wants to see it repeat
+        /// has to be able to say "twice, then stop" rather than spin until it is cancelled.
+        /// </summary>
+        public int MaxFirings { get; init; } = int.MaxValue;
 
         public IReadOnlyList<TimeSpan> Delays
         {
@@ -33,9 +42,13 @@ public class VehicleUpdateWorkerTests
                 _delays.Add(dueTime);
             }
 
-            // Queued rather than called here: firing inside CreateTimer would run the awaiting
-            // continuation on this stack and recurse once per loop iteration.
-            ThreadPool.QueueUserWorkItem(_ => callback(state));
+            if (Interlocked.Increment(ref _fired) <= MaxFirings)
+            {
+                // Queued rather than called here: firing inside CreateTimer would run the awaiting
+                // continuation on this stack and recurse once per loop iteration.
+                ThreadPool.QueueUserWorkItem(_ => callback(state));
+            }
+
             return new NoTimer();
         }
 
@@ -91,15 +104,58 @@ public class VehicleUpdateWorkerTests
         }
     }
 
+    /// <summary>Keeps the warnings, so "it is in the log" is asserted rather than assumed.</summary>
+    private sealed class CapturingLogger : ILogger<VehicleUpdateWorker>
+    {
+        private readonly List<string> _warnings = [];
+
+        public IReadOnlyList<string> Warnings
+        {
+            get { lock (_warnings) { return _warnings.ToList(); } }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel < LogLevel.Warning)
+            {
+                return;
+            }
+
+            lock (_warnings)
+            {
+                _warnings.Add(formatter(state, exception));
+            }
+        }
+    }
+
+    /// <summary>Spins on a condition the worker reaches on its own thread, rather than on a sleep.</summary>
+    private static async Task UntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the worker never reached the expected state");
+            await Task.Delay(10);
+        }
+    }
+
     private static VehicleState Reading(double soc) =>
         new(new DateTimeOffset(2026, 9, 2, 8, 0, 0, TimeSpan.Zero), SocPercent: soc, SourceId: "vw-group");
 
     private static VehicleUpdateWorker Worker(
         VehicleStateHolder holder, TimeProvider time, bool mqttFeedEnabled = false,
+        ILogger<VehicleUpdateWorker>? logger = null,
         params IVehicleUpdateService[] services) =>
         new(services,
             holder,
-            NullLogger<VehicleUpdateWorker>.Instance,
+            logger ?? NullLogger<VehicleUpdateWorker>.Instance,
             Options.Create(new VehicleOptions { Enabled = mqttFeedEnabled }),
             time);
 
@@ -179,13 +235,50 @@ public class VehicleUpdateWorkerTests
             Health = VehicleSourceHealth.NeedsOwner("The portal wants you in a browser."),
         };
 
-        var worker = Worker(new VehicleStateHolder(), new ImmediateTimeProvider(), services: service);
+        var time = new ImmediateTimeProvider { MaxFirings = 0 };
+        var worker = Worker(new VehicleStateHolder(), time, services: service);
 
         await worker.StartAsync(CancellationToken.None);
-        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
+        await service.Asked.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Parked on the reminder rather than looping: the fetch happened once and the next thing the
+        // worker asked for was six hours of silence.
+        await UntilAsync(() => time.Delays.Contains(VehicleUpdateWorker.BlockedReminder));
         await worker.StopAsync(CancellationToken.None);
 
         Assert.Equal(1, service.Fetches);
+    }
+
+    [Fact]
+    public async Task A_blocked_feed_keeps_saying_so_in_the_log_without_asking_again()
+    {
+        // Said once, at the moment it happens, is not said: a container's log is read days later with
+        // --tail, and by then the single warning has scrolled away and a stopped feed is silent in a
+        // way indistinguishable from a car that is simply parked.
+        var logger = new CapturingLogger();
+        var service = new StubService(_ => null)
+        {
+            Health = VehicleSourceHealth.NeedsOwner("The portal is showing a consent screen."),
+        };
+
+        var time = new ImmediateTimeProvider { MaxFirings = 2 };
+        var worker = Worker(new VehicleStateHolder(), time, logger: logger, services: service);
+
+        await worker.StartAsync(CancellationToken.None);
+        await UntilAsync(() => logger.Warnings.Count(Blocked) >= 3);
+        await worker.StopAsync(CancellationToken.None);
+
+        // Repeated, and still exactly one fetch: the reminder is a log line, never a network call.
+        Assert.Equal(1, service.Fetches);
+        Assert.All(
+            logger.Warnings.Where(Blocked),
+            warning =>
+            {
+                Assert.Contains("consent screen", warning);
+                Assert.Contains("Vehicle portal", warning);
+            });
+
+        static bool Blocked(string warning) => warning.Contains("has stopped and needs you");
     }
 
     [Fact]
