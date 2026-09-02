@@ -111,12 +111,15 @@ public static class VwGroupFieldNames
     /// The HV battery's energy content, as the portal reports it — what is in the pack now, and what
     /// the pack holds full.
     ///
-    /// <para><b>Recognised so it can be seen, not yet read.</b> The reference ID.4's delivery carries
-    /// no state of charge at all, and these two are the only battery figures in it: a percentage
-    /// follows from the pair by division, and nothing else in the bundle offers one. Whether to make
-    /// that division is a decision about what <c>SocPercent</c> means — the car's own number against
-    /// one we computed — and it wants the values in front of somebody first, which is exactly what
-    /// listing them here achieves.</para>
+    /// <para><b>Recognised, seen, and deliberately not read — the measurement settled it.</b> They
+    /// were surfaced to answer whether a state of charge could be divided out of them when a delivery
+    /// carried no SOC of its own. The reference ID.4 answered no: <c>328.5</c> of <c>738.0</c> is
+    /// 44.5%, against the <c>50</c> the same car's <c>battery_state_report.soc</c> reported. The units
+    /// are not kilowatt-hours and the pair does not describe the same quantity the percentage does —
+    /// a reserve below the usable window, most likely — so a percentage computed here would have been
+    /// confidently wrong by five and a half points, in the number every kWh target is derived from.
+    /// They stay listed because they are real readings that nothing yet uses, which is what
+    /// <see cref="KnownButUnused"/> is for.</para>
     /// </summary>
     public static readonly string[] EnergyContentKWh =
     [

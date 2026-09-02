@@ -69,9 +69,12 @@ public sealed class VwGroupPortalOptions
     /// <summary>
     /// How many deliveries one read may merge before it gives up on finding a state of charge.
     ///
-    /// <para><b>Four is an hour of a fifteen-minute request</b>, which is the span over which a
-    /// parked car's SOC does not meaningfully move — so a value assembled from within it is worth
-    /// having, and one from further back is a number better left absent than quoted fresh.</para>
+    /// <para><b>A count of downloads, not a span of time.</b> Four was picked as an hour of a
+    /// fifteen-minute request; the reference car then offered <i>thirty</i> deliveries whose newest
+    /// four covered most of a day, because the portal delivers when the car reports rather than on a
+    /// tidy clock. So this bounds what a read costs over a domestic uplink and nothing else — how old
+    /// the resulting reading is, is said by the reading's own capture time, and judged by
+    /// <c>Vehicle:MaxAge</c> exactly as every other source is.</para>
     ///
     /// <para>It is a ceiling, not a cost: deliveries are pulled only while the merged reading still
     /// lacks a state of charge, so a car whose newest delivery carries the battery downloads exactly

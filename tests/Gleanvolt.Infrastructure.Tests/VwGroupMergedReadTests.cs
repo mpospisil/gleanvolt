@@ -199,4 +199,29 @@ public class VwGroupMergedReadTests
         Assert.Equal(57, read.Mapping.State!.SocPercent);
         Assert.Equal(2, read.DatasetsRead);
     }
+    [Fact]
+    public async Task The_reading_is_dated_by_the_state_of_charge_not_by_the_freshest_field_beside_it()
+    {
+        // Measured, not supposed: the reference car offered thirty deliveries and the newest four
+        // spanned most of a day, because the portal delivers when the car reports rather than on a
+        // tidy clock. So a state of charge really can be hours older than the status report merged
+        // beside it, and dating the pair by the newer one shows an old percentage as minutes fresh.
+        // The percentage is what a target is computed from and what MaxAge is judged against.
+        using var portal = new Deliveries(
+            ("status-now.zip", "2026-09-02T10:30:00Z", Delivery(
+                "2026-09-02T10:29:46Z", ("mileage.value", "53065"), ("locked", "true"))),
+            ("battery-yesterday.zip", "2026-09-01T16:31:00Z", Delivery(
+                "2026-09-01T16:30:00Z", ("battery_state_report.soc", "50"))));
+
+        var read = await Client(portal, Options()).ReadAsync();
+
+        Assert.Equal(50, read.Mapping.State!.SocPercent);
+
+        // Yesterday afternoon, which is what it is -- and MaxAge can then do its job.
+        Assert.Equal(
+            new DateTimeOffset(2026, 9, 1, 16, 30, 0, TimeSpan.Zero),
+            read.Mapping.State.CapturedAt);
+    }
+
+
 }

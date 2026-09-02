@@ -92,10 +92,17 @@ Reverse-chronological. Newest entry at the top.
   charging state anywhere in it. The vocabulary was not the problem; the *delivery* was.
 - The four fields in neither list are `car_captured_time` per report section, which the unrecognised
   list excludes by design. Everything is accounted for.
-- `energy_contents.current_energy_content` and its maximal sibling are the only battery figures such a
-  delivery carries. They are now **recognised so their values show, and deliberately not read**:
-  dividing one by the other puts a number we computed where the car's own belongs, and that decision
-  wants the two figures in front of somebody first.
+- `energy_contents.current_energy_content` and its maximal sibling were surfaced to answer whether a
+  percentage could be divided out of them. **It cannot**: `328.5` of `738.0` is 44.5% against the `50`
+  the same read's `battery_state_report.soc` gave. Not kilowatt-hours, and not the same quantity. Had
+  the division shipped on the plausibility of the names, it would have been wrong by five and a half
+  points, silently, in the number every kWh target comes from.
+- **The merged read works on the reference car**: 4 of 30 deliveries merged, SOC 50%, charge state
+  `CHARGE_STATE_NOT_READY_FOR_CHARGING` → `Idle`, `"9900s"` → 165 minutes, odometer 53,065, target SOC
+  80. The newest delivery still carried none of it.
+- The four deliveries spanned most of a day, not the hour the budget was justified with — the portal
+  delivers when the car reports. Hence the dating by the SOC's own snapshot, and a span on the page
+  that shows dates when its ends disagree about the day.
 
 ### Verification performed
 

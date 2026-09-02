@@ -134,18 +134,22 @@ public static class VwGroupVehicleStateMapper
         // populated -- either way the bigger number is the true one.
         var odometer = Largest(ordered, VwGroupFieldNames.Odometer);
 
-        // Dated by the newest snapshot that actually CONTRIBUTED a value, not by the newest snapshot
-        // in the pile.
+        // Dated by the STATE OF CHARGE's own snapshot, and only otherwise by the newest field that
+        // contributed anything.
         //
-        // Within one delivery the two are minutes apart and the distinction is pedantic. Across
-        // merged deliveries it is the difference between honest and not: a state of charge assembled
-        // from an hour-old report, stamped with a two-minute-old status report's clock, is a stale
-        // reading wearing a fresh face -- and freshness is the one thing this feed exists to let
-        // somebody judge. Falls back to the newest snapshot only when nothing contributed at all,
-        // which is the rejection path below.
-        var contributedAt = NewestContribution(
+        // Within one delivery every field shares a clock and this is pedantry. Across merged
+        // deliveries it decides whether the number on the dashboard is honest: the reference car's
+        // deliveries are not a tidy quarter-hour apart -- thirty were on offer and the newest four
+        // spanned most of a day -- so a state of charge can easily be hours older than the status
+        // report merged beside it. Dating the pair by the newer of them would show an old percentage
+        // as minutes fresh, and how old the percentage is, is the entire question this feed exists to
+        // answer. Everything else on a VehicleState is display; the percentage is what a target is
+        // computed from and what MaxAge is judged against, so it is the field the timestamp belongs to.
+        //
+        // Falls back to the newest snapshot only when nothing contributed at all, which is the
+        // rejection path below.
+        var contributedAt = SocAt(ordered, soc) ?? NewestContribution(
             ordered,
-            soc is not null ? VwGroupFieldNames.StateOfCharge : null,
             range is not null ? VwGroupFieldNames.RangeKm : null,
             minutes is not null ? VwGroupFieldNames.ChargeTimeRemaining : null,
             VwGroupFieldNames.ChargeState,
@@ -192,6 +196,13 @@ public static class VwGroupVehicleStateMapper
 
         return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped, matched);
     }
+
+    /// <summary>
+    /// When the state of charge was reported, or null when there is none. The reading's own clock:
+    /// see the note where it is used.
+    /// </summary>
+    private static DateTimeOffset? SocAt(List<VwGroupSnapshot> ordered, double? soc) =>
+        soc is null ? null : Latest(ordered, VwGroupFieldNames.StateOfCharge)?.At;
 
     /// <summary>
     /// When the newest of these fields was actually reported. Nulls are skipped, so a field that

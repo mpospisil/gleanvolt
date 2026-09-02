@@ -1826,15 +1826,18 @@ deliveries — each carries the reports that changed — so the newest one on it
 which report type arrives. On the reference ID.4 it held the odometer, the charge target, the doors and
 the climate, and no state of charge at all, while the car's SOC was perfectly well known elsewhere at
 that moment. So a read takes the newest delivery and keeps merging older ones **only while the reading
-still has no state of charge**, up to four (`Vehicle:DataAct:MaxDatasetsPerRead`, an hour of a
-fifteen-minute request). A car whose newest delivery carries the battery costs exactly one download, as
-it always did.
+still has no state of charge**, up to four (`Vehicle:DataAct:MaxDatasetsPerRead`). A car whose newest
+delivery carries the battery costs exactly one download, as it always did. That number bounds what a
+read costs over a domestic uplink and nothing else: the portal delivers when the car reports rather
+than on a clock — the reference install was offered thirty deliveries whose newest four covered most of
+a day — so how old the answer is, is said by the reading's own capture time and judged by `MaxAge`.
 
 The merge needs no new rules — several snapshots, sentinels filtered first, newest real value wins is
-what the mapper already does — but it does make one thing load-bearing: a reading is dated by **the
-newest snapshot that actually contributed to it**, not by the newest one downloaded. A state of charge
-from 10:14 stamped with a 10:29 status report's clock would be a stale reading wearing a fresh face,
-and how fresh a reading is is the one thing this feed exists to let you judge.
+what the mapper already does — but it does make one thing load-bearing: a reading is dated by **its
+state of charge's own snapshot**, not by the newest report downloaded. Everything else on the card is
+display; the percentage is what a kWh target is computed from and what `MaxAge` is judged against, so
+a battery reading from yesterday afternoon merged beside this morning's odometer reads as yesterday
+afternoon — which is the only answer that lets you decide whether to trust it.
 
 **It holds one session rather than replaying a password.** The button signs in afresh on every press,
 which is right by hand and wrong on a schedule — repeatedly replaying a password at a real identity

@@ -92,6 +92,31 @@ report dropped for having no timestamp: it used to vanish whole, taking its fiel
 unrecognised list too, so a battery report under an unfamiliar timestamp spelling looked exactly like a
 bundle that never carried a battery.
 
+### The energy contents are not a state of charge, and the measurement is why we know
+
+They were surfaced precisely to answer whether a percentage could be divided out of them for a
+delivery that carried no SOC. The live read answered it: `328.5` of `738.0` is **44.5%**, against the
+**50** the same car's `battery_state_report.soc` reported in the same read. The units are not
+kilowatt-hours and the pair plainly does not describe the same quantity the percentage does — a reserve
+below the usable window would explain it.
+
+Had that division shipped on the plausibility of the names alone, it would have been wrong by five and
+a half points in the one number every kilowatt-hour target is computed from, and wrong *silently*. The
+fields stay recognised and unread, which is what `KnownButUnused` is for.
+
+### A merged reading is dated by its state of charge
+
+The merge budget was justified as "four deliveries is an hour of a fifteen-minute request". The live
+portal then offered **thirty** deliveries whose newest four spanned most of a day: it delivers when the
+car reports, not on a clock. So a state of charge can be hours older than the status report merged
+beside it, and dating the pair by the newer of them would show an old percentage as minutes fresh.
+
+The reading is therefore dated by the **state of charge's own snapshot**, falling back to the newest
+contributing field only when there is no SOC at all. Everything else on a `VehicleState` is display;
+the percentage is what a target is computed from and what `MaxAge` is judged against, so it is the
+field the timestamp belongs to. The budget bounds what a read costs over a domestic uplink and says
+nothing about how old the answer is — the answer says that itself.
+
 ### The session is held — reversing #139's "sign in afresh every time"
 
 The on-demand reader builds a cookie jar per press, and #139 recorded why: a held session that has
