@@ -66,9 +66,16 @@ public sealed class VwGroupPortalReader(
             if (mapped.State is null)
             {
                 // #73's rule, surfaced rather than swallowed: present-but-unusable is rejected whole,
-                // and the reason is the diagnosis.
+                // and the reason is the diagnosis. The unrecognised names travel with it, because the
+                // commonest reason to be here is a vocabulary that matched nothing -- and then the
+                // list *is* the fix.
+                _logger.LogWarning(
+                    "The VW portal read of {Vehicle} produced no usable reading: {Reason}",
+                    vehicle.MaskedVin, mapped.Error);
+
                 return VehiclePortalReading.Failed(
-                    nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false);
+                    nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false,
+                    unmapped: mapped.UnmappedFields);
             }
 
             _logger.LogInformation(

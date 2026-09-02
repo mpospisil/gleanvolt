@@ -126,27 +126,37 @@ else if (_reading is { Succeeded: true, State: { } state })
         <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
     </p>
 
-    @if (_reading.Unmapped.Count > 0)
-    {
-        <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+}
 
-        <p class="muted">
-            If a value above is missing, its real name is probably in this list — the portal's
-            vocabulary was written down from a description rather than from a capture, so this is
-            expected on a first run rather than a fault.
-        </p>
+@*
+    The unrecognised names, shown whether the read succeeded or not.
 
-        <ul class="sessions">
-            @foreach (var field in _reading.Unmapped)
-            {
-                <li><code>@field</code></li>
-            }
-        </ul>
-    }
-    else
-    {
-        <p class="muted">Every field in the bundle was recognised.</p>
-    }
+    They used to hang off the success branch, which put them exactly where they were least needed: a
+    bundle in which *nothing* matched is now a failure, and that is precisely the case where this list
+    is the whole answer. Reporting "unusable data" while holding the field names back would be a page
+    keeping the diagnosis to itself.
+*@
+@if (_reading is not null && _reading.Unmapped.Count > 0)
+{
+    <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+
+    <p class="muted">
+        If a value above is missing, its real name is probably in this list — the portal's vocabulary
+        was written down from VW's data dictionary rather than from your car, so this is expected on a
+        first run rather than a fault. Adding the right names to <code>VwGroupFieldNames</code> is the
+        fix; pasting this list into an issue is enough for somebody else to do it.
+    </p>
+
+    <ul class="sessions">
+        @foreach (var field in _reading.Unmapped)
+        {
+            <li><code>@field</code></li>
+        }
+    </ul>
+}
+else if (_reading is { Succeeded: true })
+{
+    <p class="muted">Every field in the bundle was recognised.</p>
 }
 
 @code {

@@ -77,6 +77,9 @@ public class VwGroupUpdateServiceTests
         /// <summary>Answers everything with this instead, when a test is about a failure.</summary>
         public Func<HttpRequestMessage, HttpResponseMessage?>? Intercept { get; set; }
 
+        /// <summary>The ZIP the download hands back. A test about the mapping supplies its own.</summary>
+        public byte[]? Bundle { get; set; }
+
         /// <summary>What the delivery list holds. Empty is "the request exists and has not filled yet".</summary>
         public string ListJson { get; set; } =
             """[{"name":"dataset-2.zip","createdOn":"2026-09-01T10:00:00Z"}]""";
@@ -151,7 +154,7 @@ public class VwGroupUpdateServiceTests
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent(VwGroupFixtures.Bundle("id4-live-capture.json"))
+                    Content = new ByteArrayContent(Bundle ?? VwGroupFixtures.Bundle("id4-live-capture.json"))
                     {
                         Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip") },
                     },
@@ -335,6 +338,21 @@ public class VwGroupUpdateServiceTests
         Assert.NotNull(await service.FetchAsync(CancellationToken.None));
         Assert.Equal(VehicleSourceState.Ok, service.Health.State);
         Assert.Equal(VwGroupUpdateService.Interval, service.NextDelay);
+    }
+
+    [Fact]
+    public async Task A_delivery_nothing_can_be_read_out_of_degrades_rather_than_blaming_the_owner()
+    {
+        // Observed live: the portal answers, the bundle parses, and not one field name matches. That
+        // is a code change rather than a browser, and the next delivery may well carry the fields --
+        // so it degrades and keeps asking. Telling somebody to go and sign in would send them to fix
+        // something that is not broken.
+        using var portal = new FakePortal { Bundle = VwGroupFixtures.Bundle("undated.json") };
+        using var service = Service(portal);
+
+        Assert.Null(await service.FetchAsync(CancellationToken.None));
+        Assert.Equal(VehicleSourceState.Degraded, service.Health.State);
+        Assert.NotEqual(Timeout.InfiniteTimeSpan, service.NextDelay);
     }
 
     [Fact]

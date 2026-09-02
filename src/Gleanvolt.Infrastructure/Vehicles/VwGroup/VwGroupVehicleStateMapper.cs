@@ -129,8 +129,40 @@ public static class VwGroupVehicleStateMapper
             MapEnum(ordered, VwGroupFieldNames.PlugState, VwGroupFieldNames.PlugStates, VehiclePlugState.Unknown),
             sourceId);
 
-        return new VwGroupMappingResult(state, null, targetSoc, odometer, Unmapped(ordered));
+        var unmapped = Unmapped(ordered);
+
+        // A timestamp and nothing else is not a reading, and must not be handed on as one.
+        //
+        // "Absent is fine" (#73) means a source that does not report a field; it was never meant to
+        // cover a bundle in which *every* field is absent, which is not a car that said nothing --
+        // it is a vocabulary that matched nothing. Two things go wrong if this is called a success:
+        // the page shows a row of dashes under a fresh capture time and looks like a working feed,
+        // and the update service writes it to the holder, replacing a good reading with an empty one
+        // whose age then reads as brand new. The dashboard would show a car that had just reported
+        // and knows nothing about itself.
+        //
+        // Reported with the count rather than silently, because the field names are the fix and they
+        // are already in hand: both surfaces list them.
+        if (state is { SocPercent: null, RangeKm: null, ChargeTimeRemaining: null }
+            and { ChargeState: VehicleChargeState.Unknown, PlugState: VehiclePlugState.Unknown })
+        {
+            return new VwGroupMappingResult(
+                null,
+                $"the bundle was read and none of its {Counted(ordered)} field(s) are ones this build "
+                + "recognises -- the state of charge, range, charging state, plug state and remaining "
+                + "time are all missing rather than absent. The unrecognised names are listed below, "
+                + "and adding them to VwGroupFieldNames is the fix",
+                targetSoc,
+                odometer,
+                unmapped);
+        }
+
+        return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped);
     }
+
+    /// <summary>How many distinct field names the bundle carried, recognised or not.</summary>
+    private static int Counted(List<VwGroupSnapshot> snapshots) =>
+        snapshots.SelectMany(snapshot => snapshot.Values.Keys).Distinct(StringComparer.OrdinalIgnoreCase).Count();
 
     /// <summary>
     /// The newest non-sentinel value of whichever field name matched, parsed as a number.

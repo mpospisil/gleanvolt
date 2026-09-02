@@ -139,4 +139,25 @@ public class VehiclePortalPageTests : PageTest
         Assert.Contains("some.unknown.field", page.Markup);
         Assert.Contains("another_one", page.Markup);
     }
+    [Fact]
+    public void A_bundle_nothing_matched_lists_the_names_it_did_not_match()
+    {
+        // The case observed live: the portal answered, the capture time was minutes old, and every
+        // value was blank. It is a failure rather than a reading of dashes -- and it is exactly the
+        // failure whose field list is the whole answer, so the page must not withhold it.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle was read and none of its 14 field(s) are ones this build recognises",
+            worthRetrying: false,
+            unmapped: ["odometer_km_v2", "battery.soc_pct"])));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("UnusableData", page.Markup);
+        Assert.Contains("odometer_km_v2", page.Markup);
+        Assert.Contains("battery.soc_pct", page.Markup);
+        Assert.Contains("VwGroupFieldNames", page.Markup);
+    }
+
+
 }

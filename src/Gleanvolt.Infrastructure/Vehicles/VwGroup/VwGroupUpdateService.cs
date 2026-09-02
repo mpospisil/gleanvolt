@@ -182,7 +182,17 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
     /// </summary>
     private void Record(VwGroupPortalException failure)
     {
-        if (!failure.IsWorthRetrying || failure.Failure == VwGroupFailure.NoDataRequest)
+        // Named rather than derived from IsWorthRetrying, which is a different question. UnusableData
+        // is not worth retrying *this instant* and is still not the owner's to fix: a bundle whose
+        // fields nothing here reads wants a code change, and the next delivery may well carry them --
+        // so it degrades and keeps asking rather than telling somebody to go and sign in.
+        var needsTheOwner = failure.Failure
+            is VwGroupFailure.SignInRejected
+            or VwGroupFailure.OwnerActionRequired
+            or VwGroupFailure.NoDataRequest
+            or VwGroupFailure.NotConfigured;
+
+        if (needsTheOwner)
         {
             Health = VehicleSourceHealth.NeedsOwner(Sentence(failure));
             NextDelay = Timeout.InfiniteTimeSpan;
@@ -237,6 +247,9 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IDisposable
         VwGroupFailure.NoDataRequest => $"{failure.Message}",
         VwGroupFailure.NotConfigured => failure.Message,
         VwGroupFailure.NoDataAvailable => $"Signed in, but {failure.Message}.",
+        VwGroupFailure.UnusableData =>
+            $"A delivery arrived and could not be read: {failure.Message}. The last good reading "
+            + "stands and is ageing.",
         _ => $"The last read did not produce a reading: {failure.Message}.",
     };
 

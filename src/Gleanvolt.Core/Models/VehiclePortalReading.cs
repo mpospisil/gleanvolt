@@ -45,6 +45,13 @@ public sealed record VehiclePortalReading(
     /// <summary>The unrecognised field names, never null.</summary>
     public IReadOnlyList<string> Unmapped => UnmappedFields ?? [];
 
-    public static VehiclePortalReading Failed(string kind, string message, bool worthRetrying) =>
-        new(false, FailureKind: kind, Message: message, IsWorthRetrying: worthRetrying);
+    /// <param name="unmapped">
+    /// The field names nothing recognised, when the failure <b>is</b> that nothing was recognised.
+    /// A failed read is exactly when this list is most worth having, and dropping it here is what
+    /// used to leave the page saying "unusable data" while holding the answer in its hand.
+    /// </param>
+    public static VehiclePortalReading Failed(
+        string kind, string message, bool worthRetrying, IReadOnlyList<string>? unmapped = null) =>
+        new(false, FailureKind: kind, Message: message, IsWorthRetrying: worthRetrying,
+            UnmappedFields: unmapped);
 }

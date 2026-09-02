@@ -180,4 +180,56 @@ public class VwGroupVehicleStateMapperTests
     {
         Assert.Contains("no snapshots", VwGroupVehicleStateMapper.Map([]).Error);
     }
+    [Fact]
+    public void ABundleWhoseFieldsAreAllStrangeIsRejectedRatherThanCalledAReading()
+    {
+        // Observed live: the portal answered, the bundle parsed, the capture time was minutes old --
+        // and every value was blank, because not one field name matched. Called a success, that is a
+        // page of dashes under a fresh timestamp, and an update service writing an empty reading over
+        // a good one and resetting its age. "Absent is fine" was about a source that does not report a
+        // field, never about a bundle in which everything is absent at once.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["some_field_nobody_wrote_down"] = "42",
+                ["another.one"] = "VALID",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.Null(result.State);
+        Assert.NotNull(result.Error);
+        Assert.Contains("recognises", result.Error);
+
+        // And the names travel with the rejection, because they are the fix.
+        Assert.Contains("some_field_nobody_wrote_down", result.UnmappedFields);
+        Assert.Contains("another.one", result.UnmappedFields);
+    }
+
+    [Fact]
+    public void OneRecognisedFieldIsStillAReading()
+    {
+        // The guard must not become "everything or nothing": an OBD-shaped source that reports only a
+        // state of charge is a supported feed, and #73's "absent is fine" still holds for the rest.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["battery_level_HV.value"] = "57",
+                ["some_field_nobody_wrote_down"] = "42",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        Assert.NotNull(result.State);
+        Assert.Equal(57, result.State.SocPercent);
+        Assert.Contains("some_field_nobody_wrote_down", result.UnmappedFields);
+    }
+
+
 }
