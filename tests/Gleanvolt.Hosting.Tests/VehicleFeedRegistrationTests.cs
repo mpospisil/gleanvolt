@@ -137,4 +137,48 @@ public class VehicleFeedRegistrationTests
             Environment.SetEnvironmentVariable("VW_ENABLED", null);
         }
     }
+    [Fact]
+    public void The_merge_budget_is_bound_from_configuration()
+    {
+        // The page and the log both tell an owner to raise this when a reading is short of something.
+        // That advice did nothing at all while the number was a constant the configuration could not
+        // reach -- the worst kind of wrong, because following it looks like the answer failing.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                [new KeyValuePair<string, string?>("Vehicle:DataAct:MaxDatasetsPerRead", "12")])
+            .Build();
+
+        Assert.Equal(12, VwGroupPortalOptionsResolver.Resolve(configuration).MaxDatasetsPerRead);
+    }
+
+    [Fact]
+    public void An_unstated_budget_keeps_the_default()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        Assert.Equal(
+            new VwGroupPortalOptions().MaxDatasetsPerRead,
+            VwGroupPortalOptionsResolver.Resolve(configuration).MaxDatasetsPerRead);
+    }
+
+    [Theory]
+    [InlineData("nonsense")]
+    [InlineData("0")]
+    [InlineData("-2")]
+    public void A_budget_that_is_not_a_count_is_refused_rather_than_ignored(string stated)
+    {
+        // Clamping a typo back to the default is how somebody spends an afternoon wondering why
+        // raising it changed nothing.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                [new KeyValuePair<string, string?>("Vehicle:DataAct:MaxDatasetsPerRead", stated)])
+            .Build();
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => VwGroupPortalOptionsResolver.Resolve(configuration));
+
+        Assert.Contains("MaxDatasetsPerRead", error.Message);
+    }
+
+
 }

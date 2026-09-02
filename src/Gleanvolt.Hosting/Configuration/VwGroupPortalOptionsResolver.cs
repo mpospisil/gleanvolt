@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
@@ -56,7 +57,36 @@ public static class VwGroupPortalOptionsResolver
             // neither is ever set.
             PortalBaseUrl = Or(Pick(section["PortalBaseUrl"], "VW_PORTAL_BASE"), defaults.PortalBaseUrl),
             IdentityBaseUrl = Or(Pick(section["IdentityBaseUrl"], "VW_IDENTITY_BASE"), defaults.IdentityBaseUrl),
+
+            // How deep a read may go. Bound because the page and the log both tell an owner to raise
+            // it when a reading is short of something -- advice that did nothing at all while this
+            // was a constant the configuration could not reach.
+            MaxDatasetsPerRead = Count(
+                Pick(section["MaxDatasetsPerRead"], "VW_MAX_DATASETS"), defaults.MaxDatasetsPerRead),
         };
+    }
+
+    /// <summary>
+    /// A positive count, or the default. Refused rather than clamped when it is nonsense: a typo that
+    /// silently becomes 4 is how somebody spends an afternoon wondering why raising it changed
+    /// nothing — which is exactly the afternoon this setting exists to prevent.
+    /// </summary>
+    private static int Count(string stated, int fallback)
+    {
+        if (string.IsNullOrWhiteSpace(stated))
+        {
+            return fallback;
+        }
+
+        if (!int.TryParse(stated, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            || value < 1)
+        {
+            throw new InvalidOperationException(
+                $"Vehicle:DataAct:MaxDatasetsPerRead ('{stated}') must be a whole number of deliveries, "
+                + "at least 1. It is how many of the portal's deliveries one read may merge.");
+        }
+
+        return value;
     }
 
     private static string Pick(string? fromSection, string environmentName) =>

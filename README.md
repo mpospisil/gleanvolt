@@ -1827,7 +1827,7 @@ which report type arrives. On the reference ID.4 it held the odometer, the charg
 the climate, and no state of charge at all, while the car's SOC was perfectly well known elsewhere at
 that moment. So a read takes the newest delivery and keeps merging older ones **while the reading is still short
 of something** — the battery, the range, the charging state, the plug, the remaining time — up to four
-(`Vehicle:DataAct:MaxDatasetsPerRead`). Stopping at the first state of charge was the first attempt and
+(`Vehicle:DataAct:MaxDatasetsPerRead`, or `VW_MAX_DATASETS`). Stopping at the first state of charge was the first attempt and
 was wrong: the reports are split by type, so it produced a card with a battery and four dashes. A delivery that carries a whole car costs exactly one
 download; a car whose reports are split will spend most of the budget, and the last of it on a field
 the car may simply never send — the log says what a read is still short of, which is how to tell

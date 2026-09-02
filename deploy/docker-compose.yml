@@ -175,6 +175,12 @@ services:
       Vehicle__DataAct__Password: ${VW_PASSWORD:-}
       Vehicle__DataAct__Vin: ${VW_VIN:-}
 
+      # How many of the portal's deliveries one read may merge (default 4). The portal splits a car
+      # across report types, so a read keeps merging older deliveries while the reading is still short
+      # of something. Raise it to reach further back for a field that has not appeared; each delivery
+      # is one ZIP download.
+      Vehicle__DataAct__MaxDatasetsPerRead: ${VW_MAX_DATASETS:-4}
+
       # The car's *usable* pack, which is what its own SOC is a percentage of (issue #99). Zero means
       # unconfigured, and costs exactly one thing: the targeted plan's "Battery target (%)" basis, which
       # cannot convert 80% into kilowatt-hours without it. Efficiency is charger-meter to cells -- not
