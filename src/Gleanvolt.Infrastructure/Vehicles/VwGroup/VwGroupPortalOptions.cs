@@ -87,6 +87,17 @@ public sealed class VwGroupPortalOptions
     public int MaxDatasetsPerRead { get; init; } = 4;
 
     /// <summary>
+    /// How long to wait between the downloads of one merged read.
+    ///
+    /// <para><b>Measured, not guessed:</b> a twelve-deep read against the live portal was answered
+    /// with <c>429 Too Many Requests</c> on the delivery endpoint. The deliveries are the only place
+    /// this client makes a burst of requests, and spacing them is the difference between asking for a
+    /// lot and asking rudely. A second costs three seconds on a four-deep read that happens every
+    /// fifteen minutes, and nothing at all on the common one-delivery case.</para>
+    /// </summary>
+    public TimeSpan PauseBetweenDownloads { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// How long any single HTTP exchange may take. The portal is a batch delivery rather than a live
     /// API, and a download is a ZIP over a domestic uplink, so this is generous by the standards of
     /// the rest of this codebase.

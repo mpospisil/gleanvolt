@@ -65,6 +65,14 @@ public sealed class VwGroupPortalReader(
                     + "one alone need not hold the battery.");
             }
 
+            if (read.StoppedEarly is { Length: > 0 } stopped)
+            {
+                notes.Add(
+                    $"The merge stopped before its budget: {stopped}. What is above is what had been "
+                    + "assembled by then, which is a real reading and not a partial one — a delivery "
+                    + "that never arrived can only have added to it.");
+            }
+
             if (VwGroupPortalClient.ReportTypes(read.Snapshots) is { Count: > 0 } types)
             {
                 notes.Add(

@@ -245,7 +245,7 @@ can never answer, or gives up on something a re-login would fix.
 | `NoDataAvailable` | Signed in, but there is nothing to download | Step 2. Either no continuous data request exists, or it exists and has not been filled yet — the message distinguishes the two |
 | `UnusableData` | The bundle arrived and could not be believed | The message says which field, and the page lists the names nothing here reads. Present-but-unusable is rejected whole, on purpose |
 | `SessionExpired` | A 401, a bounce to `/login`, or HTML where JSON was expected | Ordinary. Press again; the feed signs itself back in |
-| `Transient` | A 5xx, a timeout, a dropped connection | Try later. The portal is new and community reports include 400s and 500s on the delivery endpoint |
+| `Transient` | A 5xx, a timeout, a dropped connection — or a **429**, the portal rate-limiting the delivery endpoint | Wait. A 429 is provoked by asking for many deliveries at once, so it clears on its own and a lower `VW_MAX_DATASETS` prevents it. Nothing needs changing, and the message quotes the portal's own `Retry-After` when it sends one |
 
 `Missing a brand ..., a VW ID.` before any network traffic means `.env` was not found or not
 read — check you are running from inside the repository. With the feed switched on, the same sentence

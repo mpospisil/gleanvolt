@@ -31,6 +31,10 @@ public class VwGroupMergedReadTests
         Password = "hunter2",
         Timeout = TimeSpan.FromSeconds(5),
         MaxDatasetsPerRead = budget,
+
+        // No politeness pause in tests: the stub portal has no rate limit to be polite about, and a
+        // second per extra download would put seconds on a suite that runs in milliseconds.
+        PauseBetweenDownloads = TimeSpan.Zero,
     };
 
     /// <summary>A signed-in portal offering named datasets, each with its own bundle.</summary>
@@ -39,10 +43,19 @@ public class VwGroupMergedReadTests
     {
         public List<string> Downloaded { get; } = [];
 
+        /// <summary>Answers a request itself when it wants to, for the tests about refusals.</summary>
+        public Func<HttpRequestMessage, HttpResponseMessage?>? Intercept { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+
+            if (Intercept?.Invoke(request) is { } forced)
+            {
+                forced.RequestMessage ??= request;
+                return Task.FromResult(forced);
+            }
 
             if (path.Contains("/consent/me/vehicles", StringComparison.Ordinal))
             {
@@ -287,6 +300,99 @@ public class VwGroupMergedReadTests
         Assert.Equal(VehicleChargeState.Charging, read.Mapping.State.ChargeState);
         Assert.Null(read.Mapping.State.RangeKm);
         Assert.Equal(VehiclePlugState.Unknown, read.Mapping.State.PlugState);
+    }
+
+
+    [Fact]
+    public async Task A_rate_limit_partway_through_keeps_what_was_already_assembled()
+    {
+        // Measured against the live portal: a deep read is a burst of ZIP downloads at one endpoint,
+        // and the portal answers a burst with 429. Throwing then discarded a perfectly good reading
+        // because the EXTRA delivery it was trying to improve on was refused.
+        var served = 0;
+
+        using var portal = new Deliveries(
+            ("battery.zip", "2026-09-02T10:30:00Z", Delivery(
+                "2026-09-02T10:29:46Z", ("battery_level_HV.value", "70"))),
+            ("charging.zip", "2026-09-02T10:15:00Z", Delivery(
+                "2026-09-02T10:14:12Z", ("charging_state_report.current_charge_state", "CHARGE_STATE_CHARGING_HV_BATTERY"))));
+
+        portal.Intercept = request =>
+        {
+            if (!request.RequestUri!.AbsolutePath.EndsWith("/download", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return served++ == 0
+                ? null
+                : new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+                };
+        };
+
+        var read = await Client(portal, Options()).ReadAsync();
+
+        Assert.Equal(70, read.Mapping.State!.SocPercent);
+        Assert.NotNull(read.StoppedEarly);
+        Assert.Contains("429", read.StoppedEarly);
+    }
+
+    [Fact]
+    public async Task A_rate_limit_on_the_very_first_delivery_is_a_transient_failure()
+    {
+        // Nothing assembled, so there is nothing to report but the reason -- and it is "wait", not
+        // "something needs changing". 429 used to be classified as unusable data, which told an owner
+        // to go and fix something that was not broken.
+        using var portal = new Deliveries(
+            ("only.zip", "2026-09-02T10:30:00Z", Delivery("2026-09-02T10:29:46Z", ("locked", "true"))))
+        {
+            Intercept = request => request.RequestUri!.AbsolutePath.EndsWith("/download", StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+                }
+                : null,
+        };
+
+        var failure = await Assert.ThrowsAsync<VwGroupPortalException>(
+            () => Client(portal, Options()).ReadAsync());
+
+        Assert.Equal(VwGroupFailure.Transient, failure.Failure);
+        Assert.True(failure.IsWorthRetrying);
+        Assert.Contains("rate-limiting", failure.Message);
+    }
+
+    [Fact]
+    public async Task A_retry_after_is_quoted_back_so_the_wait_is_known()
+    {
+        using var portal = new Deliveries(
+            ("only.zip", "2026-09-02T10:30:00Z", Delivery("2026-09-02T10:29:46Z", ("locked", "true"))))
+        {
+            Intercept = request =>
+            {
+                if (!request.RequestUri!.AbsolutePath.EndsWith("/download", StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+                };
+
+                response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(
+                    TimeSpan.FromSeconds(90));
+
+                return response;
+            },
+        };
+
+        var failure = await Assert.ThrowsAsync<VwGroupPortalException>(
+            () => Client(portal, Options()).ReadAsync());
+
+        Assert.Contains("90 s", failure.Message);
     }
 
 

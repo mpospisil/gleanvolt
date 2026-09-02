@@ -30,13 +30,19 @@ public sealed record VwGroupVehicle(string Vin, string RequestId)
 /// <param name="Bundle">What the deliveries held that never became a snapshot.</param>
 /// <param name="DatasetsRead">How many deliveries were downloaded — one, unless merging was needed.</param>
 /// <param name="DatasetsAvailable">How many the portal was offering.</param>
+/// <param name="StoppedEarly">
+/// Why the merge ended before its budget, or null when it ran to completion. A rate limit partway
+/// through a deep read is the case this exists for: the reading is real and the page should say what
+/// it did not get to rather than pretending the budget was spent.
+/// </param>
 public sealed record VwGroupRead(
     VwGroupVehicle Vehicle,
     VwGroupMappingResult Mapping,
     IReadOnlyList<VwGroupSnapshot> Snapshots,
     VwGroupBundleReport Bundle,
     int DatasetsRead,
-    int DatasetsAvailable);
+    int DatasetsAvailable,
+    string? StoppedEarly = null);
 
 /// <summary>One delivery on offer: what to ask for, and when the portal made it.</summary>
 /// <param name="RequestId">The continuous data request it belongs to.</param>
@@ -161,12 +167,40 @@ public sealed class VwGroupPortalClient
 
         VwGroupMappingResult? mapping = null;
         string? firstError = null;
+        string? stoppedEarly = null;
         var read = 0;
 
         foreach (var dataset in datasets.Take(budget))
         {
-            var archive = await DownloadAsync(vehicle.Vin, dataset.RequestId, dataset.Name, cancellationToken)
-                .ConfigureAwait(false);
+            if (read > 0 && _options.PauseBetweenDownloads > TimeSpan.Zero)
+            {
+                // A deep merge is a burst of ZIP downloads at one endpoint, and the portal answers a
+                // burst with 429. Spacing them is the difference between asking for a lot and asking
+                // rudely; it costs a few seconds on a read that happens every fifteen minutes.
+                await Task.Delay(_options.PauseBetweenDownloads, cancellationToken).ConfigureAwait(false);
+            }
+
+            byte[] archive;
+
+            try
+            {
+                archive = await DownloadAsync(vehicle.Vin, dataset.RequestId, dataset.Name, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (VwGroupPortalException failure) when (read > 0 && mapping?.State is not null)
+            {
+                // Something is already assembled, so a delivery that will not come is the end of the
+                // merge rather than the end of the read. Throwing here discarded a perfectly good
+                // reading because the *extra* delivery it was trying to improve on was refused --
+                // which is what a 429 partway through a deep merge does.
+                _logger.LogInformation(
+                    "The VW portal stopped the merge after {Read} delivery/deliveries ({Reason}); "
+                    + "reporting what is assembled so far.",
+                    read, failure.Message);
+
+                stoppedEarly = failure.Message;
+                break;
+            }
 
             read++;
 
@@ -230,7 +264,8 @@ public sealed class VwGroupPortalClient
             [.. snapshots.OrderBy(snapshot => snapshot.CapturedAt)],
             Merge(bundles),
             read,
-            datasets.Count);
+            datasets.Count,
+            stoppedEarly);
     }
 
     /// <summary>
@@ -542,6 +577,23 @@ public sealed class VwGroupPortalClient
             throw new VwGroupPortalException(
                 VwGroupFailure.SessionExpired,
                 $"{VwGroupSignIn.Where(url)} answered {(int)response.StatusCode} and the session is gone");
+        }
+
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            // Transient, and the one failure this client can provoke by itself: a deep merge is a
+            // burst of ZIP downloads, and the portal rate-limits them. Reported as "wait", never as
+            // "something needs changing" -- the fix is time, and Retry-After says how much when the
+            // portal bothers to send it.
+            var after = response.Headers.RetryAfter?.Delta
+                ?? (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+
+            throw new VwGroupPortalException(
+                VwGroupFailure.Transient,
+                $"{VwGroupSignIn.Where(url)} answered 429 (too many requests)"
+                + (after is { } wait and { TotalSeconds: > 0 }
+                    ? $" and asked for {wait.TotalSeconds:F0} s before the next one"
+                    : "; it is rate-limiting, so the fix is to ask for less, less often"));
         }
 
         if ((int)response.StatusCode >= 500)
