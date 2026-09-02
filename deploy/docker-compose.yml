@@ -204,6 +204,7 @@ services:
       Ev__Vehicles__0__MaxChargingCurrentAmps: ${EV_MAX_CHARGING_CURRENT_AMPS:-}
       Ev__Vehicles__0__Telemetry__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
 
+      Solcast__Enabled: ${SOLCAST_ENABLED:-true}
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 

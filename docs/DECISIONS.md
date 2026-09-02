@@ -4,6 +4,44 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-02 — Solcast's quota belongs to the site, so development does not spend it
+
+Solcast's free tier allows ten calls a day, counted against the **resource id**. The controller
+driving the charger spends about five — it skips the dark, where a fresher forecast cannot change any
+decision. A workstation running the same configuration takes the rest, one per `dotnet run`.
+
+The failure this produces is the reason it is worth a flag rather than a habit. Nothing goes wrong on
+the machine making the calls. What goes wrong is a **429 on the Pi, hours later**, and it looks exactly
+like a regression in whatever was deployed most recently — so the hour is spent reading a diff that has
+nothing to do with it. It has already cost this project that hour once.
+
+### A flag, not a deleted key
+
+`Solcast:Enabled`, default `true`, checked **before** `ApiKey` and `ResourceId`.
+
+Deleting the key from the workstation's `.env` would also stop the calls, and was rejected. It turns a
+deliberate choice into a state indistinguishable from a misconfiguration; it warns about it on every
+refresh, which is noise that has to be learned and then ignored; and it has to be undone — correctly,
+from a password manager — before anyone can work on the forecast for an afternoon. A flag says which
+of those two situations you are in, and the key never moves.
+
+Set to `false` in `appsettings.Development.json`, which the container never reads: the Pi runs without
+`DOTNET_ENVIRONMENT`, so a deployment is untouched and the default stays on. `SOLCAST_ENABLED` covers
+the other case a second copy arrives in — a staging box, or a container somebody left running.
+
+### Off is a supported state, not a degraded one
+
+The refresh worker says so once and **stops**, rather than looping every three hours over a call it
+will not make. The forecast was already advisory: nothing on a hardware path reads it, and a plan
+without one falls back rather than failing. So turning it off exercises a path that already had to
+work, which is why this needs no compensating machinery anywhere else.
+
+The two properties worth pinning are in tests rather than in a comment: that the default is on, so no
+installation loses its forecast to a flag being added; and that development is actually off, because
+the way this regresses is somebody enabling it for an afternoon and not putting it back.
+
+---
+
 ## 2026-09-02 — Two feeds run together, the week is counted, and the handover is a setting (issue #141)
 
 Phase 3 of #137, and the only phase whose deliverable is a measurement. The MQTT source and

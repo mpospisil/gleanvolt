@@ -10,6 +10,25 @@ public sealed class SolcastOptions
 {
     public const string SectionName = "Solcast";
 
+    /// <summary>
+    /// Whether the forecast is fetched at all. On by default, and the only reason to turn it off is
+    /// the one this exists for: <b>the free tier's quota belongs to a site, not to a machine.</b>
+    ///
+    /// <para>Ten calls a day, and the controller on the roof spends about five of them. A developer
+    /// running the same configuration on a workstation spends the same site's quota — one call per
+    /// <c>dotnet run</c> — and the symptom is not a local error but a <c>429</c> on the Pi hours
+    /// later, which reads as a bug in whatever was deployed most recently. That is a genuinely
+    /// expensive hour to lose, and it is lost by the person least able to explain it.</para>
+    ///
+    /// <para>Checked <b>before</b> <see cref="ApiKey"/> rather than instead of it, so a workstation
+    /// keeps a working key in its <c>.env</c> and still makes no call — the alternative, deleting the
+    /// key, turns a deliberate choice into something indistinguishable from a misconfiguration, warns
+    /// about it on every refresh, and has to be undone before the key can ever be used.</para>
+    ///
+    /// <para>Off in <c>appsettings.Development.json</c>; nothing changes for a deployment.</para>
+    /// </summary>
+    public bool Enabled { get; init; } = true;
+
     /// <summary>Base address of the Solcast API.</summary>
     public string BaseUrl { get; init; } = "https://api.solcast.com.au/";
 

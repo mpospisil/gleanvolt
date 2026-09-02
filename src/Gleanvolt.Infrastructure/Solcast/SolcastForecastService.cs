@@ -29,6 +29,10 @@ public sealed class SolcastForecastService : ISolarForecastService
     // publication. Reads snapshot the field once into a local before use.
     private volatile SolarForecast? _cached;
 
+    // Said once. A refresh loop repeating "this is switched off" every three hours is the noise this
+    // project has spent several issues removing from elsewhere.
+    private bool _saidItIsOff;
+
     // What the cache above cannot hold: the periods that have already gone by. Solcast's forecasts
     // endpoint only ever returns the future, so a wholesale replacement loses this morning the moment
     // this morning happens -- and "what did we expect the roof to do at 09:00?" is exactly the
@@ -85,6 +89,23 @@ public sealed class SolcastForecastService : ISolarForecastService
     /// </summary>
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        if (!_options.Enabled)
+        {
+            // Information rather than a warning, and said once rather than every refresh: this is a
+            // setting somebody chose, not a fault. The worker below stops on the same flag, so in
+            // practice this guards a direct call rather than the loop.
+            if (!_saidItIsOff)
+            {
+                _saidItIsOff = true;
+                _logger.LogInformation(
+                    "Solcast is switched off (Solcast:Enabled is false); no forecast will be fetched. "
+                    + "The daily quota belongs to the site, so a workstation sharing this configuration "
+                    + "spends the controller's calls.");
+            }
+
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.ResourceId))
         {
             _logger.LogWarning(

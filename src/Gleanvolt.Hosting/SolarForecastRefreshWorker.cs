@@ -35,6 +35,19 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_options.Enabled)
+        {
+            // Stopped rather than looped over a call that would return immediately: a loop that wakes
+            // every three hours to do nothing is a loop somebody has to read the source of to
+            // understand. The singleton it warms has already been constructed by now, which is the
+            // other thing this worker is for.
+            _logger.LogInformation(
+                "Solcast is switched off (Solcast:Enabled is false); no forecast will be fetched and "
+                + "the plan falls back to what it does with no forecast. The daily quota belongs to the "
+                + "site, so a workstation sharing this configuration spends the controller's calls.");
+            return;
+        }
+
         _logger.LogInformation("Solcast forecast refresh started; interval {RefreshInterval}.", _refreshInterval);
 
         // RefreshAsync swallows its own failures (keeping any cached forecast), so the loop here

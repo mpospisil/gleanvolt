@@ -385,6 +385,7 @@ The worker fetches a solar-generation forecast for your site from [Solcast](http
 
 ```jsonc
 "Solcast": {
+  "Enabled": true,                          // off on a second copy of this installation -- see below
   "BaseUrl": "https://api.solcast.com.au/",
   "ResourceId": "your-solcast-resource-id", // the rooftop site id from your Solcast account
   "RefreshInterval": "12:00:00"             // hh:mm:ss between refreshes
@@ -414,6 +415,29 @@ The **API key is a secret and must not be committed**. Provide it out-of-band, u
   ```
 
 If the API key or resource id is missing, the worker logs a warning and skips forecast refreshes; the rest of the service continues to run. The free Solcast hobbyist tier caps daily API calls, which is why the forecast is cached and refreshed only every 12 hours by default — keep the interval within your plan's quota.
+
+#### The quota belongs to the site, not to the machine — `Solcast:Enabled`
+
+The free tier allows **ten calls a day**, and they are counted against the *resource id*. The controller
+driving the charger spends about five of them: it skips the dark, where a fresher forecast could not
+change any decision. Everything else configured with the same key spends the rest — and the way that
+shows up is not an error on the machine making the calls, but a **429 on the controller hours later**,
+which reads as a bug in whatever was deployed most recently. That is an expensive hour to lose, and it
+is lost by the person least placed to explain it.
+
+So `Solcast:Enabled` (default `true`) turns the fetching off on any *second* copy of an installation:
+
+- **A development machine.** Already done — `appsettings.Development.json` sets it to `false`, so a
+  `dotnet run` or a debugger session never spends the site's calls. Turn it on for an afternoon when
+  you are actually working on the forecast, and turn it back off.
+- **A staging box, or a container somebody left running.** `SOLCAST_ENABLED=false` in `deploy/.env`.
+
+It is checked **before** the credentials, deliberately: the key stays where it is, and nothing has to
+be deleted and put back. Deleting the key would work, but it turns a decision into something
+indistinguishable from a misconfiguration — and warns about it on every refresh.
+
+With it off, the refresh worker says so once and stops; the plan falls back to what it does with no
+forecast, which is a supported state rather than a broken one.
 
 ### Weather (the `Weather` section, optional)
 
