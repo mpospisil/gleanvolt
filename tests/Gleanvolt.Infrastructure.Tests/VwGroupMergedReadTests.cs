@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -137,12 +138,17 @@ public class VwGroupMergedReadTests
     }
 
     [Fact]
-    public async Task A_delivery_that_carries_the_battery_costs_exactly_one_download()
+    public async Task A_delivery_that_carries_a_whole_car_costs_exactly_one_download()
     {
         // The common case must not become four ZIPs over a domestic uplink every quarter of an hour.
         using var portal = new Deliveries(
-            ("battery-latest.zip", "2026-09-02T10:30:00Z", Delivery(
-                "2026-09-02T10:29:46Z", ("battery_level_HV.value", "57"))),
+            ("whole-car.zip", "2026-09-02T10:30:00Z", Delivery(
+                "2026-09-02T10:29:46Z",
+                ("battery_level_HV.value", "57"),
+                ("cruising_range_combined", "310"),
+                ("remaining_charging_time", "165"),
+                ("charging_state_report.current_charge_state", "CHARGE_STATE_NOT_READY_FOR_CHARGING"),
+                ("plug_connection_state", "connected"))),
             ("older.zip", "2026-09-02T10:15:00Z", Delivery(
                 "2026-09-02T10:14:12Z", ("battery_level_HV.value", "56"))));
 
@@ -150,6 +156,35 @@ public class VwGroupMergedReadTests
 
         Assert.Equal(57, read.Mapping.State!.SocPercent);
         Assert.Single(portal.Downloaded);
+    }
+
+    [Fact]
+    public async Task A_battery_in_one_delivery_and_the_charging_state_in_another_make_one_car()
+    {
+        // Reported from the live page: the battery came back correct and Range, Charging, Plug and
+        // Time left went blank, because the read stopped at the first state of charge and the reports
+        // are split by type. A card with a battery and four dashes is worse than the merge not
+        // existing -- before it, the older deliveries were being read anyway.
+        using var portal = new Deliveries(
+            ("battery.zip", "2026-09-02T10:30:00Z", Delivery(
+                "2026-09-02T10:29:46Z", ("battery_level_HV.value", "69"))),
+            ("charging.zip", "2026-09-02T10:15:00Z", Delivery(
+                "2026-09-02T10:14:12Z",
+                ("charging_state_report.current_charge_state", "CHARGE_STATE_NOT_READY_FOR_CHARGING"),
+                ("remaining_charging_time", "165"),
+                ("cruising_range_combined", "310"),
+                ("plug_connection_state", "connected"))));
+
+        var state = (await Client(portal, Options()).ReadAsync()).Mapping.State!;
+
+        Assert.Equal(69, state.SocPercent);
+        Assert.Equal(310, state.RangeKm);
+        Assert.Equal(TimeSpan.FromMinutes(165), state.ChargeTimeRemaining);
+        Assert.Equal(VehicleChargeState.Idle, state.ChargeState);
+        Assert.Equal(VehiclePlugState.Connected, state.PlugState);
+
+        // And the battery is still the newest one, not the one from the older delivery.
+        Assert.Equal(new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero), state.CapturedAt);
     }
 
     [Fact]

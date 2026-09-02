@@ -76,9 +76,13 @@ public sealed class VwGroupPortalOptions
     /// the resulting reading is, is said by the reading's own capture time, and judged by
     /// <c>Vehicle:MaxAge</c> exactly as every other source is.</para>
     ///
-    /// <para>It is a ceiling, not a cost: deliveries are pulled only while the merged reading still
-    /// lacks a state of charge, so a car whose newest delivery carries the battery downloads exactly
-    /// one ZIP, as it always did.</para>
+    /// <para>It is a ceiling, not a fixed cost: deliveries are pulled only while the reading is still
+    /// short of something — the battery, the range, the charging state, the plug, the remaining time —
+    /// so a delivery that carries a whole car is one ZIP. On a car whose reports are split across
+    /// deliveries, expect a read to spend most of this budget, and expect the last of it to be spent
+    /// on a field the car may simply never send. Lower it to 1 to have the newest delivery and nothing
+    /// else; the log says what a read is still short of, which is how to tell whether raising it would
+    /// buy anything.</para>
     /// </summary>
     public int MaxDatasetsPerRead { get; init; } = 4;
 

@@ -1825,10 +1825,14 @@ your file.
 deliveries — each carries the reports that changed — so the newest one on its own is a coin toss over
 which report type arrives. On the reference ID.4 it held the odometer, the charge target, the doors and
 the climate, and no state of charge at all, while the car's SOC was perfectly well known elsewhere at
-that moment. So a read takes the newest delivery and keeps merging older ones **only while the reading
-still has no state of charge**, up to four (`Vehicle:DataAct:MaxDatasetsPerRead`). A car whose newest
-delivery carries the battery costs exactly one download, as it always did. That number bounds what a
-read costs over a domestic uplink and nothing else: the portal delivers when the car reports rather
+that moment. So a read takes the newest delivery and keeps merging older ones **while the reading is still short
+of something** — the battery, the range, the charging state, the plug, the remaining time — up to four
+(`Vehicle:DataAct:MaxDatasetsPerRead`). Stopping at the first state of charge was the first attempt and
+was wrong: the reports are split by type, so it produced a card with a battery and four dashes. A delivery that carries a whole car costs exactly one
+download; a car whose reports are split will spend most of the budget, and the last of it on a field
+the car may simply never send — the log says what a read is still short of, which is how to tell
+whether raising the number would buy anything. It bounds what a read costs over a domestic uplink and
+nothing else: the portal delivers when the car reports rather
 than on a clock — the reference install was offered thirty deliveries whose newest four covered most of
 a day — so how old the answer is, is said by the reading's own capture time and judged by `MaxAge`.
 

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -138,11 +139,12 @@ public sealed class VwGroupPortalClient
     /// snapshots, filters sentinels first and lets the newest real value win, which is exactly what
     /// assembling one car out of several deliveries requires.</para>
     ///
-    /// <para><b>Adaptive, so the common case still costs one download.</b> Older deliveries are pulled
-    /// only while the merged reading still has no state of charge, and never more than
-    /// <see cref="VwGroupPortalOptions.MaxDatasetsPerRead"/> of them. A car whose newest delivery
-    /// carries the battery is one ZIP, exactly as before; a car like this one pays for as many as it
-    /// takes, up to the budget, and no more.</para>
+    /// <para><b>Adaptive, so a complete delivery still costs one download.</b> Older deliveries are
+    /// pulled only while the reading is still short of something — a state of charge, a range, a
+    /// charging state, a plug state, a remaining time — and never more than
+    /// <see cref="VwGroupPortalOptions.MaxDatasetsPerRead"/> of them. Stopping at the first state of
+    /// charge was the first attempt and was wrong: the reports are split by type, so it produced a
+    /// card with a battery and four dashes.</para>
     ///
     /// <para>Nothing here throws for an unmappable bundle: the reading comes back with its
     /// <see cref="VwGroupMappingResult.Error"/> and the diagnostics that explain it, because the
@@ -184,20 +186,29 @@ public sealed class VwGroupPortalClient
             mapping = VwGroupVehicleStateMapper.Map(
                 [.. snapshots.OrderBy(snapshot => snapshot.CapturedAt)], vehicle.MaskedVin);
 
-            if (mapping.State is { SocPercent: not null })
+            if (IsWholeCar(mapping.State))
             {
-                // The reading the feed exists for. Everything else is welcome and none of it is worth
-                // another ZIP over a domestic uplink.
+                // Everything a VehicleState can hold is in hand; another delivery could only repeat it.
                 break;
             }
 
             if (read < Math.Min(budget, datasets.Count))
             {
                 _logger.LogDebug(
-                    "The VW portal's delivery {Read} of {Available} carried no state of charge; "
-                    + "merging the one before it.",
-                    read, datasets.Count);
+                    "The VW portal's delivery {Read} of {Available} still leaves {Missing}; merging "
+                    + "the one before it.",
+                    read, datasets.Count, Missing(mapping.State));
             }
+        }
+
+        if (!IsWholeCar(mapping?.State) && mapping?.State is not null)
+        {
+            // Says what a bigger MaxDatasetsPerRead would buy, which is the only way to know whether
+            // raising it is worth the downloads.
+            _logger.LogDebug(
+                "The VW portal read merged {Read} delivery/deliveries and still has no {Missing}. "
+                + "Raising Vehicle:DataAct:MaxDatasetsPerRead reaches further back for them.",
+                read, Missing(mapping.State));
         }
 
         mapping ??= new VwGroupMappingResult(
@@ -220,6 +231,42 @@ public sealed class VwGroupPortalClient
             Merge(bundles),
             read,
             datasets.Count);
+    }
+
+    /// <summary>
+    /// Whether the reading holds everything a <see cref="VehicleState"/> can carry.
+    ///
+    /// <para><b>Not "has a state of charge", which is what this asked first and got wrong.</b> The
+    /// partial deliveries are split by report type: the battery is in one, the charging state and the
+    /// remaining time in another, the plug in a third. Stopping at the first percentage therefore
+    /// produced a card with a battery and four dashes — worse than before merging existed, because
+    /// before it the older deliveries were being read anyway. A car is the whole set.</para>
+    ///
+    /// <para>The budget is what stops this reading forever on a car that never reports a plug state:
+    /// completeness decides when to stop <i>early</i>, and <see cref="VwGroupPortalOptions.MaxDatasetsPerRead"/>
+    /// decides when to stop regardless.</para>
+    /// </summary>
+    private static bool IsWholeCar(VehicleState? state) =>
+        state is { SocPercent: not null, RangeKm: not null, ChargeTimeRemaining: not null }
+            and { ChargeState: not VehicleChargeState.Unknown, PlugState: not VehiclePlugState.Unknown };
+
+    /// <summary>What a reading is still short of, for the log line that says whether to reach further.</summary>
+    private static string Missing(VehicleState? state)
+    {
+        if (state is null)
+        {
+            return "a reading at all";
+        }
+
+        var missing = new List<string>();
+
+        if (state.SocPercent is null) missing.Add("state of charge");
+        if (state.RangeKm is null) missing.Add("range");
+        if (state.ChargeTimeRemaining is null) missing.Add("remaining time");
+        if (state.ChargeState == VehicleChargeState.Unknown) missing.Add("charging state");
+        if (state.PlugState == VehiclePlugState.Unknown) missing.Add("plug state");
+
+        return missing.Count == 0 ? "nothing" : string.Join(", ", missing);
     }
 
     /// <summary>One report out of several bundles', because a merged read has several.</summary>
