@@ -28,9 +28,23 @@ public sealed record VwGroupMappingResult(
     string? Error = null,
     double? TargetSocPercent = null,
     double? OdometerKm = null,
-    IReadOnlyList<string>? UnmappedFields = null)
+    IReadOnlyList<string>? UnmappedFields = null,
+    IReadOnlyDictionary<string, string>? MatchedFields = null)
 {
     public IReadOnlyList<string> UnmappedFields { get; init; } = UnmappedFields ?? [];
+
+    /// <summary>
+    /// The fields that <b>were</b> recognised, with the newest raw value read out of each — the other
+    /// half of the diagnostic, and the half that was missing when it was first needed.
+    ///
+    /// <para>A name absent from <see cref="UnmappedFields"/> means one of two opposite things: the
+    /// bundle did not carry it, or it carried it and the value was a sentinel that filtering threw
+    /// away. Those want opposite fixes — a name to add, against a car that reports the field empty —
+    /// and the unmapped list alone cannot tell them apart, which is a week of wondering of exactly the
+    /// kind that list exists to prevent.</para>
+    /// </summary>
+    public IReadOnlyDictionary<string, string> MatchedFields { get; init; } =
+        MatchedFields ?? new Dictionary<string, string>();
 }
 
 /// <summary>
@@ -130,6 +144,7 @@ public static class VwGroupVehicleStateMapper
             sourceId);
 
         var unmapped = Unmapped(ordered);
+        var matched = Matched(ordered);
 
         // A timestamp and nothing else is not a reading, and must not be handed on as one.
         //
@@ -154,10 +169,43 @@ public static class VwGroupVehicleStateMapper
                 + "and adding them to VwGroupFieldNames is the fix",
                 targetSoc,
                 odometer,
-                unmapped);
+                unmapped,
+                matched);
         }
 
-        return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped);
+        return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped, matched);
+    }
+
+    /// <summary>
+    /// Every field the vocabulary recognises that the bundle actually carried, with its newest raw
+    /// value — sentinels included, verbatim and untouched, because a value of <c>""</c> or
+    /// <c>"invalid"</c> is precisely what this is here to show.
+    /// </summary>
+    private static Dictionary<string, string> Matched(List<VwGroupSnapshot> snapshots)
+    {
+        string[][] known =
+        [
+            VwGroupFieldNames.StateOfCharge, VwGroupFieldNames.RangeKm,
+            VwGroupFieldNames.ChargeTimeRemaining, VwGroupFieldNames.ChargeState,
+            VwGroupFieldNames.PlugState, .. VwGroupFieldNames.KnownButUnused,
+        ];
+
+        var matched = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Oldest first, so the last write per name is the newest value -- the same rule the readings
+        // themselves follow.
+        foreach (var snapshot in snapshots)
+        {
+            foreach (var (field, value) in snapshot.Values)
+            {
+                if (known.Any(candidates => VwGroupFieldNames.Matches(field, candidates)))
+                {
+                    matched[field] = value;
+                }
+            }
+        }
+
+        return matched;
     }
 
     /// <summary>How many distinct field names the bundle carried, recognised or not.</summary>

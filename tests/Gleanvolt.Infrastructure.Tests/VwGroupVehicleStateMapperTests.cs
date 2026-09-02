@@ -232,4 +232,36 @@ public class VwGroupVehicleStateMapperTests
     }
 
 
+    [Fact]
+    public void TheFieldsItDidRecogniseAreReportedWithWhatTheySaid()
+    {
+        // The half that was missing the first time this was needed in anger. A recognised name that
+        // came back empty is invisible in the unmapped list -- it is not unmapped -- so an empty
+        // reading looked identical whether the bundle lacked the field or carried it blank. Those
+        // want opposite fixes.
+        var snapshot = new VwGroupSnapshot(
+            new DateTimeOffset(2026, 9, 2, 10, 29, 46, TimeSpan.Zero),
+            new Dictionary<string, string>
+            {
+                ["car_captured_time"] = "2026-09-02T10:29:46Z",
+                ["charging_state_report.charging_state"] = "invalid",
+                ["mileage.value"] = "24680",
+                ["settings.auto_unlock_ac"] = "true",
+            },
+            "report.json");
+
+        var result = VwGroupVehicleStateMapper.Map([snapshot], "id4");
+
+        // Recognised by leaf, and its value shown raw: "invalid" is a sentinel, which is why nothing
+        // came of it, and seeing the word is the difference between adding a name and accepting that
+        // the car sent nothing.
+        Assert.Equal("invalid", result.MatchedFields["charging_state_report.charging_state"]);
+        Assert.Equal("24680", result.MatchedFields["mileage.value"]);
+
+        // And the two lists stay disjoint: a field is either recognised or listed as unrecognised.
+        Assert.Contains("settings.auto_unlock_ac", result.UnmappedFields);
+        Assert.DoesNotContain("mileage.value", result.UnmappedFields);
+    }
+
+
 }

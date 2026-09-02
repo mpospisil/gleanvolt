@@ -160,4 +160,46 @@ public class VehiclePortalPageTests : PageTest
     }
 
 
+    [Fact]
+    public void It_shows_what_matched_and_what_each_of_those_fields_said()
+    {
+        // The two lists answer different questions and the page needs both: a name missing from the
+        // unrecognised list means either "never carried" or "carried empty", and only the values
+        // below say which.
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle was read and none of its 47 field(s) are ones this build recognises",
+            worthRetrying: false,
+            unmapped: ["settings.auto_unlock_ac"],
+            matched: new Dictionary<string, string>
+            {
+                ["charging_state_report.charging_state"] = "invalid",
+                ["mileage.value"] = "24680",
+            })));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("charging_state_report.charging_state", page.Markup);
+        Assert.Contains("invalid", page.Markup);
+        Assert.Contains("24680", page.Markup);
+        Assert.Contains("settings.auto_unlock_ac", page.Markup);
+    }
+
+    [Fact]
+    public void A_report_dropped_for_want_of_a_timestamp_is_named_with_the_fields_it_took_with_it()
+    {
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "the bundle held no dated report with any readings in it",
+            worthRetrying: false,
+            diagnostics: ["1 of 3 report(s) were dropped for carrying no timestamp this build recognises."],
+            dropped: ["battery_level_HV.value"])));
+
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("dropped for carrying no timestamp", page.Markup);
+        Assert.Contains("battery_level_HV.value", page.Markup);
+    }
+
+
 }

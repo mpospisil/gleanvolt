@@ -55,10 +55,11 @@ public sealed class VwGroupPortalReader(
             var archive = await client.DownloadAsync(vehicle.Vin, requestId, name, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var bundleError))
+            if (!VwGroupReportBundle.TryRead(archive, out var snapshots, out var bundleError, out var bundle))
             {
                 return VehiclePortalReading.Failed(
-                    nameof(VwGroupFailure.UnusableData), bundleError!, worthRetrying: false);
+                    nameof(VwGroupFailure.UnusableData), bundleError!, worthRetrying: false,
+                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields);
             }
 
             var mapped = VwGroupVehicleStateMapper.Map(snapshots, vehicle.MaskedVin);
@@ -75,7 +76,9 @@ public sealed class VwGroupPortalReader(
 
                 return VehiclePortalReading.Failed(
                     nameof(VwGroupFailure.UnusableData), mapped.Error!, worthRetrying: false,
-                    unmapped: mapped.UnmappedFields);
+                    unmapped: mapped.UnmappedFields,
+                    matched: mapped.MatchedFields,
+                    diagnostics: Notes(bundle), dropped: bundle.UndatedFields);
             }
 
             _logger.LogInformation(
@@ -91,7 +94,10 @@ public sealed class VwGroupPortalReader(
                 NewestSnapshot: snapshots[^1].CapturedAt,
                 TargetSocPercent: mapped.TargetSocPercent,
                 OdometerKm: mapped.OdometerKm,
-                UnmappedFields: mapped.UnmappedFields);
+                UnmappedFields: mapped.UnmappedFields,
+                MatchedFields: mapped.MatchedFields,
+                Diagnostics: Notes(bundle),
+                DroppedFields: bundle.UndatedFields);
         }
         catch (VwGroupPortalException failure)
         {
@@ -108,5 +114,31 @@ public sealed class VwGroupPortalReader(
         {
             throw;
         }
+    }
+
+    /// <summary>
+    /// What the bundle held that never became a reading, in sentences a page can show. Empty when
+    /// every report in it became a snapshot, which is the ordinary case and deserves no words.
+    /// </summary>
+    private static IReadOnlyList<string> Notes(VwGroupBundleReport bundle)
+    {
+        var notes = new List<string>();
+
+        if (bundle.Undated > 0)
+        {
+            // The one that hides a battery report: dropped whole, and its field names dropped with it,
+            // so the unrecognised list cannot show what was in there.
+            notes.Add(
+                $"{bundle.Undated} of {bundle.Reports} report(s) were dropped for carrying no "
+                + "timestamp this build recognises. Their fields are listed below and are invisible "
+                + "everywhere else — a timestamp spelled a new way costs the whole report.");
+        }
+
+        if (bundle.Empty > 0)
+        {
+            notes.Add($"{bundle.Empty} report(s) carried no named values at all.");
+        }
+
+        return notes;
     }
 }

@@ -129,6 +129,55 @@ else if (_reading is { Succeeded: true, State: { } state })
 }
 
 @*
+    What the vocabulary DID match, and what each of those fields actually said.
+
+    The half that was missing the first time this page was needed in anger. A name absent from the
+    unrecognised list below means one of two opposite things -- the bundle never carried it, or it
+    carried it and the value was a sentinel that filtering threw away -- and those want opposite
+    fixes: a name to add, against a car that reports the field empty. Values are shown raw, quoted
+    and untouched, because "" and "invalid" are exactly what this exists to reveal.
+*@
+@if (_reading is not null && _reading.Matched.Count > 0)
+{
+    <h2>@_reading.Matched.Count field(s) this build recognised</h2>
+
+    <dl class="facts">
+        @foreach (var (field, value) in _reading.Matched)
+        {
+            <dt><code>@field</code></dt>
+            <dd>@(string.IsNullOrWhiteSpace(value) ? "(empty)" : $"\"{value}\"")</dd>
+        }
+    </dl>
+}
+else if (_reading is not null && (_reading.Succeeded || _reading.Unmapped.Count > 0))
+{
+    <p class="muted">
+        Not one field in the bundle is in the vocabulary at all — so this is a set of names to add
+        rather than a car reporting empty values.
+    </p>
+}
+
+@if (_reading is not null && _reading.Notes.Count > 0)
+{
+    <h2>What the bundle held that never became a reading</h2>
+
+    @foreach (var note in _reading.Notes)
+    {
+        <p class="muted">@note</p>
+    }
+
+    @if (_reading.Dropped.Count > 0)
+    {
+        <ul class="sessions">
+            @foreach (var field in _reading.Dropped)
+            {
+                <li><code>@field</code></li>
+            }
+        </ul>
+    }
+}
+
+@*
     The unrecognised names, shown whether the read succeeded or not.
 
     They used to hang off the success branch, which put them exactly where they were least needed: a
