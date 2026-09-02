@@ -7,6 +7,7 @@
 @inject VehicleDisplayOptions VehicleDisplay
 @inject EvInfo Car
 @inject IEnumerable<IVehicleUpdateService> VehicleFeeds
+@inject VehicleFeedComparison Comparison
 @inject TimeProvider Time
 
 @*
@@ -139,6 +140,66 @@ else
         }
     </section>
 
+    @*
+        One section per feed, while more than one has ever reported (#141).
+
+        The card above is *the* reading -- whichever feed saw the car most recently, and the one every
+        other surface quotes. These are what each feed says on its own, and they exist because the
+        holder keeps one state: the feed that came second leaves nothing behind but a count, so
+        "the portal is healthy" and "the portal is delivering" are indistinguishable from up there.
+        They are not the same question, and on the reference install they had different answers within
+        two hours of both feeds being switched on.
+
+        Shown once two feeds have been seen and *kept* shown afterwards, even if one goes quiet: a feed
+        that stopped still has a last reading and a visibly growing age, which is the whole point of
+        looking. With a single feed there is nothing to compare and the card above already says it all.
+    *@
+    @if (_feedReport.BothFeedsSeen)
+    {
+        <h2>What each feed says</h2>
+
+        <p class="muted">
+            The card above quotes whichever feed saw the car most recently; these are their own
+            accounts, side by side. Counted over time on
+            <a href="/vehicle-feeds">the feeds page</a>.
+        </p>
+
+        @foreach (var feed in _feedReport.Sources)
+        {
+            if (feed.LastReading is not { } reading)
+            {
+                continue;
+            }
+
+            <h3>
+                @feed.SourceId
+                @if (InUse(feed))
+                {
+                    <span class="muted"> — the reading shown above</span>
+                }
+                else
+                {
+                    <span class="muted"> — @feed.Superseded reading@(feed.Superseded == 1 ? "" : "s") held back as older</span>
+                }
+            </h3>
+
+            <section class="stat-grid">
+                <Stat Label="Car battery" Value="@Percent(reading.SocPercent)"
+                      Hint="This feed's own state of charge for the car. The other feed's may differ, and which is right is what a week of both answers." />
+                <Stat Label="Car reading age" Value="@VehicleAge(reading)"
+                      Hint="How long ago the car produced THIS feed's reading. A feed that has stopped shows its age growing here while the other's stays small." />
+                <Stat Label="Car range" Value="@Km(reading.RangeKm)"
+                      Hint="The car's own range estimate, when this feed carries one. A dash means this feed does not report it." />
+                <Stat Label="Time left" Value="@ChargeTime(reading)"
+                      Hint="The car's own estimate of how much longer it needs. A dash means this feed does not report it — which is itself a finding." />
+                <Stat Label="Car charge state" Value="@reading.ChargeState.ToString()"
+                      Hint="What this feed says the car is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+                <Stat Label="Car plug state" Value="@reading.PlugState.ToString()"
+                      Hint="Whether this feed says a cable is in the car's socket. Unknown means this feed does not report it." />
+            </section>
+        }
+    }
+
     <h2>Charging session</h2>
 
     @if (!IsCharging(_status))
@@ -180,6 +241,10 @@ else
     private ChargeControlStatus? _status;
     private VehicleState? _vehicle;
     private bool _vehicleStale;
+
+    // What each feed has said on its own (#141). Read on the same tick as everything else; Report()
+    // is a snapshot, so a render never sees a tally change under it.
+    private VehicleFeedReport _feedReport = VehicleFeedReport.Empty;
 
     // The manufacturer feed's health, or null when no update service is configured -- which is itself
     // one of the four states, and the one that must read as "nothing is wrong".
@@ -225,6 +290,7 @@ else
         _vehicle = Vehicle.GetCurrentState();
         _vehicleStale = _vehicle is not null
             && _vehicle.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
+        _feedReport = Comparison.Report();
 
         // Read on the poll's cadence like the reading itself: Health is a cheap property by contract,
         // and a feed whose state changed a few seconds ago changed nothing anyone can act on sooner.
@@ -259,6 +325,19 @@ else
     // accuracy the source doesn't have. A negative age (the car's clock ahead of ours) reads as "just
     // now" rather than as a negative duration.
     private static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
+
+    // Null and zero are different facts: zero means the car says it is done, and a dash means this
+    // feed does not carry the field at all (#73). Rounded to the minute, which is all the car offers.
+    private static string ChargeTime(VehicleState reading) =>
+        reading.ChargeTimeRemaining is { } left ? $"{left.TotalMinutes:F0} min" : "—";
+
+    /// <summary>
+    /// Whether the card above is currently quoting this feed. Matched on the name the feed put on its
+    /// reading, which is the same thing the card prints after "via" — so the two can never disagree.
+    /// </summary>
+    private bool InUse(VehicleFeedTally feed) =>
+        _vehicle is not null
+        && string.Equals(_vehicle.SourceId, feed.SourceId, StringComparison.OrdinalIgnoreCase);
 
     private string VehicleAge(VehicleState vehicle)
     {

@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-02 — Each feed's own account, on the card (issue #141, follow-up)
+
+The first two hours of running both feeds on the reference install produced the case this is for: the
+portal signed in, answered every time, reported one session and no errors — and handed back the same
+16:51 delivery nine times running. On Health it read as a healthy feed. On the dashboard it was
+invisible, because `VehicleStateHolder` keeps one reading and the MQTT feed was ahead of it all
+afternoon.
+
+### What changed
+
+- `VehicleFeedTally.LastReading`: each feed's own most recent reading, which the tally already tracked
+  privately in order to measure cadence and was throwing away on the way out.
+- The dashboard gains **What each feed says** — one section per feed, headed by the name that feed
+  puts on its readings, with battery, age, range, time left, charge state and plug state. The section
+  for the feed the card above is quoting says so; the other says how many readings it has had held
+  back as older.
+- Shown once two feeds have been seen, and **kept** shown afterwards even if one goes quiet.
+
+### Things worth knowing
+
+- **Healthy and delivering are different questions.** A feed can sign in, answer, and report nothing
+  new for hours. The four-state card (#140) answers the first; only a per-feed reading answers the
+  second, and until now nothing on any surface did.
+- **A feed that stops keeps its section.** Its last reading sits there with a visibly growing age
+  beside the other feed's fresh one, which is the whole point of looking. A section that vanished
+  would take the evidence with it.
+- **Single-feed installations gain nothing and see nothing.** With one feed the card above already is
+  that feed, so a section would be the dashboard saying the same thing twice.
+- **The reading everything else uses is unchanged.** These sections are display; no plan, no charge
+  decision and no Home Assistant entity reads them, and the holder still keeps exactly one state.
+
+### Verification performed
+
+- **1478 tests pass** (7 new): the sections absent with one feed and present with two, both accounts
+  on the page including the one the holder discarded, the quoted feed named, a nine-hour-old feed
+  keeping its section with its age growing, and a field one feed carries and the other does not.
+- The tally is asserted to keep the losing reading, and to not let a re-delivered older bundle replace
+  a newer one.
+
+---
+
 ## 2026-09-02 — Two feeds, counted, and a handover made by configuration (issue #141)
 
 Phase 3 of #137, and the only phase whose deliverable is a measurement rather than a feature. What

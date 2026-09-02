@@ -69,6 +69,18 @@ public sealed record VehicleFeedReport(
 /// </param>
 /// <param name="ChargeStateReadings">Deliveries whose charge state was something other than Unknown.</param>
 /// <param name="PlugStateReadings">Deliveries whose plug state was something other than Unknown.</param>
+/// <param name="LastReading">
+/// This feed's own most recent reading, whatever became of it.
+///
+/// <para><b>The only place a losing reading survives.</b> <see cref="VehicleStateHolder"/> keeps one
+/// state — the newest — so the feed that came second leaves nothing behind but a count. While two
+/// feeds are being compared, each one's own account of the car is worth showing beside the other's:
+/// the dashboard's card can then say which feed it is quoting <i>and</i> what the other one would
+/// have said, which is the difference between "the portal is healthy" and "the portal is delivering".</para>
+///
+/// <para>Never null once <paramref name="Captures"/> is non-zero, and display only — nothing plans on
+/// it, and the reading the rest of the controller uses is still whatever the holder holds.</para>
+/// </param>
 public sealed record VehicleFeedTally(
     string SourceId,
     int Offered,
@@ -85,7 +97,8 @@ public sealed record VehicleFeedTally(
     int RangeReadings,
     int ChargeTimeReadings,
     int ChargeStateReadings,
-    int PlugStateReadings)
+    int PlugStateReadings,
+    VehicleState? LastReading = null)
 {
     /// <summary>
     /// Readings that told us nothing new — the portal handing back a bundle it had already delivered,

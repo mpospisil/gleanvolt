@@ -34,6 +34,10 @@ public class DashboardPageTests : PageTest
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
+
+        // The per-feed sections read the holder's own tally (#141), so it has to be the same object
+        // the tests push readings into -- a second comparison would see nothing.
+        Services.AddSingleton(_vehicle.Comparison);
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         Services.AddSingleton(_ => _car);
     }
@@ -442,5 +446,92 @@ public class DashboardPageTests : PageTest
         Assert.Empty(page.FindAll("button"));
         Assert.Empty(page.FindAll("input"));
         Assert.Empty(page.FindAll("select"));
+    }
+
+    [Fact]
+    public void Says_nothing_per_feed_while_only_one_has_ever_reported()
+    {
+        // With one feed the card above already is that feed. A section repeating it would be the
+        // dashboard saying the same thing twice.
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
+
+        var page = Render<Dashboard>();
+
+        Assert.DoesNotContain("What each feed says", page.Markup);
+    }
+
+    [Fact]
+    public void Gives_each_feed_its_own_section_once_two_have_reported()
+    {
+        // The reason this exists: the holder keeps one state, so the feed that came second leaves
+        // nothing behind but a count -- and "the portal is healthy" and "the portal is delivering"
+        // are then indistinguishable from the card above.
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-22), SocPercent: 60, SourceId: "vw-group"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("What each feed says", page.Markup);
+        Assert.Contains("id4", page.Markup);
+        Assert.Contains("vw-group", page.Markup);
+
+        // Both accounts are on the page, including the one the holder threw away.
+        Assert.Contains("62%", page.Markup);
+        Assert.Contains("60%", page.Markup);
+    }
+
+    [Fact]
+    public void Names_the_feed_the_card_above_is_quoting()
+    {
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-22), SocPercent: 60, SourceId: "vw-group"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("the reading shown above", page.Markup);
+        Assert.Contains("held back as older", page.Markup);
+    }
+
+    [Fact]
+    public void A_feed_that_has_gone_quiet_keeps_its_section_and_shows_its_age_growing()
+    {
+        // The one thing worth looking at after a feed stops: its own last reading, ageing, beside the
+        // other feed's fresh one. A section that vanished would take the evidence with it.
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-group"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "id4"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("What each feed says", page.Markup);
+        Assert.Contains("9.0 h", page.Markup);
+    }
+
+    [Fact]
+    public void Shows_a_field_one_feed_carries_and_the_other_does_not()
+    {
+        // Coverage, on the card rather than only in the week's tally: the portal carries a
+        // charge-time-remaining for the reference car and the MQTT feed does not, and a dash beside a
+        // figure is how that is seen at a glance.
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
+        _vehicle.Set(new VehicleState(
+            _time.Now.AddMinutes(-22),
+            SocPercent: 60,
+            ChargeTimeRemaining: TimeSpan.FromMinutes(95),
+            SourceId: "vw-group"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("Time left", page.Markup);
+        Assert.Contains("95 min", page.Markup);
     }
 }

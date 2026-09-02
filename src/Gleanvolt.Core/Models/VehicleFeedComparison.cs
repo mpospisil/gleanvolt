@@ -273,7 +273,8 @@ public sealed class VehicleFeedComparison
             _range,
             _chargeTime,
             _chargeState,
-            _plugState);
+            _plugState,
+            Last);
 
         private static int BucketFor(TimeSpan gap)
         {

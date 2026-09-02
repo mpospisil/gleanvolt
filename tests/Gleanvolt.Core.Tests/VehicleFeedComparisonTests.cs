@@ -285,6 +285,35 @@ public class VehicleFeedComparisonTests
     }
 
     [Fact]
+    public void Each_feed_keeps_its_own_last_reading_including_the_one_the_holder_discarded()
+    {
+        // The only place a losing reading survives: the holder keeps one state, so without this the
+        // feed that came second leaves nothing behind but a count.
+        var holder = new VehicleStateHolder();
+
+        holder.Set(new VehicleState(Noon, SocPercent: 62, SourceId: "mqtt"));
+        holder.Set(new VehicleState(Noon.AddMinutes(-12), SocPercent: 58, SourceId: "vw-group"));
+
+        var report = holder.Comparison.Report();
+
+        Assert.Equal(62, report.Sources.Single(s => s.SourceId == "mqtt").LastReading!.SocPercent);
+        Assert.Equal(58, report.Sources.Single(s => s.SourceId == "vw-group").LastReading!.SocPercent);
+        // And the holder itself is unchanged by any of this: it still holds only the newest.
+        Assert.Equal(62, holder.GetCurrentState()!.SocPercent);
+    }
+
+    [Fact]
+    public void A_repeat_does_not_replace_the_last_reading_with_an_older_one()
+    {
+        var comparison = new VehicleFeedComparison(new TestClock(Noon));
+
+        comparison.Record(Reading(TimeSpan.FromMinutes(30), soc: 61), taken: true);
+        comparison.Record(Reading(TimeSpan.Zero, soc: 40), taken: false);
+
+        Assert.Equal(61, Assert.Single(comparison.Report().Sources).LastReading!.SocPercent);
+    }
+
+    [Fact]
     public void The_holder_counts_every_offer_including_the_ones_it_declines()
     {
         var holder = new VehicleStateHolder();

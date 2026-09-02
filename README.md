@@ -2091,6 +2091,15 @@ sections, in the order the questions are actually asked:
   age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying which
   screen to open. The last two must never look alike: *stale* clears itself and *sign-in required* never
   will. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
+- **What each feed says** — appears only once **two** feeds have reported, and then stays. The card
+  above quotes whichever feed saw the car most recently; this is each feed's own account beside the
+  other's, headed by the name it puts on its readings, with the section for the one being quoted
+  marked as such and the other saying how many of its readings were held back as older. It exists
+  because the holder keeps a single reading, so the feed that came second otherwise leaves nothing
+  behind but a count — and *the portal is healthy* and *the portal is delivering* are then
+  indistinguishable. On the reference install those had different answers within two hours of both
+  feeds being switched on. Counted over time on
+  [`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered).
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the
