@@ -156,6 +156,8 @@ Every release carries a `SHA256SUMS` file — `sha256sum -c --ignore-missing SHA
 
 The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
 
+How a release is cut — and what to check before and after one — is [`docs/RELEASING.md`](docs/RELEASING.md). The short version: dispatch the workflow, do not reach for `git tag`.
+
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.AddGleanvolt();          // polling, control, sessions, Home Assistant, the web UI, the API

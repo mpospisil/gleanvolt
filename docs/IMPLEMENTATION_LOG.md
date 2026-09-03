@@ -4,6 +4,55 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-03 — The release pipeline runs, on all three platforms (issues #145–#148, ahead of #149)
+
+The first green run of `release.yml` in its current form. Every phase of #144 up to the tag is now
+evidence rather than intent: run
+[33730442784](https://github.com/mpospisil/gleanvolt/actions/runs/33730442784), dispatched with
+`release=false`, four jobs, nothing permanent created.
+
+### What the run proved
+
+- **`version`** printed *"Product line 1.0, next free build 0"*. The next release is `v1.0.0`, decided
+  from the repository and the tag list without anybody typing a number.
+- **`build`** built, tested and packed the solution, and uploaded five `.nupkg` and five `.snupkg`.
+- **`publish`** ran three legs, each on the platform its runtime identifier names, and each one
+  **started the binary it had just built** — the first time anything in this pipeline has executed a
+  produced artifact.
+
+| Leg | Runner | Result |
+|---|---|---|
+| `linux-x64` | `ubuntu-latest` | four assertions green, zip 48 MB |
+| `win-x64` | `windows-latest` | four assertions green, zip 51 MB |
+| `linux-arm64` | `ubuntu-24.04-arm` | four assertions green, zip 46 MB |
+
+Every leg reported the same four lines: the process survived an unreachable inverter and charger,
+`/api/v1/health` answered 200, `/_framework/blazor.web.js` answered 200 with 200,645 bytes, and the
+running build reported `1.0.0-dev` in the log and on `/health`. The Windows binary logged
+`Gleanvolt 1.0.0-dev (e006d89) starting.`
+
+### Things worth knowing
+
+- **The unknowns from #147 are settled.** All three runner labels resolve; `Compress-Archive` produces
+  a zip on the Windows leg that unpacks and runs; `actions/setup-python` works on `ubuntu-24.04-arm`;
+  and a named IANA timezone (`Europe/Prague`) resolves inside a self-contained build on Windows and on
+  arm64 alike, which is the ICU question that phase existed to ask.
+- **A cross-compiled arm64 binary is no longer taken on faith.** It is built by an arm64 toolchain and
+  started on an arm64 machine before it ships.
+- **This retroactively closes #145's "done when".** That phase asked for a green dispatch with its
+  artifacts listed, against a file that had been rewritten since its only run. Three phases of edits
+  later, the run finally happened, and the artifact set is the three zips and the ten packages.
+- **`release` was skipped**, which is the point of `release=false`: no tag, no release, nothing that
+  cannot be taken back.
+
+### Still to do, and it is not a workflow's to do
+
+`gh release list` is empty and no `v*` tag exists. Cutting one is #149, and the half of it that
+matters most — downloading from the releases page in a browser on a machine that has never had .NET
+installed, and running it — is a human act by design. `docs/RELEASING.md` is the procedure.
+
+---
+
 ## 2026-09-02 — A feed going backwards is not a feed repeating itself (issue #141, follow-up)
 
 The reference install's first evening: the portal answered all ten reads and produced **one** new
