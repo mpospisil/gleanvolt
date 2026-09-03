@@ -4,6 +4,60 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-03 — A build nobody has started is not a build (issue #147)
+
+**Context.** Nothing in the pipeline had ever executed a produced binary. Everything the release
+workflow checked, a compiler had already checked. The failures that actually reach a user are the
+other kind: Blazor's client script not surviving a self-contained publish, a missing native
+dependency, ICU absent so a named timezone throws, an arm64 build that is quietly x64, or a binary
+reporting a version nobody built.
+
+**Decision — the publish matrix extends over runner as well as RID.** `linux-x64` on `ubuntu-latest`,
+`linux-arm64` on `ubuntu-24.04-arm`, `win-x64` on `windows-latest`, all free for a public repository.
+The publishes become native as a side effect, which is welcome but not the point; the point is that a
+binary can now be *started* on the platform it names. Cross-compiling for arm64 and never running it
+on arm64 was the specific hole.
+
+**Decision — the smoke test starts from the zip, not from the publish directory.** What a user
+downloads is the archive. Unpacking it and running what comes out proves the archive is complete, and
+on Linux that the executable bit survived — a zip that unpacks to a non-executable binary is a
+download that answers "Permission denied", and nothing else in the pipeline would notice.
+
+**Decision — one Python script, not a shell script per runner.** The four assertions are a contract,
+and two implementations of a contract drift. Only archiving is split per platform, because there the
+platforms genuinely differ: `zip` records Unix permission bits and `Compress-Archive` is what always
+exists on Windows.
+
+**Decision — the version assertion is equality with the number this run built.** The issue asked for
+"not `0.0.0-dev`", which was the right test when a placeholder existed. Since #145 the version is
+known before the build starts, and a dispatch legitimately produces `1.0.5-dev` — so "not -dev" would
+fail every dry run while still passing a build stamped with the wrong number. Equality is both
+correct in each mode and strictly stronger, and it is asserted in the two places the version appears,
+the startup log line and `/api/v1/health`, because different mechanisms stamp them.
+
+**Consequences.**
+
+- The controller is pointed at `127.0.0.1:1` for both inverter and charger. Refused immediately
+  rather than routed and dropped, so the unreachable-hardware path is exercised in milliseconds.
+  Surviving that is the first assertion: a controller that dies when its inverter is absent is broken
+  in a way worth failing a release for.
+- `Controller__TimeZone` is set to a named IANA zone rather than left empty. It is the cheapest
+  exercise of the ICU data a self-contained build has to carry, and it is one of the failure modes
+  the issue names.
+- The smoke test blanks `Solcast__ApiKey` and `Weather__ApiKey` rather than assuming they are unset.
+  CI has no `.env`, but a developer running the script locally has one somewhere above them, and
+  Solcast's daily quota is small enough that spending a call on a smoke test is a real cost.
+- The cheap file-existence check on `blazor.web.js` added in #146 is **removed**, being strictly
+  weaker than asking a running binary for the file. That is not a theoretical difference: deleting
+  the file and re-running produced a **200 with an empty body**, not a 404, because the static asset
+  manifest still lists it. The HTTP check therefore also asserts a non-zero length, which is the only
+  thing that catches that case — and an empty 200 is exactly the dead page the
+  `RequiresAspNetWebAssets` comment in `Gleanvolt.Worker.csproj` warns about.
+- The API is switched on for the test, because `/health` lives on it, which means a key must be
+  configured: enabled with no key is a deliberate startup failure.
+
+---
+
 ## 2026-09-03 — One job per runtime identifier, so a broken target names itself (issue #146)
 
 **Context.** All three self-contained publishes ran in one `for rid in ...` loop inside a single job.

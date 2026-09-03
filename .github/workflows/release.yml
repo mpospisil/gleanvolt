@@ -12,8 +12,8 @@ name: Release
 #
 #   version   which number is this, decided once so no later job can compute a second one
 #   build     does the solution build, test and pack
-#   publish   does each runtime identifier produce a runnable zip -- one job per RID, so a broken
-#             target names itself in the checks list instead of hiding in a loop's log
+#   publish   does each runtime identifier produce a zip that actually runs -- one job per RID, on
+#             the platform it names, so a broken target names itself and is started before it ships
 #   release   only from here does anything permanent exist: the tag, then the release
 #
 # There is deliberately no package feed. The libraries are packed -- it is a cheap check that the
@@ -183,16 +183,28 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
-  # One job per runtime identifier. The three targets someone would actually run this on: a Windows
-  # PC or NAS, a Raspberry Pi, and an x64 Linux box. Self-contained so none of them needs a .NET
-  # install.
+  # One job per runtime identifier, on the platform that identifier names. The three targets someone
+  # would actually run this on: a Windows PC or NAS, a Raspberry Pi, and an x64 Linux box.
+  # Self-contained so none of them needs a .NET install.
   #
   # A job each rather than a loop, so that "linux-arm64 broke" is legible in the checks list instead
   # of being a line in the log of something called "Release". They are independent, so they also stop
   # being serial.
+  #
+  # And a job each on its own runner, so that each build is *started* before it is published. The
+  # failures that matter here are the ones a compile cannot see -- a missing native dependency, ICU
+  # absent, an arm64 build that is quietly x64, Blazor's client script not surviving the publish --
+  # and every one of them is invisible until something runs the binary on the target.
   publish:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+
+    # bash on all three, Git Bash on the Windows runner. One shell means the steps below read the
+    # same everywhere; where a platform genuinely differs -- archiving, which has to preserve a Unix
+    # executable bit on Linux and cannot on Windows -- it gets its own step and says why.
+    defaults:
+      run:
+        shell: bash
 
     strategy:
       # Explicit, and false rather than the default. The guarantee that matters -- no release with
@@ -203,9 +215,20 @@ jobs:
       # reason.
       fail-fast: false
       matrix:
-        # Cross-compiled here, all three on Linux. #147 extends this matrix with a runner per RID so
-        # that each binary is also *started* on the platform it names.
-        rid: [win-x64, linux-x64, linux-arm64]
+        # Each RID on the platform it names. Cross-compiling for arm64 and never running it on arm64
+        # is the specific hole this closes: every runner here is free for a public repository, so
+        # the only thing the old single-runner loop was buying was the inability to start what it
+        # built.
+        include:
+          - rid: linux-x64
+            runner: ubuntu-latest
+            exe: Gleanvolt.Worker
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+            exe: Gleanvolt.Worker
+          - rid: win-x64
+            runner: windows-latest
+            exe: Gleanvolt.Worker.exe
 
     steps:
       - name: Checkout
@@ -216,10 +239,21 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # For the smoke test below, which is one Python script rather than a shell script per runner:
+      # the four things it asserts are a contract, and two implementations of a contract drift.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       # Not --no-build: each runtime identifier is a different build, and the solution build in the
       # job above was portable and on another runner besides. Trimming is off on purpose -- the
       # configuration binder and the options types are resolved reflectively, and a trimmed build
       # fails at startup rather than at compile time.
+      #
+      # Native rather than cross-compiled now that each leg is on its own runner. That is not the
+      # point of the change -- the point is that the result can be started -- but it does mean an
+      # arm64 binary is produced by an arm64 toolchain rather than asserted to be arm64.
       - name: Publish ${{ matrix.rid }}
         run: |
           dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj \
@@ -237,20 +271,15 @@ jobs:
       - name: Carry the licence files into the zip
         run: cp LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md README.md publish/${{ matrix.rid }}/
 
-      # Blazor's client script is copied into the publish output by RequiresAspNetWebAssets in
-      # Gleanvolt.Worker.csproj, and a cross-RID self-contained publish is exactly where that
-      # inference has been known to fall over. A zip without it serves pages that render once and
-      # then sit dead, which nobody discovers until they open one. #147 proves this properly, by
-      # asking a started binary for the file over HTTP; this is the cheap half.
-      - name: Check the Blazor client script survived the publish
-        run: |
-          set -euo pipefail
-          if [ ! -f "publish/${{ matrix.rid }}/wwwroot/_framework/blazor.web.js" ]; then
-            echo "${{ matrix.rid }} published without wwwroot/_framework/blazor.web.js; the web UI would never open a circuit." >&2
-            exit 1
-          fi
-
-      - name: Zip it
+      # Two steps for one job, because this is the one place the platforms genuinely differ. `zip`
+      # records the Unix permission bits, and the executable bit on Gleanvolt.Worker is the
+      # difference between a download that runs and one that answers "Permission denied" -- so the
+      # Linux legs must use it. Windows has no such bit and no `zip`, and Compress-Archive is the
+      # thing that is always present there.
+      #
+      # Both produce the same name, and the release job checks for exactly that name.
+      - name: Zip it (Linux)
+        if: runner.os == 'Linux'
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
@@ -260,6 +289,56 @@ jobs:
           # RID, rather than unpacking its contents over whatever the user is standing in.
           (cd publish && zip -qr "../artifacts/gleanvolt-${VERSION}-${{ matrix.rid }}.zip" "${{ matrix.rid }}")
           ls -l artifacts
+
+      - name: Zip it (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          # -Path publish/<rid> rather than publish/<rid>/* so the archive keeps the one top-level
+          # directory the Linux legs produce.
+          Compress-Archive -Path "publish/${{ matrix.rid }}" `
+            -DestinationPath "artifacts/gleanvolt-$env:VERSION-${{ matrix.rid }}.zip"
+          Get-ChildItem artifacts
+
+      # From the zip rather than from publish/, deliberately. What a user downloads is the archive,
+      # so the archive is what gets started: this proves it is complete, and on Linux that the
+      # executable bit survived the round trip.
+      - name: Unpack the zip (Linux)
+        if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          unzip -q "artifacts/gleanvolt-${VERSION}-${{ matrix.rid }}.zip" -d unpacked
+
+          # Stated rather than left to be inferred. Without the executable bit the smoke test below
+          # fails with "Permission denied", which reads as a broken test rather than as a zip that
+          # nobody can run -- and that is precisely how a user would meet it.
+          if [ ! -x "unpacked/${{ matrix.rid }}/${{ matrix.exe }}" ]; then
+            echo "${{ matrix.exe }} is not executable after unzipping; the archive lost its permission bits." >&2
+            exit 1
+          fi
+
+      - name: Unpack the zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: Expand-Archive -Path "artifacts/gleanvolt-$env:VERSION-${{ matrix.rid }}.zip" -DestinationPath unpacked
+
+      # The first time anything in this pipeline has executed a produced binary. Starts it with the
+      # inverter and charger pointed at nothing, then asserts it is alive, that /api/v1/health
+      # answers, that /_framework/blazor.web.js is served non-empty, and that the version running is
+      # the version this run built. See the script for what each of those is guarding against.
+      - name: Smoke-test the ${{ matrix.rid }} build
+        run: |
+          python .github/scripts/smoke-test.py \
+            --exe "unpacked/${{ matrix.rid }}/${{ matrix.exe }}" \
+            --version "${{ needs.version.outputs.version }}"
 
       - name: Upload the ${{ matrix.rid }} zip
         uses: actions/upload-artifact@v4
