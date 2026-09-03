@@ -21,10 +21,15 @@ ARG DOTNET_VERSION=10.0
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 ARG TARGETARCH
 
-# What the built worker will report at startup and to Home Assistant. Defaults match
-# Directory.Build.props, so a plain `docker build` is honestly labelled as a local build; CI passes
-# the release version and the commit. See src/Gleanvolt.Hosting/BuildInfo.cs.
-ARG VERSION=0.0.0-dev
+# What the built worker will report at startup and to Home Assistant. CI passes the release version
+# and the commit; a plain `docker build` takes the default and is honestly labelled a local build.
+# See src/Gleanvolt.Hosting/BuildInfo.cs.
+#
+# The default mirrors Directory.Build.props by hand, because .dockerignore keeps that file out of the
+# build context on purpose and this stage therefore cannot read the product line from it. A mirror
+# can drift, so DockerfileTests asserts this literal against <MajorMinorVersion> -- bumping the minor
+# there without changing it here fails the test rather than shipping an image that misreports itself.
+ARG VERSION=1.0.0-dev
 ARG SOURCE_REVISION=
 
 WORKDIR /source

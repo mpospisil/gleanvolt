@@ -1327,7 +1327,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 The device also carries the running build as its **software version** (`1.0.0 (31bf347)`), shown on
 HA's device page. That is device metadata rather than an entity, so it creates no row on any
 dashboard and needs no automation. The same string is the first line of the worker's log at startup;
-`0.0.0-dev` with no commit means a local build rather than anything CI published.
+a version ending in `-dev` — `1.0.0-dev` — with no commit means a local build rather than anything
+CI published.
 
 #### What each entity means
 

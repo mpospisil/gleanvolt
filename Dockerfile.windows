@@ -20,9 +20,10 @@ ARG WINDOWS_VERSION=ltsc2022
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
 
-# As in the Linux Dockerfile: defaults match Directory.Build.props so a plain build is labelled a
-# local one, and CI passes the release version and commit. See src/Gleanvolt.Hosting/BuildInfo.cs.
-ARG VERSION=0.0.0-dev
+# As in the Linux Dockerfile: CI passes the release version and commit, and the default -- a hand-kept
+# mirror of <MajorMinorVersion> in Directory.Build.props, guarded by DockerfileTests -- labels a plain
+# build as a local one. See src/Gleanvolt.Hosting/BuildInfo.cs.
+ARG VERSION=1.0.0-dev
 ARG SOURCE_REVISION=
 
 WORKDIR C:\source

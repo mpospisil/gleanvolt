@@ -4,6 +4,62 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-02 — The product line is in the repository, the build number is not (issue #145)
+
+**Context.** The 2026-08-10 record below made the git tag the single source of truth and kept a
+`0.0.0-dev` placeholder in `Directory.Build.props`, reasoning that storing a real version "adds a
+commit per release whose only job is to agree with a tag". That reasoning holds for the *whole*
+version and fails for half of it. A tag name is typed by a human, so the number that reaches the
+packages, the image and the release is whatever that human typed — the placeholder guaranteed the
+parts agreed with each other, but nothing guaranteed any of them was the number intended. And `v*` as
+a trigger meant the only way to find out was to create something permanent.
+
+**Decision — the version is split by who decides it.** The major and minor are an editorial claim
+about the product, so they live in `Directory.Build.props` as `<MajorMinorVersion>`, in a commit,
+reviewable. The build number is bookkeeping, so nobody types it: `release.yml` reads the tags already
+on that line and takes the lowest number not yet claimed. The old objection is answered rather than
+overridden — there is still no bump commit, because the half that would need one is the half a
+machine now supplies.
+
+**Decision — the tag is an output, not a trigger.** `release.yml` is `workflow_dispatch` only. It
+builds first and tags afterwards, with the number it just used, so a tag cannot name a build that
+does not exist. `push: tags: ['v*']` is gone: it was a second entrance that derived a version from a
+name, which is exactly what this removes. The `release` input separates the two things a dispatch can
+mean — off, it proves the build and creates nothing; on, it tags and publishes.
+
+**Decision — `VersionPrefix`, never `Version`.** The SDK derives `AssemblyVersion` and `FileVersion`
+from the prefix and composes `Version` as prefix + suffix. Setting `Version` outright leaves the
+other two reading the SDK's own `1.0.0` default, so a package called `1.0.7` would contain an
+assembly stamped `1.0.0` — agreement broken in the one place nobody looks.
+
+**Consequences.**
+
+- A build with no `-p:BuildNumber` is stamped `-dev` and is self-evidently local: `1.0.0-dev`. The
+  suffix is set *before* `BuildNumber` is defaulted, so it reads the caller's value rather than the
+  fallback. That single condition is the whole local-versus-CI distinction.
+- A dispatch that will not tag still builds the exact number it would have used, stamped `-dev`:
+  `1.0.5-dev` proves the build-number path without producing a filename that claims a release.
+- Two release runs at once would read the same tag list, so the job is serialised by a `concurrency`
+  group. The tag push is the backstop: it is rejected if the tag exists.
+- `.dockerignore` keeps `Directory.Build.props` out of the image build context, so both Dockerfiles
+  mirror the product line as an `ARG VERSION` literal. A mirror drifts, and this one would drift
+  silently — a locally built image reporting the previous line at startup is not a build error.
+  `DockerfileTests` asserts the literal against the props, the same guard already used for the
+  hand-written `COPY` list.
+- `publish-image.yml` off a tag now reports `<line>.0-dev` rather than `0.0.0-dev`, which is the same
+  string a developer's own build produces.
+- **A tag pushed with `GITHUB_TOKEN` starts no other workflow.** So `release.yml` tagging does not
+  wake `publish-image.yml` on its own. Setting a `RELEASE_TAG_TOKEN` PAT makes it automatic; without
+  one the release still completes and the run summary says the image needs a dispatch, rather than
+  leaving the gap to be discovered by its absence.
+
+Supersedes the placeholder half of
+[2026-08-10](#2026-08-10--the-git-tag-is-the-version-the-build-carries-it-and-says-so). The other
+half of that record stands unchanged: the commit still travels with the version, and one invocation
+still makes every artifact.
+
+---
+
 ## 2026-09-02 — Two feeds run together, the week is counted, and the handover is a setting (issue #141)
 
 Phase 3 of #137, and the only phase whose deliverable is a measurement. The MQTT source and
@@ -1830,6 +1886,11 @@ because root is no longer on an SD card.
 **Context.** Nothing running could say what it was. The image tag knew, but the process did not, so a
 log file or a `docker logs` dump was untraceable to a build — and with three platforms now behind one
 manifest list, "which one is on the Pi" had become a fair question with no answer from inside.
+
+> **Partly superseded on 2026-09-02** by
+> [the record above](#2026-09-02--the-product-line-is-in-the-repository-the-build-number-is-not-issue-145):
+> the placeholder is gone and the repository now holds the major and minor, because a tag name is
+> still typed by a human. The version-and-commit half of this record is unchanged.
 
 **Decision — one source of truth, and it is the git tag.** `Directory.Build.props` carries
 `0.0.0-dev`, a deliberate placeholder. CI passes `-p:Version=<tag without the leading v>` when

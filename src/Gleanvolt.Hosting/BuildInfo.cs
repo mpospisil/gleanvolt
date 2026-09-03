@@ -13,8 +13,8 @@ namespace Gleanvolt.Hosting;
 public static class BuildInfo
 {
     /// <summary>
-    /// The full informational version, e.g. <c>1.0.0+31bf347…</c> on a release build or
-    /// <c>0.0.0-dev</c> locally. Never null — an assembly with no attribute reports "unknown".
+    /// The full informational version, e.g. <c>1.0.7+31bf347…</c> on a release build or
+    /// <c>1.0.0-dev</c> locally. Never null — an assembly with no attribute reports "unknown".
     /// </summary>
     public static string InformationalVersion { get; } =
         typeof(BuildInfo).Assembly

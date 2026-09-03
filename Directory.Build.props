@@ -2,12 +2,34 @@
 
   <PropertyGroup>
     <!--
-      A placeholder, deliberately. The git tag is the source of truth for a release version: CI
-      passes -p:Version=<tag without the leading v> when building from a v* tag, and the resulting
-      number is what the image is tagged with too, so the two can never drift. A local or
-      branch build keeps this value and is therefore self-evidently not a release.
+      The half of the version a human decides: the product line. Bumping the minor is an editorial
+      act — it says this release is different in kind from the last one — so it belongs in the
+      repository, in a commit, reviewable. Nothing else in the tree may hardcode it; anything that
+      needs it reads it from here (see DockerfileTests for the one place that must mirror it).
     -->
-    <Version>0.0.0-dev</Version>
+    <MajorMinorVersion>1.0</MajorMinorVersion>
+
+    <!--
+      The half a machine decides. release.yml takes the next build number not yet claimed by a
+      v$(MajorMinorVersion).* tag and passes -p:BuildNumber=<n>, then tags the commit with the number
+      it just built. Nobody types a version, and the tag, the packages and the image carry one number
+      because they are all made from this one invocation.
+
+      The suffix is set BEFORE the default below, and reads the caller's value rather than the
+      defaulted one: a build with no build number is a local build, and it says so. That is the
+      whole mechanism — `1.0.0-dev` is not a release and cannot be mistaken for one, while
+      `1.0.0` from CI is the first release of the 1.0 line.
+    -->
+    <VersionSuffix Condition="'$(BuildNumber)' == ''">dev</VersionSuffix>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+
+    <!--
+      VersionPrefix rather than Version, deliberately. The SDK derives AssemblyVersion and
+      FileVersion from the prefix and composes Version as prefix + suffix; setting Version outright
+      would leave those two reading the SDK's own 1.0.0 default and silently disagreeing with the
+      number in the package name.
+    -->
+    <VersionPrefix>$(MajorMinorVersion).$(BuildNumber)</VersionPrefix>
 
     <!--
       Set by CI to the commit being built. The SDK appends it to AssemblyInformationalVersion as

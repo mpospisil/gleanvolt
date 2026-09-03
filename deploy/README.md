@@ -840,8 +840,8 @@ ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose logs gleanvolt-contr
 
 The worker logs its version and the commit it was built from — `Gleanvolt 1.0.0
 (31bf347) starting.` — so you can confirm the new build is live rather than trusting that the pull
-did something. Home Assistant shows the same string as the device's software version. `0.0.0-dev`
-with no commit means somebody deployed a local build.
+did something. Home Assistant shows the same string as the device's software version. A version
+ending in `-dev` with no commit means somebody deployed a local build.
 
 ### Pinning a version, and rolling back
 
@@ -1017,7 +1017,8 @@ docker compose logs gleanvolt-controller | grep "starting\."
 That last line is worth knowing before debugging anything. The worker logs its own version and
 commit at startup (`Gleanvolt 1.0.0 (31bf347) starting.`), so a log file is traceable to
 a build without matching it against image digests. Home Assistant shows the same string as the
-device's software version. `0.0.0-dev` with no commit means somebody deployed a local build.
+device's software version. A version ending in `-dev` with no commit means somebody deployed a
+local build.
 
 See [Updating a running deployment](#updating-a-running-deployment) for upgrades, rollbacks and
 pinning.
