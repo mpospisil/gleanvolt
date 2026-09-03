@@ -44,6 +44,12 @@ If your change touches a write path:
 - Do not widen what a `ReadOnlyModbusClient` protects. The dry-run guarantee is structural — a client
   that may not write physically cannot — and it should stay that way.
 
+## Cutting a release
+
+Not something a pull request does, and not something a tag does either: `release.yml` is dispatched,
+and it writes the tag itself once everything it built has been started and passed. See
+[`docs/RELEASING.md`](docs/RELEASING.md) before reaching for `git tag`.
+
 ## Reporting a problem instead
 
 An issue with the controller's log around the event, the device model and its firmware version, and
