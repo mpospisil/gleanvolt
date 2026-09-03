@@ -4,6 +4,54 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-03 — A download you can check, and an -rc that cannot take `latest` (issue #148)
+
+**Context.** Two defects in what the release step published, both cheap. Someone downloads a ~100 MB
+zip from a web page and runs it with the privileges of whatever it controls, and there was nothing to
+check it against. And `gh release create` infers nothing from a tag, so a `v0.1.0-rc1` would have
+published as a full release and taken `latest` — which is what `docker pull …:latest` and every "get
+the newest one" instinct then follow.
+
+**Decision — `SHA256SUMS` over the final artifact set.** Generated in the release job after the
+artifacts are collected and checked, written outside `artifacts/` and moved in, because a checksum
+file that lists itself is a checksum file that can never verify. It lists bare filenames rather than
+paths so that `sha256sum -c` works in whatever directory the download landed in, and the notes give
+the line with `--ignore-missing`, because a user has taken one file and not all thirteen.
+
+**Decision — `--prerelease` derived from a hyphen in the version.** SemVer's prerelease marker, and
+the build numbers this workflow derives never contain one — so this is a guard on the product line
+rather than a routine path. It is worth having precisely because the day it matters is the day nobody
+is looking.
+
+**Decision — build provenance attestation, which the issue left open.** Taken.
+`actions/attest-build-provenance` over each zip and `.nupkg`, costing `id-token: write` and
+`attestations: write` on the release job alone, and free for a public repository.
+
+The reasoning is that checksums and attestation answer different questions. `SHA256SUMS` proves a
+download matches what the release page claims; it says nothing about whether the release page is
+telling the truth, and it is served by the same host as the thing it vouches for. An attestation is
+signed by GitHub against the workflow run and the commit, and `gh attestation verify` checks it
+without trusting the page at all. That is the same argument `SourceRevisionId` already makes for the
+assembly — a version number is shared by every build that carries it, and the commit is what makes
+one build identifiable — carried out to the file someone actually downloads. For a binary that
+controls mains electrical hardware, that is worth four lines of YAML.
+
+Not over `SHA256SUMS` itself: an attestation there would add nothing the attestations over the
+artifacts do not already say.
+
+**Consequences.**
+
+- The release job now holds three permissions rather than one. Still only that job; the jobs that
+  merely build a binary continue to run under `contents: read`.
+- The notes gained a "Verify your download" section carrying both commands, including the Windows
+  one, since `win-x64` exists for people who have never heard of .NET and will not have
+  `sha256sum`. It also says that PowerShell prints the hash in upper case and the file lists it in
+  lower, which is the first thing that would otherwise look wrong.
+- `SHA256SUMS` covers the `.snupkg` symbol packages too. They are attached, so they are checksummed;
+  only the attestation is narrowed to the things people consume.
+
+---
+
 ## 2026-09-03 — A build nobody has started is not a build (issue #147)
 
 **Context.** Nothing in the pipeline had ever executed a produced binary. Everything the release

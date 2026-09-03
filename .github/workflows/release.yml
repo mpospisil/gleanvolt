@@ -357,6 +357,10 @@ jobs:
 
     permissions:
       contents: write
+      # Both for actions/attest-build-provenance below: the OIDC token is what GitHub signs the
+      # attestation with, and the attestation itself is written to this repository's store.
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
@@ -405,6 +409,40 @@ jobs:
             exit 1
           fi
 
+      # Someone downloads a ~100 MB zip from a web page and runs it with the privileges of whatever
+      # it controls. Until now there was nothing to check it against.
+      #
+      # Generated over everything that is about to be attached, and listing bare filenames rather
+      # than paths, so that `sha256sum -c` works in whatever directory the download landed in. The
+      # file is written outside artifacts/ and moved in, because a checksum file that lists itself is
+      # a checksum file that can never verify.
+      - name: Checksum the artifacts
+        run: |
+          set -euo pipefail
+          (cd artifacts && sha256sum *) > SHA256SUMS
+          mv SHA256SUMS artifacts/
+          cat artifacts/SHA256SUMS
+
+      # What the checksums cannot say. SHA256SUMS proves a download matches what the release page
+      # claims; it says nothing about whether the release page is telling the truth. An attestation
+      # is signed by GitHub against the workflow run and the commit, and is verifiable without
+      # trusting the page at all:
+      #
+      #   gh attestation verify gleanvolt-<version>-linux-arm64.zip --repo <owner>/<repo>
+      #
+      # This is the same argument SourceRevisionId already makes for the assembly -- a version number
+      # is shared by every build that carries it, and the commit is what makes one build identifiable
+      # -- carried out to the file someone actually downloads. Free for a public repository.
+      #
+      # Not the checksum file: an attestation over SHA256SUMS would add nothing that the attestations
+      # over the artifacts themselves do not already say.
+      - name: Attest what produced these artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            artifacts/*.zip
+            artifacts/*.nupkg
+
       # The tag names the commit that produced these exact files, and it is pushed before the release
       # is created so that a failure below leaves a tag with no release rather than a release with no
       # tag.
@@ -432,6 +470,17 @@ jobs:
           # the starting point of the notes. Empty on the first release of the first line.
           previous=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
 
+          # gh infers nothing from the tag: without this a v0.1.0-rc1 would publish as a full release
+          # and take `latest`, which is what `docker pull ...:latest` and every "get the newest one"
+          # instinct then follows. A hyphen is SemVer's prerelease marker, and the build numbers this
+          # workflow derives never contain one -- so this is a guard on the product line rather than a
+          # routine path, and it is here because the day it matters is the day nobody is looking.
+          prerelease=()
+          case "$VERSION" in
+            *-*) prerelease=(--prerelease)
+                 echo "$VERSION carries a prerelease marker; publishing as a prerelease." ;;
+          esac
+
           {
             echo "## Install"
             echo
@@ -445,6 +494,32 @@ jobs:
             echo
             echo "The \`.nupkg\` files are the libraries, for building on the controller directly."
             echo "They are attached here rather than pushed to a feed."
+            echo
+            echo "## Verify your download"
+            echo
+            echo "\`SHA256SUMS\` covers every file here. From the directory you downloaded into:"
+            echo
+            echo '```'
+            echo "sha256sum -c --ignore-missing SHA256SUMS"
+            echo '```'
+            echo
+            echo "\`--ignore-missing\` because you have probably taken one file rather than all of them."
+            echo "On Windows, without installing anything:"
+            echo
+            echo '```'
+            echo "Get-FileHash gleanvolt-${VERSION}-win-x64.zip -Algorithm SHA256"
+            echo '```'
+            echo
+            echo "and compare it with the line in \`SHA256SUMS\`. PowerShell prints the hash in upper case;"
+            echo "the file lists it in lower case, and they are the same hash."
+            echo
+            echo "Each zip and \`.nupkg\` also carries a build provenance attestation, which says"
+            echo "*which workflow run and which commit produced it* rather than only that the bytes are"
+            echo "unchanged. That needs no trust in this page:"
+            echo
+            echo '```'
+            echo "gh attestation verify gleanvolt-${VERSION}-linux-arm64.zip --repo ${GITHUB_REPOSITORY}"
+            echo '```'
             echo
             echo "## Changes"
             echo
@@ -461,6 +536,7 @@ jobs:
           gh release create "$TAG" \
             --title "Gleanvolt ${VERSION}" \
             --notes-file notes.md \
+            "${prerelease[@]}" \
             artifacts/*
 
       # Publishing the image. publish-image.yml triggers on a v* tag, but GitHub does not start a
