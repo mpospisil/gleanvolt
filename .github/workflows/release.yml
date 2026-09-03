@@ -461,7 +461,12 @@ jobs:
 
       - name: Create the GitHub Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          # The same token that pushed the tag, for the same reason. A release created with
+          # GITHUB_TOKEN raises no `release` event that any workflow can see, so publish-winget.yml
+          # would never start -- the identical loop prevention that keeps a GITHUB_TOKEN tag from
+          # waking publish-image.yml. Falls back to GITHUB_TOKEN, where the release is still created
+          # correctly and only the downstream automation stays silent.
+          GH_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN || github.token }}
           TAG: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
