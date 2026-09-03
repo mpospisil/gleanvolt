@@ -1,28 +1,44 @@
 name: Release
 
-# Turns a v* tag into a GitHub Release carrying everything a user might want that is not a container
-# image: ready-to-run binaries for people who do not use Docker, and the library packages.
+# Turns a dispatch into a GitHub Release carrying everything a user might want that is not a
+# container image: ready-to-run binaries for people who do not use Docker, and the library packages.
+#
+# The version is not typed by anyone. Directory.Build.props holds the product line -- the major and
+# minor -- and this workflow supplies the build number: the lowest one not already claimed by a tag
+# on that line. It then tags the commit it just built with the number it just used, so the tag, the
+# packages and the zips are one number because one invocation made all of them.
 #
 # There is deliberately no package feed. The libraries are packed -- it is a cheap check that the
 # package metadata is coherent, and it produces the artifact if a feed is ever wanted -- but they are
 # attached to the release rather than pushed anywhere. A private consumer takes this repository as a
 # git submodule and references the projects directly, which needs no feed and no credentials.
 #
-# The image is published separately by publish-image.yml, from the same tag.
+# The image is published separately by publish-image.yml, from the same tag. See "Publishing the
+# image" at the bottom of this file: a tag pushed by GITHUB_TOKEN does not start another workflow.
 #
 # Self-contained means "no .NET installed on the target": the runtime ships inside. That is what makes
 # the win-x64 build usable by someone who has never heard of .NET, which the container images cannot
 # serve.
 
 on:
-  push:
-    tags: ['v*']
-  # For proving a change to this workflow without cutting a release: it builds, tests, packs and
-  # uploads the artifacts, and creates no release.
+  # Dispatch only. There is no `push: tags` trigger any more: the tag is an *output* of this
+  # workflow, not its input, so a trigger on tags would be a second way in that computes a version
+  # from a name someone typed -- exactly the drift the build number exists to remove.
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Tag the commit and publish a release. Off = prove the build and create nothing.'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+
+# Two runs at once would read the same tag list and pick the same build number. The second push of
+# the tag would fail -- correctly, but only after a full build. Serialise instead.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -32,36 +48,85 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Release notes are generated from the log since the previous tag, which needs the history
-          # and the tags -- actions/checkout fetches neither by default.
+          # The build number is read from the tags, and the release notes from the log since the
+          # previous one. actions/checkout fetches neither by default.
           fetch-depth: 0
+          # A tag pushed with GITHUB_TOKEN starts no other workflow -- GitHub's loop prevention --
+          # so publish-image.yml would never see this release. Set RELEASE_TAG_TOKEN to a PAT with
+          # `contents: write` and the image follows the tag on its own. Without it everything here
+          # still works and the summary says the image needs a dispatch.
+          token: ${{ secrets.RELEASE_TAG_TOKEN || github.token }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      # The git tag without its leading v on a release; the Directory.Build.props placeholder
-      # otherwise, so a dispatch build is self-evidently not a release. Same derivation as
-      # publish-image.yml, deliberately -- the package, the image and the tag are one number.
+      # The product line comes from the repository; the build number comes from the tags already on
+      # that line. A line with no tags starts at 0, so the first 1.0 release is v1.0.0.
+      #
+      # Read with sed rather than by evaluating MSBuild: this runs before any restore, and the one
+      # other place that mirrors this number is asserted by DockerfileTests rather than by a build.
       - name: Derive the version
         id: version
         run: |
           set -euo pipefail
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+          major_minor=$(sed -n 's:.*<MajorMinorVersion>\(.*\)</MajorMinorVersion>.*:\1:p' Directory.Build.props)
+          if [ -z "$major_minor" ]; then
+            echo "Directory.Build.props has no <MajorMinorVersion>; there is no product line to release." >&2
+            exit 1
+          fi
+
+          # A literal dot in the sed pattern, so v1.0.3 cannot be matched by a hypothetical v1x0.3.
+          escaped=${major_minor//./\\.}
+          highest=$(git tag --list "v${major_minor}.*" \
+            | sed -n "s/^v${escaped}\.\([0-9][0-9]*\)$/\1/p" \
+            | sort -n | tail -1)
+
+          if [ -z "$highest" ]; then
+            build=0
           else
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            build=$((highest + 1))
+          fi
+
+          {
+            echo "major_minor=$major_minor"
+            echo "build=$build"
+            echo "version=${major_minor}.${build}"
+            echo "tag=v${major_minor}.${build}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Product line $major_minor, next free build $build."
+
+      # A run that will not tag still builds the exact number it would have used, so the dispatch
+      # proves the whole path -- but stamps it `-dev`, because a version with no tag behind it is not
+      # a release and must not be mistaken for one in a log or a filename.
+      - name: Decide how this build is stamped
+        id: stamp
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.release }}" = "true" ]; then
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+            echo "version=${{ steps.version.outputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=-p:VersionSuffix=dev" >> "$GITHUB_OUTPUT"
+            echo "version=${{ steps.version.outputs.version }}-dev" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build
         run: |
           dotnet build Gleanvolt.slnx --configuration Release \
-            -p:Version=${{ steps.version.outputs.version }} \
-            -p:SourceRevisionId=${{ github.sha }}
+            -p:BuildNumber=${{ steps.version.outputs.build }} \
+            -p:SourceRevisionId=${{ github.sha }} \
+            ${{ steps.stamp.outputs.suffix }}
 
       # ci.yml is the gate for a branch, but a release is permanent in a way a branch build is not.
       # One more run before something gets a version number is cheap.
+      #
+      # No -p:BuildNumber here, deliberately: --no-build must not re-evaluate its way into a
+      # different output path, and the version does not appear in one. The assemblies under test are
+      # the ones the step above stamped.
       - name: Test
         run: dotnet test Gleanvolt.slnx --no-build --configuration Release
 
@@ -72,8 +137,9 @@ jobs:
           set -euo pipefail
           for project in Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
-              -p:Version=${{ steps.version.outputs.version }} \
+              -p:BuildNumber=${{ steps.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
+              ${{ steps.stamp.outputs.suffix }} \
               --output artifacts
           done
 
@@ -84,6 +150,8 @@ jobs:
       # portable. Trimming is off on purpose -- the configuration binder and the options types are
       # resolved reflectively, and a trimmed build fails at startup rather than at compile time.
       - name: Publish self-contained binaries
+        env:
+          VERSION: ${{ steps.stamp.outputs.version }}
         run: |
           set -euo pipefail
           for rid in win-x64 linux-x64 linux-arm64; do
@@ -92,8 +160,9 @@ jobs:
               --configuration Release \
               --runtime "$rid" \
               --self-contained true \
-              -p:Version=${{ steps.version.outputs.version }} \
+              -p:BuildNumber=${{ steps.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
+              ${{ steps.stamp.outputs.suffix }} \
               --output "$out"
 
             # The terms travel with this artifact too, exactly as they do with the images and the
@@ -101,7 +170,16 @@ jobs:
             # to the repository.
             cp LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md README.md "$out/"
 
-            (cd publish && zip -qr "../artifacts/gleanvolt-${{ steps.version.outputs.version }}-$rid.zip" "$rid")
+            # Blazor's client script is copied into the publish output by RequiresAspNetWebAssets in
+            # Gleanvolt.Worker.csproj, and a cross-RID self-contained publish is exactly where that
+            # inference has been known to fall over. A zip without it serves pages that render once
+            # and then sit dead, which nobody discovers until they open one.
+            if [ ! -f "$out/wwwroot/_framework/blazor.web.js" ]; then
+              echo "$rid published without wwwroot/_framework/blazor.web.js; the web UI would never open a circuit." >&2
+              exit 1
+            fi
+
+            (cd publish && zip -qr "../artifacts/gleanvolt-${VERSION}-$rid.zip" "$rid")
           done
           ls -l artifacts
 
@@ -111,15 +189,34 @@ jobs:
           name: release-artifacts
           path: artifacts/*
 
-      # Only from a tag. A workflow_dispatch run stops above, having proven everything except this.
-      - name: Create the GitHub Release
-        if: github.ref_type == 'tag'
+      # Everything above proved the build. Only now does anything permanent exist: the tag names the
+      # commit that produced these exact files, and it is pushed before the release is created so
+      # that a failure here leaves a tag with no release rather than a release with no tag.
+      - name: Tag the commit
+        if: inputs.release
         env:
-          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "Gleanvolt $VERSION"
+          # Rejected if the tag already exists, which is the safety net under the build number: two
+          # runs that somehow chose the same number cannot both publish it.
+          git push origin "refs/tags/$TAG"
+
+      - name: Create the GitHub Release
+        if: inputs.release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only tags on a version line, so `mit-final` and any other non-release tag cannot become
+          # the starting point of the notes. Empty on the first release of the first line.
+          previous=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
 
           {
             echo "## Install"
@@ -138,7 +235,7 @@ jobs:
             echo "## Changes"
             echo
             if [ -n "$previous" ]; then
-              git log --no-merges --pretty='- %s' "${previous}..${GITHUB_REF_NAME}"
+              git log --no-merges --pretty='- %s' "${previous}..${TAG}"
             else
               echo "First tagged release."
             fi
@@ -147,7 +244,35 @@ jobs:
             echo "License 1.0.0. Commercial use requires a separate licence — see LICENSE."
           } > notes.md
 
-          gh release create "${GITHUB_REF_NAME}" \
+          gh release create "$TAG" \
             --title "Gleanvolt ${VERSION}" \
             --notes-file notes.md \
             artifacts/*
+
+      # Publishing the image. publish-image.yml triggers on a v* tag, but GitHub does not start a
+      # workflow from a push made with GITHUB_TOKEN, so without RELEASE_TAG_TOKEN the tag above is
+      # silent. Say which happened, in the place someone reading the run will look.
+      - name: Say what still needs doing
+        if: inputs.release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          HAVE_PAT: ${{ secrets.RELEASE_TAG_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Released \`$TAG\`"
+            echo
+            if [ "$HAVE_PAT" = "true" ]; then
+              echo "The tag was pushed with \`RELEASE_TAG_TOKEN\`, so **publish-image.yml has started**"
+              echo "from it and the image will carry the same number."
+            else
+              echo "The tag was pushed with \`GITHUB_TOKEN\`, which starts no other workflow, so"
+              echo "**no image has been built**. Run \`publish-image.yml\` against \`$TAG\` to publish it:"
+              echo
+              echo '```'
+              echo "gh workflow run publish-image.yml --ref $TAG"
+              echo '```'
+              echo
+              echo "Setting a \`RELEASE_TAG_TOKEN\` secret (a PAT with \`contents: write\`) makes this automatic."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

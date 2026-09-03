@@ -50,8 +50,8 @@ host.UseGleanvolt();
 var log = host.Services.GetRequiredService<ILogger<Program>>();
 
 // First line in the log, before anything can go wrong: a log file or a `docker logs` dump is
-// otherwise untraceable to the build that produced it. "0.0.0-dev" with no commit means a local
-// build rather than anything CI published.
+// otherwise untraceable to the build that produced it. A "-dev" suffix with no commit means a
+// local build rather than anything CI published.
 log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
 
 // What this process thinks it is: which installation, and which boxes it will be talking to (issue
