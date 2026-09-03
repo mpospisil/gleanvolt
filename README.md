@@ -150,7 +150,9 @@ Gleanvolt.slnx
 
 ### The libraries as packages
 
-A release is a dispatch of [`release.yml`](.github/workflows/release.yml), which decides the build number itself, publishes self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files, and only then tags the commit and creates the [GitHub Release](https://github.com/mpospisil/gleanvolt/releases). One job per target, so a broken platform names itself. `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
+A release is a dispatch of [`release.yml`](.github/workflows/release.yml), which decides the build number itself, publishes self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files, and only then tags the commit and creates the [GitHub Release](https://github.com/mpospisil/gleanvolt/releases). One job per target, on the platform it names, so a broken platform names itself and every binary is started before it ships. `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
+
+Every release carries a `SHA256SUMS` file — `sha256sum -c --ignore-missing SHA256SUMS` in the directory you downloaded into — and each zip and `.nupkg` carries a build provenance attestation, so `gh attestation verify <file> --repo mpospisil/gleanvolt` says which workflow run and which commit produced it without taking the release page's word for anything.
 
 The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
 
