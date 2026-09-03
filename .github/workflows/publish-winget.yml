@@ -1,0 +1,67 @@
+name: Publish to WinGet
+
+# Submits the win-x64 zip to the Windows Package Manager community repository, so that
+# `winget install MartinPospisil.Gleanvolt` reaches the same artifact the releases page serves.
+#
+# This workflow only ever *updates* an existing package. winget-releaser's first step checks that at
+# least one version of the identifier already exists under microsoft/winget-pkgs and fails loudly if
+# it does not -- adding a package for the first time is a manual pull request that a Microsoft
+# reviewer merges. See packaging/winget/README.md, which carries the manifests to submit and the
+# steps to submit them.
+#
+# What actually happens: komac reads this repository's release, downloads the matching asset,
+# recomputes its hash, copies the previous version's manifest structure forward with the new URL and
+# version, and opens a pull request at microsoft/winget-pkgs from a fork. So the *shape* of the
+# package -- that it is a zip containing a portable exe, and which exe -- is decided once, by the
+# manual submission, and inherited by every release after it.
+
+on:
+  # Fires when a release is published -- but only because release.yml was changed alongside this file
+  # to create the release with RELEASE_TAG_TOKEN. A release created with GITHUB_TOKEN raises an event
+  # no workflow can see, the same loop prevention that governs the tag, and this trigger would sit
+  # there looking correct and never once fire. Without that secret, use the dispatch below.
+  release:
+    types: [released]
+
+  # For the first run after the manual submission is merged, and for retrying one that failed
+  # without cutting another release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release tag to submit, e.g. v1.0.0.'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  winget:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Submit the win-x64 build to WinGet
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: MartinPospisil.Gleanvolt
+
+          # Only the Windows zip. The default regex matches installer extensions -- exe, msi, msix,
+          # appx -- and this release carries none of those: it carries three zips and ten NuGet
+          # packages. Without this the action would find no assets at all, or, worse, find the Linux
+          # ones.
+          installers-regex: '-win-x64\.zip$'
+
+          # On a dispatch there is no release event to read the tag from, so the input supplies it.
+          release-tag: ${{ inputs.tag || github.event.release.tag_name }}
+
+          # Points a reader of the winget page at what actually changed.
+          release-notes-url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag || github.event.release.tag_name }}
+
+          # Every version stays listed, so `winget install --version` can still reach an older one.
+          max-versions-to-keep: '0'
+
+          # A classic PAT with `public_repo`, belonging to the account that holds the winget-pkgs
+          # fork. Not GITHUB_TOKEN: the pull request is opened against another organisation's
+          # repository, which this repository's token cannot do.
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: ${{ github.repository_owner }}
