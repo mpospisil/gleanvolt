@@ -150,7 +150,7 @@ Gleanvolt.slnx
 
 ### The libraries as packages
 
-Each `v*` tag produces a [GitHub Release](https://github.com/mpospisil/gleanvolt/releases) carrying self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files ([`release.yml`](.github/workflows/release.yml)). `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
+A release is a dispatch of [`release.yml`](.github/workflows/release.yml), which decides the build number itself, publishes self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files, and only then tags the commit and creates the [GitHub Release](https://github.com/mpospisil/gleanvolt/releases). One job per target, so a broken platform names itself. `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
 
 The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
 

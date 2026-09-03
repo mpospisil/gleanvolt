@@ -8,13 +8,21 @@ name: Release
 # on that line. It then tags the commit it just built with the number it just used, so the tag, the
 # packages and the zips are one number because one invocation made all of them.
 #
+# Four jobs, in the shape of the question each answers:
+#
+#   version   which number is this, decided once so no later job can compute a second one
+#   build     does the solution build, test and pack
+#   publish   does each runtime identifier produce a runnable zip -- one job per RID, so a broken
+#             target names itself in the checks list instead of hiding in a loop's log
+#   release   only from here does anything permanent exist: the tag, then the release
+#
 # There is deliberately no package feed. The libraries are packed -- it is a cheap check that the
 # package metadata is coherent, and it produces the artifact if a feed is ever wanted -- but they are
 # attached to the release rather than pushed anywhere. A private consumer takes this repository as a
 # git submodule and references the projects directly, which needs no feed and no credentials.
 #
 # The image is published separately by publish-image.yml, from the same tag. See "Publishing the
-# image" at the bottom of this file: a tag pushed by GITHUB_TOKEN does not start another workflow.
+# image" in the release job: a tag pushed by GITHUB_TOKEN does not start another workflow.
 #
 # Self-contained means "no .NET installed on the target": the runtime ships inside. That is what makes
 # the win-x64 build usable by someone who has never heard of .NET, which the container images cannot
@@ -31,42 +39,46 @@ on:
         type: boolean
         default: false
 
+# Read by default; only the release job writes, and it asks for that itself. Nothing that merely
+# builds a binary should hold a token that can push a tag.
 permissions:
-  contents: write
+  contents: read
 
 # Two runs at once would read the same tag list and pick the same build number. The second push of
-# the tag would fail -- correctly, but only after a full build. Serialise instead.
+# the tag would fail -- correctly, but only after three full publishes. Serialise instead.
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
+  # One source of truth for the number, in its own job so that every job below is handed the same
+  # answer rather than deriving its own. The publish matrix in particular must not recompute this:
+  # three legs each reading the tag list is three chances to disagree.
+  version:
     runs-on: ubuntu-latest
+
+    outputs:
+      # The build number alone, for -p:BuildNumber.
+      build: ${{ steps.version.outputs.build }}
+      # The version as it will be stamped and as it appears in filenames: 1.0.7 on a release,
+      # 1.0.7-dev on a run that will not tag.
+      version: ${{ steps.stamp.outputs.version }}
+      # The MSBuild argument that produces that -dev, or empty on a release.
+      suffix: ${{ steps.stamp.outputs.suffix }}
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # The build number is read from the tags, and the release notes from the log since the
-          # previous one. actions/checkout fetches neither by default.
+          # The build number is read from the tags, which actions/checkout does not fetch by default.
           fetch-depth: 0
-          # A tag pushed with GITHUB_TOKEN starts no other workflow -- GitHub's loop prevention --
-          # so publish-image.yml would never see this release. Set RELEASE_TAG_TOKEN to a PAT with
-          # `contents: write` and the image follows the tag on its own. Without it everything here
-          # still works and the summary says the image needs a dispatch.
-          token: ${{ secrets.RELEASE_TAG_TOKEN || github.token }}
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
 
       # The product line comes from the repository; the build number comes from the tags already on
       # that line. A line with no tags starts at 0, so the first 1.0 release is v1.0.0.
       #
-      # Read with sed rather than by evaluating MSBuild: this runs before any restore, and the one
-      # other place that mirrors this number is asserted by DockerfileTests rather than by a build.
+      # Read with sed rather than by evaluating MSBuild: this job installs no SDK, and the one other
+      # place that mirrors this number is asserted by DockerfileTests rather than by a build.
       - name: Derive the version
         id: version
         run: |
@@ -91,9 +103,7 @@ jobs:
           fi
 
           {
-            echo "major_minor=$major_minor"
             echo "build=$build"
-            echo "version=${major_minor}.${build}"
             echo "tag=v${major_minor}.${build}"
           } >> "$GITHUB_OUTPUT"
 
@@ -104,22 +114,44 @@ jobs:
       # a release and must not be mistaken for one in a log or a filename.
       - name: Decide how this build is stamped
         id: stamp
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
+          version=${TAG#v}
           if [ "${{ inputs.release }}" = "true" ]; then
             echo "suffix=" >> "$GITHUB_OUTPUT"
-            echo "version=${{ steps.version.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
           else
             echo "suffix=-p:VersionSuffix=dev" >> "$GITHUB_OUTPUT"
-            echo "version=${{ steps.version.outputs.version }}-dev" >> "$GITHUB_OUTPUT"
+            echo "version=${version}-dev" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Say which number this run is using
+        run: |
+          echo "### Version \`${{ steps.stamp.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # The solution, once. This is the gate the three publishes sit behind: a commit whose tests fail
+  # should not reach the point of producing binaries for anyone to download.
+  build:
+    needs: version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
 
       - name: Build
         run: |
           dotnet build Gleanvolt.slnx --configuration Release \
-            -p:BuildNumber=${{ steps.version.outputs.build }} \
+            -p:BuildNumber=${{ needs.version.outputs.build }} \
             -p:SourceRevisionId=${{ github.sha }} \
-            ${{ steps.stamp.outputs.suffix }}
+            ${{ needs.version.outputs.suffix }}
 
       # ci.yml is the gate for a branch, but a release is permanent in a way a branch build is not.
       # One more run before something gets a version number is cheap.
@@ -137,66 +169,170 @@ jobs:
           set -euo pipefail
           for project in Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
-              -p:BuildNumber=${{ steps.version.outputs.build }} \
+              -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
-              ${{ steps.stamp.outputs.suffix }} \
+              ${{ needs.version.outputs.suffix }} \
               --output artifacts
-          done
-
-      # The three targets someone would actually run this on: a Windows PC or NAS, a Raspberry Pi,
-      # and an x64 Linux box. Self-contained so none of them needs a .NET install.
-      #
-      # Not --no-build: each runtime identifier is a different build, and the solution build above was
-      # portable. Trimming is off on purpose -- the configuration binder and the options types are
-      # resolved reflectively, and a trimmed build fails at startup rather than at compile time.
-      - name: Publish self-contained binaries
-        env:
-          VERSION: ${{ steps.stamp.outputs.version }}
-        run: |
-          set -euo pipefail
-          for rid in win-x64 linux-x64 linux-arm64; do
-            out="publish/$rid"
-            dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj \
-              --configuration Release \
-              --runtime "$rid" \
-              --self-contained true \
-              -p:BuildNumber=${{ steps.version.outputs.build }} \
-              -p:SourceRevisionId=${{ github.sha }} \
-              ${{ steps.stamp.outputs.suffix }} \
-              --output "$out"
-
-            # The terms travel with this artifact too, exactly as they do with the images and the
-            # packages -- a zip someone downloads is the least likely of the three to be traced back
-            # to the repository.
-            cp LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md README.md "$out/"
-
-            # Blazor's client script is copied into the publish output by RequiresAspNetWebAssets in
-            # Gleanvolt.Worker.csproj, and a cross-RID self-contained publish is exactly where that
-            # inference has been known to fall over. A zip without it serves pages that render once
-            # and then sit dead, which nobody discovers until they open one.
-            if [ ! -f "$out/wwwroot/_framework/blazor.web.js" ]; then
-              echo "$rid published without wwwroot/_framework/blazor.web.js; the web UI would never open a circuit." >&2
-              exit 1
-            fi
-
-            (cd publish && zip -qr "../artifacts/gleanvolt-${VERSION}-$rid.zip" "$rid")
           done
           ls -l artifacts
 
-      - name: Upload the artifacts
+      - name: Upload the packages
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
+          name: release-packages
           path: artifacts/*
+          if-no-files-found: error
 
-      # Everything above proved the build. Only now does anything permanent exist: the tag names the
-      # commit that produced these exact files, and it is pushed before the release is created so
-      # that a failure here leaves a tag with no release rather than a release with no tag.
-      - name: Tag the commit
-        if: inputs.release
+  # One job per runtime identifier. The three targets someone would actually run this on: a Windows
+  # PC or NAS, a Raspberry Pi, and an x64 Linux box. Self-contained so none of them needs a .NET
+  # install.
+  #
+  # A job each rather than a loop, so that "linux-arm64 broke" is legible in the checks list instead
+  # of being a line in the log of something called "Release". They are independent, so they also stop
+  # being serial.
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Explicit, and false rather than the default. The guarantee that matters -- no release with
+      # two zips in it -- comes from the release job's `needs:` on this one, which a failed *or*
+      # cancelled leg breaks either way. Given that, cancelling the siblings only buys a few runner
+      # minutes and costs the answer to "is this one target or all three?", which is the question
+      # this job was split up to answer. publish-image.yml's platform matrix is false for the same
+      # reason.
+      fail-fast: false
+      matrix:
+        # Cross-compiled here, all three on Linux. #147 extends this matrix with a runner per RID so
+        # that each binary is also *started* on the platform it names.
+        rid: [win-x64, linux-x64, linux-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Not --no-build: each runtime identifier is a different build, and the solution build in the
+      # job above was portable and on another runner besides. Trimming is off on purpose -- the
+      # configuration binder and the options types are resolved reflectively, and a trimmed build
+      # fails at startup rather than at compile time.
+      - name: Publish ${{ matrix.rid }}
+        run: |
+          dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            -p:BuildNumber=${{ needs.version.outputs.build }} \
+            -p:SourceRevisionId=${{ github.sha }} \
+            ${{ needs.version.outputs.suffix }} \
+            --output publish/${{ matrix.rid }}
+
+      # The terms travel with this artifact too, exactly as they do with the images and the packages
+      # -- a zip someone downloads is the least likely of the three to be traced back to the
+      # repository.
+      - name: Carry the licence files into the zip
+        run: cp LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md README.md publish/${{ matrix.rid }}/
+
+      # Blazor's client script is copied into the publish output by RequiresAspNetWebAssets in
+      # Gleanvolt.Worker.csproj, and a cross-RID self-contained publish is exactly where that
+      # inference has been known to fall over. A zip without it serves pages that render once and
+      # then sit dead, which nobody discovers until they open one. #147 proves this properly, by
+      # asking a started binary for the file over HTTP; this is the cheap half.
+      - name: Check the Blazor client script survived the publish
+        run: |
+          set -euo pipefail
+          if [ ! -f "publish/${{ matrix.rid }}/wwwroot/_framework/blazor.web.js" ]; then
+            echo "${{ matrix.rid }} published without wwwroot/_framework/blazor.web.js; the web UI would never open a circuit." >&2
+            exit 1
+          fi
+
+      - name: Zip it
         env:
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          # Zipped from inside publish/ so the archive contains one top-level directory named for the
+          # RID, rather than unpacking its contents over whatever the user is standing in.
+          (cd publish && zip -qr "../artifacts/gleanvolt-${VERSION}-${{ matrix.rid }}.zip" "${{ matrix.rid }}")
+          ls -l artifacts
+
+      - name: Upload the ${{ matrix.rid }} zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zip-${{ matrix.rid }}
+          path: artifacts/*.zip
+          if-no-files-found: error
+
+  # Everything above proved the build. Only this job creates anything that cannot be taken back, and
+  # it needs every one of the jobs above: a half-finished publish matrix cannot reach here, so a
+  # release carrying two zips instead of three is not a state this workflow can produce.
+  release:
+    if: inputs.release
+    needs: [version, build, publish]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Release notes are generated from the log since the previous tag, which needs the history
+          # and the tags -- actions/checkout fetches neither by default.
+          fetch-depth: 0
+          # A tag pushed with GITHUB_TOKEN starts no other workflow -- GitHub's loop prevention --
+          # so publish-image.yml would never see this release. Set RELEASE_TAG_TOKEN to a PAT with
+          # `contents: write` and the image follows the tag on its own. Without it everything here
+          # still works and the summary says the image needs a dispatch.
+          token: ${{ secrets.RELEASE_TAG_TOKEN || github.token }}
+
+      # Every artifact the jobs above uploaded, flattened back into the single directory the release
+      # is created from. The pattern is deliberate rather than "download everything": it says what a
+      # release is made of, and a stray artifact added later does not silently become an asset.
+      - name: Collect the artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: release-*
+          merge-multiple: true
+
+      # The matrix cannot reach here half-finished, but it can be *edited* half-finished: a RID
+      # removed from the list above and left in the notes below would ship a release whose text
+      # promises a download that is not attached. Cheap to assert, and this is the last place anyone
+      # would look.
+      - name: Check every expected artifact arrived
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ls -l artifacts
+
+          for rid in win-x64 linux-x64 linux-arm64; do
+            if [ ! -f "artifacts/gleanvolt-${VERSION}-${rid}.zip" ]; then
+              echo "No zip for $rid; the publish matrix and this list disagree." >&2
+              exit 1
+            fi
+          done
+
+          packages=$(find artifacts -name '*.nupkg' | wc -l)
+          if [ "$packages" -ne 5 ]; then
+            echo "Expected 5 .nupkg files, found $packages." >&2
+            exit 1
+          fi
+
+      # The tag names the commit that produced these exact files, and it is pushed before the release
+      # is created so that a failure below leaves a tag with no release rather than a release with no
+      # tag.
+      - name: Tag the commit
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
@@ -207,11 +343,10 @@ jobs:
           git push origin "refs/tags/$TAG"
 
       - name: Create the GitHub Release
-        if: inputs.release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
           # Only tags on a version line, so `mit-final` and any other non-release tag cannot become
@@ -253,9 +388,8 @@ jobs:
       # workflow from a push made with GITHUB_TOKEN, so without RELEASE_TAG_TOKEN the tag above is
       # silent. Say which happened, in the place someone reading the run will look.
       - name: Say what still needs doing
-        if: inputs.release
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.version.outputs.tag }}
           HAVE_PAT: ${{ secrets.RELEASE_TAG_TOKEN != '' }}
         run: |
           set -euo pipefail

@@ -4,6 +4,48 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-03 — One job per runtime identifier, so a broken target names itself (issue #146)
+
+**Context.** All three self-contained publishes ran in one `for rid in ...` loop inside a single job.
+Three consequences, and the first is the one that matters: a `linux-arm64` failure read as "Release
+failed" in the checks list, and which target broke was a line in a log rather than a thing on the
+page. They were also serial when they are entirely independent, and all three built on the same
+runner — correct for a cross-publish, and the reason nothing could ever *start* a `win-x64` binary.
+
+**Decision — the workflow is four jobs, each answering one question.** `version` decides the number,
+`build` builds and tests and packs, `publish` is a matrix over the three RIDs, `release` tags and
+publishes. The split is by question rather than by convenience: reading the checks list should tell
+you what failed without opening anything.
+
+**Decision — `version` is its own job.** The publish matrix must not recompute the build number:
+three legs each reading the tag list is three chances to disagree, and the zips would be named
+differently from the packages. One job derives it, every other job is handed it. Same reasoning as
+the `version` job in `publish-image.yml`, and now the same shape.
+
+**Decision — `fail-fast: false`, stated rather than inherited.** The guarantee that matters — no
+release carrying two zips instead of three — comes entirely from the `release` job's `needs:` on the
+matrix, which a failed *or* cancelled leg breaks either way. Given that, cancelling the siblings buys
+a few runner minutes and costs the answer to "is this one target or all three?", which is the exact
+question splitting the job up was meant to answer. The issue suggested fail-fast contributed to the
+safety property; it does not, and `needs:` alone is load-bearing.
+
+**Consequences.**
+
+- Each leg uploads its own artifact (`release-zip-<rid>`), and the packages theirs
+  (`release-packages`). The `release` job collects them with `pattern: release-*` and
+  `merge-multiple: true` — a pattern rather than "everything", so an artifact added later does not
+  silently become a release asset.
+- A new step asserts the three zips and five `.nupkg` files are actually present before the tag is
+  pushed. The matrix cannot reach the release job half-finished, but it can be *edited*
+  half-finished: a RID dropped from the list and left in the release notes would promise a download
+  that is not attached.
+- `permissions` is now `contents: read` at the workflow level, with `contents: write` asked for by
+  the `release` job alone. Nothing that merely builds a binary holds a token that can push a tag.
+- The publish still cross-compiles all three RIDs on `ubuntu-latest`. #147 extends the matrix with a
+  runner per RID, which is what the matrix makes possible and the loop did not.
+
+---
+
 ## 2026-09-02 — The product line is in the repository, the build number is not (issue #145)
 
 **Context.** The 2026-08-10 record below made the git tag the single source of truth and kept a
