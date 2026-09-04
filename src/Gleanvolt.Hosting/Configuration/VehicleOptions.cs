@@ -79,5 +79,26 @@ public sealed class VehicleOptions
     /// that the subscription is still alive. This is not a poll interval — telemetry arrives by
     /// subscription, whenever the publisher sends it.
     /// </summary>
+    /// <summary>
+    /// Ask the car only when somebody wants to know — a person pressing the button, or a plan being
+    /// prepared — rather than on a clock (issue #168).
+    ///
+    /// <para><b>Off by default</b>, so an installation that has not asked for this behaves exactly as
+    /// it did. On, the update worker stops polling and the dashboard shows no battery or range until
+    /// it is asked for one.</para>
+    ///
+    /// <para>The reason it is worth having: on the EU Data Act portal a reading is <b>2-4 hours
+    /// behind</b> — measured across a 7h43m window, best case 1h48m — because VW's pipeline sits on
+    /// each report the car makes. A card showing that number continuously is confident and wrong, and
+    /// the eye reads the number rather than the age beside it. A figure nobody requested is a figure
+    /// nobody checked the age of.</para>
+    ///
+    /// <para>The cost, which is real: nothing polls, so
+    /// <c>ChargingSessionTracker</c> records no state of charge against a session. On a feed hours
+    /// behind, those samples were the same pre-session number repeated rather than a charge curve —
+    /// but an install that wants them back turns this off.</para>
+    /// </summary>
+    public bool OnDemandOnly { get; init; }
+
     public TimeSpan ReconnectInterval { get; init; } = TimeSpan.FromSeconds(30);
 }

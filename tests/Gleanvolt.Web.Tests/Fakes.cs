@@ -659,3 +659,31 @@ internal static class TestTargetedPlans
             Reason: "test plan");
     }
 }
+
+/// <summary>
+/// A refresh that answers whatever the test says, and counts how often it was asked (issue #168).
+///
+/// <para>The counting is the point in on-demand mode: the page's contract is that it fetches when a
+/// person asks and at no other time, and only a count can hold it to that.</para>
+/// </summary>
+internal sealed class FakeVehicleStateRefresh(
+    VehicleState? answer = null, string? failure = null, bool canRefresh = true) : IVehicleStateRefresh
+{
+    public int Asks { get; private set; }
+
+    public bool CanRefresh => canRefresh;
+
+    public Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default)
+    {
+        Asks++;
+
+        if (failure is not null)
+        {
+            return Task.FromResult(VehicleRefreshResult.Failed(failure, answer));
+        }
+
+        return Task.FromResult(answer is null
+            ? VehicleRefreshResult.NoFeed
+            : VehicleRefreshResult.Fresh(answer, answer.SourceId));
+    }
+}

@@ -1578,6 +1578,30 @@ A car whose minimum is above the installation's maximum could never charge, and 
 is silence — so it is **refused at startup** naming both keys, rather than discovered one evening as
 "I pressed the button and nothing happened".
 
+#### `OnDemandOnly` — ask the car, don't watch it
+
+```jsonc
+"Vehicle": { "OnDemandOnly": true }
+```
+
+Off by default. On, **nothing polls**: the car is asked when you press *Ask the car* on the dashboard,
+or when a plan is prepared, and at no other time. Until you ask, the dashboard shows no battery and no
+range.
+
+That sounds like less, and it is more honest. On the EU Data Act portal a reading is **2–4 hours
+behind** — the car reports promptly and VW's pipeline sits on it. Measured across a 7h43m window on the
+reference ID.4: best case 1h48m, worst 7h16m, with five consecutive deliveries carrying byte-identical
+car data. A card showing that number continuously is confident and wrong, and the eye reads the figure
+rather than the age beside it. **A number nobody requested is a number nobody checked the age of.**
+
+Everything else is unchanged: the reading still lands in the holder, the API still serves it, and an
+installation that wants an ambient card simply leaves this off.
+
+**The cost, which is real.** With nothing polling, no state of charge is recorded against a charging
+session — `vehicle_soc_percent` stays null for its whole length. On a feed hours behind, those samples
+were the same pre-session number repeated rather than a charge curve, so the loss is smaller than it
+looks; but if you want them, leave this off.
+
 ### Vehicle telemetry (the `Vehicle` section)
 
 The **feed** that reports on the car above — as distinct from the car itself, and from the home battery

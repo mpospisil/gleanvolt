@@ -25,6 +25,8 @@ public class DashboardPageTests : PageTest
     // Vehicle:Enabled=false looks like.
     private readonly VehicleStateHolder _vehicle = new();
 
+    private readonly FakeVehicleStateRefresh _refresh = new();
+
     // The car the section is about (#124/#140). Unknown by default, which is the install that has
     // never described one; a test that is about the card sets it before rendering.
     private EvInfo _car = EvInfo.Unknown;
@@ -34,6 +36,7 @@ public class DashboardPageTests : PageTest
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
+        Services.AddSingleton<IVehicleStateRefresh>(_refresh);
 
         // The per-feed sections read the holder's own tally (#141), so it has to be the same object
         // the tests push readings into -- a second comparison would see nothing.

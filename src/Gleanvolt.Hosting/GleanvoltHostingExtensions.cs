@@ -542,6 +542,14 @@ public static class GleanvoltHostingExtensions
 
         // Registered whether or not a service exists: with none it logs that fact once and stops, which
         // is a supported installation rather than a misconfigured one.
+        // Asking the car because somebody wants to know, as opposed to because a clock said so
+        // (issue #168). Registered unconditionally: the page injects it and renders "nothing to ask"
+        // itself, rather than the container deciding whether a control may exist.
+        services.AddSingleton<IVehicleStateRefresh>(provider => new VehicleStateRefresh(
+            provider.GetServices<IVehicleUpdateService>(),
+            provider.GetRequiredService<VehicleStateHolder>(),
+            provider.GetService<ILogger<VehicleStateRefresh>>()));
+
         services.AddHostedService<VehicleUpdateWorker>();
 
         // The UI needs MaxAge to mark a reading stale and the pack's size to offer a target in state of
@@ -554,7 +562,8 @@ public static class GleanvoltHostingExtensions
 
             // MaxAge is the feed's; the pack is the car's. Two sections, and the split is the point of
             // issue #124.
-            return new VehicleDisplayOptions(vehicle.MaxAge, ev.BatteryCapacityKWh, ev.ChargeEfficiency);
+            return new VehicleDisplayOptions(
+                vehicle.MaxAge, ev.BatteryCapacityKWh, ev.ChargeEfficiency, vehicle.OnDemandOnly);
         });
 
         // Same arrangement for the targeted page: it has to reject a departure beyond the horizon

@@ -54,6 +54,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly ILogger<VehicleUpdateWorker> _logger;
     private readonly TimeProvider _time;
     private readonly bool _mqttFeedConfigured;
+    private readonly bool _onDemandOnly;
 
     /// <param name="vehicleOptions">
     /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
@@ -71,6 +72,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
         _holder = holder;
         _logger = logger;
         _mqttFeedConfigured = vehicleOptions?.Value.Enabled ?? false;
+        _onDemandOnly = vehicleOptions?.Value.OnDemandOnly ?? false;
         _time = time ?? TimeProvider.System;
     }
 
@@ -81,6 +83,17 @@ public sealed class VehicleUpdateWorker : BackgroundService
             // The ordinary case, and deliberately not a warning: a car with no manufacturer feed
             // configured is a supported installation, not a misconfigured one.
             _logger.LogInformation("No vehicle update service is configured.");
+            return;
+        }
+
+        if (_onDemandOnly)
+        {
+            // The services stay registered and IVehicleStateRefresh still drives them; what stops is
+            // the clock. Logged at Information because a silent feed is otherwise indistinguishable
+            // from a broken one.
+            _logger.LogInformation(
+                "Vehicle updates are on demand only: nothing is polled, and the car is asked when the "
+                + "web UI or a plan asks for it.");
             return;
         }
 
