@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Gleanvolt.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +52,11 @@ public static class WebUiHost
         // lands without a REST API in between -- WebAssembly would need one, and this project needs
         // it for nothing else.
         services.AddRazorComponents().AddInteractiveServerComponents();
+
+        // A null object for a host with no feeds registered, so a page that asks the car can still be
+        // constructed where nothing can answer. TryAdd, so Gleanvolt.Hosting's real one wins whenever
+        // it has been registered.
+        services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
 
         // The scheme is registered whenever the UI is enabled, whether or not RequireAuthentication
         // is on: the login and logout endpoints need it to exist either way, and it is DefaultPolicy

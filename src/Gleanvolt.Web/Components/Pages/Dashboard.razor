@@ -5,6 +5,7 @@
 @inject ChargeControlStatusHolder StatusHolder
 @inject IVehicleTelemetry Vehicle
 @inject VehicleDisplayOptions VehicleDisplay
+@inject IVehicleStateRefresh VehicleRefresh
 @inject EvInfo Car
 @inject IEnumerable<IVehicleUpdateService> VehicleFeeds
 @inject VehicleFeedComparison Comparison
@@ -110,11 +111,43 @@ else
         </p>
     }
 
-    @if (_vehicle is not null)
+    @if (VehicleDisplay.OnDemandOnly)
+    {
+        @*
+            On demand (issue #168): nothing is shown that nobody asked for. The reading exists in the
+            holder and the API still serves it -- what changes is that this page does not put a number
+            in front of an eye that will read it as current, when on the Data Act portal it is
+            routinely two to four hours behind.
+        *@
+        <div class="actions">
+            <button type="button" class="secondary" id="vehicle-ask"
+                    disabled="@(_asking || !VehicleRefresh.CanRefresh)" @onclick="AskAsync">
+                @(_asking ? "Asking the car…" : "Ask the car")
+            </button>
+        </div>
+
+        @if (!VehicleRefresh.CanRefresh)
+        {
+            <p class="muted">No feed is configured for this car, so there is nothing to ask.</p>
+        }
+        else if (_askError is { Length: > 0 })
+        {
+            <p class="error">The car did not answer — @_askError</p>
+        }
+        else if (_asked is null)
+        {
+            <p class="muted">
+                The battery and range are not shown until you ask for them. A reading can be hours
+                behind the car, and a figure nobody requested is a figure nobody checked the age of.
+            </p>
+        }
+    }
+
+    @if (Showing is not null)
     {
         <p class="muted">
-            Reported by the car @VehicleAge(_vehicle) ago@(_vehicle.SourceId is null ? "" : $" via {_vehicle.SourceId}")
-            @if (_vehicleStale)
+            Reported by the car @VehicleAge(Showing) ago@(Showing.SourceId is null ? "" : $" via {Showing.SourceId}")
+            @if (IsStale(Showing))
             {
                 <strong> — stale, older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h</strong>
             }
@@ -125,17 +158,17 @@ else
         <Stat Label="Car connected" Value="@(_status.CarConnected ? "Yes" : "No")"
               Hint="Whether a vehicle is plugged in, as the charger sees it. Says nothing about whether it is drawing power." />
 
-        @if (_vehicle is not null)
+        @if (Showing is { } shown)
         {
-            <Stat Label="Car battery" Value="@Percent(_vehicle.SocPercent)"
+            <Stat Label="Car battery" Value="@Percent(shown.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
-            <Stat Label="Car range" Value="@Km(_vehicle.RangeKm)"
+            <Stat Label="Car range" Value="@Km(shown.RangeKm)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
-            <Stat Label="Car reading age" Value="@VehicleAge(_vehicle)"
+            <Stat Label="Car reading age" Value="@VehicleAge(shown)"
                   Hint="How long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died." />
-            <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()"
+            <Stat Label="Car charge state" Value="@shown.ChargeState.ToString()"
                   Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
-            <Stat Label="Car plug state" Value="@_vehicle.PlugState.ToString()"
+            <Stat Label="Car plug state" Value="@shown.PlugState.ToString()"
                   Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
         }
     </section>
@@ -240,6 +273,19 @@ else
 @code {
     private ChargeControlStatus? _status;
     private VehicleState? _vehicle;
+
+    /// <summary>What this page may put on screen (issue #168).</summary>
+    /// <remarks>
+    /// In ambient mode, whatever the holder has — the behaviour this page has always had. In
+    /// on-demand mode, only what <see cref="AskAsync"/> just fetched: the reading in the holder is
+    /// perfectly real and the API still serves it, but showing it unasked is the thing the mode
+    /// exists to stop.
+    /// </remarks>
+    private VehicleState? Showing => VehicleDisplay.OnDemandOnly ? _asked : _vehicle;
+
+    private VehicleState? _asked;
+    private string? _askError;
+    private bool _asking;
     private bool _vehicleStale;
 
     // What each feed has said on its own (#141). Read on the same tick as everything else; Report()
@@ -338,6 +384,40 @@ else
     private bool InUse(VehicleFeedTally feed) =>
         _vehicle is not null
         && string.Equals(_vehicle.SourceId, feed.SourceId, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsStale(VehicleState state) =>
+        state.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
+
+    /// <summary>
+    /// Goes and asks. Failure keeps whatever was last fetched on screen rather than blanking it — an
+    /// answer now known to be old is worth more than no answer, provided its age is beside it.
+    /// </summary>
+    private async Task AskAsync()
+    {
+        _asking = true;
+        _askError = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await VehicleRefresh.RefreshAsync();
+
+            if (result is { Succeeded: true, State: not null })
+            {
+                _asked = result.State;
+            }
+            else
+            {
+                _askError = result.Message;
+                _asked ??= result.State;
+            }
+        }
+        finally
+        {
+            _asking = false;
+            StateHasChanged();
+        }
+    }
 
     private string VehicleAge(VehicleState vehicle)
     {

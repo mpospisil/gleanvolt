@@ -154,6 +154,7 @@ services:
       Vehicle__Username: ${MQTT_USERNAME:-}
       Vehicle__Password: ${MQTT_PASSWORD:-}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
+      Vehicle__OnDemandOnly: ${VEHICLE_ON_DEMAND_ONLY:-false}
 
       # The car read from VW's own EU Data Act portal (issues #137/#139/#140) -- the other way to fill
       # the same reading, and the only manufacturer integration in the codebase.
