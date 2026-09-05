@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject IVehiclePortalReader Portal
 @inject EvInfo Car
+@inject IVehicleAccountSignIn Account
 
 @*
     Reading the car from the manufacturer's own portal, on demand (issues #137/#139).
@@ -19,6 +20,67 @@
 *@
 
 <SiteTitle Page="Vehicle portal" />
+
+@*
+    Signing in to the manufacturer account (issue #170). It lives on this page rather than behind a
+    settings screen because of when it is needed: volkswagen.de's cold login always emails a one-time
+    code, so it can only be done while a person is here to read it -- and the moment a person wants
+    the car's state is exactly that moment.
+
+    The session it establishes is what the live source then polls on while a charge runs. Nothing
+    here is required for charging: a controller with no account signed in charges exactly as before.
+*@
+@if (Account.IsConfigured)
+{
+    <h2>@Account.AccountName</h2>
+
+    <p class="muted">
+        The live source, as distinct from the portal below. Signing in here is what lets the car be
+        followed while it charges; the code Volkswagen emails can only be answered by you, which is
+        why this is a page and not a background job.
+    </p>
+
+    @if (_signIn.IsSignedIn)
+    {
+        <p class="muted"><strong>Signed in</strong> — @_signIn.Message</p>
+        <div class="actions">
+            <button type="button" class="secondary" id="account-signout" @onclick="SignOutAsync">Sign out</button>
+        </div>
+    }
+    else
+    {
+        @if (_signIn.Status != VehicleSignInStatus.Unknown)
+        {
+            <p class="@(_signIn.Status == VehicleSignInStatus.Failed ? "error" : "muted")">@_signIn.Message</p>
+        }
+
+        @if (_signIn.WantsCode)
+        {
+            <div class="control">
+                <label for="account-code">One-time code</label>
+                <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                       @bind="_code" @bind:event="oninput" />
+            </div>
+
+            <div class="actions">
+                <button type="button" class="secondary" id="account-code-submit"
+                        disabled="@(_busy || string.IsNullOrWhiteSpace(_code))" @onclick="SubmitCodeAsync">
+                    @(_busy ? "Checking…" : "Submit code")
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="actions">
+                <button type="button" class="secondary" id="account-signin"
+                        disabled="@_busy" @onclick="SignInAsync">
+                    @(_busy ? "Signing in…" : "Sign in")
+                </button>
+            </div>
+        }
+    }
+}
+
 
 <h1>Vehicle portal</h1>
 
@@ -233,6 +295,60 @@ else if (_reading is { Succeeded: true })
 }
 
 @code {
+    private VehicleSignInState _signIn = VehicleSignInState.Unknown;
+    private string _code = string.Empty;
+
+    protected override void OnInitialized() => _signIn = Account.State;
+
+    /// <summary>
+    /// Starts a sign-in. Never called on render: opening a page must not replay a password, and a
+    /// refresh must not email the owner a code they did not ask for.
+    /// </summary>
+    private async Task SignInAsync()
+    {
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            _signIn = await Account.SignInAsync();
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitCodeAsync()
+    {
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            _signIn = await Account.SubmitCodeAsync(_code);
+
+            if (_signIn.IsSignedIn)
+            {
+                _code = string.Empty;
+            }
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task SignOutAsync()
+    {
+        Account.SignOut();
+        _signIn = Account.State;
+        _code = string.Empty;
+        return Task.CompletedTask;
+    }
+
     private VehiclePortalReading? _reading;
     private bool _busy;
 

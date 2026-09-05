@@ -687,3 +687,44 @@ internal sealed class FakeVehicleStateRefresh(
             : VehicleRefreshResult.Fresh(answer, answer.SourceId));
     }
 }
+
+/// <summary>
+/// A manufacturer-account sign-in the test drives (issue #170).
+///
+/// <para>Counts attempts, because the contract that matters is negative: opening the page must never
+/// start one. A page that signs in on render would replay a password on every refresh and email the
+/// owner a code they did not ask for.</para>
+/// </summary>
+internal sealed class FakeVehicleAccountSignIn(
+    bool configured = true, VehicleSignInState? first = null, VehicleSignInState? afterCode = null)
+    : IVehicleAccountSignIn
+{
+    public int SignIns { get; private set; }
+
+    public int CodeSubmissions { get; private set; }
+
+    public string? LastCode { get; private set; }
+
+    public string AccountName => "volkswagen.de";
+
+    public bool IsConfigured => configured;
+
+    public VehicleSignInState State { get; private set; } = VehicleSignInState.Unknown;
+
+    public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default)
+    {
+        SignIns++;
+        State = first ?? VehicleSignInState.CodeRequired("a code was emailed");
+        return Task.FromResult(State);
+    }
+
+    public Task<VehicleSignInState> SubmitCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        CodeSubmissions++;
+        LastCode = code;
+        State = afterCode ?? VehicleSignInState.SignedIn("signed in");
+        return Task.FromResult(State);
+    }
+
+    public void SignOut() => State = VehicleSignInState.Unknown;
+}
