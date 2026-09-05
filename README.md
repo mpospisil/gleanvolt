@@ -1602,6 +1602,41 @@ session — `vehicle_soc_percent` stays null for its whole length. On a feed hou
 were the same pre-session number repeated rather than a charge curve, so the loss is smaller than it
 looks; but if you want them, leave this off.
 
+#### `Vehicle:Website` — volkswagen.de, the live source
+
+```jsonc
+"Vehicle": { "Website": { "Enabled": true, "Vin": "WVGZZZ…", "PollInterval": "00:05:00" } }
+```
+
+Off by default. On, the car is asked **only while a charging session is open** — so the state of
+charge is recorded as it actually moves, and nothing is fetched while the car sits idle.
+
+**Why this exists beside the [EU Data Act portal](docs/VW_PORTAL_SETUP.md).** Measured on the
+reference ID.4, both asked within a minute of each other:
+
+| Source | SOC | Captured | Age |
+|---|---|---|---|
+| `volkswagen.de` | 55% | 08:39Z | ~1 h |
+| EU Data Act portal | 55% | 21:16Z the day before | **~12.5 h** |
+
+The car had reported; the portal had not yet published it. Portal publication runs **1h48m–7h16m**
+behind the car, so a charge is over before its first in-charge reading appears there. The two are kept
+because neither is a superset — the portal carries `settings.target_soc`, which this source reported as
+null for the same car at the same moment.
+
+**Signing in is a page, not a setting.** A cold login *always* wants a one-time code emailed to the
+account owner. That makes it hostile to a background service and perfectly ordinary at the moment you
+are preparing a charge, so it is done from **Vehicle portal → Sign in**, where the code box is. The
+settings above only say which account and which car; nothing signs in on its own, and opening the page
+does not either.
+
+**The session is kept in `data/vw-website-session.json`**, which carries the *remember this browser*
+grant — that file is why a restart does not cost another code. **Treat it as a password**: anyone
+holding it is signed in as you. It is written owner-only and never logged.
+
+If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
+portal keeps answering with its aged reading, and nothing that writes to hardware depends on either.
+
 ### Vehicle telemetry (the `Vehicle` section)
 
 The **feed** that reports on the car above — as distinct from the car itself, and from the home battery

@@ -57,6 +57,7 @@ public static class WebUiHost
         // constructed where nothing can answer. TryAdd, so Gleanvolt.Hosting's real one wins whenever
         // it has been registered.
         services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
+        services.TryAddSingleton<IVehicleAccountSignIn, NoVehicleAccountSignIn>();
 
         // The scheme is registered whenever the UI is enabled, whether or not RequireAuthentication
         // is on: the login and logout endpoints need it to exist either way, and it is DefaultPolicy

@@ -14,6 +14,7 @@ using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
+using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
@@ -538,6 +539,34 @@ public static class GleanvoltHostingExtensions
                 VwGroupPortalOptionsResolver.Resolve(configuration),
                 provider.GetRequiredService<TimeProvider>(),
                 provider.GetService<ILogger<VwGroupUpdateService>>()));
+        }
+
+        // volkswagen.de -- the live source, asked only while a charge runs (issue #170). A cold login
+        // always wants an emailed one-time code, so the sign-in seam is registered too and the web UI
+        // drives it while a person is there to read the email. The client is shared between the two:
+        // one cookie jar for the whole flow is not optional, and two of them lose the session.
+        var website = configuration.GetSection(VwWebsiteOptions.SectionName).Get<VwWebsiteOptions>()
+            ?? new VwWebsiteOptions();
+
+        if (website.IsConfigured)
+        {
+            services.AddSingleton(website);
+            services.AddSingleton(new VwWebsiteSessionStore(website.SessionPath));
+            services.AddSingleton(provider => new VwWebsiteClient(
+                website,
+                provider.GetRequiredService<VwWebsiteSessionStore>(),
+                provider.GetService<ILogger<VwWebsiteClient>>(),
+                provider.GetRequiredService<TimeProvider>()));
+
+            services.AddSingleton<IVehicleAccountSignIn>(provider => new VwWebsiteSignIn(
+                website, provider.GetRequiredService<VwWebsiteClient>()));
+
+            services.AddSingleton<IVehicleUpdateService>(provider => new VwWebsiteUpdateService(
+                website,
+                provider.GetRequiredService<VwWebsiteClient>(),
+                provider.GetRequiredService<ChargeControlStatusHolder>(),
+                provider.GetRequiredService<EvInfo>().Id,
+                provider.GetService<ILogger<VwWebsiteUpdateService>>()));
         }
 
         // Registered whether or not a service exists: with none it logs that fact once and stops, which

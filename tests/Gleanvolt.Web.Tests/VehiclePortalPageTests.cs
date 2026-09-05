@@ -41,10 +41,13 @@ public class VehiclePortalPageTests : PageTest
         }
     }
 
-    private IRenderedComponent<VehiclePortal> Render(StubReader reader)
+        private readonly FakeVehicleAccountSignIn Account = new(configured: false);
+
+private IRenderedComponent<VehiclePortal> Render(StubReader reader)
     {
         Services.AddSingleton<IVehiclePortalReader>(reader);
         Services.AddSingleton(Car());
+        Services.AddSingleton<IVehicleAccountSignIn>(Account);
         return Render<VehiclePortal>();
     }
 

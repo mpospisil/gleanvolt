@@ -1,0 +1,39 @@
+{
+ "data": {
+  "batteryStatus": {
+   "carCapturedTimestamp": "2026-09-05T08:39:01Z",
+   "chargeEnergy_kWh": null,
+   "cruisingRangeElectric_km": 220,
+   "currentSOC_pct": 55,
+   "navigationTargetSOC_pct": null,
+   "routeBasedRange_km": null,
+   "temperatureHvBattery_K": null
+  },
+  "chargingStatus": {
+   "carCapturedTimestamp": "2026-09-05T08:39:01Z",
+   "remainingChargingTimeToComplete_min": 0,
+   "chargingState": "notReadyForCharging",
+   "chargeRate_kmph": null,
+   "chargePower_kW": 0,
+   "chargeType": "invalid",
+   "chargeMode": "manual",
+   "chargingSettings": "default",
+   "chargingScenario": "off",
+   "chargeTargetTime": null,
+   "maxChargePowerCurrent_kW": null,
+   "remainingChargingTimeNavigation_min": null,
+   "estimatedFinishTimeLocal": null,
+   "profileChargeReason": "invalid",
+   "updateReason": "ignitionOff"
+  },
+  "plugStatus": {
+   "carCapturedTimestamp": "2026-09-05T08:39:01Z",
+   "plugConnectionState": "disconnected",
+   "plugLockState": "unlocked",
+   "externalPower": "unavailable",
+   "ledColor": "none",
+   "plugPosition": null,
+   "flapOpenState": null
+  }
+ }
+}
