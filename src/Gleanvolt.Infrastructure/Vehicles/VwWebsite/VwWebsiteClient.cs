@@ -193,6 +193,10 @@ public sealed class VwWebsiteClient : IDisposable
 
             if (VwWebsiteLoginPage.IsRejectedCode(result.Body))
             {
+                _logger.LogInformation(
+                    "volkswagen.de refused that one-time code; the challenge is still open, so the "
+                    + "newest emailed code can be tried without starting over.");
+
                 // The challenge survives a wrong code; only the state rotates.
                 _pendingCodeState = VwWebsiteLoginPage.Read(result.Url, result.Body).State ?? _pendingCodeState;
                 return VwWebsiteLoginStep.OneTimeCodeRequired;
@@ -204,6 +208,19 @@ public sealed class VwWebsiteClient : IDisposable
             {
                 _pendingCodeUrl = null;
                 _pendingCodeState = null;
+
+                // Logged because it is the event the whole flow exists to reach, and because its
+                // absence is indistinguishable from a code that was never submitted: the first run
+                // of this had only the failure branch below, and the only way to tell a successful
+                // sign-in from an abandoned one was to read the cookie file.
+                var remembered = _jar.GetAllCookies().Any(
+                    cookie => cookie.Name.StartsWith("auth0-mf", StringComparison.OrdinalIgnoreCase));
+
+                _logger.LogInformation(
+                    "Signed in to volkswagen.de. This browser is {Remembered}, so the next start "
+                    + "{Expectation} need another code.",
+                    remembered ? "remembered" : "NOT remembered",
+                    remembered ? "should not" : "will probably");
 
                 if (!_session.Save(_jar))
                 {
