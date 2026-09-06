@@ -13,6 +13,15 @@
     --line: #e3e6ea;
     --accent: #0b6b3a;
     --amber: #f5b400;
+    /*
+        The energy chart's series (#173). Named after what they carry rather than after the colour,
+        so the day chart, the swatches and any later view can't drift apart -- and so the dark theme
+        below can lift each one without a second palette living in JavaScript.
+    */
+    --solar: #f5b400;
+    --grid-flow: #6b7280;
+    --ev: #b45309;
+    --house: #7c3aed;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +33,10 @@
         --line: #2c3138;
         --accent: #4ade80;
         --amber: #f7c948;
+        --solar: #f7c948;
+        --grid-flow: #9aa2ad;
+        --ev: #fb923c;
+        --house: #a78bfa;
     }
 }
 
@@ -530,6 +543,15 @@ h1 {
 }
 
 /*
+    The energy day chart (#173): taller than the other two and carrying a legend of six or seven
+    series under it, so it takes its height from its content instead of from the fixed box above --
+    which the legend would otherwise spill out of.
+*/
+.chart.day {
+    height: auto;
+}
+
+/*
     The energy table (the EnergyMonitor viewer). It reuses .sessions for its frame and adds only what
     a numeric table of ~96 rows needs: right-aligned figures, a slightly tighter row, a sticky header
     so the columns stay readable while scrolling a day, and a visible marker on the partial rows.
@@ -573,7 +595,8 @@ h1 {
     line-height: 1.4;
 }
 
-.table-note {
+.table-note,
+.chart-note {
     margin-top: 0.75rem;
     font-size: 0.85rem;
     line-height: 1.5;

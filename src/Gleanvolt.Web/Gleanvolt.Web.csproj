@@ -19,6 +19,16 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <!--
+    So the day chart's arithmetic (EnergyChartSeries) can be tested directly. Turning kWh buckets into
+    a watt series is where the honesty of that chart lives: the coverage division, and the holes left
+    where nothing was observed. The alternative was inferring both from rendered markup, or making a
+    detail of one page part of this library's public surface.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Web.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
   </ItemGroup>
