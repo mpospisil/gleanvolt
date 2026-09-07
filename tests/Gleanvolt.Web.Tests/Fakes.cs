@@ -302,7 +302,18 @@ internal static class TestSessions
             Sunset: null,
             Controlled: true);
 
-    public static ChargingSessionSample Sample(Guid sessionId, DateTimeOffset timestamp, double batterySocPercent) =>
+    public static ChargingSessionSample Sample(
+        Guid sessionId,
+        DateTimeOffset timestamp,
+        double batterySocPercent,
+        double solarPowerWatts = 2_000,
+        double gridPowerWatts = 0,
+        double batteryPowerWatts = 0,
+        double evChargerPowerWatts = 2_000,
+        double? forecastPowerWatts = null,
+        double? vehicleSocPercent = null,
+        DateTimeOffset? vehicleSocCapturedAt = null,
+        bool batteryHoldActive = false) =>
         new(
             SessionId: sessionId,
             Timestamp: timestamp,
@@ -310,10 +321,10 @@ internal static class TestSessions
             State: ChargeControlState.Charging,
             ChargerStatus: EvChargerStatus.Charging,
             BatterySocPercent: batterySocPercent,
-            SolarPowerWatts: 2_000,
-            GridPowerWatts: 0,
-            BatteryPowerWatts: 0,
-            EvChargerPowerWatts: 2_000,
+            SolarPowerWatts: solarPowerWatts,
+            GridPowerWatts: gridPowerWatts,
+            BatteryPowerWatts: batteryPowerWatts,
+            EvChargerPowerWatts: evChargerPowerWatts,
             EvChargingCurrentAmps: 8,
             ActiveCurrentAmps: 8,
             TargetCurrentAmps: 8,
@@ -328,14 +339,14 @@ internal static class TestSessions
             SolarWh: 0,
             ForecastSolarWh: null,
             GridImportWh: 0,
-            VehicleSocPercent: null,
-            VehicleSocCapturedAt: null,
+            VehicleSocPercent: vehicleSocPercent,
+            VehicleSocCapturedAt: vehicleSocCapturedAt,
             VehicleChargeTimeRemainingMinutes: 0,
             VehicleChargeTimeRemainingReported: false,
             SurplusWatts: 2_000,
             LoanPowerWatts: 0,
-            BatteryHoldActive: false,
-            ForecastPowerWatts: null,
+            BatteryHoldActive: batteryHoldActive,
+            ForecastPowerWatts: forecastPowerWatts,
             PlanRemainingPvWh: null,
             PlanFeasibleEvEnergyWh: null,
             PlanRequiredSocFloorPercent: null);

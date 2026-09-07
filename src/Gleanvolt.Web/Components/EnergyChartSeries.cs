@@ -148,20 +148,11 @@ internal sealed record EnergyChartSeries(
             partialEnds,
             dayStart.ToUnixTimeSeconds(),
             dayEnd.ToUnixTimeSeconds(),
-            IanaId(zone),
+            ChartTimeZone.IanaId(zone),
             // Null rather than zero everywhere, so the legend does not offer a "Forecast" line that is
             // nothing but a gap: no forecast covered the day is a different fact from a flat zero.
             ordered.Any(i => i.ForecastSolarKwh is not null));
     }
-
-    /// <summary>
-    /// The zone as the browser can read it. On Linux — the Pi, the container — <c>Id</c> is already
-    /// IANA and this is a no-op; on Windows it is something like "Central Europe Standard Time",
-    /// which <c>Intl</c> rejects outright. Where no mapping exists the id is passed through and the
-    /// chart falls back to the browser's own zone rather than refusing to draw.
-    /// </summary>
-    private static string IanaId(TimeZoneInfo zone) =>
-        zone.HasIanaId || !TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var iana) ? zone.Id : iana;
 
     /// <summary>
     /// Average power over the part of the window that was actually observed. Dividing by the nominal
