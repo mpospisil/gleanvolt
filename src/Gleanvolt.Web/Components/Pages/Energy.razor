@@ -1,17 +1,24 @@
 @page "/energy"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IEnergyIntervalStore Store
+@inject IJSRuntime JS
 @inject TimeProvider Time
 
 @*
-    The first way to look at what EnergyMonitor records. Read-only and deliberately plain: a day at a
-    time, one row per interval, exactly the columns the table stores. IEnergyIntervalStore's query
-    member already existed for this, so nothing here reaches past the interface into SQLite.
+    The way to look at what EnergyMonitor records. Read-only and a day at a time: the day drawn, then
+    the same day printed, one row per interval, exactly the columns the table stores.
+    IEnergyIntervalStore's query member already existed for this, so nothing here reaches past the
+    interface into SQLite -- and the chart is built from the very list the table renders, not from a
+    second fetch that could disagree with it.
 
-    A table rather than a chart, on purpose. The point of this store is that the numbers are exact and
-    that a partial row is visibly partial; a chart would smooth over precisely the thing worth seeing
-    first. Charts can come later, over the same query.
+    The table came first, and it stays. The exactness is the point of this store: a partial row must
+    read as partial and a figure must be the figure. What the table cannot do is show that a day has a
+    shape -- the sun rising, the battery filling, the car taking the middle out of the afternoon --
+    and reading that out of ninety-six rows of eleven columns is work a picture does for free (#173).
+    So both, in that order. The arithmetic behind the chart lives in EnergyChartSeries, where it can
+    be tested; this page only hands it over.
 *@
 
 <SiteTitle Page="Energy" />
@@ -41,6 +48,19 @@ else if (_intervals.Count == 0)
 }
 else
 {
+    <section class="chart-section">
+        <h2>The day</h2>
+        <div id="energy-chart" class="chart day"></div>
+        <p class="muted chart-note">
+            Power, averaged over each quarter hour that was observed — the store keeps energy, and a
+            bucket the service only saw part of is divided by the part it saw, so a restart is a gap
+            rather than a dip the sun never took. <strong>Grid</strong> is import above the line and
+            export below it; <strong>Battery</strong> is charging above and discharging below. Click a
+            name in the legend to take that series out. A bar along the bottom marks the windows that
+            were only partly observed — the same ones the table below shows in italics.
+        </p>
+    </section>
+
     <table class="sessions energy">
         <thead>
             <tr>
@@ -119,8 +139,18 @@ else
     private DateOnly _day;
     private DateOnly _today;
     private IReadOnlyList<EnergyInterval>? _intervals;
+    private EnergyChartSeries? _chart;
     private int _partialCount;
     private bool _error;
+
+    // Reset on every load so a new day is drawn; set again as soon as it has been.
+    private bool _chartRendered;
+
+    // See SessionDetail.razor for the reasoning: _chartRendered goes false whenever the day changes,
+    // so it cannot answer the question disposal actually has -- "is there a uPlot instance on the
+    // other side to tear down?" Once true it stays true, and while it is false no interop is
+    // permitted at all: during the prerender pass OnAfterRenderAsync never ran.
+    private bool _chartCreated;
 
     protected override Task OnInitializedAsync()
     {
@@ -144,11 +174,16 @@ else
     private async Task LoadAsync()
     {
         _error = false;
+        _chartRendered = false;
         try
         {
             var (from, to) = LocalDay(_day);
             _intervals = await Store.GetIntervalsAsync(from, to, CancellationToken.None);
             _partialCount = _intervals.Count(IsPartial);
+
+            // From and to, not the first and last row: a day the service missed the morning of is
+            // still a day, and the chart should say so by leaving the morning empty.
+            _chart = EnergyChartSeries.From(_intervals, from, to, Time.LocalTimeZone);
         }
         catch (Exception)
         {
@@ -156,8 +191,42 @@ else
             // -- and that must read as "not available", not crash the page. Recording's own failures
             // are already silent by design (EnergyMonitorWorker); browsing degrades the same way.
             _intervals = null;
+            _chart = null;
             _partialCount = 0;
             _error = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartRendered || _chart is null || _intervals is not { Count: > 0 })
+        {
+            return;
+        }
+
+        _chartRendered = true;
+
+        // Set before the call, not after: if the interop is cut off mid-flight the chart may already
+        // exist on the other side, and disposing one that isn't there is a no-op anyway.
+        _chartCreated = true;
+
+        await JS.InvokeVoidAsync("solaxCharts.renderEnergyDayChart", "energy-chart", _chart);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_chartCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "energy-chart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is already gone (e.g. the browser tab closed) -- nothing left to clean up.
         }
     }
 

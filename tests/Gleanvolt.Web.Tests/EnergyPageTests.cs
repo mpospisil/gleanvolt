@@ -1,11 +1,19 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Web.Components;
 using Gleanvolt.Web.Components.Pages;
 
 namespace Gleanvolt.Web.Tests;
 
-/// <summary>The energy viewer: one recorded day at a time, as the table it is stored as.</summary>
+/// <summary>
+/// The energy viewer: one recorded day at a time, drawn and then printed — the chart above (#173) and
+/// the table it is stored as below.
+///
+/// JSInterop is Loose because the chart itself is vendored JS (uPlot) this suite cannot see: what is
+/// checked here is that the page hands it a day when it has one and keeps quiet when it doesn't. The
+/// numbers that go into it are <see cref="EnergyChartSeriesTests"/>' business.
+/// </summary>
 public class EnergyPageTests : PageTest
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
@@ -18,6 +26,7 @@ public class EnergyPageTests : PageTest
     {
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IEnergyIntervalStore>(_store);
+        JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
     // 10:00 Prague on the 12th, i.e. 08:00 UTC — the summer offset is +2.
@@ -181,5 +190,72 @@ public class EnergyPageTests : PageTest
         var page = Render<Energy>();
 
         page.WaitForAssertion(() => Assert.Contains("isn't available right now", page.Markup));
+    }
+
+    [Fact]
+    public void Draws_the_day_above_the_rows_it_is_drawn_from()
+    {
+        _store.Intervals.Add(TestIntervals.Sample(PragueMorning(), solarKwh: 1.42));
+
+        var page = Render<Energy>();
+
+        page.WaitForAssertion(() =>
+        {
+            Assert.NotNull(page.Find("#energy-chart"));
+
+            var invocation = Assert.Single(JSInterop.Invocations["solaxCharts.renderEnergyDayChart"]);
+            var series = Assert.IsType<EnergyChartSeries>(invocation.Arguments[1]);
+
+            // 1.42 kWh over a quarter hour, and the site's zone rather than the browser's -- the axis
+            // has to agree with the table underneath it.
+            Assert.Equal(5680, series.Solar[0]!.Value, 3);
+            Assert.Equal("Europe/Prague", series.TimeZoneId);
+        });
+    }
+
+    [Fact]
+    public void Draws_nothing_when_the_day_recorded_nothing()
+    {
+        var page = Render<Energy>();
+
+        page.WaitForAssertion(() => Assert.Contains("Nothing was recorded on this day", page.Markup));
+
+        Assert.Empty(page.FindAll("#energy-chart"));
+        Assert.Empty(JSInterop.Invocations["solaxCharts.renderEnergyDayChart"]);
+    }
+
+    [Fact]
+    public void Draws_nothing_when_the_store_is_unavailable()
+    {
+        _store.Unavailable = true;
+
+        var page = Render<Energy>();
+
+        page.WaitForAssertion(() => Assert.Contains("isn't available right now", page.Markup));
+
+        Assert.Empty(page.FindAll("#energy-chart"));
+        Assert.Empty(JSInterop.Invocations["solaxCharts.renderEnergyDayChart"]);
+    }
+
+    [Fact]
+    public void Redraws_when_the_day_moves()
+    {
+        _store.Intervals.Add(TestIntervals.Sample(PragueMorning(day: 11), solarKwh: 2.0));
+        _store.Intervals.Add(TestIntervals.Sample(PragueMorning(day: 12), solarKwh: 1.0));
+
+        var page = Render<Energy>();
+        page.WaitForAssertion(() => Assert.Single(JSInterop.Invocations["solaxCharts.renderEnergyDayChart"]));
+
+        page.Find("button[aria-label='Previous day']").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            // The 11th, not the 12th redrawn: stepping the day has to move the picture as well as the
+            // rows, and both come from the one query.
+            var series = Assert.IsType<EnergyChartSeries>(
+                JSInterop.Invocations["solaxCharts.renderEnergyDayChart"][^1].Arguments[1]);
+
+            Assert.Equal(8000, series.Solar[0]!.Value, 3);
+        });
     }
 }

@@ -48,7 +48,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
   charger is driven.
 - **Charging session history** — every controlled session recorded to a local SQLite file: when it ran, which strategy drove it, and how much of the energy came from solar, the grid and the home battery.
 - **Energy history at 15-minute resolution** — a monitoring service that does nothing but record, to its own database: for every quarter hour of every day, how much the roof made, how much the forecast said it would, how much crossed the meter each way, how much the car took, and where the home battery sat. Charging or not, plugged in or not — the series analytics is built on, with a
-  day-at-a-time viewer in the web UI.
+  day-at-a-time viewer in the web UI: the day drawn as a chart, and the same day printed as the rows it is stored as.
 - **Background service** — runs unattended as a long-lived process (e.g. systemd service / Windows Service), and can be **stopped gracefully from the web UI or Home Assistant** — the charger released, the open session closed and written — instead of being killed. It stays stopped until you start it again, while a reboot or a power cut still brings it straight back; see [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller).
 - **Local data ownership** — no cloud dependency for core operation.
 
@@ -2320,17 +2320,43 @@ looking at.
 
 #### Browsing the energy history
 
-`/energy` shows one recorded day at a time, as the table it is stored as: a row per interval with
-solar, forecast, grid each way, energy to the car, the battery each way, the house residual, SOC and
-coverage, and a day total beneath them. A date picker and prev/next buttons move the window; the
-"next" button stops at today.
+`/energy` shows one recorded day at a time, twice: **the day drawn, then the day printed**. A date
+picker and prev/next buttons move both together; the "next" button stops at today. One query feeds
+them, so the picture can never disagree with the rows.
 
-A **table rather than a chart, on purpose.** The point of this store is that the figures are exact and
-that a partial row is *visibly* partial — a row that covers less than the full interval is marked and
-counted in a note under the table, and a window no forecast covered shows an em dash rather than
-`0.00`. A chart would smooth over precisely the two things worth seeing first. It reads through
-`IEnergyIntervalStore.GetIntervalsAsync` and degrades to "isn't available right now" when
-`EnergyMonitor:Enabled` is off or the file can't be opened, exactly as `/sessions` does.
+The **table** is a row per interval with solar, forecast, grid each way, energy to the car, the
+battery each way, the house residual, SOC and coverage, and a day total beneath them. It is where the
+figures are exact and where a partial row is *visibly* partial — a row that covers less than the full
+interval is marked and counted in a note under the table, and a window no forecast covered shows an em
+dash rather than `0.00`.
+
+The **chart** above it is the shape of the day, which ninety-six rows of eleven columns cannot show:
+the sun rising, the battery filling, the car taking the middle out of the afternoon. Worth knowing
+about how it is drawn:
+
+- **Watts, not kWh.** The store keeps energy per bucket; a chart against time is read as power, so
+  each bucket is divided by **the part of the window that was actually observed**. A quarter hour the
+  service saw four minutes of is drawn at the power it was really running at, not at a quarter of it —
+  a restart at 09:07 is not the sun going out for seven minutes.
+- **Gaps stay gaps.** A stretch with no rows at all is a hole in every line, never a line drawn
+  straight across it, and a window observed for less than a tenth of its length is not drawn at all —
+  a few seconds' energy divided by a few seconds is noise, not a spike.
+- **Import and export share a line, and so do the battery's two directions.** Import and charging are
+  above zero, export and discharging below. The columns stay separate where exactness matters, in the
+  table underneath; folding them is what makes a *picture* readable, and the zero line is drawn for it.
+- **Forecast over solar.** The forecast is a dashed line on the same axis as the production it was a
+  forecast of, and a window nothing forecast is a break in it. A day nothing forecast at all has no
+  forecast line rather than a flat zero.
+- **The whole day, always.** Midnight to midnight in the site's own zone — which the axis is labelled
+  in, not the browser's, so the chart and the table agree even when you are reading from elsewhere.
+  A morning's rows look like a morning.
+- **The short windows are marked** with a band along the bottom: the same ones the table shows in
+  italics. Clicking a name in the legend takes that series out.
+
+The page reads through `IEnergyIntervalStore.GetIntervalsAsync` and degrades to "isn't available right
+now" when `EnergyMonitor:Enabled` is off or the file can't be opened, exactly as `/sessions` does. The
+kWh-to-watts arithmetic lives in `EnergyChartSeries` rather than in the markup, because the coverage
+division and the holes are the parts worth a test rather than an eyeball.
 
 Nothing was added to Home Assistant. This is history, not telemetry — see
 [Energy history](#energy-history-the-energymonitor-section) below for what is recorded.
@@ -2898,8 +2924,8 @@ GROUP BY utc_slot ORDER BY utc_slot;
   with an error in the log — polling, charge control, session recording and Home Assistant carry on
   untouched.
 - **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
-- **A viewer is built in.** The web UI's `/energy` page shows a day at a time — see
-  [Browsing the energy history](#browsing-the-energy-history) above.
+- **A viewer is built in.** The web UI's `/energy` page shows a day at a time, drawn as a chart and
+  printed as rows — see [Browsing the energy history](#browsing-the-energy-history) above.
 
 ## License
 
