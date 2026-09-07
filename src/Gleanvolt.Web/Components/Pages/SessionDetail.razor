@@ -7,10 +7,17 @@
 @inject IJSRuntime JS
 
 @*
-    Phase 4 (#49). The per-source split and the SOC-over-time chart the issue asks for. The chart is
-    the vendored uPlot (issue #44's decision) via JS interop -- see wwwroot/js/charts.js -- so it
-    keeps rendering with no internet connection, which is exactly when a locally controlled system is
-    most worth looking at.
+    Phase 4 (#49). The per-source split and the chart of what the session did. The chart is the
+    vendored uPlot (issue #44's decision) via JS interop -- see wwwroot/js/charts.js -- so it keeps
+    rendering with no internet connection, which is exactly when a locally controlled system is most
+    worth looking at.
+
+    It began as one line, the home battery's SOC, while every sample carried a dozen more figures that
+    the page showed nowhere. #175 gave it the day chart's vocabulary over the session's own window:
+    what the roof made, what crossed the meter each way, what the wall delivered and what the car said
+    about itself -- because "where did those 7 kWh come from, and why did it drop at 14:20" is the
+    question this page is opened to answer. The arithmetic lives in SessionChartSeries, where it is
+    tested; this page only hands it over and prints the list of marked moments beside it.
 *@
 
 <SiteTitle Page="Session" />
@@ -126,14 +133,39 @@ else
     </section>
 
     <section class="chart-section">
-        <h2>Battery SOC over time</h2>
-        @if (_document.Samples.Count == 0)
+        <h2>The session</h2>
+        @if (_chart is null)
         {
             <p class="muted">No samples were recorded for this session.</p>
         }
         else
         {
-            <div id="soc-chart" class="chart"></div>
+            <div id="session-chart" class="chart session"></div>
+            <p class="muted chart-note">
+                Every meter as it was sampled, in watts. <strong>Grid</strong> is import above the line
+                and export below it; <strong>Battery</strong> is charging above and discharging below.
+                Click a name in the legend to take that series out. A shaded band marks the stretches
+                the battery hold was armed for, and a stretch with no samples in it is a hole rather
+                than a line drawn across it.
+                @if (_chart.HasVehicleSoc)
+                {
+                    @:<strong>Car SOC</strong> steps at the time the car captured each reading, which
+                    @:is routinely hours before the sample that carried it.
+                }
+            </p>
+
+            @if (_chart.MarkTimes.Length > 0)
+            {
+                <ul class="chart-marks">
+                    @for (var i = 0; i < _chart.MarkTimes.Length; i++)
+                    {
+                        <li>
+                            <time>@Local(DateTimeOffset.FromUnixTimeSeconds(_chart.MarkTimes[i]), "HH:mm")</time>
+                            <span>@_chart.MarkLabels[i]</span>
+                        </li>
+                    }
+                </ul>
+            }
         }
     </section>
 }
@@ -143,6 +175,7 @@ else
     public Guid Id { get; set; }
 
     private ChargingSessionDocument? _document;
+    private SessionChartSeries? _chart;
     private bool _loaded;
     private bool _error;
     private bool _chartRendered;
@@ -160,10 +193,17 @@ else
         try
         {
             _document = await Store.ExportAsync(Id, CancellationToken.None);
+
+            // Null for a session with nothing sampled, which is what the empty state keys off: a
+            // chart frame around no data says less than the sentence does.
+            _chart = _document is { Samples.Count: > 0 }
+                ? SessionChartSeries.From(_document, Time.LocalTimeZone, Time.GetUtcNow())
+                : null;
         }
         catch (Exception)
         {
             _document = null;
+            _chart = null;
             _error = true;
         }
         finally
@@ -174,19 +214,15 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_chartRendered || _document is not { Samples.Count: > 0 })
+        if (_chartRendered || _chart is null)
         {
             return;
         }
 
         _chartRendered = true;
-
-        var timestamps = _document.Samples.Select(s => s.Timestamp.ToUnixTimeSeconds()).ToArray();
-        var soc = _document.Samples.Select(s => s.BatterySocPercent).ToArray();
-
         _chartCreated = true;
 
-        await JS.InvokeVoidAsync("solaxCharts.renderSocChart", "soc-chart", timestamps, soc);
+        await JS.InvokeVoidAsync("solaxCharts.renderSessionChart", "session-chart", _chart);
     }
 
     public async ValueTask DisposeAsync()
@@ -198,7 +234,7 @@ else
 
         try
         {
-            await JS.InvokeVoidAsync("solaxCharts.dispose", "soc-chart");
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "session-chart");
         }
         catch (JSDisconnectedException)
         {

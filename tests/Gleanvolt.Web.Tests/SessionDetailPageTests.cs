@@ -8,9 +8,10 @@ using Gleanvolt.Web.Components.Pages;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// Phase 4 (#49): the session detail page -- the per-source split and the SOC-over-time chart.
-/// JSInterop is Loose: the chart itself is rendered by vendored JS (uPlot) this suite cannot see, so
-/// these tests cover the data and markup around it, not the rendered pixels.
+/// Phase 4 (#49): the session detail page -- the per-source split and, since #175, the chart of every
+/// meter the session sampled. JSInterop is Loose: the chart itself is rendered by vendored JS (uPlot)
+/// this suite cannot see, so these tests cover the data and markup around it, not the rendered pixels.
+/// The arithmetic behind the picture is SessionChartSeriesTests' business.
 /// </summary>
 public class SessionDetailPageTests : PageTest
 {
@@ -224,7 +225,7 @@ public class SessionDetailPageTests : PageTest
 
         var page = RenderFor(session.Id);
 
-        page.WaitForAssertion(() => Assert.NotEmpty(page.FindAll("#soc-chart")));
+        page.WaitForAssertion(() => Assert.NotEmpty(page.FindAll("#session-chart")));
     }
 
     [Fact]
@@ -237,6 +238,49 @@ public class SessionDetailPageTests : PageTest
         var page = RenderFor(session.Id);
 
         page.WaitForAssertion(() => Assert.Contains("No samples were recorded", page.Markup));
-        Assert.Empty(page.FindAll("#soc-chart"));
+        Assert.Empty(page.FindAll("#session-chart"));
+    }
+
+    [Fact]
+    public void Lists_the_moments_the_chart_rules_beside_it()
+    {
+        // The rules on the canvas are pixels this suite cannot read; the list under them is the same
+        // set of moments in words, which is both what makes them legible and what can be asserted.
+        var session = TestSessions.Sample(startedAt: _time.Now.AddHours(-1), endedAt: _time.Now);
+        var samples = new[] { TestSessions.Sample(session.Id, _time.Now.AddMinutes(-30), 68) };
+        var events = new[]
+        {
+            new ChargingSessionEvent(session.Id, _time.Now.AddMinutes(-60), ChargingSessionEventKind.SessionStarted, "Opened"),
+            new ChargingSessionEvent(session.Id, _time.Now.AddMinutes(-20), ChargingSessionEventKind.ChargingPaused, "Surplus below the floor"),
+        };
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, samples, events);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.Single(page.FindAll(".chart-marks li")));
+        Assert.Contains("Surplus below the floor", page.Markup);
+    }
+
+    [Fact]
+    public void Explains_the_cars_lag_only_when_the_car_reported_anything()
+    {
+        var session = TestSessions.Sample(startedAt: _time.Now.AddHours(-1), endedAt: _time.Now);
+        var quiet = new[] { TestSessions.Sample(session.Id, _time.Now.AddMinutes(-30), 68) };
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, quiet, []);
+
+        var page = RenderFor(session.Id);
+
+        page.WaitForAssertion(() => Assert.NotEmpty(page.FindAll("#session-chart")));
+        Assert.DoesNotContain("Car SOC", page.Markup);
+
+        var reported = TestSessions.Sample(session.Id, _time.Now.AddMinutes(-30), 68,
+            vehicleSocPercent: 44, vehicleSocCapturedAt: _time.Now.AddHours(-4));
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [reported], []);
+
+        var withCar = RenderFor(session.Id);
+
+        withCar.WaitForAssertion(() => Assert.Contains("Car SOC", withCar.Markup));
     }
 }

@@ -2307,11 +2307,32 @@ existing `COMPOSE_FILE` line doesn't break — merging it is now a no-op.
 Phase 4 adds `/sessions`: a list of recorded sessions (date, duration, driving strategy, energy
 delivered, solar share), each linking to a detail page with the per-source energy split, the day's
 forecast total with its p10–p90 band, the weather at each end of the session with the day's daylight
-window, and a battery-SOC-over-time chart. It reads through `IChargingSessionStore`'s existing query methods —
+window, and **a chart of the session** underneath them. It reads through `IChargingSessionStore`'s existing query methods —
 nothing here reaches past the interface into SQLite — and degrades to "isn't available right now"
 rather than an error page when `SessionStore:Enabled` is off or the file can't be opened. See
 [Charging session history](#charging-session-history-the-sessionstore-section) below for what is
 actually recorded.
+
+The chart speaks the same vocabulary as [the energy day chart](#browsing-the-energy-history) below —
+solar and the forecast that expected it, grid with import above the line and export below, the
+battery charging above and discharging below, what the wall delivered, and SOC on the right-hand axis
+— over the session's own window rather than a calendar day. Three of its lines answer questions only a
+session asks:
+
+- **The car's own SOC steps at the time the car captured it**, not at the sample that carried it. The
+  vehicle feed routinely lags by hours; plotted where it arrived it would draw the car standing still
+  and then jumping. A session the car never reported in has no such line at all.
+- **A stretch with no samples is a hole**, not a line sloped across it — the same rule the energy
+  chart applies to a day. The car's line is the one exception, because the car timestamps its own
+  readings and a reading taken before an outage is still where the car was during it.
+- **A shaded band marks the stretches the battery discharge hold was armed for**, with the battery's
+  own line inside it. Whether a hold actually held is a question about what the pack did while it was
+  armed, and this is where that is now visible rather than inferred.
+
+A dashed rule marks each moment that changed the shape — a mode change, a pause, a plan going
+unusable or usable again — and the list under the chart says what each one was. The setpoint changes
+are deliberately not ruled: they fire most cycles on a sunny afternoon, and a chart ruled once a
+minute is a hatched chart.
 
 The chart uses [uPlot](https://github.com/leeoniya/uPlot) (MIT licensed), vendored into
 `Gleanvolt.Web/wwwroot/lib/` rather than fetched from a CDN — issue #44's decision, so the history stays
