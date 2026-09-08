@@ -2046,9 +2046,24 @@ exception, and keeps the product name: it is reached before anyone has signed in
 
 #### `/vehicle-portal` — the car from the manufacturer, on demand
 
-A button that asks VW's own [EU Data Act portal](docs/VW_PORTAL_SETUP.md) for the car and shows what
-came back: battery, range, charge state, plug state and the *car's* capture time; then the delivery it
-arrived in; then every field in it that nothing here recognises yet.
+A button that asks VW's own [EU Data Act portal](docs/VW_PORTAL_SETUP.md) for the car, and then **one
+card**: battery, range, reading age, charge state and plug state — the dashboard vehicle card's own
+figures, in its own labels and the same rounding, so the two pages can be read side by side without
+translating — plus the two the portal carries and the card has no source for, the car's own **target
+SOC** and its own **time left**.
+
+Under it, what the feed is holding at that moment and how far apart the two are. They are different
+sessions asking at different moments, so a couple of points is the expected outcome rather than a
+fault; [`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) is where a persistent
+difference gets counted instead of eyeballed. An install with no feed switched on is told it has
+nothing to compare against, which is a supported answer and not an error.
+
+**Diagnostics**, collapsed, holds everything the page used to lead with: the delivery it arrived in
+(snapshots, their span, the odometer), every field the build recognised with the raw value and the
+moment the *car* reported it, and every field in the bundle that nothing here reads yet. That is the
+only thing that answers *why is that figure a dash* when a car starts reporting something new, so it
+is kept rather than dropped — and it **opens by itself when the read failed**, because a bundle in
+which nothing matched is a failure whose field list is the whole diagnosis.
 
 **A diagnostic, and the way you prove the credentials.** Nothing polls *this*: each press signs in
 afresh, with its own session, and the reading it shows is not written into the dashboard's vehicle card

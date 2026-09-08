@@ -41,13 +41,28 @@ public class VehiclePortalPageTests : PageTest
         }
     }
 
-        private readonly FakeVehicleAccountSignIn Account = new(configured: false);
+    private readonly FakeVehicleAccountSignIn Account = new(configured: false);
 
-private IRenderedComponent<VehiclePortal> Render(StubReader reader)
+    private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
+
+    /// <summary>Now, for the reading ages the card prints (#178). Two hours after <see cref="Reported"/>.</summary>
+    private readonly FixedTimeProvider _time =
+        new(new DateTimeOffset(2026, 9, 2, 12, 29, 46, TimeSpan.Zero), Prague);
+
+    /// <summary>
+    /// What the feed is holding, which the page shows this press against (#178). Empty by default:
+    /// that is the install with no feed switched on, and the page has to say so rather than compare
+    /// against nothing.
+    /// </summary>
+    private readonly VehicleStateHolder _feed = new();
+
+    private IRenderedComponent<VehiclePortal> Render(StubReader reader)
     {
         Services.AddSingleton<IVehiclePortalReader>(reader);
         Services.AddSingleton(Car());
         Services.AddSingleton<IVehicleAccountSignIn>(Account);
+        Services.AddSingleton<TimeProvider>(_time);
+        Services.AddSingleton<IVehicleTelemetry>(_feed);
         return Render<VehiclePortal>();
     }
 
@@ -278,5 +293,191 @@ private IRenderedComponent<VehiclePortal> Render(StubReader reader)
         Assert.Contains("&lt;script&gt;", page.Markup);
     }
 
+    /// <summary>
+    /// A successful read that carries a state of charge, for the owner-facing tests below. Its
+    /// capture time is <see cref="Reported"/>, two hours before the fixture's clock.
+    /// </summary>
+    private static VehiclePortalReading Answered(
+        double? soc = 64,
+        double? targetSoc = 80,
+        TimeSpan? timeLeft = null) =>
+        new(
+            Succeeded: true,
+            State: new VehicleState(
+                Reported,
+                SocPercent: soc,
+                RangeKm: 312,
+                ChargeTimeRemaining: timeLeft,
+                ChargeState: VehicleChargeState.Charging,
+                PlugState: VehiclePlugState.Connected),
+            Vehicle: "…1234",
+            SnapshotCount: 6,
+            TargetSocPercent: targetSoc,
+            OdometerKm: 53065);
 
+    /// <summary>
+    /// The point of #178. The battery percentage used to be the fourth thing on the page, behind
+    /// three developer-facing sections; it is now the first, in the same labels the dashboard's card
+    /// uses so the two can be read side by side without translating between them.
+    /// </summary>
+    [Fact]
+    public void The_car_comes_first_in_the_dashboard_cards_own_figures()
+    {
+        var page = Render(new StubReader(Answered()));
+        page.Find("#portal-read").Click();
+
+        var card = page.Find("#car").TextContent;
+
+        Assert.Contains("Car battery", card);
+        Assert.Contains("64%", card);
+        Assert.Contains("Car range", card);
+        Assert.Contains("312 km", card);
+        Assert.Contains("Car charge state", card);
+        Assert.Contains("Charging", card);
+        Assert.Contains("Car plug state", card);
+        Assert.Contains("Connected", card);
+    }
+
+    /// <summary>
+    /// The two the portal carries and the dashboard's card cannot. Their absence is what makes the
+    /// card an incomplete answer, so a page that led with the car and dropped them would have moved
+    /// the problem rather than solved it.
+    /// </summary>
+    [Fact]
+    public void The_card_carries_the_two_figures_the_dashboard_has_no_source_for()
+    {
+        var page = Render(new StubReader(Answered(timeLeft: TimeSpan.FromMinutes(95))));
+        page.Find("#portal-read").Click();
+
+        var card = page.Find("#car").TextContent;
+
+        Assert.Contains("Target SOC", card);
+        Assert.Contains("80%", card);
+        Assert.Contains("Time left", card);
+        Assert.Contains("95 min", card);
+    }
+
+    /// <summary>
+    /// The age is the <b>car's</b>, counted from its capture time rather than from the press. A page
+    /// that timed its own button would report a fresh reading of an hours-old fact, which is the one
+    /// thing this data most needs stated.
+    /// </summary>
+    [Fact]
+    public void The_reading_age_is_counted_from_the_cars_capture_time_not_the_press()
+    {
+        var page = Render(new StubReader(Answered()));
+        page.Find("#portal-read").Click();
+
+        // Reported at 10:29:46, the fixture's clock at 12:29:46.
+        Assert.Contains("2.0 h", page.Find("#car").TextContent);
+    }
+
+    /// <summary>
+    /// Kept, and out of the way. The delivery breakdown and the field lists are the only thing that
+    /// answers "why is this field missing" (#140 needed them in anger), but an owner reading a
+    /// battery percentage is not asking that.
+    /// </summary>
+    [Fact]
+    public void A_read_that_worked_puts_the_field_lists_behind_a_collapsed_disclosure()
+    {
+        var page = Render(new StubReader(Answered() with
+        {
+            UnmappedFields = ["settings.auto_unlock_ac"],
+        }));
+
+        page.Find("#portal-read").Click();
+
+        var diagnostics = page.Find("#diagnostics");
+
+        Assert.False(diagnostics.HasAttribute("open"));
+        Assert.Contains("Diagnostics", diagnostics.TextContent);
+
+        // Still there, and still complete -- collapsed is not dropped.
+        Assert.Contains("settings.auto_unlock_ac", diagnostics.TextContent);
+        Assert.Contains("53065", diagnostics.TextContent);
+    }
+
+    /// <summary>
+    /// The exception, and the reason the disclosure is not simply always shut: a bundle in which
+    /// nothing matched is a failure whose field list <b>is</b> the diagnosis. Hiding it behind a
+    /// click would be the page reporting "unusable data" while holding the answer in its hand.
+    /// </summary>
+    [Fact]
+    public void A_read_that_failed_opens_the_disclosure_because_that_is_the_whole_answer()
+    {
+        var page = Render(new StubReader(VehiclePortalReading.Failed(
+            "UnusableData",
+            "none of its 47 field(s) are ones this build recognises",
+            worthRetrying: false,
+            unmapped: ["odometer_km_v2"])));
+
+        page.Find("#portal-read").Click();
+
+        Assert.True(page.Find("#diagnostics").HasAttribute("open"));
+        Assert.Contains("odometer_km_v2", page.Markup);
+    }
+
+    /// <summary>
+    /// A lid over nothing. Not reachable from the real reader — a success is a bundle something was
+    /// mapped out of — but the sections inside would answer "not one field is in the vocabulary" and
+    /// "every field was recognised" together, so the disclosure is decided on content rather than on
+    /// the success flag.
+    /// </summary>
+    [Fact]
+    public void A_reading_with_nothing_in_it_gets_no_disclosure_rather_than_an_empty_one()
+    {
+        var page = Render(new StubReader(new VehiclePortalReading(Succeeded: true)));
+        page.Find("#portal-read").Click();
+
+        Assert.Empty(page.FindAll("#diagnostics"));
+    }
+
+    /// <summary>
+    /// This press and the feed are different sessions asking at different moments, and the page says
+    /// so: a couple of points apart is the expected outcome, not evidence of a fault. Without the
+    /// comparison an owner has to open two tabs and do the subtraction themselves.
+    /// </summary>
+    [Fact]
+    public void A_press_is_shown_against_what_the_feed_is_currently_holding()
+    {
+        _feed.Set(new VehicleState(
+            Reported - TimeSpan.FromMinutes(40), SocPercent: 61, SourceId: "vw-group …1234"));
+
+        var page = Render(new StubReader(Answered(soc: 64)));
+        page.Find("#portal-read").Click();
+
+        var against = page.Find("#against-the-feed").TextContent;
+
+        Assert.Contains("61%", against);
+        Assert.Contains("vw-group …1234", against);
+        Assert.Contains("3 points below this press", against);
+    }
+
+    /// <summary>Two sources agreeing is a finding too, and must not read as a disagreement of zero.</summary>
+    [Fact]
+    public void Two_sources_that_agree_are_said_to_agree()
+    {
+        _feed.Set(new VehicleState(Reported - TimeSpan.FromMinutes(40), SocPercent: 64));
+
+        var page = Render(new StubReader(Answered(soc: 64)));
+        page.Find("#portal-read").Click();
+
+        Assert.Contains("the same state of charge", page.Find("#against-the-feed").TextContent);
+    }
+
+    /// <summary>
+    /// No feed is a supported install rather than a fault, so the page says there is nothing to
+    /// compare against instead of comparing against a blank.
+    /// </summary>
+    [Fact]
+    public void With_no_feed_the_page_says_there_is_nothing_to_hold_the_press_against()
+    {
+        var page = Render(new StubReader(Answered()));
+        page.Find("#portal-read").Click();
+
+        var against = page.Find("#against-the-feed").TextContent;
+
+        Assert.Contains("Nothing has reached the dashboard's card yet", against);
+        Assert.DoesNotContain("below this press", against);
+    }
 }
