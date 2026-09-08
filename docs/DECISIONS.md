@@ -283,32 +283,117 @@ The rule still governs everything else. A manufacturer with no statutory portal,
 have not written, is a Home Assistant automation publishing to a topic — and that path is still here,
 still tested, and still one setting away.
 
-### What the week has to answer, and where the numbers go
+### What the week measured, and what it decided
 
-The instrument exists; the figures are the reference install's to produce. **This section is finished
-when the table below is filled in**, and an empty table is not a formality — it is the difference
-between recording a measurement and recording an intention.
+Both feeds ran from 2026-09-02 22:28 to 2026-09-08 21:24 — 5 d 23 h, and **not unattended**: ten feed
+starts, so the "seven consecutive days" the issue asked for was never achieved. Everything below is
+measured within continuous stretches and stands regardless, but the survival claim is weaker than
+intended and this record says so rather than rounding it up.
 
-| | MQTT (`volkswagen_connect` → HA) | VW portal (`vw-group`) |
-|---|---|---|
-| Days observed, one process | | |
-| Deliveries / repeats | | |
-| Mean gap, longest gap | | |
-| Gaps over 45 min | | |
-| SOC coverage | | |
-| Charge-time-remaining coverage | | |
-| Target SOC seen | n/a | |
-| Sign-ins over the week | n/a | |
-
-| | |
+| | VW portal (`vw-group …4196`) |
 |---|---|
-| SOC agreement, car parked (mean signed / worst) | |
-| Mean separation of compared captures | |
+| Read attempts / produced a reading | 564 / 547 (97%) |
+| Failures | 13 `SessionExpired`, 3 `UnusableData`, 1 transient |
+| Distinct capture times | 76, of which 59 were forward deliveries |
+| Gap between deliveries — median / longest | 59 min / 14 h 16 m |
+| Gaps over 45 min | 30 of 58 |
+| Steps backwards | **132**, worst −2 d 20 h |
+| Sign-ins | **193** (median session 1 h 00 m, max 1 h 45 m) |
+| Reading superseded by the MQTT feed | 311 of 547 (57%) |
+| `settings.target_soc` | 80%, on every read |
+| Charge-time-remaining | carried on every read — the MQTT feed never carried it |
+| Plug state | **never** carried — 568 of 568 reads `Unknown` |
+| Charge state | carried on 557 of 568 |
 
-**And the decision, with its reason:** _(handover performed / declined — record which, and why)_
+**Handover accepted.** `Vehicle__Enabled` off, the Home Assistant automation stopped, the portal feed
+left on. No code deleted, and the MQTT path is one setting away exactly as promised.
 
-If the week is not boring, that is a result too: record it, stay on MQTT, and do not perform the
-handover because an issue said so.
+**And by the time it was made, the portal was no longer the only internal feed.** #170 added
+`vw-website`, which reads volkswagen.de directly: it polls fast **while the car is charging** and
+returns nothing when it is not, and its readings arrive with roughly twenty seconds of lag rather than
+hours. So the site now runs two manufacturer services with different jobs, and the handover replaced
+one feed with a pair:
+
+| | `vw-group` (Data Act portal) | `vw-website` (volkswagen.de) |
+|---|---|---|
+| When | always, every 15 min | only while charging; idles at 1 min |
+| Lag | hours — the car's own batch cadence | ~20 s |
+| Plug state | never | yes |
+| Target SOC / time remaining | yes | — |
+
+That pairing is why the loss of the MQTT feed's plug state costs nothing in practice, and it is also
+why the two-feed comparison built for #141 keeps its subject: there are still two feeds to compare,
+they still disagree about the same battery, and one of them is silent most of the day by design.
+
+### The reading that nearly went the other way, and why it was wrong
+
+The first pass over these numbers **declined** the handover, on the figure that looks most damning:
+the portal's reading was already a median of **5 h 10 m old when it arrived**, and only 3% of reads
+were less than half an hour old. Against a feed assumed to be live, that is disqualifying.
+
+The assumption was never checked, and it was false. The retained MQTT message at the moment of the
+decision was `2026-09-08T15:54:16Z` — 4 h 26 m old — while the portal was holding `19:17:18Z`, an hour
+old. **The portal was three and a half hours ahead of the feed it was being measured against.**
+
+Then the reason, which is the finding worth keeping:
+
+| MQTT capture | Nearest portal capture | Difference |
+|---|---|---|
+| 09-04 08:09:34 | 09-04 08:09:34 | 0 s |
+| 09-04 16:16:10 | 09-04 16:16:14 | 4 s |
+| 09-05 16:31:05 | 09-05 16:31:11 | 6 s |
+| 09-06 18:17:34 | 09-06 18:18:22 | 48 s |
+| 09-07 16:08:20 | 09-07 16:09:50 | 90 s |
+| 09-08 15:54:16 | 09-08 15:54:20 | 4 s |
+
+Six of seven within ninety seconds. **The two feeds carry the same car reports** — `volkswagen_connect`
+and the Data Act portal both ultimately surface the ID.4's own `car_captured_time`, by different roads.
+Neither can be fresher than the car chooses to be, and the five-hour median is the **car's** reporting
+cadence rather than either feed's lag.
+
+Two lessons, and the second is the expensive one:
+
+- **A comparison measures both sides or it measures nothing.** The instrument counted the portal
+  exactly as designed and the analysis still reached the wrong verdict, because the benchmark was
+  assumed rather than read. `VehicleFeedComparison` records per-source cadence honestly; what it could
+  not do was stop somebody reading one column and calling it a comparison.
+- **The MQTT feed's per-reading log line is `Debug`**, so a week of it is invisible in a production log
+  while the portal's is `Information`. That asymmetry is what made the wrong reading easy, and it is
+  worth fixing before the next feed is judged this way.
+
+### What is genuinely wrong with the portal, and survives the correction
+
+- **193 sign-ins in six days**, a session lasting an hour. Self-healing — every bounce recovered in
+  about a second, no OTP and no CAPTCHA all week — and invisible to the owner, but "one sign-in is the
+  healthy answer" was wrong by two orders of magnitude, and #138's question now has a real number.
+- **132 backward steps.** The feed repeatedly produced a capture time older than one it had already
+  delivered. Through the week this was cosmetic: `VehicleStateHolder` keeps the newest capture and
+  refuses an older one, so the dashboard never regressed — and it still refuses with one feed, which is
+  what makes the handover safe. What it costs is deliveries: a feed that goes backwards is a feed not
+  advancing.
+- **No plug state, ever.** 568 reads, 568 `Unknown`. The MQTT feed carried it and the portal does not,
+  so the handover loses that field outright. The charger's own view of whether a car is connected is
+  unaffected, and is the one that matters.
+
+### "Own a schema, not a client" is partly walked back, for one manufacturer
+
+Worth stating plainly rather than leaving in the diff. #73 set the rule: this codebase owns a
+*schema* — `captured_at`, `soc_percent`, and the rest — and every car's adaptation happens in Home
+Assistant, so a second car costs no code. `VwGroupUpdateService` is a client. It has credentials, a
+session, its own failure modes and a form flow that VW can change without notice, and it is exactly the
+kind of thing that rule existed to keep out.
+
+The justification is narrow and does not generalise: the EU Data Act portal is the **documented
+statutory interface**, not a reverse-engineered app API. It is the owner's own data by law, free of
+charge, and if it breaks it breaks in public with a regulator's attention on it — which is a different
+risk from an undocumented endpoint that can be withdrawn in a release note, as VW's WeConnect OAuth
+client was in May–June 2026.
+
+The rule still governs everything else. A manufacturer with no statutory portal, or one whose portal we
+have not written, is a Home Assistant automation publishing to a topic — and that path is still here,
+still tested, and still one setting away. **That is the reason the MQTT feed is switched off rather
+than deleted**, and the reason it must stay that way: the day this becomes a two-car installation, it
+is the only thing that works.
 
 ---
 

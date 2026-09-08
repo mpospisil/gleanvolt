@@ -1962,20 +1962,30 @@ keep new-device challenges rare.
 > controller says at startup when both are on, and the dashboard names which feed the reading on screen
 > came from.
 
-**Running both is the point, for a while.** [#141](https://github.com/mpospisil/gleanvolt/issues/141)
-is a measurement rather than a feature: leave the two side by side for a week and decide between them
-on what they actually delivered.
-[`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) is where those numbers are — how
-often each one produced a *fresh* reading, whether the two agree about the same battery, which fields
-either of them carries, and how many times the portal session had to be re-established.
+**This is the reference site's baseline vehicle source, as of 2026-09-08** — alongside
+[`vw-website`](#vehiclewebsite--volkswagende-the-live-source), which reads volkswagen.de live while the car
+is charging and is silent when it is not. The portal is the one that answers all day.
 
-**The handover is a setting, and nothing is deleted.** When the week is boring: set
-`Vehicle__Enabled=false`, stop the Home Assistant vehicle automation, and leave
-`Vehicle__DataAct__Enabled=true`. `VehicleMqttWorker`, the payload contract, `Vehicle__Broker*`,
-`Vehicle__Topic` and the per-car `Telemetry:Topic` all stay in the tree and keep working — if the
-portal disappoints in month two the old feed is one setting away, and it remains the answer for every
-car nobody has written a service for. If the week is *not* boring, that is a result too: record it and
-stay on MQTT.
+[#141](https://github.com/mpospisil/gleanvolt/issues/141) ran both feeds side by side for six days and
+handed over on what they delivered. The finding that decided it: **the two feeds carry the same car
+reports.** Six of seven MQTT capture times matched a portal capture within ninety seconds, four of them
+within six — `volkswagen_connect` and the Data Act portal both surface the ID.4's own
+`car_captured_time`, by different roads. Neither can be fresher than the car chooses to be, so the
+choice between them is about which road is more dependable, not about the data.
+
+What the portal gains: `settings.target_soc` (80%, on every read) and a charge-time-remaining, neither
+of which the MQTT feed ever carried. What it loses: **plug state**, which it has never once reported —
+the charger's own view of whether a car is connected is unaffected and is the one that matters. What it
+costs: a portal session lasts about an hour, so it signs in roughly thirty times a day, unattended and
+without an OTP. The numbers, including the ones that argue against it, are in
+[docs/DECISIONS.md](docs/DECISIONS.md).
+
+**The handover is a setting, and nothing was deleted.** `Vehicle__Enabled=false`, the Home Assistant
+vehicle automation stopped, `Vehicle__DataAct__Enabled=true`. `VehicleMqttWorker`, the payload
+contract, `Vehicle__Broker*`, `Vehicle__Topic` and the per-car `Telemetry:Topic` all stay in the tree
+and keep working. That is not sentiment about the old feed: **it is the only path that works for a car
+nobody has written a service for**, which is still most of them, and it is what a second vehicle on
+this installation would use. Turning it back on is one line.
 
 Everything else about the feed is unchanged: `MaxAge` still judges staleness, nothing in `ChargeControl`
 or `BatteryHold` reads it, and an installation with `Enabled: false` behaves exactly as it did before
