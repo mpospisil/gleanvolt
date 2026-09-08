@@ -367,15 +367,12 @@ else
             : described;
     }
 
-    // Coarse on purpose: this data is hours old routinely, so minutes of precision would imply an
-    // accuracy the source doesn't have. A negative age (the car's clock ahead of ours) reads as "just
-    // now" rather than as a negative duration.
-    private static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
+    // The car's figures are formatted in VehicleFormatting rather than here (#178): /vehicle-portal
+    // shows the same ones, and it exists to be compared against this card. Two roundings would let
+    // the two pages disagree over a reading they agree on.
+    private static string Km(double? km) => VehicleFormatting.Km(km);
 
-    // Null and zero are different facts: zero means the car says it is done, and a dash means this
-    // feed does not carry the field at all (#73). Rounded to the minute, which is all the car offers.
-    private static string ChargeTime(VehicleState reading) =>
-        reading.ChargeTimeRemaining is { } left ? $"{left.TotalMinutes:F0} min" : "—";
+    private static string ChargeTime(VehicleState reading) => VehicleFormatting.ChargeTime(reading);
 
     /// <summary>
     /// Whether the card above is currently quoting this feed. Matched on the name the feed put on its
@@ -419,29 +416,8 @@ else
         }
     }
 
-    private string VehicleAge(VehicleState vehicle)
-    {
-        var age = vehicle.AgeAt(Time.GetUtcNow());
-
-        if (age < TimeSpan.Zero)
-        {
-            return "just now";
-        }
-
-        if (age < TimeSpan.FromMinutes(1))
-        {
-            return "under a minute";
-        }
-
-        if (age < TimeSpan.FromHours(1))
-        {
-            return $"{age.TotalMinutes:F0} min";
-        }
-
-        return age < TimeSpan.FromDays(1)
-            ? $"{age.TotalHours:F1} h"
-            : $"{age.TotalDays:F1} days";
-    }
+    private string VehicleAge(VehicleState vehicle) =>
+        VehicleFormatting.Age(vehicle, Time.GetUtcNow());
 
     private static string Watts(double watts) => $"{watts:F0} W";
 
@@ -451,7 +427,7 @@ else
 
     private static string Percent(double percent) => $"{percent:F0}%";
 
-    private static string Percent(double? percent) => percent is null ? "—" : $"{percent.Value:F0}%";
+    private static string Percent(double? percent) => VehicleFormatting.Percent(percent);
 
     private static string Amps(int amps) => $"{amps} A";
 

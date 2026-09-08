@@ -4,6 +4,8 @@
 @inject IVehiclePortalReader Portal
 @inject EvInfo Car
 @inject IVehicleAccountSignIn Account
+@inject IVehicleTelemetry Feed
+@inject TimeProvider Time
 
 @*
     Reading the car from the manufacturer's own portal, on demand (issues #137/#139).
@@ -17,6 +19,13 @@
     whatever feed is configured. Pressing the button is how the credentials and the mapping are proved
     before anything signs in unattended -- and how they are re-checked afterwards, since a feed blocked
     on a consent screen stops asking by design.
+
+    Owner-first since #178. The page used to answer "does the mapping work at all" in three sections,
+    which was the right shape while that was the open question and the wrong one once it was settled:
+    the battery percentage was the fourth thing you read. It now leads with the car, in the same
+    figures the dashboard's card shows, and the three diagnostic sections are one disclosure below it.
+    They were not dropped -- #140 needed them in anger, and they are still the only thing that answers
+    "why is this field missing" when a car starts reporting something new.
 *@
 
 <SiteTitle Page="Vehicle portal" />
@@ -85,11 +94,10 @@
 <h1>Vehicle portal</h1>
 
 <p class="muted">
-    Asks @Portal.PortalName for @(string.IsNullOrWhiteSpace(Car.Name) ? "the car" : Car.Name), once,
-    when you press the button. <em>This press</em> runs on no schedule and what it shows is fed to
-    nothing — not the dashboard's card, not any charging decision — so it is how you check that the
-    credentials work and that the portal's fields are understood, whether or not the feed on its own
-    clock is switched on.
+    Asks @Portal.PortalName for @CarName, once, when you press the button. <em>This press</em> runs on
+    no schedule and what it shows is fed to nothing — not the dashboard's card, not any charging
+    decision — so it is how you check that the credentials work and that the portal's fields are
+    understood, whether or not the feed on its own clock is switched on.
 </p>
 
 @if (!Portal.IsConfigured)
@@ -133,165 +141,223 @@ else
 }
 else if (_reading is { Succeeded: true, State: { } state })
 {
-    <h2>What the car said</h2>
+    @*
+        The car, in the dashboard card's own figures and its own component (#178) — battery, range,
+        reading age, charge state, plug state — plus the two the portal carries that the card cannot:
+        the car's own charge limit, and its own estimate of how much longer it needs.
 
-    <dl class="facts">
-        <dt>Captured</dt>
-        <dd>@state.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss zzz")</dd>
+        Same Stat component and the same formatters, deliberately: the reason to look at this page
+        beside the dashboard is to compare them, and a difference in rounding would read as a
+        difference in the reading.
+    *@
+    <h2>@CarName</h2>
 
-        <dt>Battery</dt>
-        <dd>@Show(state.SocPercent, "%")</dd>
-
-        <dt>Range</dt>
-        <dd>@Show(state.RangeKm, " km")</dd>
-
-        <dt>Charging</dt>
-        <dd>@state.ChargeState</dd>
-
-        <dt>Plug</dt>
-        <dd>@state.PlugState</dd>
-
-        <dt>Time left</dt>
-        <dd>@(state.ChargeTimeRemaining is { } left ? $"{left.TotalMinutes:N0} min" : "—")</dd>
-    </dl>
+    <section class="stat-grid" id="car">
+        <Stat Label="Car battery" Value="@VehicleFormatting.Percent(state.SocPercent)"
+              Hint="The car's own state of charge, as the portal answered this press. Not the home battery." />
+        <Stat Label="Car range" Value="@VehicleFormatting.Km(state.RangeKm)"
+              Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
+        <Stat Label="Car reading age" Value="@Age(state)"
+              Hint="How long ago the car itself produced this reading — not how long ago you pressed the button. Hours old is normal for a parked car." />
+        <Stat Label="Car charge state" Value="@state.ChargeState.ToString()"
+              Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+        <Stat Label="Car plug state" Value="@state.PlugState.ToString()"
+              Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
+        <Stat Label="Target SOC" Value="@VehicleFormatting.Percent(_reading.TargetSocPercent)"
+              Hint="The car's own charge limit, set in the car or its app. The portal carries it and the dashboard's card cannot: no plan reads it yet (#101). A dash means this bundle did not carry it." />
+        <Stat Label="Time left" Value="@VehicleFormatting.ChargeTime(state)"
+              Hint="The car's own estimate of how much longer it needs, not one of ours. A dash means the portal did not carry it — which is itself a finding." />
+    </section>
 
     <p class="muted table-note">
         The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago is
         normal and not a fault — its state of charge does not drift.
     </p>
-}
 
-@*
-    The delivery itself, shown whether the mapping succeeded or not: how many snapshots arrived and
-    what they span is how "this quarter-hour said nothing" is told apart from "the portal handed us
-    one report type and the battery is in another delivery". On a failure it is half the diagnosis.
-*@
-@if (_reading is { SnapshotCount: > 0 })
-{
-    <h2>The delivery</h2>
+    @*
+        This press against what the feed is holding (#178).
 
-    <dl class="facts">
-        <dt>Vehicle</dt>
-        <dd>@_reading.Vehicle</dd>
-
-        <dt>Snapshots</dt>
-        <dd>
-            @_reading.SnapshotCount
-            @if (_reading.OldestSnapshot is { } oldest && _reading.NewestSnapshot is { } newest)
-            {
-                @* A merged read reaches back as far as it has to, and the reference car's deliveries
-                   are not a tidy quarter-hour apart -- the first live merge spanned most of a day. As
-                   bare clock times that read as "16:30 - 10:29", which looks like a fault rather than
-                   a span. The date appears exactly when the two ends disagree about it. *@
-                <span class="muted"> (@Span(oldest, newest))</span>
-            }
-        </dd>
-
-        <dt>Target SOC</dt>
-        <dd>@Show(_reading.TargetSocPercent, "%")</dd>
-
-        <dt>Odometer</dt>
-        <dd>@Show(_reading.OdometerKm, " km")</dd>
-    </dl>
-
-    <p class="muted table-note">
-        Target SOC and the odometer are carried but nothing reads them yet. The first is what would
-        let a plan refuse an impossible battery target, deferred on
-        <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
-    </p>
-}
-
-@*
-    What the vocabulary DID match, and what each of those fields actually said.
-
-    The half that was missing the first time this page was needed in anger. A name absent from the
-    unrecognised list below means one of two opposite things -- the bundle never carried it, or it
-    carried it and the value was a sentinel that filtering threw away -- and those want opposite
-    fixes: a name to add, against a car that reports the field empty. Values are shown raw, quoted
-    and untouched, because "" and "invalid" are exactly what this exists to reveal.
-*@
-@if (_reading is not null && _reading.Matched.Count > 0)
-{
-    <h2>@_reading.Matched.Count field(s) this build recognised</h2>
-
-    <p class="muted">
-        Each with the moment the <em>car</em> reported it. A read merges several deliveries, so two
-        figures here can be hours apart — and comparing them without that is how a coarse reading and
-        a stale one get mistaken for each other.
-    </p>
-
-    @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
-       column sized to fit its own content. *@
-    <dl class="fields">
-        @foreach (var (field, reading) in _reading.Matched.OrderByDescending(entry => entry.Value.At))
-        {
-            <dt><code>@Breakable(field)</code></dt>
-            <dd>
-                @(string.IsNullOrWhiteSpace(reading.Value)
-                    ? (MarkupString)"(empty)"
-                    : Breakable($"\"{reading.Value}\""))
-                <span class="muted">@reading.At.ToString("yyyy-MM-dd HH:mm")</span>
-            </dd>
-        }
-    </dl>
-}
-else if (_reading is not null && (_reading.Succeeded || _reading.Unmapped.Count > 0))
-{
-    <p class="muted">
-        Not one field in the bundle is in the vocabulary at all — so this is a set of names to add
-        rather than a car reporting empty values.
-    </p>
-}
-
-@if (_reading is not null && _reading.Notes.Count > 0)
-{
-    <h2>What the bundle held that never became a reading</h2>
-
-    @foreach (var note in _reading.Notes)
+        They are different sessions, asking at different moments, and the point of saying so out loud
+        is that a small disagreement here is the expected outcome rather than evidence of a fault.
+        A large or persistent one is a real finding, and the feeds page is where it gets counted
+        rather than eyeballed.
+    *@
+    @if (Feed.GetCurrentState() is { } held)
     {
-        <p class="muted">@note</p>
+        <p class="muted" id="against-the-feed">
+            The dashboard's card is showing @VehicleFormatting.Percent(held.SocPercent) from
+            @(string.IsNullOrWhiteSpace(held.SourceId) ? "the feed" : held.SourceId), captured
+            @Age(held) ago@(Difference(state, held)). That is a different session asking at a different
+            moment, so a difference is not by itself a fault —
+            <a href="/vehicle-feeds">the feeds page</a> is where a persistent one is counted.
+        </p>
     }
-
-    @if (_reading.Dropped.Count > 0)
+    else
     {
-        <ul class="sessions">
-            @foreach (var field in _reading.Dropped)
-            {
-                <li><code>@field</code></li>
-            }
-        </ul>
+        <p class="muted" id="against-the-feed">
+            Nothing has reached the dashboard's card yet, so there is nothing to hold this against.
+            That is what an install with no feed switched on looks like, and it is not a fault: this
+            press is the whole reading.
+        </p>
     }
 }
 
 @*
-    The unrecognised names, shown whether the read succeeded or not.
+    Everything the page used to lead with, one disclosure down (#178).
 
-    They used to hang off the success branch, which put them exactly where they were least needed: a
-    bundle in which *nothing* matched is now a failure, and that is precisely the case where this list
-    is the whole answer. Reporting "unusable data" while holding the field names back would be a page
-    keeping the diagnosis to itself.
+    Collapsed when the read worked, because then it is the answer to a question nobody is asking.
+    Open when it did not, because then it is the answer to the only question there is: a bundle in
+    which nothing matched is a failure whose field list IS the diagnosis, and hiding it behind a
+    click would be a page reporting "unusable data" while holding the answer in its hand.
 *@
-@if (_reading is not null && _reading.Unmapped.Count > 0)
+@if (_reading is not null && HasDiagnostics)
 {
-    <h2>@_reading.Unmapped.Count field(s) nothing here reads</h2>
+    <details class="diagnostics" id="diagnostics" open="@(!_reading.Succeeded)">
+        <summary>Diagnostics</summary>
 
-    <p class="muted">
-        If a value above is missing, its real name is probably in this list — the portal's vocabulary
-        was written down from VW's data dictionary rather than from your car, so this is expected on a
-        first run rather than a fault. Adding the right names to <code>VwGroupFieldNames</code> is the
-        fix; pasting this list into an issue is enough for somebody else to do it.
-    </p>
+        <p class="muted">
+            What the portal delivered and how much of it this build understands. This is what answers
+            <em>why is that field a dash</em> — worth opening when a figure above is missing, and
+            worth ignoring when none is.
+        </p>
 
-    <ul class="sessions">
-        @foreach (var field in _reading.Unmapped)
+        @*
+            The delivery itself, shown whether the mapping succeeded or not: how many snapshots arrived
+            and what they span is how "this quarter-hour said nothing" is told apart from "the portal
+            handed us one report type and the battery is in another delivery". On a failure it is half
+            the diagnosis.
+        *@
+        @if (_reading is { SnapshotCount: > 0 })
         {
-            <li><code>@field</code></li>
+            <h3>The delivery</h3>
+
+            <dl class="facts">
+                <dt>Vehicle</dt>
+                <dd>@_reading.Vehicle</dd>
+
+                <dt>Snapshots</dt>
+                <dd>
+                    @_reading.SnapshotCount
+                    @if (_reading.OldestSnapshot is { } oldest && _reading.NewestSnapshot is { } newest)
+                    {
+                        @* A merged read reaches back as far as it has to, and the reference car's deliveries
+                           are not a tidy quarter-hour apart -- the first live merge spanned most of a day. As
+                           bare clock times that read as "16:30 - 10:29", which looks like a fault rather than
+                           a span. The date appears exactly when the two ends disagree about it. *@
+                        <span class="muted"> (@Span(oldest, newest))</span>
+                    }
+                </dd>
+
+                @* Repeated from the card above rather than moved out of it: on a failed read there is
+                   no card, and this is then the only place the bundle's own figures can appear. *@
+                <dt>Target SOC</dt>
+                <dd>@VehicleFormatting.Percent(_reading.TargetSocPercent)</dd>
+
+                <dt>Odometer</dt>
+                <dd>@VehicleFormatting.Km(_reading.OdometerKm)</dd>
+            </dl>
+
+            <p class="muted table-note">
+                The odometer is carried but nothing reads it. Target SOC is the one that would let a
+                plan refuse an impossible battery target, deferred on
+                <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
+            </p>
         }
-    </ul>
-}
-else if (_reading is { Succeeded: true })
-{
-    <p class="muted">Every field in the bundle was recognised.</p>
+
+        @*
+            What the vocabulary DID match, and what each of those fields actually said.
+
+            The half that was missing the first time this page was needed in anger. A name absent from
+            the unrecognised list below means one of two opposite things -- the bundle never carried
+            it, or it carried it and the value was a sentinel that filtering threw away -- and those
+            want opposite fixes: a name to add, against a car that reports the field empty. Values are
+            shown raw, quoted and untouched, because "" and "invalid" are exactly what this exists to
+            reveal.
+        *@
+        @if (_reading.Matched.Count > 0)
+        {
+            <h3>@_reading.Matched.Count field(s) this build recognised</h3>
+
+            <p class="muted">
+                Each with the moment the <em>car</em> reported it. A read merges several deliveries, so
+                two figures here can be hours apart — and comparing them without that is how a coarse
+                reading and a stale one get mistaken for each other.
+            </p>
+
+            @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
+               column sized to fit its own content. *@
+            <dl class="fields">
+                @foreach (var (field, reading) in _reading.Matched.OrderByDescending(entry => entry.Value.At))
+                {
+                    <dt><code>@Breakable(field)</code></dt>
+                    <dd>
+                        @(string.IsNullOrWhiteSpace(reading.Value)
+                            ? (MarkupString)"(empty)"
+                            : Breakable($"\"{reading.Value}\""))
+                        <span class="muted">@reading.At.ToString("yyyy-MM-dd HH:mm")</span>
+                    </dd>
+                }
+            </dl>
+        }
+        else if (_reading.Succeeded || _reading.Unmapped.Count > 0)
+        {
+            <p class="muted">
+                Not one field in the bundle is in the vocabulary at all — so this is a set of names to
+                add rather than a car reporting empty values.
+            </p>
+        }
+
+        @if (_reading.Notes.Count > 0)
+        {
+            <h3>What the bundle held that never became a reading</h3>
+
+            @foreach (var note in _reading.Notes)
+            {
+                <p class="muted">@note</p>
+            }
+
+            @if (_reading.Dropped.Count > 0)
+            {
+                <ul class="sessions">
+                    @foreach (var field in _reading.Dropped)
+                    {
+                        <li><code>@field</code></li>
+                    }
+                </ul>
+            }
+        }
+
+        @*
+            The unrecognised names, shown whether the read succeeded or not.
+
+            They used to hang off the success branch, which put them exactly where they were least
+            needed: a bundle in which *nothing* matched is a failure, and that is precisely the case
+            where this list is the whole answer.
+        *@
+        @if (_reading.Unmapped.Count > 0)
+        {
+            <h3>@_reading.Unmapped.Count field(s) nothing here reads</h3>
+
+            <p class="muted">
+                If a value above is missing, its real name is probably in this list — the portal's
+                vocabulary was written down from VW's data dictionary rather than from your car, so
+                this is expected on a first run rather than a fault. Adding the right names to
+                <code>VwGroupFieldNames</code> is the fix; pasting this list into an issue is enough
+                for somebody else to do it.
+            </p>
+
+            <ul class="sessions">
+                @foreach (var field in _reading.Unmapped)
+                {
+                    <li><code>@field</code></li>
+                }
+            </ul>
+        }
+        else if (_reading.Succeeded)
+        {
+            <p class="muted">Every field in the bundle was recognised.</p>
+        }
+    </details>
 }
 
 @code {
@@ -352,6 +418,24 @@ else if (_reading is { Succeeded: true })
     private VehiclePortalReading? _reading;
     private bool _busy;
 
+    /// <summary>The owner's word for the car, falling back to something that reads as a sentence.</summary>
+    private string CarName => string.IsNullOrWhiteSpace(Car.Name) ? "the car" : Car.Name;
+
+    /// <summary>
+    /// Whether the disclosure has anything in it at all — measured on content, never on success.
+    ///
+    /// <para>A reading that succeeded while carrying no snapshots, no matched fields and nothing
+    /// unrecognised is not reachable from the real reader (a success is a bundle something mapped out
+    /// of), but it is trivially constructible, and the sections inside would then answer with
+    /// "not one field is in the vocabulary" and "every field was recognised" at once. Nothing to
+    /// show is a reason for no lid rather than for an empty one.</para>
+    /// </summary>
+    private bool HasDiagnostics =>
+        _reading is { SnapshotCount: > 0 }
+        || _reading?.Matched.Count > 0
+        || _reading?.Unmapped.Count > 0
+        || _reading?.Notes.Count > 0;
+
     private async Task ReadAsync()
     {
         _busy = true;
@@ -372,8 +456,32 @@ else if (_reading is { Succeeded: true })
         }
     }
 
-    private static string Show(double? value, string unit) =>
-        value is { } number ? $"{number:0.#}{unit}" : "—";
+    private string Age(VehicleState state) => VehicleFormatting.Age(state, Time.GetUtcNow());
+
+    /// <summary>
+    /// How far this press and the feed's held reading are apart, as a clause to hang off the end of
+    /// the sentence. Empty when there is nothing to compare — one of the two carrying no state of
+    /// charge is a fact about the sources, not a disagreement between them.
+    /// </summary>
+    private static string Difference(VehicleState pressed, VehicleState held)
+    {
+        if (pressed.SocPercent is not { } here || held.SocPercent is not { } there)
+        {
+            return string.Empty;
+        }
+
+        // Compared at the precision both are displayed at. Two readings that print as 64% must not be
+        // described as differing, whatever their third decimal places are doing.
+        var gap = Math.Round(here) - Math.Round(there);
+
+        if (gap == 0)
+        {
+            return " — the same state of charge";
+        }
+
+        var size = Math.Abs(gap);
+        return $" — {size:F0} point{(size == 1 ? "" : "s")} {(gap > 0 ? "below" : "above")} this press";
+    }
 
     /// <summary>
     /// A portal field name with break opportunities marked after its separators.
