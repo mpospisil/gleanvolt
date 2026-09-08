@@ -62,7 +62,10 @@ public class ForecastedTabTests : PageTest
 
         Assert.Contains("only shown while", page.Markup);
         Assert.Contains("Solar", page.Markup);
-        Assert.DoesNotContain("Day outlook", page.Markup);
+
+        // The stat grid, not the words in it: the controls above now name the figures they feed
+        // ("it sets Day outlook"), so a text search would find the label without a plan behind it.
+        Assert.Empty(page.FindAll(".stat-grid"));
 
         // The controls the mode reads are not part of the plan, and stay reachable whatever is driving.
         Assert.NotEmpty(page.FindAll("#daily-ev-target"));
@@ -267,5 +270,98 @@ public class ForecastedTabTests : PageTest
         _holder.Set(Statuses.Sample(_time.Now));
 
         page.WaitForAssertion(() => Assert.Equal("9", page.Find("#daily-ev-target").GetAttribute("value")));
+    }
+
+    // The two energy numbers read alike and behave nothing alike (#173): the daily target is a
+    // yardstick the plan reports against, the session target is the only hard stop. The verdict is
+    // what the daily target buys -- one sentence instead of three tiles -- and the session line is
+    // what the ceiling has left.
+    [Fact]
+    public void Says_in_one_sentence_how_today_stands_against_what_the_owner_drives()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
+        {
+            Plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Tight),
+        });
+
+        var page = RenderTab();
+
+        // The sample plan expects 6 kWh into the car against a 15 kWh target.
+        Assert.Contains("Today covers 6.0 kWh of the 15.0 kWh you drive — 9.0 kWh short", page.Markup);
+    }
+
+    [Fact]
+    public void Calls_a_day_that_reaches_the_target_covered_rather_than_short()
+    {
+        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Surplus) with
+        {
+            EvExpectedTodayWh = 15_000,
+            EvTargetWh = 15_000,
+        };
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
+
+        var page = RenderTab();
+
+        Assert.Contains("Today covers the full 15.0 kWh you drive", page.Markup);
+        Assert.DoesNotContain("kWh short", page.Markup);
+    }
+
+    [Fact]
+    public void Says_the_car_gets_nothing_on_a_day_with_no_window()
+    {
+        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.NoChargeToday) with { NextFeasibleWindow = null };
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
+
+        var page = RenderTab();
+
+        Assert.Contains("no chargeable window", page.Markup);
+        Assert.Contains("the battery keeps priority", page.Markup);
+    }
+
+    [Fact]
+    public void Judges_nothing_when_no_daily_target_is_set()
+    {
+        // 0 makes the outlook permanently Surplus, so a verdict phrased against the target would be
+        // a lie dressed as good news.
+        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Surplus) with { EvTargetWh = 0 };
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
+
+        var page = RenderTab();
+
+        Assert.Contains("No daily target set", page.Markup);
+    }
+
+    [Fact]
+    public void Counts_the_session_off_against_its_ceiling()
+    {
+        _forecast.SetSessionEnergyTargetWh(10_000, "test setup");
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 4_000 });
+
+        var page = RenderTab();
+
+        Assert.Contains("4.0 kWh of 10.0 kWh in this session", page.Markup);
+    }
+
+    [Fact]
+    public void Says_the_ceiling_is_what_is_holding_the_car_once_it_is_reached()
+    {
+        _forecast.SetSessionEnergyTargetWh(10_000, "test setup");
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 10_400 });
+
+        var page = RenderTab();
+
+        Assert.Contains("reached, so the car stays paused until you unplug it", page.Markup);
+    }
+
+    [Fact]
+    public void Reports_a_zero_session_target_as_no_limit_rather_than_a_0_kwh_one()
+    {
+        // 0 is unlimited, so "0.0 kWh of 0.0 kWh" would read as a charge that can never run.
+        _forecast.SetSessionEnergyTargetWh(0, "test setup");
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 3_000 });
+
+        var page = RenderTab();
+
+        Assert.Contains("No limit set. 3.0 kWh into the car since it was plugged in", page.Markup);
     }
 }

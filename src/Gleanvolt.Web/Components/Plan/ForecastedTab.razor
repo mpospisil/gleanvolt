@@ -18,6 +18,11 @@
     The numbers are written through IForecastRuntimeSettings, the seam the MQTT worker's number
     entities write, and re-read whenever a new status lands: Home Assistant or a second browser can
     move any of them, and this tab shows what the controller is actually using.
+
+    They are grouped by what they act on rather than listed as four boxes, because the pair that reads
+    alike behaves least alike: the daily EV target is a yardstick the plan reports against and never a
+    limit, while the session target is the only hard stop here. The verdict the daily target buys --
+    "today covers 9 of the 15 kWh you drive" -- is one sentence above the plan, said once.
 *@
 
 <p class="muted">
@@ -37,45 +42,57 @@
     </span>
 </div>
 
-<div class="control">
-    <label for="daily-ev-target">Daily EV target (kWh)</label>
-    <input id="daily-ev-target" type="number" step="0.1" min="0"
-           @bind="_dailyEvTargetKWh" @bind:event="onchange" @bind:after="OnDailyEvTargetSelected" />
-    <span class="hint">
-        How much energy the car should get on a normal day. Doesn't persist across restarts.
-    </span>
-</div>
+<section class="plan" id="ev-energy">
+    <h2>How much the car gets</h2>
 
-<div class="control">
-    <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
-    <input id="session-energy-target" type="number" step="0.1" min="0"
-           @bind="_sessionEnergyTargetKWh" @bind:event="onchange" @bind:after="OnSessionEnergyTargetSelected" />
-    <span class="hint">
-        Stop charging once this much has gone into the car in one session. 0 means no limit.
-        Doesn't persist across restarts.
-    </span>
-</div>
+    <div class="control">
+        <label for="daily-ev-target">Daily EV target (kWh)</label>
+        <input id="daily-ev-target" type="number" step="0.1" min="0"
+               @bind="_dailyEvTargetKWh" @bind:event="onchange" @bind:after="OnDailyEvTargetSelected" />
+        <span class="hint">
+            What you drive on a normal day. The plan judges the day against it — the verdict is the
+            line above <strong>The plan</strong> below — but <strong>it never stops the charger</strong>.
+            To cap a charge, use the session target. Doesn't persist across restarts.
+        </span>
+    </div>
 
-<div class="control">
-    <label for="min-battery-soc">Minimum battery SOC (%)</label>
-    <input id="min-battery-soc" type="number" step="1" min="0" max="100"
-           @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
-    <span class="hint">
-        The hard floor the plan may never take the home battery below. Shared with
-        <a href="/charging-plan/targeted">Targeted</a>, which works to the same floor. Doesn't persist
-        across restarts.
-    </span>
-</div>
+    <div class="control">
+        <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
+        <input id="session-energy-target" type="number" step="0.1" min="0"
+               @bind="_sessionEnergyTargetKWh" @bind:event="onchange" @bind:after="OnSessionEnergyTargetSelected" />
+        <span class="hint">
+            The one hard stop: the car is paused as soon as this much has gone into it. Counted per
+            plug-in, so unplugging the car resets it. Stands in for "charge to 80%", since the charger
+            cannot see the car's own SOC. Doesn't persist across restarts.
+        </span>
+        <span class="hint">@SessionTargetProgress()</span>
+    </div>
+</section>
 
-<div class="control">
-    <label for="resume-margin">SOC resume margin (%)</label>
-    <input id="resume-margin" type="number" step="1" min="0" max="50"
-           @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
-    <span class="hint">
-        How far above the floor the battery must recover before a paused session restarts. Raise it
-        if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.
-    </span>
-</div>
+<section class="plan" id="battery-floor">
+    <h2>What the home battery keeps</h2>
+
+    <div class="control">
+        <label for="min-battery-soc">Minimum battery SOC (%)</label>
+        <input id="min-battery-soc" type="number" step="1" min="0" max="100"
+               @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
+        <span class="hint">
+            The hard floor the plan may never take the home battery below. Shared with
+            <a href="/charging-plan/targeted">Targeted</a>, which works to the same floor. Doesn't persist
+            across restarts.
+        </span>
+    </div>
+
+    <div class="control">
+        <label for="resume-margin">SOC resume margin (%)</label>
+        <input id="resume-margin" type="number" step="1" min="0" max="50"
+               @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
+        <span class="hint">
+            How far above the floor the battery must recover before a paused session restarts. Raise it
+            if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.
+        </span>
+    </div>
+</section>
 
 @if (Status is null)
 {
@@ -91,6 +108,8 @@ else if (Status.Plan is not { } plan)
 else
 {
     <h2>The plan</h2>
+
+    <p><strong>@Verdict(plan)</strong></p>
 
     <p class="muted">
         Updated @TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
@@ -145,6 +164,10 @@ else
     private double _sessionEnergyTargetKWh;
     private double _minBatterySocPercent;
     private double _resumeMarginPercent;
+
+    // A tenth of a kWh: what Kwh() rounds to, so a difference the sentence would print as "0.0 kWh
+    // short" is called covered instead.
+    private const double NegligibleWh = 50;
 
     private bool _chartRendered;
 
@@ -244,6 +267,54 @@ else
         _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
         _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
+    }
+
+    // The whole point of the daily EV target, in the one sentence it is worth: the plan's verdict on
+    // today against what the owner actually drives. The stats below carry the same figures apart --
+    // outlook here, expected there, shortfall a tile further on -- and nobody reads three tiles to
+    // answer "is the car going to be ready?".
+    private string Verdict(SolarDayPlan plan)
+    {
+        if (!plan.IsUsable)
+        {
+            return "No usable forecast, so no verdict on today; the mode is charging on live surplus instead.";
+        }
+
+        if (plan.EvTargetWh <= 0)
+        {
+            return $"No daily target set, so today is not judged against anything. {Kwh(plan.EvExpectedTodayWh)} expected into the car.";
+        }
+
+        if (plan.Outlook == DayOutlook.NoChargeToday)
+        {
+            return $"Today has no chargeable window: the car gets nothing of the {Kwh(plan.EvTargetWh)} you drive, and the battery keeps priority.";
+        }
+
+        var shortWh = plan.EvTargetWh - plan.EvExpectedTodayWh;
+
+        return shortWh <= NegligibleWh
+            ? $"Today covers the full {Kwh(plan.EvTargetWh)} you drive."
+            : $"Today covers {Kwh(plan.EvExpectedTodayWh)} of the {Kwh(plan.EvTargetWh)} you drive — {Kwh(shortWh)} short. The battery keeps priority.";
+    }
+
+    private string SessionTargetProgress()
+    {
+        if (Status is null)
+        {
+            return "No poll has completed yet.";
+        }
+
+        var deliveredWh = Status.SessionEnergyWh;
+        var targetWh = _sessionEnergyTargetKWh * 1000;
+
+        if (targetWh <= 0)
+        {
+            return $"No limit set. {Kwh(deliveredWh)} into the car since it was plugged in.";
+        }
+
+        return deliveredWh >= targetWh
+            ? $"{Kwh(deliveredWh)} of {Kwh(targetWh)} in — reached, so the car stays paused until you unplug it or raise this."
+            : $"{Kwh(deliveredWh)} of {Kwh(targetWh)} in this session.";
     }
 
     private string FormatWindow((DateTimeOffset Start, DateTimeOffset End)? window) =>
