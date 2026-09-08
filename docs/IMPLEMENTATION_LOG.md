@@ -53,6 +53,54 @@ installed, and running it — is a human act by design. `docs/RELEASING.md` is t
 
 ---
 
+## 2026-09-08 — The week is in, the handover is made, and the first reading of it was wrong (issue #141)
+
+Both feeds ran 2026-09-02 22:28 → 2026-09-08 21:24. **Handover accepted**: `Vehicle__Enabled=false`,
+the Home Assistant automation stopped, the portal feed left on. No code deleted.
+
+### What the week measured
+
+- 564 read attempts, 547 produced a reading (97%). 13 `SessionExpired`, 3 `UnusableData`, 1 transient.
+- 76 distinct capture times, 59 of them forward. Median gap 59 min, longest 14 h 16 m, 30 of 58 gaps
+  over 45 minutes.
+- **132 steps backwards**, worst −2 d 20 h.
+- **193 sign-ins**, median session 1 h 00 m.
+- `settings.target_soc` 80% on every read; charge-time-remaining on every read; **plug state on none**
+  (568 of 568 `Unknown`).
+- Ten feed starts, so the run was **not** the unattended week the issue asked for.
+
+### The correction, which is the point of this entry
+
+The first pass **declined** the handover, on the portal's reading being a median of 5 h 10 m old when
+it arrived and only 3% of reads under half an hour. That is disqualifying against a live feed, and the
+feed it was compared with was assumed to be live rather than read.
+
+It was not. The retained MQTT message at that moment was 4 h 26 m old while the portal held one an hour
+old. Six of seven MQTT capture times then turned out to match a portal capture within ninety seconds —
+**the two feeds carry the same car reports**, by different roads, and the five-hour median is the car's
+own reporting cadence rather than either feed's lag.
+
+Two things worth carrying forward:
+
+- **A comparison measures both sides or it measures nothing.** `VehicleFeedComparison` counted the
+  portal exactly as designed; what no instrument could do was stop one column being read as a verdict.
+- **The MQTT feed's per-reading line is `Debug` and the portal's is `Information`**, so a week of one
+  is invisible in a production log while the other is fully recorded. That asymmetry is what made the
+  wrong reading easy, and it should be levelled before another feed is judged this way.
+
+### What this leaves behind
+
+- `/vehicle-feeds` and the dashboard's per-feed sections are now **dead surfaces**: both are gated on
+  two feeds having been seen, and there is one. They come out, and the parts still worth having with a
+  single feed — cadence, coverage, and the regression counter — move to the portal page.
+- Nothing arbitrates a backward step any more except the holder's own max-wins rule, which still
+  refuses an older capture with one feed. That is what makes the handover safe, and it is the reason
+  the regression counter has to survive the cleanup.
+- The plan can still compute an SOC target from a stale reading; with one feed there is no second
+  opinion to correct it. A freshness guard is the follow-up that matters most.
+
+---
+
 ## 2026-09-02 — A feed going backwards is not a feed repeating itself (issue #141, follow-up)
 
 The reference install's first evening: the portal answered all ten reads and produced **one** new
