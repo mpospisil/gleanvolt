@@ -27,6 +27,7 @@ internal static class ControlEndpoints
             ChargeControlStatusHolder holder,
             TargetedChargeRequestLimits limits,
             TimeProvider time,
+            ApiHostInfo host,
             CancellationToken cancellationToken) =>
         {
             var source = http.Source();
@@ -57,7 +58,8 @@ internal static class ControlEndpoints
                     basis: body.Fast?.Basis ?? FastChargeBasis.Full,
                     energyWh: body.Fast?.EnergyKWh * 1000,
                     targetSocPercent: body.Fast?.TargetSocPercent,
-                    vehicleSocPercent: vehicle.GetCurrentState()?.SocPercent,
+                    vehicleSoc: VehicleSocBasis.From(
+                        vehicle.GetCurrentState(), host.VehicleMaxAge, time.GetUtcNow()),
                     pack: limits.Pack,
                     now: time.GetUtcNow(),
                     departBy: body.Fast?.DepartBy,
@@ -105,7 +107,8 @@ internal static class ControlEndpoints
                     + "when. Quote it first with POST /plans/targeted/preview.");
             }
 
-            if (!TargetedRequests.TryCompose(body.Target, vehicle, limits, time, out var request, out var error))
+            if (!TargetedRequests.TryCompose(
+                    body.Target, vehicle, limits, time, host.VehicleMaxAge, out var request, out var error))
             {
                 return error!;
             }
@@ -160,11 +163,13 @@ internal static class ControlEndpoints
             ChargeControlStatusHolder holder,
             TargetedChargeRequestLimits limits,
             TimeProvider time,
+            ApiHostInfo host,
             CancellationToken cancellationToken) =>
         {
             var source = http.Source();
 
-            if (!TargetedRequests.TryCompose(body, vehicle, limits, time, out var request, out var error))
+            if (!TargetedRequests.TryCompose(
+                    body, vehicle, limits, time, host.VehicleMaxAge, out var request, out var error))
             {
                 return error!;
             }

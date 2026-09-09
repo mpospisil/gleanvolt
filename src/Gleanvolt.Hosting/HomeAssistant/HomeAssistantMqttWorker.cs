@@ -432,7 +432,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             basis: _pendingFastBasis,
             energyWh: _pendingFastEnergyKWh * 1000,
             targetSocPercent: _pendingFastSocPercent,
-            vehicleSocPercent: _vehicle?.GetCurrentState()?.SocPercent,
+            vehicleSoc: VehicleSocBasis.From(
+                _vehicle?.GetCurrentState(), _vehicleOptions.MaxAge, _timeProvider.GetUtcNow()),
             pack: new VehiclePackLimits(_vehicleOptions.BatteryCapacityKWh, _vehicleOptions.ChargeEfficiency),
             now: _timeProvider.GetUtcNow(),
             departBy: _pendingFastDeparture,
