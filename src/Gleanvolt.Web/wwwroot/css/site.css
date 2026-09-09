@@ -190,6 +190,50 @@ h1 {
     }
 }
 
+/* The vehicle portal's Diagnostics disclosure (#178).
+
+   Everything the page used to lead with lives in here, and the shape has one job: to read as a lid
+   rather than as a heading somebody forgot to write. Hence the panel frame, and hence the summary
+   being the only clickable-looking thing in it -- an owner whose battery percentage is on screen
+   should be able to see at a glance that there is nothing below they need. */
+.diagnostics {
+    margin: 1.5rem 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 1.25rem;
+}
+
+.diagnostics > summary {
+    cursor: pointer;
+    padding: 0.75rem 0;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+/* Open, the contents need room; closed, the summary's own padding is the whole box. */
+.diagnostics[open] {
+    padding-bottom: 1.25rem;
+}
+
+.diagnostics[open] > summary {
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1rem;
+}
+
+/* The sections inside are h3 under the disclosure's own weight, and the first must not push the
+   panel open with a heading margin the border already spaces. */
+.diagnostics h3 {
+    font-size: 1rem;
+    margin: 1.5rem 0 0.75rem;
+}
+
+/* Narrowly the intro paragraph, not every first-of-type child: the h3s below it keep their spacing,
+   and only the line sitting immediately under the summary's rule loses its top margin. */
+.diagnostics > p:first-of-type {
+    margin-top: 0;
+}
+
 .muted {
     color: var(--muted);
 }

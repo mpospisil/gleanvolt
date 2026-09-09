@@ -36,6 +36,12 @@ public class VehicleAccountSignInPageTests : PageTest
         Services.AddSingleton<IVehiclePortalReader>(new QuietReader());
         Services.AddSingleton(Car());
         Services.AddSingleton<IVehicleAccountSignIn>(account);
+
+        // The page shows the car in the dashboard card's figures and against what the feed holds
+        // (#178), so it needs a clock and a telemetry source even in tests that are only about the
+        // sign-in box above them. Empty and stopped: nothing here reads either.
+        Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
         return Render<VehiclePortal>();
     }
 
