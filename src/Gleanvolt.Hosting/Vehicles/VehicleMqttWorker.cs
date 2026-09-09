@@ -185,7 +185,14 @@ public sealed class VehicleMqttWorker : BackgroundService
         }
         else
         {
-            _logger.LogDebug(
+            // Information, not Debug, and deliberately the same level VehicleUpdateWorker logs its
+            // feeds at (#180). The asymmetry that used to be here cost a verdict: through #141's
+            // comparison week the portal's every reading was in the log at Information and this feed's
+            // were at Debug, which is off in production -- so one feed was fully recorded and the
+            // other was invisible, and the two were then compared as though the record were even.
+            // Whatever the level is, it has to be the same for every feed, or the log is evidence
+            // about logging rather than about feeds.
+            _logger.LogInformation(
                 "Vehicle reading: SOC={Soc}% charge={ChargeState} plug={PlugState} captured {CapturedAt:O}.",
                 state.SocPercent, state.ChargeState, state.PlugState, state.CapturedAt);
         }

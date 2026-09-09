@@ -2079,8 +2079,27 @@ the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md)
 
 #### `/vehicle-feeds` — what each feed actually delivered
 
-Two feeds may run at once, and this is the page that decides between them on numbers rather than on
-which one sounded better. It reports and changes nothing.
+Two feeds run at once, and this is the page that says what each one actually delivered. It reports and
+changes nothing.
+
+**Running two is the steady state, not a trial** ([#180](https://github.com/mpospisil/gleanvolt/issues/180)).
+The page was written for #141's bake-off — the MQTT topic against the manufacturer's portal, for a
+week, with a handover at the end — and the handover happened without leaving one feed. It left two with
+different jobs:
+
+| | `vw-group` (EU Data Act portal) | `vw-website` (volkswagen.de) |
+|---|---|---|
+| **Asked** | always, every 15 min | only while a charge is running |
+| **Lag behind the car** | hours — the car's own batch cadence | seconds |
+| **Plug state** | never seen one | yes |
+| **Target SOC, time left** | yes | — |
+
+So neither feed carries everything, and one of them is **silent most of the day by design**. That is
+the single thing this page has to get right, because a feed asked only during a charge has a longest
+gap the length of a weekend: its rows are marked *while charging only*, its longest gap is labelled
+*between charges*, and the cadence bands past two hours are one entry per charging session rather than
+a count of dropouts. A feed that has not declared itself charge-gated is described as an ordinary one,
+which is the safe way round.
 
 - **Cadence.** Per feed: deliveries, repeats, steps backwards, superseded, and the shortest, mean and
   longest interval between deliveries, with the intervals also counted into bands. A *delivery* is a
@@ -2098,10 +2117,14 @@ which one sounded better. It reports and changes nothing.
   the finding), its mean size, the worst one, and how far apart in time the two captures typically
   were. Shown twice, and the **parked** row is the one that answers the question: a parked car's SOC
   does not drift, so a difference there is one of the two feeds being read wrong, whereas a difference
-  measured across twenty minutes of charging is the car doing its job.
+  measured across twenty minutes of charging is the car doing its job. Samples are **scarce by
+  design** now: one feed is asked only during a charge and the other runs hours behind, so the pair
+  only has something to compare while a charge is live. A long run of nothing here means the car has
+  not charged, not that a feed has stopped.
 - **Coverage.** The share of deliveries that carried each field. A missing field is a supported answer
-  rather than a fault — but *time left* is worth reading: nothing has ever established whether the
-  reference car reports a charge-time-remaining at all, and a week of zero is that answer.
+  rather than a fault — and this is now the **standing reference for which feed carries what** rather
+  than a week's finding. It is what showed that the portal has never once reported a plug state while
+  `vw-website` does, which is precisely why both feeds still run.
 - **Survival.** For the manufacturer feed: reads of attempts, **sign-ins** (one, however long the
   controller has been up, is the healthy answer), the current session's age, and whether the car's own
   **target SOC** ever arrives — the field that is not part of a reading, and the one whose absence
@@ -2113,8 +2136,16 @@ together would turn a redeployment into evidence against a portal. A week means 
 and the page says how long it has been counting before it says anything else.
 
 Feeds are grouped by the name they put on their readings. The MQTT payload's `source` is optional, so a
-reading that arrives without one is labelled `mqtt`; the manufacturer feed labels its own
-`vw-group …1234`.
+reading that arrives without one is labelled `mqtt`; the manufacturer feeds label their own —
+`vw-group …1234` and `vw-website`. That leading name is also how a row is matched to the feed that
+declared itself charge-gated, since both services compose the id from it.
+
+**Every feed's readings are logged at the same level**
+([#180](https://github.com/mpospisil/gleanvolt/issues/180)). They were not: the portal's every reading
+was `Information` and the MQTT feed's were `Debug`, which is off in production — so through #141's
+comparison week one feed was fully recorded and the other was invisible, and the two were then
+compared as though the record were even. Whatever the level is, it has to be the same for every feed,
+or the log is evidence about logging rather than about feeds.
 
 #### `/pv-system` — the installation, read-only
 

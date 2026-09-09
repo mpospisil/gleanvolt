@@ -4,6 +4,68 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-09 — Two feeds is the steady state, and a feed declares its own silence (issue #180)
+
+**Context.** #141 ran the MQTT topic against the manufacturer's portal for a week and handed over. The
+plan after that was to delete `/vehicle-feeds`, on the assumption that a handover leaves one feed.
+**That was wrong.** What it left was two internal services with different jobs:
+
+| | `vw-group` (EU Data Act portal) | `vw-website` (volkswagen.de, #170) |
+|---|---|---|
+| Asked | always, every 15 min | only while a charge is running |
+| Lag behind the car | hours — its own batch cadence | seconds |
+| Plug state | never seen one | yes |
+| Target SOC, time left | yes | — |
+
+Neither carries everything, so both stay. The page keeps its subject and needed re-framing rather than
+deleting.
+
+**Decision — the page is an instrument, not a countdown.** Every sentence written for a bake-off with
+an end date is gone: the closing "when the week is boring" section, the hints that offered to decide
+which feed was right, and the framing that treated a second feed as temporary. What replaces them says
+what each feed is *for* before it says any number about it, because one of these feeds is meant to be
+idle and its figures mean nothing until you know that.
+
+**Decision — a feed declares whether it only delivers while charging; the page does not infer it.**
+`IVehicleUpdateService.DeliversOnlyWhileCharging`, defaulting to false. Only the service knows:
+volkswagen.de's gate is the *controller's* session — mode not Off, car connected, session not
+completed — and not the car's self-reported charge state, so nothing downstream could work it out from
+a reading. Inferring it from `VehicleState.ChargeState` would have measured the wrong predicate and
+mislabelled the portal, whose idle gaps really are dropouts.
+
+A row is matched to its service on the leading manufacturer name, which is how both services
+**compose** the source id rather than a guess about it — `vw-website` reports exactly that, the portal
+reports `vw-group …1234`. This is not the dispatch `Manufacturer` warns against: nothing is selected
+by the name, it only decides how a gap is described, and a feed that fails to match is described as an
+ordinary one. That is the safe way round — an unmarked designed silence is a puzzle, a marked dropout
+is a lie.
+
+**Decision — label the silence rather than exclude it.** The issue allowed either. Excluding would
+mean deciding, for each interval between two deliveries, whether a charge was running in the middle of
+it — and the comparison only ever sees the instants at its ends. Inventing a session model inside an
+observation-only instrument to remove numbers from a page is a poor trade against captioning the
+numbers that are there. So the marked feed's rows say *while charging only*, its longest gap says
+*between charges*, and the bands say that everything past two hours is one entry per charging session.
+
+**Decision — the regression column and the coverage table stay, and the page now says why.** With the
+MQTT feed off, the holder keeping the newest reading is the only thing refusing a backward one, and
+nothing else anywhere reports that it happened. Coverage stops being a week's finding and becomes the
+standing reference for which feed carries what — it is what showed the portal has never once reported
+a plug state.
+
+**Decision — every feed's readings are logged at the same level, and that level is Information.** They
+were not. The portal's every reading was `Information` and the MQTT feed's were `Debug`, which is off
+in production, so through the comparison week one feed was fully recorded and the other invisible —
+and the two were then compared as though the record were even. #141 reached a wrong verdict partly on
+that asymmetry. Information for all of them, because a feed logged at Debug is unmeasurable after the
+fact, and being able to audit the comparison is the whole point of keeping one.
+
+Not taken: deleting the page, and changing the `BothFeedsSeen` gate on the dashboard's per-feed
+sections. The gate is still right — two feeds is still the arrangement — but what the sections *mean*
+changed, so their wording did.
+
+---
+
 ## 2026-09-03 — A download you can check, and an -rc that cannot take `latest` (issue #148)
 
 **Context.** Two defects in what the release step published, both cheap. Someone downloads a ~100 MB

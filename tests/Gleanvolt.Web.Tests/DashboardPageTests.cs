@@ -70,6 +70,30 @@ public class DashboardPageTests : PageTest
     private void Feed(VehicleSourceHealth health) =>
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed(health));
 
+    /// <summary>volkswagen.de's shape: asked only while a charge runs (#170/#180).</summary>
+    private sealed class ChargeGatedFeed : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-website";
+
+        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("used while a charge is running");
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
+
+        public bool DeliversOnlyWhileCharging => true;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    private void ChargeGatedFeedConfigured() =>
+        Services.AddSingleton<IVehicleUpdateService>(new ChargeGatedFeed());
+
+    /// <summary>Markup with whitespace collapsed, so a prose assertion need not know where it wrapped.</summary>
+    private static string Prose(IRenderedComponent<Dashboard> page) =>
+        System.Text.RegularExpressions.Regex.Replace(page.Markup, @"\s+", " ");
+
     [Fact]
     public void Shows_the_car_and_its_pack_with_no_feed_configured_and_says_nothing_is_wrong()
     {
@@ -536,5 +560,49 @@ public class DashboardPageTests : PageTest
 
         Assert.Contains("Time left", page.Markup);
         Assert.Contains("95 min", page.Markup);
+    }
+
+    /// <summary>
+    /// The re-framing #180 asks for. "What each feed says" was written for portal-against-MQTT,
+    /// where the open question was which of the two was right. Portal-against-volkswagen.de is a
+    /// different comparison: they carry different fields on different clocks, and one is silent
+    /// unless the car is charging — so a section that still invited the old reading would have an
+    /// owner diagnosing a dropout every time the car sat on the drive.
+    /// </summary>
+    [Fact]
+    public void Presents_the_per_feed_sections_as_complementary_rather_than_a_contest()
+    {
+        _car = Id4();
+        ChargeGatedFeedConfigured();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-website"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "vw-group …1234"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("What each feed says", page.Markup);
+        Assert.Contains("Not a contest between them", Prose(page));
+
+        // The nine-hour age is the car being parked, and the marker is what says so.
+        Assert.Contains("while charging only", Prose(page));
+        Assert.DoesNotContain("which is right is what a week of both answers", Prose(page));
+    }
+
+    /// <summary>
+    /// The safe way round: a feed on its own clock gets no marker, because its growing age really is
+    /// something to look into.
+    /// </summary>
+    [Fact]
+    public void Leaves_a_feed_on_its_own_clock_unmarked()
+    {
+        _car = Id4();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-group"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "id4"));
+
+        var page = Render<Dashboard>();
+
+        Assert.Contains("What each feed says", page.Markup);
+        Assert.DoesNotContain("while charging only", Prose(page));
     }
 }

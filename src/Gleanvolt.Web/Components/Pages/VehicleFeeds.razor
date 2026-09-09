@@ -8,13 +8,20 @@
 @inject IEnumerable<IVehicleUpdateService> Feeds
 
 @*
-    The week of running both feeds, as numbers (issue #141).
+    What each vehicle feed delivers (issues #141, #180).
 
-    Phase 3 of #137 is a measurement rather than a feature: the Home Assistant topic and the
-    manufacturer's own portal run side by side, and the handover between them is decided on what they
-    actually delivered instead of on which one sounded better. This page is where those figures are
-    read off -- cadence, agreement, coverage and survival, the four #141 asks for -- and it is the
-    thing to copy into docs/DECISIONS.md when the week is up.
+    Written for #141's bake-off -- the Home Assistant topic against the manufacturer's portal, for a
+    week, with a handover at the end -- and re-framed once that week was over. The comparison ended;
+    the page did not, because two feeds did not become one. It became two feeds with DIFFERENT JOBS:
+
+        vw-group    the EU Data Act portal, always, every 15 min, hours behind the car, carries
+                    target SOC and time left, has never once reported a plug state
+        vw-website  volkswagen.de (#170), only while a charge is running, ~20 s behind, carries the
+                    plug state -- and delivers nothing at all between charges, by design
+
+    So this is a standing instrument rather than a countdown to a decision, and the thing it has to
+    get right changed with it: a feed that is silent on purpose must not read as the broken one. See
+    IVehicleUpdateService.DeliversOnlyWhileCharging, which the feed declares about itself.
 
     Observation only. Nothing here is read by a charging decision, and a feed comparison that said
     nothing at all would change no register.
@@ -25,11 +32,46 @@
 <h1>Vehicle feeds</h1>
 
 <p class="muted">
-    What each feed has actually delivered, counted rather than eyeballed. Two feeds may run at once —
-    the car's own portal and whatever publishes to the MQTT topic — and the holder keeps whichever saw
-    the car most recently, so this is also the only place a reading that <em>lost</em> is still
+    What each feed has actually delivered, counted rather than eyeballed. Running two feeds is the
+    <strong>steady state</strong>, not a trial with an end date: they answer different questions about
+    the same battery, and one of them is quiet most of the day on purpose. The holder keeps whichever
+    saw the car most recently, so this is also the only place a reading that <em>lost</em> is still
     visible.
 </p>
+
+@*
+    What each feed is FOR, before any number about it. #141's version of this page opened on the
+    measurement because the measurement was the point; now the numbers only mean something once you
+    know that one of these feeds is meant to be idle.
+*@
+@if (Feeds.Any())
+{
+    <h2>What each feed is for</h2>
+
+    <dl class="facts">
+        @foreach (var feed in Feeds)
+        {
+            <dt>@feed.Manufacturer</dt>
+            <dd>
+                @if (feed.DeliversOnlyWhileCharging)
+                {
+                    <text>
+                        Delivers <strong>only while a charge is running</strong>, then nothing until the
+                        next one. Its gaps are the hours the car was not charging — read its cadence as
+                        how closely it followed a charge, never as uptime.
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        Delivers on its own clock whatever the car is doing, so its gaps <em>are</em> a
+                        measure of the feed. Asked every @Duration(feed.NextDelay) at present.
+                    </text>
+                }
+            </dd>
+        }
+    </dl>
+}
 
 @*
     The window first, because every number below is worth exactly as much as the time it was measured
@@ -101,7 +143,13 @@ else
             @foreach (var source in _report.Sources)
             {
                 <tr>
-                    <td>@source.SourceId</td>
+                    <td>
+                        @source.SourceId
+                        @if (ChargeGated(source))
+                        {
+                            <span class="muted"> — while charging only</span>
+                        }
+                    </td>
                     <td class="num">@source.Captures</td>
                     <td class="num">@source.Repeats</td>
                     <td class="num @(source.HasRegressed ? "error" : null)">
@@ -114,7 +162,16 @@ else
                     <td class="num">@source.Superseded</td>
                     <td class="num">@Gap(source.ShortestGap)</td>
                     <td class="num">@Gap(source.MeanGap)</td>
-                    <td class="num">@Gap(source.LongestGap)</td>
+                    <td class="num">
+                        @Gap(source.LongestGap)
+                        @if (ChargeGated(source))
+                        {
+                            @* Not a dropout, and the one figure most likely to be read as one: for a
+                               feed asked only during a charge this is the longest the car went without
+                               charging. *@
+                            <span class="muted"> (between charges)</span>
+                        }
+                    </td>
                     <td>
                         @if (source.LastCapturedAt is { } last)
                         {
@@ -144,6 +201,30 @@ else
     </p>
 
     @*
+        Went back is the column #180 asks to keep, and the reason is worth carrying on the page rather
+        than only in the issue: with the MQTT feed off, the holder's max-wins rule is the only thing
+        refusing a backward reading, and this is the only place one is ever visible.
+    *@
+    <p class="muted table-note">
+        <em>Went back</em> keeps its column now the comparison is over, and this is why: nothing
+        rejects a backward reading except the holder keeping the newest one, and nothing else anywhere
+        reports that it happened. #141 counted them in the hundreds over a week, the worst reaching
+        back most of three days. A figure in that column is live and measured; the count is the only
+        warning there is.
+    </p>
+
+    @if (_report.Sources.Any(ChargeGated))
+    {
+        <p class="muted table-note">
+            <strong>A feed marked <em>while charging only</em> is not being measured for uptime.</strong>
+            It is asked while a session is live and not at all between sessions, so its
+            <em>shortest</em> and <em>mean</em> describe how closely it followed a charge, while its
+            <em>longest</em> is simply the longest the car went without charging. A quiet week of
+            driving makes it look like the worst feed here, and it is behaving exactly as designed.
+        </p>
+    }
+
+    @*
         And the distribution behind that mean, because one bad night and a bad week look identical in
         a mean and a maximum. The bands are placed around the claim being tested: the portal says a
         quarter of an hour, so the second column is "it kept its word" and the third is "it missed
@@ -165,7 +246,13 @@ else
             @foreach (var source in _report.Sources)
             {
                 <tr>
-                    <td>@source.SourceId</td>
+                    <td>
+                        @source.SourceId
+                        @if (ChargeGated(source))
+                        {
+                            <span class="muted"> — while charging only</span>
+                        }
+                    </td>
                     @foreach (var count in source.GapBuckets)
                     {
                         <td class="num">@count</td>
@@ -174,6 +261,17 @@ else
             }
         </tbody>
     </table>
+
+    @if (_report.Sources.Any(ChargeGated))
+    {
+        <p class="muted table-note">
+            For a feed marked <em>while charging only</em>, read the left of the row and ignore the
+            right: the short bands are its cadence during a charge, and everything past two hours is
+            one gap per charging session — a count of how often the car was plugged in, not of
+            dropouts. The bands were placed to test a feed that claims a quarter of an hour, which
+            that feed never claimed.
+        </p>
+    }
 
     @*
         Coverage. "Absent is fine, present-but-unusable is not" (#73) means a missing field is a
@@ -210,8 +308,10 @@ else
 
     <p class="muted table-note">
         The share of deliveries that carried each field. A missing field is a supported answer, not a
-        fault — but <em>time left</em> is worth reading closely: nothing has ever established whether
-        this car reports a charge-time-remaining at all, and a week of zero is that answer.
+        fault — and this table is now the <strong>reference for which feed carries what</strong>
+        rather than a week's finding. It is what showed that the portal has never once reported a plug
+        state (0 of 568) while <code>vw-website</code> does, and that is exactly why both feeds are
+        still running: neither one carries everything.
     </p>
 }
 
@@ -266,6 +366,14 @@ else
             mean near zero with a non-trivial mean size is noise; a mean that stays a few points off is
             the systematic offset, and it matters which of the two is wrong.
         </p>
+
+        <p class="muted table-note">
+            Samples here are scarce <strong>by design</strong> and that is not a fault of either feed:
+            one is asked only during a charge and the other is hours behind the car, so the pair only
+            has something to compare while a charge is running and the portal happens to have caught
+            up. This is no longer deciding between them — it is a standing check that they still
+            describe the same battery.
+        </p>
     }
 }
 else if (_report.Sources.Count > 1)
@@ -275,8 +383,10 @@ else if (_report.Sources.Count > 1)
     <p class="muted">
         Both feeds have delivered, but no two of their capture times have yet landed within
         @Duration(VehicleFeedComparison.PairingWindow) of each other with a state of charge on both —
-        so there is nothing to compare. That is itself worth knowing: two feeds this far apart in time
-        describe the same battery at different moments, not the same reading twice.
+        so there is nothing to compare. <strong>Expected rather than wrong</strong>: with one feed
+        asked only during a charge and the other running hours behind the car, the two overlap only
+        while a charge is live. A long run of nothing here means the car has not charged, not that a
+        feed has stopped.
     </p>
 }
 
@@ -343,15 +453,34 @@ else if (_report.Sources.Count > 1)
     </p>
 }
 
-<h2>When the week is boring</h2>
+<h2>What this page is for now</h2>
 
 <p class="muted">
-    The handover is a setting, not a deletion. Switch <code>Vehicle__Enabled</code> to
-    <code>false</code>, stop the Home Assistant vehicle automation, and leave
-    <code>Vehicle__DataAct__Enabled</code> on. No code goes away: if the portal disappoints in month
-    two, the old feed is one setting away, and it stays the answer for any car nobody has written a
-    service for. If the week is <em>not</em> boring, that is a result too — record it and stay on
-    MQTT.
+    #141's week is over and the handover is made: the MQTT feed is off, and what runs is the portal
+    plus volkswagen.de. That did not leave one feed, so this page did not stop being useful — it
+    stopped being a countdown. Three of its numbers earn their keep permanently:
+</p>
+
+<ul class="muted">
+    <li>
+        <strong>Went back.</strong> With the MQTT feed gone, the holder keeping the newest reading is
+        the only thing refusing a backward one, and this is the only place one is ever visible.
+    </li>
+    <li>
+        <strong>Coverage.</strong> Neither feed carries everything — the portal has target SOC and
+        time left and no plug state, volkswagen.de is the other way about — so which feed carries
+        what is a standing question, not a settled one.
+    </li>
+    <li>
+        <strong>Sign-ins.</strong> A session that expires needs a person with an email code, and the
+        count is how you find out before a charge does.
+    </li>
+</ul>
+
+<p class="muted">
+    Switching either feed off is still a setting rather than a deletion —
+    <code>Vehicle__DataAct__Enabled</code> for the portal, and the MQTT feed is one
+    <code>Vehicle__Enabled</code> away if a car ever needs it again.
 </p>
 
 @code {
@@ -407,6 +536,22 @@ else if (_report.Sources.Count > 1)
     // measured durations below are not.
     private static string Short(TimeSpan span) =>
         span < TimeSpan.FromHours(1) ? $"{span.TotalMinutes:0} min" : $"{span.TotalHours:0} h";
+
+    /// <summary>
+    /// Whether this row's feed only delivers while a charge is running (#180), which decides how
+    /// every gap figure beside it should be read.
+    ///
+    /// <para>Joined on the leading manufacturer name, because that is how both services <b>compose</b>
+    /// the source id rather than a guess about it: volkswagen.de reports exactly
+    /// <c>vw-website</c> and the portal reports <c>vw-group …1234</c>. This is not the dispatch
+    /// <see cref="IVehicleUpdateService.Manufacturer"/> warns against — nothing is selected by the
+    /// name, and a feed that fails to match is described as an ordinary one, which is the safe way
+    /// round.</para>
+    /// </summary>
+    private bool ChargeGated(VehicleFeedTally source) =>
+        Feeds.Any(feed =>
+            feed.DeliversOnlyWhileCharging
+            && source.SourceId.StartsWith(feed.Manufacturer, StringComparison.OrdinalIgnoreCase));
 
     private static string Gap(TimeSpan? gap) => gap is { } span ? Duration(span) : "—";
 

@@ -51,6 +51,40 @@ public class VehicleFeedsPageTests : PageTest
     private void Feed(VehicleFeedDiagnostics diagnostics) =>
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed(diagnostics));
 
+    /// <summary>
+    /// A feed that only answers while a charge runs — volkswagen.de's shape (#170/#180). Declares it
+    /// about itself, which is the only way the page can tell a designed silence from a dropout.
+    /// </summary>
+    private sealed class ChargeGatedFeed : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "vw-website";
+
+        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("used while a charge is running");
+
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
+
+        public bool DeliversOnlyWhileCharging => true;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
+    }
+
+    private void ChargeGatedFeedConfigured() =>
+        Services.AddSingleton<IVehicleUpdateService>(new ChargeGatedFeed());
+
+    /// <summary>
+    /// The page's markup with runs of whitespace collapsed to single spaces.
+    ///
+    /// <para>Prose in a <c>.razor</c> file wraps at the source's line width, so any sentence long
+    /// enough to be worth asserting on is routinely split by a newline and twenty spaces. An
+    /// assertion that has to know where the wrap fell is an assertion about formatting, and it breaks
+    /// the next time the paragraph is re-flowed.</para>
+    /// </summary>
+    private static string Prose(IRenderedComponent<VehicleFeeds> page) =>
+        System.Text.RegularExpressions.Regex.Replace(page.Markup, @"\s+", " ");
+
     private void Deliver(TimeSpan offset, string source, double soc, VehicleChargeState charge = VehicleChargeState.Idle) =>
         _vehicle.Set(new VehicleState(Noon + offset, SocPercent: soc, ChargeState: charge, SourceId: source));
 
@@ -201,12 +235,96 @@ public class VehicleFeedsPageTests : PageTest
         Assert.Contains("on 90 of 96 reads", page.Markup);
     }
 
+    /// <summary>
+    /// Still the point after the handover (#180): the wording moved, the promise did not. Either feed
+    /// is a setting away from being switched off, and nothing about that is a deletion.
+    /// </summary>
     [Fact]
-    public void Spells_out_that_the_handover_is_a_setting_and_nothing_is_deleted()
+    public void Spells_out_that_switching_a_feed_off_is_a_setting_and_nothing_is_deleted()
     {
         var page = Render<VehicleFeeds>();
 
         Assert.Contains("Vehicle__Enabled", page.Markup);
-        Assert.Contains("No code goes away", page.Markup);
+        Assert.Contains("Vehicle__DataAct__Enabled", page.Markup);
+        Assert.Contains("a setting rather than a deletion", Prose(page));
+    }
+
+    /// <summary>
+    /// The point of #180. A feed asked only during a charge shows a longest gap the length of a
+    /// weekend, and every band past two hours fills with the hours the car sat parked — so without a
+    /// marker the best-behaved feed reads as the broken one.
+    /// </summary>
+    [Fact]
+    public void Marks_a_feed_that_only_delivers_while_charging()
+    {
+        ChargeGatedFeedConfigured();
+        Deliver(TimeSpan.Zero, "vw-website", 40);
+        Deliver(TimeSpan.FromHours(14), "vw-website", 62);
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.Contains("while charging only", page.Markup);
+
+        // And says what the gap actually is, next to the figure most likely to be misread.
+        Assert.Contains("between charges", page.Markup);
+        Assert.Contains("not being measured for uptime", Prose(page));
+    }
+
+    /// <summary>
+    /// The safe way round: a feed that has not declared itself charge-gated is described as an
+    /// ordinary one, whose gaps really are a measure of the feed.
+    /// </summary>
+    [Fact]
+    public void Does_not_mark_a_feed_that_runs_on_its_own_clock()
+    {
+        Feed(new VehicleFeedDiagnostics(4, 4, Noon, Noon, Noon.AddMinutes(15), 1, TimeSpan.FromHours(3)));
+        Deliver(TimeSpan.Zero, "vw-group …1234", 40);
+        Deliver(TimeSpan.FromMinutes(15), "vw-group …1234", 41);
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.DoesNotContain("while charging only", page.Markup);
+        Assert.DoesNotContain("between charges", page.Markup);
+    }
+
+    /// <summary>
+    /// The re-framing (#180). The page was a countdown to a handover; the handover happened and two
+    /// feeds remained, so it must not still read as a trial with an end date.
+    /// </summary>
+    [Fact]
+    public void Presents_two_feeds_as_the_steady_state_rather_than_a_trial()
+    {
+        ChargeGatedFeedConfigured();
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.Contains("steady state", page.Markup);
+
+        // What each feed is FOR, before any number about it.
+        Assert.Contains("What each feed is for", page.Markup);
+
+        // And none of the bake-off framing the page used to close on.
+        Assert.DoesNotContain("When the week is boring", page.Markup);
+        Assert.DoesNotContain("stay on\n    MQTT", page.Markup);
+    }
+
+    /// <summary>
+    /// Kept, and now with the reason on the page: with the MQTT feed off, the holder keeping the
+    /// newest reading is the only thing refusing a backward one.
+    /// </summary>
+    [Fact]
+    public void Keeps_the_regression_column_and_says_why_it_is_kept()
+    {
+        Feed(new VehicleFeedDiagnostics(2, 2, Noon, Noon, Noon.AddMinutes(15), 1, TimeSpan.FromHours(3)));
+        Deliver(TimeSpan.Zero, "vw-group …1234", 40);
+        Deliver(TimeSpan.FromHours(-3), "vw-group …1234", 31);
+
+        var page = Render<VehicleFeeds>();
+
+        Assert.Contains("Went back", page.Markup);
+        Assert.Contains("the count is the only warning there is", Prose(page));
+
+        // The live figure, which is what the minus sign is reserved for.
+        Assert.Contains("−", page.Markup);
     }
 }
