@@ -49,6 +49,12 @@ public sealed class VwWebsiteUpdateService(
     /// </summary>
     public TimeSpan NextDelay => IsCharging ? options.PollInterval : TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// True, and the whole point of this service (#170/#180). Between charges it fetches nothing at
+    /// all, so its gaps measure how much the car was driven rather than how reliable the feed is.
+    /// </summary>
+    public bool DeliversOnlyWhileCharging => true;
+
     private bool IsCharging =>
         status.Current is { } current
         && current.Mode != ChargeControlMode.Off
