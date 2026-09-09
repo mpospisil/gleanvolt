@@ -4,6 +4,69 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-09 — A stale car must not silently become a target (issue #179)
+
+**Context.** Reverses [a decision from 2026-08-22](#2026-08-22--the-car-answers-what-it-can-and-the-plan-is-quoted-before-it-is-promised),
+and the reversal is the interesting part: the original reasoning was sound and its premise expired.
+
+That record said a stale reading is *flagged, not withdrawn* — stale means "the feed may be dead", not
+"the number is wrong", since a parked car's SOC does not drift, and withdrawing the basis would only
+push the owner into doing the same arithmetic in their head from the same figure. That argument
+survived on an unstated condition: **two** feeds wrote to one holder and the newest won, so one of them
+was usually recent.
+
+[#141](https://github.com/mpospisil/gleanvolt/issues/141) removed the condition and measured what was
+left. The MQTT feed is off, `vw-website` is silent unless the car is charging, and for most of the day
+the portal is the only thing reporting — at a **median 5 h 10 m old when it arrived**, worst case
+**2 d 22 h**. There is no second opinion left to correct a stale or regressed reading, and `MaxAge` only
+ever greyed a number on a card.
+
+**Decision — a percentage target refuses to convert from a reading older than `Vehicle:MaxAge`.** In
+the terms it was asked in, with both figures and the setting name in the sentence: what the car said,
+how long ago, what the limit is. "I cannot tell you what 80% is in kWh right now" is a better answer
+than spending yesterday's percentage, because the amount is fixed at that moment and nothing downstream
+ever re-derives it. That one-shot rule is what makes the guard necessary rather than merely tidy — if
+the number is fixed for good, the reading it is fixed from has to be worth fixing on.
+
+**Decision — the guard lives on a `VehicleSocBasis`, not in the factories.** The percentage travels
+with its age and the limit it is judged against, replacing the bare `double?` both
+`TargetedChargeRequestFactory` and `FastChargeLimitFactory` used to take. A percentage on its own
+cannot answer the only question that matters at the moment of conversion — *is this still true?* —
+and the refusal wording lives there too, so the three doors (web tabs, HTTP API, Home Assistant
+button) cannot word it differently. `Vehicle:MaxAge` rides on the basis rather than on
+`VehiclePackLimits`, because it describes the **feed** and the pack figures describe the **car**: two
+configuration sections, and that split is deliberate.
+
+**Decision — absent is not stale, and is refused in its own words.** An installation with no feed is
+fully supported ([#137](https://github.com/mpospisil/gleanvolt/issues/137)) and sees no change at all.
+The two failures look alike from the arithmetic's side — neither yields a number — and want opposite
+things from an owner: one a feed, or asking in kilowatt-hours for good; the other the portal button
+pressed and the same request again. `VehicleSocBasis.None` is explicitly not stale, and a reading
+carrying range and a plug state but no percentage is not stale either, whatever its age.
+
+**Decision — it guards a conversion; it does not gate charging.** The feed stays advisory and nothing
+on a hardware path may depend on it — which was the second reason [#101's gates](#what-we-deliberately-did-not-build)
+were declined: *a gate on an advisory feed fails the wrong way*, refusing valid charges whenever the
+cloud session lapsed. This is not that gate. Asking in kilowatt-hours never reads the car, and `Full`
+on a fast charge asks it for nothing, so a dead feed cannot stop a charge — only a *percentage* one,
+and only by naming the reason.
+
+**Decision — a just-in-time tail on an energy request still splits from whatever reading there is.**
+The one place a stale percentage is deliberately still used. An energy request's amount is what the
+owner typed, so the reading can only shift *when* the held stretch lands, never how much is delivered.
+Refusing there would gate charging on the feed; silently dropping the hold would change behaviour
+without saying so. A plan that holds the wrong stretch back still delivers the energy asked for.
+
+**Decision — the form says so before the button does.** Both tabs' `SocConversionHint` went through
+the same guard. A hint reading *"From 42% now, that is about 32.5 kWh"* above a Start that refuses is
+the page contradicting itself, and the hint is where an owner reads the conversion first.
+
+Not taken: [#101](https://github.com/mpospisil/gleanvolt/issues/101)'s impossible-target gate. This
+gives it the trigger it was waiting for — the portal does carry `settings.target_soc` — but that is a
+different decision about a different number, and it is still deferred.
+
+---
+
 ## 2026-09-03 — A download you can check, and an -rc that cannot take `latest` (issue #148)
 
 **Context.** Two defects in what the release step published, both cheap. Someone downloads a ~100 MB
@@ -1238,6 +1301,12 @@ gap visible, and costs nothing else on the install.
 **Decision — a stale reading is flagged, not withdrawn.** Stale means "the feed may be dead", not "the
 number is wrong": a parked car's SOC does not drift. Withdrawing the basis would only push the owner
 into doing the same arithmetic in their head from the very same figure.
+
+> **Superseded on 2026-09-09** by
+> [A stale car must not silently become a target](#2026-09-09--a-stale-car-must-not-silently-become-a-target-issue-179).
+> The reasoning held while two feeds wrote to one holder and the newest won; with one feed reporting at
+> a median 5 h 10 m old, there is no second opinion left, and a percentage target now refuses to
+> convert from a reading past `Vehicle:MaxAge`.
 
 **Decision — range is display only, and is not recorded on the session.** Nothing here could compute
 it and nothing here should plan on it, but it is the figure that actually answers "is 80% enough for

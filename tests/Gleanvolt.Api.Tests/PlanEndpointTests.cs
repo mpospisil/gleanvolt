@@ -276,4 +276,51 @@ public sealed class PlanEndpointTests : IAsyncDisposable
         energyKWh = 22,
         departBy = Fixtures.Now.AddHours(17).ToString("o"),
     };
+
+    /// <summary>
+    /// The guard, through the door (#179). The unit tests prove the factory refuses; this proves the
+    /// endpoint actually hands it an age — the wiring is exactly what could be silently absent and
+    /// leave the whole guard inert.
+    /// </summary>
+    [Fact]
+    public async Task Refuses_a_state_of_charge_target_measured_from_a_stale_reading()
+    {
+        var client = await _host.StartAsync();
+
+        // 13 h, against the test host's 12 h Vehicle:MaxAge. #141 measured the reference portal at a
+        // median 5 h 10 m old on arrival, so this is not a contrived figure.
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now.AddHours(-13), SocPercent: 42));
+
+        var response = await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", new
+        {
+            targetSocPercent = 80,
+            departBy = Fixtures.Now.AddHours(17).ToString("o"),
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var detail = (await response.ReadAsync()).Text("detail");
+        Assert.Contains("13.0 h", detail);
+        Assert.Contains("Vehicle:MaxAge", detail);
+        Assert.Contains("kilowatt-hours", detail);
+    }
+
+    /// <summary>
+    /// And the fallback in the same breath: the identical stale reading, asked in kilowatt-hours,
+    /// quotes as normal. This is a guard on a conversion, not a gate on charging.
+    /// </summary>
+    [Fact]
+    public async Task Quotes_an_energy_target_normally_from_the_same_stale_reading()
+    {
+        var client = await _host.StartAsync();
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now.AddHours(-13), SocPercent: 42));
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", new
+        {
+            energyKWh = 22,
+            departBy = Fixtures.Now.AddHours(17).ToString("o"),
+        })).ReadAsync();
+
+        Assert.Equal(22_000, body.GetProperty("request").Number("requiredEnergyWh"), 1);
+    }
 }

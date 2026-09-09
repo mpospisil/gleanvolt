@@ -22,9 +22,11 @@ internal static class PlanEndpoints
             ITargetedChargePreview preview,
             IVehicleTelemetry vehicle,
             TargetedChargeRequestLimits limits,
-            TimeProvider time) =>
+            TimeProvider time,
+            ApiHostInfo host) =>
         {
-            if (!TargetedRequests.TryCompose(body, vehicle, limits, time, out var request, out var error))
+            if (!TargetedRequests.TryCompose(
+                    body, vehicle, limits, time, host.VehicleMaxAge, out var request, out var error))
             {
                 return error!;
             }
@@ -80,9 +82,12 @@ internal static class TargetedRequests
         IVehicleTelemetry vehicle,
         TargetedChargeRequestLimits limits,
         TimeProvider time,
+        TimeSpan vehicleMaxAge,
         out TargetedChargeRequest request,
         out IResult? error)
     {
+        var now = time.GetUtcNow();
+
         // The same factory the web UI's form goes through: the SOC to kilowatt-hours conversion, the
         // just-in-time split, the horizon and the "car is already there" refusal all live there.
         var composed = TargetedChargeRequestFactory.Create(
@@ -91,9 +96,9 @@ internal static class TargetedRequests
             targetSocPercent: body.TargetSocPercent,
             priority: body.Priority,
             restSocPercent: body.RestSocPercent,
-            vehicleSocPercent: vehicle.GetCurrentState()?.SocPercent,
+            vehicleSoc: VehicleSocBasis.From(vehicle.GetCurrentState(), vehicleMaxAge, now),
             limits: limits,
-            now: time.GetUtcNow());
+            now: now);
 
         if (composed.Request is not { } composedRequest)
         {

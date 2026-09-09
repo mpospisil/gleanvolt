@@ -205,7 +205,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
             basis: _basis == FastChargeBasis.Soc && !CanTargetSoc ? FastChargeBasis.Full : _basis,
             energyWh: _energyKWh * 1000,
             targetSocPercent: _targetSocPercent,
-            vehicleSocPercent: _vehicle?.SocPercent,
+            vehicleSoc: SocBasis,
             pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityKWh, VehicleDisplay.ChargeEfficiency),
             now: Time.GetUtcNow(),
             // Only when the basis can carry one -- the box is hidden under Full, so a stale value left
@@ -271,16 +271,33 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         : "Ends itself: at the amount above, or when the car stops drawing first. Either way the "
           + "setpoint drops to the pause current and the mode returns to Off, which releases the hold.";
 
+    /// <summary>
+    /// What the car last reported, and whether it is still worth converting from (#179). One
+    /// expression, so the hint under the box and the press that follows cannot disagree.
+    /// </summary>
+    private VehicleSocBasis SocBasis =>
+        VehicleSocBasis.From(_vehicle, VehicleDisplay.MaxAge, Time.GetUtcNow());
+
     private string SocConversionHint()
     {
+        var basis = SocBasis;
+
+        // Said before the press rather than only after it (#179), for the same reason the targeted tab
+        // does it: a figure quoted here off an hours-old percentage is the silent conversion the guard
+        // exists to stop, and this mode draws the site's supply limit for hours on the answer.
+        if (basis.StaleRefusal is { } tooOld)
+        {
+            return tooOld;
+        }
+
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            _vehicle?.SocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Percent(_vehicle?.SocPercent)} — nothing to do.",
-            _ => $"From {Percent(_vehicle?.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
+            <= 0 => $"The car is already at {Percent(basis.SocPercent)} — nothing to do.",
+            _ => $"From {Percent(basis.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
                 + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
                 + "of what the charger meters reaching the cells.",
         };

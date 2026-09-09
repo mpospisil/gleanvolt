@@ -19,6 +19,10 @@ namespace Gleanvolt.Core.Strategies;
 /// <see cref="TargetedChargeRequest.TargetSocPercent"/> explains at length: a parked car's cloud SOC
 /// arrives when it feels like it, and a promise already half delivered must not move at 02:00 because
 /// the car finally phoned home.</para>
+///
+/// <para>That one-shot rule is exactly why <see cref="VehicleSocBasis"/> is checked before the
+/// conversion rather than after (#179): if the amount is fixed here for good, the reading it is fixed
+/// from has to be one worth fixing on.</para>
 /// </summary>
 public static class TargetedChargeRequestFactory
 {
@@ -38,7 +42,8 @@ public static class TargetedChargeRequestFactory
     ///
     /// <para>Rejections are the interesting part and are all stated in the terms they were asked in:
     /// a car already at or above the target, a departure in the past, a departure past the horizon,
-    /// or a SOC target on an installation that cannot convert one.</para>
+    /// a SOC target on an installation that cannot convert one, and a SOC target measured from a
+    /// reading too old to convert from (#179).</para>
     /// </summary>
     /// <param name="departBy">When the energy has to be in the car.</param>
     /// <param name="energyWh">The energy asked for, at the charger. Null when asking in state of charge.</param>
@@ -48,7 +53,11 @@ public static class TargetedChargeRequestFactory
     /// Where a just-in-time hold parks the car, or null for <see cref="TargetedChargeRequestLimits.DefaultRestSocPercent"/>.
     /// Ignored under <see cref="TargetedChargePriority.Cheapest"/>.
     /// </param>
-    /// <param name="vehicleSocPercent">What the car last reported, or null when there is no reading.</param>
+    /// <param name="vehicleSoc">
+    /// What the car last reported and whether that is still worth converting from (#179). A reading
+    /// older than <c>Vehicle:MaxAge</c> is refused rather than spent, since nothing downstream
+    /// re-derives the amount once it is set.
+    /// </param>
     /// <param name="limits">The installation's horizon and pack figures.</param>
     /// <param name="now">The instant the request is being made — what delivery is metered from.</param>
     public static Result Create(
@@ -57,10 +66,12 @@ public static class TargetedChargeRequestFactory
         double? targetSocPercent,
         TargetedChargePriority priority,
         double? restSocPercent,
-        double? vehicleSocPercent,
+        VehicleSocBasis vehicleSoc,
         TargetedChargeRequestLimits limits,
         DateTimeOffset now)
     {
+        ArgumentNullException.ThrowIfNull(vehicleSoc);
+
         double askedWh;
         double? soc = null;
         double? socNow = null;
@@ -79,7 +90,16 @@ public static class TargetedChargeRequestFactory
                     + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.");
             }
 
-            socNow = vehicleSocPercent;
+            // Asked before the conversion, and in its own words: a reading too old to trust and a
+            // reading that never arrived both leave RequiredWh with nothing to work from, and the two
+            // want opposite things from an owner (#179). Refusing here is the whole guard -- the amount
+            // is fixed at this moment and nothing downstream revisits it.
+            if (vehicleSoc.StaleRefusal is { } tooOld)
+            {
+                return Result.Rejected(tooOld);
+            }
+
+            socNow = vehicleSoc.ConvertibleSocPercent;
             var requiredWh = VehicleTargetEnergy.RequiredWh(
                 socNow, target, limits.BatteryCapacityWh, limits.ChargeEfficiency);
 
@@ -130,12 +150,17 @@ public static class TargetedChargeRequestFactory
         {
             var rest = restSocPercent ?? limits.DefaultRestSocPercent;
 
+            // Deliberately the raw reading rather than the guarded one, and only on this path: an
+            // energy request's amount is what the owner typed and is never derived from the car, so a
+            // stale percentage can only mis-time the held tail -- it cannot change how much is
+            // delivered. Refusing here would gate charging on the feed, which #179 rules out; a plan
+            // that holds the wrong stretch back still delivers the energy asked for.
             var endSoc = soc ?? VehicleTargetEnergy.ResultingSocPercent(
-                vehicleSocPercent, askedWh, limits.BatteryCapacityWh, limits.ChargeEfficiency);
+                vehicleSoc.SocPercent, askedWh, limits.BatteryCapacityWh, limits.ChargeEfficiency);
 
             var tailWh = endSoc is { } end
                 ? VehicleTargetEnergy.TailAboveRestWh(
-                    vehicleSocPercent, end, rest, limits.BatteryCapacityWh, limits.ChargeEfficiency)
+                    vehicleSoc.SocPercent, end, rest, limits.BatteryCapacityWh, limits.ChargeEfficiency)
                 : null;
 
             request = request with

@@ -44,13 +44,17 @@ public static class FastChargeLimitFactory
     /// Composes a limit from the basis the owner chose.
     ///
     /// <para>Rejections are stated in the terms they were asked in: a car already at or above the
-    /// target, a SOC basis on an installation that cannot convert one, a missing figure. Each surface
-    /// shows the message it is given rather than writing its own.</para>
+    /// target, a SOC basis on an installation that cannot convert one, a missing figure, and a
+    /// reading too old to convert from (#179). Each surface shows the message it is given rather than
+    /// writing its own.</para>
     /// </summary>
     /// <param name="basis">What the owner is aiming at. <see cref="FastChargeBasis.Full"/> needs neither figure.</param>
     /// <param name="energyWh">The energy asked for, at the charger. Read under <see cref="FastChargeBasis.Energy"/>.</param>
     /// <param name="targetSocPercent">The state of charge asked for. Read under <see cref="FastChargeBasis.Soc"/>.</param>
-    /// <param name="vehicleSocPercent">What the car last reported, or null when there is no reading.</param>
+    /// <param name="vehicleSoc">
+    /// What the car last reported and whether that is still worth converting from (#179). A reading
+    /// older than <c>Vehicle:MaxAge</c> is refused rather than spent.
+    /// </param>
     /// <param name="pack">The car's capacity and charge efficiency, or an unconfigured pack.</param>
     /// <param name="now">The instant the limit is being set — what delivery is metered from.</param>
     /// <param name="departBy">
@@ -66,13 +70,14 @@ public static class FastChargeLimitFactory
         FastChargeBasis basis,
         double? energyWh,
         double? targetSocPercent,
-        double? vehicleSocPercent,
+        VehicleSocBasis vehicleSoc,
         VehiclePackLimits pack,
         DateTimeOffset now,
         DateTimeOffset? departBy = null,
         TimeSpan? maxHorizon = null)
     {
         ArgumentNullException.ThrowIfNull(pack);
+        ArgumentNullException.ThrowIfNull(vehicleSoc);
 
         // Checked before the basis, so "when" is refused in its own terms rather than after the owner
         // has been told something about kilowatt-hours.
@@ -130,8 +135,17 @@ public static class FastChargeLimitFactory
                         + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.");
                 }
 
+                // Before the conversion and in its own words, exactly as the targeted factory does it
+                // (#179): a fast charge stops itself on this amount, so an amount derived from an
+                // hours-old percentage is a charge that ends at the wrong place.
+                if (vehicleSoc.StaleRefusal is { } tooOld)
+                {
+                    return Result.Rejected(tooOld);
+                }
+
+                var socNow = vehicleSoc.ConvertibleSocPercent;
                 var requiredWh = VehicleTargetEnergy.RequiredWh(
-                    vehicleSocPercent, target, pack.BatteryCapacityWh, pack.ChargeEfficiency);
+                    socNow, target, pack.BatteryCapacityWh, pack.ChargeEfficiency);
 
                 if (requiredWh is null)
                 {
@@ -146,10 +160,10 @@ public static class FastChargeLimitFactory
                 if (requiredWh.Value <= 0)
                 {
                     return Result.Rejected(
-                        $"The car is already at {vehicleSocPercent:F0}%, at or above the {target:F0}% asked for.");
+                        $"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for.");
                 }
 
-                return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, vehicleSocPercent, departBy));
+                return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, socNow, departBy));
 
             default:
                 return Result.Rejected($"Unknown fast charge basis '{basis}'.");

@@ -195,6 +195,46 @@ public class HaButtonCommandTests
         Assert.Single(_actions.Starts);
     }
 
+    /// <summary>
+    /// The guard, at the third door (#179). A button cannot put a message in front of anybody, so the
+    /// press is dropped and logged — which is what this surface already does with every other refusal.
+    /// Starting anyway would run to full when a percentage was asked for.
+    /// </summary>
+    [Fact]
+    public async Task ChargeFastRefusesTheSocBasisWhenTheReadingIsTooOldToConvert()
+    {
+        // 13 h against VehicleOptions.MaxAge's 12 h default.
+        _vehicle.State = new VehicleState(Now.AddHours(-13), SocPercent: 42);
+        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Soc");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastTargetSocNumber), "60");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Empty(_actions.Starts);
+        Assert.Null(_fast.Limit);
+    }
+
+    /// <summary>
+    /// The fallback: the same stale reading under the energy basis presses through. A dead feed must
+    /// not be able to stop a charge asked for in kilowatt-hours.
+    /// </summary>
+    [Fact]
+    public async Task ChargeFastStillTakesAnEnergyAmountWhenTheReadingIsStale()
+    {
+        _vehicle.State = new VehicleState(Now.AddHours(-13), SocPercent: 42);
+        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "20");
+        await worker.HandleCommandAsync(
+            Discovery.ButtonCommandTopic("start_fast_no_battery"), HaDiscovery.PayloadPress);
+
+        Assert.Equal(20_000, _fast.Limit!.RequiredEnergyWh);
+        Assert.Single(_actions.Starts);
+    }
+
     [Fact]
     public async Task ARefusedAmountStopsThePressRatherThanChargingToFull()
     {
