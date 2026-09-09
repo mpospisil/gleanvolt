@@ -4,6 +4,131 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-09 — Two feeds is the steady state, and a feed declares its own silence (issue #180)
+
+**Context.** #141 ran the MQTT topic against the manufacturer's portal for a week and handed over. The
+plan after that was to delete `/vehicle-feeds`, on the assumption that a handover leaves one feed.
+**That was wrong.** What it left was two internal services with different jobs:
+
+| | `vw-group` (EU Data Act portal) | `vw-website` (volkswagen.de, #170) |
+|---|---|---|
+| Asked | always, every 15 min | only while a charge is running |
+| Lag behind the car | hours — its own batch cadence | seconds |
+| Plug state | never seen one | yes |
+| Target SOC, time left | yes | — |
+
+Neither carries everything, so both stay. The page keeps its subject and needed re-framing rather than
+deleting.
+
+**Decision — the page is an instrument, not a countdown.** Every sentence written for a bake-off with
+an end date is gone: the closing "when the week is boring" section, the hints that offered to decide
+which feed was right, and the framing that treated a second feed as temporary. What replaces them says
+what each feed is *for* before it says any number about it, because one of these feeds is meant to be
+idle and its figures mean nothing until you know that.
+
+**Decision — a feed declares whether it only delivers while charging; the page does not infer it.**
+`IVehicleUpdateService.DeliversOnlyWhileCharging`, defaulting to false. Only the service knows:
+volkswagen.de's gate is the *controller's* session — mode not Off, car connected, session not
+completed — and not the car's self-reported charge state, so nothing downstream could work it out from
+a reading. Inferring it from `VehicleState.ChargeState` would have measured the wrong predicate and
+mislabelled the portal, whose idle gaps really are dropouts.
+
+A row is matched to its service on the leading manufacturer name, which is how both services
+**compose** the source id rather than a guess about it — `vw-website` reports exactly that, the portal
+reports `vw-group …1234`. This is not the dispatch `Manufacturer` warns against: nothing is selected
+by the name, it only decides how a gap is described, and a feed that fails to match is described as an
+ordinary one. That is the safe way round — an unmarked designed silence is a puzzle, a marked dropout
+is a lie.
+
+**Decision — label the silence rather than exclude it.** The issue allowed either. Excluding would
+mean deciding, for each interval between two deliveries, whether a charge was running in the middle of
+it — and the comparison only ever sees the instants at its ends. Inventing a session model inside an
+observation-only instrument to remove numbers from a page is a poor trade against captioning the
+numbers that are there. So the marked feed's rows say *while charging only*, its longest gap says
+*between charges*, and the bands say that everything past two hours is one entry per charging session.
+
+**Decision — the regression column and the coverage table stay, and the page now says why.** With the
+MQTT feed off, the holder keeping the newest reading is the only thing refusing a backward one, and
+nothing else anywhere reports that it happened. Coverage stops being a week's finding and becomes the
+standing reference for which feed carries what — it is what showed the portal has never once reported
+a plug state.
+
+**Decision — every feed's readings are logged at the same level, and that level is Information.** They
+were not. The portal's every reading was `Information` and the MQTT feed's were `Debug`, which is off
+in production, so through the comparison week one feed was fully recorded and the other invisible —
+and the two were then compared as though the record were even. #141 reached a wrong verdict partly on
+that asymmetry. Information for all of them, because a feed logged at Debug is unmeasurable after the
+fact, and being able to audit the comparison is the whole point of keeping one.
+
+Not taken: deleting the page, and changing the `BothFeedsSeen` gate on the dashboard's per-feed
+sections. The gate is still right — two feeds is still the arrangement — but what the sections *mean*
+changed, so their wording did.
+
+---
+
+## 2026-09-09 — A stale car must not silently become a target (issue #179)
+
+**Context.** Reverses [a decision from 2026-08-22](#2026-08-22--the-car-answers-what-it-can-and-the-plan-is-quoted-before-it-is-promised),
+and the reversal is the interesting part: the original reasoning was sound and its premise expired.
+
+That record said a stale reading is *flagged, not withdrawn* — stale means "the feed may be dead", not
+"the number is wrong", since a parked car's SOC does not drift, and withdrawing the basis would only
+push the owner into doing the same arithmetic in their head from the same figure. That argument
+survived on an unstated condition: **two** feeds wrote to one holder and the newest won, so one of them
+was usually recent.
+
+[#141](https://github.com/mpospisil/gleanvolt/issues/141) removed the condition and measured what was
+left. The MQTT feed is off, `vw-website` is silent unless the car is charging, and for most of the day
+the portal is the only thing reporting — at a **median 5 h 10 m old when it arrived**, worst case
+**2 d 22 h**. There is no second opinion left to correct a stale or regressed reading, and `MaxAge` only
+ever greyed a number on a card.
+
+**Decision — a percentage target refuses to convert from a reading older than `Vehicle:MaxAge`.** In
+the terms it was asked in, with both figures and the setting name in the sentence: what the car said,
+how long ago, what the limit is. "I cannot tell you what 80% is in kWh right now" is a better answer
+than spending yesterday's percentage, because the amount is fixed at that moment and nothing downstream
+ever re-derives it. That one-shot rule is what makes the guard necessary rather than merely tidy — if
+the number is fixed for good, the reading it is fixed from has to be worth fixing on.
+
+**Decision — the guard lives on a `VehicleSocBasis`, not in the factories.** The percentage travels
+with its age and the limit it is judged against, replacing the bare `double?` both
+`TargetedChargeRequestFactory` and `FastChargeLimitFactory` used to take. A percentage on its own
+cannot answer the only question that matters at the moment of conversion — *is this still true?* —
+and the refusal wording lives there too, so the three doors (web tabs, HTTP API, Home Assistant
+button) cannot word it differently. `Vehicle:MaxAge` rides on the basis rather than on
+`VehiclePackLimits`, because it describes the **feed** and the pack figures describe the **car**: two
+configuration sections, and that split is deliberate.
+
+**Decision — absent is not stale, and is refused in its own words.** An installation with no feed is
+fully supported ([#137](https://github.com/mpospisil/gleanvolt/issues/137)) and sees no change at all.
+The two failures look alike from the arithmetic's side — neither yields a number — and want opposite
+things from an owner: one a feed, or asking in kilowatt-hours for good; the other the portal button
+pressed and the same request again. `VehicleSocBasis.None` is explicitly not stale, and a reading
+carrying range and a plug state but no percentage is not stale either, whatever its age.
+
+**Decision — it guards a conversion; it does not gate charging.** The feed stays advisory and nothing
+on a hardware path may depend on it — which was the second reason [#101's gates](#what-we-deliberately-did-not-build)
+were declined: *a gate on an advisory feed fails the wrong way*, refusing valid charges whenever the
+cloud session lapsed. This is not that gate. Asking in kilowatt-hours never reads the car, and `Full`
+on a fast charge asks it for nothing, so a dead feed cannot stop a charge — only a *percentage* one,
+and only by naming the reason.
+
+**Decision — a just-in-time tail on an energy request still splits from whatever reading there is.**
+The one place a stale percentage is deliberately still used. An energy request's amount is what the
+owner typed, so the reading can only shift *when* the held stretch lands, never how much is delivered.
+Refusing there would gate charging on the feed; silently dropping the hold would change behaviour
+without saying so. A plan that holds the wrong stretch back still delivers the energy asked for.
+
+**Decision — the form says so before the button does.** Both tabs' `SocConversionHint` went through
+the same guard. A hint reading *"From 42% now, that is about 32.5 kWh"* above a Start that refuses is
+the page contradicting itself, and the hint is where an owner reads the conversion first.
+
+Not taken: [#101](https://github.com/mpospisil/gleanvolt/issues/101)'s impossible-target gate. This
+gives it the trigger it was waiting for — the portal does carry `settings.target_soc` — but that is a
+different decision about a different number, and it is still deferred.
+
+---
+
 ## 2026-09-03 — A download you can check, and an -rc that cannot take `latest` (issue #148)
 
 **Context.** Two defects in what the release step published, both cheap. Someone downloads a ~100 MB
@@ -1238,6 +1363,12 @@ gap visible, and costs nothing else on the install.
 **Decision — a stale reading is flagged, not withdrawn.** Stale means "the feed may be dead", not "the
 number is wrong": a parked car's SOC does not drift. Withdrawing the basis would only push the owner
 into doing the same arithmetic in their head from the very same figure.
+
+> **Superseded on 2026-09-09** by
+> [A stale car must not silently become a target](#2026-09-09--a-stale-car-must-not-silently-become-a-target-issue-179).
+> The reasoning held while two feeds wrote to one holder and the newest won; with one feed reporting at
+> a median 5 h 10 m old, there is no second opinion left, and a percentage target now refuses to
+> convert from a reading past `Vehicle:MaxAge`.
 
 **Decision — range is display only, and is not recorded on the session.** Nothing here could compute
 it and nothing here should plan on it, but it is the figure that actually answers "is 80% enough for

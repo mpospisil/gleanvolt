@@ -186,6 +186,12 @@ else
         Shown once two feeds have been seen and *kept* shown afterwards, even if one goes quiet: a feed
         that stopped still has a last reading and a visibly growing age, which is the whole point of
         looking. With a single feed there is nothing to compare and the card above already says it all.
+
+        Re-framed for the steady state (#180). The gate is unchanged -- two feeds is still the
+        arrangement -- but the point of the comparison is not: portal-against-MQTT was "which of these
+        is right", and portal-against-volkswagen.de is "each carries what the other does not, and one
+        is quiet unless the car is charging". A section that still invited the old reading would have
+        an owner diagnosing a dropout every time the car sat on the drive.
     *@
     @if (_feedReport.BothFeedsSeen)
     {
@@ -193,8 +199,10 @@ else
 
         <p class="muted">
             The card above quotes whichever feed saw the car most recently; these are their own
-            accounts, side by side. Counted over time on
-            <a href="/vehicle-feeds">the feeds page</a>.
+            accounts, side by side. <strong>Not a contest between them</strong> (#180) — they carry
+            different fields on different clocks, and one of them reports only while a charge is
+            running, so an age that has grown to hours there is usually the car being parked. Counted
+            over time on <a href="/vehicle-feeds">the feeds page</a>.
         </p>
 
         @foreach (var feed in _feedReport.Sources)
@@ -214,17 +222,21 @@ else
                 {
                     <span class="muted"> — @feed.Superseded reading@(feed.Superseded == 1 ? "" : "s") held back as older</span>
                 }
+                @if (ChargeGated(feed))
+                {
+                    <span class="muted"> · while charging only</span>
+                }
             </h3>
 
             <section class="stat-grid">
                 <Stat Label="Car battery" Value="@Percent(reading.SocPercent)"
-                      Hint="This feed's own state of charge for the car. The other feed's may differ, and which is right is what a week of both answers." />
+                      Hint="This feed's own state of charge for the car. The other feed's may differ, and usually should: they were captured at different moments by feeds on different clocks." />
                 <Stat Label="Car reading age" Value="@VehicleAge(reading)"
-                      Hint="How long ago the car produced THIS feed's reading. A feed that has stopped shows its age growing here while the other's stays small." />
+                      Hint="How long ago the car produced THIS feed's reading. An age growing here while the other stays small means either a feed that has stopped or one that only reports during a charge — the marker beside the name says which." />
                 <Stat Label="Car range" Value="@Km(reading.RangeKm)"
                       Hint="The car's own range estimate, when this feed carries one. A dash means this feed does not report it." />
                 <Stat Label="Time left" Value="@ChargeTime(reading)"
-                      Hint="The car's own estimate of how much longer it needs. A dash means this feed does not report it — which is itself a finding." />
+                      Hint="The car's own estimate of how much longer it needs. A dash means this feed does not carry the field — expected rather than a fault, and which feed carries what is on the feeds page." />
                 <Stat Label="Car charge state" Value="@reading.ChargeState.ToString()"
                       Hint="What this feed says the car is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
                 <Stat Label="Car plug state" Value="@reading.PlugState.ToString()"
@@ -373,6 +385,17 @@ else
     private static string Km(double? km) => VehicleFormatting.Km(km);
 
     private static string ChargeTime(VehicleState reading) => VehicleFormatting.ChargeTime(reading);
+
+    /// <summary>
+    /// Whether this feed only delivers while a charge is running (#180), so that an age grown to
+    /// hours reads as a parked car rather than as a dropout. Same join, and the same reasoning, as
+    /// <c>/vehicle-feeds</c>: both services compose the source id from the manufacturer name, and a
+    /// feed that fails to match is described as an ordinary one.
+    /// </summary>
+    private bool ChargeGated(VehicleFeedTally feed) =>
+        VehicleFeeds.Any(service =>
+            service.DeliversOnlyWhileCharging
+            && feed.SourceId.StartsWith(service.Manufacturer, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Whether the card above is currently quoting this feed. Matched on the name the feed put on its

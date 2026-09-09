@@ -218,6 +218,45 @@ public sealed class ControlEndpointTests : IAsyncDisposable
         Assert.Empty(_host.Actions.Starts);
     }
 
+    /// <summary>
+    /// The guard on the mode that draws the site's supply limit (#179): a fast charge stops itself on
+    /// the converted amount, so an amount taken from a 13-hour-old percentage ends the charge in the
+    /// wrong place. Through the door, so the endpoint's own wiring is what is proved.
+    /// </summary>
+    [Fact]
+    public async Task Refuses_a_state_of_charge_amount_measured_from_a_stale_reading()
+    {
+        var client = await _host.StartAsync();
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now.AddHours(-13), SocPercent: 42));
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new { mode = "fastNoBattery", fast = new { basis = "soc", targetSocPercent = 60 } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var detail = (await response.ReadAsync()).Text("detail");
+        Assert.Contains("13.0 h", detail);
+        Assert.Contains("Vehicle:MaxAge", detail);
+        Assert.Empty(_host.Actions.Starts);
+    }
+
+    /// <summary>The fallback: the same stale reading, asked as Full, starts as it always did.</summary>
+    [Fact]
+    public async Task Starts_a_full_fast_charge_from_the_same_stale_reading()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now.AddHours(-13), SocPercent: 42));
+
+        var body = await (await client.PostAsJsonAsync(
+            "/api/v1/charging/start",
+            new { mode = "fastNoBattery", fast = new { basis = "full" } })).ReadAsync();
+
+        Assert.True(body.GetProperty("succeeded").GetBoolean());
+        Assert.Null(_host.Fast.Limit);
+    }
+
     [Fact]
     public async Task Refuses_a_car_already_past_the_amount_asked_for()
     {

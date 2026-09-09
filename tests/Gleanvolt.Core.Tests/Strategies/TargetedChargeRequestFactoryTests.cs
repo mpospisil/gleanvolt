@@ -26,16 +26,24 @@ public class TargetedChargeRequestFactoryTests
         double? restSoc = null,
         double? vehicleSoc = null,
         TimeSpan? ahead = null,
-        TargetedChargeRequestLimits? limits = null) =>
+        TargetedChargeRequestLimits? limits = null,
+        VehicleSocBasis? socBasis = null) =>
         TargetedChargeRequestFactory.Create(
             Now + (ahead ?? TimeSpan.FromHours(9)),
             energyWh,
             targetSoc,
             priority,
             restSoc,
-            vehicleSoc,
+            socBasis ?? Fresh(vehicleSoc),
             limits ?? Limits,
             Now);
+
+    /// <summary>
+    /// A reading taken this instant — what every test written before #179 assumed a bare percentage
+    /// meant, and what keeps them all about the arithmetic rather than about the clock.
+    /// </summary>
+    private static VehicleSocBasis Fresh(double? soc) =>
+        soc is null ? VehicleSocBasis.None : new(soc, TimeSpan.Zero, TimeSpan.FromHours(12));
 
     [Fact]
     public void Takes_an_energy_target_as_it_is_given()
@@ -169,5 +177,88 @@ public class TargetedChargeRequestFactoryTests
         Assert.NotNull(request);
         Assert.Equal(0, request!.TailEnergyWh);
         Assert.False(request.HoldsTail);
+    }
+
+    /// <summary>
+    /// The guard (#179). The amount is fixed here for good — nothing downstream re-derives it — so a
+    /// percentage too old to vouch for must not be what it is fixed from. Refusing is the point:
+    /// "I cannot tell you what 80% is in kWh right now" beats spending yesterday's reading.
+    /// </summary>
+    [Fact]
+    public void Refuses_a_state_of_charge_target_measured_from_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromHours(13), TimeSpan.FromHours(12));
+
+        var result = Create(targetSoc: 80, socBasis: stale);
+
+        Assert.Null(result.Request);
+        Assert.Contains("13.0 h", result.Error);
+        Assert.Contains("kilowatt-hours", result.Error);
+    }
+
+    /// <summary>
+    /// The fallback the issue names, and the reason this is a guard rather than a gate: asking in
+    /// kilowatt-hours never touches the car's reading, so a dead feed cannot stop a charge.
+    /// </summary>
+    [Fact]
+    public void An_energy_request_is_untouched_by_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromDays(3), TimeSpan.FromHours(12));
+
+        var request = Create(energyWh: 22_000, socBasis: stale).Request;
+
+        Assert.NotNull(request);
+        Assert.Equal(22_000, request!.RequiredEnergyWh);
+    }
+
+    /// <summary>
+    /// Absent is refused in its own words, not as stale. An installation with no feed is fully
+    /// supported (#137) and must not be told its reading is old when it has none.
+    /// </summary>
+    [Fact]
+    public void A_car_with_no_reading_is_still_refused_for_having_none()
+    {
+        var result = Create(targetSoc: 80, socBasis: VehicleSocBasis.None);
+
+        Assert.Null(result.Request);
+        Assert.Contains("has not reported a state of charge", result.Error);
+        Assert.DoesNotContain("Vehicle:MaxAge", result.Error);
+    }
+
+    /// <summary>A reading inside MaxAge converts exactly as it did before the guard existed.</summary>
+    [Fact]
+    public void A_fresh_reading_converts_as_before()
+    {
+        var fresh = new VehicleSocBasis(42, TimeSpan.FromHours(5), TimeSpan.FromHours(12));
+
+        var request = Create(targetSoc: 80, socBasis: fresh).Request;
+
+        Assert.NotNull(request);
+
+        // (80 - 42) / 100 * 77000 / 0.9
+        Assert.Equal(32_511, request!.RequiredEnergyWh, 0);
+        Assert.Equal(42, request.VehicleSocPercentAtRequest);
+    }
+
+    /// <summary>
+    /// The one place a stale reading is deliberately still used, and why that is not a hole: an energy
+    /// request's amount is what the owner typed, so the reading can only shift <b>when</b> the held
+    /// tail lands, never how much is delivered. Refusing here would gate charging on the feed, which
+    /// #179 rules out.
+    /// </summary>
+    [Fact]
+    public void A_just_in_time_energy_request_still_splits_its_tail_from_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromHours(30), TimeSpan.FromHours(12));
+
+        var request = Create(
+            energyWh: 30_000,
+            priority: TargetedChargePriority.JustInTime,
+            restSoc: 60,
+            socBasis: stale).Request;
+
+        Assert.NotNull(request);
+        Assert.Equal(30_000, request!.RequiredEnergyWh);
+        Assert.True(request.TailEnergyWh > 0, "the hold is still armed rather than silently dropped");
     }
 }
