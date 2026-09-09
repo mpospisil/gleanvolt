@@ -360,6 +360,83 @@ public class TargetedTabTests : PageTest
         Assert.Contains("Charging to 80%, from the 42% the car last reported", page.Find("#target-preview").TextContent);
     }
 
+    /// <summary>
+    /// The guard, from the form (#179). MaxAge used to grey a number on the dashboard and nothing
+    /// more; a thirteen-hour-old percentage could still be converted into the kilowatt-hours a
+    /// charger then delivered against.
+    /// </summary>
+    [Fact]
+    public void Refuses_a_battery_target_measured_from_a_stale_reading()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+        Activate(page);
+
+        Assert.Contains("13.0 h", page.Find("p.error").TextContent);
+        Assert.Empty(_target.Sets);
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    /// <summary>
+    /// And it says so <b>under the box</b>, before anything is pressed. Refusing on Start while the
+    /// hint above still promised "that is about 32.5 kWh" would be the page contradicting itself —
+    /// and the hint is where an owner reads the conversion first.
+    /// </summary>
+    [Fact]
+    public void Says_a_reading_is_too_old_to_convert_before_the_button_is_pressed()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+
+        Assert.DoesNotContain("that is about", page.Markup);
+        Assert.Contains("13.0 h", page.Markup);
+        Assert.Contains("Vehicle:MaxAge", page.Markup);
+    }
+
+    /// <summary>
+    /// The fallback, and the reason this is a guard and not a gate: the identical stale reading, asked
+    /// in kilowatt-hours, starts exactly as it always did.
+    /// </summary>
+    [Fact]
+    public void Still_takes_an_energy_target_from_a_car_whose_reading_is_stale()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
+
+        var page = RenderTab();
+        page.Find("#target-energy").Change("22");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+        Assert.Equal(22_000, request.RequiredEnergyWh);
+    }
+
+    /// <summary>A reading inside MaxAge converts as it always has — the guard is not a tightening.</summary>
+    [Fact]
+    public void A_reading_inside_max_age_converts_as_before()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(5));
+
+        var page = RenderTab();
+        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-soc").Change("80");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+        Assert.Equal(32_511, request.RequiredEnergyWh, 0);
+    }
+
     [Fact]
     public void Refuses_a_battery_target_the_car_is_already_past()
     {

@@ -54,8 +54,9 @@ public class FastTabTests : PageTest
     private void WithAKnownPack() =>
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityKWh: 77, ChargeEfficiency: 0.9));
 
-    private void CarReports(double? socPercent = 42) =>
-        _vehicle.Set(new VehicleState(Now.AddMinutes(-20), SocPercent: socPercent, SourceId: "id4"));
+    private void CarReports(double? socPercent = 42, TimeSpan? age = null) =>
+        _vehicle.Set(new VehicleState(
+            Now - (age ?? TimeSpan.FromMinutes(20)), SocPercent: socPercent, SourceId: "id4"));
 
     private IRenderedComponent<ChargingPlan> RenderTab() =>
         Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "fast"));
@@ -382,4 +383,57 @@ public class FastTabTests : PageTest
         TomorrowForecastWh: null,
         Timestamp: Now,
         FastCharge: progress);
+
+    /// <summary>
+    /// The guard on the mode that draws the site's supply limit for hours (#179). A fast charge stops
+    /// itself on the converted amount, so an amount taken from a thirteen-hour-old percentage ends
+    /// the charge in the wrong place — and nothing downstream revisits it.
+    /// </summary>
+    [Fact]
+    public void Refuses_a_battery_target_measured_from_a_stale_reading()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
+
+        var page = RenderTab();
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Soc));
+        page.Find("#fast-soc").Change("60");
+        page.Find("#start-fast-no-battery").Click();
+
+        Assert.Contains("13.0 h", page.Find("p.error").TextContent);
+        Assert.Empty(_fast.Sets);
+    }
+
+    /// <summary>And under the box, before the press — the hint must not promise what Start refuses.</summary>
+    [Fact]
+    public void Says_a_reading_is_too_old_to_convert_before_the_button_is_pressed()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
+
+        var page = RenderTab();
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Soc));
+        page.Find("#fast-soc").Change("60");
+
+        Assert.DoesNotContain("that is about", page.Markup);
+        Assert.Contains("13.0 h", page.Markup);
+    }
+
+    /// <summary>
+    /// The fallback that always works: Full asks the car for nothing, so a dead feed cannot stop the
+    /// one basis an owner can still reach for.
+    /// </summary>
+    [Fact]
+    public void Still_starts_a_full_charge_for_a_car_whose_reading_is_stale()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42, age: TimeSpan.FromDays(3));
+
+        var page = RenderTab();
+        page.Find("#fast-basis").Change(nameof(FastChargeBasis.Full));
+        page.Find("#start-fast-no-battery").Click();
+
+        Assert.Empty(page.FindAll("p.error"));
+        Assert.Contains(_actions.Starts, start => start.Mode == ChargeControlMode.FastNoBattery);
+    }
 }

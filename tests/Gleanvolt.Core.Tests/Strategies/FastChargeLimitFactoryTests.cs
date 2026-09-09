@@ -22,9 +22,14 @@ public class FastChargeLimitFactoryTests
         double? vehicleSoc = null,
         VehiclePackLimits? pack = null,
         DateTimeOffset? departBy = null,
-        TimeSpan? maxHorizon = null) =>
+        TimeSpan? maxHorizon = null,
+        VehicleSocBasis? socBasis = null) =>
         FastChargeLimitFactory.Create(
-            basis, energyWh, targetSoc, vehicleSoc, pack ?? Pack, Now, departBy, maxHorizon);
+            basis, energyWh, targetSoc, socBasis ?? Fresh(vehicleSoc), pack ?? Pack, Now, departBy, maxHorizon);
+
+    /// <summary>A reading taken this instant, as every test written before #179 assumed.</summary>
+    private static VehicleSocBasis Fresh(double? soc) =>
+        soc is null ? VehicleSocBasis.None : new(soc, TimeSpan.Zero, TimeSpan.FromHours(12));
 
     [Fact]
     public void Full_is_accepted_and_carries_no_limit()
@@ -84,7 +89,7 @@ public class FastChargeLimitFactoryTests
             targetSocPercent: 80,
             TargetedChargePriority.Cheapest,
             restSocPercent: null,
-            vehicleSocPercent: 42,
+            vehicleSoc: Fresh(42),
             new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77, 0.9),
             Now).Request;
 
@@ -229,5 +234,84 @@ public class FastChargeLimitFactoryTests
         var result = Create(FastChargeBasis.Energy, energyWh: 0, departBy: Now.AddMinutes(-1));
 
         Assert.Contains("in the past", result.Error);
+    }
+
+    /// <summary>
+    /// The guard (#179), on the surface where it bites hardest: a fast charge <b>stops itself</b> on
+    /// this amount, so an amount derived from an hours-old percentage is a charge that ends in the
+    /// wrong place — and this mode draws the site's supply limit while it does it.
+    /// </summary>
+    [Fact]
+    public void Refuses_a_state_of_charge_basis_measured_from_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromHours(13), TimeSpan.FromHours(12));
+
+        var result = Create(FastChargeBasis.Soc, targetSoc: 80, socBasis: stale);
+
+        Assert.False(result.Accepted);
+        Assert.Contains("13.0 h", result.Error);
+        Assert.Contains("kilowatt-hours", result.Error);
+    }
+
+    /// <summary>The fallback: an energy basis never reads the car, so a dead feed cannot stop it.</summary>
+    [Fact]
+    public void An_energy_basis_is_untouched_by_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromDays(3), TimeSpan.FromHours(12));
+
+        var limit = Create(FastChargeBasis.Energy, energyWh: 20_000, socBasis: stale).Limit;
+
+        Assert.NotNull(limit);
+        Assert.Equal(20_000, limit!.RequiredEnergyWh);
+    }
+
+    /// <summary>
+    /// And Full least of all — "charge until the car says stop" asks the car for nothing, so a stale
+    /// reading has nothing to spoil. The basis that keeps working when the feed has died.
+    /// </summary>
+    [Fact]
+    public void Full_is_untouched_by_a_stale_reading()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromDays(3), TimeSpan.FromHours(12));
+
+        var result = Create(FastChargeBasis.Full, socBasis: stale);
+
+        Assert.True(result.Accepted);
+        Assert.Null(result.Limit);
+    }
+
+    /// <summary>Absent is refused for being absent, not for being old (#137).</summary>
+    [Fact]
+    public void A_car_with_no_reading_is_still_refused_for_having_none()
+    {
+        var result = Create(FastChargeBasis.Soc, targetSoc: 80, socBasis: VehicleSocBasis.None);
+
+        Assert.False(result.Accepted);
+        Assert.Contains("has not reported a state of charge", result.Error);
+        Assert.DoesNotContain("Vehicle:MaxAge", result.Error);
+    }
+
+    /// <summary>
+    /// Both factories refuse a stale reading in the same words, which is the whole reason the message
+    /// lives on the basis rather than in either of them: three doors, one wording.
+    /// </summary>
+    [Fact]
+    public void Refuses_it_in_the_same_words_the_targeted_factory_uses()
+    {
+        var stale = new VehicleSocBasis(42, TimeSpan.FromHours(20), TimeSpan.FromHours(12));
+
+        var fast = Create(FastChargeBasis.Soc, targetSoc: 80, socBasis: stale).Error;
+
+        var targeted = TargetedChargeRequestFactory.Create(
+            Now.AddHours(9),
+            energyWh: null,
+            targetSocPercent: 80,
+            TargetedChargePriority.Cheapest,
+            restSocPercent: null,
+            vehicleSoc: stale,
+            new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77, 0.9),
+            Now).Error;
+
+        Assert.Equal(targeted, fast);
     }
 }

@@ -902,7 +902,10 @@ already asks — and the answer is a **stopping condition and nothing else**:
   `Ev:Vehicles:0:BatteryCapacityKWh` and `Ev:Vehicles:0:ChargeEfficiency`. A later reading does not
   move a charge that is already part delivered — the same rule, and the same reasoning, as
   [a targeted SOC request](#setting-a-target). It is offered only where it can be honoured:
-  a configured capacity **and** a reading from the car. Without both, ask in kilowatt-hours.
+  a configured capacity **and** a reading from the car — and, since
+  [#179](https://github.com/mpospisil/gleanvolt/issues/179), one no older than `Vehicle:MaxAge`. A
+  reading past it is refused with its age in the sentence rather than converted. Ask in
+  kilowatt-hours, or press `Full`.
 - **Delivery is metered from the moment you start**, not from when the car was plugged in. Energy the
   car took under an earlier mode does not count towards this amount.
 - **Whichever comes first wins.** A car that reaches its own limit at 12 kWh of the 20 asked for ends
@@ -1226,9 +1229,40 @@ a second basis appears — **Battery target (%)** — and the kilowatt-hours are
 
 The tab shows what the car last said about itself above the form — **battery, range, plug state,
 charge state and the age of the reading** — because those are the numbers the plan is about to be built
-from. A reading past `Vehicle:MaxAge` is flagged rather than withdrawn: a parked car's SOC does not
-drift, and refusing the basis outright would only push you into doing the same arithmetic in your head
-from the same figure.
+from.
+
+**A reading past `Vehicle:MaxAge` is refused rather than converted** ([#179](https://github.com/mpospisil/gleanvolt/issues/179)).
+This used to go the other way, and the reversal is worth stating: the argument for converting anyway
+was that a parked car's SOC does not drift, so refusing would only push you into doing the same
+arithmetic in your head from the same figure. That held while **two** feeds wrote to one holder and the
+newest won — one of them was usually recent. It stopped holding when the MQTT feed went off and
+`vw-website` fell silent except during a charge: for most of the day the portal is the only thing
+reporting, and there is no second opinion left to correct a stale reading. [#141](https://github.com/mpospisil/gleanvolt/issues/141)
+measured that portal at a **median 5 h 10 m old when it arrived**, worst case **2 d 22 h**.
+
+So the form says how old the reading is and what the limit is, and asks for kilowatt-hours instead:
+
+> The car last reported 42% 13.0 h ago, past the 12.0 h this installation treats as current
+> (`Vehicle:MaxAge`), so there is no honest way to say what that target is in kilowatt-hours. Read the
+> car again, or ask in kilowatt-hours instead.
+
+Said **under the box as well as on Start**, so a hint promising "that is about 32.5 kWh" cannot sit
+above a button that refuses. Pressing **Read the car now** on
+[`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand) is the fix, and then the
+same request again.
+
+Three things this deliberately is not:
+
+- **It does not gate charging.** Asking in kilowatt-hours never touches the car's reading, so a dead
+  feed cannot stop a charge — and `Full` on a fast charge asks the car for nothing at all. The feed
+  stays advisory; nothing on a hardware path depends on it.
+- **It never fires on a car with no feed.** An installation that reports nothing is fully supported
+  ([#137](https://github.com/mpospisil/gleanvolt/issues/137)) and sees no change: *absent* is refused
+  for being absent ("the car has not reported a state of charge"), which is a different sentence
+  wanting a different fix. The guard triggers on *configured and old*, never on *missing*.
+- **It does not touch a request already running.** The conversion was made once, at activation, from
+  whatever was current then. A reading going stale afterwards does not revise a promise that is
+  already part delivered — that is the same one-shot rule, from the other side.
 
 The conversion happens **once, at the moment you start it**, and is never re-derived. A parked car
 reports when it feels like it, so a SOC that jumps six points at 02:00 because the car finally phoned
@@ -1355,7 +1389,7 @@ description or tooltip field. The meanings live here instead.
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
 | **Fast energy** | kWh | How much to deliver before the fast charge stops itself, measured at the charger and metered from the press. Read only under the `Energy` basis. Doesn't persist across restarts. |
-| **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Ev:Vehicles:0:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. Doesn't persist across restarts. |
+| **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Ev:Vehicles:0:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. A reading older than `Vehicle:MaxAge` is **refused**, not converted: the press logs why and starts nothing, since a button has nowhere to show a message (#179). Ask in **Fast energy**, or press `Full`. Doesn't persist across restarts. |
 | **Fast departure** | text | When the car has to be ready, as `HH:mm` (the next one) or `yyyy-MM-dd HH:mm`. Empty means charge straight away, which is the default. With a time the charge is held back and starts as late as it still can — see [When? (the departure)](#when-the-departure). Needs an amount to work back from, so a departure with the basis on `Full` is refused. Doesn't persist across restarts. |
 | **Fast start** | sensor | When the deferred charge will begin, as `HH:mm`, or `none` when it starts immediately. Moves later as energy goes in, and earlier if the car turns out to draw less than the charger offers. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast delivered** | kWh | Energy delivered against the fast charge's amount, since it was started. Absent unless `FastNoBattery` is driving with an amount set. |
@@ -1648,7 +1682,8 @@ the inverter reports. Off by default:
   "Enabled": false,
   "BrokerHost": "localhost",
   "BrokerPort": 1883,
-  "MaxAge": "12:00:00"                  // past this, a reading is shown as stale
+  "MaxAge": "12:00:00"                  // past this a reading is shown as stale, and a percentage
+                                        //   target refuses to convert from it (#179)
 }
 ```
 
@@ -1853,8 +1888,16 @@ Measured on the reference install, not assumed:
 
 So `MaxAge` exists to catch a **dead feed**, not to reject merely old numbers, and a charge target
 stays a Gleanvolt setting rather than something read from the car. Anything that writes to hardware
-must behave identically when this feed is absent, stale, or gone — which in this phase is trivially
-true, because nothing consumes it yet.
+must behave identically when this feed is absent, stale, or gone.
+
+That last rule still holds, and `MaxAge` now does one thing beyond greying a number
+([#179](https://github.com/mpospisil/gleanvolt/issues/179)): a target asked for **as a percentage**
+refuses to convert from a reading older than it, on all three doors — the web tabs, the HTTP API and
+the Home Assistant button. That is not a hardware dependency in disguise. It refuses to *compute an
+amount* from a number it cannot vouch for, and the amount is exactly what nothing downstream ever
+re-derives; asking in kilowatt-hours is unaffected, so no charge is ever gated on the feed being
+alive. The full argument is under
+[Setting a target](#setting-a-target).
 
 #### The car from the manufacturer, on a clock (the `Vehicle:DataAct` section)
 

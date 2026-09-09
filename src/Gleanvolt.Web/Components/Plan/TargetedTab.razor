@@ -474,7 +474,7 @@ else
             targetSocPercent: socBasis ? _targetSocPercent : null,
             priority: _priority,
             restSocPercent: _restSocPercent,
-            vehicleSocPercent: _vehicle?.SocPercent,
+            vehicleSoc: SocBasisAt(now),
             limits: Limits,
             now: now);
 
@@ -557,16 +557,35 @@ else
             + $"sits at {_restSocPercent:F0}% overnight instead of at its target.";
     }
 
+    /// <summary>
+    /// What the car last reported, and whether it is still worth converting from (#179). One
+    /// expression, so the hint under the box and the press that follows it cannot disagree about
+    /// whether the reading is usable.
+    /// </summary>
+    private VehicleSocBasis SocBasisAt(DateTimeOffset now) =>
+        VehicleSocBasis.From(_vehicle, VehicleDisplay.MaxAge, now);
+
     private string SocConversionHint()
     {
+        var basis = SocBasisAt(Time.GetUtcNow());
+
+        // The guard, said before the press rather than only after it (#179). A hint quoting "that is
+        // about 32.5 kWh" off a thirteen-hour-old percentage is precisely the silent conversion this
+        // is about, and the form is where an owner reads it first — refusing on Start while the box
+        // underneath still promised a figure would be the page contradicting itself.
+        if (basis.StaleRefusal is { } tooOld)
+        {
+            return tooOld;
+        }
+
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            _vehicle?.SocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Percent(_vehicle?.SocPercent)} — nothing to do.",
-            _ => $"From {Percent(_vehicle?.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
+            <= 0 => $"The car is already at {Percent(basis.SocPercent)} — nothing to do.",
+            _ => $"From {Percent(basis.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
                 + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
                 + "of what the charger meters reaching the cells.",
         };
