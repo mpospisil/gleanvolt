@@ -137,6 +137,12 @@ public static class GleanvoltHostingExtensions
         // service warmed at startup.
         services.AddSingleton<SolcastForecastService>();
         services.AddSingleton<ISolarForecastService>(provider => provider.GetRequiredService<SolcastForecastService>());
+
+        // Registered by interface so that a host with another forecast source replaces it the same
+        // way it replaces the reader -- by registering later. Before this, the refresh worker took
+        // the concrete type, so the only way to be rid of it was to remove its service descriptor,
+        // and until you did the process kept demanding a Solcast API key it had no use for.
+        services.AddSingleton<ISolarForecastRefresh>(provider => provider.GetRequiredService<SolcastForecastService>());
         services.AddHostedService<SolarForecastRefreshWorker>();
 
         // The weather a session ran in (issue #96). Off unless a key and the site's coordinates are
