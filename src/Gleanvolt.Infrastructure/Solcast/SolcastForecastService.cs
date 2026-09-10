@@ -15,7 +15,7 @@ namespace Gleanvolt.Infrastructure.Solcast;
 /// externally (see the worker that calls <see cref="RefreshAsync"/> on a schedule). A failed
 /// refresh keeps the previously cached forecast intact.
 /// </summary>
-public sealed class SolcastForecastService : ISolarForecastService
+public sealed class SolcastForecastService : ISolarForecastService, ISolarForecastRefresh
 {
     /// <summary>Name of the configured <see cref="HttpClient"/> used to reach Solcast.</summary>
     public const string HttpClientName = "Solcast";

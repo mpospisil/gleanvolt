@@ -1,17 +1,18 @@
 using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Infrastructure.Solcast;
 
 namespace Gleanvolt.Hosting;
 
 /// <summary>
-/// Drives <see cref="SolcastForecastService.RefreshAsync"/>: fetches the forecast once at startup
+/// Drives <see cref="ISolarForecastRefresh.RefreshAsync"/>: fetches the forecast once at startup
 /// (so the cache is warm) and then re-fetches on the configured <see cref="SolcastOptions.RefreshInterval"/>.
 /// Hosting this as a background service is also what causes the singleton forecast service to be
 /// instantiated when the application starts.
 /// </summary>
 public sealed class SolarForecastRefreshWorker : BackgroundService
 {
-    private readonly SolcastForecastService _forecastService;
+    private readonly ISolarForecastRefresh _forecastService;
     private readonly ILogger<SolarForecastRefreshWorker> _logger;
     private readonly SolcastOptions _options;
     private readonly TimeSpan _refreshInterval;
@@ -21,7 +22,7 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
     private static readonly TimeSpan DaylightLeadTime = TimeSpan.FromMinutes(30);
 
     public SolarForecastRefreshWorker(
-        SolcastForecastService forecastService,
+        ISolarForecastRefresh forecastService,
         IOptions<SolcastOptions> options,
         ILogger<SolarForecastRefreshWorker> logger,
         TimeProvider? timeProvider = null)
@@ -60,7 +61,7 @@ public sealed class SolarForecastRefreshWorker : BackgroundService
     /// change any decision made in the dark but still spends an API call against the daily quota. The
     /// night sleep is capped so a missing or wrong forecast can't strand the loop.
     /// </summary>
-    private TimeSpan NextDelay()
+    internal TimeSpan NextDelay()
     {
         var now = _timeProvider.GetUtcNow();
         var expectedNow = _forecastService.ExpectedPowerWattsNow(now);
