@@ -1,0 +1,107 @@
+@inject ISolarGridSettings SolarGridSettings
+@inject TimeProvider Time
+
+@*
+    Sun first, grid allowed, and only for as long as today's sun lasts. One number steers it -- the
+    minimum surplus below which the grid may not help -- and one verdict explains it: when the forecast
+    says the useful sun ends, which is also when the mode will switch itself off.
+
+    The number is written through ISolarGridSettings, the seam the MQTT worker's number entity writes,
+    and re-read whenever a new status lands, for the same reason the forecast tab re-reads its four:
+    Home Assistant or a second browser can move it, and this tab shows what the controller is using.
+*@
+
+<p class="muted">
+    Charge from the sun, and let the grid help. While the surplus the house isn't using stays above
+    your minimum, the car follows it; when that surplus is too small for the charger's minimum current
+    on its own, the grid tops it up to that minimum, with the home battery held out of it. There is no
+    full-battery gate. When the surplus drops below your minimum the car pauses — smoothed over a few
+    minutes, so a passing cloud doesn't stop it — and once the forecast has no sun left today that
+    clears the minimum, the mode switches itself off.
+</p>
+
+<div class="control">
+    <button type="button" class="primary" id="start-solar-grid" disabled="@Busy" @onclick="StartSolarGrid">
+        Charge from sun + grid
+    </button>
+    <span class="hint">
+        Puts the charger into Fast and hands it to the surplus. Ends by itself at the end of the day's
+        useful sun, when the car stops drawing, or when it is unplugged.
+    </span>
+</div>
+
+<div class="control">
+    <label for="min-solar-surplus">Minimum solar surplus (W)</label>
+    <input id="min-solar-surplus" type="number" step="100" min="0"
+           @bind="_minSurplusWatts" @bind:event="onchange" @bind:after="OnMinSurplusSelected" />
+    <span class="hint">
+        Below this the car pauses instead of taking grid. The most the grid ever adds is the charger's
+        minimum power (about 4.1 kW at 6 A on three phases) less this figure; set it at or above that
+        and the grid never helps at all. Also the line the rest of today's forecast has to clear.
+        Doesn't persist across restarts.
+    </span>
+</div>
+
+@if (Status is { } status)
+{
+    <section class="stat-grid">
+        <Stat Label="Solar surplus" Value="@Watts(status.SurplusWatts)"
+              Hint="PV left after household consumption — the smoothed 3-minute average this mode decides on. Blank while a mode that doesn't decide on surplus is driving." />
+        <Stat Label="Sun until" Value="@SunUntil(status)"
+              Hint="When the forecast says the surplus stops clearing your minimum today — when this mode will switch itself off if the live surplus agrees. Only shown while this mode is driving." />
+        <Stat Label="Target current" Value="@Amps(status.TargetCurrentAmps)"
+              Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
+        <Stat Label="Grid power" Value="@Watts(status.GridPowerWatts)"
+              Hint="Positive while importing. While the grid is topping up a small surplus, this is roughly that top-up." />
+    </section>
+
+    @if (status.Mode == ChargeControlMode.SolarGrid && status.SolarGrid is { } outlook)
+    {
+        <p class="muted">Forecast: @outlook.Reason.</p>
+    }
+}
+
+@code {
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
+
+    private double _minSurplusWatts;
+
+    // Which status the number was last refreshed from: only a new poll may overwrite a value the owner
+    // is halfway through typing, not the re-render a button press causes.
+    private ChargeControlStatus? _seenStatus;
+
+    protected override void OnInitialized() => _minSurplusWatts = SolarGridSettings.MinSurplusWatts;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_seenStatus, Status))
+        {
+            return;
+        }
+
+        _seenStatus = Status;
+        _minSurplusWatts = SolarGridSettings.MinSurplusWatts;
+    }
+
+    private Task StartSolarGrid() => Start(ChargeControlMode.SolarGrid);
+
+    private void OnMinSurplusSelected() => SolarGridSettings.SetMinSurplusWatts(_minSurplusWatts, "Web UI");
+
+    private string SunUntil(ChargeControlStatus status) => status.SolarGrid switch
+    {
+        null => "—",
+        { ForecastUsable: false } => "no forecast",
+        { SunUntil: { } until } => TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone).ToString("HH:mm"),
+        _ => "none left today",
+    };
+
+    private static string Watts(double watts) => $"{watts:F0} W";
+
+    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
+
+    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+}

@@ -32,6 +32,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     // is configured -- in which case the entity is not published and this is never read.
     private readonly IVehicleUpdateService? _vehicleFeed;
     private readonly TargetedChargeOptions _targetedOptions;
+    private readonly ISolarGridSettings? _solarGrid;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -77,8 +78,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         HaDiscovery discovery,
         IVehicleTelemetry? vehicle = null,
         IEnumerable<IVehicleUpdateService>? vehicleFeeds = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ISolarGridSettings? solarGrid = null)
     {
+        _solarGrid = solarGrid;
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
         _discovery = discovery;
@@ -283,6 +286,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // typed, so a fast charge started from the web UI shows up here too.
         yield return (HaDiscovery.FastEnergyNumber, (_fast.Limit?.RequiredEnergyWh / 1000) ?? _pendingFastEnergyKWh);
         yield return (HaDiscovery.FastTargetSocNumber, _fast.Limit?.TargetSocPercent ?? _pendingFastSocPercent);
+
+        if (_solarGrid is not null)
+        {
+            yield return (HaDiscovery.MinSolarSurplusNumber, _solarGrid.MinSurplusWatts);
+        }
     }
 
     // The departure as text, echoed back so a Home Assistant restart (or a second dashboard) sees what
@@ -552,6 +560,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 break;
             case HaDiscovery.FastTargetSocNumber:
                 _pendingFastSocPercent = Math.Clamp(value, 0, 100);
+                break;
+            case HaDiscovery.MinSolarSurplusNumber when _solarGrid is not null:
+                // Applied at once, like the forecast numbers: it steers a running mode, and there is no
+                // button that would turn it into anything more than it already is.
+                _solarGrid.SetMinSurplusWatts(value, "Home Assistant");
                 break;
             default:
                 return Task.CompletedTask;

@@ -107,10 +107,11 @@ public sealed class HaDiscovery
     public const string TargetRestSocNumber = "target_rest_soc";
     public const string FastEnergyNumber = "fast_energy";
     public const string FastTargetSocNumber = "fast_target_soc";
+    public const string MinSolarSurplusNumber = "min_solar_surplus";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
         [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
-         TargetRestSocNumber, FastEnergyNumber, FastTargetSocNumber];
+         TargetRestSocNumber, FastEnergyNumber, FastTargetSocNumber, MinSolarSurplusNumber];
 
     /// <summary>
     /// The charging-priority select. Its own platform rather than a switch, because "Cheapest" and
@@ -154,6 +155,7 @@ public sealed class HaDiscovery
         ("start_solar", ChargeControlMode.Solar, "Charge solar", "mdi:solar-power"),
         ("start_forecasted", ChargeControlMode.Forecasted, "Charge forecasted", "mdi:weather-partly-cloudy"),
         ("start_fast_no_battery", ChargeControlMode.FastNoBattery, "Charge fast", "mdi:lightning-bolt"),
+        ("start_solar_grid", ChargeControlMode.SolarGrid, "Charge solar + grid", "mdi:solar-power-variant"),
     ];
 
     /// <summary>
@@ -483,6 +485,12 @@ public sealed class HaDiscovery
         // plugged in and doing nothing at 23:00 actually wants to know.
         yield return Sensor("fast_start", "Fast start", template: Optional("fast_start"), icon: "mdi:clock-start");
 
+        // The solar-grid mode's one number and its one verdict. Published unconditionally, like the
+        // other modes' controls, so the minimum can be set before the button is pressed. The sensor is
+        // the answer to "when will this switch itself off?" -- absent unless the mode is driving.
+        yield return Number(MinSolarSurplusNumber, "Min solar surplus", min: 0, max: 20000, step: 100, unit: "W", icon: "mdi:solar-power-variant");
+        yield return Sensor("sun_until", "Sun until", template: Optional("sun_until"), icon: "mdi:weather-sunset-down");
+
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
             ["name"] = "Car connected",
@@ -630,6 +638,15 @@ public sealed class HaDiscovery
             // same choice target_grid_start makes just above.
             payload["fast_start"] = fast.Plan is { } schedule
                 ? $"{schedule.StartNoLaterThan.LocalDateTime:HH:mm}"
+                : "none";
+        }
+
+        // "none" once the forecast has spoken and has no sun left -- the mode is about to end itself --
+        // and absent while there is no usable forecast, which is a different fact: nobody knows.
+        if (s.SolarGrid is { ForecastUsable: true } solarGrid)
+        {
+            payload["sun_until"] = solarGrid.SunUntil is { } until
+                ? $"{until.LocalDateTime:HH:mm}"
                 : "none";
         }
 

@@ -55,6 +55,11 @@ namespace Gleanvolt.Core.Models;
 /// <paramref name="Plan"/> and <paramref name="TargetedPlan"/> follow. Null also means "no limit": the
 /// owner asked for <see cref="Enums.FastChargeBasis.Full"/> and the car decides when to stop.
 /// </param>
+/// <param name="SolarGrid">
+/// The forecast's verdict on sun still to come, populated <b>only</b> while
+/// <see cref="ChargeControlMode.SolarGrid"/> is the mode driving the charger — the same rule the other
+/// mode-owned fields follow.
+/// </param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 /// <param name="SessionCompleted">
 /// This cycle the controller reported that charging was over and the mode ended itself — the fast and
@@ -93,4 +98,5 @@ public sealed record ChargeControlStatus(
     DateTimeOffset Timestamp,
     TargetedChargePlan? TargetedPlan = null,
     bool SessionCompleted = false,
-    FastChargeProgress? FastCharge = null);
+    FastChargeProgress? FastCharge = null,
+    SolarGridOutlook? SolarGrid = null);

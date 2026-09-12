@@ -41,6 +41,7 @@ public class ChargingPlanPageTests : PageTest
         Services.AddSingleton<IChargeActions>(_actions);
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
+        Services.AddSingleton<ISolarGridSettings>(new FakeSolarGridSettings());
         Services.AddSingleton<ITargetedChargeSelector>(_target);
         Services.AddSingleton<IFastChargeSelector>(_fast);
         Services.AddSingleton<ITargetedChargePreview>(new FakeTargetedChargePreview());
@@ -59,7 +60,7 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab();
 
         Assert.Equal(
-            ["Solar", "Forecasted", "Fast (no battery)", "Targeted"],
+            ["Solar", "Forecasted", "Solar + grid", "Fast (no battery)", "Targeted"],
             page.FindAll("nav.tabs a").Select(a => a.TextContent.Trim()));
     }
 
@@ -127,6 +128,7 @@ public class ChargingPlanPageTests : PageTest
     [InlineData("solar", "#start-solar", ChargeControlMode.Solar)]
     [InlineData("forecasted", "#start-forecasted", ChargeControlMode.Forecasted)]
     [InlineData("fast", "#start-fast-no-battery", ChargeControlMode.FastNoBattery)]
+    [InlineData("solar-grid", "#start-solar-grid", ChargeControlMode.SolarGrid)]
     public void Each_tabs_button_starts_its_own_strategy_with_the_web_ui_as_source(
         string tab, string selector, ChargeControlMode expected)
     {

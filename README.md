@@ -32,6 +32,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Battery discharge hold** — stop the home battery serving house load, so the EV charges from PV and grid while the battery still charges from surplus.
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full — or when the amount you asked for has been delivered, said in kilowatt-hours or as a battery target. Tell it when you leave and it waits, starting as late as it can and still finish — so a car charged above 80% sits there for minutes rather than all night.
 - **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs. Ask in kilowatt-hours, or, with a car that reports its own battery, in state of charge — "80% by seven". Either way the plan is put in front of you and started only when you confirm it. Choose **just in time** instead of cheapest and the last stretch is held back so the car reaches 100% shortly before you leave rather than sitting full all night — the preview names what that costs in grid before you commit to it.
+- **Solar with grid help** — "take the sun, let the grid make a weak sun usable, and stop when the day's sun is over": the car follows the surplus while it clears a minimum you set, a surplus too small for the charger's 6 A floor is topped up to it from the grid with the home battery held out of it, and once the forecast has no sun left today that clears your minimum the mode switches itself off.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
@@ -1037,7 +1038,7 @@ would only ever drift apart.
 
 ### Targeted charging (the `Targeted` mode)
 
-The four other modes all ration the car to what the day happens to offer. None of them answers the
+The other modes all ration the car to what the day happens to offer. None of them answers the
 question an owner actually asks the night before a trip: **"I need 22 kWh in the car by 07:00 — do
 that, and use as little grid as you can."**
 
@@ -1299,6 +1300,76 @@ neither can a request that does not survive a restart.
 }
 ```
 
+### Solar with grid help (the `SolarGrid` mode)
+
+For the day you want the car to take the sun as it comes, are happy to buy a little grid to make a weak
+sun usable, and want nothing to happen once the sun is gone. It is `Solar` without the battery-full
+gate, plus a grid bridge, plus an end.
+
+One number steers it: the **minimum solar surplus** — `ChargeControl:SolarGrid:MinSurplusWatts`,
+2000 W by default, settable at runtime from the **Solar + grid** tab and the **Min solar surplus**
+entity. It is measured against the same smoothed 3-minute surplus every solar mode decides on.
+
+| Smoothed surplus | Decision | From the grid |
+|---|---|---|
+| at or above the charger's floor (~4.14 kW at 6 A on three phases) | follow the surplus, whole amps, up to `MaxChargingCurrentAmps` | nothing |
+| at or above your minimum, below the floor | charge at the 6 A floor | the gap to the floor, with the discharge hold armed |
+| below your minimum | pause — see below | nothing, except while a running charge is held at the floor |
+
+Set the minimum at or above the floor and the grid never helps: the mode is then plain surplus
+charging with no battery gate, ending at sunset.
+
+#### Clouds
+
+The same machinery as the other solar modes, so a passing shadow does not stop the car:
+
+- the **3-minute moving average** (`ChargeControl:SurplusAverageWindow`) is what is compared, never
+  the instantaneous reading;
+- a paused car restarts only **`ResumeHysteresisWatts` above** the minimum, while a running one
+  continues down to the minimum itself;
+- a running charge that dips below the minimum is **held at 6 A** for `ChargeControl:Forecast:MinRunTime`
+  (10 min) — with the gap reported as a grid bridge, so the pack stays out of it — and a paused one
+  waits `ChargeControl:Forecast:MinPauseTime` (15 min) before restarting. The restart wait only applies
+  once the car has actually drawn power: a wait counted from the button press would waste the sun that
+  is there now.
+
+#### The end of the day
+
+Only once the live surplus is under the minimum does the forecast get a say, and it answers one
+question: does any stretch of the rest of today have a forecast surplus — PV at
+`ChargeControl:SolarGrid:ForecastConfidence` (the median, `P50`, by default), less the learned house
+load — that clears the minimum?
+
+- **Yes, now or within 15 minutes** — pause; this is a dip.
+- **Yes, but later** — the charger is **stood down** (use-mode `Stop`), because this wallbox will not
+  sit in Fast at 0 A for hours. The first live surplus over the start threshold re-arms it.
+- **No** — the car is paused and the mode returns itself to `Off`, exactly as the Off button would.
+
+**The forecast never turns away real sun**: a surplus over the minimum charges the car whatever the
+forecast said about the afternoon. With **no usable forecast** — none fetched, or older than
+`ChargeControl:Forecast:StaleForecastAfter` with sun still in it — the mode waits on live surplus and
+never ends itself on the forecast's word. The one exception is an old forecast with no PV at all left
+today, even in its optimistic band: the evening is exactly when the forecast stops being refreshed,
+and "the sun has set" does not go out of date.
+
+It also ends itself, like `Targeted`, when the car **stops drawing** for `CompletionDwell` while being
+asked to charge, or is **unplugged** — a full car held at a bridged 6 A would otherwise keep the pack
+held and the house on the grid for nothing.
+
+#### What it doesn't do
+
+- **No battery-full gate.** The car competes with the home battery for the surplus from the first watt
+  over the minimum. Use `Forecasted` if the battery must reach 100% by evening.
+- **No battery loan.** The grid is the only source for the bridge — and only with
+  `BatteryHold:Enabled`. Without the hold the bridge still runs, but the inverter serves the gap from
+  the pack; a warning says so when the mode is selected.
+- **Nothing survives a restart**, the minimum set at runtime included.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `ChargeControl:SolarGrid:MinSurplusWatts` | `2000` | The boot value of the minimum solar surplus, in watts. |
+| `ChargeControl:SolarGrid:ForecastConfidence` | `P50` | The forecast band that decides whether sun is still to come. |
+
 ### Home Assistant (MQTT)
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
@@ -1318,6 +1389,9 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
     the charge ends. The amount is optional and lives on the three entities beside the button:
     **Fast basis**, **Fast energy**, **Fast target SOC** and **Fast departure**. Left at `Full` with
     no departure — the default — the button does exactly what it always did.
+  - **Charge solar + grid** — follow the surplus while it clears **Min solar surplus**, top a sub-floor
+    surplus up from the grid, and switch itself off once the forecast has no sun left today. See
+    [Solar with grid help](#solar-with-grid-help-the-solargrid-mode) above.
   - **Activate target** — deliver a stated amount of energy by a stated departure time, sun first and
     paced across the window so the roof covers as much of it as it can. See
     [Targeted charging](#targeted-charging-the-targeted-mode) below.
@@ -1356,6 +1430,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   **Activate target** button — plus its plan sensors: **Target plan state**, **Target solar energy**,
   **Target grid energy**, **Target expected**, **Target shortfall** and **Grid top-up start**. See
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
+- the solar-grid controls — the **Min solar surplus** number, applied at once — plus its **Sun until**
+  sensor, populated while the mode is driving.
 - binary sensors: **Car connected** and **Charging now**.
 - **Car feed** — only on an installation with a
   [manufacturer vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section)
@@ -1377,10 +1453,11 @@ description or tooltip field. The meanings live here instead.
 
 | Entity | Unit | What it means |
 | --- | --- | --- |
-| **Charge mode** | sensor | Which strategy is driving the charger: `Off`, `Solar`, `Forecasted`, `FastNoBattery` or `Targeted`. Read-only — it reports what a button did, and it moves on its own when `FastNoBattery` or `Targeted` finish. Always `Off` after a restart. |
+| **Charge mode** | sensor | Which strategy is driving the charger: `Off`, `Solar`, `Forecasted`, `FastNoBattery`, `Targeted` or `SolarGrid`. Read-only — it reports what a button did, and it moves on its own when `FastNoBattery`, `Targeted` or `SolarGrid` finish. Always `Off` after a restart. |
 | **Charge solar** | button | Starts the `Solar` strategy: writes the charger's use-mode `Fast`, then selects the mode. A charger that refuses the write leaves the mode untouched and logs a warning, rather than reporting a strategy that is doing nothing. |
 | **Charge forecasted** | button | The same, for `Forecasted`. |
 | **Charge fast** | button | The same, for `FastNoBattery`, and it applies the three **Fast** entities below as it goes. Read the warning about `MaxChargingCurrentAmps` before pressing it — this one draws the site's supply limit for hours. An amount it cannot honour (a battery target with no configured capacity, a car already past it) logs a warning and starts nothing, rather than charging to full instead. |
+| **Charge solar + grid** | button | The same, for `SolarGrid`. Reads **Min solar surplus** on every poll rather than at the press, so the number can be moved while it runs. Switches itself off at the end of the day's useful sun, when the car stops drawing, or when it is unplugged. |
 | **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` is different: it arms its own hold only while the plan is importing — inside its grid block and while the grid bridge runs — and never touches this switch. |
 | **Daily EV target** | kWh | What you would like the car to have taken by the end of the day — a yardstick, not a limit. **Day outlook**, **Projected shortfall** and **EV energy expected today** are all measured against it, and nothing stops on it: past the target the car goes on taking whatever surplus the plan still allows, and lowering it sends the car no less. **Session energy target** is the one that caps a charge. Doesn't persist across restarts. |
@@ -1394,6 +1471,8 @@ description or tooltip field. The meanings live here instead.
 | **Fast start** | sensor | When the deferred charge will begin, as `HH:mm`, or `none` when it starts immediately. Moves later as energy goes in, and earlier if the car turns out to draw less than the charger offers. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast delivered** | kWh | Energy delivered against the fast charge's amount, since it was started. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast target** | kWh | The amount that fast charge is working to — the number **Fast delivered** is counting towards. Absent on the same terms. |
+| **Min solar surplus** | W | The smoothed surplus below which `SolarGrid` pauses the car instead of topping it up from the grid — and the line the rest of today's forecast has to clear for the mode to keep waiting. Applied at once, including to a running charge. The most the grid ever adds is the charger's floor (~4.14 kW on three phases) less this; at or above the floor the grid never helps. Doesn't persist across restarts. |
+| **Sun until** | sensor | When today's forecast surplus last clears **Min solar surplus**, as `HH:mm` — the time `SolarGrid` will switch itself off if the live surplus agrees. `none` when the forecast has no such sun left; absent with no usable forecast, and whenever another mode is driving. |
 | **Control state** | — | What charge control is doing right now. `Disabled`: nothing is running, the charger is the owner's. `Idle`: a strategy is running but not acting — most often because the charger has been taken out of Fast at the wallbox since it was started. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
 | **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
 | **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |

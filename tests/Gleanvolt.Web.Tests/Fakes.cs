@@ -166,6 +166,19 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
 }
 
 /// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
+internal sealed class FakeSolarGridSettings : ISolarGridSettings
+{
+    public double MinSurplusWatts { get; private set; } = 2000;
+
+    public List<(double Watts, string Source)> Sets { get; } = [];
+
+    public void SetMinSurplusWatts(double watts, string source)
+    {
+        MinSurplusWatts = Math.Max(0, watts);
+        Sets.Add((MinSurplusWatts, source));
+    }
+}
+
 internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 {
     public double DailyEvTargetWh { get; private set; } = 15_000;

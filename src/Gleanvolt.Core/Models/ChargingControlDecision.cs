@@ -74,6 +74,11 @@ namespace Gleanvolt.Core.Models;
 /// down again seventeen seconds after starting it, and only got going for good a minute later. Once a
 /// wait has been released it stays released.</para>
 /// </param>
+/// <param name="SolarGrid">
+/// What the rest of today's forecast says about sun clearing the owner's minimum, when the
+/// <see cref="Enums.ChargeControlMode.SolarGrid"/> mode is the one driving. Only
+/// <see cref="Strategies.SolarGridChargingController"/> reads it, which is why it defaults to null.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -89,7 +94,8 @@ public sealed record ChargingControlInput(
     FastChargeProgress? FastCharge = null,
     bool ChargerStoodDown = false,
     TimeSpan ChargerNotFastFor = default,
-    bool WaitAlreadyReleased = false);
+    bool WaitAlreadyReleased = false,
+    SolarGridOutlook? SolarGrid = null);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
@@ -116,7 +122,7 @@ public sealed record ChargingControlInput(
 /// setpoint; the orchestrator then switches the mode back to <see cref="ChargeControlMode.Off"/>,
 /// which also releases the hold the fast mode armed.
 ///
-/// <para>Set by the fast and targeted modes. The solar and forecast-driven ones never do: they follow
+/// <para>Set by the fast, targeted and solar-grid modes. The solar and forecast-driven ones never do: they follow
 /// the sun for as long as they are selected, and a car that has stopped taking their surplus has not
 /// ended anything.</para>
 /// </param>

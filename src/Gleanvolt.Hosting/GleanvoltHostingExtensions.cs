@@ -11,6 +11,7 @@ using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
+using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -333,6 +334,35 @@ public static class GleanvoltHostingExtensions
                     MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts));
         });
 
+        // Solar with the grid allowed to help: follow the surplus while it clears an owner-set minimum,
+        // bridge a sub-floor surplus from the grid, and give up for the day once the forecast has no sun
+        // left that clears the minimum. The minimum is runtime state like the forecast mode's numbers.
+        services.Configure<SolarGridChargeOptions>(configuration.GetSection(SolarGridChargeOptions.SectionName));
+        services.AddSingleton<ISolarGridSettings, SolarGridSettings>();
+        services.AddSingleton<SolarGridProvider>();
+
+        services.AddSingleton(provider =>
+        {
+            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var forecast = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+            var solarGrid = provider.GetRequiredService<IOptions<SolarGridChargeOptions>>().Value;
+            var limits = provider.GetRequiredService<ChargingLimits>();
+
+            return new SolarGridChargingController(
+                provider.GetRequiredService<ChargePowerConverter>(),
+                new SolarGridChargingOptions(
+                    MinChargingCurrentAmps: limits.MinAmps,
+                    MaxChargingCurrentAmps: limits.MaxAmps,
+                    CurrentStepAmps: chargeControl.CurrentStepAmps,
+                    ResumeHysteresisWatts: chargeControl.ResumeHysteresisWatts,
+                    // The forecast mode's dwell timers, as the targeted mode takes them: they spare the
+                    // contactor and the car, which is a property of the hardware and not of a strategy.
+                    MinRunTime: forecast.MinRunTime,
+                    MinPauseTime: forecast.MinPauseTime,
+                    CompletionDwell: chargeControl.CompletionDwell,
+                    MinSurplusWatts: solarGrid.MinSurplusWatts));
+        });
+
         services.AddSingleton(provider =>
             new SurplusMovingAverage(provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value.SurplusAverageWindow));
 
@@ -348,6 +378,7 @@ public static class GleanvoltHostingExtensions
                 [ChargeControlMode.Forecasted] = provider.GetRequiredService<ForecastedChargingController>(),
                 [ChargeControlMode.FastNoBattery] = provider.GetRequiredService<FastChargingController>(),
                 [ChargeControlMode.Targeted] = provider.GetRequiredService<TargetedChargingController>(),
+                [ChargeControlMode.SolarGrid] = provider.GetRequiredService<SolarGridChargingController>(),
             };
 
             return new ChargingControlCoordinator(

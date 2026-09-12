@@ -143,6 +143,18 @@ public class ChargingSessionTrackerTests
     }
 
     [Fact]
+    public void TheSolarGridModeIsRecordedLikeAnyOtherControllingMode()
+    {
+        // The mode that mixes the two sources is exactly the one whose solar/grid split is worth reading.
+        var tracker = NewTracker();
+
+        var started = tracker.Observe(Status(Noon, mode: ChargeControlMode.SolarGrid)).Started;
+
+        Assert.NotNull(started);
+        Assert.Equal(ChargeControlMode.SolarGrid, started!.StartMode);
+    }
+
+    [Fact]
     public void SwitchingModeMidSessionRecordsAnEventRatherThanSplittingTheSession()
     {
         var tracker = NewTracker();
