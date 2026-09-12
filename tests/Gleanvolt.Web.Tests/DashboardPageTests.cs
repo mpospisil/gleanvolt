@@ -27,6 +27,9 @@ public class DashboardPageTests : PageTest
 
     private readonly FakeVehicleStateRefresh _refresh = new();
 
+    // Holds nothing by default: the install before its first forecast refresh.
+    private readonly FakeSolarForecastService _forecast = new();
+
     // The car the section is about (#124/#140). Unknown by default, which is the install that has
     // never described one; a test that is about the card sets it before rendering.
     private EvInfo _car = EvInfo.Unknown;
@@ -37,6 +40,7 @@ public class DashboardPageTests : PageTest
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
         Services.AddSingleton<IVehicleStateRefresh>(_refresh);
+        Services.AddSingleton<ISolarForecastService>(_forecast);
 
         // The per-feed sections read the holder's own tally (#141), so it has to be the same object
         // the tests push readings into -- a second comparison would see nothing.
@@ -459,6 +463,60 @@ public class DashboardPageTests : PageTest
 
         Assert.Contains("Forecast solar power", page.Markup);
         Assert.Contains("0 W", page.Markup);
+    }
+
+    /// <summary>Today's whole-day forecast tile, by its label.</summary>
+    private static AngleSharp.Dom.IElement TodayForecastTile(IRenderedComponent<Dashboard> page) =>
+        page.FindAll(".stat").Single(s => s.QuerySelector(".label")!.TextContent == "Forecast solar today");
+
+    [Fact]
+    public void Shows_the_whole_of_todays_forecast_in_kilowatt_hours()
+    {
+        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
+        _forecast.DayTotals[new DateOnly(2026, 8, 13)] = 3_100;
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Equal("18.4 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+    }
+
+    [Fact]
+    public void Takes_today_in_the_sites_zone_rather_than_utc()
+    {
+        // 22:30 UTC is half past midnight in Prague: the day the owner is living in is already the next.
+        _time.Now = new DateTimeOffset(2026, 8, 12, 22, 30, 0, TimeSpan.Zero);
+        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
+        _forecast.DayTotals[new DateOnly(2026, 8, 13)] = 9_700;
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Equal("9.7 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+    }
+
+    [Fact]
+    public void Shows_a_dash_for_today_while_no_forecast_is_held()
+    {
+        // Not 0 kWh: nothing fetched yet is a very different claim from a day the sun won't come up.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Equal("—", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+    }
+
+    [Fact]
+    public void Picks_up_a_forecast_that_lands_after_the_page_opened()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        var page = Render<Dashboard>();
+
+        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        page.WaitForAssertion(() =>
+            Assert.Equal("18.4 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent));
     }
 
     [Fact]

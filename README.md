@@ -2330,8 +2330,9 @@ with a form of its own. Reading an outcome and adjusting its input meant changin
 **`/` reports and no longer decides.** It carries no button, no input and no select at all — three
 sections, in the order the questions are actually asked:
 
-- **Energy** — solar power against what the forecast expected of this instant, solar surplus, battery
-  SOC and power, grid power. True whatever is or isn't plugged in, which is why it comes first.
+- **Energy** — solar power against what the forecast expected of this instant, the whole of today's
+  forecast production (morning included; a dash while no forecast is held for today), solar surplus,
+  battery SOC and power, grid power. True whatever is or isn't plugged in, which is why it comes first.
 - **Vehicle** — the car, because it is *configured*: its name and pack, then the charger's own view of
   whether one is connected, then whatever feed reports on it. The feed is an attachment, and the card
   names which of four situations it is in — no feed configured (nothing is wrong), a reading and its
