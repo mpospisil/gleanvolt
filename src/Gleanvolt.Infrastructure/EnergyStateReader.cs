@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Gleanvolt.Infrastructure.RegisterMaps;
 
 namespace Gleanvolt.Infrastructure;
@@ -19,18 +20,30 @@ public sealed class EnergyStateReader : IEnergyStateReader
     private readonly IModbusClient _evChargerClient;
     private readonly ILogger<EnergyStateReader> _logger;
 
+    // The phase the grid meter cannot see, or null for a meter that sees all three. Corrected here, once,
+    // rather than in each consumer: surplus, house profile, battery hold, energy intervals and Home
+    // Assistant then all read the same number without knowing there was anything to correct.
+    private readonly GridPhase? _unmeteredGridPhase;
+    private readonly int _evPhases;
+
     // Whether the last poll reached the charger. Only used to keep the log to one line per outage
     // rather than one per poll; this service is a singleton, so it survives between polls.
     private bool _evChargerReachable = true;
 
+    /// <param name="site">The installation, for its unmetered grid phase. Null reads the meter as it is.</param>
+    /// <param name="limits">The car's phase count, for how its load divides between phases. Null assumes three.</param>
     public EnergyStateReader(
         [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverterClient,
         [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient evChargerClient,
-        ILogger<EnergyStateReader> logger)
+        ILogger<EnergyStateReader> logger,
+        PvSystemInfo? site = null,
+        ChargingLimits? limits = null)
     {
         _inverterClient = inverterClient;
         _evChargerClient = evChargerClient;
         _logger = logger;
+        _unmeteredGridPhase = site?.UnmeteredGridPhase;
+        _evPhases = limits?.Phases ?? 3;
     }
 
     public async Task<EnergyState> ReadAsync(CancellationToken cancellationToken = default)
@@ -45,7 +58,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
 
         var evCharger = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
 
-        return EnergyState.FromRawRegisters(
+        var state = EnergyState.FromRawRegisters(
             DateTimeOffset.UtcNow,
             batterySocRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryCapacity),
             batteryPowerRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryPowerCharge1),
@@ -57,6 +70,27 @@ public sealed class EnergyStateReader : IEnergyStateReader
             evChargerPowerRaw: evCharger.PowerRaw)
             with
         { ChargeMode = evCharger.Mode, ChargeCurrentAmps = evCharger.CurrentAmps };
+
+        return _unmeteredGridPhase is { } blind ? WithUnmeteredPhaseEstimated(state, inverterBlock, blind) : state;
+    }
+
+    // The inverter's per-phase output is already in the telemetry block (it is what the grid diagnostic
+    // below logs), so the correction costs no extra Modbus read.
+    private EnergyState WithUnmeteredPhaseEstimated(EnergyState state, ushort[] block, GridPhase blind)
+    {
+        var inverterOutput = new PhaseWatts(
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerR)),
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerS)),
+            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerT)));
+
+        var estimate = UnmeteredGridPhaseEstimate.GridPowerWatts(
+            state.GridPowerWatts, blind, inverterOutput, state.EvChargerPowerWatts, _evPhases);
+
+        return state with
+        {
+            GridPowerWatts = Math.Round(estimate),
+            MeteredGridPowerWatts = state.GridPowerWatts,
+        };
     }
 
     // The charger is optional in a way the inverter is not: it can be switched off, moved to another

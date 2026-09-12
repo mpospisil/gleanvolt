@@ -235,4 +235,44 @@ public class PvSystemResolverTests
         Assert.Contains("50.0755,14.4378", description);
         Assert.Contains("SolaX X3-HYB-G4 PRO at 192.168.2.10:502", description);
     }
+
+    [Fact]
+    public void A_meter_that_sees_every_phase_is_the_default()
+    {
+        var site = Resolve(PvDevices);
+
+        Assert.Null(site.UnmeteredGridPhase);
+        Assert.DoesNotContain("blind", site.Describe());
+    }
+
+    [Theory]
+    [InlineData("L3", Core.Enums.GridPhase.L3)]
+    [InlineData("T", Core.Enums.GridPhase.L3)]
+    [InlineData("t", Core.Enums.GridPhase.L3)]
+    [InlineData("R", Core.Enums.GridPhase.L1)]
+    [InlineData(" l2 ", Core.Enums.GridPhase.L2)]
+    public void An_unmetered_phase_is_read_in_either_spelling(string configured, Core.Enums.GridPhase expected)
+    {
+        var site = Resolve(WithDevices(("Pv:Inverter:UnmeteredGridPhase", configured)));
+
+        Assert.Equal(expected, site.UnmeteredGridPhase);
+    }
+
+    [Fact]
+    public void An_unmetered_phase_that_is_not_a_phase_stops_the_host_naming_the_key()
+    {
+        var error = Record.Exception(() => Resolve(WithDevices(("Pv:Inverter:UnmeteredGridPhase", "L4"))));
+
+        Assert.NotNull(error);
+        Assert.Contains("Pv:Inverter:UnmeteredGridPhase", error.Message);
+    }
+
+    [Fact]
+    public void The_log_line_says_the_grid_figure_is_an_estimate()
+    {
+        // The startup line is where "why does Grid disagree with my meter?" gets answered.
+        var description = Resolve(WithDevices(("Pv:Inverter:UnmeteredGridPhase", "T"))).Describe();
+
+        Assert.Contains("grid meter blind on L3", description);
+    }
 }

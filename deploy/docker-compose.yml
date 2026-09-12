@@ -100,6 +100,9 @@ services:
 
       Pv__Inverter__Model: ${PV_INVERTER_MODEL:-SolaX X3-HYB-G4 PRO}
       Pv__Inverter__Host: ${INVERTER_HOST:-192.168.2.10}
+      # Only for a grid meter missing a phase clamp: which phase (L1-L3, or R/S/T). Unset reads the meter
+      # as it is, which is right for every correctly wired installation. See .env.example.
+      Pv__Inverter__UnmeteredGridPhase: ${PV_INVERTER_UNMETERED_GRID_PHASE:-}
 
       # A list, of which exactly one entry is supported -- a second is refused at startup rather than
       # silently ignored. The index is in the key rather than in .env so that an operator with one
