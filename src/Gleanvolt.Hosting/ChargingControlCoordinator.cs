@@ -97,13 +97,15 @@ public sealed class ChargingControlCoordinator
     /// How a limited fast charge is going, or null when there is no limit — which covers both the other
     /// modes and a fast charge asked for as Full.
     /// </param>
+    /// <param name="solarGrid">The solar-grid mode's forecast outlook, or null when the mode doesn't use one.</param>
     public async Task<ChargeControlCycleResult> RunCycleAsync(
         EnergyState state,
         ChargeControlMode mode,
         SolarDayPlan? plan,
         CancellationToken cancellationToken,
         TargetedChargePlan? targetedPlan = null,
-        FastChargeProgress? fastCharge = null)
+        FastChargeProgress? fastCharge = null,
+        SolarGridOutlook? solarGrid = null)
     {
         if (!_controllers.TryGetValue(mode, out var controller))
         {
@@ -148,7 +150,8 @@ public sealed class ChargingControlCoordinator
                 fastCharge,
                 _stoodDown,
                 ChargerNotFastFor(state.Timestamp),
-                _waitReleased));
+                _waitReleased,
+                solarGrid));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "

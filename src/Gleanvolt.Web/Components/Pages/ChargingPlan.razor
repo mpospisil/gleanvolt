@@ -62,7 +62,8 @@
             Starting any mode below puts the charger into Fast; Off stops the car, whichever mode was
             running. Nothing survives a restart — the service boots in Off and writes nothing until
             something here is pressed. Fast (no battery) and Targeted switch themselves off once the
-            car finishes, and the line above follows them without this page's help.
+            car finishes, Solar + grid once the day's useful sun is over, and the line above follows
+            them without this page's help.
         </span>
     </div>
 
@@ -105,6 +106,10 @@
             <ForecastedTab Status="_status" Busy="_busy" Start="StartAsync" />
             break;
 
+        case SolarGridSlug:
+            <SolarGridTab Status="_status" Busy="_busy" Start="StartAsync" />
+            break;
+
         case FastSlug:
             <FastTab Status="_status" Busy="_busy" Start="StartAsync" />
             break;
@@ -122,15 +127,18 @@
 @code {
     private const string SolarSlug = "solar";
     private const string ForecastedSlug = "forecasted";
+    private const string SolarGridSlug = "solar-grid";
     private const string FastSlug = "fast";
     private const string TargetedSlug = "targeted";
 
     // The order is the order they are worth reaching for: the two everyday solar modes first, then
-    // the two that will buy from the grid when they have to.
+    // the one that follows the sun but lets the grid help, then the two that buy from the grid when
+    // they have to.
     private static readonly (string Slug, string Label, ChargeControlMode Mode)[] Tabs =
     [
         (SolarSlug, "Solar", ChargeControlMode.Solar),
         (ForecastedSlug, "Forecasted", ChargeControlMode.Forecasted),
+        (SolarGridSlug, "Solar + grid", ChargeControlMode.SolarGrid),
         (FastSlug, "Fast (no battery)", ChargeControlMode.FastNoBattery),
         (TargetedSlug, "Targeted", ChargeControlMode.Targeted),
     ];

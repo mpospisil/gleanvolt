@@ -15,7 +15,9 @@ namespace Gleanvolt.Api.Contracts;
 /// <c>forecasted</c> lets today's forecast decide how much of the sun the car may have;
 /// <c>fastNoBattery</c> charges flat out from PV and grid with the home battery held out of it, and
 /// ends itself when the car is full; <c>targeted</c> delivers a stated amount by a stated time and
-/// needs <c>target</c>. <c>off</c> is not a mode to start — use the stop endpoint.
+/// needs <c>target</c>; <c>solarGrid</c> follows the surplus while it clears the configured minimum,
+/// tops a sub-floor surplus up from the grid, and ends itself when today's forecast has no such sun
+/// left. <c>off</c> is not a mode to start — use the stop endpoint.
 /// </param>
 /// <param name="Target">
 /// The target, required for <c>targeted</c> and rejected for every other mode. The same shape the

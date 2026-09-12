@@ -7,6 +7,7 @@ using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
+using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting.Tests;
@@ -36,16 +37,29 @@ public class HaButtonCommandTests
     private readonly TargetedChargeSelector _target = new(NullLogger<TargetedChargeSelector>.Instance);
     private readonly FastChargeSelector _fast = new(NullLogger<FastChargeSelector>.Instance);
     private readonly FakeVehicleTelemetry _vehicle = new();
+    private readonly SolarGridSettings _solarGrid =
+        new(Options.Create(new SolarGridChargeOptions()), NullLogger<SolarGridSettings>.Instance);
 
     [Theory]
     [InlineData("start_solar", ChargeControlMode.Solar)]
     [InlineData("start_forecasted", ChargeControlMode.Forecasted)]
     [InlineData("start_fast_no_battery", ChargeControlMode.FastNoBattery)]
+    [InlineData("start_solar_grid", ChargeControlMode.SolarGrid)]
     public async Task EachButtonStartsItsOwnStrategy(string objectId, ChargeControlMode expected)
     {
         await Worker().HandleCommandAsync(Discovery.ButtonCommandTopic(objectId), HaDiscovery.PayloadPress);
 
         Assert.Equal((expected, "Home Assistant"), Assert.Single(_actions.Starts));
+    }
+
+    [Fact]
+    public async Task TheMinimumSolarSurplusIsAppliedAtOnce()
+    {
+        // No button turns it into anything: it steers a running mode, like the forecast numbers.
+        await Worker().HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.MinSolarSurplusNumber), "3500");
+
+        Assert.Equal(3500, _solarGrid.MinSurplusWatts);
+        Assert.Empty(_actions.Starts);
     }
 
     [Fact]
@@ -365,7 +379,8 @@ public class HaButtonCommandTests
             // No manufacturer update service (#140): this suite is about the buttons, and the Car feed
             // entity is not published at all without one.
             vehicleFeeds: null,
-            new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
+            new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")),
+            _solarGrid);
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>
     private sealed class RecordingChargeActions : IChargeActions

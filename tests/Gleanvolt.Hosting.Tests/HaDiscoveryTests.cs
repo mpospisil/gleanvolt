@@ -445,6 +445,7 @@ public class HaDiscoveryTests
     [InlineData("session_energy_target")]
     [InlineData("min_battery_soc")]
     [InlineData("resume_margin")]
+    [InlineData("min_solar_surplus")]
     public void DiscoveryMessages_IncludeTheSettableNumbers(string objectId)
     {
         var message = Discovery.DiscoveryMessages()
@@ -506,6 +507,28 @@ public class HaDiscoveryTests
 
         Assert.False(json.RootElement.TryGetProperty("outlook", out _));
         Assert.False(json.RootElement.TryGetProperty("soc_floor", out _));
+    }
+
+    [Fact]
+    public void SunUntil_IsPublishedOnlyWhileTheSolarGridModeHasAForecastVerdict()
+    {
+        Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == "homeassistant/sensor/solax_controller/sun_until/config");
+
+        var at = new DateTimeOffset(new DateTime(2026, 9, 12, 12, 0, 0, DateTimeKind.Local));
+        var sunny = new SolarGridOutlook(2000, at, ForecastUsable: true, NextSunAt: at, SunUntil: at.AddHours(4.5), "sunny");
+
+        string? SunUntil(ChargeControlStatus status)
+        {
+            using var json = JsonDocument.Parse(Discovery.StateJson(status));
+            return json.RootElement.TryGetProperty("sun_until", out var value) ? value.GetString() : null;
+        }
+
+        Assert.Null(SunUntil(Status()));
+        Assert.Equal("16:30", SunUntil(Status(mode: ChargeControlMode.SolarGrid) with { SolarGrid = sunny }));
+
+        // "none" is the forecast saying the day is over; absent is nobody knowing.
+        Assert.Equal("none", SunUntil(Status(mode: ChargeControlMode.SolarGrid) with { SolarGrid = sunny with { NextSunAt = null, SunUntil = null } }));
+        Assert.Null(SunUntil(Status(mode: ChargeControlMode.SolarGrid) with { SolarGrid = SolarGridOutlook.Unavailable(2000, at, "no forecast") }));
     }
 
     [Fact]

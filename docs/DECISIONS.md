@@ -4,6 +4,38 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-12 — Solar with grid help: reality starts the car, the forecast only ends the day
+
+**Context.** A mode was asked for that takes both solar and grid, pauses when the sun is below an
+owner-set minimum — judged over several samples, the way the other modes ride out a cloud — and stops
+once the forecast has no energy left for the rest of the day.
+
+**Decision — the minimum is on the smoothed surplus, and the grid only bridges to the floor.** The same
+3-minute average, hysteresis and dwell timers every solar mode uses; nothing new about clouds. Above the
+minimum the car follows the surplus, and a surplus under the 6 A floor is topped up to the floor and no
+further — the `Targeted` grid bridge, and the hold arms on it the same way. A minimum at or above the
+floor turns the bridge off without a second setting.
+
+**Decision — the forecast is consulted only once the live gate is closed.** It decides what an idle car
+does (wait, stand down, or end), never whether a car getting real sun may charge. Ending the day on a
+sunny afternoon because a forecast wrote it off is the expensive mistake, so the band defaults to the
+median, not the day plan's P10.
+
+**Decision — a stale forecast is believed about the evening.** The refresh worker stops spending calls
+once there is no sun worth refreshing for, so "stale after four hours" would have made the mode unable to
+end after dark — the one time it is sure to be right. An old forecast with no PV at all left today in its
+optimistic band still ends the day; one with any sun left is not believed.
+
+**Decision — it ends itself on a finished or unplugged car, unlike `Solar` and `Forecasted`.** A full car
+held at a bridged 6 A keeps the hold armed and the house on the grid for nothing; the pure solar modes
+have no such cost, and keep following the sun.
+
+**Decision — a forecast wait is a stand-down, a cloud is a pause.** Sun more than 15 minutes off is a
+wait in half-hours, which this wallbox will not spend in Fast at 0 A (#135). A shorter gap stays a pause,
+so a passing shadow costs no use-mode writes on a link that already drops ~45 times a day.
+
+---
+
 ## 2026-09-09 — Two feeds is the steady state, and a feed declares its own silence (issue #180)
 
 **Context.** #141 ran the MQTT topic against the manufacturer's portal for a week and handed over. The

@@ -6,6 +6,7 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 
 namespace Gleanvolt.Hosting;
@@ -54,6 +55,7 @@ public sealed class PollingService : BackgroundService
     private readonly bool _chargeControlDryRun;
     private readonly BatteryHoldOptions _batteryHoldOptions;
     private readonly ForecastChargeOptions _forecastOptions;
+    private readonly SolarGridProvider? _solarGrid;
     private readonly ILogger<PollingService> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _pollInterval;
@@ -92,8 +94,10 @@ public sealed class PollingService : BackgroundService
         IOptions<BatteryHoldOptions> batteryHoldOptions,
         IOptions<ForecastChargeOptions> forecastOptions,
         ILogger<PollingService> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        SolarGridProvider? solarGrid = null)
     {
+        _solarGrid = solarGrid;
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
@@ -179,12 +183,20 @@ public sealed class PollingService : BackgroundService
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
 
+                // Only for the mode that reads it: unlike the three above there is no meter here that has
+                // to keep running across a mode switch, and building it elsewhere would only log an
+                // outlook nothing is acting on. After DayPlanProvider.Update, whose house-load profile
+                // it takes out of the forecast.
+                var solarGrid = mode == ChargeControlMode.SolarGrid
+                    ? Planned("solar-grid outlook", () => _solarGrid?.Update(state))
+                    : null;
+
                 ChargeControlCycleResult result;
                 if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
-                    or ChargeControlMode.Targeted)
+                    or ChargeControlMode.Targeted or ChargeControlMode.SolarGrid)
                 {
                     result = await _chargingControl.RunCycleAsync(
-                        state, mode, plan, stoppingToken, targetedPlan, fastCharge);
+                        state, mode, plan, stoppingToken, targetedPlan, fastCharge, solarGrid);
                 }
                 else
                 {
@@ -244,6 +256,7 @@ public sealed class PollingService : BackgroundService
                     // the cycle: a fast charge that has just met its limit reads Off by here, and the
                     // amount it was working to belongs to the session that has just ended.
                     FastCharge: mode == ChargeControlMode.FastNoBattery ? fastCharge : null,
+                    SolarGrid: mode == ChargeControlMode.SolarGrid ? solarGrid : null,
                     LoanPowerWatts: result.LoanPowerWatts,
                     SessionEnergyWh: _chargingControl.SessionEnergyWh,
                     LoanedTodayWh: _chargingControl.LoanedTodayWh,
@@ -317,6 +330,14 @@ public sealed class PollingService : BackgroundService
             _logger.LogWarning(
                 "{Mode} selected but BatteryHold:Enabled is false: charging at the maximum current anyway, "
                 + "with no way to stop the inverter discharging the home battery into the car.",
+                mode);
+        }
+
+        if (mode == ChargeControlMode.SolarGrid && !_batteryHoldOptions.Enabled)
+        {
+            _logger.LogWarning(
+                "{Mode} selected but BatteryHold:Enabled is false: a surplus under the charger's floor is still "
+                + "bridged, but the gap will come out of the home battery rather than from the grid.",
                 mode);
         }
     }
@@ -555,6 +576,24 @@ public sealed class PollingService : BackgroundService
 
             _autoHold = importing;
             return importing;
+        }
+
+        if (mode == ChargeControlMode.SolarGrid)
+        {
+            // The targeted mode's bridge rule and nothing else: this mode has no planned import, so the
+            // bridge is the only time the car draws more than the roof gives. Everywhere else the car is
+            // on surplus, and holding the pack there would only push the house onto the grid.
+            if (gridBridging != _autoHold)
+            {
+                _logger.LogInformation(
+                    "Battery discharge hold {Action} automatically: the {Mode} grid bridge {State}.",
+                    gridBridging ? "armed" : "released",
+                    mode,
+                    gridBridging ? "has started" : "is not running");
+            }
+
+            _autoHold = gridBridging;
+            return gridBridging;
         }
 
         if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)

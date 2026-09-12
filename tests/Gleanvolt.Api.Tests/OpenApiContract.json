@@ -203,7 +203,7 @@
       "requested": "boolean (required)",
       "targetWatts": "number|string(double)? (required)"
     },
-    "ChargeControlMode": "enum[off|solar|forecasted|fastNoBattery|targeted]",
+    "ChargeControlMode": "enum[off|solar|forecasted|fastNoBattery|targeted|solarGrid]",
     "ChargeControlState": "enum[disabled|idle|charging|paused]",
     "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|]",
     "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded]",

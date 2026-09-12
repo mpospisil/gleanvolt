@@ -45,4 +45,16 @@ public enum ChargeControlMode
     /// is Fast.
     /// </summary>
     Targeted,
+
+    /// <summary>
+    /// Charge from the sun with the grid allowed to help, for as long as today's sun lasts: while the
+    /// smoothed surplus clears an owner-set minimum the car follows it, and a surplus that clears the
+    /// minimum but not the charger's 6 A floor is topped up to the floor from the grid, with the
+    /// discharge hold armed so the home battery never pays for it. There is no battery-full gate. A dip
+    /// below the minimum pauses the car through the same smoothing and dwell timers the other solar
+    /// modes use; once the forecast shows no sun left today that clears the minimum, the mode returns
+    /// itself to <see cref="Off"/>. Like the other modes it only acts while the charger's own use-mode
+    /// is Fast.
+    /// </summary>
+    SolarGrid,
 }
