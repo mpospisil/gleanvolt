@@ -685,6 +685,30 @@ internal static class TestTargetedPlans
 }
 
 /// <summary>
+/// A forecast source that holds per-day totals and nothing else.
+///
+/// <para>The periods throw on purpose: a page showing a day's total must read the one the source worked
+/// out when its forecast landed, and a render that summed the periods itself would be doing on every poll
+/// what the real source does once per refresh.</para>
+/// </summary>
+internal sealed class FakeSolarForecastService : ISolarForecastService
+{
+    public Dictionary<DateOnly, double> DayTotals { get; } = [];
+
+    public SolarForecast? GetForecastForToday() =>
+        throw new NotSupportedException("A render must read the day total, not the periods.");
+
+    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) =>
+        throw new NotSupportedException("A render must read the day total, not the periods.");
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) =>
+        throw new NotSupportedException("A render must read the day total, not the periods.");
+
+    public double? GetDayEnergyWattHours(DateOnly localDate) =>
+        DayTotals.TryGetValue(localDate, out var wattHours) ? wattHours : null;
+}
+
+/// <summary>
 /// A refresh that answers whatever the test says, and counts how often it was asked (issue #168).
 ///
 /// <para>The counting is the point in on-demand mode: the page's contract is that it fetches when a

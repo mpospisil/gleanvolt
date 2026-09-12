@@ -50,6 +50,10 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         builder.Services.AddSingleton<IVehicleTelemetry>(vehicle);
         builder.Services.AddSingleton(vehicle.Comparison);
 
+        // The dashboard's whole-day forecast tile reads this. Holding nothing is the install before its
+        // first refresh, which is all an auth suite needs.
+        builder.Services.AddSingleton<ISolarForecastService>(new FakeSolarForecastService());
+
         // The car itself (#124), which the dashboard's vehicle card now names whether or not anything
         // reports on it (#140). Unknown is the install that has never described one.
         builder.Services.AddSingleton(EvInfo.Unknown);

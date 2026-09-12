@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Core.Strategies;
@@ -96,6 +97,33 @@ public sealed class SolarForecastHistory
 
         var day = snapshot.ForDate(localDate, timeZone);
         return day.Periods.Count > 0 ? day : null;
+    }
+
+    /// <summary>
+    /// Every retained local calendar day with its forecast energy in watt-hours, elapsed periods
+    /// included — what <see cref="ForDate"/> followed by <see cref="SolarForecast.ExpectedEnergyWattHours"/>
+    /// answers, for all days at once.
+    /// </summary>
+    /// <remarks>
+    /// Meant to be taken once per <see cref="Merge"/> and held, not asked for on every read: the totals
+    /// change only when a refresh lands, and the dashboard showing today's re-renders on every poll. A
+    /// day with nothing retained is absent rather than zero, for the reason <see cref="ForDate"/> answers
+    /// null. Days are attributed exactly as <see cref="ForDate"/> attributes them, so the two cannot
+    /// disagree over a period near midnight.
+    /// </remarks>
+    public IReadOnlyDictionary<DateOnly, double> DailyEnergyWattHours(TimeZoneInfo timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+
+        SolarForecastPeriod[] periods;
+        lock (_gate)
+        {
+            periods = [.. _periods.Values];
+        }
+
+        return periods
+            .GroupBy(p => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.PeriodEnd, timeZone).DateTime))
+            .ToFrozenDictionary(day => day.Key, day => day.Sum(p => p.EnergyWattHours));
     }
 
     private void Prune(DateTimeOffset cutoff)

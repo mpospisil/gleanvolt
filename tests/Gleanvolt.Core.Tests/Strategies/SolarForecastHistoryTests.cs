@@ -100,4 +100,48 @@ public class SolarForecastHistoryTests
         Assert.Equal(1, history.Count);
         Assert.Null(history.ForDate(DateOnly.FromDateTime(Midnight.DateTime), Prague));
     }
+
+    [Fact]
+    public void DayTotalsKeepTheMorningTheProviderHasStoppedReporting()
+    {
+        var history = new SolarForecastHistory();
+
+        history.Merge(Forecast(
+            Midnight.AddHours(7.5),
+            (Midnight.AddHours(8), 1000),
+            (Midnight.AddHours(13), 4000)));
+        history.Merge(Forecast(
+            Midnight.AddHours(14),
+            (Midnight.AddHours(15), 3000),
+            (Midnight.AddDays(1).AddHours(12), 6000)));
+
+        var totals = history.DailyEnergyWattHours(Prague);
+
+        Assert.Equal(2, totals.Count);
+        Assert.Equal((1000 + 4000 + 3000) * 0.5, totals[DateOnly.FromDateTime(Midnight.DateTime)], 3);
+        Assert.Equal(6000 * 0.5, totals[DateOnly.FromDateTime(Midnight.AddDays(1).DateTime)], 3);
+    }
+
+    [Fact]
+    public void DayTotalsAttributeAPeriodToTheSameDayForDateDoes()
+    {
+        // 23:30 UTC on the 8th is 01:30 on the 9th in Prague. Were the totals to bucket by UTC, the
+        // dashboard's figure and the day's own curve would disagree over exactly this period.
+        var history = new SolarForecastHistory();
+        var lateUtc = new DateTimeOffset(2026, 8, 8, 23, 30, 0, TimeSpan.Zero);
+
+        history.Merge(Forecast(Midnight.AddHours(-3), (lateUtc, 200), (Midnight.AddHours(12), 5000)));
+
+        var day = DateOnly.FromDateTime(Midnight.DateTime);
+        var totals = history.DailyEnergyWattHours(Prague);
+
+        Assert.Equal(history.ForDate(day, Prague)!.ExpectedEnergyWattHours, Assert.Single(totals).Value, 3);
+        Assert.Equal(day, totals.Keys.Single());
+    }
+
+    [Fact]
+    public void DayTotalsAreEmptyBeforeTheFirstRefreshRatherThanZero()
+    {
+        Assert.Empty(new SolarForecastHistory().DailyEnergyWattHours(Prague));
+    }
 }

@@ -47,6 +47,7 @@ public class DashboardOnDemandTests : PageTest
         Services.AddSingleton<IVehicleStateRefresh>(refresh);
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), 77, 0.9, onDemand));
         Services.AddSingleton(EvInfo.Unknown);
+        Services.AddSingleton<ISolarForecastService>(new FakeSolarForecastService());
         return refresh;
     }
 
