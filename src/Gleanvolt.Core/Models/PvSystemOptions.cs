@@ -150,7 +150,22 @@ public abstract class PvDeviceOptions
 }
 
 /// <summary>The system's inverter. No id: a PV system has one, and it is addressed as such.</summary>
-public sealed class PvInverterOptions : PvDeviceOptions;
+public sealed class PvInverterOptions : PvDeviceOptions
+{
+    /// <summary>
+    /// The phase the grid meter does not measure — <c>L1</c>, <c>L2</c> or <c>L3</c>, or SolaX's
+    /// <c>R</c>, <c>S</c>, <c>T</c> — or empty for a meter that sees all three, which is every correctly
+    /// wired installation and the default.
+    ///
+    /// <para><b>A workaround for wiring, not a tuning knob.</b> A meter missing a phase clamp makes the
+    /// house appear to use the sun the inverter exports on that phase, and to generate while the car
+    /// charges; with this set, the grid figure is estimated instead (see
+    /// <see cref="Strategies.UnmeteredGridPhaseEstimate"/>). The fix is the clamp, and the day it is
+    /// fitted this goes back to empty. A string rather than an enum so that a typo is a named startup
+    /// error rather than a binder exception.</para>
+    /// </summary>
+    public string UnmeteredGridPhase { get; init; } = string.Empty;
+}
 
 /// <summary>One EV charger on the system.</summary>
 public sealed class PvChargerOptions : PvDeviceOptions

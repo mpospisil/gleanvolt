@@ -16,7 +16,11 @@ public sealed record EnergyState(
     EvChargerMode? ChargeMode = null,
     // The charger's active current setpoint in amps, or null when it couldn't be read. Same story as
     // ChargeMode: a control holding register, attached after FromRawRegisters.
-    int? ChargeCurrentAmps = null)
+    int? ChargeCurrentAmps = null,
+    // What the grid meter itself read, set only while GridPowerWatts has been replaced by an estimate
+    // because the meter is blind on a phase (PvSystemInfo.UnmeteredGridPhase). Null means GridPowerWatts
+    // is the meter. Kept for the log, so the correction can always be read against what it corrected.
+    double? MeteredGridPowerWatts = null)
 {
     /// <summary>
     /// Household consumption excluding the EV charger, the battery, and PV -- the "Other Loads"

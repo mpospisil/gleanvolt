@@ -318,7 +318,8 @@ feature.
 
   "Inverter": {
     "Model": "SolaX X3-HYB-G4 PRO",
-    "Host": "192.168.2.10", "Port": 502, "UnitId": 1
+    "Host": "192.168.2.10", "Port": 502, "UnitId": 1,
+    "UnmeteredGridPhase": ""       // only for a grid meter missing a phase clamp: "L3" (or SolaX's "T")
   },
 
   "Chargers": [                    // a list; exactly one entry is supported
@@ -350,10 +351,21 @@ configuration does not have to change shape the day the control logic can drive 
 today: there is one charge mode, one set of Home Assistant controls and one surplus to divide. A second
 entry is therefore **a startup failure**, not a silently ignored one.
 
+**`UnmeteredGridPhase` is a workaround for a grid meter missing a phase clamp**, and stays empty on every
+correctly wired installation. House load is worked out as PV + grid − EV − battery, so a meter blind on
+one phase makes the house appear to use whatever the inverter exports there — nearly all the sun on every
+sunny afternoon, so no solar mode can start the car — and to generate while the car charges. Name the
+phase (`L1`–`L3`, or SolaX's `R`/`S`/`T`) and the grid flow on it is estimated from the inverter's own
+output on that phase, the car's share, and half the house load the other two phases carry. Everything
+downstream reads the estimate, Home Assistant's **Grid power** included; the poll log prints the meter's
+own figure beside it, and the startup line says the correction is on. To confirm a blind phase, read the
+inverter's per-phase meter registers (0x82/0x84/0x86): one reads 0 W while the inverter's output register
+for the same phase (0x6C/0x70/0x74) does not. The real fix is the clamp; once it is fitted, empty this.
+
 **What is validated at startup.** A site that cannot be described stops the worker with every problem
 listed at once, each naming its key: an id that is not a slug, a latitude without a longitude, a tilt
 outside 0–90, a loss factor outside (0, 1], an unparsable install date, a missing inverter or charger
-address, two chargers, or two chargers sharing an id.
+address, an unmetered grid phase that is not a phase, two chargers, or two chargers sharing an id.
 
 #### Keys that have moved
 
@@ -1484,7 +1496,7 @@ description or tooltip field. The meanings live here instead.
 | **Active charging current** | A | The charger's setpoint **read back** from the hardware: what it was actually left at. Compare it with the target — if they disagree for more than a poll or two, a write isn't landing (or the controller is in dry run). |
 | **Battery SOC** | % | Home battery state of charge as the inverter reports it. 0–100% spans the capacity the pack will actually cycle — its usable energy, not its nameplate. |
 | **Battery power** | W | Positive while the battery charges, negative while it discharges. With the discharge hold armed this should sit at or above roughly −60 W: a working hold still leaves a small standby trickle, but the pack is no longer serving the house. |
-| **Grid power** | W | Positive while importing from the grid, negative while exporting. This is the opposite of the sign the SolaX register uses; it's negated on read so positive always means power flowing into the house. |
+| **Grid power** | W | Positive while importing from the grid, negative while exporting. This is the opposite of the sign the SolaX register uses; it's negated on read so positive always means power flowing into the house. With `Pv:Inverter:UnmeteredGridPhase` set it is an **estimate** — the meter's two seen phases plus the blind one worked out from the inverter's output — and will disagree with the meter by design; see [the `Pv` section](#the-pv-system-the-pv-section). |
 | **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. `Unknown` when no hold is armed. |
 | **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
 | **Car feed** | — | How the [manufacturer's vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) is doing, with the sentence as a `reason` attribute. `Ok`: the last read produced a reading. `Degraded`: it is trying and not currently succeeding — a 5xx, a timeout, an expired session, or a delivery not filled yet; it backs off and clears itself. `NeedsOwner`: a refused password, a consent screen, an OTP or a portal setting only you can make — **the feed has stopped asking** and will not resume until you have cleared it and restarted the controller. That last state is the one worth a notification; the other two are not. Absent entirely on an installation with no such feed. |

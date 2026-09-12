@@ -74,7 +74,34 @@ public static partial class PvSystemRules
             LossFactor: Fraction(pv.LossFactor, "Pv:LossFactor", problems),
             InstallDate: ParseInstallDate(pv.InstallDate, problems),
             Inverter: ResolveInverter(pv, inverterDeviceId, problems),
-            Chargers: ResolveChargers(pv, problems));
+            Chargers: ResolveChargers(pv, problems))
+        {
+            UnmeteredGridPhase = ResolveUnmeteredGridPhase(pv, problems),
+        };
+    }
+
+    // Empty is the ordinary installation. Both spellings are accepted because the one on the inverter's
+    // display and in its register names is SolaX's R/S/T, and the one on an electrician's drawing is L1-L3.
+    private static Enums.GridPhase? ResolveUnmeteredGridPhase(PvSystemOptions pv, List<string> problems)
+    {
+        var value = pv.Inverter?.UnmeteredGridPhase.Trim() ?? string.Empty;
+
+        Enums.GridPhase? phase = value.ToUpperInvariant() switch
+        {
+            "L1" or "R" => Enums.GridPhase.L1,
+            "L2" or "S" => Enums.GridPhase.L2,
+            "L3" or "T" => Enums.GridPhase.L3,
+            _ => null,
+        };
+
+        if (phase is null && value.Length > 0)
+        {
+            problems.Add(
+                $"Pv:Inverter:UnmeteredGridPhase ('{value}') must be L1, L2 or L3 (or SolaX's R, S or T), or "
+                + "empty for a grid meter that measures all three phases.");
+        }
+
+        return phase;
     }
 
     /// <summary>

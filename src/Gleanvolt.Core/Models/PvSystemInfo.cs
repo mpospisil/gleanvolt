@@ -42,6 +42,14 @@ public sealed record PvSystemInfo(
     public bool HasLocation => Latitude is not null && Longitude is not null;
 
     /// <summary>
+    /// The phase the grid meter does not measure, or null for a meter that sees all three. While set,
+    /// the grid figure everything downstream reads is an estimate rather than the meter — see
+    /// <see cref="Strategies.UnmeteredGridPhaseEstimate"/>. Not positional, so a site described anywhere
+    /// else need not mention it.
+    /// </summary>
+    public Enums.GridPhase? UnmeteredGridPhase { get; init; }
+
+    /// <summary>
     /// One line for the log at startup, so a `docker logs` dump answers "which installation was this,
     /// and what was it talking to" without the configuration beside it.
     /// </summary>
@@ -54,7 +62,11 @@ public sealed record PvSystemInfo(
             ? "no charger"
             : string.Join(", ", Chargers.Select(charger => charger.Describe()));
 
-        return $"{name} ({id}) at {where}; inverter {Inverter.Describe()}; charger {chargers}";
+        var meter = UnmeteredGridPhase is { } blind
+            ? $"; grid meter blind on {blind}, its flow estimated from the inverter's output"
+            : string.Empty;
+
+        return $"{name} ({id}) at {where}; inverter {Inverter.Describe()}; charger {chargers}{meter}";
     }
 }
 

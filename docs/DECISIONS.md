@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-12 — A blind meter phase is estimated from the inverter, not believed as zero
+
+**Context.** On the reference install the grid meter's L3 clamp (SolaX "T") reads 0 W: register 0x86
+against the inverter's own 1.7–2.3 kW on that phase at 0x74. Everything on L3 is invisible — a third of a
+three-phase charge, and whatever the inverter exports there — so the house-load residual (PV + grid − EV −
+battery) went several kW negative while the car charged and sat at ~90% of PV on every sunny afternoon for
+at least twelve days. Every solar mode decides on it. SolarGrid showed it most plainly: paused on a cloud
+and never restarted with 4–5 kW on the roof. The "PV diverter" open question in the implementation log
+was this.
+
+**Decision — correct the grid figure in the reader, once, behind an explicit setting.**
+`Pv:Inverter:UnmeteredGridPhase` names the blind phase; with it set the reader replaces `GridPowerWatts`
+with an estimate and keeps the meter in `MeteredGridPowerWatts`, which the poll log prints beside it.
+Correcting the one input rather than each consumer means surplus, the house profile, the battery hold,
+energy intervals, session attribution and Home Assistant all read the same corrected number. Not
+auto-detected: a phase reading 0 W can also be a phase with nothing on it, and a guessed correction is far
+harder to spot than a configured one.
+
+**Decision — the blind phase's flow is the inverter's output there, the car's share, and half the metered
+house.** Only the house load on the blind phase is measured nowhere. Half of what the other two carry is
+wrong for any single large load and right for none, but it is bounded by the house — the kilowatts of
+inverter and charger power that made the old figure wrong are measured. The car is spread over the phases
+it charges on, a single-phase car on L1.
+
+**Decision — the real fix is the clamp.** This is a workaround for wiring and says so wherever it is
+documented; once the meter is repaired the setting goes back to empty and nothing else changes.
+
+---
+
 ## 2026-09-12 — Solar with grid help: reality starts the car, the forecast only ends the day
 
 **Context.** A mode was asked for that takes both solar and grid, pauses when the sun is below an

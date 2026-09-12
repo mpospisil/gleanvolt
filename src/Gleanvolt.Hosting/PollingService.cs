@@ -148,11 +148,14 @@ public sealed class PollingService : BackgroundService
                 var state = await _energyStateReader.ReadAsync(stoppingToken);
 
                 _logger.LogInformation(
-                    "SOC={BatterySocPercent}% BatteryPower={BatteryPowerWatts}W Solar={SolarPowerWatts}W Grid={GridPowerWatts}W EvCharger={EvChargerStatus} EvMode={EvChargeMode} EvCurrent={EvChargeCurrentAmps} EvPower={EvChargerPowerWatts}W",
+                    "SOC={BatterySocPercent}% BatteryPower={BatteryPowerWatts}W Solar={SolarPowerWatts}W Grid={GridPowerWatts}W{GridMeterDetail} EvCharger={EvChargerStatus} EvMode={EvChargeMode} EvCurrent={EvChargeCurrentAmps} EvPower={EvChargerPowerWatts}W",
                     state.BatterySocPercent,
                     state.BatteryPowerWatts,
                     state.SolarPowerWatts,
                     state.GridPowerWatts,
+                    // While a blind meter phase is being estimated, the meter's own figure beside it: the
+                    // correction is only as trustworthy as it is easy to read against what it replaced.
+                    state.MeteredGridPowerWatts is { } metered ? $" (meter {metered:F0}W)" : string.Empty,
                     state.EvChargerStatus,
                     (object?)state.ChargeMode ?? "n/a",
                     state.ChargeCurrentAmps is null ? "n/a" : $"{state.ChargeCurrentAmps}A",
