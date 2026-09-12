@@ -23,7 +23,6 @@ internal static class ForecastEndpoints
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
 
             var todayForecast = forecasts.GetDayForecast(today);
-            var tomorrowForecast = forecasts.GetDayForecast(today.AddDays(1));
 
             var startLocal = today.ToDateTime(TimeOnly.MinValue);
             var endLocal = startLocal.AddDays(2);
@@ -45,9 +44,11 @@ internal static class ForecastEndpoints
 
             return Results.Ok(new ForecastResponse(
                 RetrievedAt: window?.RetrievedAt ?? todayForecast?.RetrievedAt,
-                TodayExpectedWh: todayForecast?.ExpectedEnergyWattHours,
+                // The day totals the dashboard shows, taken when the forecast landed rather than summed
+                // here -- one number for one question, whichever surface asks it.
+                TodayExpectedWh: forecasts.GetDayEnergyWattHours(today),
                 TodayRemainingWh: remaining?.ExpectedEnergyWattHours,
-                TomorrowExpectedWh: tomorrowForecast?.ExpectedEnergyWattHours,
+                TomorrowExpectedWh: forecasts.GetDayEnergyWattHours(today.AddDays(1)),
                 PeakPowerWatts: window?.PeakPowerWatts ?? 0,
                 Periods: [.. periods.Select(ForecastPeriodResponse.From)],
                 Weather: observation is null ? null : WeatherResponse.From(observation.Observation)));

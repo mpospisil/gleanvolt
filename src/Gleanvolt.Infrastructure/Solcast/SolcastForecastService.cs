@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
@@ -35,6 +36,13 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     // question a finished session has to be read against. Nothing in charge control reads it.
     private readonly SolarForecastHistory _history = new();
 
+    // The history's per-day totals, worked out once per refresh and published wholesale like the cache.
+    // They change only when a refresh lands, and the dashboard asks for today's on every poll: summing a
+    // week of periods every few seconds to get the same number back is work with nothing to show for it.
+    // Keyed by local date rather than holding "today", because the night sleep outlasts midnight by hours
+    // and the day has to roll over without a refresh.
+    private volatile IReadOnlyDictionary<DateOnly, double> _dayTotals = FrozenDictionary<DateOnly, double>.Empty;
+
     public SolcastForecastService(
         IHttpClientFactory httpClientFactory,
         IOptions<SolcastOptions> options,
@@ -66,6 +74,10 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
 
     public SolarForecast? GetDayForecast(DateOnly localDate) =>
         _history.ForDate(localDate, _timeProvider.LocalTimeZone);
+
+    /// <summary>A lookup into the totals taken at the last refresh; no periods are summed here.</summary>
+    public double? GetDayEnergyWattHours(DateOnly localDate) =>
+        _dayTotals.TryGetValue(localDate, out var wattHours) ? wattHours : null;
 
     /// <summary>
     /// When the sun next rises above <paramref name="thresholdWatts"/> according to the cached
@@ -117,9 +129,10 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
             var forecast = new SolarForecast(_timeProvider.GetUtcNow(), periods);
             _cached = forecast;
 
-            // Merged *after* publication: the history is for later analysis, and no query on the hot
-            // path should ever wait behind it.
+            // Merged, and the day totals taken from it, *after* publication: the history is for later
+            // analysis, and no query on the hot path should ever wait behind it.
             _history.Merge(forecast);
+            _dayTotals = _history.DailyEnergyWattHours(_timeProvider.LocalTimeZone);
 
             // The day's overall shape is logged here, once per refresh -- the polling loop only
             // logs the live actual-vs-forecast comparison, not this summary.

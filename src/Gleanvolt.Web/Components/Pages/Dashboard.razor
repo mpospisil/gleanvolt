@@ -9,6 +9,7 @@
 @inject EvInfo Car
 @inject IEnumerable<IVehicleUpdateService> VehicleFeeds
 @inject VehicleFeedComparison Comparison
+@inject ISolarForecastService Forecasts
 @inject TimeProvider Time
 
 @*
@@ -58,6 +59,8 @@ else
               Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
         <Stat Label="Forecast solar power" Value="@Watts(_status.ForecastSolarPowerWatts)"
               Hint="What the forecast expected the roof to be making right now, to read against the measured figure beside it. 0 when no forecast covers this moment." />
+        <Stat Label="Forecast solar today" Value="@Kwh(_todayForecastWh)"
+              Hint="The whole of today's forecast production, morning included -- what the day was expected to bring, not what is still to come. A dash while no forecast is held for today." />
         <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
               Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
         <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"
@@ -310,6 +313,9 @@ else
 
     private IVehicleUpdateService? _service;
 
+    // The whole of today's forecast, or null while none is held for today.
+    private double? _todayForecastWh;
+
     protected override void OnInitialized()
     {
         _status = StatusHolder.Current;
@@ -321,6 +327,7 @@ else
         _service = VehicleFeeds.FirstOrDefault();
 
         RefreshVehicle();
+        ReadTodayForecast();
     }
 
     private void OnStatusUpdated(ChargeControlStatus status)
@@ -331,8 +338,18 @@ else
         // readings arrive minutes apart at best, so a few seconds of latency is invisible, and this
         // keeps the page to one event subscription and the render to one path.
         RefreshVehicle();
+        ReadTodayForecast();
 
         InvokeAsync(StateHasChanged);
+    }
+
+    // A lookup, not a sum: the forecast source works the day totals out when a forecast lands, so this
+    // is cheap enough for every poll. Reading it on the poll's cadence is also what picks up a refresh
+    // and moves on to the next day at local midnight, without a subscription of its own.
+    private void ReadTodayForecast()
+    {
+        var localToday = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).DateTime);
+        _todayForecastWh = Forecasts.GetDayEnergyWattHours(localToday);
     }
 
     public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
@@ -447,6 +464,8 @@ else
     private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
 
     private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+
+    private static string Kwh(double? wattHours) => wattHours is null ? "—" : Kwh(wattHours.Value);
 
     private static string Percent(double percent) => $"{percent:F0}%";
 

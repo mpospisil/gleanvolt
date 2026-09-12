@@ -35,4 +35,16 @@ public interface ISolarForecastService
     /// actually saw a forecast for are retained.</para>
     /// </summary>
     SolarForecast? GetDayForecast(DateOnly localDate);
+
+    /// <summary>
+    /// The forecast energy for one whole local calendar day in watt-hours — the total of
+    /// <see cref="GetDayForecast"/>, elapsed periods included — or <c>null</c> when nothing is held for
+    /// that day.
+    ///
+    /// <para><b>Cheap enough for a render.</b> The dashboard asks on every poll, and the answer changes
+    /// only when a refresh lands, so an implementation that holds a forecast works the totals out then
+    /// and serves them from there. The default sums the day's periods on each call: the same answer, and
+    /// fine for a stand-in that holds nothing worth caching, but not what a real source should do.</para>
+    /// </summary>
+    double? GetDayEnergyWattHours(DateOnly localDate) => GetDayForecast(localDate)?.ExpectedEnergyWattHours;
 }
