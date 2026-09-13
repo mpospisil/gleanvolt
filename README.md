@@ -68,6 +68,9 @@ that affects it goes through the inverter's power-control block. Its **usable** 
 site-specific number the forecast-driven mode cannot work without — see
 [`BatteryCapacityKWh`](#forecast-driven-charging-the-forecasted-mode).
 
+Other SolaX inverters and chargers that answer the same registers are listed, with what has and has not
+been tested, in [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md).
+
 ## Tech stack
 
 - [.NET 10](https://dotnet.microsoft.com/) — target framework
