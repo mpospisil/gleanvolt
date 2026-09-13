@@ -4,6 +4,25 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-13 — A restart dwell guards the mode's own charge, not the plug-in's
+
+**Context.** This installation's charger starts a car by itself when it is plugged in. The owner plugged
+in at 10:37 and selected SolarGrid a minute later; the mode's first decision found a paused car that
+"had drawn power" — the flag is scoped to the plug-in — applied the 15-minute restart dwell, wrote
+16 A → 0 A and waited with 2.3–4.4 kW of surplus. The same thing cost fifteen minutes on 2026-09-12.
+
+**Decision — the dwell is gated on a draw the mode asked for.** The coordinator tracks `ChargedThisMode`:
+the car drew power while the coordinator had it charging, since the running mode was selected. It resets
+on Off and on a switch between controlled modes, which does not pass through Off. `EvDrewPower` keeps its
+meaning, because telling a finished car from one that has not started is exactly where a charger-started
+charge should count. SolarGrid's dwell reads the new flag; Targeted already avoided the trap through its
+delivered-energy meter.
+
+**Not changed: `Forecasted`.** Its restart dwell has no gate at all and counts from the moment the mode is
+selected — the same lost start in a different shape, left for its own change.
+
+---
+
 ## 2026-09-12 — A blind meter phase is estimated from the inverter, not believed as zero
 
 **Context.** On the reference install the grid meter's L3 clamp (SolaX "T") reads 0 W: register 0x86

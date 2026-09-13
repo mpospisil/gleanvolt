@@ -100,11 +100,14 @@ public sealed class SolarGridChargingController : IChargingController
 
         if (surplus >= threshold)
         {
-            // The restart dwell spares the contactor when a charge that has already run is flapping on
-            // the threshold. Not before the first watt: there is nothing to restart, and a dwell counted
-            // from the button press is a quarter of an hour of free sun lost to a timer guarding nothing
-            // (the Targeted mode learned that on 2026-08-23).
-            if (!input.Charging && input.EvDrewPower && input.TimeInCurrentState < _options.MinPauseTime)
+            // The restart dwell spares the contactor when a charge this mode has run is flapping on the
+            // threshold. Not before this mode's first watt: there is nothing to restart, and a dwell
+            // counted from the button press is a quarter of an hour of free sun lost to a timer guarding
+            // nothing (the Targeted mode learned that on 2026-08-23). This mode's, not the plug-in's: the
+            // charger starts a car by itself when it is plugged in, and on 2026-09-13 the first decision
+            // after the owner picked this mode stopped that running car and waited 15 minutes with
+            // 2-4 kW of surplus to hand.
+            if (!input.Charging && input.ChargedThisMode && input.TimeInCurrentState < _options.MinPauseTime)
             {
                 return Pause(
                     $"Surplus {surplus:F0}W is back over the {threshold:F0}W {thresholdName}, but paused "

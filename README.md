@@ -1342,8 +1342,9 @@ The same machinery as the other solar modes, so a passing shadow does not stop t
 - a running charge that dips below the minimum is **held at 6 A** for `ChargeControl:Forecast:MinRunTime`
   (10 min) — with the gap reported as a grid bridge, so the pack stays out of it — and a paused one
   waits `ChargeControl:Forecast:MinPauseTime` (15 min) before restarting. The restart wait only applies
-  once the car has actually drawn power: a wait counted from the button press would waste the sun that
-  is there now.
+  once **this mode** has charged the car: a wait counted from the button press would waste the sun that
+  is there now. A charge the charger started by itself when the car was plugged in does not count — the
+  mode takes that car over at once, at whatever the surplus supports.
 
 #### The end of the day
 

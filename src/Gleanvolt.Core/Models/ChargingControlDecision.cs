@@ -79,6 +79,13 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="Enums.ChargeControlMode.SolarGrid"/> mode is the one driving. Only
 /// <see cref="Strategies.SolarGridChargingController"/> reads it, which is why it defaults to null.
 /// </param>
+/// <param name="ChargedThisMode">
+/// Whether the car has drawn power while this mode had it charging — since the running mode was
+/// selected, not since the car was plugged in. What a <em>restart</em> dwell has to know:
+/// <see cref="EvDrewPower"/> also counts a charge the charger started by itself at plug-in, before any
+/// mode was chosen, and a dwell gated on that stops a running car on the mode's first decision to wait
+/// out a "restart" of a charge the mode never ran (2026-09-13).
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -95,7 +102,8 @@ public sealed record ChargingControlInput(
     bool ChargerStoodDown = false,
     TimeSpan ChargerNotFastFor = default,
     bool WaitAlreadyReleased = false,
-    SolarGridOutlook? SolarGrid = null);
+    SolarGridOutlook? SolarGrid = null,
+    bool ChargedThisMode = false);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
