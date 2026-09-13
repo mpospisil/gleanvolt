@@ -4,22 +4,31 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
-## 2026-09-13 — A restart dwell guards the mode's own charge, not the plug-in's
+## 2026-09-13 — The restart dwell guards the running mode's own charge, in every mode that has one
 
-**Context.** This installation's charger starts a car by itself when it is plugged in. The owner plugged
-in at 10:37 and selected SolarGrid a minute later; the mode's first decision found a paused car that
-"had drawn power" — the flag is scoped to the plug-in — applied the 15-minute restart dwell, wrote
-16 A → 0 A and waited with 2.3–4.4 kW of surplus. The same thing cost fifteen minutes on 2026-09-12.
+**Context.** `MinPauseTime` (15 min, 2026-08-08) keeps a paused charge from being restarted on every
+passing cloud: each stop and start is a contactor cycle and a vehicle wake. It was written as a *restart*
+guard, but each mode gated it its own way and each got the first start wrong differently. This charger
+starts a car by itself when it is plugged in; the owner plugged in at 10:37 and selected SolarGrid a
+minute later, and the mode's first decision found a car that "had drawn power" — a flag scoped to the
+plug-in — wrote 16 A → 0 A and waited with 2.3–4.4 kW of surplus (the same on 2026-09-12). `Forecasted`
+had no gate at all, so its dwell counted from the moment it was selected, every time. `Targeted` gated on
+energy delivered since activation, which also counts a charger-started draw.
 
-**Decision — the dwell is gated on a draw the mode asked for.** The coordinator tracks `ChargedThisMode`:
-the car drew power while the coordinator had it charging, since the running mode was selected. It resets
-on Off and on a switch between controlled modes, which does not pass through Off. `EvDrewPower` keeps its
-meaning, because telling a finished car from one that has not started is exactly where a charger-started
-charge should count. SolarGrid's dwell reads the new flag; Targeted already avoided the trap through its
-delivered-energy meter.
+**Decision — one rule, `RestartDwell`, asked by every mode.** The wait holds only while paused, after the
+car has drawn power at this mode's request since it was selected, and for less than `MinPauseTime`. The
+coordinator tracks that as `ChargedThisMode`, reset on Off and on a switch between controlled modes, which
+does not pass through Off. SolarGrid, Forecasted and Targeted all ask the rule and none defines "restart"
+itself, so no mode can drift back into the lost start on its own. `EvDrewPower` keeps its meaning: telling
+a finished car from one that has not started is exactly where a charger-started charge should count.
 
-**Not changed: `Forecasted`.** Its restart dwell has no gate at all and counts from the moment the mode is
-selected — the same lost start in a different shape, left for its own change.
+**Decision — where the rule is asked stays in the mode.** The coordinator does not turn a Charge into a
+Pause, because it cannot know why the mode wanted to charge. Forecasted's hard stops still pause
+regardless; Targeted still never defers a pace the charger can hold outright, and additionally requires a
+charge under the current target, so re-activating a target starts fresh.
+
+**Not changed: the 15 minutes.** No measurement or manufacturer limit backs the value. Changing it is a
+tuning decision for all three modes and belongs in its own change.
 
 ---
 

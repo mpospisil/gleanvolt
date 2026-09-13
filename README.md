@@ -830,7 +830,8 @@ the deadline.
     "LoanSocMarginPercent": 2,
     "MinViableWindow": "00:30:00",   // shortest forecast window worth starting a session for
     "MinRunTime": "00:10:00",        // dwell timers: no start/stop churn faster than these
-    "MinPauseTime": "00:15:00",
+    "MinPauseTime": "00:15:00",      // guards a restart only, never a mode's first charge (SolarGrid,
+                                     //   Forecasted and Targeted share it)
     "FinalGuardBefore": "01:00:00",  // pause the car this long before the deadline if SOC < 100%
     "StaleForecastAfter": "04:00:00",// older than this → fall back to Solar behaviour
     "AutoArmBatteryHoldAtFloor": true,
