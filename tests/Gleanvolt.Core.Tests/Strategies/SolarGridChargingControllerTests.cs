@@ -37,7 +37,8 @@ public class SolarGridChargingControllerTests
         bool evDrewPower = false,
         TimeSpan evIdleFor = default,
         EvChargerStatus status = EvChargerStatus.Charging,
-        bool stoodDown = false) =>
+        bool stoodDown = false,
+        bool chargedThisMode = false) =>
         new(
             new EnergyState(Now, 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, status, EvChargerPowerWatts: 0),
             surplus,
@@ -47,7 +48,8 @@ public class SolarGridChargingControllerTests
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
             ChargerStoodDown: stoodDown,
-            SolarGrid: outlook ?? SunNow);
+            SolarGrid: outlook ?? SunNow,
+            ChargedThisMode: chargedThisMode);
 
     [Theory]
     [InlineData(EvChargerMode.Green)]
@@ -209,12 +211,23 @@ public class SolarGridChargingControllerTests
     }
 
     [Fact]
-    public void TheRestartDwellAppliesOnceTheCarHasCharged()
+    public void TheRestartDwellAppliesOnceThisModeHasCharged()
     {
-        var result = Controller.Decide(Input(5000, timeInState: TimeSpan.FromMinutes(5), evDrewPower: true));
+        var result = Controller.Decide(Input(5000, timeInState: TimeSpan.FromMinutes(5), evDrewPower: true, chargedThisMode: true));
 
         Assert.Equal(ChargingControlAction.Pause, result.Action);
         Assert.Contains("minimum before restarting", result.Reason);
+    }
+
+    [Fact]
+    public void ACarTheChargerStartedBeforeTheModeWasPicked_IsNotMadeToWaitForARestart()
+    {
+        // 2026-09-13: the car had drawn power -- the charger started it at plug-in -- but not under this
+        // mode, and the first decision stopped it for 15 minutes with the surplus over the threshold.
+        var result = Controller.Decide(Input(2300, evDrewPower: true, chargedThisMode: false));
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(6, result.ChargeCurrentAmps);
     }
 
     [Fact]

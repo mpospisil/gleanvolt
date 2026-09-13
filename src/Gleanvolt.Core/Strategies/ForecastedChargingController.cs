@@ -146,9 +146,11 @@ public sealed class ForecastedChargingController : IChargingController
 
         // --- Soft reasons: subject to the dwell timers. ---
 
-        if (!input.Charging && input.TimeInCurrentState < _options.MinPauseTime)
+        // A restart only, never this mode's first charge: the dwell used to count from the moment the
+        // mode was selected, so every start waited 15 minutes. See RestartDwell.
+        if (RestartDwell.Holds(input, _options.MinPauseTime))
         {
-            return Pause($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
+            return Pause(RestartDwell.Reason(input, _options.MinPauseTime));
         }
 
         if (plan.FeasibleEvEnergyWh <= 0)

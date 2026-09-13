@@ -80,6 +80,45 @@ public class SolarGridModeTests
         Assert.Equal(ChargeControlMode.SolarGrid, _mode.Mode);
     }
 
+    [Fact]
+    public async Task ACarTheChargerStartedAtPlugIn_IsTakenOverAtOnce_WithoutTheRestartDwell()
+    {
+        // 2026-09-13 10:37: plugged in, the charger started the car at 16A by itself, and the mode was
+        // picked a minute later. Its first decision used to stop the car and wait 15 minutes to
+        // "restart" a charge it never ran, with 2.3kW of surplus there.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 5_000),
+            Drawing(Now, surplusWatts: 2_300, evWatts: 10_900),
+            Drawing(Now.AddSeconds(8), surplusWatts: 2_300, evWatts: 4_140));
+
+        Assert.DoesNotContain(_writes, w => w.Reason.Contains("minimum before restarting"));
+        Assert.Equal(6, _writes[0].Target);
+    }
+
+    [Fact]
+    public async Task APauseAfterThisModeHasCharged_StillWaitsTheRestartDwell()
+    {
+        // The dwell's real job: a charge this mode ran, paused by a cloud, is not restarted a minute
+        // later just because the average climbed back over the threshold.
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            Drawing(Now, surplusWatts: 6_000, evWatts: 0),
+            Drawing(Now.AddMinutes(1), surplusWatts: 6_000, evWatts: 5_520),
+            Drawing(Now.AddMinutes(11), surplusWatts: 0, evWatts: 5_520),
+            Exporting(Now.AddMinutes(12), 6_000));
+
+        // Paused at 11 min; the 3kW average at 12 min would have restarted at 6A without the dwell.
+        Assert.Equal(0, _writes[^1].Target);
+        Assert.Contains("minimum before restarting", _writes[^1].Reason);
+    }
+
+    // A car drawing evWatts while the roof makes the stated surplus over a 300W house.
+    private static EnergyState Drawing(DateTimeOffset at, double surplusWatts, double evWatts) =>
+        new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: surplusWatts + 300,
+            GridPowerWatts: evWatts - surplusWatts, EvChargerStatus.Charging, EvChargerPowerWatts: evWatts);
+
     // Drives the real poll loop over a scripted telemetry sequence, then stops it -- the arrangement
     // TargetedModeTests uses, with the solar-grid mode's own provider in it.
     private async Task RunAsync(ISolarForecastService forecast, params EnergyState[] states)

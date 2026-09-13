@@ -73,7 +73,8 @@ public class TargetedChargingControllerTests
         bool evDrewPower = false,
         TimeSpan evIdleFor = default,
         EvChargerStatus status = EvChargerStatus.Charging,
-        DateTimeOffset? now = null) =>
+        DateTimeOffset? now = null,
+        bool chargedThisMode = false) =>
         new(
             new EnergyState(now ?? Now, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 0,
                 GridPowerWatts: 0, status, EvChargerPowerWatts: 0),
@@ -84,7 +85,8 @@ public class TargetedChargingControllerTests
             TargetedPlan: plan,
             TimeInCurrentState: timeInState,
             EvDrewPower: evDrewPower,
-            EvIdleFor: evIdleFor);
+            EvIdleFor: evIdleFor,
+            ChargedThisMode: chargedThisMode);
 
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()
@@ -287,10 +289,24 @@ public class TargetedChargingControllerTests
         // threshold must not cycle the contactor every poll.
         var plan = Plan(deliveredWh: 4_000, paceWatts: 1_000);
 
-        var decision = Controller().Decide(Input(plan, surplusWatts: 5_000, timeInState: TimeSpan.FromMinutes(3)));
+        var decision = Controller().Decide(Input(plan, surplusWatts: 5_000, timeInState: TimeSpan.FromMinutes(3), chargedThisMode: true));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Contains("before restarting", decision.Reason);
+    }
+
+    [Fact]
+    public void EnergyTheChargerDrewOnItsOwn_DoesNotStartTheRestartDwell()
+    {
+        // The delivered meter counts any draw after activation. A car the charger started by itself at
+        // plug-in adds to it without this mode ever asking for a charge, so there is still nothing to
+        // restart.
+        var plan = Plan(deliveredWh: 4_000, paceWatts: 1_000);
+
+        var decision = Controller().Decide(Input(plan, surplusWatts: 5_000, timeInState: TimeSpan.FromMinutes(3), chargedThisMode: false));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.DoesNotContain("before restarting", decision.Reason);
     }
 
     [Fact]

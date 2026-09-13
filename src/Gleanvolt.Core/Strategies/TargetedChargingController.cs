@@ -215,13 +215,12 @@ public sealed class TargetedChargingController : IChargingController
 
         // The dwell spares the contactor when *we* are choosing to start. It must not defer a pace the
         // charger could hold outright -- that is the deadline asking, not us -- and it must not run at
-        // all before the first charge: see HasChargedThisTarget.
+        // all before this target's first charge by this mode: see HasChargedThisTarget and RestartDwell.
         if (HasChargedThisTarget(plan)
-            && !input.Charging
-            && input.TimeInCurrentState < _options.MinPauseTime
+            && RestartDwell.Holds(input, _options.MinPauseTime)
             && paceWatts < MinChargePowerWatts)
         {
-            return Pause($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
+            return Pause(RestartDwell.Reason(input, _options.MinPauseTime));
         }
 
         var commandedWatts = _power.AmpsToWatts(targetAmps);
@@ -286,7 +285,7 @@ public sealed class TargetedChargingController : IChargingController
 
         // The same restart dwell a solar block waits out: a bridge is still a contactor cycle and a
         // vehicle wake.
-        if (HasChargedThisTarget(plan) && !input.Charging && input.TimeInCurrentState < _options.MinPauseTime)
+        if (HasChargedThisTarget(plan) && RestartDwell.Holds(input, _options.MinPauseTime))
         {
             return null;
         }
@@ -393,6 +392,10 @@ public sealed class TargetedChargingController : IChargingController
     ///
     /// <para>Metered from activation rather than from the plug-in, so re-activating a target starts a
     /// fresh count and gets a prompt start too.</para>
+    ///
+    /// <para>Asked together with <see cref="RestartDwell"/>, never instead of it: the meter counts any draw
+    /// after activation, a charge the charger started by itself included, and only the coordinator knows
+    /// whether this mode asked for it.</para>
     /// </summary>
     private static bool HasChargedThisTarget(TargetedChargePlan plan) => plan.DeliveredEnergyWh > 0;
 

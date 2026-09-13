@@ -59,6 +59,15 @@ public sealed class ChargingControlCoordinator
     private bool _waitReleased;
     private DateTimeOffset? _evIdleSince;
 
+    // Whether the car has drawn power while *we* had it charging, since the mode now running was
+    // selected. Narrower than _evDrewPower on purpose: that one also counts a charge the charger started
+    // by itself at plug-in, which is right for telling a finished car from one that hasn't started, and
+    // wrong for a restart dwell, which must only guard a charge this mode actually ran. Keyed to the mode
+    // because a switch between two controlled modes never passes through ReleaseControl.
+    private bool _chargedThisMode;
+    private bool _askedToChargeThisMode;
+    private ChargeControlMode? _chargedThisModeFor;
+
     /// <param name="idlePowerThresholdWatts">
     /// Below this draw the car counts as not charging. Well above a charger's standby reading and well
     /// below its 6 A floor, so nothing in between is ambiguous.
@@ -113,6 +122,14 @@ public sealed class ChargingControlCoordinator
             return new ChargeControlCycleResult(ChargeControlState.Idle, null, null, HoldingControl: false);
         }
 
+        // A mode just selected has charged nothing yet, whatever the one before it did.
+        if (_chargedThisModeFor != mode)
+        {
+            _chargedThisModeFor = mode;
+            _chargedThisMode = false;
+            _askedToChargeThisMode = false;
+        }
+
         TrackSession(state);
 
         try
@@ -151,7 +168,8 @@ public sealed class ChargingControlCoordinator
                 _stoodDown,
                 ChargerNotFastFor(state.Timestamp),
                 _waitReleased,
-                solarGrid));
+                solarGrid,
+                ChargedThisMode: _chargedThisMode));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -229,6 +247,9 @@ public sealed class ChargingControlCoordinator
                 _ => ChargeControlState.Idle,
             };
 
+            // After the decision, so a Charge asked for this cycle is what lets the next poll's draw count.
+            _askedToChargeThisMode = _charging;
+
             return new ChargeControlCycleResult(
                 reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
                 decision.SessionComplete, decision.GridBridgeWatts, _stoodDown);
@@ -258,6 +279,9 @@ public sealed class ChargingControlCoordinator
         // "the car has already charged" verdict to the next one selected on the same plugged-in car.
         _evDrewPower = false;
         _evIdleSince = null;
+        _chargedThisMode = false;
+        _askedToChargeThisMode = false;
+        _chargedThisModeFor = null;
 
         // Not a command to the charger -- ReleaseControl deliberately leaves the hardware exactly as it
         // is -- only our claim on the Stop we wrote. Whoever selects the next mode arms the charger
@@ -348,6 +372,11 @@ public sealed class ChargingControlCoordinator
         {
             _evDrewPower = true;
             _evIdleSince = null;
+
+            if (_askedToChargeThisMode)
+            {
+                _chargedThisMode = true;
+            }
         }
         else
         {
