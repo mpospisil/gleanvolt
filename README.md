@@ -60,6 +60,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 | Hybrid inverter | SolaX X3-HYB-G4 PRO | Modbus TCP |
 | EV charger | SolaX X1/X3-HAC | Modbus TCP |
 | Home battery | SolaX T-BAT H 2.5 modules + BMS (**10 kWh** nominal on the reference install) | via the inverter — no direct connection |
+| Electric vehicle | Any Type 2 AC car; a VW ID.4 Pro on the reference install | through the charger — see [Supported electric vehicles](docs/SUPPORTED_EVS.md) |
 
 The battery has no interface of its own: everything about it reaches us through the inverter's
 registers (SOC from `BatteryCapacity 0x1C`, power from `BatteryPowerCharge1 0x16`) and every command
