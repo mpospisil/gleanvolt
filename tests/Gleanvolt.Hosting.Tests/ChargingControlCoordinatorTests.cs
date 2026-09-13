@@ -462,6 +462,45 @@ public class ChargingControlCoordinatorTests
             EvChargerStatus.Available, EvChargerPowerWatts: 0);
 
     // Plugged in, drawing nothing.
+    [Fact]
+    public async Task ChargedThisMode_CountsOnlyADrawTheModeAskedFor_AndResetsOnADirectModeSwitch()
+    {
+        var solar = new StubChargingController();
+        var solarGrid = new StubChargingController();
+        var coordinator = new ChargingControlCoordinator(
+            new Dictionary<ChargeControlMode, IChargingController>
+            {
+                [ChargeControlMode.Solar] = solar,
+                [ChargeControlMode.SolarGrid] = solarGrid,
+            },
+            _charger,
+            new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
+            NullLogger<ChargingControlCoordinator>.Instance);
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        solar.NextDecision = new(ChargingControlAction.Charge, 6, "charge");
+        solarGrid.NextDecision = new(ChargingControlAction.Charge, 6, "charge");
+
+        // The charger started the car by itself at plug-in: drawn power, but nothing this mode asked for.
+        await coordinator.RunCycleAsync(Drawing(Now), ChargeControlMode.SolarGrid, plan: null, CancellationToken.None);
+        Assert.True(solarGrid.LastInput!.EvDrewPower);
+        Assert.False(solarGrid.LastInput.ChargedThisMode);
+
+        // Still drawing on the next poll, now at the mode's own request.
+        await coordinator.RunCycleAsync(Drawing(Now.AddSeconds(8)), ChargeControlMode.SolarGrid, plan: null, CancellationToken.None);
+        Assert.True(solarGrid.LastInput!.ChargedThisMode);
+
+        // Straight to another controlled mode with no Off in between: it has charged nothing yet.
+        await coordinator.RunCycleAsync(Drawing(Now.AddSeconds(16)), ChargeControlMode.Solar, plan: null, CancellationToken.None);
+        Assert.False(solar.LastInput!.ChargedThisMode);
+        Assert.True(solar.LastInput.EvDrewPower);
+    }
+
+    private static EnergyState Drawing(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 10_900);
+
     private static EnergyState Connected(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Preparing, EvChargerPowerWatts: 0);

@@ -830,7 +830,8 @@ the deadline.
     "LoanSocMarginPercent": 2,
     "MinViableWindow": "00:30:00",   // shortest forecast window worth starting a session for
     "MinRunTime": "00:10:00",        // dwell timers: no start/stop churn faster than these
-    "MinPauseTime": "00:15:00",
+    "MinPauseTime": "00:15:00",      // guards a restart only, never a mode's first charge (SolarGrid,
+                                     //   Forecasted and Targeted share it)
     "FinalGuardBefore": "01:00:00",  // pause the car this long before the deadline if SOC < 100%
     "StaleForecastAfter": "04:00:00",// older than this → fall back to Solar behaviour
     "AutoArmBatteryHoldAtFloor": true,
@@ -1342,8 +1343,9 @@ The same machinery as the other solar modes, so a passing shadow does not stop t
 - a running charge that dips below the minimum is **held at 6 A** for `ChargeControl:Forecast:MinRunTime`
   (10 min) — with the gap reported as a grid bridge, so the pack stays out of it — and a paused one
   waits `ChargeControl:Forecast:MinPauseTime` (15 min) before restarting. The restart wait only applies
-  once the car has actually drawn power: a wait counted from the button press would waste the sun that
-  is there now.
+  once **this mode** has charged the car: a wait counted from the button press would waste the sun that
+  is there now. A charge the charger started by itself when the car was plugged in does not count — the
+  mode takes that car over at once, at whatever the surplus supports.
 
 #### The end of the day
 

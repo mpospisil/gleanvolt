@@ -87,7 +87,8 @@ public class ForecastedChargingControllerTests
         TimeSpan timeInState = default,
         double sessionEnergyWh = 0,
         double loanedTodayWh = 0,
-        DateTimeOffset? now = null) =>
+        DateTimeOffset? now = null,
+        bool chargedThisMode = false) =>
         new(
             new EnergyState(now ?? Now, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 6000,
                 GridPowerWatts: 0, EvChargerStatus.Charging, EvChargerPowerWatts: 0),
@@ -98,7 +99,8 @@ public class ForecastedChargingControllerTests
             TargetedPlan: null,
             TimeInCurrentState: timeInState,
             SessionEnergyWh: sessionEnergyWh,
-            LoanedTodayWh: loanedTodayWh);
+            LoanedTodayWh: loanedTodayWh,
+            ChargedThisMode: chargedThisMode);
 
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()
@@ -400,10 +402,23 @@ public class ForecastedChargingControllerTests
     {
         var controller = Controller(Options(minPauseTime: TimeSpan.FromMinutes(15)));
 
-        var decision = controller.Decide(Input(8000, charging: false, timeInState: TimeSpan.FromMinutes(5)));
+        var decision = controller.Decide(Input(8000, charging: false, timeInState: TimeSpan.FromMinutes(5), chargedThisMode: true));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Contains("minimum before restarting", decision.Reason);
+    }
+
+    [Fact]
+    public void JustSelected_ItDoesNotWaitToRestartAChargeItNeverRan()
+    {
+        // The dwell used to count from the moment the mode was selected, so every start lost up to 15
+        // minutes of sun -- whether or not the charger had already started the car at plug-in.
+        var controller = Controller(Options(minPauseTime: TimeSpan.FromMinutes(15)));
+
+        var decision = controller.Decide(Input(8000, charging: false, timeInState: TimeSpan.Zero, chargedThisMode: false));
+
+        Assert.DoesNotContain("minimum before restarting", decision.Reason);
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
     }
 
     [Fact]
