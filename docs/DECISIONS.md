@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-15 — The bridge hold arms on the car's live shortfall, and lets go after a dwell
+
+**Context.** The daylight check in #191 found the home battery giving 0.80 kWh to a 30.6 kWh SolarGrid
+charge, although the grid is the only source that mode promises for a bridge. The hold armed on
+`GridBridgeWatts > 0`, and the bridge is decided on the 3-minute average surplus. When a cloud cut the
+roof, the average stayed over the 4.14 kW floor for tens of seconds, the bridge read zero, and the
+inverter covered the car from the pack: 25 episodes, 0.49 kWh, down to −4.1 kW. Released on the first
+poll without a bridge, the hold also followed an average hovering on the floor: 22 arms and releases,
+five of them re-armed within 12 s, each a write to the inverter (#197).
+
+**Decision — arm on the live shortfall as well as the bridge.** In `SolarGrid` and `Targeted`, while the
+mode is charging, the hold arms when the car draws more than `BatteryHold:BridgeShortfallWatts` (300 W)
+beyond the instantaneous surplus. Charging decisions stay on the average; only the hold reads the live
+figure, because the hold is what keeps the pack out and has to act in the cycle the shortfall appears.
+Arming on the battery actually discharging was rejected: it is the direct evidence, but always a poll
+late by construction.
+
+**Decision — let go after a dwell, but only while charging.** The hold stays armed for
+`BatteryHold:BridgeReleaseDwell` (3 min, the averaging window) after the last bridge or shortfall. A
+charge that pauses, stands down or ends releases it in the same cycle, as before: with nothing being
+charged, holding the pack only puts the house on the grid. The cost is the house on the grid for up to
+three minutes after a shortfall — a few Wh, against kilowatts from the pack.
+
+**Not changed.** `Forecasted`'s SOC-floor hold, `FastNoBattery`'s switch-driven hold, and the hold's power
+target. The target is computed from the current poll, so a solar ramp before the next write can let the
+grid charge the pack for a poll or two (0.10 kWh that day); #197 records it to be measured again.
+
+---
+
 ## 2026-09-13 — The restart dwell guards the running mode's own charge, in every mode that has one
 
 **Context.** `MinPauseTime` (15 min, 2026-08-08) keeps a paused charge from being restarted on every

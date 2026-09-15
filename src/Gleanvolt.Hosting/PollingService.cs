@@ -64,6 +64,10 @@ public sealed class PollingService : BackgroundService
     // than in the selector so the manual switch stays exactly what the owner set.
     private bool _autoHold;
 
+    // When SolarGrid or Targeted last needed the grid-bridge hold -- a bridge or a live shortfall -- so
+    // it is let go only after BatteryHold:BridgeReleaseDwell without one (#197).
+    private DateTimeOffset? _bridgeHoldNeededAt;
+
     // The fast mode's hold is the exception, and deliberately so (#119). It is armed *through* the
     // selector rather than beside it, because the HA switch publishes what is actually armed
     // (BatteryHoldActive) rather than what was asked for: a hold armed only in _autoHold shows ON in
@@ -222,8 +226,13 @@ public sealed class PollingService : BackgroundService
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
 
+                // Charging as it stands after the block above, so a mode that has just ended itself lets
+                // go of a bridge hold in this cycle instead of holding it through the release dwell.
                 var hold = await ApplyBatteryHoldAsync(
-                    state, mode, plan, targetedPlan, fastCharge, result.GridBridgeWatts > 0, stoppingToken);
+                    state, mode, plan, targetedPlan, fastCharge,
+                    charging: result.State == ChargeControlState.Charging,
+                    gridBridging: result.GridBridgeWatts > 0,
+                    stoppingToken);
 
                 _statusHolder.Set(new ChargeControlStatus(
                     Mode: mode,
@@ -445,6 +454,7 @@ public sealed class PollingService : BackgroundService
         SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
         FastChargeProgress? fastCharge,
+        bool charging,
         bool gridBridging,
         CancellationToken cancellationToken)
     {
@@ -457,7 +467,7 @@ public sealed class PollingService : BackgroundService
         // switch is on, and the fast mode's release runs *inside* AutoHold -- through the switch. A
         // mode ending while its own hold was armed would then never release it, which is the one
         // outcome this whole arrangement exists to prevent.
-        var auto = AutoHold(state, mode, plan, targetedPlan, fastCharge, gridBridging);
+        var auto = AutoHold(state, mode, plan, targetedPlan, fastCharge, charging, gridBridging);
         var hold = _batteryHold.Hold || auto;
         var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
 
@@ -505,6 +515,56 @@ public sealed class PollingService : BackgroundService
     }
 
     /// <summary>
+    /// Whether the car is drawing more than the sun gives, for the two modes that promise the grid — not
+    /// the pack — pays for that (#197): a grid bridge, or a live shortfall the averaged surplus has not
+    /// caught up with, and then a dwell before letting go.
+    ///
+    /// <para><b>The live shortfall, not only the bridge.</b> The bridge is decided on the 3-minute
+    /// average, so when a cloud cuts the roof from 5 kW to 1.3 kW the average stays over the charger's
+    /// floor for tens of seconds and the bridge reads zero, while the inverter covers the car from the
+    /// pack. On 2026-09-15 that was 25 episodes and 0.49kWh, down to -4.1 kW. The car's draw against the
+    /// instantaneous surplus is known in the same cycle, before the battery reacts; arming on the battery
+    /// actually discharging would always be a poll late.</para>
+    ///
+    /// <para><b>A dwell before release, but only while charging.</b> Released on the first poll without a
+    /// bridge, the hold followed an average hovering on the floor: 22 arms and releases that day, five
+    /// re-armed within 12 s, each a write to the inverter. Once the car is no longer being charged --
+    /// paused, stood down, or the mode ended -- there is nothing left to keep the pack out of, and holding
+    /// it would only put the house on the grid, so that releases at once.</para>
+    /// </summary>
+    private (bool Armed, string Why) BridgeHold(
+        EnergyState state, ChargeControlMode mode, bool charging, bool gridBridging)
+    {
+        if (!charging)
+        {
+            _bridgeHoldNeededAt = null;
+            return (false, $"{mode} is not charging the car");
+        }
+
+        if (gridBridging)
+        {
+            _bridgeHoldNeededAt = state.Timestamp;
+            return (true, $"the {mode} grid bridge has started");
+        }
+
+        var shortfall = state.EvChargerPowerWatts - state.SolarSurplusPowerWatts;
+        if (shortfall > _batteryHoldOptions.BridgeShortfallWatts)
+        {
+            _bridgeHoldNeededAt = state.Timestamp;
+            return (true, $"the car is drawing {shortfall:F0}W more than the sun gives in {mode}");
+        }
+
+        if (_bridgeHoldNeededAt is { } neededAt && state.Timestamp - neededAt < _batteryHoldOptions.BridgeReleaseDwell)
+        {
+            return (true, $"{mode} needed it {(state.Timestamp - neededAt).TotalSeconds:F0}s ago");
+        }
+
+        _bridgeHoldNeededAt = null;
+        return (false,
+            $"{mode} has had no grid bridge and no shortfall for {_batteryHoldOptions.BridgeReleaseDwell.TotalMinutes:F0} min");
+    }
+
+    /// <summary>
     /// Whether the selected mode wants the discharge hold armed right now, independently of the owner's
     /// manual switch — which is OR-ed with this, so a hold the owner asked for is never released by one
     /// of the modes answered here.
@@ -520,6 +580,9 @@ public sealed class PollingService : BackgroundService
     /// requires for a 100% battery by the deadline, so an estimate error cannot dig below it — the grid
     /// covers the gap instead of the pack. Released again only after SOC has recovered a margin above the
     /// floor, so the hold doesn't chatter around the line.</para>
+    ///
+    /// <para><see cref="ChargeControlMode.SolarGrid"/> and <see cref="ChargeControlMode.Targeted"/> want it
+    /// while the car draws more than the sun gives — see <see cref="BridgeHold"/>.</para>
     /// </summary>
     private bool AutoHold(
         EnergyState state,
@@ -527,9 +590,17 @@ public sealed class PollingService : BackgroundService
         SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
         FastChargeProgress? fastCharge,
+        bool charging,
         bool gridBridging)
     {
         ReleaseFastHoldIfEnded(mode);
+
+        // The bridge dwell belongs to the two modes that run a bridge; one left over from either must not
+        // keep the hold armed when that mode is selected again later.
+        if (mode is not (ChargeControlMode.SolarGrid or ChargeControlMode.Targeted))
+        {
+            _bridgeHoldNeededAt = null;
+        }
 
         if (mode == ChargeControlMode.FastNoBattery)
         {
@@ -560,21 +631,21 @@ public sealed class PollingService : BackgroundService
             // rest of the time the car is running on surplus, and holding the pack there would only
             // push the house onto the grid for nothing.
             //
-            // Two of them, not one. The planned grid block is the obvious case. The other is the live
-            // grid bridge, which is easy to miss and expensive to get wrong: the controller has just
-            // commanded 6 A against a surplus that cannot carry it, so without the hold the shortfall
-            // comes out of the pack and the "grid" bridge is quietly a battery loan -- the one thing
-            // this mode promises never to do.
-            var importing = targetedPlan?.IsInGridBlock(state.Timestamp) == true || gridBridging;
+            // Two of them, not one. The planned grid block is the obvious case. The other is the car
+            // drawing more than the sun gives outside a block -- the grid bridge, or a cloud the averaged
+            // surplus has not caught up with (#197) -- which is easy to miss and expensive to get wrong:
+            // without the hold the shortfall comes out of the pack and the "grid" is quietly a battery
+            // loan -- the one thing this mode promises never to do.
+            var inGridBlock = targetedPlan?.IsInGridBlock(state.Timestamp) == true;
+            var bridge = BridgeHold(state, mode, charging, gridBridging);
+            var importing = inGridBlock || bridge.Armed;
 
             if (importing != _autoHold)
             {
                 _logger.LogInformation(
-                    "Battery discharge hold {Action} automatically: the {Mode} plan's {Source} {State}.",
+                    "Battery discharge hold {Action} automatically: {Why}.",
                     importing ? "armed" : "released",
-                    mode,
-                    gridBridging ? "grid bridge" : "grid top-up",
-                    importing ? "has started" : "is not running");
+                    inGridBlock ? $"the {mode} plan's grid top-up has started" : bridge.Why);
             }
 
             _autoHold = importing;
@@ -583,20 +654,22 @@ public sealed class PollingService : BackgroundService
 
         if (mode == ChargeControlMode.SolarGrid)
         {
-            // The targeted mode's bridge rule and nothing else: this mode has no planned import, so the
-            // bridge is the only time the car draws more than the roof gives. Everywhere else the car is
-            // on surplus, and holding the pack there would only push the house onto the grid.
-            if (gridBridging != _autoHold)
+            // The targeted mode's rule without the planned block: this mode plans no import, so the car
+            // drawing more than the sun gives is the only time the pack would otherwise fund it.
+            // Everywhere else the car is on surplus, and holding the pack there would only push the
+            // house onto the grid.
+            var bridge = BridgeHold(state, mode, charging, gridBridging);
+
+            if (bridge.Armed != _autoHold)
             {
                 _logger.LogInformation(
-                    "Battery discharge hold {Action} automatically: the {Mode} grid bridge {State}.",
-                    gridBridging ? "armed" : "released",
-                    mode,
-                    gridBridging ? "has started" : "is not running");
+                    "Battery discharge hold {Action} automatically: {Why}.",
+                    bridge.Armed ? "armed" : "released",
+                    bridge.Why);
             }
 
-            _autoHold = gridBridging;
-            return gridBridging;
+            _autoHold = bridge.Armed;
+            return bridge.Armed;
         }
 
         if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)

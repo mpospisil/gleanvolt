@@ -114,6 +114,56 @@ public class SolarGridModeTests
         Assert.Contains("minimum before restarting", _writes[^1].Reason);
     }
 
+    [Fact]
+    public async Task ACloudTheAverageHasNotCaughtUp_ArmsTheHoldOnTheLiveShortfall()
+    {
+        // 2026-09-15 11:47: the roof fell from 5kW to 1.3kW with the car at 6A. The 3-minute average
+        // stayed over the 4.14kW floor, so there was no bridge and no hold, and the pack covered the car
+        // at -3.3kW for 16s until the average caught up (#197).
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            Drawing(Now, surplusWatts: 5_000, evWatts: 4_830),
+            Drawing(Now.AddSeconds(30), surplusWatts: 5_000, evWatts: 4_830),
+            Drawing(Now.AddSeconds(60), surplusWatts: 5_000, evWatts: 4_830),
+            Drawing(Now.AddSeconds(90), surplusWatts: 5_000, evWatts: 4_830),
+            Drawing(Now.AddSeconds(98), surplusWatts: 1_000, evWatts: 4_830));
+
+        // The average (4.2kW) still charges from the sun alone: no bridge was decided.
+        Assert.Contains("from the sun", _writes[^1].Reason);
+        Assert.Equal([false, false, false, false, true], _inverter.Applied);
+    }
+
+    [Fact]
+    public async Task AnAverageHoveringOnTheFloor_KeepsTheHoldThroughTheDwell_InsteadOfFlapping()
+    {
+        // 2026-09-15 11:53: the bridge went 51W, 110W, 0W, 45W on consecutive polls and the hold was
+        // armed and released with it -- 22 times that day, each a write to the inverter (#197).
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            Drawing(Now, surplusWatts: 6_000, evWatts: 4_830),                  // on the sun
+            Drawing(Now.AddSeconds(8), surplusWatts: 1_000, evWatts: 4_830),    // bridged: armed
+            Drawing(Now.AddSeconds(16), surplusWatts: 6_000, evWatts: 4_830),   // no bridge, no shortfall
+            Drawing(Now.AddSeconds(24), surplusWatts: 1_000, evWatts: 4_830),   // bridged again
+            Drawing(Now.AddMinutes(4), surplusWatts: 6_000, evWatts: 4_830));   // 3.6min clear: released
+
+        Assert.Equal([false, true, true, true, false], _inverter.Applied);
+    }
+
+    [Fact]
+    public async Task APausedCharge_ReleasesTheHoldAtOnce_WithoutWaitingTheDwell()
+    {
+        // The dwell protects a charge that is running. Once the car is paused there is nothing left to
+        // keep the pack out of, and holding it would only put the house on the grid.
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            Drawing(Now, surplusWatts: 6_000, evWatts: 4_830),
+            Drawing(Now.AddMinutes(9), surplusWatts: 1_000, evWatts: 4_830),                // a dip inside the run time: bridged
+            Drawing(Now.AddMinutes(10).AddSeconds(30), surplusWatts: 0, evWatts: 4_830));   // run time over: paused
+
+        Assert.Contains("waiting for this dip to pass", _writes[^1].Reason);
+        Assert.Equal([false, true, false], _inverter.Applied);
+    }
+
     // A car drawing evWatts while the roof makes the stated surplus over a 300W house.
     private static EnergyState Drawing(DateTimeOffset at, double surplusWatts, double evWatts) =>
         new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: surplusWatts + 300,

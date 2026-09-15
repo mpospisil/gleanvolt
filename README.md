@@ -652,7 +652,9 @@ the signal it is there to give.
   "Enabled": false,                 // master switch — while off, inverter writes are impossible
   "DryRun": true,                   // decide and log, but write nothing
   "Duration": "00:01:00",           // how long each command stays armed; also the failsafe window
-  "TargetChangeThresholdWatts": 100 // how far the target must move before reissuing
+  "TargetChangeThresholdWatts": 100, // how far the target must move before reissuing
+  "BridgeShortfallWatts": 300,      // SolarGrid/Targeted: arm when the car draws this much more than the sun gives
+  "BridgeReleaseDwell": "00:03:00"  // SolarGrid/Targeted: keep it this long after the last need, while charging
 }
 ```
 
@@ -1134,8 +1136,12 @@ keep imports strictly inside the blocks the plan drew.
 - **The home battery keeps its priority.** Its need is reserved out of the forecast by the same
   backward pass [`SolarDayPlanner`](#the-shoulders-belong-to-the-battery-the-plateau-belongs-to-the-car)
   uses, so the car is only ever offered what is left; and the discharge hold arms **whenever the car is
-  drawing more than the roof is giving**. Unlike `FastNoBattery`, the hold is scoped to the importing
-  part of the cycle rather than to the whole mode. Below the plan's SOC floor the sun belongs to the
+  drawing more than the roof is giving** — inside a grid block, while the grid bridge runs, or when a
+  cloud leaves the car drawing more than `BatteryHold:BridgeShortfallWatts` (300 W) beyond the live
+  surplus before the 3-minute average notices. Outside a block it stays armed for
+  `BatteryHold:BridgeReleaseDwell` (3 min) after the last of those while the car charges, so it does not
+  flap on the floor. Unlike `FastNoBattery`, the hold is scoped to the importing part of the cycle
+  rather than to the whole mode. Below the plan's SOC floor the sun belongs to the
   pack outright: the car still gets its pace, but funded entirely by the grid, and the whole of it
   counts as imported so the hold arms for all of it.
 - **There is still no battery loan in this mode.** The pack keeps priority and the grid is the honest
@@ -1379,8 +1385,13 @@ held and the house on the grid for nothing.
 - **No battery-full gate.** The car competes with the home battery for the surplus from the first watt
   over the minimum. Use `Forecasted` if the battery must reach 100% by evening.
 - **No battery loan.** The grid is the only source for the bridge — and only with
-  `BatteryHold:Enabled`. Without the hold the bridge still runs, but the inverter serves the gap from
-  the pack; a warning says so when the mode is selected.
+  `BatteryHold:Enabled`. The hold arms whenever the car draws more than the sun gives: while the bridge
+  runs, and also when a cloud leaves the car drawing more than `BatteryHold:BridgeShortfallWatts`
+  (300 W) beyond the live surplus, before the 3-minute average has caught up and a bridge is decided.
+  It stays armed for `BatteryHold:BridgeReleaseDwell` (3 min) after the last of those while the car is
+  charging, so an average hovering on the 6 A floor does not flap it; a pause or the end of the mode
+  releases it at once. Without the hold the bridge still runs, but the inverter serves the gap from the
+  pack; a warning says so when the mode is selected.
 - **Nothing survives a restart**, the minimum set at runtime included.
 
 | Key | Default | Meaning |
@@ -1477,7 +1488,7 @@ description or tooltip field. The meanings live here instead.
 | **Charge fast** | button | The same, for `FastNoBattery`, and it applies the three **Fast** entities below as it goes. Read the warning about `MaxChargingCurrentAmps` before pressing it — this one draws the site's supply limit for hours. An amount it cannot honour (a battery target with no configured capacity, a car already past it) logs a warning and starts nothing, rather than charging to full instead. |
 | **Charge solar + grid** | button | The same, for `SolarGrid`. Reads **Min solar surplus** on every poll rather than at the press, so the number can be moved while it runs. Switches itself off at the end of the day's useful sun, when the car stops drawing, or when it is unplugged. |
 | **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
-| **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` is different: it arms its own hold only while the plan is importing — inside its grid block and while the grid bridge runs — and never touches this switch. |
+| **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` and `SolarGrid` are different: they arm their own hold only while the car draws more than the sun gives — `Targeted`'s grid block, the grid bridge, or a cloud the 3-minute average has not caught up with — keep it for `BatteryHold:BridgeReleaseDwell` after the last of those while charging, and never touch this switch. |
 | **Daily EV target** | kWh | What you would like the car to have taken by the end of the day — a yardstick, not a limit. **Day outlook**, **Projected shortfall** and **EV energy expected today** are all measured against it, and nothing stops on it: past the target the car goes on taking whatever surplus the plan still allows, and lowering it sends the car no less. **Session energy target** is the one that caps a charge. Doesn't persist across restarts. |
 | **Session energy target** | kWh | The only hard stop in the `Forecasted` mode: the car is paused the moment the charger's meter passes this much, ahead of the dwell timers and whatever the forecast says. Stands in for "charge to 80%", since the charger cannot see the car's own SOC. Counted per plug-in — unplugging the car and plugging it back in starts the count at zero, and nothing else resets it. `0` means no limit. Doesn't persist across restarts. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
