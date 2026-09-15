@@ -662,6 +662,26 @@ h1 {
     font-style: italic;
 }
 
+/*
+    The dashboard's forecast table (today and tomorrow). The date goes on its own line under the day's
+    name, whole: beside it, or free to wrap, it is what pushes five columns past a phone's width. On a
+    phone the cells' side padding is halved too -- at the energy table's 0.6rem, ten paddings are wider
+    than the figures between them, and a 360px screen gets a table it has to scroll sideways.
+*/
+.forecast-date {
+    display: block;
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 40rem) {
+    .forecast-days td,
+    .forecast-days th {
+        padding-left: 0.3rem;
+        padding-right: 0.3rem;
+    }
+}
+
 .day-step {
     padding: 0.15rem 0.55rem;
     line-height: 1.4;

@@ -18,10 +18,13 @@
     be read in the order the questions are actually asked, rather than as one undifferentiated grid
     of fourteen figures followed by a column of inputs.
 
-    Three sections, in that order:
+    Four sections, in that order:
 
       Energy          -- the house: what the roof is making, what the battery and the grid are doing.
                          True whatever is or isn't plugged in, which is why it comes first.
+      Solar forecast  -- today and tomorrow as a table, with what each column means written beneath it
+                         rather than in hover hints: these figures are read against each other --
+                         tomorrow against today, the cautious band against the median -- not one at a time.
       Vehicle         -- the car: the charger's own view of whether one is connected, plus whatever
                          the car's own feed last said about itself (#73, #140). Read-only, and
                          nothing in the control logic consumes the cloud half yet.
@@ -59,8 +62,6 @@ else
               Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
         <Stat Label="Forecast solar power" Value="@Watts(_status.ForecastSolarPowerWatts)"
               Hint="What the forecast expected the roof to be making right now, to read against the measured figure beside it. 0 when no forecast covers this moment." />
-        <Stat Label="Forecast solar today" Value="@Kwh(_todayForecastWh)"
-              Hint="The whole of today's forecast production, morning included -- what the day was expected to bring, not what is still to come. A dash while no forecast is held for today." />
         <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
               Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
         <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"
@@ -70,6 +71,49 @@ else
         <Stat Label="Grid power" Value="@Watts(_status.GridPowerWatts)"
               Hint="Positive while importing from the grid, negative while exporting." />
     </section>
+
+    <h2>Solar forecast</h2>
+
+    @* Units in the note, not in the cells or the headers, and the date under the day's name rather than
+       beside it: five columns have to fit a phone, and either would push the table sideways. *@
+    <table class="sessions energy forecast-days" id="solar-forecast">
+        <thead>
+            <tr>
+                <th>Day</th>
+                <th class="num">Expected</th>
+                <th class="num">Low (p10)</th>
+                <th class="num">High (p90)</th>
+                <th class="num">Peak</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (label, date, day) in _forecastDays)
+            {
+                <tr>
+                    <td>@label <span class="muted forecast-date">@date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span></td>
+                    <td class="num">@Figure(day?.ExpectedWh)</td>
+                    <td class="num">@Figure(day?.LowWh)</td>
+                    <td class="num">@Figure(day?.HighWh)</td>
+                    <td class="num">@Figure(day?.PeakWatts)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="muted table-note">
+        Energy in kWh, peak power in kW. Each row is a whole day, midnight to midnight in
+        @Time.LocalTimeZone.Id time. Today's includes the hours already gone, as last forecast before they
+        happened, so it is what the day was expected to bring rather than what is still to come.
+        <strong>Expected</strong> is Solcast's median: as likely to be beaten as missed.
+        <strong>Low (p10)</strong> is the cautious figure, one the day should beat about nine times in ten —
+        the Forecasted mode plans on this band by default.
+        <strong>High (p90)</strong> is the hopeful one, beaten only about one time in ten; the wider the gap
+        between the two, the less sure the sky.
+        <strong>Peak</strong> is the strongest half hour the median expects, before the house takes its
+        share — a quick check on whether the roof will make enough to charge the car at all.
+        Solcast is asked again every few hours in daylight, so tomorrow's figures keep moving until the
+        day arrives. A dash means no forecast is held for that day yet.
+    </p>
 
     <h2>Vehicle</h2>
 
@@ -313,8 +357,8 @@ else
 
     private IVehicleUpdateService? _service;
 
-    // The whole of today's forecast, or null while none is held for today.
-    private double? _todayForecastWh;
+    // Today and tomorrow, in that order; a summary is null while no forecast is held for its day.
+    private IReadOnlyList<(string Label, DateOnly Date, SolarDayForecastSummary? Summary)> _forecastDays = [];
 
     protected override void OnInitialized()
     {
@@ -327,7 +371,7 @@ else
         _service = VehicleFeeds.FirstOrDefault();
 
         RefreshVehicle();
-        ReadTodayForecast();
+        ReadDayForecasts();
     }
 
     private void OnStatusUpdated(ChargeControlStatus status)
@@ -338,7 +382,7 @@ else
         // readings arrive minutes apart at best, so a few seconds of latency is invisible, and this
         // keeps the page to one event subscription and the render to one path.
         RefreshVehicle();
-        ReadTodayForecast();
+        ReadDayForecasts();
 
         InvokeAsync(StateHasChanged);
     }
@@ -346,10 +390,15 @@ else
     // A lookup, not a sum: the forecast source works the day totals out when a forecast lands, so this
     // is cheap enough for every poll. Reading it on the poll's cadence is also what picks up a refresh
     // and moves on to the next day at local midnight, without a subscription of its own.
-    private void ReadTodayForecast()
+    private void ReadDayForecasts()
     {
         var localToday = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).DateTime);
-        _todayForecastWh = Forecasts.GetDayEnergyWattHours(localToday);
+        var localTomorrow = localToday.AddDays(1);
+        _forecastDays =
+        [
+            ("Today", localToday, Forecasts.GetDaySummary(localToday)),
+            ("Tomorrow", localTomorrow, Forecasts.GetDaySummary(localTomorrow)),
+        ];
     }
 
     public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
@@ -466,6 +515,9 @@ else
     private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
 
     private static string Kwh(double? wattHours) => wattHours is null ? "—" : Kwh(wattHours.Value);
+
+    // A forecast-table cell: Wh as kWh, or W as kW, with the unit left to the column header.
+    private static string Figure(double? value) => value is null ? "—" : $"{value.Value / 1000:F1}";
 
     private static string Percent(double percent) => $"{percent:F0}%";
 

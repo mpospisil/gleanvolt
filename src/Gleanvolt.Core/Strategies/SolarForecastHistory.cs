@@ -100,30 +100,34 @@ public sealed class SolarForecastHistory
     }
 
     /// <summary>
-    /// Every retained local calendar day with its forecast energy in watt-hours, elapsed periods
-    /// included — what <see cref="ForDate"/> followed by <see cref="SolarForecast.ExpectedEnergyWattHours"/>
-    /// answers, for all days at once.
+    /// Every retained local calendar day with its forecast summarised, elapsed periods included — what
+    /// <see cref="ForDate"/> followed by <see cref="SolarDayForecastSummary.Of"/> answers, for all days at
+    /// once.
     /// </summary>
     /// <remarks>
-    /// Meant to be taken once per <see cref="Merge"/> and held, not asked for on every read: the totals
-    /// change only when a refresh lands, and the dashboard showing today's re-renders on every poll. A
-    /// day with nothing retained is absent rather than zero, for the reason <see cref="ForDate"/> answers
-    /// null. Days are attributed exactly as <see cref="ForDate"/> attributes them, so the two cannot
-    /// disagree over a period near midnight.
+    /// Meant to be taken once per <see cref="Merge"/> and held, not asked for on every read: the
+    /// summaries change only when a refresh lands, and the dashboard showing today's and tomorrow's
+    /// re-renders on every poll. A day with nothing retained is absent rather than zero, for the reason
+    /// <see cref="ForDate"/> answers null. Days are attributed exactly as <see cref="ForDate"/> attributes
+    /// them, so the two cannot disagree over a period near midnight.
     /// </remarks>
-    public IReadOnlyDictionary<DateOnly, double> DailyEnergyWattHours(TimeZoneInfo timeZone)
+    public IReadOnlyDictionary<DateOnly, SolarDayForecastSummary> DailySummaries(TimeZoneInfo timeZone)
     {
         ArgumentNullException.ThrowIfNull(timeZone);
 
         SolarForecastPeriod[] periods;
+        DateTimeOffset retrievedAt;
         lock (_gate)
         {
             periods = [.. _periods.Values];
+
+            // Nothing is held before the first merge, so the fallback can never reach a summary.
+            retrievedAt = _retrievedAt ?? DateTimeOffset.MinValue;
         }
 
         return periods
             .GroupBy(p => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.PeriodEnd, timeZone).DateTime))
-            .ToFrozenDictionary(day => day.Key, day => day.Sum(p => p.EnergyWattHours));
+            .ToFrozenDictionary(day => day.Key, day => SolarDayForecastSummary.Of(new SolarForecast(retrievedAt, [.. day])));
     }
 
     private void Prune(DateTimeOffset cutoff)

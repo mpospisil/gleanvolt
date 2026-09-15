@@ -75,6 +75,30 @@ public sealed class SolcastForecastServiceTests
         Assert.Equal(2000, service.GetDayEnergyWattHours(Today)!.Value, 3);
     }
 
+    [Fact]
+    public async Task TheDaySummaryCarriesSolcastsBandsAndPeak()
+    {
+        var clock = new Clock(At(5, 30));
+        var handler = new QueueHandler((HttpStatusCode.OK, JsonSerializer.Serialize(new
+        {
+            forecasts = new[]
+            {
+                new { pv_estimate = 2.0, pv_estimate10 = 1.0, pv_estimate90 = 3.0, period_end = At(10, 0), period = "PT30M" },
+                new { pv_estimate = 5.0, pv_estimate10 = 4.0, pv_estimate90 = 5.5, period_end = At(11, 0), period = "PT30M" },
+            },
+        })));
+        var service = NewService(handler, clock);
+
+        await service.RefreshAsync();
+
+        var day = service.GetDaySummary(Today)!;
+        Assert.Equal((2000 + 5000) * 0.5, day.ExpectedWh, 3);
+        Assert.Equal((1000 + 4000) * 0.5, day.LowWh, 3);
+        Assert.Equal((3000 + 5500) * 0.5, day.HighWh, 3);
+        Assert.Equal(5000, day.PeakWatts, 3);
+        Assert.Equal(day.ExpectedWh, service.GetDayEnergyWattHours(Today)!.Value, 3);
+    }
+
     private static DateTimeOffset At(int hour, int minute) => new(2026, 8, 9, hour, minute, 0, TimeSpan.Zero);
 
     private static (HttpStatusCode, string) Ok(params (DateTimeOffset End, double Kw)[] periods) =>
