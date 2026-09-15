@@ -7,9 +7,9 @@ namespace Gleanvolt.Hosting;
 /// How much of the commanded charge the home battery is currently lending, bridging a sub-minimum
 /// surplus up to the charger's floor. Zero outside the forecast-driven mode.
 /// </param>
-/// <param name="SessionComplete">
-/// The controller reported that the car has finished (or gone away) and the mode should end itself.
-/// Only the fast mode ever sets it; the poll loop answers by returning the mode to Off.
+/// <param name="EndsSession">
+/// The controller ended the mode itself this cycle, and why (#198): the decision's own reason, carried to
+/// the poll loop, which answers by returning the mode to Off and hands the reason on to the session.
 /// </param>
 /// <param name="ChargerStoodDown">
 /// Whether the charger is sitting in Stop because a deferred charge put it there for its wait. A
@@ -28,6 +28,10 @@ public readonly record struct ChargeControlCycleResult(
     int? TargetCurrentAmps,
     bool HoldingControl,
     double LoanPowerWatts = 0,
-    bool SessionComplete = false,
+    ChargingSessionEndReason? EndsSession = null,
     double GridBridgeWatts = 0,
-    bool ChargerStoodDown = false);
+    bool ChargerStoodDown = false)
+{
+    /// <summary>Whether the mode ends itself this cycle; <see cref="EndsSession"/> says why.</summary>
+    public bool SessionComplete => EndsSession is not null;
+}

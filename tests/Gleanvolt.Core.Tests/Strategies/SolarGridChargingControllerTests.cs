@@ -143,7 +143,7 @@ public class SolarGridChargingControllerTests
         var result = Controller.Decide(Input(500, outlook: NoSunLeft));
 
         Assert.Equal(ChargingControlAction.Pause, result.Action);
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.NoSunLeftToday, result.EndsSession);
         Assert.Contains("returning to Off", result.Reason);
     }
 
@@ -246,7 +246,7 @@ public class SolarGridChargingControllerTests
         var result = Controller.Decide(Input(
             5000, charging: true, timeInState: TimeSpan.FromHours(1), evDrewPower: true, evIdleFor: TimeSpan.FromMinutes(3)));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, result.EndsSession);
         Assert.Contains("stopped drawing", result.Reason);
     }
 
@@ -256,7 +256,7 @@ public class SolarGridChargingControllerTests
         var result = Controller.Decide(Input(
             5000, charging: true, timeInState: TimeSpan.FromHours(1), evDrewPower: true, status: EvChargerStatus.Available));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.CarUnplugged, result.EndsSession);
         Assert.Contains("unplugged", result.Reason);
     }
 

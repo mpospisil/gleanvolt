@@ -63,8 +63,11 @@ public class SolarGridModeTests
             Exporting(Now, 0));
 
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
-        Assert.Contains(_charger.ModeWrites, w => w.Mode == EvChargerMode.Stop);
+        Assert.Contains(_charger.ModeWrites, w => w.Mode == EvChargerMode.Stop && w.Reason.Contains("no sun was left to charge on today"));
         Assert.Contains("returning to Off", _writes[^1].Reason);
+
+        // 2026-09-15: this ending was recorded as "the car finished charging", with the car at 75% (#198).
+        Assert.Equal(ChargingSessionEndReason.NoSunLeftToday, _status.Current?.SessionEndReason);
     }
 
     [Fact]

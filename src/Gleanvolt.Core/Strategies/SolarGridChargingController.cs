@@ -84,12 +84,12 @@ public sealed class SolarGridChargingController : IChargingController
             // Known-disconnected, not merely "not connected": Unknown is a failed read.
             if (input.State.EvChargerStatus.IsCarKnownDisconnected())
             {
-                return Complete("Car unplugged");
+                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
             }
 
             if (input.EvIdleFor >= _options.CompletionDwell)
             {
-                return Complete($"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min — its own limit");
+                return Complete(ChargingSessionEndReason.SessionComplete, $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min — its own limit");
             }
         }
 
@@ -131,7 +131,7 @@ public sealed class SolarGridChargingController : IChargingController
 
         if (outlook.NoSunLeftToday)
         {
-            return Complete($"{below} Nothing left of today will do better: {outlook.Reason}");
+            return Complete(ChargingSessionEndReason.NoSunLeftToday, $"{below} Nothing left of today will do better: {outlook.Reason}");
         }
 
         if (outlook.NextSunAt is { } next && next - input.State.Timestamp >= StandDownAfter)
@@ -192,8 +192,8 @@ public sealed class SolarGridChargingController : IChargingController
 
     // Pause rather than None: the charger must be left idle, not armed at the last setpoint. The
     // orchestrator writes the pause current and then switches the mode to Off.
-    private static ChargingControlDecision Complete(string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", SessionComplete: true);
+    private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
+        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
 
     // Whole-amp setpoint the charger accepts: convert (phase-aware), floor to the step, clamp to max.
     private int ToHardwareCurrent(double availableWatts)

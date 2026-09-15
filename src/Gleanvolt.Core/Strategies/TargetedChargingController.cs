@@ -64,6 +64,7 @@ public sealed class TargetedChargingController : IChargingController
         if (plan is not null && now >= plan.DepartBy)
         {
             return Complete(
+                ChargingSessionEndReason.DeparturePassed,
                 $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with {plan.DeliveredEnergyWh / 1000:F1}kWh "
                 + $"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
@@ -84,7 +85,7 @@ public sealed class TargetedChargingController : IChargingController
 
         if (plan.IsComplete)
         {
-            return Complete($"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
+            return Complete(ChargingSessionEndReason.TargetReached, $"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
         // "The car has stopped" is only meaningful while we are asking it to charge. Between blocks we
@@ -96,12 +97,13 @@ public sealed class TargetedChargingController : IChargingController
             // the mode on one costs the owner the whole request — there is nothing left to restart it.
             if (input.State.EvChargerStatus.IsCarKnownDisconnected())
             {
-                return Complete("Car unplugged");
+                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
             }
 
             if (input.EvIdleFor >= _options.CompletionDwell)
             {
                 return Complete(
+                    ChargingSessionEndReason.SessionComplete,
                     $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min at {plan.DeliveredEnergyWh / 1000:F1}kWh "
                     + $"of {plan.RequiredEnergyWh / 1000:F1}kWh — its own limit, short of the target");
             }
@@ -403,8 +405,8 @@ public sealed class TargetedChargingController : IChargingController
 
     // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever
     // plugs in next. The orchestrator writes the pause current and then switches the mode to Off.
-    private static ChargingControlDecision Complete(string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", SessionComplete: true);
+    private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
+        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
 
     // Whole-amp setpoint the charger accepts: convert (phase-aware), floor to the step, clamp to max.
     private int ToHardwareCurrent(double availableWatts)

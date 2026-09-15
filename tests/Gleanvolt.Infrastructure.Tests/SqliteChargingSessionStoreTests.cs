@@ -90,6 +90,23 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task AnEndReasonAppendedLaterComesBackByName()
+    {
+        // Stored by name, and #198 appended four members: a new one has to round-trip, and nothing that
+        // was written before it existed is renumbered underneath it.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+        await store.CompleteSessionAsync(Closed(session) with { EndReason = ChargingSessionEndReason.NoSunLeftToday }, Ct);
+
+        var document = await store.ExportAsync(session.Id, Ct);
+
+        Assert.Equal(ChargingSessionEndReason.NoSunLeftToday, document!.Session.EndReason);
+    }
+
+    [Fact]
     public async Task TheFourChargingFiguresSurviveTheRoundTripSeparately()
     {
         using var store = NewStore();

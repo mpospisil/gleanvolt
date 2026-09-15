@@ -252,7 +252,7 @@ public sealed class ChargingControlCoordinator
 
             return new ChargeControlCycleResult(
                 reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
-                decision.SessionComplete, decision.GridBridgeWatts, _stoodDown);
+                decision.EndsSession, decision.GridBridgeWatts, _stoodDown);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

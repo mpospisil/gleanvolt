@@ -4,6 +4,30 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-15 — A mode that ends itself says why, and the session records that reason
+
+**Context.** On 2026-09-15 SolarGrid ended its session at 17:00 because the forecast had no sun left
+that day. The car was at 75%. The session was recorded as `SessionComplete` — *"The car finished
+charging"* — and the log said *"(charging finished)"*. `ChargingControlDecision.SessionComplete` was one
+flag that twelve different endings set, and the tracker read it before `CarConnected`, so even a car the
+mode saw unplugged was filed as finished (#198).
+
+**Decision — the decision carries the reason.** `ChargingControlDecision.EndsSession`,
+`ChargeControlCycleResult.EndsSession` and `ChargeControlStatus.SessionEndReason` replace the flags, and
+the old flag names remain only as properties computed from them, so a completion cannot be written
+without saying which one it is. The tracker takes the controller's reason first.
+
+**Decision — append to the enum, and keep `SessionComplete` for what its name says.** It now means the
+car stopped drawing on its own limit. `TargetReached`, `DeparturePassed`, `NoSunLeftToday` and
+`ChargerTakenOver` are new; a controller-detected unplug uses the existing `CarUnplugged`. The enum is
+stored by name, so rows written before this still parse. They keep `SessionComplete` whatever ended them,
+because nothing stored says which it was.
+
+**Decision — one wording.** `ChargingSessionEndReason.Describe()` is the clause used by the log (*"set to
+Off by SolarGrid (no sun was left to charge on today)"*), the session's end event and the session page.
+
+---
+
 ## 2026-09-15 — The bridge hold arms on the car's live shortfall, and lets go after a dwell
 
 **Context.** The daylight check in #191 found the home battery giving 0.80 kWh to a 30.6 kWh SolarGrid

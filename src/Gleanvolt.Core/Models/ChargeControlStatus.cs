@@ -61,13 +61,12 @@ namespace Gleanvolt.Core.Models;
 /// mode-owned fields follow.
 /// </param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
-/// <param name="SessionCompleted">
-/// This cycle the controller reported that charging was over and the mode ended itself — the fast and
-/// targeted modes both do. True for the single status that carries the transition, and the only way a
-/// later reader can tell "it finished" from "somebody selected Off": by the time <see cref="Mode"/>
-/// reads <see cref="ChargeControlMode.Off"/> the two look identical. <em>Why</em> it finished — the
-/// car reached its own limit, or the amount asked for was delivered — is in the reason recorded on the
-/// session. Not published to Home Assistant.
+/// <param name="SessionEndReason">
+/// This cycle the controller ended the mode itself, and why: the fast, targeted and solar-grid modes all
+/// can. Set for the single status that carries the transition, and the only way a later reader can tell
+/// "it finished" from "somebody selected Off": by the time <see cref="Mode"/> reads
+/// <see cref="ChargeControlMode.Off"/> the two look identical. The session records this reason as its own
+/// (#198). Not published to Home Assistant.
 /// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
@@ -97,6 +96,10 @@ public sealed record ChargeControlStatus(
     double? TomorrowForecastWh,
     DateTimeOffset Timestamp,
     TargetedChargePlan? TargetedPlan = null,
-    bool SessionCompleted = false,
+    ChargingSessionEndReason? SessionEndReason = null,
     FastChargeProgress? FastCharge = null,
-    SolarGridOutlook? SolarGrid = null);
+    SolarGridOutlook? SolarGrid = null)
+{
+    /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
+    public bool SessionCompleted => SessionEndReason is not null;
+}

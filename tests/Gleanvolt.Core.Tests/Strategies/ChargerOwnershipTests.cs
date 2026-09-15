@@ -67,7 +67,7 @@ public class ChargerOwnershipTests
         // the completion checks could run. The mode has to notice it is driving nothing.
         var decision = ChargerOwnership.NotOurs(Input(EvChargerMode.Stop, notFastFor: TimeSpan.FromMinutes(3)));
 
-        Assert.True(decision!.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.ChargerTakenOver, decision!.EndsSession);
 
         // Never a current: writing one to a charger that is not ours is what the guard exists to stop.
         Assert.Equal(ChargingControlAction.None, decision.Action);
