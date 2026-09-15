@@ -123,21 +123,28 @@ public sealed record ChargingControlInput(
 /// grid block: the car is running partly on imported energy either way, and the pack must stay out
 /// of it.
 /// </param>
-/// <param name="SessionComplete">
-/// The controller's one way of saying "this is over": what was asked for has been delivered, or the
-/// car has finished on its own (or gone away), and there is nothing left to control. Accompanies a
-/// <see cref="ChargingControlAction.Pause"/> so the charger is left idle rather than armed at the last
-/// setpoint; the orchestrator then switches the mode back to <see cref="ChargeControlMode.Off"/>,
-/// which also releases the hold the fast mode armed.
+/// <param name="EndsSession">
+/// The controller's one way of saying "this is over", and why: what was asked for has been delivered, the
+/// departure has passed, the car has finished on its own or gone away, the day's sun is spent, or the
+/// charger is no longer ours to drive. Accompanies a <see cref="ChargingControlAction.Pause"/> so the
+/// charger is left idle rather than armed at the last setpoint (or a <see cref="ChargingControlAction.None"/>
+/// when the charger is not ours to write to); the orchestrator then switches the mode back to
+/// <see cref="ChargeControlMode.Off"/>, which also releases the hold the fast mode armed.
 ///
-/// <para>Set by the fast, targeted and solar-grid modes. The solar and forecast-driven ones never do: they follow
-/// the sun for as long as they are selected, and a car that has stopped taking their surplus has not
-/// ended anything.</para>
+/// <para>A reason rather than a flag (#198). With a flag, every one of those endings was recorded as "the
+/// car finished charging"; now a completion cannot be written without saying which it is. Set by the fast,
+/// targeted and solar-grid modes and by <see cref="Strategies.ChargerOwnership"/>. The solar and
+/// forecast-driven modes never set it: they follow the sun for as long as they are selected, and a car that
+/// has stopped taking their surplus has not ended anything.</para>
 /// </param>
 public sealed record ChargingControlDecision(
     ChargingControlAction Action,
     int? ChargeCurrentAmps,
     string Reason,
     double LoanPowerWatts = 0,
-    bool SessionComplete = false,
-    double GridBridgeWatts = 0);
+    ChargingSessionEndReason? EndsSession = null,
+    double GridBridgeWatts = 0)
+{
+    /// <summary>Whether this decision ends the mode; <see cref="EndsSession"/> says why.</summary>
+    public bool SessionComplete => EndsSession is not null;
+}

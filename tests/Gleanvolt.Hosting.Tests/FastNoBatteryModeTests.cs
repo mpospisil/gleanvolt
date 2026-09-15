@@ -101,7 +101,7 @@ public class FastNoBatteryModeTests
         await RunAsync(Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4)));
 
         Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
-        Assert.Contains("charging finished", Assert.Single(_charger.ModeWrites).Reason);
+        Assert.Contains("the car finished charging", Assert.Single(_charger.ModeWrites).Reason);
     }
 
     [Fact]

@@ -164,7 +164,7 @@ public class FastChargingControllerTests
             evIdleFor: TimeSpan.FromMinutes(3),
             fastCharge: Progress(requiredWh: 30_000, deliveredWh: 12_000)));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, result.EndsSession);
     }
 
     [Theory]
@@ -252,7 +252,7 @@ public class FastChargingControllerTests
 
         // Pause, not None: the charger is left idle rather than armed at 16A for whatever plugs in next.
         Assert.Equal(ChargingControlAction.Pause, result.Action);
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, result.EndsSession);
         Assert.Null(result.ChargeCurrentAmps);
     }
 
@@ -262,7 +262,7 @@ public class FastChargingControllerTests
         var result = Controller.Decide(Input(status: EvChargerStatus.Available));
 
         Assert.Equal(ChargingControlAction.Pause, result.Action);
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.CarUnplugged, result.EndsSession);
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class FastChargingControllerTests
     {
         var result = Controller.Decide(Input(fastCharge: Progress(20_000, 20_100)));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.TargetReached, result.EndsSession);
         Assert.Equal(ChargingControlAction.Pause, result.Action);
         Assert.Contains("Fast target reached", result.Reason);
         Assert.Contains("returning to Off", result.Reason);
@@ -331,7 +331,7 @@ public class FastChargingControllerTests
             evIdleFor: TimeSpan.FromMinutes(30),
             fastCharge: Progress(20_000, 20_000)));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.TargetReached, result.EndsSession);
         Assert.Contains("Fast target reached", result.Reason);
         Assert.DoesNotContain("charge limit reached", result.Reason);
     }
@@ -343,7 +343,7 @@ public class FastChargingControllerTests
             evIdleFor: TimeSpan.FromMinutes(3),
             fastCharge: Progress(20_000, 12_400)));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, result.EndsSession);
         Assert.Contains("charge limit reached", result.Reason);
         Assert.Contains("12.4kWh of the 20.0kWh asked for", result.Reason);
     }
@@ -422,7 +422,7 @@ public class FastChargingControllerTests
 
         var result = Controller.Decide(At(planned.AddHours(10), progress));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.DeparturePassed, result.EndsSession);
         Assert.Contains("has passed", result.Reason);
         Assert.Contains("28.0kWh of 30.0kWh", result.Reason);
     }
@@ -436,7 +436,7 @@ public class FastChargingControllerTests
 
         var result = Controller.Decide(At(planned.AddHours(10), progress));
 
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.TargetReached, result.EndsSession);
         Assert.Contains("Fast target reached", result.Reason);
         Assert.DoesNotContain("has passed", result.Reason);
     }

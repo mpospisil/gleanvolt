@@ -57,7 +57,7 @@ public static class ChargerOwnership
                 null,
                 $"The charger has been in {input.CurrentSettings.Mode} rather than Fast for "
                 + $"{input.ChargerNotFastFor.TotalMinutes:F0} min, so it is no longer ours to drive; returning to Off.",
-                SessionComplete: true);
+                EndsSession: ChargingSessionEndReason.ChargerTakenOver);
         }
 
         return new ChargingControlDecision(

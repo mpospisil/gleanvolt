@@ -411,12 +411,12 @@ public class ChargingControlCoordinatorTests
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
         _controller.NextDecision = new(
-            ChargingControlAction.Pause, null, "car finished", SessionComplete: true);
+            ChargingControlAction.Pause, null, "car finished", EndsSession: ChargingSessionEndReason.SessionComplete);
 
         var result = await Cycle();
 
         Assert.Equal(0, _charger.LastTarget); // pauseCurrentAmps -- not left armed at 16A
-        Assert.True(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, result.EndsSession);
     }
 
     [Fact]

@@ -58,7 +58,7 @@ else
         @if (session.EndReason is { } reason)
         {
             <dt>End reason</dt>
-            <dd>@reason</dd>
+            <dd>@reason.DescribeSentence()</dd>
         }
 
         <dt>Battery SOC</dt>

@@ -26,7 +26,7 @@ public class ChargingSessionTrackerTests
         bool holdActive = false,
         double loanWatts = 0,
         SolarDayPlan? plan = null,
-        bool sessionCompleted = false) => new(
+        ChargingSessionEndReason? endReason = null) => new(
         Mode: mode,
         DryRun: false,
         HoldingControl: state is ChargeControlState.Charging or ChargeControlState.Paused,
@@ -53,7 +53,7 @@ public class ChargingSessionTrackerTests
         LoanedTodayWh: 0,
         TomorrowForecastWh: null,
         Timestamp: at,
-        SessionCompleted: sessionCompleted);
+        SessionEndReason: endReason);
 
     private static ChargingSessionTracker NewTracker(bool recordUncontrolled = false) =>
         new(Cadence, recordUncontrolled, TimeProvider.System);
@@ -219,9 +219,32 @@ public class ChargingSessionTrackerTests
             mode: ChargeControlMode.Off,
             state: ChargeControlState.Disabled,
             evWatts: 0,
-            sessionCompleted: true));
+            endReason: ChargingSessionEndReason.SessionComplete));
 
         Assert.Equal(ChargingSessionEndReason.SessionComplete, update.Ended!.EndReason);
+    }
+
+    [Theory]
+    [InlineData(ChargeControlMode.SolarGrid, ChargingSessionEndReason.NoSunLeftToday, "No sun was left to charge on today")]
+    [InlineData(ChargeControlMode.Targeted, ChargingSessionEndReason.TargetReached, "The energy asked for was delivered")]
+    [InlineData(ChargeControlMode.Targeted, ChargingSessionEndReason.DeparturePassed, "The departure time passed")]
+    [InlineData(ChargeControlMode.FastNoBattery, ChargingSessionEndReason.ChargerTakenOver, "The charger was switched out of Fast")]
+    [InlineData(ChargeControlMode.SolarGrid, ChargingSessionEndReason.CarUnplugged, "The car was unplugged")]
+    public void AModeThatEndsItselfIsRecordedWithItsOwnReason(
+        ChargeControlMode mode, ChargingSessionEndReason reason, string sentence)
+    {
+        // 2026-09-15: SolarGrid ended at 17:00 for want of sun, with the car at 75%, and the session said
+        // "The car finished charging" -- as every session a mode ended itself used to, unplugs included (#198).
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon, mode: mode));
+
+        var update = tracker.Observe(Status(
+            Noon.AddMinutes(2), mode: ChargeControlMode.Off, state: ChargeControlState.Disabled, evWatts: 0, endReason: reason));
+
+        Assert.Equal(reason, update.Ended!.EndReason);
+        Assert.StartsWith(
+            sentence + ";",
+            Assert.Single(update.Events, e => e.Kind == ChargingSessionEventKind.SessionEnded).Detail);
     }
 
     [Fact]

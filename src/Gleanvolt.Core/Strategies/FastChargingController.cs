@@ -86,6 +86,7 @@ public sealed class FastChargingController : IChargingController
         if (input.FastCharge is { IsMet: true } progress)
         {
             return Complete(
+                ChargingSessionEndReason.TargetReached,
                 $"Fast target reached: {progress.DeliveredWh / 1000:F1}kWh of "
                 + $"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
@@ -99,6 +100,7 @@ public sealed class FastChargingController : IChargingController
             if (plan.HasDepartedAt(now))
             {
                 return Complete(
+                    ChargingSessionEndReason.DeparturePassed,
                     $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with "
                     + $"{input.FastCharge.DeliveredWh / 1000:F1}kWh of "
                     + $"{input.FastCharge.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
@@ -138,7 +140,7 @@ public sealed class FastChargingController : IChargingController
             // reports Unknown, and a dropped read is not a car that has gone away.
             if (input.State.EvChargerStatus.IsCarKnownDisconnected())
             {
-                return Complete("Car unplugged");
+                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
             }
 
             if (input.EvIdleFor >= _completionDwell)
@@ -151,6 +153,7 @@ public sealed class FastChargingController : IChargingController
                     : string.Empty;
 
                 return Complete(
+                    ChargingSessionEndReason.SessionComplete,
                     $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){shortfall}");
             }
         }
@@ -183,6 +186,6 @@ public sealed class FastChargingController : IChargingController
 
     // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever
     // plugs in next. The orchestrator writes the pause current and then switches the mode to Off.
-    private static ChargingControlDecision Complete(string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", SessionComplete: true);
+    private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
+        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
 }

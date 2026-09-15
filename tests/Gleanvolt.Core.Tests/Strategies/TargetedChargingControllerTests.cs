@@ -360,7 +360,7 @@ public class TargetedChargingControllerTests
         var decision = Controller().Decide(Input(
             plan, charging: true, evDrewPower: true, status: EvChargerStatus.Available));
 
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.CarUnplugged, decision.EndsSession);
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
     }
 
@@ -376,7 +376,7 @@ public class TargetedChargingControllerTests
             mode: EvChargerMode.Stop,
             now: DepartBy.AddMinutes(5)));
 
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.DeparturePassed, decision.EndsSession);
         Assert.Contains("has passed", decision.Reason);
     }
 
@@ -395,7 +395,7 @@ public class TargetedChargingControllerTests
             evIdleFor: TimeSpan.FromMinutes(5),
             status: EvChargerStatus.Finishing));
 
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, decision.EndsSession);
         Assert.Contains("its own limit", decision.Reason);
     }
 
@@ -405,7 +405,7 @@ public class TargetedChargingControllerTests
         var decision = Controller().Decide(Input(Plan(strategy: TargetedChargeStrategy.Complete, deliveredWh: 22_000)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.TargetReached, decision.EndsSession);
         Assert.Contains("Target reached", decision.Reason);
     }
 
@@ -414,7 +414,7 @@ public class TargetedChargingControllerTests
     {
         var decision = Controller().Decide(Input(Plan(), now: DepartBy.AddMinutes(1)));
 
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.DeparturePassed, decision.EndsSession);
         Assert.Contains("has passed", decision.Reason);
     }
 
@@ -428,7 +428,7 @@ public class TargetedChargingControllerTests
         var decision = Controller().Decide(Input(
             plan, charging: true, evDrewPower: true, evIdleFor: TimeSpan.FromMinutes(3)));
 
-        Assert.True(decision.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, decision.EndsSession);
         Assert.Contains("short of the target", decision.Reason);
     }
 

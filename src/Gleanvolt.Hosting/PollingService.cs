@@ -212,7 +212,7 @@ public sealed class PollingService : BackgroundService
                     result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
                 }
 
-                if (result.SessionComplete)
+                if (result.EndsSession is { } endReason)
                 {
                     // A mode that switches itself off has to leave the charger where the Off button
                     // would: stopped, not sitting in Fast at the pause current. That is one code path,
@@ -221,7 +221,10 @@ public sealed class PollingService : BackgroundService
                     // The controller has already had the pause current written. Ending the mode here --
                     // before the hold is reconciled below -- means the release reaches the inverter in
                     // this same cycle rather than a poll later.
-                    await _chargeActions.StopAsync($"{mode} (charging finished)", stoppingToken);
+                    //
+                    // Named by its reason, not "charging finished": the sun running out at 17:00 with the car
+                    // at 75% is not the car finishing (#198).
+                    await _chargeActions.StopAsync($"{mode} ({endReason.Describe()})", stoppingToken);
                     mode = ChargeControlMode.Off;
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
@@ -276,8 +279,8 @@ public sealed class PollingService : BackgroundService
                     Timestamp: state.Timestamp,
                     // Carried out of the loop because it is unrecoverable afterwards: the mode has
                     // already been returned to Off above, so nothing downstream could otherwise tell
-                    // "the car finished" from "somebody switched it off".
-                    SessionCompleted: result.SessionComplete));
+                    // why it ended from "somebody switched it off".
+                    SessionEndReason: result.EndsSession));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

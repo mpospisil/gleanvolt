@@ -2879,10 +2879,24 @@ device, so unlike `ChargeControl` and `BatteryHold` it is **on by default**.
 
 #### What a session is
 
-A session **opens** when a controlling mode (`Solar`, `Forecasted`, `FastNoBattery`, `Targeted`) is
-driving a connected car, and **closes** when that stops being true — the mode returns to `Off`, the
-controller ends itself because the car is full or because the amount asked for has been delivered, the
-car is unplugged, or the service stops.
+A session **opens** when a controlling mode (`Solar`, `Forecasted`, `FastNoBattery`, `Targeted`,
+`SolarGrid`) is driving a connected car, and **closes** when that stops being true. Its end reason says
+how:
+
+| End reason | What happened |
+|---|---|
+| `ModeOff` | Somebody switched the mode off. |
+| `CarUnplugged` | The car was unplugged. |
+| `ServiceStopped` | The service shut down with the session open. |
+| `Interrupted` | The service crashed or lost power; see below. |
+| `SessionComplete` | The mode ended itself because the car stopped drawing on its own limit. |
+| `TargetReached` | `Targeted`, or `FastNoBattery` with an amount, delivered what was asked for. |
+| `DeparturePassed` | `Targeted`, or `FastNoBattery` with a departure, ran out of time. |
+| `NoSunLeftToday` | `SolarGrid` ended for the day, however full the car is. |
+| `ChargerTakenOver` | The charger left Fast, so the mode stopped driving it. |
+
+Sessions recorded before these reasons existed show `SessionComplete` for every session a mode ended
+itself.
 
 Switching mode mid-session does **not** start a new one. "Forecasted all afternoon, then
 `FastNoBattery` at 17:00" is one story about one car, and it is recorded as one session with a

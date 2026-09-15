@@ -412,24 +412,15 @@ public sealed class ChargingSessionTracker
     private static ChargingSessionEndReason EndReasonFor(ChargeControlStatus status) => status switch
     {
         // Checked before the others: by the time this status is published the loop has already
-        // returned the mode to Off, so every other signal says "switched off" instead of "car full".
-        { SessionCompleted: true } => ChargingSessionEndReason.SessionComplete,
+        // returned the mode to Off, so every other signal says "switched off". The controller's own
+        // reason is the one that knows what happened -- a car the mode saw unplugged included (#198).
+        { SessionEndReason: { } reason } => reason,
         { CarConnected: false } => ChargingSessionEndReason.CarUnplugged,
         _ => ChargingSessionEndReason.ModeOff,
     };
 
-    private static string DescribeEnd(ChargingSessionEndReason reason, ChargingSession session)
-    {
-        var delivered = $"{session.EnergyDeliveredWh / 1000:F2}kWh delivered";
-        return reason switch
-        {
-            ChargingSessionEndReason.SessionComplete => $"The car finished charging; {delivered}.",
-            ChargingSessionEndReason.CarUnplugged => $"The car was unplugged; {delivered}.",
-            ChargingSessionEndReason.ModeOff => $"Charge control returned to Off; {delivered}.",
-            ChargingSessionEndReason.ServiceStopped => $"The service stopped; {delivered}.",
-            _ => $"The session was interrupted; {delivered}.",
-        };
-    }
+    private static string DescribeEnd(ChargingSessionEndReason reason, ChargingSession session) =>
+        $"{reason.DescribeSentence()}; {session.EnergyDeliveredWh / 1000:F2}kWh delivered.";
 
     private static string Describe(int? amps) => amps is { } value ? $"{value}A" : "off";
 
