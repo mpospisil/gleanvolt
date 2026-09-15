@@ -121,6 +121,35 @@ public class TargetedModeTests
     }
 
     [Fact]
+    public async Task ACloudTheAverageHasNotCaughtUp_ArmsTheHoldOutsideTheGridBlock()
+    {
+        // #197, the targeted half. Charging on real sun outside any grid block -- the forecast covers the
+        // whole 0.5kWh, so the plan imports nothing -- a cloud leaves the car drawing more than the roof
+        // gives while the 3-minute average still covers it. The pack must not fund that gap any more
+        // than it funds a bridge.
+        var sunFrom = Now.AddHours(1);
+        Request(500, Now.AddHours(2));
+
+        await RunAsync(
+            new WeakSunForecastService(sunFrom, watts: 3_000),
+            Exporting(Now, surplusWatts: 6_000),
+            OnTheSun(Now.AddMinutes(20), surplusWatts: 6_000, evWatts: 5_520),
+            OnTheSun(Now.AddMinutes(20).AddSeconds(30), surplusWatts: 6_000, evWatts: 5_520),
+            OnTheSun(Now.AddMinutes(21), surplusWatts: 6_000, evWatts: 5_520),
+            OnTheSun(Now.AddMinutes(21).AddSeconds(8), surplusWatts: 1_000, evWatts: 5_520));
+
+        // No planned import to arm it, and nothing armed until the cloud: the average (4.75kW) still
+        // charges without a bridge, so the live shortfall is the only thing that can.
+        Assert.False(_status.Current!.TargetedPlan!.IsInGridBlock(Now.AddMinutes(21).AddSeconds(8)));
+        Assert.Equal([false, false, false, false, true], _inverter.Applied);
+    }
+
+    // A car drawing evWatts while the roof exports the stated surplus over a 300W house, on a full pack.
+    private static EnergyState OnTheSun(DateTimeOffset at, double surplusWatts, double evWatts) =>
+        new(at, BatterySocPercent: 100, BatteryPowerWatts: 0, SolarPowerWatts: surplusWatts + 300,
+            GridPowerWatts: evWatts - surplusWatts, EvChargerStatus.Charging, EvChargerPowerWatts: evWatts);
+
+    [Fact]
     public async Task WhenTheTargetIsMetTheModeReturnsItselfToOffAndTheHoldIsReleased()
     {
         // A car already drawing when the request is made. There is no forecast, so the import starts

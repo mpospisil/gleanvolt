@@ -42,4 +42,20 @@ public sealed class BatteryHoldOptions
     /// command is not EEPROM-backed, so this is about Modbus traffic and log noise, not wear.
     /// </summary>
     public double TargetChangeThresholdWatts { get; init; } = 100;
+
+    /// <summary>
+    /// How far the car's draw must exceed the live solar surplus before <c>SolarGrid</c> and
+    /// <c>Targeted</c> arm the hold with no grid bridge running (#197). The bridge is decided on the
+    /// 3-minute average, which lags a cloud; this catches the shortfall in the cycle it appears. Large
+    /// enough that meter noise and the pack's own standby trickle do not arm it.
+    /// </summary>
+    public double BridgeShortfallWatts { get; init; } = 300;
+
+    /// <summary>
+    /// How long <c>SolarGrid</c> and <c>Targeted</c> keep that hold armed after the last poll that needed
+    /// it — a bridge or a shortfall — while the car is still being charged (#197). Matches
+    /// <c>ChargeControl:SurplusAverageWindow</c>: the bridge is itself a 3-minute average, and letting go
+    /// faster than it settles is what made the hold flap. A paused or ended charge releases at once.
+    /// </summary>
+    public TimeSpan BridgeReleaseDwell { get; init; } = TimeSpan.FromMinutes(3);
 }
