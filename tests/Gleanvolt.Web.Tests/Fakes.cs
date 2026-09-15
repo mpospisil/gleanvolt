@@ -685,15 +685,15 @@ internal static class TestTargetedPlans
 }
 
 /// <summary>
-/// A forecast source that holds per-day totals and nothing else.
+/// A forecast source that holds per-day summaries and nothing else.
 ///
-/// <para>The periods throw on purpose: a page showing a day's total must read the one the source worked
-/// out when its forecast landed, and a render that summed the periods itself would be doing on every poll
-/// what the real source does once per refresh.</para>
+/// <para>The periods throw on purpose: a page showing a day's figures must read the summary the source
+/// worked out when its forecast landed, and a render that summed the periods itself would be doing on
+/// every poll what the real source does once per refresh.</para>
 /// </summary>
 internal sealed class FakeSolarForecastService : ISolarForecastService
 {
-    public Dictionary<DateOnly, double> DayTotals { get; } = [];
+    public Dictionary<DateOnly, SolarDayForecastSummary> Days { get; } = [];
 
     public SolarForecast? GetForecastForToday() =>
         throw new NotSupportedException("A render must read the day total, not the periods.");
@@ -704,8 +704,10 @@ internal sealed class FakeSolarForecastService : ISolarForecastService
     public SolarForecast? GetDayForecast(DateOnly localDate) =>
         throw new NotSupportedException("A render must read the day total, not the periods.");
 
-    public double? GetDayEnergyWattHours(DateOnly localDate) =>
-        DayTotals.TryGetValue(localDate, out var wattHours) ? wattHours : null;
+    public SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
+        Days.TryGetValue(localDate, out var day) ? day : null;
+
+    public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
 }
 
 /// <summary>

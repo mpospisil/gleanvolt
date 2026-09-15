@@ -219,14 +219,14 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void Groups_what_it_reports_under_the_three_questions_being_asked()
+    public void Groups_what_it_reports_under_the_four_questions_being_asked()
     {
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
         Assert.Equal(
-            ["Energy", "Vehicle", "Charging session"],
+            ["Energy", "Solar forecast", "Vehicle", "Charging session"],
             page.FindAll("h2").Select(h => h.TextContent.Trim()));
     }
 
@@ -465,45 +465,52 @@ public class DashboardPageTests : PageTest
         Assert.Contains("0 W", page.Markup);
     }
 
-    /// <summary>Today's whole-day forecast tile, by its label.</summary>
-    private static AngleSharp.Dom.IElement TodayForecastTile(IRenderedComponent<Dashboard> page) =>
-        page.FindAll(".stat").Single(s => s.QuerySelector(".label")!.TextContent == "Forecast solar today");
+    /// <summary>The forecast table's cells for the row whose day cell starts with <paramref name="day"/>.</summary>
+    private static string[] ForecastRow(IRenderedComponent<Dashboard> page, string day) =>
+        [.. page.FindAll("#solar-forecast tbody tr")
+            .Single(row => row.QuerySelector("td")!.TextContent.StartsWith(day, StringComparison.Ordinal))
+            .QuerySelectorAll("td")
+            .Select(cell => cell.TextContent.Trim())];
 
     [Fact]
-    public void Shows_the_whole_of_todays_forecast_in_kilowatt_hours()
+    public void Tabulates_today_and_tomorrow_with_their_bands_and_peak()
     {
-        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
-        _forecast.DayTotals[new DateOnly(2026, 8, 13)] = 3_100;
+        _forecast.Days[new DateOnly(2026, 8, 12)] = new(ExpectedWh: 18_400, LowWh: 14_100, HighWh: 21_900, PeakWatts: 5_300);
+        _forecast.Days[new DateOnly(2026, 8, 13)] = new(ExpectedWh: 3_100, LowWh: 1_200, HighWh: 6_400, PeakWatts: 1_800);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
-        Assert.Equal("18.4 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+        Assert.Equal(["Today Wed 12 Aug", "18.4", "14.1", "21.9", "5.3"], ForecastRow(page, "Today"));
+        Assert.Equal(["Tomorrow Thu 13 Aug", "3.1", "1.2", "6.4", "1.8"], ForecastRow(page, "Tomorrow"));
     }
 
     [Fact]
-    public void Takes_today_in_the_sites_zone_rather_than_utc()
+    public void Takes_today_and_tomorrow_in_the_sites_zone_rather_than_utc()
     {
         // 22:30 UTC is half past midnight in Prague: the day the owner is living in is already the next.
         _time.Now = new DateTimeOffset(2026, 8, 12, 22, 30, 0, TimeSpan.Zero);
-        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
-        _forecast.DayTotals[new DateOnly(2026, 8, 13)] = 9_700;
+        _forecast.Days[new DateOnly(2026, 8, 12)] = new(18_400, 14_100, 21_900, 5_300);
+        _forecast.Days[new DateOnly(2026, 8, 13)] = new(9_700, 8_000, 11_000, 3_200);
+        _forecast.Days[new DateOnly(2026, 8, 14)] = new(21_300, 17_000, 24_000, 5_600);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
-        Assert.Equal("9.7 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+        Assert.Equal("9.7", ForecastRow(page, "Today")[1]);
+        Assert.Equal("21.3", ForecastRow(page, "Tomorrow")[1]);
     }
 
     [Fact]
-    public void Shows_a_dash_for_today_while_no_forecast_is_held()
+    public void Shows_dashes_for_a_day_no_forecast_reaches()
     {
-        // Not 0 kWh: nothing fetched yet is a very different claim from a day the sun won't come up.
+        // Not 0.0: nothing fetched yet is a very different claim from a day the sun won't come up.
+        _forecast.Days[new DateOnly(2026, 8, 12)] = new(18_400, 14_100, 21_900, 5_300);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
-        Assert.Equal("—", TodayForecastTile(page).QuerySelector(".value")!.TextContent);
+        Assert.Equal(["—", "—", "—", "—"], ForecastRow(page, "Tomorrow")[1..]);
     }
 
     [Fact]
@@ -512,11 +519,25 @@ public class DashboardPageTests : PageTest
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
         var page = Render<Dashboard>();
 
-        _forecast.DayTotals[new DateOnly(2026, 8, 12)] = 18_400;
+        _forecast.Days[new DateOnly(2026, 8, 12)] = new(18_400, 14_100, 21_900, 5_300);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
-        page.WaitForAssertion(() =>
-            Assert.Equal("18.4 kWh", TodayForecastTile(page).QuerySelector(".value")!.TextContent));
+        page.WaitForAssertion(() => Assert.Equal("18.4", ForecastRow(page, "Today")[1]));
+    }
+
+    [Fact]
+    public void Explains_the_forecast_columns_beneath_the_table()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        var note = page.Find("#solar-forecast").NextElementSibling!;
+        Assert.Equal("P", note.TagName);
+        Assert.Contains("kWh", note.TextContent);
+        Assert.Contains("Low (p10)", note.TextContent);
+        Assert.Contains("High (p90)", note.TextContent);
+        Assert.Contains("Peak", note.TextContent);
     }
 
     [Fact]

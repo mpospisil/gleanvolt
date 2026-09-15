@@ -115,11 +115,11 @@ public class SolarForecastHistoryTests
             (Midnight.AddHours(15), 3000),
             (Midnight.AddDays(1).AddHours(12), 6000)));
 
-        var totals = history.DailyEnergyWattHours(Prague);
+        var days = history.DailySummaries(Prague);
 
-        Assert.Equal(2, totals.Count);
-        Assert.Equal((1000 + 4000 + 3000) * 0.5, totals[DateOnly.FromDateTime(Midnight.DateTime)], 3);
-        Assert.Equal(6000 * 0.5, totals[DateOnly.FromDateTime(Midnight.AddDays(1).DateTime)], 3);
+        Assert.Equal(2, days.Count);
+        Assert.Equal((1000 + 4000 + 3000) * 0.5, days[DateOnly.FromDateTime(Midnight.DateTime)].ExpectedWh, 3);
+        Assert.Equal(6000 * 0.5, days[DateOnly.FromDateTime(Midnight.AddDays(1).DateTime)].ExpectedWh, 3);
     }
 
     [Fact]
@@ -133,15 +133,35 @@ public class SolarForecastHistoryTests
         history.Merge(Forecast(Midnight.AddHours(-3), (lateUtc, 200), (Midnight.AddHours(12), 5000)));
 
         var day = DateOnly.FromDateTime(Midnight.DateTime);
-        var totals = history.DailyEnergyWattHours(Prague);
+        var days = history.DailySummaries(Prague);
 
-        Assert.Equal(history.ForDate(day, Prague)!.ExpectedEnergyWattHours, Assert.Single(totals).Value, 3);
-        Assert.Equal(day, totals.Keys.Single());
+        Assert.Equal(history.ForDate(day, Prague)!.ExpectedEnergyWattHours, Assert.Single(days).Value.ExpectedWh, 3);
+        Assert.Equal(day, days.Keys.Single());
     }
 
     [Fact]
     public void DayTotalsAreEmptyBeforeTheFirstRefreshRatherThanZero()
     {
-        Assert.Empty(new SolarForecastHistory().DailyEnergyWattHours(Prague));
+        Assert.Empty(new SolarForecastHistory().DailySummaries(Prague));
+    }
+
+    [Fact]
+    public void DaySummariesCarryTheBandsAndPeakAndCountAMissingBandAtTheMedian()
+    {
+        // A period with no p10/p90 must not read as a dark half hour in the cautious total.
+        var history = new SolarForecastHistory();
+        history.Merge(new SolarForecast(
+            Midnight.AddHours(6),
+            [
+                new SolarForecastPeriod(Midnight.AddHours(10), TimeSpan.FromMinutes(30), 2000, EstimatedPowerWattsP10: 1000, EstimatedPowerWattsP90: 3000),
+                new SolarForecastPeriod(Midnight.AddHours(13), TimeSpan.FromMinutes(30), 5000),
+            ]));
+
+        var day = history.DailySummaries(Prague)[DateOnly.FromDateTime(Midnight.DateTime)];
+
+        Assert.Equal((2000 + 5000) * 0.5, day.ExpectedWh, 3);
+        Assert.Equal((1000 + 5000) * 0.5, day.LowWh, 3);
+        Assert.Equal((3000 + 5000) * 0.5, day.HighWh, 3);
+        Assert.Equal(5000, day.PeakWatts, 3);
     }
 }

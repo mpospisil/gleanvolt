@@ -36,12 +36,13 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     // question a finished session has to be read against. Nothing in charge control reads it.
     private readonly SolarForecastHistory _history = new();
 
-    // The history's per-day totals, worked out once per refresh and published wholesale like the cache.
-    // They change only when a refresh lands, and the dashboard asks for today's on every poll: summing a
-    // week of periods every few seconds to get the same number back is work with nothing to show for it.
-    // Keyed by local date rather than holding "today", because the night sleep outlasts midnight by hours
-    // and the day has to roll over without a refresh.
-    private volatile IReadOnlyDictionary<DateOnly, double> _dayTotals = FrozenDictionary<DateOnly, double>.Empty;
+    // The history's per-day summaries, worked out once per refresh and published wholesale like the cache.
+    // They change only when a refresh lands, and the dashboard asks for today's and tomorrow's on every
+    // poll: summing a week of periods every few seconds to get the same numbers back is work with nothing
+    // to show for it. Keyed by local date rather than holding "today", because the night sleep outlasts
+    // midnight by hours and the day has to roll over without a refresh.
+    private volatile IReadOnlyDictionary<DateOnly, SolarDayForecastSummary> _daySummaries =
+        FrozenDictionary<DateOnly, SolarDayForecastSummary>.Empty;
 
     public SolcastForecastService(
         IHttpClientFactory httpClientFactory,
@@ -75,9 +76,12 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     public SolarForecast? GetDayForecast(DateOnly localDate) =>
         _history.ForDate(localDate, _timeProvider.LocalTimeZone);
 
-    /// <summary>A lookup into the totals taken at the last refresh; no periods are summed here.</summary>
-    public double? GetDayEnergyWattHours(DateOnly localDate) =>
-        _dayTotals.TryGetValue(localDate, out var wattHours) ? wattHours : null;
+    /// <summary>A lookup into the summaries taken at the last refresh; no periods are summed here.</summary>
+    public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
+
+    /// <summary>A lookup into the summaries taken at the last refresh; no periods are summed here.</summary>
+    public SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
+        _daySummaries.TryGetValue(localDate, out var day) ? day : null;
 
     /// <summary>
     /// When the sun next rises above <paramref name="thresholdWatts"/> according to the cached
@@ -129,10 +133,10 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
             var forecast = new SolarForecast(_timeProvider.GetUtcNow(), periods);
             _cached = forecast;
 
-            // Merged, and the day totals taken from it, *after* publication: the history is for later
+            // Merged, and the day summaries taken from it, *after* publication: the history is for later
             // analysis, and no query on the hot path should ever wait behind it.
             _history.Merge(forecast);
-            _dayTotals = _history.DailyEnergyWattHours(_timeProvider.LocalTimeZone);
+            _daySummaries = _history.DailySummaries(_timeProvider.LocalTimeZone);
 
             // The day's overall shape is logged here, once per refresh -- the polling loop only
             // logs the live actual-vs-forecast comparison, not this summary.

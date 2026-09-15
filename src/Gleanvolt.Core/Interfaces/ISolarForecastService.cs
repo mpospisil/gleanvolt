@@ -47,4 +47,15 @@ public interface ISolarForecastService
     /// fine for a stand-in that holds nothing worth caching, but not what a real source should do.</para>
     /// </summary>
     double? GetDayEnergyWattHours(DateOnly localDate) => GetDayForecast(localDate)?.ExpectedEnergyWattHours;
+
+    /// <summary>
+    /// One whole local calendar day summarised — median, p10 and p90 energy and the peak power — elapsed
+    /// periods included, or <c>null</c> when nothing is held for that day.
+    ///
+    /// <para><b>Cheap enough for a render</b>, on the same terms as <see cref="GetDayEnergyWattHours"/>: a
+    /// source that holds a forecast works the summaries out when it lands. The default summarises
+    /// <see cref="GetDayForecast"/> on each call.</para>
+    /// </summary>
+    SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
+        GetDayForecast(localDate) is { } day ? SolarDayForecastSummary.Of(day) : null;
 }
