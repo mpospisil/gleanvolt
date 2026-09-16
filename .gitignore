@@ -212,6 +212,10 @@ publish/
 # The Linux package output of release.yml and packaging/linux/README.md
 /deb/
 
+# The .deb's settings template: an .env by name, but a tracked file with no secret in it, and without
+# it the package build fails. The *.env rule above would otherwise keep it out of every commit.
+!packaging/linux/gleanvolt.env
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml
