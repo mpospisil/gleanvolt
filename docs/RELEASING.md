@@ -89,6 +89,10 @@ in a browser, on a machine that has never had .NET installed:
 
 - Download `gleanvolt-<version>-win-x64.zip`, unzip it, run it, open the UI.
 - Repeat on the Pi with `linux-arm64`.
+- On a clean Raspberry Pi OS Lite 64-bit and a clean Ubuntu, run the one-line install from the notes,
+  open the UI, press **Stop service** and check `systemctl status gleanvolt` says *inactive* and not
+  *failed*. CI installs and smoke-tests the `.deb` on both architectures, but on a runner, not on a
+  Pi, and it cannot press a button in the UI.
 - Check that the notes say what to download, and that following the README's install section lands
   somewhere.
 
@@ -101,14 +105,20 @@ This is the half a workflow cannot do for you, and it is the half a stranger mee
 | `gleanvolt-<version>-win-x64.zip` | self-contained, ~51 MB |
 | `gleanvolt-<version>-linux-x64.zip` | self-contained, ~48 MB |
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
+| `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
+| `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract |
 | five `.nupkg` and five `.snupkg` | the libraries and their symbols, attached rather than pushed to a feed |
 | `SHA256SUMS` | covers every file above, and not itself |
 
-Each zip and `.nupkg` also carries a build provenance attestation, verifiable with
+Each zip, `.deb`, `install.sh` and `.nupkg` also carries a build provenance attestation, verifiable with
 `gh attestation verify <file> --repo mpospisil/gleanvolt` — which says *which run and which commit*
 produced it, without trusting the release page.
 
-Self-contained means the runtime ships inside: none of the three needs .NET installed. Trimming is
+Self-contained means the runtime ships inside: none of the three needs .NET installed.
+
+A dry run's `.deb` is versioned `1.0.7~dev`, not `1.0.7-dev`. To dpkg a hyphen separates the Debian
+revision, so `1.0.7-dev` would sort *above* `1.0.7` and a test build installed on a device would block
+the real release from upgrading it. The tilde sorts below. Trimming is
 off on purpose — the configuration binder and the options types are resolved reflectively, and a
 trimmed build fails at startup rather than at compile time.
 

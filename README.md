@@ -194,6 +194,24 @@ written to either device: the service always boots with the charge mode **Off** 
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
 
+## Install on Linux
+
+On **Debian, Ubuntu or Raspberry Pi OS (64-bit)**, amd64 or arm64, one command installs the controller
+and its web UI as a systemd service, with no Docker, no .NET installation and no Home Assistant or
+MQTT broker:
+
+```bash
+curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
+```
+
+It starts straight away with the default configuration: web UI on `http://<device>:8090`, charge mode
+`Off`, battery hold disabled. Set your inverter and charger addresses in `/etc/gleanvolt/gleanvolt.env`
+and `sudo systemctl restart gleanvolt`. Running the command again upgrades; settings and data are kept.
+
+Settings, where the data and logs live, pinning a version and uninstalling are in
+**[packaging/linux/README.md](packaging/linux/README.md)**. For Home Assistant alongside it, use the
+Docker deployment below.
+
 ## Deployment
 
 For unattended operation the whole system runs on a Raspberry Pi (Raspberry Pi OS Lite, 64-bit) as
