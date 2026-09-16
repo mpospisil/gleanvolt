@@ -3,7 +3,7 @@
 Which cars Gleanvolt can charge, and which it can read. Those are **two different questions**, and
 the answer to the first does not depend on the second.
 
-> **Last reviewed 2026-09-13.** The charging half is a fact about the charging standard and changes
+> **Last reviewed 2026-09-16.** The charging half is a fact about the charging standard and changes
 > slowly. The reading half depends on manufacturers' cloud services, which change without notice —
 > VW closed its app API to third parties in May 2026. Treat every row marked *not tested* as a
 > pointer, not a promise.
@@ -15,6 +15,7 @@ the answer to the first does not depend on the second.
 | **Any EV or plug-in hybrid with a Type 2 AC inlet** | Yes — the charger drives it, the car needs no account | Not by itself; see the rows below | — |
 | **Volkswagen, Audi, Škoda, SEAT, Cupra, Bentley** | Yes | **Built in**: the VW Group EU Data Act portal | VW ID.4 Pro |
 | **Volkswagen** (a car in myVolkswagen) | Yes | **Built in**: volkswagen.de, live while charging | VW ID.4 Pro |
+| **Škoda** (a car in MySkoda) | Yes | **Built in**: the MyŠkoda Public API, live | **Not yet** — built from the published spec |
 | **Any other brand** | Yes | No — targets are given in kWh instead of % | — |
 
 The reference installation charges a **VW ID.4 Pro** (77 kWh usable, three-phase, 16 A). It is the
@@ -73,7 +74,7 @@ Reading the car adds three things and removes none:
 charger delivers it. Without a feed, every kWh target, every solar mode and every fast charge works
 unchanged.
 
-There are two routes, both built into Gleanvolt.
+There are three routes, all built into Gleanvolt.
 
 ### Route A — VW Group EU Data Act portal (built in)
 
@@ -122,6 +123,29 @@ freshest reading wins.
 > instead. It is still undocumented, so VW can change it without notice; when it does, Route A is the
 > fallback and nothing about charging is affected.
 
+### Route C — MyŠkoda Public API (built in, not yet verified on a car)
+
+The live source for a Škoda, in Route B's place. Škoda published a documented REST API for owners on
+2026-08-31 (MySkoda app 8.16): an [OpenAPI spec](https://public.api.connect.skoda-auto.cz/v3/api-docs),
+typed problem responses and rate-limit headers.
+
+| | |
+|---|---|
+| **Brands** | Škoda only. Nothing says the other VW Group brands will follow; `Vehicle:Skoda:BaseUrl` is there to try it if one does |
+| **Cars** | A connected Škoda EV or plug-in hybrid in your MySkoda account |
+| **Reads** | State of charge, range, charge state, charge time remaining, **plug state** (derived: `CONNECT_CABLE` means unplugged) |
+| **Freshness** | As fresh as Škoda's cloud: every 15 minutes idle, every 5 while charging. How often the car itself reports while charging is not yet known |
+| **Needs you** | An API key created in the MySkoda app, pasted once on **Vehicle portal**. It expires; renewing is pasting a new one |
+| **Quota** | 20 requests an hour per VIN, shared with *Ask the car* |
+| **Tested** | **No.** Built from the published spec with spec-built fixtures; nobody has run it against a Škoda yet. Reports in [issue #193](https://github.com/mpospisil/gleanvolt/issues/193) are very welcome |
+| **Setup** | [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
+
+Route C and Route B cannot run together — they read two different cars, and an installation has one.
+Route A (`VW_BRAND=skoda`) may run beside Route C, and the freshest reading wins. The key Route C uses
+is scoped to the cars it names, expires, and is revocable in the app — a much smaller secret than a
+brand password — and it clears Gleanvolt's bar below more comfortably than Route B: a documented
+interface the manufacturer published for exactly this use.
+
 ### Why only VW Group is built in
 
 Gleanvolt's rule is that a manufacturer earns a built-in client only through a **documented statutory
@@ -134,6 +158,7 @@ Most manufacturers' EU Data Act offerings do not yet meet that bar. What owners 
 | Manufacturer | Data Act access for owners | Usable as a feed? |
 |---|---|---|
 | VW Group | Portal, scheduled JSON/CSV deliveries | **Yes — Route A** |
+| Škoda (beyond the Data Act) | A documented owner API with keys, since 2026-08 | **Yes — Route C** |
 | BMW, MINI | CarData: API and a real-time MQTT stream, free | **Yes** — the strongest candidate for a second built-in client |
 | Tesla | The existing Fleet API, with a free tier | Possibly, but it wakes the car |
 | Hyundai, Kia, Genesis | A file sent by email on request | No |

@@ -1791,6 +1791,49 @@ holding it is signed in as you. It is written owner-only and never logged.
 If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
 portal keeps answering with its aged reading, and nothing that writes to hardware depends on either.
 
+#### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
+
+```jsonc
+"Ev":      { "Vehicles": [ { "Id": "enyaq", "Name": "The Enyaq", "Make": "Škoda", "Model": "Enyaq 85", "BatteryCapacityKWh": 77 } ] },
+"Vehicle": {
+  "Skoda":   { "Enabled": true, "Vin": "TMBJ…" },   // SKODA_ENABLED / SKODA_VIN in deploy/.env
+  "DataAct": { "Enabled": false }                   // optional, beside it: VW_BRAND=skoda
+}
+```
+
+The part `Vehicle:Website` plays for a Volkswagen, for a Škoda — which volkswagen.de cannot read. It uses
+the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs) Škoda published for owners in
+2026-08 (MySkoda app 8.16). **Built from the published spec and not yet verified on a car** — see
+[issue #193](https://github.com/mpospisil/gleanvolt/issues/193) for what only a real Škoda can settle.
+
+| Setting | Default | |
+|---|---|---|
+| `Enabled`, `Vin` | off, empty | Both required. **This section chooses the feed** — `Ev:Vehicles[].Make` never does |
+| `ChargingPollInterval` | `00:05:00` | While a charge is running |
+| `IdlePollInterval` | `00:15:00` | Between charges. Unlike volkswagen.de, it does keep asking: a key has no session to spend, and the state of charge before a charge starts is what a % target is planned from |
+| `KeyPath` | `data/skoda-api-key.json` | Where the pasted key is kept, owner-only |
+| `BaseUrl`, `SourceId` | Škoda's API, `skoda` | A hedge, not an abstraction: the test environment, or another VW Group brand if one ever publishes the same API |
+
+**The key is pasted on a page, and is in no setting.** Create an API key for this car in the MySkoda
+app, then paste it on **Vehicle portal**. One request (`?include=info`) proves the key, the VIN and that
+one covers the other; the page then says *Key valid until … · your car's name*, and the feed starts
+without a restart. An expired key, an unknown key, a key that does not cover the VIN and an unknown VIN
+each get their own sentence and nothing is stored. Keys expire: from a week before, the feed is
+*Degraded* and says when, and renewing is pasting a new key on the same page. **Sign out** deletes the
+file — the key keeps working at Škoda until you revoke it in the app, because the API has no revoke.
+
+**The key is not read-only** (the same key starts and stops charging), so the file is treated as a
+password: owner-only, never logged, never rendered, never in the REST API or Home Assistant. Gleanvolt's
+client has no method for any command endpoint.
+
+**Twenty requests an hour, per VIN**, shared with *Ask the car* and the sign-in. The feed takes four an
+hour idle and twelve while charging, stops the clock for the window once only three are left, and honours
+`Retry-After`. The quota being spent and the car itself declining (low 12 V battery, deep sleep) are two
+different *Degraded* sentences; a key problem is *sign-in required* until a new key is pasted.
+
+**`Vehicle:Website` and `Vehicle:Skoda` both enabled stops startup**, naming both: they are live sources
+for two different cars, and an installation has one. The Data Act portal may run beside either.
+
 ### Vehicle telemetry (the `Vehicle` section)
 
 The **feed** that reports on the car above — as distinct from the car itself, and from the home battery

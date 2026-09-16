@@ -31,7 +31,7 @@ public class VehicleAccountSignInPageTests : PageTest
             Task.FromResult(new VehiclePortalReading(true));
     }
 
-    private IRenderedComponent<VehiclePortal> Render(FakeVehicleAccountSignIn account)
+    private IRenderedComponent<VehiclePortal> Render(IVehicleAccountSignIn account)
     {
         Services.AddSingleton<IVehiclePortalReader>(new QuietReader());
         Services.AddSingleton(Car());
@@ -115,6 +115,63 @@ public class VehicleAccountSignInPageTests : PageTest
     }
 
     [Fact]
+    public void The_explanation_is_the_sign_ins_own()
+    {
+        var page = Render(new FakeVehicleAccountSignIn());
+
+        Assert.Contains("the code Volkswagen emails", page.Markup);
+    }
+
+    /// <summary>A Škoda installation (#193): a key box straight away, and no word of Volkswagen.</summary>
+    [Fact]
+    public void A_key_sign_in_asks_for_a_key_in_a_password_box_without_being_pressed()
+    {
+        var account = new FakeKeySignIn();
+
+        var page = Render(account);
+
+        var box = page.Find("#account-key");
+        Assert.Equal("password", box.GetAttribute("type"));
+        Assert.Equal("off", box.GetAttribute("autocomplete"));
+        Assert.Empty(page.FindAll("#account-code"));
+        Assert.Empty(page.FindAll("#account-signin"));
+        Assert.DoesNotContain("Volkswagen", page.Markup);
+        Assert.Equal(0, account.Submissions);
+    }
+
+    [Fact]
+    public void A_submitted_key_is_signed_in_and_never_rendered_back()
+    {
+        const string key = "sk-live-0123456789abcdef";
+        var account = new FakeKeySignIn();
+
+        var page = Render(account);
+        page.Find("#account-key").Input(key);
+        page.Find("#account-key-submit").Click();
+
+        Assert.Equal(key, account.LastAnswer);
+        Assert.Contains("Key valid until 2027-03-01", page.Markup);
+        Assert.Single(page.FindAll("#account-signout"));
+        Assert.DoesNotContain(key, page.Markup);
+    }
+
+    [Fact]
+    public void A_refused_key_keeps_the_box_open_and_empty()
+    {
+        const string key = "sk-live-expired";
+        var account = new FakeKeySignIn(
+            VehicleSignInState.KeyRequired("That key has expired — create a new one in the app."));
+
+        var page = Render(account);
+        page.Find("#account-key").Input(key);
+        page.Find("#account-key-submit").Click();
+
+        Assert.Contains("That key has expired", page.Markup);
+        Assert.Single(page.FindAll("#account-key"));
+        Assert.DoesNotContain(key, page.Markup);
+    }
+
+    [Fact]
     public void An_already_signed_in_account_offers_sign_out_rather_than_a_code_box()
     {
         var account = new FakeVehicleAccountSignIn(first: VehicleSignInState.SignedIn("session restored"));
@@ -125,4 +182,35 @@ public class VehicleAccountSignInPageTests : PageTest
         Assert.Empty(page.FindAll("#account-code"));
         Assert.Single(page.FindAll("#account-signout"));
     }
+}
+
+/// <summary>A sign-in that wants an API key, as the Škoda one does (issue #193).</summary>
+internal sealed class FakeKeySignIn(VehicleSignInState? afterKey = null) : IVehicleAccountSignIn
+{
+    public int Submissions { get; private set; }
+
+    public string? LastAnswer { get; private set; }
+
+    public string AccountName => "MyŠkoda API";
+
+    public string Explanation => "Create an API key in the MySkoda app and paste it here once.";
+
+    public bool IsConfigured => true;
+
+    public VehicleSignInState State { get; private set; } =
+        VehicleSignInState.KeyRequired("Create an API key for this car in the MySkoda app and paste it here.");
+
+    public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(State);
+
+    public Task<VehicleSignInState> SubmitAsync(string answer, CancellationToken cancellationToken = default)
+    {
+        Submissions++;
+        LastAnswer = answer;
+        State = afterKey ?? VehicleSignInState.SignedIn("Key valid until 2027-03-01 · My Enyaq");
+        return Task.FromResult(State);
+    }
+
+    public void SignOut() =>
+        State = VehicleSignInState.KeyRequired("Signed out; the key works until revoked in the app.");
 }

@@ -1,0 +1,1 @@
+{"type":"https://public.api.connect.skoda-auto.cz/problems/vehicle-not-accepting-requests","title":"Too Many Requests","status":429,"detail":"The vehicle declined the operation.","instance":"/api/v1/vehicles/TMBJB9NY5RF999999"}

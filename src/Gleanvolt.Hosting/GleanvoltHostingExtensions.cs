@@ -14,6 +14,7 @@ using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Vehicles;
+using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
@@ -585,6 +586,21 @@ public static class GleanvoltHostingExtensions
         var website = configuration.GetSection(VwWebsiteOptions.SectionName).Get<VwWebsiteOptions>()
             ?? new VwWebsiteOptions();
 
+        // MyŠkoda's public API -- the live source for a Škoda (issue #193), in vw-website's place.
+        var skoda = configuration.GetSection(SkodaApiOptions.SectionName).Get<SkodaApiOptions>()
+            ?? new SkodaApiOptions();
+
+        if (website.Enabled && skoda.Enabled)
+        {
+            // Refused rather than both run: they are live sources for two different cars, and one
+            // installation has one car -- the reasoning that refuses a second Ev:Vehicles entry. The
+            // Data Act portal may run beside either.
+            throw new InvalidOperationException(
+                "Vehicle:Website and Vehicle:Skoda are both enabled, but they read two different cars "
+                + "(volkswagen.de and the MyŠkoda API) and an installation has one. Switch off whichever "
+                + "is not this installation's car (VW_WEBSITE_ENABLED or SKODA_ENABLED).");
+        }
+
         if (website.IsConfigured)
         {
             services.AddSingleton(website);
@@ -604,6 +620,33 @@ public static class GleanvoltHostingExtensions
                 provider.GetRequiredService<ChargeControlStatusHolder>(),
                 provider.GetRequiredService<EvInfo>().Id,
                 provider.GetService<ILogger<VwWebsiteUpdateService>>()));
+        }
+
+        // Registered on Enabled and a VIN, not on a key: the key is pasted on the Vehicle portal page,
+        // and until it is the feed is there, fetches nothing and says NeedsOwner. The store is shared
+        // by the sign-in and the feed, so a pasted key is in use without a restart; the client is
+        // shared so both spend -- and read -- one quota. The feed is chosen by this section alone;
+        // nothing reads Ev:Vehicles[].Make.
+        if (skoda.IsConfigured)
+        {
+            services.AddSingleton(skoda);
+            services.AddSingleton(new SkodaApiKeyStore(skoda.KeyPath));
+            services.AddSingleton(provider => new SkodaApiClient(skoda, provider.GetRequiredService<TimeProvider>()));
+
+            services.AddSingleton<IVehicleAccountSignIn>(provider => new SkodaApiSignIn(
+                skoda,
+                provider.GetRequiredService<SkodaApiKeyStore>(),
+                provider.GetRequiredService<SkodaApiClient>(),
+                provider.GetService<ILogger<SkodaApiSignIn>>()));
+
+            services.AddSingleton<IVehicleUpdateService>(provider => new SkodaApiUpdateService(
+                skoda,
+                provider.GetRequiredService<SkodaApiKeyStore>(),
+                provider.GetRequiredService<SkodaApiClient>(),
+                provider.GetRequiredService<EvInfo>().Id,
+                provider.GetRequiredService<ChargeControlStatusHolder>(),
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetService<ILogger<SkodaApiUpdateService>>()));
         }
 
         // Registered whether or not a service exists: with none it logs that fact once and stops, which

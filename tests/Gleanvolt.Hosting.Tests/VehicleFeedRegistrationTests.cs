@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Vehicles;
+using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 namespace Gleanvolt.Hosting.Tests;
@@ -97,6 +98,59 @@ public class VehicleFeedRegistrationTests
         // The portal button is untouched by any of this: it is what proves the credentials before the
         // feed is switched on, so it stays available on exactly the same terms.
         Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
+    }
+
+    /// <summary>A Škoda installation (issue #193): its own section, its own sign-in, its own feed.</summary>
+    private static readonly (string Key, string? Value)[] TheSkoda =
+    [
+        ("Ev:Vehicles:0:Id", "enyaq"),
+        ("Ev:Vehicles:0:Make", "Škoda"),
+        ("Ev:Vehicles:0:BatteryCapacityKWh", "77"),
+        ("Vehicle:Skoda:Vin", "TMBJB9NY5RF999999"),
+        ("Vehicle:Skoda:KeyPath", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir", "skoda-api-key.json")),
+    ];
+
+    [Fact]
+    public async Task A_skoda_installation_registers_its_feed_and_its_key_sign_in_without_a_key()
+    {
+        // Enabled and a VIN are enough: the key is pasted on the page afterwards, and until then the
+        // feed is present, sends nothing, and says so.
+        var services = Services(TheSkoda.Concat([("Vehicle:Skoda:Enabled", "true")]).ToArray());
+
+        await using var provider = services.BuildServiceProvider();
+        var feed = provider.GetRequiredService<IVehicleUpdateService>();
+
+        Assert.Equal("skoda", feed.Manufacturer);
+        Assert.Equal("enyaq", feed.VehicleId);
+        Assert.False(feed.DeliversOnlyWhileCharging);
+        Assert.True(feed.Health.IsBlocked);
+
+        var signIn = Assert.IsType<SkodaApiSignIn>(provider.GetRequiredService<IVehicleAccountSignIn>());
+        Assert.True(signIn.State.WantsKey);
+    }
+
+    [Fact]
+    public void Make_alone_chooses_no_feed()
+    {
+        // "Škoda" in Ev:Vehicles is reported, never acted on. The section is the switch.
+        var services = Services(TheSkoda);
+
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(SkodaApiKeyStore));
+    }
+
+    [Fact]
+    public void Website_and_Skoda_both_enabled_is_refused_naming_both()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => Services(
+            TheSkoda.Concat(
+            [
+                ("Vehicle:Skoda:Enabled", "true"),
+                ("Vehicle:Website:Enabled", "true"),
+            ]).ToArray()));
+
+        Assert.Contains("Vehicle:Website", error.Message);
+        Assert.Contains("Vehicle:Skoda", error.Message);
     }
 
     [Fact]

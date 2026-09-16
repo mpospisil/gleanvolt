@@ -166,6 +166,11 @@ services:
       Vehicle__Website__Password: ${VW_WEBSITE_PASSWORD:-}
       Vehicle__Website__Vin: ${VW_WEBSITE_VIN:-}
       Vehicle__Website__PollInterval: ${VW_WEBSITE_POLL_INTERVAL:-00:05:00}
+      # MyŠkoda's public API -- the live source for a Škoda, in place of the block above (issue #193).
+      # No key here: it is pasted on the Vehicle portal page and kept in data/skoda-api-key.json.
+      # Enabling this and VW_WEBSITE_ENABLED together stops startup -- one installation, one car.
+      Vehicle__Skoda__Enabled: ${SKODA_ENABLED:-false}
+      Vehicle__Skoda__Vin: ${SKODA_VIN:-}
 
       # The car read from VW's own EU Data Act portal (issues #137/#139/#140) -- the other way to fill
       # the same reading, and the only manufacturer integration in the codebase.
