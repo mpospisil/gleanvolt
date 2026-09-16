@@ -4,6 +4,39 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-16 — With a full pack, the hold's target reaches past PV, or it caps PV
+
+**Context.** On 2026-09-16 SolarGrid started a charge at 12:13 with the pack at 99% and 6.1 kW of sun. The
+hold armed on the car's shortfall and wrote `-min(house load, PV)`. A full pack takes nothing, so the target
+capped PV at the reading it came from. The pack's 326 W standby trickle let the next reading come in lower,
+and each target followed it down: Solar read 5992, 4995 … 1618 … 407, 177 and 116 W, and the targets were
+−5162, −4995 … −1618 … −407 and −177 W. For seven minutes the car took 4.2 kW from the grid under a clear
+sky. SolarGrid paused at 12:23:54, the hold released, and PV read 5.9 kW on the next poll. The 15-minute
+restart dwell then kept the car off. 2026-09-12 12:19 shows the same: 3777 → 792 W in four minutes, 3764 W
+on release. The 2026-07-26 record below left upstream's full-pack branch out "pending observation of
+whether PV curtailment actually occurs on this hardware". It does.
+
+**Decision — reach past PV while the pack is full.** When PV reads under the load, SOC is at or above
+`BatteryHold:FullPackSocPercent` (95) and the pack takes no more than 100 W, the push is
+`min(house load, PV + min(FullPackHeadroomWatts, forecast now − PV))`, with a 1000 W default. PV the target
+had capped climbs back by that margin at each write. If the sun really is that weak, a full pack covers
+the margin. The breach warning's allowance widens by the same amount, since that discharge was asked for.
+
+**Why bounded by the forecast.** A fixed offset lends from the pack at dusk and at night, when the hold
+runs under `FastNoBattery` for hours. There the forecast gap is zero. With no forecast for the moment there
+is no headroom, so a site without Solcast keeps the old behaviour.
+
+**Why not upstream's `-PV - 150` at SOC ≥ 98%.** 150 W is less than this pack's trickle, so the reading
+would still fall, only more slowly.
+
+**Why not drop the hold at a full pack.** A cloud edge would put the car on the pack, which is what #197
+set out to stop.
+
+**Not changed.** With PV at or above the load the push is still the whole load, so a held full pack still
+exports nothing.
+
+---
+
 ## 2026-09-15 — A mode that ends itself says why, and the session records that reason
 
 **Context.** On 2026-09-15 SolarGrid ended its session at 17:00 because the forecast had no sun left

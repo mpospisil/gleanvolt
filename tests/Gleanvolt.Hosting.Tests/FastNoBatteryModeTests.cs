@@ -70,6 +70,30 @@ public class FastNoBatteryModeTests
         Assert.False(_manualHold.Hold);
     }
 
+    // 2026-09-16, mid-ratchet: the pack at 99% and trickling, PV already capped to 1.6 kW under a 6 kW
+    // sun, and the car drawing 11 kW.
+    private static EnergyState FullPackCappedSun(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 99, BatteryPowerWatts: -326, SolarPowerWatts: 1618, GridPowerWatts: 9556,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 11_000);
+
+    [Fact]
+    public async Task AFullPackUnderASunnyForecast_TheHoldReachesPastPv()
+    {
+        // A target of exactly the PV reading is what capped it; the loop has to hand the strategy the
+        // forecast and the options for the target to leave room above it.
+        await RunAsync([FullPackCappedSun(Now)], forecast: new WeakSunForecastService(Now.AddMinutes(-5), 6000));
+
+        Assert.Equal(-2618, _status.Current!.BatteryHoldTargetWatts);
+    }
+
+    [Fact]
+    public async Task AFullPackWithNoForecast_TheHoldPushesOnlyThePv()
+    {
+        await RunAsync([FullPackCappedSun(Now)]);
+
+        Assert.Equal(-1618, _status.Current!.BatteryHoldTargetWatts);
+    }
+
     [Fact]
     public async Task TheChargerIsPinnedAtTheConfiguredMaximum()
     {
@@ -462,7 +486,8 @@ public class FastNoBatteryModeTests
 
     // Drives the real poll loop over a scripted telemetry sequence, then stops it. The service parks on
     // the reader once the script runs out, so exactly these polls happen -- no timing assumptions.
-    private async Task RunAsync(EnergyState[] states, bool batteryHoldEnabled = true, FastChargeLimit? limit = null)
+    private async Task RunAsync(
+        EnergyState[] states, bool batteryHoldEnabled = true, FastChargeLimit? limit = null, ISolarForecastService? forecast = null)
     {
         if (limit is not null)
         {
@@ -479,7 +504,7 @@ public class FastNoBatteryModeTests
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecast = new NoForecastService();
+        forecast ??= new NoForecastService();
 
         // One instance, shared by the coordinator and the action -- the arrangement DI produces, and the
         // whole point of the action reading its current off the controller.

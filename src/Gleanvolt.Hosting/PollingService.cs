@@ -68,6 +68,9 @@ public sealed class PollingService : BackgroundService
     // it is let go only after BatteryHold:BridgeReleaseDwell without one (#197).
     private DateTimeOffset? _bridgeHoldNeededAt;
 
+    // Whether the last cycle's held target reached past PV for a full pack, so the change is logged once.
+    private bool _fullPackHeadroom;
+
     // The fast mode's hold is the exception, and deliberately so (#119). It is armed *through* the
     // selector rather than beside it, because the HA switch publishes what is actually armed
     // (BatteryHoldActive) rather than what was asked for: a hold armed only in _autoHold shows ON in
@@ -472,12 +475,15 @@ public sealed class PollingService : BackgroundService
         // outcome this whole arrangement exists to prevent.
         var auto = AutoHold(state, mode, plan, targetedPlan, fastCharge, charging, gridBridging);
         var hold = _batteryHold.Hold || auto;
-        var targetWatts = BatteryDischargeHoldStrategy.ActivePowerTargetWatts(state);
+        var expectedPvWatts = _solarForecast.GetForecastForToday()?.ExpectedPowerWattsAt(state.Timestamp);
+        var target = BatteryDischargeHoldStrategy.Target(
+            state, expectedPvWatts, _batteryHoldOptions.FullPackSocPercent, _batteryHoldOptions.FullPackHeadroomWatts);
+        LogFullPackHeadroom(hold, target, state, expectedPvWatts);
 
         BatteryHoldState result;
         try
         {
-            result = await _batteryDischargeControl.ApplyAsync(hold, targetWatts, state.Timestamp, cancellationToken);
+            result = await _batteryDischargeControl.ApplyAsync(hold, target.ActivePowerWatts, state.Timestamp, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -492,8 +498,11 @@ public sealed class PollingService : BackgroundService
         //
         // Both a deadband and a dwell, and it took a bad diagnosis to learn why: see
         // ResidualDischargeWatts and HoldBreachDwell. A working hold trickles, and it takes a moment to
-        // bite; only a sustained, substantial discharge is evidence of anything.
-        var breaching = result.Held && !_batteryHoldOptions.DryRun && state.BatteryPowerWatts < -ResidualDischargeWatts;
+        // bite; only a sustained, substantial discharge is evidence of anything. The full-pack headroom
+        // is discharge the target asked for, so it widens the allowance rather than counting as a breach.
+        var breaching = result.Held
+            && !_batteryHoldOptions.DryRun
+            && state.BatteryPowerWatts < -(ResidualDischargeWatts + target.HeadroomWatts);
         if (!breaching)
         {
             _holdBreachSince = null;
@@ -515,6 +524,37 @@ public sealed class PollingService : BackgroundService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Says once when the hold's target starts reaching past the PV reading because the pack is full, and
+    /// once when it stops — the line a check on the Pi looks for, since the target itself moves every poll.
+    /// </summary>
+    private void LogFullPackHeadroom(bool hold, BatteryHoldTarget target, EnergyState state, double? expectedPvWatts)
+    {
+        var applied = hold && target.HeadroomWatts > 0;
+        if (applied == _fullPackHeadroom)
+        {
+            return;
+        }
+
+        _fullPackHeadroom = applied;
+        if (applied)
+        {
+            _logger.LogInformation(
+                "Battery discharge hold reaches {HeadroomWatts:F0}W past PV: the pack is full ({SocPercent:F0}%) and PV reads "
+                + "{SolarWatts:F0}W against a {HouseLoadWatts:F0}W load with {ExpectedWatts:F0}W forecast, so the target "
+                + "could otherwise be what caps it.",
+                target.HeadroomWatts,
+                state.BatterySocPercent,
+                state.SolarPowerWatts,
+                state.HouseLoadPowerWatts,
+                expectedPvWatts ?? 0);
+        }
+        else
+        {
+            _logger.LogInformation("Battery discharge hold no longer reaches past PV.");
+        }
     }
 
     /// <summary>
