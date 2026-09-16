@@ -933,6 +933,11 @@ docker compose logs -f gleanvolt-controller    # watch it come up
 service that was stopped this way. Either way the controller comes back in charge mode **Off** with
 the battery hold disabled, like any other restart.
 
+> **Installed from the .deb instead of Docker?** The same contract holds under systemd
+> (`Restart=on-failure`), and the commands are `sudo systemctl start gleanvolt`,
+> `systemctl status gleanvolt` and `journalctl -u gleanvolt -f`. A stop from the UI stays stopped
+> across an upgrade of the package too. See [packaging/linux/README.md](../packaging/linux/README.md).
+
 > **Note.** While the controller is stopped there is no web UI and no Home Assistant integration —
 > the service *is* both of those. There is currently no way to start it back from either surface; a
 > future version may replace the stop with a standby mode that keeps the UI up so a **Start** button

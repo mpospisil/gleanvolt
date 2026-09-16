@@ -33,6 +33,13 @@ Serilog.Debugging.SelfLog.Enable(Console.Error);
 // GleanvoltHostingExtensions for how that is enforced rather than merely intended.
 var builder = WebApplication.CreateBuilder(args);
 
+// The .deb package runs this as a systemd `Type=notify` unit (issue #205): readiness is reported to
+// systemd once the host has actually started, so `systemctl start` waits for it and a startup refusal
+// is a failed start rather than a service that looks active and exits a second later. A no-op outside
+// systemd -- it checks for the manager's environment itself -- so Docker, `dotnet run` and Windows
+// are unaffected.
+builder.Services.AddSystemd();
+
 builder.Logging.ClearProviders();
 builder.Services.AddSerilog(config => config
     .ReadFrom.Configuration(builder.Configuration)

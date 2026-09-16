@@ -27,3 +27,8 @@ jobs:
 
       - name: Test
         run: dotnet test Gleanvolt.slnx --no-build --configuration Release
+
+      # The .deb's maintainer scripts and the installer run as root on someone else's machine, and are
+      # otherwise exercised only by a release. shellcheck is preinstalled on the Ubuntu runners.
+      - name: Lint the Linux packaging scripts
+        run: shellcheck -s sh packaging/linux/install.sh packaging/linux/scripts/*.sh

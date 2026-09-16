@@ -1,0 +1,90 @@
+# The Gleanvolt .deb (issue #205), built by release.yml with nfpm (https://nfpm.goreleaser.com/).
+#
+# Built from a self-contained publish output rather than from source, so the package carries exactly
+# the binary the zip carries and the smoke test has already started. Run from the repository root,
+# with that publish output at publish/deb/ -- a fixed path, because nfpm expands variables in the
+# package metadata but not in `contents`. Two variables, both set by the workflow (and by
+# packaging/linux/README.md for a local build):
+#
+#   GLEANVOLT_VERSION   the Debian version: 1.0.7 for a release, 1.0.7~dev for a dry run
+#   GLEANVOLT_ARCH      amd64 or arm64
+#
+# One definition for every format nfpm writes, so an .rpm later is another `--packager`, not a second
+# file to keep in step with this one.
+
+name: gleanvolt
+arch: ${GLEANVOLT_ARCH}
+platform: linux
+version: ${GLEANVOLT_VERSION}
+# Taken as written. The default semver parsing would turn 1.0.7~dev into something else, and the
+# tilde is the point: dpkg sorts 1.0.7~dev *below* 1.0.7, so a dry-run build never outranks the
+# release it precedes.
+version_schema: none
+section: misc
+priority: optional
+maintainer: Martin Pospisil <mpospisil@users.noreply.github.com>
+homepage: https://github.com/mpospisil/gleanvolt
+license: PolyForm-Noncommercial-1.0.0
+description: |-
+  Local controller for a SolaX hybrid inverter and EV charger
+   Gleanvolt polls a SolaX X3-HYB-G4 PRO inverter and an X1/X3-HAC EV charger over Modbus TCP
+   on the local network and charges the car from solar surplus, a forecast or a deadline,
+   with a self-hosted web UI on port 8090. No cloud service is required.
+
+# The runtime is inside the package; what it still takes from the system is below. ICU is not part
+# of a self-contained build, and its package name carries the ICU version, so every name a
+# supported release uses is listed as an alternative: 70 Ubuntu 22.04, 72 Debian 12 and Raspberry
+# Pi OS Bookworm, 74 Ubuntu 24.04, 76 Debian 13, Raspberry Pi OS Trixie and Ubuntu 25.04+.
+# libssl3t64 is Ubuntu 24.04's name for libssl3.
+depends:
+  - libc6
+  - libgcc-s1
+  - libstdc++6
+  - zlib1g
+  - libssl3 | libssl3t64
+  - libicu70 | libicu72 | libicu74 | libicu76 | libicu77 | libicu78
+  - ca-certificates
+  - tzdata
+  - systemd
+  - passwd
+
+contents:
+  # The publish output, unchanged: the binary, appsettings.json and the web UI's assets.
+  - src: publish/deb/
+    dst: /opt/gleanvolt
+    type: tree
+    file_info:
+      owner: root
+      group: root
+
+  - src: packaging/linux/gleanvolt.service
+    dst: /usr/lib/systemd/system/gleanvolt.service
+    file_info:
+      mode: 0644
+
+  # A conffile: dpkg keeps the operator's edited copy on upgrade. Shipped root:root because the
+  # gleanvolt group does not exist yet when the archive is unpacked; postinst gives it the group.
+  - src: packaging/linux/gleanvolt.env
+    dst: /etc/gleanvolt/gleanvolt.env
+    type: config|noreplace
+    file_info:
+      mode: 0640
+
+  # The terms travel with the artifact, as they do with the image, the zips and the packages.
+  - src: LICENSE
+    dst: /usr/share/doc/gleanvolt/LICENSE
+    file_info:
+      mode: 0644
+  - src: LICENSE-MIT
+    dst: /usr/share/doc/gleanvolt/LICENSE-MIT
+    file_info:
+      mode: 0644
+  - src: THIRD-PARTY-NOTICES.md
+    dst: /usr/share/doc/gleanvolt/THIRD-PARTY-NOTICES.md
+    file_info:
+      mode: 0644
+
+scripts:
+  postinstall: packaging/linux/scripts/postinst.sh
+  preremove: packaging/linux/scripts/prerm.sh
+  postremove: packaging/linux/scripts/postrm.sh

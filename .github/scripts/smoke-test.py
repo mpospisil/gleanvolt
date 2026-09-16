@@ -12,6 +12,16 @@ assertions below are the contract, and two implementations of a contract drift.
 The controller is pointed at an inverter and a charger that are not there, on purpose. Surviving that
 is the first assertion: a controller that dies when its hardware is unreachable is broken in a way
 worth failing a release for.
+
+Two ways to run it, with the same four assertions:
+
+  --exe <path>        start the binary from a publish folder or an unpacked zip
+  --service <unit>    check a systemd service that is already running -- the installed .deb (#205),
+                      configured with the settings `--print-env` prints
+
+The second exists because a package can be broken in ways the binary is not: a dependency the
+package does not declare, a unit that points at the wrong content root, a data path the service user
+cannot write. Only starting the installed service shows those.
 """
 
 import argparse
@@ -33,10 +43,9 @@ KEY = "smoke-test-key-not-a-secret"
 STARTUP_TIMEOUT = 90
 
 
-def environment(expected_version):
+def settings():
     """What the binary is told about the world. Everything outbound is switched off or unreachable."""
-    env = dict(os.environ)
-    env.update({
+    return {
         # Not Development: appsettings.Development.json travels in the publish output, and a smoke
         # test that quietly ran under it would be testing a configuration nobody deploys.
         "DOTNET_ENVIRONMENT": "Production",
@@ -75,7 +84,13 @@ def environment(expected_version):
         # No broker on the runner, and nothing to say to one.
         "HomeAssistant__Enabled": "false",
         "Vehicle__Enabled": "false",
-    })
+    }
+
+
+def environment():
+    """The process environment for --exe: this runner's, with the settings above on top."""
+    env = dict(os.environ)
+    env.update(settings())
     return env
 
 
@@ -93,90 +108,166 @@ def get(path, key=None):
         return None, b""
 
 
-def wait_for_it(process, log_path):
-    """Poll until the API answers, or the process dies, or we run out of patience."""
+class Process:
+    """A binary this script starts itself (--exe). Its output goes to a file beside it."""
+
+    def __init__(self, executable, log_path):
+        self.executable = executable
+        self.log_path = log_path
+        self.process = None
+
+    def start(self):
+        print(f"Starting {self.executable}")
+        # Run from beside the binary: the log file and the two SQLite stores are opened relative to
+        # the working directory, and opening them is part of what is being proved.
+        with open(self.log_path, "wb") as sink:
+            self.process = subprocess.Popen(
+                [self.executable],
+                cwd=os.path.dirname(self.executable),
+                env=environment(),
+                stdout=sink,
+                stderr=subprocess.STDOUT,
+            )
+
+    def died(self):
+        """None while running, otherwise a sentence saying how it ended."""
+        if self.process.poll() is None:
+            return None
+        return f"the process exited with code {self.process.returncode}"
+
+    def output(self):
+        try:
+            with open(self.log_path, "r", encoding="utf-8", errors="replace") as handle:
+                return handle.read()
+        except OSError:
+            return "(no output captured)"
+
+    def stop(self):
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+
+
+class Service:
+    """A systemd unit that is already running (--service). Started, and stopped, by its package."""
+
+    def __init__(self, unit):
+        self.unit = unit
+
+    def start(self):
+        print(f"Checking the running service {self.unit}")
+
+    def show(self, prop):
+        return subprocess.run(
+            ["systemctl", "show", "--value", "-p", prop, self.unit],
+            capture_output=True, text=True,
+        ).stdout.strip()
+
+    def died(self):
+        state = self.show("ActiveState")
+        if state == "active":
+            return None
+        return f"the service is {state} (result {self.show('Result')}, exit status {self.show('ExecMainStatus')})"
+
+    def output(self):
+        # This run of the unit only, so an earlier start with a different configuration cannot supply
+        # the startup line being asserted.
+        invocation = self.show("InvocationID")
+        selector = [f"_SYSTEMD_INVOCATION_ID={invocation}"] if invocation else ["-u", self.unit]
+        result = subprocess.run(
+            ["journalctl", "--no-pager", "-o", "cat", *selector],
+            capture_output=True, text=True,
+        )
+        return result.stdout or result.stderr or "(no output captured)"
+
+    def stop(self):
+        # Not ours to stop: the workflow that installed it removes it.
+        pass
+
+
+def wait_for_it(target):
+    """Poll until the API answers, or the target dies, or we run out of patience."""
     deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
-        if process.poll() is not None:
-            fail(f"the process exited with code {process.returncode} during startup", log_path)
+        ended = target.died()
+        if ended is not None:
+            fail(f"{ended} during startup", target)
         status, _ = get("/api/v1/health", KEY)
         if status is not None:
             return
         time.sleep(1)
-    fail(f"nothing answered on port {PORT} within {STARTUP_TIMEOUT}s", log_path)
+    fail(f"nothing answered on port {PORT} within {STARTUP_TIMEOUT}s", target)
 
 
-def fail(message, log_path):
+def fail(message, target):
     print(f"\nSMOKE TEST FAILED: {message}\n", file=sys.stderr)
     print("--- captured output ---", file=sys.stderr)
-    print(read(log_path), file=sys.stderr)
+    print(target.output(), file=sys.stderr)
     sys.exit(1)
 
 
-def read(log_path):
-    try:
-        with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
-            return handle.read()
-    except OSError:
-        return "(no output captured)"
-
-
-def startup_line(log_path):
+def startup_line(target):
     """The line the worker logs before anything can go wrong: `Gleanvolt <version> (<sha>) starting.`"""
-    for line in read(log_path).splitlines():
+    for line in target.output().splitlines():
         if "Gleanvolt " in line and " starting." in line:
             return line
     return None
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--exe", required=True, help="the published Gleanvolt.Worker executable")
-    parser.add_argument("--version", required=True, help="the version this run built, e.g. 1.0.7")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    what = parser.add_mutually_exclusive_group(required=True)
+    what.add_argument("--exe", help="the published Gleanvolt.Worker executable, started by this script")
+    what.add_argument("--service", help="a systemd unit already running with the --print-env settings")
+    what.add_argument("--print-env", action="store_true",
+                      help="print the smoke-test settings as KEY=VALUE lines, for a systemd EnvironmentFile, and exit")
+    parser.add_argument("--version", help="the version this run built, e.g. 1.0.7")
     arguments = parser.parse_args()
 
-    executable = os.path.abspath(arguments.exe)
-    if not os.path.isfile(executable):
-        print(f"SMOKE TEST FAILED: no executable at {executable}", file=sys.stderr)
-        return 1
+    if arguments.print_env:
+        for key, value in settings().items():
+            print(f"{key}={value}")
+        return 0
 
-    # Run from beside the binary: the log file and the two SQLite stores are opened relative to the
-    # working directory, and opening them is part of what is being proved.
-    working_directory = os.path.dirname(executable)
-    log_path = os.path.join(working_directory, "smoke-test-output.log")
+    if not arguments.version:
+        parser.error("--version is required with --exe and --service")
 
-    print(f"Starting {executable}")
-    with open(log_path, "wb") as sink:
-        process = subprocess.Popen(
-            [executable],
-            cwd=working_directory,
-            env=environment(arguments.version),
-            stdout=sink,
-            stderr=subprocess.STDOUT,
-        )
+    if arguments.exe:
+        executable = os.path.abspath(arguments.exe)
+        if not os.path.isfile(executable):
+            print(f"SMOKE TEST FAILED: no executable at {executable}", file=sys.stderr)
+            return 1
+        target = Process(executable, os.path.join(os.path.dirname(executable), "smoke-test-output.log"))
+    else:
+        target = Service(arguments.service)
+
+    target.start()
 
     try:
-        wait_for_it(process, log_path)
+        wait_for_it(target)
 
         # 1. Still alive. Everything below would also fail if it were not, but this says why.
-        if process.poll() is not None:
-            fail(f"the process exited with code {process.returncode} after answering", log_path)
+        ended = target.died()
+        if ended is not None:
+            fail(f"{ended} after answering", target)
         print("ok: the process survived an unreachable inverter and charger")
 
         # 2. The health endpoint answers. Not "reports healthy" -- it cannot be, with no inverter to
         #    poll. That it answers at all is the liveness claim being made here.
         status, body = get("/api/v1/health", KEY)
         if status != 200:
-            fail(f"/api/v1/health answered {status}, not 200", log_path)
+            fail(f"/api/v1/health answered {status}, not 200", target)
         print("ok: /api/v1/health answered 200")
 
         # 3. Blazor's client script. A 404 means the pages render once and then sit dead. A zero-byte
         #    200 means the same thing and is the harder one to notice, so length is checked too.
         status, script = get("/_framework/blazor.web.js")
         if status != 200:
-            fail(f"/_framework/blazor.web.js answered {status}, not 200 -- the web UI would never open a circuit", log_path)
+            fail(f"/_framework/blazor.web.js answered {status}, not 200 -- the web UI would never open a circuit", target)
         if len(script) == 0:
-            fail("/_framework/blazor.web.js answered 200 with an empty body, which is the same dead page as a 404", log_path)
+            fail("/_framework/blazor.web.js answered 200 with an empty body, which is the same dead page as a 404", target)
         print(f"ok: /_framework/blazor.web.js answered 200 with {len(script)} bytes")
 
         # 4. The version that was built is the version that is running -- asserted in both places it
@@ -185,29 +276,25 @@ def main():
         try:
             reported = json.loads(body).get("version") or ""
         except (ValueError, AttributeError):
-            fail("/api/v1/health did not return readable JSON", log_path)
+            fail("/api/v1/health did not return readable JSON", target)
         # BuildInfo.Describe(), so "1.0.7 (31bf347)" rather than "1.0.7" -- the commit is appended
         # whenever the build was stamped with one, which in CI is always. Compare the version alone;
         # the sha is not this test's business and pinning it here would fail on every commit.
         if reported.split(" ")[0] != arguments.version:
-            fail(f"/api/v1/health reports version {reported!r}, but this run built {arguments.version!r}", log_path)
+            fail(f"/api/v1/health reports version {reported!r}, but this run built {arguments.version!r}", target)
 
-        line = startup_line(log_path)
+        line = startup_line(target)
         if line is None:
-            fail("the worker never logged its startup line", log_path)
+            fail("the worker never logged its startup line", target)
         if f"Gleanvolt {arguments.version} " not in line:
-            fail(f"the startup line does not carry {arguments.version!r}: {line.strip()!r}", log_path)
+            fail(f"the startup line does not carry {arguments.version!r}: {line.strip()!r}", target)
         print(f"ok: running build reports {arguments.version} in the log and on /health")
 
         print("\n--- startup output ---")
-        print(read(log_path))
+        print(target.output())
         return 0
     finally:
-        process.terminate()
-        try:
-            process.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            process.kill()
+        target.stop()
 
 
 if __name__ == "__main__":

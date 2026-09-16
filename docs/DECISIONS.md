@@ -4,6 +4,61 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-16 — Linux gets a .deb from the release, installed by one script; not AppImage, not an APT repository yet
+
+**Context.** Issue #205. A Linux user had the container image, which assumes Docker, a `.env` and chowned
+bind mounts, or a self-contained zip, which is a folder with no service, no fixed place for settings or
+data and no way to upgrade. Neither is an install. The controller is a headless service that has to start
+at boot, run as its own user and keep its settings across upgrades.
+
+**Decision — a `.deb` for amd64 and arm64, built by `release.yml`.** It is the same publish output the zip
+carries, wrapped by nfpm. The two Linux legs install it on their own runners, smoke-test the running
+systemd service (the same assertions as the zip, from the same script) and purge it, before anything is
+released. That covers Debian 12+, Ubuntu 22.04+ and Raspberry Pi OS 64-bit, which is every system the Pi
+and x64 deployments are realistically on. `.rpm`, musl and `armhf` are left out until someone asks.
+
+**Why not AppImage.** AppImage is for desktop programs a user starts. It creates no user, installs no
+unit, has no conffiles and needs FUSE, which Raspberry Pi OS Lite and Ubuntu 22.04+ do not install. An
+installer script would have to do everything a `.deb` does, by hand and with no upgrade or removal
+handling. For "run it anywhere" the zips already exist.
+
+**Decision — GitHub Releases, with `install.sh` attached under a fixed name.**
+`releases/latest/download/install.sh` never changes, and the script finds the package and its checksum by
+name in `SHA256SUMS`, so it needs no API call. Rerunning it is the upgrade. **An APT repository is
+deferred, not rejected.** It needs a signing key to guard and an index to rebuild on every release, and on
+a machine with unattended upgrades it would update charger-driving software with nobody watching. The
+script is the only entry point users type, so moving to a repository later changes what the script does,
+not what users run.
+
+**Decision — the default configuration, unedited.** Installing starts the service with the shipped
+`appsettings.json`. That means the web UI with no login, mode `Off`, the hold disabled, and no Home
+Assistant, MQTT or vehicle feed. `PackagingTests` checks that nothing in the package switches on a broker.
+The device addresses stay the reference install's, and the settings template and the post-install
+message name them as the first thing to change. Clearing them would have changed `dotnet run` for
+everyone.
+
+**Decision — the content root stays in `/opt`, and every writable path is set absolute in the unit.**
+`appsettings.json` and the Blazor assets are found through the content root, but relative data paths
+resolve against two different roots (the SQLite stores against the content root, the vehicle files
+against the working directory). The unit therefore sets `ASPNETCORE_CONTENTROOT=/opt/gleanvolt`, runs in
+`/var/lib/gleanvolt`, and gives each `…Path` setting an absolute value. `PackagingTests` fails if a new
+one appears in `appsettings.json` without a line in the unit. The unit uses `ProtectSystem=strict`, so a
+missing line fails on the first write rather than silently writing into `/opt`.
+
+**Decision — `Type=notify`, and the exit-code contract unchanged.** `AddSystemd()` makes a refused startup
+a failed `systemctl start`; outside systemd it does nothing. `Restart=on-failure` reads exit 0 (Stop from
+the UI) and 143 (SIGTERM) the way compose's `restart: on-failure` does. `SuccessExitStatus=143` keeps a
+normal `systemctl stop` from being logged as a failure. The maintainer scripts carry the rule through
+upgrades: a stopped service stays stopped, and a running one is stopped gracefully before its files are
+replaced and started again after.
+
+**Logs go to files as well as the journal.** The issue proposed the journal alone, with the package
+making it persistent. Changing journald's global storage is not a package's business, and the Pi's RAM
+journal is the reason the file log exists (`HostShutdown`). Serilog's file sink therefore stays, pointed
+at `/var/log/gleanvolt` with its own 14-day retention.
+
+---
+
 ## 2026-09-16 — A Škoda is read through its owner API with a pasted key, and a feed a key unblocks resumes by itself
 
 **Context.** Issue #193. On 2026-08-31 Škoda published the MyŠkoda Public API: documented, keyed per owner

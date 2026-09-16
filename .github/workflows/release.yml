@@ -13,13 +13,19 @@ name: Release
 #   version   which number is this, decided once so no later job can compute a second one
 #   build     does the solution build, test and pack
 #   publish   does each runtime identifier produce a zip that actually runs -- one job per RID, on
-#             the platform it names, so a broken target names itself and is started before it ships
+#             the platform it names, so a broken target names itself and is started before it ships.
+#             The two Linux legs also build the .deb (#205), install it, smoke-test the running
+#             service and purge it again
 #   release   only from here does anything permanent exist: the tag, then the release
 #
 # There is deliberately no package feed. The libraries are packed -- it is a cheap check that the
 # package metadata is coherent, and it produces the artifact if a feed is ever wanted -- but they are
 # attached to the release rather than pushed anywhere. A private consumer takes this repository as a
 # git submodule and references the projects directly, which needs no feed and no credentials.
+#
+# The Linux .deb packages are attached to the release too, with packaging/linux/install.sh beside them
+# under that exact name: `releases/latest/download/install.sh` is the one-line install, and it finds
+# the right package by name in SHA256SUMS. There is no APT repository yet; see docs/DECISIONS.md.
 #
 # The image is published separately by publish-image.yml, from the same tag. See "Publishing the
 # image" in the release job: a tag pushed by GITHUB_TOKEN does not start another workflow.
@@ -223,9 +229,15 @@ jobs:
           - rid: linux-x64
             runner: ubuntu-latest
             exe: Gleanvolt.Worker
+            # The Debian architecture of the .deb this leg also builds (#205), and the name nfpm's own
+            # release gives the build of nfpm that runs on this runner.
+            deb_arch: amd64
+            nfpm_arch: x86_64
           - rid: linux-arm64
             runner: ubuntu-24.04-arm
             exe: Gleanvolt.Worker
+            deb_arch: arm64
+            nfpm_arch: arm64
           - rid: win-x64
             runner: windows-latest
             exe: Gleanvolt.Worker.exe
@@ -347,6 +359,100 @@ jobs:
           path: artifacts/*.zip
           if-no-files-found: error
 
+      # The .deb (#205), on the two Linux legs: the same publish output the zip carries and the smoke
+      # test has just started, wrapped in a systemd service by packaging/linux/nfpm.yaml.
+      #
+      # nfpm is downloaded pinned and checked against its release's checksums rather than installed
+      # from an action or `go install`: it runs with this job's token in the environment, and a
+      # version that moves under us is a build that changes without a commit.
+      - name: Build the .deb
+        if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          NFPM_VERSION: 2.47.0
+          NFPM_ARCHIVE: nfpm_2.47.0_Linux_${{ matrix.nfpm_arch }}.tar.gz
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nfpm"
+          curl -fsSL -o "$RUNNER_TEMP/nfpm/$NFPM_ARCHIVE" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/${NFPM_ARCHIVE}"
+          curl -fsSL -o "$RUNNER_TEMP/nfpm/checksums.txt" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/checksums.txt"
+          (cd "$RUNNER_TEMP/nfpm" && grep " ${NFPM_ARCHIVE}\$" checksums.txt | sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/nfpm/$NFPM_ARCHIVE" -C "$RUNNER_TEMP/nfpm" nfpm
+
+          # A tilde, not a hyphen, for the Debian version: dpkg sorts 1.0.7~dev *below* 1.0.7, where
+          # 1.0.7-dev would be read as upstream 1.0.7, Debian revision "dev" -- and outrank the release.
+          export GLEANVOLT_VERSION="${VERSION//-/\~}"
+          export GLEANVOLT_ARCH="${{ matrix.deb_arch }}"
+
+          # nfpm.yaml reads a fixed publish/deb/ (it expands no variables in `contents`). Permissions
+          # normalised, because what dpkg installs is what the archive records: a group-writable file
+          # in /opt from a permissive umask would be one any member of that group could replace.
+          rm -rf publish/deb
+          cp -a "publish/${{ matrix.rid }}" publish/deb
+          chmod -R u=rwX,go=rX publish/deb
+
+          mkdir -p deb
+          "$RUNNER_TEMP/nfpm/nfpm" package \
+            --config packaging/linux/nfpm.yaml \
+            --packager deb \
+            --target "deb/gleanvolt_${GLEANVOLT_VERSION}_${GLEANVOLT_ARCH}.deb"
+          dpkg-deb --info deb/*.deb
+
+      # What the zip test cannot show: that the package installs -- its Depends resolve on a stock
+      # Ubuntu, its postinst creates the user and directories, and the unit it enables starts the
+      # binary with a content root and data paths that work. Installed for real on the runner, which
+      # runs systemd, then smoke-tested as the running service rather than as a folder.
+      - name: Install the .deb and smoke-test the running service
+        if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/*.deb
+
+          # First with the configuration it ships with, untouched: installing is meant to be enough.
+          sudo systemctl is-enabled gleanvolt
+          if ! sudo systemctl is-active --quiet gleanvolt; then
+            echo "gleanvolt is not running after a default install." >&2
+            sudo systemctl status gleanvolt --no-pager || true
+            sudo journalctl -u gleanvolt --no-pager || true
+            exit 1
+          fi
+          echo "ok: installed, enabled and running with the default configuration"
+
+          # Then pointed at nothing, with the API on, exactly as the zip was -- the settings come from
+          # the smoke test itself so the two runs cannot drift apart.
+          python3 .github/scripts/smoke-test.py --print-env | sudo tee -a /etc/gleanvolt/gleanvolt.env >/dev/null
+          sudo systemctl restart gleanvolt
+          sudo python3 .github/scripts/smoke-test.py --service gleanvolt --version "$VERSION"
+
+      # And that it leaves: `apt purge` is documented to take the user, the settings and the data, and
+      # a package that says so and does not is worse than one that never claimed it.
+      - name: Purge the .deb and check nothing is left
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get purge -y gleanvolt
+          left=0
+          for path in /opt/gleanvolt /etc/gleanvolt /var/lib/gleanvolt /var/log/gleanvolt \
+                      /usr/lib/systemd/system/gleanvolt.service; do
+            if [ -e "$path" ]; then echo "still present after purge: $path" >&2; left=1; fi
+          done
+          if getent passwd gleanvolt >/dev/null; then echo "user gleanvolt still exists" >&2; left=1; fi
+          if getent group gleanvolt >/dev/null; then echo "group gleanvolt still exists" >&2; left=1; fi
+          exit "$left"
+
+      - name: Upload the ${{ matrix.deb_arch }} .deb
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-deb-${{ matrix.deb_arch }}
+          path: deb/*.deb
+          if-no-files-found: error
+
   # Everything above proved the build. Only this job creates anything that cannot be taken back, and
   # it needs every one of the jobs above: a half-finished publish matrix cannot reach here, so a
   # release carrying two zips instead of three is not a state this workflow can produce.
@@ -385,6 +491,14 @@ jobs:
           pattern: release-*
           merge-multiple: true
 
+      # Not built by anything, so not an artifact of the jobs above -- but part of the release, under
+      # this exact name, because the install command everyone is given points at
+      # releases/latest/download/install.sh. Added before the checksums so SHA256SUMS covers it.
+      - name: Add the Linux installer
+        run: |
+          set -euo pipefail
+          cp packaging/linux/install.sh artifacts/install.sh
+
       # The matrix cannot reach here half-finished, but it can be *edited* half-finished: a RID
       # removed from the list above and left in the notes below would ship a release whose text
       # promises a download that is not attached. Cheap to assert, and this is the last place anyone
@@ -402,6 +516,20 @@ jobs:
               exit 1
             fi
           done
+
+          # install.sh finds the package by these names in SHA256SUMS, so a release without one of them
+          # is a release the one-line install fails on for that architecture.
+          for arch in amd64 arm64; do
+            if [ ! -f "artifacts/gleanvolt_${VERSION}_${arch}.deb" ]; then
+              echo "No .deb for $arch; the publish matrix and this list disagree." >&2
+              exit 1
+            fi
+          done
+
+          if [ ! -f artifacts/install.sh ]; then
+            echo "No install.sh; the one-line Linux install would 404." >&2
+            exit 1
+          fi
 
           packages=$(find artifacts -name '*.nupkg' | wc -l)
           if [ "$packages" -ne 5 ]; then
@@ -441,6 +569,8 @@ jobs:
         with:
           subject-path: |
             artifacts/*.zip
+            artifacts/*.deb
+            artifacts/install.sh
             artifacts/*.nupkg
 
       # The tag names the commit that produced these exact files, and it is pushed before the release
@@ -489,6 +619,27 @@ jobs:
           {
             echo "## Install"
             echo
+            echo "### Debian, Ubuntu, Raspberry Pi OS (64-bit)"
+            echo
+            echo "Installs the controller and its web UI as a systemd service, started with the default"
+            echo "configuration. Run it again to upgrade; settings and data are kept."
+            echo
+            echo '```'
+            echo "curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.sh | sudo sh"
+            echo '```'
+            echo
+            echo "Or by hand, choosing \`amd64\` or \`arm64\`:"
+            echo
+            echo '```'
+            echo "wget https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/gleanvolt_${VERSION}_arm64.deb"
+            echo "sudo apt install ./gleanvolt_${VERSION}_arm64.deb"
+            echo '```'
+            echo
+            echo "Then open \`http://<device>:8090\` and set your inverter and charger addresses in"
+            echo "\`/etc/gleanvolt/gleanvolt.env\`."
+            echo
+            echo "### Docker"
+            echo
             echo '```'
             echo "docker pull ghcr.io/${GITHUB_REPOSITORY,,}:${VERSION}"
             echo '```'
@@ -518,7 +669,7 @@ jobs:
             echo "and compare it with the line in \`SHA256SUMS\`. PowerShell prints the hash in upper case;"
             echo "the file lists it in lower case, and they are the same hash."
             echo
-            echo "Each zip and \`.nupkg\` also carries a build provenance attestation, which says"
+            echo "Each zip, \`.deb\`, \`install.sh\` and \`.nupkg\` also carries a build provenance attestation, which says"
             echo "*which workflow run and which commit produced it* rather than only that the bytes are"
             echo "unchanged. That needs no trust in this page:"
             echo
