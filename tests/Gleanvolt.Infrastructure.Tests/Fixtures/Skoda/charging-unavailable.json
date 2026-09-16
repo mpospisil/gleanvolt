@@ -1,0 +1,11 @@
+{
+  "vehicle": {
+    "vin": "TMBJB9NY5RF999999"
+  },
+  "errors": [
+    {
+      "type": "CHARGING_UNAVAILABLE",
+      "description": "Charging status could not be retrieved from the vehicle."
+    }
+  ]
+}

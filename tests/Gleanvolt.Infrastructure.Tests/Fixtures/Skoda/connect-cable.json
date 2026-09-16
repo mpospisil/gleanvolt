@@ -1,0 +1,23 @@
+{
+  "vehicle": {
+    "vin": "TMBJB9NY5RF999999",
+    "charging": {
+      "isVehicleInSavedLocation": false,
+      "status": {
+        "chargingRateInKilometersPerHour": 0.0,
+        "chargePowerInKw": 0.0,
+        "state": "CONNECT_CABLE",
+        "chargeType": "OFF",
+        "battery": {
+          "remainingCruisingRangeInMeters": 176000,
+          "stateOfChargeInPercent": 48
+        }
+      },
+      "settings": {
+        "targetStateOfChargeInPercent": 80
+      },
+      "carCapturedTimestamp": "2026-09-15T07:12:00Z"
+    }
+  },
+  "errors": []
+}

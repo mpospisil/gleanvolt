@@ -24,7 +24,9 @@ namespace Gleanvolt.Hosting.Vehicles;
 /// <see cref="VehicleSourceState.NeedsOwner"/> — a refused password, a consent screen, an OTP — asking
 /// again cannot help and replaying a password on a clock is how accounts get locked. The loop ends,
 /// the dashboard says <i>sign-in required</i>, and it is a restart (after the owner has done their
-/// part) that puts the feed back on its clock.</para>
+/// part) that puts the feed back on its clock — unless the service itself stops reporting blocked,
+/// as the Škoda feed does the moment a new API key is pasted (#193), in which case the loop picks up
+/// again on its own.</para>
 ///
 /// <para>Nothing here is on any hardware path. The car is advisory data: a manufacturer's cloud that
 /// is unreachable, refusing or simply empty changes nothing about how the charger is driven.</para>
@@ -48,6 +50,13 @@ public sealed class VehicleUpdateWorker : BackgroundService
     /// which is the entire point of stopping.</para>
     /// </summary>
     public static readonly TimeSpan BlockedReminder = TimeSpan.FromHours(6);
+
+    /// <summary>
+    /// How often a stopped feed's <see cref="IVehicleUpdateService.Health"/> is looked at again (#193).
+    /// A property read, never a fetch: it notices an owner who pasted a new key within a minute, and
+    /// costs nothing on the network for a feed that never unblocks itself.
+    /// </summary>
+    public static readonly TimeSpan OwnerCheckInterval = TimeSpan.FromMinutes(1);
 
     private readonly IReadOnlyList<IVehicleUpdateService> _services;
     private readonly VehicleStateHolder _holder;
@@ -159,7 +168,12 @@ public sealed class VehicleUpdateWorker : BackgroundService
 
             if (service.Health.IsBlocked || delay < TimeSpan.Zero)
             {
-                await WaitOnTheOwnerAsync(service, stoppingToken).ConfigureAwait(false);
+                if (await WaitOnTheOwnerAsync(service, stoppingToken).ConfigureAwait(false))
+                {
+                    lastHealth = service.Health;
+                    continue;
+                }
+
                 break;
             }
 
@@ -175,31 +189,53 @@ public sealed class VehicleUpdateWorker : BackgroundService
     }
 
     /// <summary>
-    /// What a stopped feed does for the rest of the process's life: nothing, loudly.
+    /// What a stopped feed does until the owner has done their part: nothing, loudly.
     ///
-    /// <para>It never fetches again — a password replayed on a clock is how accounts get locked, and a
+    /// <para>It never fetches — a password replayed on a clock is how accounts get locked, and a
     /// consent screen is answered by nobody here. But it repeats the reason on
     /// <see cref="BlockedReminder"/> so that the log of a controller that has been sitting blocked for
     /// three days says so, rather than saying nothing at all. The web UI carries the same sentence on
     /// every page for as long as this is true.</para>
+    ///
+    /// <para>Returns true when the service reports it is no longer blocked — a key pasted on the page
+    /// that the service can see (#193) — so the loop resumes without a restart. A feed whose owner
+    /// action happens outside this process never reports that, and waits here until shutdown.</para>
     /// </summary>
-    private async Task WaitOnTheOwnerAsync(IVehicleUpdateService service, CancellationToken stoppingToken)
+    private async Task<bool> WaitOnTheOwnerAsync(IVehicleUpdateService service, CancellationToken stoppingToken)
     {
+        var sinceReminder = BlockedReminder;
+
         while (true)
         {
-            _logger.LogWarning(
-                "The {Manufacturer} feed for {Vehicle} has stopped and needs you: {Reason} It will not "
-                + "be asked again until you have cleared it and restarted the controller — press "
-                + "\"Read the car now\" on the Vehicle portal page to check.",
-                service.Manufacturer, service.VehicleId, service.Health.Message);
+            if (sinceReminder >= BlockedReminder)
+            {
+                _logger.LogWarning(
+                    "The {Manufacturer} feed for {Vehicle} has stopped and needs you: {Reason} It will not "
+                    + "be asked again until you have cleared it — on the Vehicle portal page — and, for a "
+                    + "feed that cannot see that, restarted the controller.",
+                    service.Manufacturer, service.VehicleId, service.Health.Message);
+
+                sinceReminder = TimeSpan.Zero;
+            }
 
             try
             {
-                await Task.Delay(BlockedReminder, _time, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(OwnerCheckInterval, _time, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                return;
+                return false;
+            }
+
+            sinceReminder += OwnerCheckInterval;
+
+            if (!service.Health.IsBlocked && service.NextDelay >= TimeSpan.Zero)
+            {
+                _logger.LogInformation(
+                    "The {Manufacturer} feed for {Vehicle} is no longer waiting on you; asking again.",
+                    service.Manufacturer, service.VehicleId);
+
+                return true;
             }
         }
     }

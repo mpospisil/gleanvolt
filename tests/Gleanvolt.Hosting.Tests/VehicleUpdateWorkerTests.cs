@@ -241,9 +241,9 @@ public class VehicleUpdateWorkerTests
         await worker.StartAsync(CancellationToken.None);
         await service.Asked.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        // Parked on the reminder rather than looping: the fetch happened once and the next thing the
-        // worker asked for was six hours of silence.
-        await UntilAsync(() => time.Delays.Contains(VehicleUpdateWorker.BlockedReminder));
+        // Parked rather than looping: the fetch happened once and the next thing the worker asked for
+        // was a look at the service's health, which is a property read and not a request.
+        await UntilAsync(() => time.Delays.Contains(VehicleUpdateWorker.OwnerCheckInterval));
         await worker.StopAsync(CancellationToken.None);
 
         Assert.Equal(1, service.Fetches);
@@ -261,7 +261,11 @@ public class VehicleUpdateWorkerTests
             Health = VehicleSourceHealth.NeedsOwner("The portal is showing a consent screen."),
         };
 
-        var time = new ImmediateTimeProvider { MaxFirings = 2 };
+        // Two reminders' worth of health checks, then the clock stops granting them.
+        var time = new ImmediateTimeProvider
+        {
+            MaxFirings = 2 * (int)(VehicleUpdateWorker.BlockedReminder / VehicleUpdateWorker.OwnerCheckInterval),
+        };
         var worker = Worker(new VehicleStateHolder(), time, logger: logger, services: service);
 
         await worker.StartAsync(CancellationToken.None);
@@ -279,6 +283,36 @@ public class VehicleUpdateWorkerTests
             });
 
         static bool Blocked(string warning) => warning.Contains("has stopped and needs you");
+    }
+
+    [Fact]
+    public async Task A_service_that_stops_being_blocked_is_asked_again_without_a_restart()
+    {
+        // The Škoda feed (#193): the owner pastes a new key on the page, the service can see it, and
+        // the feed must pick up on its own -- a restart to use a key already in hand would be absurd.
+        var service = new StubService(count => count == 2 ? Reading(63) : null)
+        {
+            Health = VehicleSourceHealth.NeedsOwner("Paste an API key on the Vehicle portal page."),
+            AskedEnough = 2,
+        };
+
+        var holder = new VehicleStateHolder();
+        // Health checks are granted freely: they are property reads, and the test flips the health
+        // while the worker is somewhere among them.
+        var time = new ImmediateTimeProvider();
+        var worker = Worker(holder, time, services: service);
+
+        await worker.StartAsync(CancellationToken.None);
+        await UntilAsync(() => time.Delays.Contains(VehicleUpdateWorker.OwnerCheckInterval));
+        Assert.Equal(1, service.Fetches);
+
+        service.Health = VehicleSourceHealth.Starting;
+
+        await service.Asked.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await UntilAsync(() => holder.GetCurrentState() is not null);
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal(63, holder.GetCurrentState()?.SocPercent);
     }
 
     [Fact]

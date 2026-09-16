@@ -757,6 +757,8 @@ internal sealed class FakeVehicleAccountSignIn(
 
     public string AccountName => "volkswagen.de";
 
+    public string Explanation => "the code Volkswagen emails can only be answered by you";
+
     public bool IsConfigured => configured;
 
     public VehicleSignInState State { get; private set; } = VehicleSignInState.Unknown;
@@ -768,7 +770,7 @@ internal sealed class FakeVehicleAccountSignIn(
         return Task.FromResult(State);
     }
 
-    public Task<VehicleSignInState> SubmitCodeAsync(string code, CancellationToken cancellationToken = default)
+    public Task<VehicleSignInState> SubmitAsync(string code, CancellationToken cancellationToken = default)
     {
         CodeSubmissions++;
         LastCode = code;

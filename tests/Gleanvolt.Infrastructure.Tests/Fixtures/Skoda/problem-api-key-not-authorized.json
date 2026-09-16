@@ -1,0 +1,1 @@
+{"type":"https://public.api.connect.skoda-auto.cz/problems/api-key-not-authorized","title":"Forbidden","status":403,"detail":"The API key is not authorized to execute the operation.","instance":"/api/v1/vehicles/TMBJB9NY5RF999999"}

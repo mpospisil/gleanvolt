@@ -12,6 +12,9 @@ public sealed record VehicleSignInState(VehicleSignInStatus Status, string Messa
     /// <summary>Whether a code box should be on screen.</summary>
     public bool WantsCode => Status == VehicleSignInStatus.CodeRequired;
 
+    /// <summary>Whether a key box should be on screen (issue #193).</summary>
+    public bool WantsKey => Status == VehicleSignInStatus.KeyRequired;
+
     public static VehicleSignInState NotConfigured { get; } = new(
         VehicleSignInStatus.NotConfigured,
         "No manufacturer account is configured, so there is nothing to sign in to.");
@@ -23,6 +26,9 @@ public sealed record VehicleSignInState(VehicleSignInStatus Status, string Messa
 
     public static VehicleSignInState CodeRequired(string message) =>
         new(VehicleSignInStatus.CodeRequired, message);
+
+    public static VehicleSignInState KeyRequired(string message) =>
+        new(VehicleSignInStatus.KeyRequired, message);
 
     public static VehicleSignInState Failed(string message) => new(VehicleSignInStatus.Failed, message);
 }
@@ -44,6 +50,13 @@ public enum VehicleSignInStatus
     /// nothing loops — a login replayed at a real identity provider is how an account gets locked.
     /// </summary>
     CodeRequired,
+
+    /// <summary>
+    /// An API key is wanted (issue #193): created by the owner in the manufacturer's app and pasted
+    /// once. Different from a code in what the page asks for — a secret to keep, not a number to
+    /// type and forget — which is why it is its own kind rather than a code with another label.
+    /// </summary>
+    KeyRequired,
 
     /// <summary>Refused, unreachable, or the flow lost its session part-way.</summary>
     Failed,

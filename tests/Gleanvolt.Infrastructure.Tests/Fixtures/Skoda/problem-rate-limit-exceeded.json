@@ -1,0 +1,1 @@
+{"type":"https://public.api.connect.skoda-auto.cz/problems/rate-limit-exceeded","title":"Too Many Requests","status":429,"detail":"The rate limit for the API key has been exceeded.","instance":"/api/v1/vehicles/TMBJB9NY5RF999999"}

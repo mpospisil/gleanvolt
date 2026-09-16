@@ -1,0 +1,9 @@
+{
+  "vehicle": {
+    "vin": "TMBJB9NY5RF999999",
+    "name": "My Enyaq",
+    "licensePlate": "1MB 1234",
+    "renderUrl": "https://www.example.com/render"
+  },
+  "errors": []
+}

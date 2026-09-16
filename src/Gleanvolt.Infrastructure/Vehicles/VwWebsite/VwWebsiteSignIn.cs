@@ -16,6 +16,11 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
 
     public string AccountName => "volkswagen.de";
 
+    public string Explanation =>
+        "The live source, as distinct from the portal below. Signing in here is what lets the car be "
+        + "followed while it charges; the code Volkswagen emails can only be answered by you, which is "
+        + "why this is a page and not a background job.";
+
     public bool IsConfigured => options.IsConfigured;
 
     public VehicleSignInState State => IsConfigured ? _state : VehicleSignInState.NotConfigured;
@@ -31,7 +36,7 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
         return _state = Describe(step, afterCode: false);
     }
 
-    public async Task<VehicleSignInState> SubmitCodeAsync(
+    public async Task<VehicleSignInState> SubmitAsync(
         string code, CancellationToken cancellationToken = default)
     {
         if (!IsConfigured)

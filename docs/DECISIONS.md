@@ -4,6 +4,39 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-16 — A Škoda is read through its owner API with a pasted key, and a feed a key unblocks resumes by itself
+
+**Context.** Issue #193. On 2026-08-31 Škoda published the MyŠkoda Public API: documented, keyed per owner
+and VIN, 20 requests an hour. `vw-website` is volkswagen.de and cannot read a Škoda, so a Škoda had only
+the Data Act portal's batch. The sign-in seam (`IVehicleAccountSignIn`) had one implementation and said it
+would stay unfrozen until a second one argued with it.
+
+**Decision — the contract grows by what a key needs.** `VehicleSignInStatus.KeyRequired` beside
+`CodeRequired`; `SubmitCodeAsync` becomes `SubmitAsync`, answering whichever the state asked for; the
+paragraph under the page's heading is the sign-in's `Explanation`. No credential-kind enum. The key lives
+in `data/skoda-api-key.json`, never in configuration: keys expire, and one place to renew one beats a
+`.env` edit plus a restart.
+
+**Decision — the feed is chosen by `Vehicle:Skoda`, and `Vehicle:Website` beside it is refused.** They are
+live sources for two different cars; an installation has one. `Ev:Vehicles[].Make` still selects nothing.
+
+**Decision — a blocked feed is re-checked, not only reminded about.** `VehicleUpdateWorker` used to park a
+`NeedsOwner` feed until restart. The Škoda feed stops being blocked the moment a key is pasted into the
+store it reads, so the worker now looks at `Health` once a minute (a property read, no request) and resumes
+when it clears. The VW feeds change health only inside a fetch, so they resume only if an on-demand ask
+succeeds — which is the owner having done their part too.
+
+**Decision — unlike `vw-website`, it polls between charges.** A key has no session to spend and an idle read
+costs one request; a Škoda has no other live source for the SOC a plan starts from. 15 min idle, 5 charging,
+the clock stops once three requests are left in the window, `Retry-After` honoured, `RateLimit-Remaining`
+read from every response rather than counted.
+
+**Not verified on a car.** Everything is built from the published spec with spec-built fixtures. The
+`state` → charge/plug mapping, the per-key-or-per-VIN quota and the charging capture cadence wait on a Škoda
+owner.
+
+---
+
 ## 2026-09-16 — With a full pack, the hold's target reaches past PV, or it caps PV
 
 **Context.** On 2026-09-16 SolarGrid started a charge at 12:13 with the pack at 99% and 6.1 kW of sun. The

@@ -14,6 +14,8 @@ internal sealed class NoVehicleAccountSignIn : IVehicleAccountSignIn
 {
     public string AccountName => "no manufacturer account";
 
+    public string Explanation => string.Empty;
+
     public bool IsConfigured => false;
 
     public VehicleSignInState State => VehicleSignInState.NotConfigured;
@@ -21,8 +23,8 @@ internal sealed class NoVehicleAccountSignIn : IVehicleAccountSignIn
     public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(VehicleSignInState.NotConfigured);
 
-    public Task<VehicleSignInState> SubmitCodeAsync(
-        string code, CancellationToken cancellationToken = default) =>
+    public Task<VehicleSignInState> SubmitAsync(
+        string answer, CancellationToken cancellationToken = default) =>
         Task.FromResult(VehicleSignInState.NotConfigured);
 
     public void SignOut()

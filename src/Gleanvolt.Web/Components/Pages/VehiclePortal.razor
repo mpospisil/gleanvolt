@@ -38,16 +38,18 @@
 
     The session it establishes is what the live source then polls on while a charge runs. Nothing
     here is required for charging: a controller with no account signed in charges exactly as before.
+
+    A Škoda installation (#193) puts a different sign-in in the same seat: no code, but an API key
+    created in the MySkoda app and pasted once. The state says which box to draw, and the paragraph
+    under the heading is the sign-in's, so neither car reads about the other's account. The key box
+    is a password input and is emptied after every submission, accepted or not: a key is
+    bearer-equivalent and must never be rendered back.
 *@
 @if (Account.IsConfigured)
 {
     <h2>@Account.AccountName</h2>
 
-    <p class="muted">
-        The live source, as distinct from the portal below. Signing in here is what lets the car be
-        followed while it charges; the code Volkswagen emails can only be answered by you, which is
-        why this is a page and not a background job.
-    </p>
+    <p class="muted">@Account.Explanation</p>
 
     @if (_signIn.IsSignedIn)
     {
@@ -68,13 +70,28 @@
             <div class="control">
                 <label for="account-code">One-time code</label>
                 <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code"
-                       @bind="_code" @bind:event="oninput" />
+                       @bind="_answer" @bind:event="oninput" />
             </div>
 
             <div class="actions">
                 <button type="button" class="secondary" id="account-code-submit"
-                        disabled="@(_busy || string.IsNullOrWhiteSpace(_code))" @onclick="SubmitCodeAsync">
+                        disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
                     @(_busy ? "Checking…" : "Submit code")
+                </button>
+            </div>
+        }
+        else if (_signIn.WantsKey)
+        {
+            <div class="control">
+                <label for="account-key">API key</label>
+                <input id="account-key" type="password" autocomplete="off" spellcheck="false"
+                       @bind="_answer" @bind:event="oninput" />
+            </div>
+
+            <div class="actions">
+                <button type="button" class="secondary" id="account-key-submit"
+                        disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
+                    @(_busy ? "Checking…" : "Save key")
                 </button>
             </div>
         }
@@ -362,7 +379,7 @@ else if (_reading is { Succeeded: true, State: { } state })
 
 @code {
     private VehicleSignInState _signIn = VehicleSignInState.Unknown;
-    private string _code = string.Empty;
+    private string _answer = string.Empty;
 
     protected override void OnInitialized() => _signIn = Account.State;
 
@@ -386,22 +403,30 @@ else if (_reading is { Succeeded: true, State: { } state })
         }
     }
 
-    private async Task SubmitCodeAsync()
+    private async Task SubmitAsync()
     {
+        var wasKey = _signIn.WantsKey;
         _busy = true;
         StateHasChanged();
 
         try
         {
-            _signIn = await Account.SubmitCodeAsync(_code);
+            _signIn = await Account.SubmitAsync(_answer);
 
             if (_signIn.IsSignedIn)
             {
-                _code = string.Empty;
+                _answer = string.Empty;
             }
         }
         finally
         {
+            // A code is kept after a rejection so a typo can be fixed; a key never is, whatever
+            // happened, because what stays in the box stays in the page.
+            if (wasKey)
+            {
+                _answer = string.Empty;
+            }
+
             _busy = false;
             StateHasChanged();
         }
@@ -411,7 +436,7 @@ else if (_reading is { Succeeded: true, State: { } state })
     {
         Account.SignOut();
         _signIn = Account.State;
-        _code = string.Empty;
+        _answer = string.Empty;
         return Task.CompletedTask;
     }
 
