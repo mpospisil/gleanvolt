@@ -610,6 +610,15 @@ the hold doesn't touch the charger at all. It uses the inverter's **Modbus Power
   has nowhere to go but the battery, so surplus charging is preserved.
 - **PV falls short** — push out all the PV there is. The inverter is already at its maximum, so the
   shortfall can only come from the grid. The battery is never asked to contribute.
+- **PV falls short and the pack is full** — push out up to `FullPackHeadroomWatts` (1 kW) more than PV
+  reads, but never more than the forecast expects the roof to make right now, and never more than the
+  load. "Already at its maximum" is only true while the pack can take the PV the target leaves over. A
+  full pack can't, so a target of exactly the PV reading caps PV there. The pack's standby trickle then
+  lets the next reading come in lower, and the target follows it down. On 2026-09-16 that took PV from
+  6.1 kW to 115 W in three minutes under a clear sky, with the car on the grid. The headroom lets PV the
+  target capped climb back. If the sun really is that weak, a full pack covers up to the headroom. It
+  applies at `FullPackSocPercent` (95%) or above, while the pack takes no more than 100 W and a forecast
+  covers the moment, so a night charge never borrows from the pack.
 
 > **This is not the SolaX "No Discharge" mode.** That option exists in the upstream Home Assistant
 > integration but never reaches the inverter — it is a client-side strategy, and the formula above is
@@ -654,7 +663,9 @@ the signal it is there to give.
   "Duration": "00:01:00",           // how long each command stays armed; also the failsafe window
   "TargetChangeThresholdWatts": 100, // how far the target must move before reissuing
   "BridgeShortfallWatts": 300,      // SolarGrid/Targeted: arm when the car draws this much more than the sun gives
-  "BridgeReleaseDwell": "00:03:00"  // SolarGrid/Targeted: keep it this long after the last need, while charging
+  "BridgeReleaseDwell": "00:03:00", // SolarGrid/Targeted: keep it this long after the last need, while charging
+  "FullPackSocPercent": 95,         // at or above this, a pack that isn't charging counts as full
+  "FullPackHeadroomWatts": 1000     // full pack: how far past PV the target may reach, so it can't cap PV; 0 = off
 }
 ```
 

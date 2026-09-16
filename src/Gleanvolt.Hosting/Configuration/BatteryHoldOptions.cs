@@ -58,4 +58,19 @@ public sealed class BatteryHoldOptions
     /// faster than it settles is what made the hold flap. A paused or ended charge releases at once.
     /// </summary>
     public TimeSpan BridgeReleaseDwell { get; init; } = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// The state of charge at or above which the pack counts as full for the hold's target. A full pack
+    /// that is not charging cannot take the PV the target leaves over, so the target caps PV instead —
+    /// see <see cref="FullPackHeadroomWatts"/>.
+    /// </summary>
+    public double FullPackSocPercent { get; init; } = 95;
+
+    /// <summary>
+    /// How far past the PV being read the hold's target may reach while the pack is full, so PV the
+    /// target itself capped can climb back. Without it PV ratcheted from 6.1 kW to 115 W in three minutes
+    /// on 2026-09-16. Never past the forecast for the moment and never past the house load, so a sun that
+    /// really is that weak takes at most this much from a full pack. 0 turns it off.
+    /// </summary>
+    public double FullPackHeadroomWatts { get; init; } = 1000;
 }
