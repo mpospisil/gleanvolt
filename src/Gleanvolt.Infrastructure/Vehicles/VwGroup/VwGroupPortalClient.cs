@@ -351,7 +351,8 @@ public sealed class VwGroupPortalClient
         var url = $"{_options.PortalBaseUrl.TrimEnd('/')}/proxy_api/euda-apim/datarequest/vehicles/"
             + $"{Uri.EscapeDataString(vin)}/metadata/partial";
 
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
+        using var document = await GetJsonAsync(url, cancellationToken, missingIsEmpty: true)
+            .ConfigureAwait(false);
 
         var root = document.RootElement;
 
@@ -513,8 +514,13 @@ public sealed class VwGroupPortalClient
 
     // One re-sign-in per call, never a loop: a refused password must fail rather than hammer the
     // account, and a session that will not stick is a fault to report rather than to work around.
+    // missingIsEmpty: a 404 reads as an empty object rather than a failure, for the one endpoint
+    // where a 404 is an answer ("none exists") and not a fault.
     private async Task<JsonDocument> GetJsonAsync(
-        string url, CancellationToken cancellationToken, IReadOnlyDictionary<string, string>? headers = null)
+        string url,
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? headers = null,
+        bool missingIsEmpty = false)
     {
         var response = await SendAsync(url, cancellationToken, headers).ConfigureAwait(false);
 
@@ -530,6 +536,11 @@ public sealed class VwGroupPortalClient
 
         using (response)
         {
+            if (missingIsEmpty && response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return JsonDocument.Parse("{}");
+            }
+
             Classify(response, url);
 
             var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);

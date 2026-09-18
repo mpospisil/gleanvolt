@@ -298,6 +298,26 @@ public class VwGroupPortalClientTests
     }
 
     [Fact]
+    public async Task ADataRequestThatAnswers404IsOneThatNoLongerExists()
+    {
+        // What the portal did on 2026-09-18 once the ID.4's request ended: the metadata endpoint went
+        // 404. Reported as unreadable data, it told the owner "something needs changing" and not what.
+        var handler = new StubHandler(request =>
+            request.RequestUri!.AbsolutePath.Contains("datarequest", StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : Json("[{\"vin\":\"WVWZZZE2ZMP012345\"}]"));
+
+        using var http = new HttpClient(handler);
+        var client = new VwGroupPortalClient(http, Options());
+
+        var error = await Assert.ThrowsAsync<VwGroupPortalException>(async () =>
+            await client.GetNewestDatasetAsync(await client.GetVehicleAsync()));
+
+        Assert.Equal(VwGroupFailure.NoDataRequest, error.Failure);
+        Assert.Contains("Data clusters", error.Message);
+    }
+
+    [Fact]
     public void TheAuthorizeUrlAsksForWhatThePortalsOwnClientAsksFor()
     {
         using var http = new HttpClient(new StubHandler(_ => Json("{}")));
