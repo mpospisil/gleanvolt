@@ -847,3 +847,82 @@ button.link:hover {
     color: var(--muted);
     white-space: nowrap;
 }
+
+/* The PV system's edit form (#204). Two columns of label-over-input where there is room, one on a
+   phone; each field carries where its value comes from, because the web UI's file overrides .env and
+   that is otherwise invisible. */
+.pv-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.75rem 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.pv-field label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.pv-field input {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pv-field input:disabled {
+    color: var(--muted);
+}
+
+.pv-field .source {
+    display: inline-block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+/* A value from the web UI is the one that can surprise someone reading .env, so it is the one marked. */
+.pv-field .source.edited {
+    color: var(--ev);
+    font-weight: 600;
+}
+
+.pv-field .revert {
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.pv-editor h3 {
+    font-size: 1rem;
+    margin: 1.25rem 0 0.5rem;
+}
+
+/* Saved, not applied: amber rather than the alert's red, because nothing is wrong -- it is waiting. */
+.alert.pending {
+    border-color: var(--amber);
+}
+
+.alert.pending p {
+    margin: 0 0 0.35rem;
+}
+
+.alert.pending ul {
+    margin: 0 0 0.5rem;
+    padding-left: 1.25rem;
+}
+
+.alert.pending .control {
+    border-top: none;
+    padding-bottom: 0;
+}
+
+.probes {
+    margin: 0.75rem 0 0.25rem;
+    padding-left: 1.25rem;
+}

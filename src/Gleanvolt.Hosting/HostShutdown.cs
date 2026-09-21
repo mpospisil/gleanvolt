@@ -14,6 +14,9 @@ namespace Gleanvolt.Hosting;
 /// again by hand.</description></item>
 /// <item><description><b><see cref="TerminatedExitCode"/></b> — SIGTERM: a Pi reboot, a Docker daemon
 /// restart, `docker compose restart`. The controller must come back on its own, and does.</description></item>
+/// <item><description><b><see cref="RestartExitCode"/></b> — somebody pressed Restart, usually to apply a
+/// configuration saved from the web UI (issue #204). Non-zero, so it comes back; a code of its own, so
+/// `docker inspect` and `systemctl status` can tell it from a signal.</description></item>
 /// </list>
 /// <para>Without the distinction the two are indistinguishable — .NET exits 0 for a SIGTERM too — and
 /// a rebooted Pi would sit there with no controller running and nothing saying so.</para>
@@ -27,12 +30,22 @@ public sealed class HostShutdown : IServiceShutdown
     /// </summary>
     public const int TerminatedExitCode = 143;
 
+    /// <summary>
+    /// What the process returns when an operator asked for a restart: <c>EX_TEMPFAIL</c> from
+    /// sysexits.h, "try again later", which is what it means. Any non-zero code brings the process back
+    /// under <c>restart: on-failure</c> and <c>Restart=on-failure</c>; this one is simply recognisable.
+    /// </summary>
+    public const int RestartExitCode = 75;
+
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<HostShutdown> _logger;
 
     // Written from a UI circuit or the MQTT client's callback, read on the main thread once Run()
     // returns. Only ever set to true, but it crosses threads, so it is not a plain bool.
     private volatile bool _stopRequested;
+
+    // Set together with _stopRequested when the stop is meant to come back.
+    private volatile bool _restartRequested;
 
     // Who asked, kept for the closing log line. Same threading story as the flag above.
     private volatile string? _stopSource;
@@ -49,8 +62,14 @@ public sealed class HostShutdown : IServiceShutdown
     /// </summary>
     public bool StopRequested => _stopRequested;
 
-    /// <summary>The exit code this run should return: 0 for a requested stop, otherwise "terminated".</summary>
-    public int ExitCode => _stopRequested ? 0 : TerminatedExitCode;
+    /// <summary>Whether the requested stop is a restart. Read after the host has stopped.</summary>
+    public bool RestartRequested => _restartRequested;
+
+    /// <summary>
+    /// The exit code this run should return: <see cref="RestartExitCode"/> for a requested restart, 0
+    /// for a requested stop, otherwise "terminated".
+    /// </summary>
+    public int ExitCode => _restartRequested ? RestartExitCode : _stopRequested ? 0 : TerminatedExitCode;
 
     /// <summary>
     /// Arms the line that says the process stopped on purpose. Call once, before the host starts.
@@ -69,6 +88,18 @@ public sealed class HostShutdown : IServiceShutdown
 
     private void LogStopped()
     {
+        if (_restartRequested)
+        {
+            _logger.LogInformation(
+                "Gleanvolt stopped cleanly for a restart requested by {Source}. Exiting with code "
+                + "{ExitCode}: where a restart policy is watching, it will be started again and read its "
+                + "configuration afresh; where none is, start it again by hand.",
+                _stopSource,
+                ExitCode);
+
+            return;
+        }
+
         if (_stopRequested)
         {
             _logger.LogInformation(
@@ -105,6 +136,24 @@ public sealed class HostShutdown : IServiceShutdown
         // Non-blocking by design: it signals ApplicationStopping and returns, so the caller's own
         // work (rendering the confirmation, acknowledging the MQTT command) completes normally.
         // Idempotent in the host — a second call while stopping does nothing.
+        _lifetime.StopApplication();
+    }
+
+    public void RequestRestart(string source)
+    {
+        // Warning for the same reason as a stop: it is the answer to "why did the controller go away
+        // at 14:02?", and the next run's first lines will not say.
+        _logger.LogWarning(
+            "Restart requested by {Source}. Shutting down gracefully — the charger will be paused and the "
+            + "open session closed — and exiting with code {ExitCode} so that the restart policy starts it "
+            + "again.",
+            source,
+            RestartExitCode);
+
+        _stopSource = source;
+        _restartRequested = true;
+        _stopRequested = true;
+
         _lifetime.StopApplication();
     }
 }

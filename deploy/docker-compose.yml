@@ -52,6 +52,7 @@ services:
     # The exit code carries the difference, which is why the app sets one deliberately (HostShutdown):
     #
     #   0    an operator asked for the stop -> stays down until `docker compose start gleanvolt-controller`
+    #   75   an operator asked for a restart (Health, or applying a /pv-system edit) -> comes back
     #   143  SIGTERM: a Pi reboot, a Docker daemon restart, `docker compose restart` -> comes back
     #   any other non-zero / killed  a crash or a power cut -> comes back
     #

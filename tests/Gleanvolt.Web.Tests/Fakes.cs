@@ -162,7 +162,11 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
 {
     public List<string> Requests { get; } = [];
 
+    public List<string> Restarts { get; } = [];
+
     public void RequestStop(string source) => Requests.Add(source);
+
+    public void RequestRestart(string source) => Restarts.Add(source);
 }
 
 /// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
@@ -779,4 +783,88 @@ internal sealed class FakeVehicleAccountSignIn(
     }
 
     public void SignOut() => State = VehicleSignInState.Unknown;
+}
+
+/// <summary>
+/// A stand-in for the host's <c>PvSystemEditor</c> (issue #204): the file is a dictionary, every key not
+/// in it comes from "the environment" with its running value, and a save is refused on request rather
+/// than by the real resolver, which has its own tests in Gleanvolt.Hosting.Tests.
+/// </summary>
+internal sealed class FakePvSystemEditor : IPvSystemEditor
+{
+    public Dictionary<string, string?> Running { get; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [PvSystemSettingKeys.Id] = "home-roof",
+        [PvSystemSettingKeys.Name] = "Home Roof",
+        [PvSystemSettingKeys.Latitude] = "50.0755",
+        [PvSystemSettingKeys.Longitude] = "14.4378",
+        [PvSystemSettingKeys.TiltDegrees] = "35",
+        [PvSystemSettingKeys.InverterHost] = "192.168.2.10",
+        [PvSystemSettingKeys.InverterPort] = "502",
+        [PvSystemSettingKeys.ChargerId] = "wallbox",
+        [PvSystemSettingKeys.ChargerHost] = "192.168.2.6",
+    };
+
+    public Dictionary<string, string> Stored { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyList<string> Refuse { get; set; } = [];
+
+    public string? Unavailable { get; set; }
+
+    public DeviceProbeResult ProbeResult { get; set; } = new(true, true, "answered: battery at 57 %.");
+
+    public List<IReadOnlyDictionary<string, string>> Saves { get; } = [];
+
+    public List<string> Reverts { get; } = [];
+
+    public List<(PvDeviceRole Role, string Host, int Port, byte UnitId)> Probes { get; } = [];
+
+    public PvSystemSettings Read() => new(
+        "/app/data/pv-system.json",
+        [.. PvSystemSettingKeys.All.Select(key =>
+        {
+            var running = Running.GetValueOrDefault(key);
+            return Stored.TryGetValue(key, out var saved)
+                ? new PvSystemSetting(key, saved, running, PvSettingSource.WebUi, "/app/data/pv-system.json", running)
+                : new PvSystemSetting(key, running, running, PvSettingSource.Environment, PvSystemSettingKeys.EnvironmentVariable(key), running);
+        })],
+        Unavailable);
+
+    public PvSystemSaveResult Save(IReadOnlyDictionary<string, string> values)
+    {
+        Saves.Add(values);
+
+        if (Refuse.Count > 0)
+        {
+            return PvSystemSaveResult.Refused(Refuse);
+        }
+
+        foreach (var (key, value) in values)
+        {
+            if (value == (Running.GetValueOrDefault(key) ?? string.Empty))
+            {
+                Stored.Remove(key);
+            }
+            else
+            {
+                Stored[key] = value;
+            }
+        }
+
+        return PvSystemSaveResult.Success;
+    }
+
+    public PvSystemSaveResult Revert(string key)
+    {
+        Reverts.Add(key);
+        Stored.Remove(key);
+        return PvSystemSaveResult.Success;
+    }
+
+    public Task<DeviceProbeResult> ProbeAsync(
+        PvDeviceRole role, string host, int port, byte unitId, CancellationToken cancellationToken = default)
+    {
+        Probes.Add((role, host, port, unitId));
+        return Task.FromResult(ProbeResult);
+    }
 }

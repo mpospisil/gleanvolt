@@ -60,6 +60,49 @@ public class HostShutdownTests
         Assert.Equal(2, _lifetime.StopCalls);
     }
 
+    // Restart (#204): the same graceful stop, with a code of its own that is non-zero -- so the restart
+    // policy brings it back -- and is neither 0 nor the SIGTERM code, so `docker inspect` can tell it apart.
+
+    [Fact]
+    public void A_requested_restart_exits_with_its_own_non_zero_code()
+    {
+        var shutdown = Shutdown();
+
+        shutdown.RequestRestart("Web UI");
+
+        Assert.True(shutdown.RestartRequested);
+        Assert.Equal(HostShutdown.RestartExitCode, shutdown.ExitCode);
+        Assert.NotEqual(0, shutdown.ExitCode);
+        Assert.NotEqual(HostShutdown.TerminatedExitCode, shutdown.ExitCode);
+        Assert.Equal(1, _lifetime.StopCalls);
+    }
+
+    [Fact]
+    public void A_stop_is_not_a_restart()
+    {
+        var shutdown = Shutdown();
+
+        shutdown.RequestStop("Web UI");
+
+        Assert.False(shutdown.RestartRequested);
+        Assert.Equal(0, shutdown.ExitCode);
+    }
+
+    [Fact]
+    public void Says_who_asked_for_the_restart_and_that_it_comes_back()
+    {
+        var log = new CapturingLogger();
+        var shutdown = new HostShutdown(_lifetime, log);
+        shutdown.LogWhenStopped();
+
+        shutdown.RequestRestart("Web UI");
+        _lifetime.NotifyStopped();
+
+        var line = Assert.Single(log.Messages, m => m.Contains("stopped cleanly"));
+        Assert.Contains("restart requested by Web UI", line);
+        Assert.Contains($"code {HostShutdown.RestartExitCode}", line);
+    }
+
     // The closing line. A run's log ending without one is how an operator tells a deliberate stop from
     // the box dying mid-cycle -- on the Pi the file log is the only evidence that survives a reboot --
     // so what it says, and that it is written at all, is the point rather than a formatting detail.

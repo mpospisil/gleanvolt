@@ -943,6 +943,32 @@ the battery hold disabled, like any other restart.
 > future version may replace the stop with a standby mode that keeps the UI up so a **Start** button
 > has somewhere to live.
 
+### Restarting it from the web UI
+
+**Health** → **Restart** (or **Apply them** in the *Saved, not applied* banner on **PV system**) runs
+the same graceful shutdown as Stop and exits with code `75`, which `restart: on-failure` — and the
+.deb's `Restart=on-failure` — treats as a failure to recover from. The container is back in a few
+seconds, reads its configuration afresh, and starts in mode **Off**; the page reloads by itself. It
+spends one Solcast call at startup, like any restart.
+
+Where nothing restarts the process — `dotnet run`, a `docker run` without a restart policy, the
+Windows zip — Restart simply exits. There is no way to detect a restart policy from inside the
+container, so the confirmation says this rather than checking.
+
+### Settings saved from the web UI
+
+Values edited on **PV system** are kept in `data/pv-system.json` — `/opt/gleanvolt/data/pv-system.json`
+on the Pi, on the same bind mount as the session database, so they survive image upgrades and
+`docker compose down`. The file **overrides `.env` key by key**, and only for the keys it contains. If
+an `.env` edit seems to be ignored, the startup log names the file and every key it overrode:
+
+```
+PV system: …; overridden by /app/data/pv-system.json (saved from the web UI): Pv:Inverter:Host.
+```
+
+Use **Revert** on the page to take a key out, or delete the file to go back to `.env` entirely. Its
+location is `Pv__OverridesPath`; the .deb sets it to `/var/lib/gleanvolt/pv-system.json`.
+
 ### How long a stop takes
 
 Usually a second or two. It can be much longer, and the reason is always the same: a Modbus read
@@ -974,6 +1000,10 @@ NOT be restarted, and stays down until it is started again.
 
 Gleanvolt stopped cleanly after a termination signal. Exiting with code 143:
 where a restart policy is watching, it will be started again.
+
+Gleanvolt stopped cleanly for a restart requested by Web UI. Exiting with code 75:
+where a restart policy is watching, it will be started again and read its
+configuration afresh; where none is, start it again by hand.
 ```
 
 **A log that ends without one of those lines is a run that died** — killed, OOM-ed, or the power went.
@@ -993,6 +1023,7 @@ code deliberately so that policy can tell the two cases apart:
 | How the run ended | Exit code | What Docker does |
 |---|---|---|
 | Somebody pressed **Stop** (UI, HA) | `0` | leaves it down until you start it |
+| Somebody pressed **Restart** (UI) — e.g. to apply a `/pv-system` edit | `75` | starts it again |
 | `docker compose stop` | — | leaves it down (a manual stop always wins) |
 | SIGTERM: Pi reboot, Docker daemon restart, `docker compose restart` | `143` | starts it again |
 | Crash, OOM kill, power cut | non-zero | starts it again |

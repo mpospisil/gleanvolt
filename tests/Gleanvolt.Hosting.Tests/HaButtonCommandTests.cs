@@ -411,6 +411,8 @@ public class HaButtonCommandTests
     private sealed class NoopShutdown : IServiceShutdown
     {
         public void RequestStop(string source) { }
+
+        public void RequestRestart(string source) { }
     }
 
     /// <summary>A clock that does not move, in the site's zone — "07:00" has to mean tomorrow morning.</summary>

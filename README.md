@@ -1615,7 +1615,7 @@ HomeAssistant__Username=<user>
 HomeAssistant__Password=<pass>
 ```
 
-All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-read-only) — including
+All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-and-editing-it) — including
 the topic prefix, which no single setting spells out — so "what is this controller publishing, and
 where?" does not need an ssh session and a `grep` of `.env`. The password itself is shown there only
 when the UI is behind a login.
@@ -1876,7 +1876,7 @@ above exist to make.
 supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
 
 The feed as configured — broker, username, client id, and the topic it actually subscribed to — is
-shown at [`/pv-system`](#pv-system--the-installation-read-only), which is also where a feed switched on
+shown at [`/pv-system`](#pv-system--the-installation-and-editing-it), which is also where a feed switched on
 with no topic reads as the misconfiguration it is rather than as a car that never reports.
 
 > **Upgrading?** `Vehicle:BatteryCapacityKWh`, `Vehicle:ChargeEfficiency` and `Vehicle:Topic` have
@@ -2370,7 +2370,7 @@ comparison week one feed was fully recorded and the other was invisible, and the
 compared as though the record were even. Whatever the level is, it has to be the same for every feed,
 or the log is evidence about logging rather than about feeds.
 
-#### `/pv-system` — the installation, read-only
+#### `/pv-system` — the installation, and editing it
 
 What this controller is and what it is talking to, from a browser rather than from the startup log:
 the system's name, id and address, its coordinates, the array's bearing (with the compass point spelled
@@ -2378,11 +2378,39 @@ out, because `172°` is only checkable by someone who already thinks in degrees)
 factor and commissioning date, and a table of the devices — the inverter and each charger, with model,
 address and unit id. See [The PV system](#the-pv-system-the-pv-section) for what each value means.
 
-**Read-only, and not merely for now.** Every value on it is resolved once at startup — the Modbus
-clients are constructed from it, and anything unusable has already stopped the host — so a control that
-edited it would be editing a copy of a decision that has already been made. Changing it means editing
-the configuration and restarting, and the page says so rather than leaving someone hunting for a Save
-button.
+**What it shows is what is running.** Every value in those sections is resolved once at startup —
+the Modbus clients are constructed from it, and anything unusable has already stopped the host — and
+none of it changes under a running process.
+
+**The Edit form at the top changes what the *next* start reads**
+([issue #204](https://github.com/mpospisil/gleanvolt/issues/204)). It covers every key in the `Pv`
+section the page shows — identity, location and orientation, capacity, the inverter and the one
+charger — and nothing else: secrets, `ChargeControl`, `BatteryHold`, `Ev` and `HomeAssistant` stay in
+`.env`.
+
+- **A save is checked by the startup resolver.** The form builds the configuration the next start
+  would read and runs it through the same checks; if they refuse it, nothing is written and the page
+  shows why. A saved file can therefore never be the reason the controller does not start.
+- **It goes to the overrides file, `Pv:OverridesPath`** — `data/pv-system.json` by default, which is
+  `/opt/gleanvolt/data/` on the Pi and `/var/lib/gleanvolt/pv-system.json` under the .deb. The file
+  holds only the keys that differ, and **wins over `.env`** (and over `/etc/gleanvolt/gleanvolt.env`)
+  key by key, while a command-line argument still wins over it. Each field says where its value comes
+  from — *default*, *appsettings.json*, *environment* or *web UI* — and a field set from the web UI has
+  **Revert**, which takes the key back out of the file (the last one deletes it). The startup log line
+  `PV system: …` ends with the keys the file overrode, so a `docker logs` dump explains why an `.env`
+  edit "isn't working".
+- **A changed device address is probed once** before saving: one read, and what answered. An
+  inverter address that reads no believable battery SOC, or a charger address that reads no
+  believable run mode, is flagged as a likely swap. It warns and never blocks — a charger that is
+  switched off answers nothing and is still the right address.
+- **Changing `Id` or clearing the coordinates asks first**: the id moves every MQTT topic (see
+  [Renaming what Home Assistant sees](deploy/README.md#renaming-what-home-assistant-sees)), and without coordinates no
+  weather is recorded.
+- **Saved is not applied.** Until a restart, the page shows *Saved, not applied — N changes take
+  effect on restart*, each as *running → saved*, with **Restart** beside it. The banner survives a
+  reload and disappears once the restarted controller is running with those values.
+- **With no login configured the form is read-only**, and says why: it includes the addresses the
+  controller writes Modbus commands to, and anyone on the LAN could redirect them.
 
 It is also where the **deprecation notices** live: any older key still supplying a value is listed
 under *Configuration to move*. The same lines are logged once at startup, where nobody ever sees them
@@ -2489,7 +2517,13 @@ forecast tab shows an explicit empty state while any mode other than `Forecasted
 than the last stale plan, and the targeted tab does the same — but the controls on both stay reachable
 whatever is running, because a target is prepared *before* the mode is on.
 
-The `/health` page also carries the one control that isn't about charging: **Stop service**, which
+The `/health` page also carries the two controls that aren't about charging. **Restart** is the same
+graceful shutdown as Stop, ending with exit code `75` so that Docker's `restart: on-failure` or the
+.deb's systemd unit starts it again — which is how a change saved on `/pv-system` is applied. It pauses
+a charge in progress, comes back in mode **Off** like any start, leaves the UI unreachable for about
+half a minute, and spends a Solcast call at startup; the page reloads by itself once the controller is
+back. Where nothing supervises the process (`dotnet run`, a plain `docker run`, the Windows zip) it
+simply exits. **Stop service**
 shuts the whole controller down gracefully — the charger returned to its pause current, the open
 charging session closed and written, the session store flushed, Modbus and MQTT closed — rather than
 leaving it to be killed, which revokes nothing and leaves the car drawing at the last current we
@@ -2718,7 +2752,7 @@ curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and 
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
 
-All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-read-only), including
+All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-and-editing-it), including
 that second line with this installation's own address and key already substituted in. The key itself is
 shown only when the UI is behind a [login](#authentication); without one the page shows the names and
 says what makes the secrets readable, because a key is bearer-equivalent to the stop button on the

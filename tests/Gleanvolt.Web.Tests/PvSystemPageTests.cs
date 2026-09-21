@@ -1,14 +1,16 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Web.Components.Pages;
 
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// The read-only view of the installation (issue #111). What it has to get right is what a
-/// configuration page is for: showing what is actually configured, saying plainly when something is
-/// not, and never implying that anything on it can be edited here.
+/// The view of the installation as it is running (issue #111). What it has to get right is what a
+/// configuration page is for: showing what is actually configured and saying plainly when something is
+/// not. The edit form at its top (issue #204) has its own tests in PvSystemEditorFormTests.
 /// </summary>
 public class PvSystemPageTests : BunitContext
 {
@@ -130,6 +132,11 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton(mqtt ?? MqttDisplayOptions.None);
         context.Services.AddSingleton(api ?? ApiDisplayOptions.Off);
 
+        // The edit form's dependencies, in the UI's default state: no login, so the form is read-only.
+        context.Services.AddSingleton<IPvSystemEditor>(new FakePvSystemEditor());
+        context.Services.AddSingleton(Options.Create(new WebOptions()));
+        context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
+
         return context.Render<PvSystem>();
     }
 
@@ -238,16 +245,16 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
-    public void Offers_nothing_to_click()
+    public void Without_a_login_offers_nothing_that_edits()
     {
-        // Read-only is the point: everything here was resolved once at startup, and the Modbus clients
-        // were built from it. A control that edited it would be editing a copy of a settled decision.
+        // Device addresses decide where Modbus writes go, so an open UI shows the form and lets nobody
+        // use it (#204); the running view below was never editable at all.
         var page = Render();
 
+        Assert.All(page.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
         Assert.Empty(page.FindAll("button"));
-        Assert.Empty(page.FindAll("input"));
         Assert.Empty(page.FindAll("select"));
-        Assert.Contains("restarting the controller", page.Markup);
+        Assert.Contains("no login", page.Find("#pv-readonly").TextContent);
     }
 
     // -- The car (#124).
@@ -452,8 +459,10 @@ public class PvSystemPageTests : BunitContext
         var page = Render(mqtt: Mqtt(
             homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
 
-        Assert.DoesNotContain("Web__PasswordHash", page.Markup);
-        Assert.Contains("anonymous", page.Markup);
+        // The MQTT section only: the edit form above it names Web__PasswordHash for its own reason.
+        var mqtt = page.Markup[page.Markup.IndexOf("<h2>MQTT</h2>", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("Web__PasswordHash", mqtt);
+        Assert.Contains("anonymous", mqtt);
     }
 
     [Fact]

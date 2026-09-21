@@ -9,15 +9,17 @@
 @inject NavigationManager Nav
 
 @*
-    The installation, as configured (issue #111). Read-only on purpose and not merely for now: every
-    value here is resolved once at startup — the Modbus clients are constructed from it, and the
-    resolver has already refused anything that could not be used — so a control that edited it would
-    be editing a copy of a decision that has already been made. Changing any of it means editing the
-    configuration and restarting, and the page says so rather than leaving someone hunting for a
-    Save button.
+    The installation, as configured (issue #111). What this page shows is still read-only, and not
+    merely for now: every value below is resolved once at startup — the Modbus clients are constructed
+    from it, and the resolver has already refused anything that could not be used — so a control that
+    edited it would be editing a copy of a decision that has already been made.
 
-    What it is for: answering "which system is this, and what is it talking to?" from a browser, the
-    question the startup log answers once and then buries.
+    The form at the top (issue #204) edits something else: the configuration the *next* start reads.
+    A save goes to the web UI's overrides file, a restart applies it, and until then the form says what
+    is saved and not yet running. See PvSystemEditorForm.
+
+    What the rest is for: answering "which system is this, and what is it talking to?" from a browser,
+    the question the startup log answers once and then buries.
 *@
 
 <SiteTitle Page="PV system" />
@@ -25,9 +27,11 @@
 <h1>PV system</h1>
 
 <p class="muted">
-    Read from the configuration at startup. Changing any of it means editing <code>.env</code> or
-    <code>appsettings.json</code> and restarting the controller.
+    Everything after the form is what the controller is running with, read from the configuration at
+    startup. The form changes what the next start reads; a restart applies it.
 </p>
+
+<PvSystemEditorForm />
 
 <h2>Identity</h2>
 
