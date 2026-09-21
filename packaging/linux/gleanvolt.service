@@ -38,6 +38,9 @@ Environment=SessionStore__Path=/var/lib/gleanvolt/sessions.db
 Environment=EnergyMonitor__Path=/var/lib/gleanvolt/energy.db
 Environment=Vehicle__Website__SessionPath=/var/lib/gleanvolt/vw-website-session.json
 Environment=Vehicle__Skoda__KeyPath=/var/lib/gleanvolt/skoda-api-key.json
+# The PV system as edited on the web UI's /pv-system page (issue #204). It overrides gleanvolt.env
+# key by key, and "Revert" on that page -- or deleting this file -- goes back to it.
+Environment=Pv__OverridesPath=/var/lib/gleanvolt/pv-system.json
 # Serilog's rolling file sink, which keeps its own 14 days. Kept beside the journal rather than
 # replaced by it: on a Raspberry Pi the journal is in RAM by default and is gone after a reboot, and
 # the log of the run that ended badly is the one worth having.
@@ -51,6 +54,8 @@ ExecStart=/opt/gleanvolt/Gleanvolt.Worker
 # The exit code is the contract HostShutdown documents, read here exactly as `restart: on-failure`
 # reads it in docker-compose.yml:
 #   0    Stop service in the web UI or Home Assistant -> stays down until `systemctl start gleanvolt`
+#   75   Restart in the web UI (e.g. to apply a /pv-system edit) -> restarted, like a crash, but
+#        recognisably on purpose
 #   143  SIGTERM (systemctl stop, reboot) -> a stop systemd asked for is never restarted, and an
 #        enabled unit starts again at boot
 #   else a crash -> restarted

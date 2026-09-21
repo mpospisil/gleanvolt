@@ -162,10 +162,17 @@
                 The safe way to take the controller down: the charger is returned to its pause current,
                 the open charging session is closed and written, and the session store is flushed —
                 none of which happens if the process is killed instead. It does not come back on its
-                own.
+                own; Restart below is the same shutdown, for a controller that should.
             </span>
         }
     </div>
+
+    @if (!_stopping)
+    {
+        <div class="control">
+            <RestartService Hint="The same graceful shutdown as Stop, ending with the exit code that tells Docker or systemd to start it again. The new process reads its configuration afresh, which is how a change saved on the PV system page is applied." />
+        </div>
+    }
 </section>
 
 @code {

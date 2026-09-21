@@ -1,0 +1,405 @@
+@inject IPvSystemEditor Editor
+@inject IOptions<WebOptions> Web
+
+@*
+    The installation, editable (issue #204). Everything below this form on /pv-system is what the process
+    is running with; this is what the next start will read. The two are kept apart on purpose: the
+    running PvSystemInfo and the Modbus clients built from it are a decision already made, and a save
+    never touches them. It writes the web UI's overrides file, and a restart applies it.
+
+    Each field says where its value comes from, because the file wins over .env: a value set here and
+    forgotten is exactly the thing that makes ".env isn't working" a mystery. Revert takes a key back
+    out of the file.
+*@
+
+<section class="controls pv-editor" id="pv-editor">
+    <h2>Edit</h2>
+
+    @if (_pending.Count > 0)
+    {
+        <div class="alert pending" id="pv-pending">
+            <p>
+                <strong>Saved, not applied</strong> —
+                @($"{_pending.Count} {(_pending.Count == 1 ? "change takes" : "changes take")} effect on restart.")
+            </p>
+            <ul>
+                @foreach (var setting in _pending)
+                {
+                    <li>@Labels[setting.Key]: @Show(setting.Running) → @Show(setting.Saved)</li>
+                }
+            </ul>
+            <div class="control">
+                <RestartService Label="Apply them" />
+            </div>
+        </div>
+    }
+
+    @if (_settings.Unavailable is { } unavailable)
+    {
+        <p class="error" id="pv-unavailable">@unavailable</p>
+    }
+    else if (ReadOnly)
+    {
+        <p class="muted" id="pv-readonly">
+            Read-only, because this UI has no login. These fields include the addresses the controller
+            writes Modbus commands to, and without a login anyone on the LAN could point them somewhere
+            else. Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and they become
+            editable here; until then, change them in <code>.env</code> and restart.
+        </p>
+    }
+    else
+    {
+        <p class="muted">
+            A save is checked the way startup checks the configuration, and writes only what differs to
+            <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key, so
+            each field says where its value comes from. Nothing changes until the controller restarts.
+        </p>
+    }
+
+    @foreach (var (group, keys) in Groups)
+    {
+        <h3>@group</h3>
+
+        <div class="pv-fields">
+            @foreach (var key in keys)
+            {
+                var setting = _settings[key];
+                var id = "pv-" + key.Replace(':', '-');
+
+                <div class="pv-field">
+                    <label for="@id">@Labels[key]</label>
+                    <input id="@id" type="text" spellcheck="false" autocomplete="off"
+                           placeholder="@Hints.GetValueOrDefault(key)"
+                           disabled="@(!Editable || _busy)"
+                           value="@_values[key]"
+                           @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
+                    <span class="source @(setting.IsEdited ? "edited" : null)" title="@SourceTitle(setting)">
+                        @SourceName(setting)
+                    </span>
+                    @if (setting.IsEdited && Editable)
+                    {
+                        <button type="button" class="link revert" disabled="@_busy" @onclick="() => Revert(key)">
+                            Revert to @Show(setting.Underlying)
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (_warnings.Count > 0)
+    {
+        <div class="control" id="pv-warnings">
+            @foreach (var warning in _warnings)
+            {
+                <p class="error">@warning</p>
+            }
+            <button type="button" class="danger" id="pv-save-anyway" @onclick="() => SaveAsync(confirmed: true)">Save anyway</button>
+            <button type="button" class="secondary" @onclick="() => _warnings = []">Cancel</button>
+        </div>
+    }
+    else if (Editable)
+    {
+        <div class="control actions">
+            <button type="button" class="primary" id="pv-save" disabled="@(_busy || Edits().Count == 0)"
+                    @onclick="() => SaveAsync(confirmed: false)">
+                @(_busy ? "Checking…" : "Save")
+            </button>
+            <button type="button" class="secondary" disabled="@(_busy || Edits().Count == 0)" @onclick="Discard">
+                Discard changes
+            </button>
+        </div>
+    }
+
+    @if (_probes.Count > 0)
+    {
+        <ul class="probes" id="pv-probes">
+            @foreach (var (role, probe) in _probes)
+            {
+                <li class="@(probe.Answered && probe.Plausible ? null : "error")">@role: @probe.Message</li>
+            }
+        </ul>
+        @if (_probes.Any(entry => !entry.Result.Answered || !entry.Result.Plausible))
+        {
+            <p class="table-note muted">
+                Saved anyway: a charger that is switched off answers nothing and is still the right address.
+                Both devices answer Modbus on port 502, so a swapped pair shows up as a frozen battery and
+                zero solar once running — check which is which before restarting.
+            </p>
+        }
+    }
+
+    @if (_problems.Count > 0)
+    {
+        <div id="pv-problems">
+            <p class="error">Not saved — the controller would refuse to start with this:</p>
+            <ul class="error">
+                @foreach (var problem in _problems)
+                {
+                    <li>@problem</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="muted" id="pv-message">@message</p>
+    }
+</section>
+
+@code {
+    private const string Missing = "—";
+
+    private static readonly (string Group, string[] Keys)[] Groups =
+    [
+        ("Identity", [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
+        ("Location and orientation", [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
+        ("Capacity", [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
+        ("Inverter", [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
+        ("Charger", [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
+    ];
+
+    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [PvSystemSettingKeys.Id] = "Id",
+        [PvSystemSettingKeys.Name] = "Name",
+        [PvSystemSettingKeys.Address] = "Address",
+        [PvSystemSettingKeys.InstallDate] = "Commissioned",
+        [PvSystemSettingKeys.Latitude] = "Latitude",
+        [PvSystemSettingKeys.Longitude] = "Longitude",
+        [PvSystemSettingKeys.AzimuthDegrees] = "Azimuth",
+        [PvSystemSettingKeys.TiltDegrees] = "Tilt",
+        [PvSystemSettingKeys.CapacityKwp] = "Peak DC capacity (kWp)",
+        [PvSystemSettingKeys.InverterCapacityKw] = "Inverter capacity (kW)",
+        [PvSystemSettingKeys.LossFactor] = "Loss factor",
+        [PvSystemSettingKeys.InverterModel] = "Inverter model",
+        [PvSystemSettingKeys.InverterHost] = "Inverter host",
+        [PvSystemSettingKeys.InverterPort] = "Inverter port",
+        [PvSystemSettingKeys.InverterUnitId] = "Inverter unit id",
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "Unmetered grid phase",
+        [PvSystemSettingKeys.ChargerId] = "Charger id",
+        [PvSystemSettingKeys.ChargerModel] = "Charger model",
+        [PvSystemSettingKeys.ChargerHost] = "Charger host",
+        [PvSystemSettingKeys.ChargerPort] = "Charger port",
+        [PvSystemSettingKeys.ChargerUnitId] = "Charger unit id",
+    };
+
+    private static readonly Dictionary<string, string> Hints = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [PvSystemSettingKeys.Id] = "a-z, 0-9, - and _",
+        [PvSystemSettingKeys.InstallDate] = "yyyy-MM-dd",
+        [PvSystemSettingKeys.Latitude] = "decimal degrees",
+        [PvSystemSettingKeys.Longitude] = "decimal degrees",
+        [PvSystemSettingKeys.AzimuthDegrees] = "degrees from north, 180 = south",
+        [PvSystemSettingKeys.TiltDegrees] = "degrees, 0 = flat",
+        [PvSystemSettingKeys.LossFactor] = "0 to 1",
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "L1, L2, L3 or empty",
+        [PvSystemSettingKeys.InverterPort] = "502",
+        [PvSystemSettingKeys.ChargerPort] = "502",
+        [PvSystemSettingKeys.InverterUnitId] = "1",
+        [PvSystemSettingKeys.ChargerUnitId] = "1",
+    };
+
+    private static readonly string[] InverterAddress =
+        [PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId];
+
+    private static readonly string[] ChargerAddress =
+        [PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId];
+
+    private PvSystemSettings _settings = new(string.Empty, []);
+    private Dictionary<string, string> _values = [];
+    private List<PvSystemSetting> _pending = [];
+    private IReadOnlyList<string> _problems = [];
+    private List<string> _warnings = [];
+    private List<(string Role, DeviceProbeResult Result)> _probes = [];
+    private string? _message;
+    private bool _busy;
+
+    // Editing device addresses redirects Modbus writes, so an open UI shows the form without letting
+    // anyone use it. Restart is not held to this: it follows Stop, which an open UI already offers.
+    private bool ReadOnly => !Web.Value.AuthenticationRequired;
+
+    private bool Editable => !ReadOnly && _settings.Unavailable is null;
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _settings = Editor.Read();
+        _values = _settings.Settings.ToDictionary(
+            setting => setting.Key, setting => setting.Saved ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        _pending = [.. _settings.Pending];
+    }
+
+    // What the form holds that the next start would not already read.
+    private Dictionary<string, string> Edits() =>
+        _settings.Settings
+            .Where(setting => _values.TryGetValue(setting.Key, out var value)
+                && !string.Equals(value.Trim(), setting.Saved ?? string.Empty, StringComparison.Ordinal))
+            .ToDictionary(setting => setting.Key, setting => _values[setting.Key].Trim(), StringComparer.OrdinalIgnoreCase);
+
+    private async Task SaveAsync(bool confirmed)
+    {
+        var edits = Edits();
+
+        if (edits.Count == 0)
+        {
+            return;
+        }
+
+        _message = null;
+        _problems = [];
+
+        if (!confirmed)
+        {
+            var warnings = Warnings(edits);
+
+            if (warnings.Count > 0)
+            {
+                _warnings = warnings;
+                return;
+            }
+        }
+
+        _warnings = [];
+        _busy = true;
+
+        try
+        {
+            _probes = await ProbeAsync(edits);
+
+            var result = Editor.Save(edits);
+
+            if (!result.Saved)
+            {
+                _problems = result.Problems;
+                return;
+            }
+
+            Reload();
+            _message = _pending.Count > 0
+                ? "Saved. Restart the controller to apply it."
+                : "Saved. The controller is already running with these values.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Revert(string key)
+    {
+        _message = null;
+        _probes = [];
+        var result = Editor.Revert(key);
+
+        if (!result.Saved)
+        {
+            _problems = result.Problems;
+            return;
+        }
+
+        _problems = [];
+        Reload();
+        _message = $"{Labels[key]} reverted; it comes from {SourceName(_settings[key])} again.";
+    }
+
+    private void Discard()
+    {
+        _problems = [];
+        _warnings = [];
+        _message = null;
+        Reload();
+    }
+
+    // Changes that are allowed but cost something the form cannot show: asked for once, then saved.
+    private List<string> Warnings(Dictionary<string, string> edits)
+    {
+        var warnings = new List<string>();
+
+        if (edits.ContainsKey(PvSystemSettingKeys.Id))
+        {
+            warnings.Add(
+                "Changing the id moves every MQTT topic the controller publishes under, so Home Assistant "
+                + "sees new topics after the restart. See \"Renaming what Home Assistant sees\" in deploy/README.md "
+                + "and HA_RETIRE_TOPIC_PREFIX for clearing the old ones. The Home Assistant device id is "
+                + "set separately and does not move.");
+        }
+
+        if ((edits.TryGetValue(PvSystemSettingKeys.Latitude, out var latitude) && latitude.Length == 0)
+            || (edits.TryGetValue(PvSystemSettingKeys.Longitude, out var longitude) && longitude.Length == 0))
+        {
+            warnings.Add(
+                "Clearing the coordinates turns off weather recording against charging sessions and the "
+                + "forecast site.");
+        }
+
+        return warnings;
+    }
+
+    // One read against each device whose address changed, before the save: a swapped inverter and
+    // charger is invisible until it is running, and then it looks like a frozen battery.
+    private async Task<List<(string Role, DeviceProbeResult Result)>> ProbeAsync(Dictionary<string, string> edits)
+    {
+        var probes = new List<(string, DeviceProbeResult)>();
+
+        if (InverterAddress.Any(edits.ContainsKey) && Address(InverterAddress) is { } inverter)
+        {
+            probes.Add(("Inverter", await Editor.ProbeAsync(PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId)));
+        }
+
+        if (ChargerAddress.Any(edits.ContainsKey) && Address(ChargerAddress) is { } charger)
+        {
+            probes.Add(("Charger", await Editor.ProbeAsync(PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId)));
+        }
+
+        return probes;
+    }
+
+    // The address as the form now has it, with the same defaults the device options take; null when it
+    // is not one the resolver would accept, which the save will say better than a probe could.
+    private (string Host, int Port, byte UnitId)? Address(string[] keys)
+    {
+        var host = _values[keys[0]].Trim();
+        var port = _values[keys[1]].Trim();
+        var unit = _values[keys[2]].Trim();
+
+        if (host.Length == 0)
+        {
+            return null;
+        }
+
+        var portNumber = 502;
+        byte unitId = 1;
+
+        if ((port.Length > 0 && !int.TryParse(port, out portNumber))
+            || (unit.Length > 0 && !byte.TryParse(unit, out unitId)))
+        {
+            return null;
+        }
+
+        return (host, portNumber, unitId);
+    }
+
+    private static string Show(string? value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
+
+    private static string SourceName(PvSystemSetting setting) => setting.Source switch
+    {
+        PvSettingSource.WebUi => "web UI",
+        PvSettingSource.Environment => "environment",
+        PvSettingSource.CommandLine => "command line",
+        PvSettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
+        _ => "default",
+    };
+
+    private static string SourceTitle(PvSystemSetting setting) => setting.Source switch
+    {
+        PvSettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
+        PvSettingSource.Environment =>
+            $"{setting.SourceDetail}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.",
+        PvSettingSource.CommandLine => "A command-line argument, which wins over this page.",
+        PvSettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
+        _ => "Set nowhere; the built-in default applies.",
+    };
+}

@@ -4,6 +4,57 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-21 — The installation is edited in the web UI into an overrides file, and applied by a restart
+
+**Context.** Issue #204. `/pv-system` was read-only because every value on it is resolved once at startup
+and the Modbus clients are built from it. Correcting a tilt angle or moving the charger to a new address
+meant SSH, an editor and `docker compose up -d`.
+
+**Decision — a save writes the configuration the next start reads; a restart applies it.** The running
+process never edits a decision it has already made. The web UI writes the edited keys to an overrides
+file, and the page shows *Saved, not applied* until a restart has picked them up. Scope is the `Pv`
+section as `/pv-system` shows it. Secrets, `ChargeControl`, `BatteryHold`, `Ev` and `HomeAssistant` can
+follow on the same mechanism later.
+
+**Decision — the file's location is a setting, `Pv:OverridesPath`.** The default is
+`data/pv-system.json`, resolved against the content root like the SQLite stores, which lands on the
+existing bind mount under Docker. The .deb's content root is a read-only `/opt` under
+`ProtectSystem=strict`, so its unit sets `/var/lib/gleanvolt/pv-system.json`. `PackagingTests` already
+requires a unit line for every `…Path` setting, which enforces it. Writing into `.env` or
+`/etc/gleanvolt/gleanvolt.env` was rejected: the container cannot see `.env`, and the service cannot
+write under `/etc`.
+
+**Decision — the file sits after environment variables and before the command line.** Compose always
+sets the device addresses and models from `.env`, falling back to defaults when `.env` is empty. If the
+environment won, the fields most worth editing could never be edited. The cost is that an `.env` edit
+can be silently shadowed. The file therefore holds only the keys that differ, each field names its
+source, **Revert** removes a key, and the startup log line names every key the file overrode.
+
+**Decision — a save runs the startup resolver on the merged candidate.** The editor predicts the next
+start by walking the process's own configuration providers in order, reading the file afresh where it
+sits. The merged result goes through `PvSystemResolver`, and a refusal writes nothing. The alternative
+was a file that stops the controller from starting, and the only remedy for that is SSH.
+
+**Decision — restart is its own exit code, 75 (`EX_TEMPFAIL`).** `restart: on-failure` and systemd's
+`Restart=on-failure` restart it, and it is distinguishable from 0 (Stop, stays down) and 143 (SIGTERM).
+It goes through the same graceful shutdown as Stop. Where nothing supervises the process (`dotnet run`,
+a plain `docker run`, the Windows zip) it simply exits, and the confirmation says so. Two alternatives
+were rejected. Relaunching our own executable would race the old process for the port and the Modbus
+connections. Rebuilding the host in a loop inside `Program.cs` would give up the fresh process that a
+restart is supposed to mean, since Serilog's static logger and the variables loaded from `.env` would
+carry over.
+
+**Decision — editing needs a login; restarting does not.** Device addresses decide where Modbus writes
+go, so with `Web:AuthenticationRequired` false the form is shown read-only and says why. Restart follows
+Stop, which an open UI already offers.
+
+**Consequence.** A changed device address is probed once before saving, with one read of a register
+whose range tells an inverter from a charger. It warns and never blocks, because a charger can
+legitimately be offline. After a restart the browser watches for the controller to go away and come
+back, then reloads, because Blazor's reconnect gives up on a circuit the new process never had.
+
+---
+
 ## 2026-09-16 — Linux gets a .deb from the release, installed by one script; not AppImage, not an APT repository yet
 
 **Context.** Issue #205. A Linux user had the container image, which assumes Docker, a `.env` and chowned

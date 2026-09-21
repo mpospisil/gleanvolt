@@ -27,4 +27,14 @@ public interface IServiceShutdown
     /// <paramref name="source"/> names who asked, for the log. Calling twice is harmless.
     /// </summary>
     void RequestStop(string source);
+
+    /// <summary>
+    /// Begins the same graceful shutdown as <see cref="RequestStop"/>, but ends the process with the
+    /// exit code that means "bring me back" (issue #204). A supervisor that restarts on failure —
+    /// <c>restart: on-failure</c> in Docker, <c>Restart=on-failure</c> under systemd — starts it again,
+    /// and the new process reads the configuration afresh; that is how a saved change is applied.
+    /// Where nothing supervises the process (<c>dotnet run</c>, a plain <c>docker run</c>, the Windows
+    /// zip) it simply exits. Returns immediately, like <see cref="RequestStop"/>.
+    /// </summary>
+    void RequestRestart(string source);
 }

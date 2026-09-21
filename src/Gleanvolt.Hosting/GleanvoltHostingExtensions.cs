@@ -71,8 +71,17 @@ public static class GleanvoltHostingExtensions
         // described is a startup failure, not a connection error minutes later — and registered as one
         // object so that every surface reads the same answer.
         services.Configure<PvSystemOptions>(configuration.GetSection(PvSystemOptions.SectionName));
-        var site = PvSystemResolver.Resolve(configuration);
+        var site = ResolveSite(configuration);
         services.AddSingleton(site);
+
+        // The same section, editable from /pv-system (issue #204). The values are taken now, while they
+        // are certainly the ones `site` was resolved from, so "running" means what this process started
+        // with -- not whatever a reloaded appsettings.json says later.
+        var runningPv = PvSystemEditor.Snapshot(configuration);
+        services.AddSingleton<IPvSystemEditor>(provider => new PvSystemEditor(
+            configuration,
+            runningPv,
+            provider.GetRequiredService<ILogger<PvSystemEditor>>()));
 
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
         {
@@ -710,6 +719,11 @@ public static class GleanvoltHostingExtensions
     /// </summary>
     public static WebApplicationBuilder AddGleanvolt(this WebApplicationBuilder builder)
     {
+        // The installation as edited from /pv-system (issue #204), over the environment and under the
+        // command line. Added here rather than in the service registration because it is a
+        // configuration source, and has to be in place before anything below reads the Pv section.
+        builder.Configuration.AddPvSystemOverrides(builder.Environment.ContentRootPath);
+
         builder.Services.AddGleanvolt(builder.Configuration);
 
         if (ReadWebOptions(builder.Configuration).Enabled)
@@ -724,6 +738,25 @@ public static class GleanvoltHostingExtensions
         }
 
         return builder;
+    }
+
+    // The resolver's refusal, with one thing added when it applies: that some of what it refused was
+    // saved from the web UI. The resolver checks every save, so this takes a change underneath it --
+    // an .env edited afterwards -- but when it happens, the file is the thing nobody thinks to look at.
+    private static PvSystemInfo ResolveSite(IConfiguration configuration)
+    {
+        try
+        {
+            return PvSystemResolver.Resolve(configuration);
+        }
+        catch (InvalidOperationException ex) when (PvSystemOverrides.Find(configuration) is { LoadedKeys.Count: > 0 } overrides)
+        {
+            throw new InvalidOperationException(
+                ex.Message + Environment.NewLine
+                + $"These keys come from {overrides.Path}, saved from the web UI, and override .env: "
+                + string.Join(", ", overrides.LoadedKeys) + ". Delete the file to go back to .env and appsettings.json.",
+                ex);
+        }
     }
 
     /// <summary>

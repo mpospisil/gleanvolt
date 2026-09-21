@@ -1,0 +1,80 @@
+@inject IServiceShutdown Shutdown
+@inject IJSRuntime JS
+
+@*
+    Restart, with its confirmation (issue #204). One component because it has two homes -- Health, next
+    to Stop, and the pending-changes banner on /pv-system -- and the sentence it has to say before the
+    click is the same in both and easy to let drift.
+
+    Two clicks, like Stop, but for a different reason: nothing is lost, and it comes back by itself
+    where a restart policy is watching. What the confirmation is for is the cost -- a charge that pauses,
+    half a minute without a controller, a Solcast call spent -- and the one host where it does not come
+    back at all.
+*@
+
+@if (_restarting)
+{
+    <p class="stopping" id="restart-progress">
+        Restarting… The charger is being paused and the open session closed. This page reloads by itself
+        once the controller is back.
+    </p>
+    <span class="hint">
+        If it does not come back within a minute or two, nothing is restarting it: see
+        <code>docker ps -a</code> or <code>systemctl status gleanvolt</code>, or start it again by hand.
+    </span>
+}
+else if (_confirming)
+{
+    <label>Restart the controller?</label>
+    <button type="button" class="danger" id="restart-confirm" @onclick="ConfirmAsync">Yes, restart it</button>
+    <button type="button" class="secondary" @onclick="() => _confirming = false">Cancel</button>
+    <span class="hint">
+        A charge in progress is paused, and the controller comes back in Off, as it does after any
+        start — the charging mode, a Targeted request and a Fast limit are not kept, so choose them
+        again afterwards. This UI and Home Assistant are unreachable for roughly half a minute. Starting up fetches the solar forecast, so a restart spends
+        one of the day's Solcast calls when a key is configured. It comes back by itself under Docker's
+        <code>restart: on-failure</code> and the .deb's systemd unit; run any other way — <code>dotnet run</code>,
+        a plain <code>docker run</code>, the Windows zip — it simply exits and has to be started again.
+    </span>
+}
+else
+{
+    <label>@Label</label>
+    <button type="button" class="secondary restart" id="restart" @onclick="() => _confirming = true">Restart</button>
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <span class="hint">@Hint</span>
+    }
+}
+
+@code {
+    /// <summary>What the button's line is called where it sits.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Restart the service";
+
+    /// <summary>A line under the button before it is pressed; none when empty.</summary>
+    [Parameter]
+    public string? Hint { get; set; }
+
+    private bool _confirming;
+    private bool _restarting;
+
+    private async Task ConfirmAsync()
+    {
+        _confirming = false;
+        _restarting = true;
+
+        // The browser starts watching before the server goes away, so the reload does not depend on the
+        // circuit surviving long enough to ask for it. A browser that has no script to run it is left
+        // with Blazor's own reconnect prompt, which is where it would have been anyway.
+        try
+        {
+            await JS.InvokeVoidAsync("gleanvolt.reloadAfterRestart");
+        }
+        catch (JSException)
+        {
+        }
+
+        Shutdown.RequestRestart("Web UI");
+    }
+}

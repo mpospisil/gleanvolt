@@ -63,7 +63,12 @@ log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
 
 // What this process thinks it is: which installation, and which boxes it will be talking to (issue
 // #111). A log file that cannot answer that is a log file nobody can read six months later.
-log.LogInformation("PV system: {System}.", host.Services.GetRequiredService<PvSystemInfo>().Describe());
+// A value saved from /pv-system (issue #204) overrides .env, which is exactly what makes ".env isn't
+// working" otherwise inexplicable from a log. The suffix names every key the file overrode, and where it is.
+log.LogInformation(
+    "PV system: {System}{Overrides}.",
+    host.Services.GetRequiredService<PvSystemInfo>().Describe(),
+    PvSystemOverrides.DescribeLoaded(builder.Configuration));
 
 // And the car, on the same terms (#124): "which installation was this, and what car did it think it
 // had" should both be answerable from a `docker logs` dump with no configuration file beside it.

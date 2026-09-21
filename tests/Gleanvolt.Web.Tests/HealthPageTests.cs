@@ -218,6 +218,28 @@ public class HealthPageTests : PageTest
         Assert.Contains("Stopping", page.Markup);
         Assert.Contains("docker compose start gleanvolt-controller", page.Markup);
         Assert.Empty(page.FindAll("button.danger"));
+        Assert.Empty(page.FindAll("#restart"));
+    }
+
+    // The restart control (#204): the same two clicks, and a different request -- the one whose exit
+    // code brings the controller back.
+
+    [Fact]
+    public void Restarts_on_the_confirmation_rather_than_stopping()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var page = Render<Health>();
+
+        page.Find("#restart").Click();
+        Assert.Empty(_shutdown.Restarts);
+        Assert.Contains("Solcast", page.Find("#restart-confirm").ParentElement!.TextContent);
+
+        page.Find("#restart-confirm").Click();
+
+        Assert.Equal(["Web UI"], _shutdown.Restarts);
+        Assert.Empty(_shutdown.Requests);
+        Assert.Contains("reloads by itself", page.Find("#restart-progress").TextContent);
+        JSInterop.VerifyInvoke("gleanvolt.reloadAfterRestart");
     }
     /// <summary>A feed that also reports how its running is going.</summary>
     private sealed class StubFeedWithDiagnostics(VehicleSourceHealth health, VehicleFeedDiagnostics diagnostics)
