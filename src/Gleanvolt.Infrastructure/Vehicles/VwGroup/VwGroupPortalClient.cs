@@ -570,6 +570,16 @@ public sealed class VwGroupPortalClient
             return true;
         }
 
+        // A 5xx is the portal being unwell, never the session. It is judged before the two
+        // heuristics below because the portal serves its outages as HTML -- on 2026-09-21 the
+        // whole API answered 503 with a maintenance page -- and the content-type test read that
+        // as "signed out", which replayed the password at VW's identity provider on every press
+        // and then reported the wrong reason for the failure.
+        if ((int)response.StatusCode >= 500)
+        {
+            return false;
+        }
+
         var landed = response.RequestMessage?.RequestUri?.AbsolutePath ?? requested;
 
         if (landed.Contains("/login", StringComparison.OrdinalIgnoreCase))
