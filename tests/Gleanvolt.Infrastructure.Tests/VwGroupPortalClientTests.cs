@@ -252,6 +252,27 @@ public class VwGroupPortalClientTests
     }
 
     [Fact]
+    public async Task AnOutageServedAsHtmlIsTransientAndCostsNoSignIn()
+    {
+        // 2026-09-21: the whole portal API answered 503 with a maintenance page. HTML where JSON was
+        // expected is one of the three shapes of a dead session, so every press signed in afresh and
+        // then reported SessionExpired -- a password replayed at VW's identity provider because a
+        // server was down. A 5xx is the portal being unwell whatever it is dressed as.
+        var handler = new StubHandler(_ => Html("<html>maintenance</html>", HttpStatusCode.ServiceUnavailable));
+
+        using var http = new HttpClient(handler);
+
+        var error = await Assert.ThrowsAsync<VwGroupPortalException>(
+            () => new VwGroupPortalClient(http, Options()).GetVehiclesAsync());
+
+        Assert.Equal(VwGroupFailure.Transient, error.Failure);
+        Assert.True(error.IsWorthRetrying);
+
+        // The point of the fix: one request, and nothing sent to the identity provider.
+        Assert.Equal(["GET /proxy_api/consent/me/vehicles"], handler.Requests);
+    }
+
+    [Fact]
     public async Task AnAccountWithSeveralCarsAndNoConfiguredVinRefusesToPick()
     {
         var handler = new StubHandler(_ => Json("""
