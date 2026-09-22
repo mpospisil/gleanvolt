@@ -218,6 +218,62 @@ public class VwGroupMergedReadTests
         Assert.Contains("recognises", read.Mapping.Error);
     }
 
+    /// <summary>What the portal delivers for a car that has reported nothing new: a report, no readings.</summary>
+    private static byte[] EmptyDelivery() =>
+        VwGroupFixtures.BundleOf(("report.json", """{"Data":[]}"""));
+
+    [Fact]
+    public async Task Empty_deliveries_do_not_spend_the_budget()
+    {
+        // The live case, 2026-09-22: a car parked since late morning, and by the afternoon its newest
+        // four deliveries were all empty. The last real one sat fifth, outside a budget of four, and
+        // every read -- the feed's and the button's -- came back with nothing.
+        using var portal = new Deliveries(
+            ("empty-1.zip", "2026-09-02T11:30:00Z", EmptyDelivery()),
+            ("empty-2.zip", "2026-09-02T11:15:00Z", EmptyDelivery()),
+            ("empty-3.zip", "2026-09-02T11:00:00Z", EmptyDelivery()),
+            ("battery.zip", "2026-09-02T10:45:00Z", Delivery(
+                "2026-09-02T10:44:00Z", ("battery_level_HV.value", "74"))));
+
+        var read = await Client(portal, Options(budget: 1)).ReadAsync();
+
+        Assert.Equal(74, read.Mapping.State!.SocPercent);
+        Assert.Equal(1, read.DatasetsRead);
+        Assert.Equal(3, read.EmptyDeliveries);
+    }
+
+    [Fact]
+    public async Task A_delivery_found_empty_is_not_downloaded_again()
+    {
+        // The feed holds one client for the life of the process. Without this, a car parked overnight
+        // would cost the whole backlog of empty deliveries in downloads every fifteen minutes.
+        using var portal = new Deliveries(
+            ("empty.zip", "2026-09-02T11:00:00Z", EmptyDelivery()),
+            ("battery.zip", "2026-09-02T10:45:00Z", Delivery(
+                "2026-09-02T10:44:00Z", ("battery_level_HV.value", "74"))));
+
+        var client = Client(portal, Options(budget: 1));
+        await client.ReadAsync();
+        var second = await client.ReadAsync();
+
+        Assert.Equal(["empty.zip", "battery.zip", "battery.zip"], portal.Downloaded);
+        Assert.Equal(74, second.Mapping.State!.SocPercent);
+        Assert.Equal(1, second.EmptyDeliveries);
+    }
+
+    [Fact]
+    public async Task Nothing_but_empty_deliveries_says_the_car_has_sent_nothing()
+    {
+        using var portal = new Deliveries(
+            ("empty-1.zip", "2026-09-02T11:30:00Z", EmptyDelivery()),
+            ("empty-2.zip", "2026-09-02T11:15:00Z", EmptyDelivery()));
+
+        var read = await Client(portal, Options()).ReadAsync();
+
+        Assert.Null(read.Mapping.State);
+        Assert.Contains("none of the 2 deliveries", read.Mapping.Error);
+    }
+
     [Fact]
     public async Task The_newest_delivery_is_read_first_whatever_order_the_portal_lists_them_in()
     {

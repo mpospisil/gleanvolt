@@ -35,6 +35,11 @@ public sealed record VwGroupVehicle(string Vin, string RequestId)
 /// through a deep read is the case this exists for: the reading is real and the page should say what
 /// it did not get to rather than pretending the budget was spent.
 /// </param>
+/// <param name="EmptyDeliveries">
+/// Deliveries passed over for carrying no readings at all, whether downloaded this time or known
+/// empty from an earlier read. They are not in <paramref name="DatasetsRead"/> and did not spend its
+/// budget.
+/// </param>
 public sealed record VwGroupRead(
     VwGroupVehicle Vehicle,
     VwGroupMappingResult Mapping,
@@ -42,7 +47,8 @@ public sealed record VwGroupRead(
     VwGroupBundleReport Bundle,
     int DatasetsRead,
     int DatasetsAvailable,
-    string? StoppedEarly = null);
+    string? StoppedEarly = null,
+    int EmptyDeliveries = 0);
 
 /// <summary>One delivery on offer: what to ask for, and when the portal made it.</summary>
 /// <param name="RequestId">The continuous data request it belongs to.</param>
@@ -87,6 +93,12 @@ public sealed class VwGroupPortalClient
     private readonly VwGroupSignIn _signIn;
     private readonly VwGroupPortalOptions _options;
     private readonly ILogger _logger;
+
+    // Deliveries already downloaded and found to carry no readings, by name. A delivery never changes
+    // once it is listed, so one found empty stays empty; remembering it is what stops the feed, which
+    // holds this client for the life of the process, from re-downloading a parked car's whole
+    // backlog of empty deliveries every fifteen minutes.
+    private readonly HashSet<string> _emptyDeliveries = new(StringComparer.Ordinal);
 
     public VwGroupPortalClient(
         HttpClient http, VwGroupPortalOptions options, VwGroupSignIn? signIn = null, ILogger? logger = null)
@@ -169,10 +181,23 @@ public sealed class VwGroupPortalClient
         string? firstError = null;
         string? stoppedEarly = null;
         var read = 0;
+        var downloaded = 0;
+        var empty = 0;
 
-        foreach (var dataset in datasets.Take(budget))
+        foreach (var dataset in datasets)
         {
-            if (read > 0 && _options.PauseBetweenDownloads > TimeSpan.Zero)
+            if (read >= budget)
+            {
+                break;
+            }
+
+            if (_emptyDeliveries.Contains(dataset.Name))
+            {
+                empty++;
+                continue;
+            }
+
+            if (downloaded > 0 && _options.PauseBetweenDownloads > TimeSpan.Zero)
             {
                 // A deep merge is a burst of ZIP downloads at one endpoint, and the portal answers a
                 // burst with 429. Spacing them is the difference between asking for a lot and asking
@@ -202,10 +227,27 @@ public sealed class VwGroupPortalClient
                 break;
             }
 
-            read++;
+            downloaded++;
 
             if (!VwGroupReportBundle.TryRead(archive, out var found, out var error, out var bundle))
             {
+                if (bundle is { Reports: > 0, Undated: 0 } && bundle.Empty == bundle.Reports)
+                {
+                    // A delivery with reports in it and not one reading in any of them: what the
+                    // portal sends for a car that has reported nothing new. It does not spend the
+                    // budget, because the budget is there to bound a merge -- and on 2026-09-22 a
+                    // car parked since late morning had its last real delivery pushed out of the
+                    // newest four by empty ones, and every read after that came back with nothing.
+                    // Not remembered when the report is undated rather than empty: that one might
+                    // be a battery under a timestamp spelling this build learns tomorrow.
+                    _emptyDeliveries.Add(dataset.Name);
+                    firstError ??= error;
+                    empty++;
+                    bundles.Add(bundle);
+                    continue;
+                }
+
+                read++;
                 // One unreadable delivery does not end the read: the next one down may be the whole
                 // answer, and a bundle that is not a ZIP is exactly the sort of thing a portal in its
                 // first year does once.
@@ -214,6 +256,7 @@ public sealed class VwGroupPortalClient
                 continue;
             }
 
+            read++;
             bundles.Add(bundle);
             snapshots.AddRange(found);
 
@@ -226,7 +269,7 @@ public sealed class VwGroupPortalClient
                 break;
             }
 
-            if (read < Math.Min(budget, datasets.Count))
+            if (read < budget)
             {
                 _logger.LogDebug(
                     "The VW portal's delivery {Read} of {Available} still leaves {Missing}; merging "
@@ -247,7 +290,10 @@ public sealed class VwGroupPortalClient
 
         mapping ??= new VwGroupMappingResult(
             null,
-            firstError ?? "the delivery held nothing that could be read");
+            read == 0 && empty > 0
+                ? $"none of the {empty} deliveries looked at carried a reading: the car has sent nothing "
+                  + "the portal still holds"
+                : firstError ?? "the delivery held nothing that could be read");
 
         if (mapping.UnmappedFields.Count > 0)
         {
@@ -265,7 +311,8 @@ public sealed class VwGroupPortalClient
             Merge(bundles),
             read,
             datasets.Count,
-            stoppedEarly);
+            stoppedEarly,
+            empty);
     }
 
     /// <summary>
