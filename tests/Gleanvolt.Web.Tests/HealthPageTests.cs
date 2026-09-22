@@ -19,6 +19,7 @@ public class HealthPageTests : PageTest
     private readonly ChargeControlStatusHolder _holder = new();
     private readonly FixedTimeProvider _time = new(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), Prague);
     private readonly FakeServiceShutdown _shutdown = new();
+    private readonly FakeSecretStore _secrets = new();
 
     public HealthPageTests()
     {
@@ -26,6 +27,22 @@ public class HealthPageTests : PageTest
         Services.AddSingleton(new WebBuildInfo("1.4.2 (31bf347)"));
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IServiceShutdown>(_shutdown);
+        Services.AddSingleton<ISecretStore>(_secrets);
+    }
+
+    /// <summary>
+    /// Issue #215: the page quotes the store's own sentence about what protects the secrets, and says
+    /// that the data directory is worth guarding. It never claims encryption, because nothing a
+    /// service restarts into unattended is encrypted in any sense worth the word.
+    /// </summary>
+    [Fact]
+    public void Names_what_protects_the_secrets_without_claiming_encryption()
+    {
+        var page = Render<Health>();
+
+        Assert.Contains("Windows DPAPI, this user", page.Markup);
+        Assert.Contains("bearer-equivalent", page.Markup);
+        Assert.DoesNotContain("encrypt", page.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A feed that only ever reports how it is; the page must never make it fetch.</summary>

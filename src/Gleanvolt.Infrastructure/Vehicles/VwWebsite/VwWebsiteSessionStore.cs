@@ -1,11 +1,13 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Gleanvolt.Core.Interfaces;
 
 namespace Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 
 /// <summary>
-/// Keeps a signed-in volkswagen.de session across restarts (issue #170).
+/// Keeps a signed-in volkswagen.de session across restarts (issue #170), through
+/// <see cref="ISecretStore"/>.
 ///
 /// <para><b>The difference between usable and hateful.</b> A cold login always demands an email
 /// one-time code — verified against the live account rather than assumed. The cookie jar carries the
@@ -13,11 +15,12 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 /// restart into a code rarely. Without this the feature would be switched off within a week.</para>
 ///
 /// <para><b>Treated as a secret, because it is one.</b> These cookies are bearer-equivalent: whoever
-/// holds them is signed in as the owner. The file is written owner-only, never logged, never
-/// rendered, and a failure to save is not allowed to take the process down — the session in memory is
-/// still good, and the cost of losing the file is one code next restart.</para>
+/// holds them is signed in as the owner. They are never logged and never rendered, and a failure to
+/// save is not allowed to take the process down — the session in memory is still good, and the cost of
+/// losing it is one code next restart. <b>Where</b> they are kept and what protects them is the secret
+/// store's business, not this type's (issue #215); this type knows about cookies.</para>
 /// </summary>
-public sealed class VwWebsiteSessionStore(string path)
+public sealed class VwWebsiteSessionStore(ISecretStore secrets)
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -25,27 +28,31 @@ public sealed class VwWebsiteSessionStore(string path)
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public string Path => path;
-
-    /// <summary>Whether a saved session exists to try. Says nothing about whether it still works.</summary>
-    public bool Exists => File.Exists(path);
+    /// <summary>What protects the saved session, for a sentence that has to mention it. Never the cookies.</summary>
+    public string Protection => secrets.Describe();
 
     /// <summary>
-    /// Loads the jar, or returns an empty one. A file we cannot read is not an error worth stopping
+    /// Whether a saved session exists to try. Says nothing about whether it still works — and a
+    /// session that cannot be read back, for whatever reason, is one that does not exist.
+    /// </summary>
+    public bool Exists => secrets.Read(SecretNames.VwWebsiteSession) is not null;
+
+    /// <summary>
+    /// Loads the jar, or returns an empty one. A session we cannot read is not an error worth stopping
     /// for: it means a code will be wanted, which the caller already knows how to ask for.
     /// </summary>
     public CookieContainer Load()
     {
         var jar = new CookieContainer();
 
-        if (!File.Exists(path))
+        if (secrets.Read(SecretNames.VwWebsiteSession) is not { } stored)
         {
             return jar;
         }
 
         try
         {
-            var saved = JsonSerializer.Deserialize<StoredCookie[]>(File.ReadAllText(path), Json) ?? [];
+            var saved = JsonSerializer.Deserialize<StoredCookie[]>(stored, Json) ?? [];
 
             foreach (var cookie in saved)
             {
@@ -62,8 +69,7 @@ public sealed class VwWebsiteSessionStore(string path)
                 });
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException
-                                       or CookieException or ArgumentException)
+        catch (Exception ex) when (ex is JsonException or CookieException or ArgumentException)
         {
             return new CookieContainer();
         }
@@ -77,65 +83,18 @@ public sealed class VwWebsiteSessionStore(string path)
     /// </summary>
     public bool Save(CookieContainer jar)
     {
-        try
-        {
-            var directory = System.IO.Path.GetDirectoryName(path);
+        var cookies = jar.GetAllCookies()
+            .Select(cookie => new StoredCookie(
+                cookie.Name, cookie.Value, cookie.Domain, cookie.Path,
+                cookie.Expires == default ? null : new DateTimeOffset(cookie.Expires.ToUniversalTime()),
+                cookie.Secure, cookie.HttpOnly))
+            .ToArray();
 
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var cookies = jar.GetAllCookies()
-                .Select(cookie => new StoredCookie(
-                    cookie.Name, cookie.Value, cookie.Domain, cookie.Path,
-                    cookie.Expires == default ? null : new DateTimeOffset(cookie.Expires.ToUniversalTime()),
-                    cookie.Secure, cookie.HttpOnly))
-                .ToArray();
-
-            File.WriteAllText(path, JsonSerializer.Serialize(cookies, Json));
-            Restrict(path);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return false;
-        }
+        return secrets.Write(SecretNames.VwWebsiteSession, JsonSerializer.Serialize(cookies, Json));
     }
 
     /// <summary>Forgets the session, so the next attempt starts cold.</summary>
-    public void Clear()
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Nothing useful to do: the caller is already signing in again.
-        }
-    }
-
-    /// <summary>Owner-only where the platform has the concept. A no-op on Windows, which does not.</summary>
-    private static void Restrict(string file)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        try
-        {
-            File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
-        {
-            // Best effort. A readable file is worse than an unreadable one and better than no session.
-        }
-    }
+    public void Clear() => secrets.Delete(SecretNames.VwWebsiteSession);
 
     private sealed record StoredCookie(
         string Name, string Value, string Domain, string Path,

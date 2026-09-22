@@ -93,9 +93,32 @@ it. Upgrades never overwrite it.
 |---|---|
 | `/opt/gleanvolt/` | the program: replaced on every upgrade, never edit it |
 | `/etc/gleanvolt/gleanvolt.env` | your settings |
-| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, vehicle sign-in files. Back this up |
+| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, vehicle sign-in files. Back this up — **carefully**, see below |
 | `/var/log/gleanvolt/` | the log files, one per day, kept 14 days |
 | `journalctl -u gleanvolt` | the same log in the system journal. On a Raspberry Pi the journal is lost at reboot; the files above are not |
+
+### The data directory holds secrets
+
+`/var/lib/gleanvolt` is owned by the `gleanvolt` user and is mode `0750`, and two files in it are
+passwords in all but name ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)):
+
+| | |
+|---|---|
+| `vw-website-session.json` | a live volkswagen.de session — whoever holds it is signed in as you, with no password and no emailed code |
+| `skoda-api-key.json` | the MyŠkoda API key — reads the car, and starts and stops charging |
+
+Both are written mode `0600`, which is what the startup log and `/health` report:
+`owner-only files (0600) in the data directory`. **That is a file permission, not encryption**, and
+the controller never claims otherwise — it has to come back from a restart with nobody present, so
+anything it can undo unattended, `root` can undo too.
+
+So back the directory up, but back it up the way you would back up a password file: onto an encrypted
+volume, not into a shared drive, an issue attachment or a support bundle. A copy of
+`/var/lib/gleanvolt` hands over the car. Against a stolen SD card the effective answer is full-disk
+encryption, which is yours to arrange and not something this package can do for you.
+
+To stop handing it over, use **Sign out** on the web UI's Vehicle portal page: it deletes the stored
+value rather than leaving a tombstone holding it.
 
 ## Running it
 

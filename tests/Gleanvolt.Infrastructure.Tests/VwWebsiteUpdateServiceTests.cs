@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -21,8 +22,8 @@ public sealed class VwWebsiteUpdateServiceTests : IDisposable
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "VwWebsite", "charging-status.json"));
 
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-    private readonly string _sessionPath =
-        Path.Combine(Path.GetTempPath(), $"gleanvolt-vw-website-{Guid.NewGuid():N}", "session.json");
+    private readonly FileSecretStore _secrets = new(
+        Path.Combine(Path.GetTempPath(), $"gleanvolt-vw-website-{Guid.NewGuid():N}"));
     private readonly VwWebsiteOptions _options;
     private readonly VwWebsiteClient _client;
     private readonly VwWebsiteUpdateService _service;
@@ -46,7 +47,7 @@ public sealed class VwWebsiteUpdateServiceTests : IDisposable
             Timeout = TimeSpan.FromSeconds(5),
         };
 
-        _client = new VwWebsiteClient(_options, new VwWebsiteSessionStore(_sessionPath));
+        _client = new VwWebsiteClient(_options, new VwWebsiteSessionStore(_secrets));
 
         // A holder that has never seen a poll: nothing is charging, the car is parked.
         _service = new VwWebsiteUpdateService(_options, _client, new ChargeControlStatusHolder(), "id4");
@@ -90,11 +91,9 @@ public sealed class VwWebsiteUpdateServiceTests : IDisposable
         _listener.Stop();
         _client.Dispose();
 
-        var directory = Path.GetDirectoryName(_sessionPath)!;
-
-        if (Directory.Exists(directory))
+        if (Directory.Exists(_secrets.Directory))
         {
-            Directory.Delete(directory, recursive: true);
+            Directory.Delete(_secrets.Directory, recursive: true);
         }
     }
 

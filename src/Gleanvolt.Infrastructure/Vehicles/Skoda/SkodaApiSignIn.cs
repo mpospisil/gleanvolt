@@ -97,8 +97,9 @@ public sealed class SkodaApiSignIn(
         if (!saved)
         {
             _logger.LogWarning(
-                "The Škoda API key is in use but could not be saved to {Path}; a restart will ask for it again.",
-                store.Path);
+                "The Škoda API key is in use but could not be saved to the secret store ({Store}); "
+                + "a restart will ask for it again.",
+                store.Protection);
         }
 
         return Say(SignedIn(stored, saved));
@@ -141,7 +142,8 @@ public sealed class SkodaApiSignIn(
 
         var persistence = saved
             ? string.Empty
-            : $". It could not be saved to {store.Path}, so a restart will ask for it again.";
+            : ". It could not be saved to this controller's data directory, so a restart will ask for "
+              + "it again.";
 
         return VehicleSignInState.SignedIn(validity + car + persistence);
     }

@@ -868,3 +868,23 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
         return Task.FromResult(ProbeResult);
     }
 }
+
+/// <summary>
+/// A secret store that holds nothing and answers the one question a page asks it (issue #215).
+///
+/// <para>It gives a Windows answer whatever the test run's platform is, on purpose: the page has to
+/// print what the store says rather than deciding for itself what the platform implies. Writing and
+/// deleting throw, because a render that reaches a secret is a bug this should catch.</para>
+/// </summary>
+internal sealed class FakeSecretStore : ISecretStore
+{
+    internal string Protection { get; set; } = "Windows DPAPI, this user";
+
+    public string? Read(string name) => null;
+
+    public bool Write(string name, string value) => throw new NotSupportedException("A render must never write a secret.");
+
+    public bool Delete(string name) => throw new NotSupportedException("A render must never delete a secret.");
+
+    public string Describe() => Protection;
+}

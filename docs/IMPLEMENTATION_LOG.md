@@ -4,6 +4,101 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-22 — One secret store: owner-only on Linux, DPAPI on Windows, and nothing called "encrypted" (issue #215)
+
+Three files under the data directory were bearer-equivalent and plaintext, each doing its own file
+I/O with its own idea of what protected it. This puts all of them behind one seam, names what
+protects them in one sentence that appears in three places, and says that sentence honestly.
+
+### The shape, and why it is not a cipher
+
+The controller must come back from a restart with nobody present, so the key that decrypts a stored
+secret has to be readable by this process, at boot, unattended. Every option that sounds stronger
+breaks that: a key file beside the data is file A encrypted with a key in file B in the same backup;
+ASP.NET Data Protection is the same thing wearing a framework (on Linux its keyring is plaintext XML
+in the same directory); a passphrase at start is dead on arrival for a Pi in a cupboard;
+`systemd-creds` needs the credential named in the unit and `ProtectSystem=strict` forbids the web UI
+writing it. Full-disk encryption is the one that works against a stolen SD card and is not ours to
+implement — it is now in the install docs instead. See `docs/DECISIONS.md` for the full record.
+
+### What was built
+
+- **`ISecretStore`** (`Gleanvolt.Core/Interfaces`) — `Read`/`Write`/`Delete`/`Describe`, by name, with
+  `SecretNames` holding the three names. Nothing throws out of it: an unreadable secret is null
+  (which every caller already turns into *sign in again*) and a failed write is false.
+- **`FileSecretStore`** — one file per secret, `<directory>/<name>.json`, `0600` set on creation
+  rather than after, temp-file-plus-rename so a power cut leaves one version or the other, and the
+  temp file removed when a write fails so a secret is never left lying beside the target.
+- **`DpapiSecretStore`** — composed over the file store rather than duplicating its I/O. Payloads
+  carry a `GV-DPAPI-1:` marker, which is what lets a plaintext file be recognised and re-sealed
+  instead of being handed to `Unprotect` and coming back as a crypto exception. `CurrentUser` scope,
+  fixed entropy (not a key — a per-install value would be a key file by another name).
+- **`SecretStoreSelection`** — a pure `(configured, isWindows, inContainer) -> choice + reason +
+  warning`. Windows is two deployments: the zip/winget install gets DPAPI, the Windows container does
+  not, because Nano Server's built-in account does not survive the container being recreated and a
+  secret sealed to it is unrecoverable rather than stale. Explicit `Dpapi` in a container is honoured
+  *with a warning* rather than overruled; explicit `Dpapi` off Windows is refused at startup.
+- **`SkodaApiKeyStore` and `VwWebsiteSessionStore`** keep their types and semantics and stop touching
+  the file system. Their two "could not be saved" messages no longer quote a path; they quote
+  `Describe()`.
+
+### The migration is that there is no migration
+
+Both stores already wrote `<data>/vw-website-session.json` and `<data>/skoda-api-key.json`, and the
+new store looks for exactly those names in exactly that directory. On Linux, Docker and the .deb an
+upgrade finds its session where it left it and nobody signs in again. On a Windows install the first
+read sees plaintext, returns it, and re-seals it — one line in the log, no interruption.
+`SecretMigrationTests` writes the pre-#215 file formats by hand and asserts both come back.
+
+### What changed outside the new files
+
+- `Secrets:Directory` (default `data`, resolved against the content root like the SQLite stores) and
+  `Secrets:Store` (`Auto`/`File`/`Dpapi`) replace `Vehicle:Website:SessionPath` and
+  `Vehicle:Skoda:KeyPath`. Both old keys are now in `RetiredConfigurationKeys`, so a unit or `.env`
+  that still sets one refuses to start naming the replacement — silently reading secrets from
+  elsewhere would cost a fresh sign-in with nothing in the log.
+- The systemd unit sets `Secrets__Directory=/var/lib/gleanvolt` in place of the two path lines.
+  `PackagingTests` now covers `…Directory` settings as well as `…Path`, and accepts a writable root
+  named as itself rather than only as a prefix.
+- `Dockerfile.windows` sets `DOTNET_RUNNING_IN_CONTAINER=true` itself rather than trusting the base
+  image, because that variable is what keeps DPAPI out of the container.
+- `/health` gained `secretStore`; the web health page gained a **Secrets** row; the startup log gained
+  a line naming the store and the reason. All three quote `Describe()`, and a test in each of the
+  three suites asserts the word "encrypt" does not appear.
+- `System.Security.Cryptography.ProtectedData` is a new package reference — DPAPI is not in the
+  shared framework even on Windows.
+
+### Verified
+
+`dotnet test Gleanvolt.slnx -m:1` green (1853 tests). The worker started from
+`src/Gleanvolt.Worker` and logged:
+
+```
+Secrets: owner-only files (0600) in the data directory, because this is not Windows. The data
+directory holds bearer-equivalent secrets; back it up accordingly.
+```
+
+and the volkswagen.de feed wrote `data/vw-website-session.json` at mode `0600` — the same path and the
+same mode as before the change, through the new seam. The DPAPI store's own round trip can only be
+asserted on Windows and is skipped elsewhere; the decision that keeps it out of the container is a
+pure function and is tested on every platform.
+
+### Files changed
+
+New: `src/Gleanvolt.Core/Interfaces/ISecretStore.cs`, `src/Gleanvolt.Infrastructure/Secrets/`
+(`FileSecretStore`, `DpapiSecretStore`, `SecretStoreSelection`, `SecretsOptions`),
+`tests/Gleanvolt.Infrastructure.Tests/SecretStoreTests.cs`,
+`tests/Gleanvolt.Hosting.Tests/SecretStoreRegistrationTests.cs`.
+
+Changed: the two vehicle stores and their options, `SkodaApiSignIn`, `VwWebsiteClient`,
+`GleanvoltHostingExtensions`, `RetiredConfigurationKeys`, `StatusEndpoints`, `ControlContracts`,
+`Health.razor`, `Program.cs`, `appsettings.json`, `packaging/linux/gleanvolt.service`,
+`Dockerfile.windows`, `PackagingTests`, the affected test fixtures, and the docs
+(`README.md`, `deploy/README.md`, `packaging/linux/README.md`, `packaging/winget/README.md`,
+`docs/SUPPORTED_EVS.md`, `docs/DECISIONS.md`).
+
+---
+
 ## 2026-09-03 — The release pipeline runs, on all three platforms (issues #145–#148, ahead of #149)
 
 The first green run of `release.yml` in its current form. Every phase of #144 up to the tag is now

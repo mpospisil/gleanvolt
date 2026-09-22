@@ -36,8 +36,12 @@ Environment=DOTNET_EnableDiagnostics=0
 # setting in appsettings.json has a line here, so a new one cannot quietly land in /opt.
 Environment=SessionStore__Path=/var/lib/gleanvolt/sessions.db
 Environment=EnergyMonitor__Path=/var/lib/gleanvolt/energy.db
-Environment=Vehicle__Website__SessionPath=/var/lib/gleanvolt/vw-website-session.json
-Environment=Vehicle__Skoda__KeyPath=/var/lib/gleanvolt/skoda-api-key.json
+# The secret store's directory (issue #215): the volkswagen.de session and the MyŠkoda API key, each
+# written 0600. It is the same directory the files were in before, under their own names, so an
+# upgrade from a build that had two path settings never costs a fresh sign-in. ProtectSystem=strict
+# and ProtectHome=true below are what keeps the rest of the filesystem out of reach of this service;
+# what keeps other accounts out of this directory is its own mode, set by the postinstall script.
+Environment=Secrets__Directory=/var/lib/gleanvolt
 # The PV system as edited on the web UI's /pv-system page (issue #204). It overrides gleanvolt.env
 # key by key, and "Revert" on that page -- or deleting this file -- goes back to it.
 Environment=Pv__OverridesPath=/var/lib/gleanvolt/pv-system.json

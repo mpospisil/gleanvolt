@@ -232,3 +232,26 @@ internal sealed class FakeChargingSessionStore : IChargingSessionStore
 
     public Task<int> PruneAsync(TimeSpan retention, CancellationToken cancellationToken) => Task.FromResult(0);
 }
+
+/// <summary>
+/// A secret store in memory. <c>/health</c> only ever asks it what protects the secrets, so what this
+/// answers is the thing under test: the sentence, not the bytes.
+/// </summary>
+internal sealed class FakeSecretStore : ISecretStore
+{
+    private readonly Dictionary<string, string> _secrets = [];
+
+    internal string Protection { get; set; } = "owner-only files (0600) in the data directory";
+
+    public string? Read(string name) => _secrets.GetValueOrDefault(name);
+
+    public bool Write(string name, string value)
+    {
+        _secrets[name] = value;
+        return true;
+    }
+
+    public bool Delete(string name) => _secrets.Remove(name) || true;
+
+    public string Describe() => Protection;
+}

@@ -791,6 +791,7 @@ Everything that is state, because none of it lives inside a container:
 | `/opt/gleanvolt/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
 | `data/sessions.db` | charging-session history, with its SQLite WAL |
 | `data/energy.db` | the site's 15-minute energy history, with its SQLite WAL |
+| `data/vw-website-session.json`, `data/skoda-api-key.json` | **the car's sign-in.** Bearer-equivalent, mode `0600` — see below |
 | `logs/` | the controller's own log files |
 | `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
 | `mosquitto/config/passwd` | broker credentials, created by hand |
@@ -798,6 +799,18 @@ Everything that is state, because none of it lives inside a container:
 `docker compose down` and even `docker rm -f` on any single container are equally safe, for the same
 reason. What *is* overwritten every deploy is `mosquitto.conf` and the compose files — so edit those
 in the repo, not on the Pi, or your change disappears at the next update.
+
+**`data/` is secret-bearing** ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)). Two
+of the files in it are passwords in all but name: a live volkswagen.de session, and the MyŠkoda API
+key that starts and stops charging. The controller writes both mode `0600` and says so at startup and
+on `/health` — `owner-only files (0600) in the data directory` — and that is a file permission, not
+encryption. It cannot be: the service has to come back from a reboot with nobody present.
+
+So a `docker cp gleanvolt:/app/data .`, an `rsync` of `/opt/gleanvolt` to a laptop, or a tarball
+attached to an issue all hand over the car. Copy `data/` the way you would copy `.env`: onto an
+encrypted volume, and nowhere public. Against a stolen SD card what actually helps is full-disk
+encryption on the Pi, which is outside this stack. **Sign out** on the web UI's Vehicle portal page
+deletes the stored value rather than leaving a tombstone holding it.
 
 ### Updating the controller also updates Home Assistant and the broker
 

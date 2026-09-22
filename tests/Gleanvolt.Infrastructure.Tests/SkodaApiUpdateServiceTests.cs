@@ -1,6 +1,7 @@
 using System.Net;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using static Gleanvolt.Infrastructure.Tests.SkodaFixtures;
 
@@ -15,7 +16,7 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 15, 18, 40, 0, TimeSpan.Zero);
 
-    private readonly string _keyPath = KeyPath();
+    private readonly FileSecretStore _secrets = SecretStore();
     private readonly TestClock _clock = new(Now);
     private readonly FakeApi _api = new(_ => Json(HttpStatusCode.OK, "connect-cable.json", Now.AddMonths(6)));
     private readonly SkodaApiKeyStore _store;
@@ -24,7 +25,7 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
 
     public SkodaApiUpdateServiceTests()
     {
-        _store = new SkodaApiKeyStore(_keyPath);
+        _store = new SkodaApiKeyStore(_secrets);
         _client = new SkodaApiClient(Options(), _clock, _api);
         _service = new SkodaApiUpdateService(Options(), _store, _client, "enyaq", time: _clock);
     }
@@ -32,11 +33,9 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
     public void Dispose()
     {
         _client.Dispose();
-        var directory = Path.GetDirectoryName(_keyPath)!;
-
-        if (Directory.Exists(directory))
+        if (Directory.Exists(_secrets.Directory))
         {
-            Directory.Delete(directory, recursive: true);
+            Directory.Delete(_secrets.Directory, recursive: true);
         }
     }
 
@@ -248,7 +247,7 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
         await _service.FetchAsync(CancellationToken.None);
 
         Assert.Equal(renewed, _store.Current?.ExpiresAt);
-        Assert.Equal(renewed, new SkodaApiKeyStore(_keyPath).Current?.ExpiresAt);
+        Assert.Equal(renewed, new SkodaApiKeyStore(_secrets).Current?.ExpiresAt);
     }
 
     [Fact]

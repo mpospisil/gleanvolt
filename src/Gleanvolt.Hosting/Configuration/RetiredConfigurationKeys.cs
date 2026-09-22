@@ -36,6 +36,14 @@ public static class RetiredConfigurationKeys
         ("Vehicle:BatteryCapacityKWh", "Ev:Vehicles:0:BatteryCapacityKWh"),
         ("Vehicle:ChargeEfficiency", "Ev:Vehicles:0:ChargeEfficiency"),
         ("Vehicle:Topic", "Ev:Vehicles:0:Telemetry:Topic"),
+
+        // Issue #215. The session file and the key file stopped being two arrangements with two
+        // settings and became one secret store with one directory. Refused rather than ignored for
+        // exactly the reason above: a .deb upgraded from #205 still carries both lines in its unit,
+        // and silently reading secrets from somewhere else would cost the owner a fresh sign-in with
+        // nothing in the log to say why.
+        ("Vehicle:Website:SessionPath", "Secrets:Directory"),
+        ("Vehicle:Skoda:KeyPath", "Secrets:Directory"),
     ];
 
     /// <summary>

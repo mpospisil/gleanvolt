@@ -12,6 +12,12 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.10" />
     <PackageReference Include="NModbus" Version="3.0.83" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <!--
+      DPAPI is not in the shared framework: ProtectedData is a package even on Windows, and this
+      is the one thing DpapiSecretStore needs (issue #215). It is a no-op off Windows, where the
+      selection never builds that store.
+    -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

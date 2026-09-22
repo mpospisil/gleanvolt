@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -27,9 +28,9 @@ internal static class SkodaFixtures
         Timeout = TimeSpan.FromSeconds(5),
     };
 
-    /// <summary>A key file of the test's own, removed with the test.</summary>
-    public static string KeyPath() =>
-        Path.Combine(Path.GetTempPath(), "gleanvolt-skoda-tests", Guid.NewGuid().ToString("N"), "skoda-api-key.json");
+    /// <summary>A secret store of the test's own, in a directory removed with the test.</summary>
+    public static FileSecretStore SecretStore() => new(
+        Path.Combine(Path.GetTempPath(), "gleanvolt-skoda-tests", Guid.NewGuid().ToString("N")));
 
     public static HttpResponseMessage Json(
         HttpStatusCode status,

@@ -317,6 +317,63 @@ addresses moved out of.
 The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
 are documented in the subsections that follow.
 
+### The data directory holds secrets (the `Secrets` section)
+
+**The data directory is bearer-equivalent. Whoever can read it can read — and charge — your car.**
+Two files in it are passwords in all but name ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)):
+
+| File | What it holds | What it lets someone do |
+|---|---|---|
+| `vw-website-session.json` | a live volkswagen.de session, including the *remember this browser* grant | read the car as you, with no password and no emailed code |
+| `skoda-api-key.json` | the MyŠkoda Public API key | read the car, and start and stop charging |
+
+They live in one place, behind one seam, so there is one answer to "what protects these?":
+
+```jsonc
+"Secrets": {
+  "Directory": "data",   // relative paths resolve against the content root; the .deb sets it absolutely
+  "Store": "Auto"        // "Auto" | "File" | "Dpapi" -- Auto is right everywhere
+}
+```
+
+| Deployment | Directory | What protects it |
+|---|---|---|
+| Docker (Linux) | `/app/data` on the `./data` bind mount | mode `0600`, plus the host directory's own mode |
+| .deb / systemd | `/var/lib/gleanvolt` (mode `0750`, owner `gleanvolt`) | mode `0600`, plus `ProtectSystem=strict` and `ProtectHome=true` |
+| Windows zip / winget | `data\` next to the exe | Windows DPAPI, `CurrentUser` scope |
+| Windows container | `C:pp\data` | the volume's ACLs — DPAPI deliberately **not** used, see below |
+| `dotnet run` | `src/Gleanvolt.Worker/data` | mode `0600`; already gitignored |
+
+**Nothing here is encryption, and the controller never says it is.** The service has to come back
+from a restart with nobody present — that is the point of `Restart=on-failure` — so whatever protects
+a stored secret must be undoable by this process, on this machine, at boot, unattended. A key file
+beside the data, or ASP.NET Data Protection (whose Linux keyring is plaintext XML *in the same
+directory*), would encrypt file A with a key in file B in the same backup. The startup log and
+`/health` therefore report what is true — `owner-only files (0600) in the data directory`, or
+`Windows DPAPI, this user` — and never the word *encrypted*. What genuinely protects a stolen SD card
+is full-disk encryption, which is the installer's to arrange and not this program's to claim.
+
+**Back the directory up accordingly.** It belongs on an encrypted volume; it does not belong in a
+casual backup, an issue attachment or a shared drive; and `docker cp` of it hands over the car. To
+hand it over deliberately, don't — use **Sign out** on the [Vehicle portal](#the-car-the-ev-section)
+page first, which deletes the value rather than leaving a tombstone holding it.
+
+**Windows is two deployments, not one.** On the zip and winget installs DPAPI earns its place: the
+key is the operating system's, there is no key file to lose or back up by accident, and `data\` sits
+inside a package directory that an upgrade may replace and that people copy around wholesale. Scope
+is `CurrentUser`, never `LocalMachine` — machine scope is readable by every account on the box, which
+is weaker than the file permissions it was meant to improve on. In the **Windows container** it is
+deliberately off: Nano Server runs under a built-in account that does not survive the container being
+recreated, and a secret sealed to it would be *unrecoverable* rather than merely stale. The choice is
+explicit and on the startup log, never inferred from "this is Windows".
+
+A secret that cannot be read back — truncated, or sealed for a Windows profile this machine no longer
+has — is reported as *sign in again*, which is a page to visit, not a crypto exception in the log.
+
+Out of scope, and staying out: secrets that arrive as environment variables (the Solcast key, the
+MQTT password, the `VW_*` and `SKODA_*` values in `.env`) are the deployment's to protect; this is
+about what the process writes. `Web:PasswordHash` is a one-way hash, not a secret.
+
 ### The PV system (the `Pv` section)
 
 One section describes the installation: where the array is, what it faces, what it is made of, and what
@@ -1813,9 +1870,11 @@ are preparing a charge, so it is done from **Vehicle portal → Sign in**, where
 settings above only say which account and which car; nothing signs in on its own, and opening the page
 does not either.
 
-**The session is kept in `data/vw-website-session.json`**, which carries the *remember this browser*
-grant — that file is why a restart does not cost another code. **Treat it as a password**: anyone
-holding it is signed in as you. It is written owner-only and never logged.
+**The session is kept in the data directory**, as `vw-website-session.json`, and it carries the
+*remember this browser* grant — that file is why a restart does not cost another code. **Treat it as a
+password**: anyone holding it is signed in as you. It is never logged and never rendered, and what
+protects it on disk is [the secret store](#the-data-directory-holds-secrets-the-secrets-section) —
+owner-only on Linux, DPAPI on a Windows install, and named on the startup log and `/health`.
 
 If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
 dashboard's card says *volkswagen.de wants a one-time code — sign in again on the vehicle page* with a
@@ -1845,7 +1904,6 @@ the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs) Škoda 
 | `Enabled`, `Vin` | off, empty | Both required. **This section chooses the feed** — `Ev:Vehicles[].Make` never does |
 | `ChargingPollInterval` | `00:05:00` | While a charge is running |
 | `IdlePollInterval` | `00:15:00` | Between charges: the state of charge before a charge starts is what a % target is planned from |
-| `KeyPath` | `data/skoda-api-key.json` | Where the pasted key is kept, owner-only |
 | `BaseUrl`, `SourceId` | Škoda's API, `skoda` | A hedge, not an abstraction: the test environment, or another VW Group brand if one ever publishes the same API |
 
 **The key is pasted on a page, and is in no setting.** Create an API key for this car in the MySkoda
@@ -1854,11 +1912,13 @@ one covers the other; the page then says *Key valid until … · your car's name
 without a restart. An expired key, an unknown key, a key that does not cover the VIN and an unknown VIN
 each get their own sentence and nothing is stored. Keys expire: from a week before, the feed is
 *Degraded* and says when, and renewing is pasting a new key on the same page. **Sign out** deletes the
-file — the key keeps working at Škoda until you revoke it in the app, because the API has no revoke.
+stored key outright — no tombstone keeps the value — although the key keeps working at Škoda until you
+revoke it in the app, because the API has no revoke.
 
-**The key is not read-only** (the same key starts and stops charging), so the file is treated as a
-password: owner-only, never logged, never rendered, never in the REST API or Home Assistant. Gleanvolt's
-client has no method for any command endpoint.
+**The key is not read-only** (the same key starts and stops charging), so it is treated as a
+password: never logged, never rendered, never in the REST API or Home Assistant, and kept in
+[the secret store](#the-data-directory-holds-secrets-the-secrets-section) as `skoda-api-key.json`.
+Gleanvolt's client has no method for any command endpoint.
 
 **Twenty requests an hour, per VIN**, shared with *Ask the car* and the sign-in. The feed takes four an
 hour idle and twelve while charging, stops the clock for the window once only three are left, and honours
@@ -2720,7 +2780,7 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /` | What this is, where the document is, how to authenticate, and every operation this build serves. **No key.** |
 | `GET /site` | Which installation this is: name, id, address, coordinates, the array's bearing, tilt, capacity and loss factor, and the devices it is made of with their models and addresses. Ask it first — every other endpoint reports what the controller is *doing*, and two installations answer those identically. |
 | `GET /status` | The live snapshot: mode, state, PV, grid, battery power and SOC, EV power and current, the hold, session energy, the running plan. 503 until the first poll completes. |
-| `GET /health` | Which system is answering, the build version, age of the last poll, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read. |
+| `GET /health` | Which system is answering, the build version, age of the last poll, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read, and what protects the secrets in the data directory (`secretStore`). |
 | `GET /energy/intervals?from=&to=` | The recorded series — solar, forecast solar, import, export, EV, battery in and out, the SOC band, and each window's **coverage**. Defaults to the last 24 hours. |
 | `GET /energy/days/{date}` | One local day added up, so "how was Tuesday?" is one call rather than 96 rows. |
 | `GET /sessions?from=&to=&limit=` | Charging sessions, newest first, with the energy split by source. Defaults to the last 30 days. |

@@ -1,10 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Gleanvolt.Core.Interfaces;
 
 namespace Gleanvolt.Infrastructure.Vehicles.Skoda;
 
 /// <summary>
-/// The pasted MyŠkoda API key, in memory and on disk (issue #193).
+/// The pasted MyŠkoda API key, in memory and — through <see cref="ISecretStore"/> — on disk (issue #193).
 ///
 /// <para><b>One holder, shared.</b> The sign-in writes it and the feed reads it on every fetch, so a
 /// key submitted on the page is in use by the next fetch without a restart. <see cref="Version"/>
@@ -12,9 +13,10 @@ namespace Gleanvolt.Infrastructure.Vehicles.Skoda;
 /// new key the owner has just pasted" without keeping a second copy of the secret.</para>
 ///
 /// <para><b>Treated as a secret, because it is one.</b> The key is not read-only — it starts and stops
-/// charging — so the file is written owner-only (the <c>VwWebsiteSessionStore</c> arrangement), never
-/// logged, never rendered, and a failure to save is not allowed to take the process down: the key in
-/// memory still works until the process ends.</para>
+/// charging — so it is never logged and never rendered, and a failure to save is not allowed to take
+/// the process down: the key in memory still works until the process ends. <b>Where</b> it is kept and
+/// what protects it is no longer this type's business (issue #215): it keeps the key's shape and its
+/// semantics — an expiring key, a version that moves — and the store keeps the bytes.</para>
 /// </summary>
 public sealed class SkodaApiKeyStore
 {
@@ -24,17 +26,18 @@ public sealed class SkodaApiKeyStore
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    private readonly string _path;
+    private readonly ISecretStore _secrets;
     private volatile SkodaApiKey? _current;
     private int _version;
 
-    public SkodaApiKeyStore(string path)
+    public SkodaApiKeyStore(ISecretStore secrets)
     {
-        _path = path;
-        _current = Load(path);
+        _secrets = secrets;
+        _current = Load(secrets);
     }
 
-    public string Path => _path;
+    /// <summary>What protects the saved key, for a sentence that has to mention it. Never the key itself.</summary>
+    public string Protection => _secrets.Describe();
 
     /// <summary>The key in use, or null when none has been pasted.</summary>
     public SkodaApiKey? Current => _current;
@@ -43,8 +46,8 @@ public sealed class SkodaApiKeyStore
     public int Version => Volatile.Read(ref _version);
 
     /// <summary>
-    /// Makes this the key in use and writes it to disk. Returns whether the file stuck — the key is in
-    /// use either way, and the caller says a restart will want it again when it did not.
+    /// Makes this the key in use and writes it to the secret store. Returns whether it stuck — the key
+    /// is in use either way, and the caller says a restart will want it again when it did not.
     /// </summary>
     public bool Save(SkodaApiKey key)
     {
@@ -74,78 +77,33 @@ public sealed class SkodaApiKeyStore
     {
         _current = null;
         Interlocked.Increment(ref _version);
-
-        try
-        {
-            if (File.Exists(_path))
-            {
-                File.Delete(_path);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Nothing useful to do: the key is already out of use in this process.
-        }
+        _secrets.Delete(SecretNames.SkodaApiKey);
     }
 
     /// <summary>
-    /// The saved key, or none. A file that cannot be read is not worth stopping for: it means the page
-    /// asks for a key, which it already knows how to do.
+    /// The saved key, or none. A stored value that cannot be read back is not worth stopping for: it
+    /// means the page asks for a key, which it already knows how to do.
     /// </summary>
-    private static SkodaApiKey? Load(string path)
+    private static SkodaApiKey? Load(ISecretStore secrets)
     {
+        if (secrets.Read(SecretNames.SkodaApiKey) is not { } stored)
+        {
+            return null;
+        }
+
         try
         {
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-
-            var saved = JsonSerializer.Deserialize<SkodaApiKey>(File.ReadAllText(path), Json);
+            var saved = JsonSerializer.Deserialize<SkodaApiKey>(stored, Json);
             return string.IsNullOrWhiteSpace(saved?.Key) ? null : saved;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (JsonException)
         {
             return null;
         }
     }
 
-    private bool Write(SkodaApiKey key)
-    {
-        try
-        {
-            var directory = System.IO.Path.GetDirectoryName(_path);
-
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var open = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write };
-
-            // Owner-only before the secret is written, rather than restricted after: there is then no
-            // moment at which the key sits in a readable file. The mode on creation covers a new file,
-            // the explicit set one left over from a looser umask. Windows has no such concept.
-            if (!OperatingSystem.IsWindows())
-            {
-                open.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            using var stream = new FileStream(_path, open);
-
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
-            JsonSerializer.Serialize(stream, key, Json);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return false;
-        }
-    }
+    private bool Write(SkodaApiKey key) =>
+        _secrets.Write(SecretNames.SkodaApiKey, JsonSerializer.Serialize(key, Json));
 }
 
 /// <summary>A pasted key and what Škoda said about it when it was checked.</summary>

@@ -43,6 +43,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     internal VehicleStateHolder Vehicle { get; } = new();
 
+    internal FakeSecretStore Secrets { get; } = new();
+
     /// <summary>
     /// The configured car (#124) — what it <em>is</em>, as opposed to <see cref="Vehicle"/>, which is
     /// what it last <em>said</em>. Unknown unless a test describes one.
@@ -79,6 +81,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<IEnergyIntervalStore>(Energy);
         builder.Services.AddSingleton<IChargingSessionStore>(Sessions);
         builder.Services.AddSingleton<IVehicleTelemetry>(Vehicle);
+        builder.Services.AddSingleton<ISecretStore>(Secrets);
         builder.Services.AddSingleton(new ApiHostInfo("1.2.3-test", TimeSpan.FromHours(12)));
         builder.Services.AddSingleton(Fixtures.Site);
         builder.Services.AddSingleton(Car);

@@ -146,6 +146,14 @@ is scoped to the cars it names, expires, and is revocable in the app — a much 
 brand password — and it clears Gleanvolt's bar below more comfortably than Route B: a documented
 interface the manufacturer published for exactly this use.
 
+**Prefer the weakest credential that does the job, because whichever one you choose ends up on the
+Pi.** All three routes leave something bearer-equivalent in the data directory — Route C an expiring,
+revocable, VIN-scoped key; Route B a live volkswagen.de session; Route A the portal credentials — and
+what protects it there is a file mode on Linux and DPAPI on a Windows install, never encryption the
+controller could claim with a straight face. That is the whole argument for the ranking above, and
+[the data directory holds secrets](../README.md#the-data-directory-holds-secrets-the-secrets-section)
+is where it is written down.
+
 ### Why only VW Group is built in
 
 Gleanvolt's rule is that a manufacturer earns a built-in client only through a **documented statutory

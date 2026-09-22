@@ -20,6 +20,7 @@ using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Sessions;
 using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
@@ -82,6 +83,39 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>()));
+
+        // Where the bearer-equivalent secrets live, and what protects them (issue #215). One store for
+        // all of them: the volkswagen.de session, the MyŠkoda key and -- once #214 lands -- the vehicle
+        // account password are the same kind of thing, and protecting one while the others sit beside it
+        // in plain text buys nothing. Registered unconditionally, whether or not a car feed is, so that
+        // /health can name the store on an installation that has no car.
+        //
+        // The choice is made once, here, and carried as a value so the startup log can say which store
+        // and why. Auto is right everywhere; see SecretStoreSelection for why Windows is two answers.
+        services.Configure<SecretsOptions>(configuration.GetSection(SecretsOptions.SectionName));
+
+        var secrets = configuration.GetSection(SecretsOptions.SectionName).Get<SecretsOptions>()
+            ?? new SecretsOptions();
+
+        var secretStore = SecretStoreSelection.Choose(
+            secrets.Store, OperatingSystem.IsWindows(), SecretStoreSelection.RunningInContainer());
+
+        services.AddSingleton(secretStore);
+
+        services.AddSingleton<ISecretStore>(provider =>
+        {
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+
+            // Resolved against the content root, as the SQLite stores and pv-system.json are, so a
+            // relative path means the same thing under `dotnet run`, the debugger and the container.
+            // The .deb sets it absolutely: its content root is a read-only /opt/gleanvolt.
+            var directory = Path.IsPathRooted(secrets.Directory)
+                ? secrets.Directory
+                : Path.Combine(environment.ContentRootPath, secrets.Directory);
+
+            return SecretStoreSelection.Create(
+                secretStore, directory, provider.GetRequiredService<ILoggerFactory>());
+        });
 
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
         {
@@ -603,7 +637,8 @@ public static class GleanvoltHostingExtensions
         if (website.IsConfigured)
         {
             services.AddSingleton(website);
-            services.AddSingleton(new VwWebsiteSessionStore(website.SessionPath));
+            services.AddSingleton(provider => new VwWebsiteSessionStore(
+                provider.GetRequiredService<ISecretStore>()));
             services.AddSingleton(provider => new VwWebsiteClient(
                 website,
                 provider.GetRequiredService<VwWebsiteSessionStore>(),
@@ -629,7 +664,8 @@ public static class GleanvoltHostingExtensions
         if (skoda.IsConfigured)
         {
             services.AddSingleton(skoda);
-            services.AddSingleton(new SkodaApiKeyStore(skoda.KeyPath));
+            services.AddSingleton(provider => new SkodaApiKeyStore(
+                provider.GetRequiredService<ISecretStore>()));
             services.AddSingleton(provider => new SkodaApiClient(skoda, provider.GetRequiredService<TimeProvider>()));
 
             services.AddSingleton<IVehicleAccountSignIn>(provider => new SkodaApiSignIn(

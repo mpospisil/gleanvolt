@@ -1,5 +1,7 @@
 using System.Net;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using static Gleanvolt.Infrastructure.Tests.SkodaFixtures;
 
@@ -13,7 +15,7 @@ public sealed class SkodaApiSignInTests : IDisposable
 {
     private static readonly DateTimeOffset Expiry = new(2027, 3, 1, 12, 0, 0, TimeSpan.Zero);
 
-    private readonly string _keyPath = KeyPath();
+    private readonly FileSecretStore _secrets = SecretStore();
     private readonly FakeApi _api = new(_ => Json(HttpStatusCode.OK, "info.json", Expiry));
     private readonly CapturingLogger<SkodaApiSignIn> _log = new();
     private readonly SkodaApiKeyStore _store;
@@ -22,7 +24,7 @@ public sealed class SkodaApiSignInTests : IDisposable
 
     public SkodaApiSignInTests()
     {
-        _store = new SkodaApiKeyStore(_keyPath);
+        _store = new SkodaApiKeyStore(_secrets);
         _client = new SkodaApiClient(Options(), transport: _api);
         _signIn = new SkodaApiSignIn(Options(), _store, _client, _log);
     }
@@ -30,11 +32,9 @@ public sealed class SkodaApiSignInTests : IDisposable
     public void Dispose()
     {
         _client.Dispose();
-        var directory = Path.GetDirectoryName(_keyPath)!;
-
-        if (Directory.Exists(directory))
+        if (Directory.Exists(_secrets.Directory))
         {
-            Directory.Delete(directory, recursive: true);
+            Directory.Delete(_secrets.Directory, recursive: true);
         }
     }
 
@@ -69,13 +69,15 @@ public sealed class SkodaApiSignInTests : IDisposable
     {
         await _signIn.SubmitAsync(Key);
 
-        var restarted = new SkodaApiKeyStore(_keyPath);
+        var restarted = new SkodaApiKeyStore(_secrets);
         Assert.Equal(Key, restarted.Current?.Key);
         Assert.Equal(Expiry, restarted.Current?.ExpiresAt);
 
         if (!OperatingSystem.IsWindows())
         {
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_keyPath));
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                File.GetUnixFileMode(_secrets.PathFor(SecretNames.SkodaApiKey)));
         }
 
         // Signed in after the restart without asking Škoda again.
@@ -102,7 +104,7 @@ public sealed class SkodaApiSignInTests : IDisposable
         Assert.True(state.WantsKey);
         Assert.Contains(sentence, state.Message);
         Assert.Null(_store.Current);
-        Assert.False(File.Exists(_keyPath));
+        Assert.False(File.Exists(_secrets.PathFor(SecretNames.SkodaApiKey)));
     }
 
     [Fact]
@@ -124,7 +126,7 @@ public sealed class SkodaApiSignInTests : IDisposable
         _signIn.SignOut();
 
         Assert.Null(_store.Current);
-        Assert.False(File.Exists(_keyPath));
+        Assert.False(File.Exists(_secrets.PathFor(SecretNames.SkodaApiKey)));
         Assert.True(_signIn.State.WantsKey);
         Assert.Contains("revoke it in the MySkoda app", _signIn.State.Message);
     }

@@ -38,8 +38,12 @@ public class PackagingTests
                 + $"set it. On an installed machine it resolves under the read-only /opt/gleanvolt. Add "
                 + $"`Environment={key}=/var/lib/gleanvolt/…`.");
 
+            // A file inside a writable root, or the root itself: the secret store is named by its
+            // directory, and /var/lib/gleanvolt is the directory it belongs in.
             Assert.True(
-                WritableRoots.Any(root => match.Groups[1].Value.StartsWith(root, StringComparison.Ordinal)),
+                WritableRoots.Any(root =>
+                    match.Groups[1].Value.StartsWith(root, StringComparison.Ordinal)
+                    || match.Groups[1].Value == root.TrimEnd('/')),
                 $"gleanvolt.service sets {key} to {match.Groups[1].Value}, which is not under "
                 + $"{string.Join(" or ", WritableRoots)} -- the only directories the unit makes writable.");
         }
@@ -86,9 +90,13 @@ public class PackagingTests
     }
 
     /// <summary>
-    /// Every string setting in the Worker's appsettings.json whose name ends in "path", as the
-    /// environment-variable key that overrides it — <c>SessionStore__Path</c>,
-    /// <c>Serilog__WriteTo__1__Args__path</c>.
+    /// Every string setting in the Worker's appsettings.json whose name ends in "path" or
+    /// "directory", as the environment-variable key that overrides it — <c>SessionStore__Path</c>,
+    /// <c>Serilog__WriteTo__1__Args__path</c>, <c>Secrets__Directory</c>.
+    ///
+    /// <para>"Directory" is in for the secret store (issue #215), which is named by the folder its
+    /// files live in rather than by a file. It writes the same way, in the same read-only content
+    /// root, and the failure it would cause is the same one.</para>
     /// </summary>
     private static IEnumerable<string> PathSettings()
     {
@@ -122,7 +130,8 @@ public class PackagingTests
                     }
                     break;
 
-                case JsonValueKind.String when keys[^1].EndsWith("path", StringComparison.OrdinalIgnoreCase):
+                case JsonValueKind.String when keys[^1].EndsWith("path", StringComparison.OrdinalIgnoreCase)
+                        || keys[^1].EndsWith("directory", StringComparison.OrdinalIgnoreCase):
                     yield return string.Join("__", keys);
                     break;
             }

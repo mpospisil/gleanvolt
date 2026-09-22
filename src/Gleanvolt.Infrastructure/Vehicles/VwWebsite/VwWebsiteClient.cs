@@ -237,8 +237,8 @@ public sealed class VwWebsiteClient : IDisposable
                 if (!_session.Save(_jar))
                 {
                     _logger.LogWarning(
-                        "Signed in to volkswagen.de but could not save the session to {Path}; the next "
-                        + "restart will need another code.", _session.Path);
+                        "Signed in to volkswagen.de but could not save the session to the secret store "
+                        + "({Store}); the next restart will need another code.", _session.Protection);
                 }
             }
 

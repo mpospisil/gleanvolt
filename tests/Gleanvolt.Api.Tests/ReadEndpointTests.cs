@@ -73,6 +73,27 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         Assert.Equal(1800, stale.Number("lastPollAgeSeconds"));
     }
 
+    /// <summary>
+    /// Issue #215: the store in use is named, in words that do not overclaim. A monitor reading this
+    /// is usually about to decide where a backup of the data directory goes.
+    /// </summary>
+    [Fact]
+    public async Task Health_names_what_protects_the_secrets_without_claiming_encryption()
+    {
+        var client = await _host.StartAsync();
+
+        var body = await (await client.GetAsync("/api/v1/health")).ReadAsync();
+
+        Assert.Equal("owner-only files (0600) in the data directory", body.Text("secretStore"));
+
+        _host.Secrets.Protection = "Windows DPAPI, this user";
+
+        var windows = await (await client.GetAsync("/api/v1/health")).ReadAsync();
+
+        Assert.Equal("Windows DPAPI, this user", windows.Text("secretStore"));
+        Assert.DoesNotContain("encrypt", windows.Text("secretStore"), StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task Health_reports_a_store_that_will_not_open_rather_than_failing()
     {

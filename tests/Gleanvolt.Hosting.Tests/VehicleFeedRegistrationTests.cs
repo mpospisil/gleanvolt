@@ -106,7 +106,9 @@ public class VehicleFeedRegistrationTests
         ("Ev:Vehicles:0:Make", "Škoda"),
         ("Ev:Vehicles:0:BatteryCapacityKWh", "77"),
         ("Vehicle:Skoda:Vin", "TMBJB9NY5RF999999"),
-        ("Vehicle:Skoda:KeyPath", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir", "skoda-api-key.json")),
+        // Somewhere that does not exist: registration must not write a secret, and a store pointed at
+        // a missing directory reads nothing rather than failing (issue #215).
+        ("Secrets:Directory", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir")),
     ];
 
     [Fact]
@@ -158,7 +160,7 @@ public class VehicleFeedRegistrationTests
         ("Vehicle:Website:Username", "owner@example.com"),
         ("Vehicle:Website:Password", "hunter2"),
         ("Vehicle:Website:Vin", "WVGZZZE2ZPE999999"),
-        ("Vehicle:Website:SessionPath", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir", "vw-website-session.json")),
+        ("Secrets:Directory", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir")),
     ];
 
     private static readonly (string Key, string? Value)[] ThePortalSwitchedOn =
