@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Time.Testing;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Vehicles;
@@ -18,9 +17,7 @@ public class VehicleStateRefreshTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 8, 0, 0, TimeSpan.Zero);
 
-    private sealed class Feed(
-        VehicleState? answer, Exception? throws = null, VehicleSourceHealth? health = null,
-        Func<CancellationToken, Task<VehicleState?>>? ask = null) : IVehicleUpdateService
+    private sealed class Feed(VehicleState? answer, Exception? throws = null) : IVehicleUpdateService
     {
         public int Asks { get; private set; }
 
@@ -30,7 +27,7 @@ public class VehicleStateRefreshTests
 
         public string DisplayName => "volkswagen.de";
 
-        public VehicleSourceHealth Health => health ?? VehicleSourceHealth.Ok("answering");
+        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("answering");
 
         public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
 
@@ -43,12 +40,6 @@ public class VehicleStateRefreshTests
         public Task<VehicleState?> AskAsync(CancellationToken cancellationToken)
         {
             Asks++;
-
-            if (ask is not null)
-            {
-                return ask(cancellationToken);
-            }
-
             return throws is not null ? Task.FromException<VehicleState?>(throws) : Task.FromResult(answer);
         }
     }
@@ -121,106 +112,5 @@ public class VehicleStateRefreshTests
 
         Assert.False(result.Succeeded);
         Assert.Contains("volkswagen.de", result.Message);
-    }
-
-    /// <summary>A parked car's reading, captured at its last charge three days before <see cref="Now"/>.</summary>
-    private static VehicleStateHolder HoldingLastCharge()
-    {
-        var holder = new VehicleStateHolder();
-        holder.Set(At(Now.AddDays(-3), 71));
-        return holder;
-    }
-
-    private static VehicleStateRefresh Planning(IVehicleUpdateService feed, VehicleStateHolder holder, TimeProvider time) =>
-        new(new ConfiguredVehicleFeed(feed), holder, time: time);
-
-    [Fact]
-    public async Task Planning_asks_the_car_when_the_reading_is_its_last_charge_s()
-    {
-        var time = new FakeTimeProvider(Now);
-        var holder = HoldingLastCharge();
-        var feed = new Feed(At(Now, 38));
-
-        await Planning(feed, holder, time).PrepareForPlanningAsync();
-
-        Assert.Equal(1, feed.Asks);
-        Assert.Equal(38, holder.GetCurrentState()!.SocPercent);
-    }
-
-    [Fact]
-    public async Task Previews_in_quick_succession_share_one_ask()
-    {
-        // "What if I leave at eight?" is several presses; each one must not spend a request.
-        var time = new FakeTimeProvider(Now);
-        var feed = new Feed(At(Now.AddDays(-3), 71));
-        var refresh = Planning(feed, HoldingLastCharge(), time);
-
-        await refresh.PrepareForPlanningAsync();
-        time.Advance(TimeSpan.FromMinutes(2));
-        await refresh.PrepareForPlanningAsync();
-
-        Assert.Equal(1, feed.Asks);
-
-        time.Advance(VehicleStateRefresh.PlanningReuse);
-        await refresh.PrepareForPlanningAsync();
-
-        Assert.Equal(2, feed.Asks);
-    }
-
-    [Fact]
-    public async Task A_reading_the_car_captured_moments_ago_is_planned_from_as_it_is()
-    {
-        // Mid-charge the feed is polled every few minutes: nothing to add by asking again.
-        var time = new FakeTimeProvider(Now);
-        var holder = new VehicleStateHolder();
-        holder.Set(At(Now.AddMinutes(-2), 55));
-        var feed = new Feed(At(Now, 56));
-
-        await Planning(feed, holder, time).PrepareForPlanningAsync();
-
-        Assert.Equal(0, feed.Asks);
-    }
-
-    [Fact]
-    public async Task A_feed_waiting_on_its_owner_is_not_asked_for_them()
-    {
-        var time = new FakeTimeProvider(Now);
-        var feed = new Feed(
-            At(Now, 38), health: VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."));
-
-        await Planning(feed, HoldingLastCharge(), time).PrepareForPlanningAsync();
-
-        Assert.Equal(0, feed.Asks);
-    }
-
-    [Fact]
-    public async Task A_car_that_does_not_answer_in_time_leaves_the_held_reading_to_plan_from()
-    {
-        var time = new FakeTimeProvider(Now);
-        var holder = HoldingLastCharge();
-        var feed = new Feed(null, ask: async token =>
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, token);
-            return null;
-        });
-
-        var planning = Planning(feed, holder, time).PrepareForPlanningAsync();
-        await Task.Delay(50);
-        time.Advance(VehicleStateRefresh.PlanningWait);
-        await planning.WaitAsync(TimeSpan.FromSeconds(10));
-
-        Assert.Equal(71, holder.GetCurrentState()!.SocPercent);
-    }
-
-    [Fact]
-    public async Task A_car_that_does_not_answer_leaves_the_held_reading_to_plan_from()
-    {
-        var time = new FakeTimeProvider(Now);
-        var holder = HoldingLastCharge();
-
-        await Planning(new Feed(null, new HttpRequestException("unreachable")), holder, time)
-            .PrepareForPlanningAsync();
-
-        Assert.Equal(71, holder.GetCurrentState()!.SocPercent);
     }
 }

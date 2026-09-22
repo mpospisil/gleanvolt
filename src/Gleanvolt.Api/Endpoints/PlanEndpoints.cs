@@ -5,7 +5,6 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace Gleanvolt.Api.Endpoints;
@@ -18,18 +17,14 @@ internal static class PlanEndpoints
 {
     internal static void MapPlans(this IEndpointRouteBuilder api)
     {
-        api.MapPost("/plans/targeted/preview", async (
+        api.MapPost("/plans/targeted/preview", (
             TargetedChargeRequestBody body,
             ITargetedChargePreview preview,
             IVehicleTelemetry vehicle,
             TargetedChargeRequestLimits limits,
             TimeProvider time,
-            ApiHostInfo host,
-            [FromServices] IVehicleStateRefresh? refresh,
-            CancellationToken cancellationToken) =>
+            ApiHostInfo host) =>
         {
-            await TargetedRequests.AskTheCarIfNeededAsync(body, refresh, cancellationToken);
-
             if (!TargetedRequests.TryCompose(
                     body, vehicle, limits, time, host.VehicleMaxAge, out var request, out var error))
             {
@@ -82,19 +77,6 @@ internal static class PlanEndpoints
 /// </summary>
 internal static class TargetedRequests
 {
-    /// <summary>
-    /// Reads the car first when the request is measured from its state of charge (#212) — a battery
-    /// target, or a just-in-time rest point. A request in kilowatt-hours needs nothing from the car and
-    /// is not held up by it. Repeated previews reuse one ask; see
-    /// <see cref="IVehicleStateRefresh.PrepareForPlanningAsync"/>.
-    /// </summary>
-    internal static Task AskTheCarIfNeededAsync(
-        TargetedChargeRequestBody body, IVehicleStateRefresh? refresh, CancellationToken cancellationToken) =>
-        refresh is not null
-        && (body.TargetSocPercent is not null || body.Priority == TargetedChargePriority.JustInTime)
-            ? refresh.PrepareForPlanningAsync(cancellationToken)
-            : Task.CompletedTask;
-
     internal static bool TryCompose(
         TargetedChargeRequestBody body,
         IVehicleTelemetry vehicle,

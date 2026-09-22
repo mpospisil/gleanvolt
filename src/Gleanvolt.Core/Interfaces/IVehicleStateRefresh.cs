@@ -30,19 +30,4 @@ public interface IVehicleStateRefresh
     /// where one exists, the last known reading.</para>
     /// </summary>
     Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Makes sure what <see cref="IVehicleTelemetry"/> serves is worth planning from, asking the car
-    /// first when it may not be (issue #212). Called before a plan converts a state of charge — the
-    /// Targeted and Fast tabs as they open, the API's preview and start, a Home Assistant press.
-    ///
-    /// <para>The polling clock reads volkswagen.de only while a charge runs, so between charges the
-    /// held reading is the last charge's, and after a drive it is simply wrong. A plan is made before
-    /// the charge, so this is the moment to ask.</para>
-    ///
-    /// <para>Cheap to call repeatedly: an implementation reuses a recent ask rather than sending one
-    /// per preview. Never throws for an expected failure; the held reading then stands, with its age
-    /// beside it wherever it is shown. Defaulted to doing nothing, for a host with no feed.</para>
-    /// </summary>
-    Task PrepareForPlanningAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

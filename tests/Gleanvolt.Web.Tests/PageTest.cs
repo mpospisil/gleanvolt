@@ -18,9 +18,6 @@ public abstract class PageTest : BunitContext
 
         // Resolved lazily, so a fixture that registers a feed after this still gets it (#212).
         Services.AddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
-
-        // Nothing to ask unless a fixture says otherwise; a later registration wins.
-        Services.AddSingleton<IVehicleStateRefresh>(new FakeVehicleStateRefresh(canRefresh: false));
     }
 }
 

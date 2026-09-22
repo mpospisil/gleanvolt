@@ -62,22 +62,6 @@ public class FastTabTests : PageTest
         Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "fast"));
 
     [Fact]
-    public void Asks_the_car_as_it_opens_so_a_battery_target_can_be_offered()
-    {
-        // #212: no reading held at all -- a parked ID.4 whose feed is read only while charging. The ask
-        // on opening is what brings the battery-target option.
-        WithAKnownPack();
-        var refresh = new FakeVehicleStateRefresh(onPrepare: () => _vehicle.Set(new VehicleState(
-            Now, SocPercent: 38, SourceId: "vw-website")));
-        Services.AddSingleton<Core.Interfaces.IVehicleStateRefresh>(refresh);
-
-        var page = RenderTab();
-
-        page.WaitForAssertion(() => Assert.Contains("Battery target (%)", page.Find("#fast-basis").TextContent));
-        Assert.Equal(1, refresh.Prepares);
-    }
-
-    [Fact]
     public void Presses_through_to_the_mode_with_no_limit_by_default()
     {
         // The whole "nothing changes for anyone who does not ask" promise, in one case.

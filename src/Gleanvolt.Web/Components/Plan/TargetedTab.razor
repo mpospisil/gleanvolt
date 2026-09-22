@@ -3,7 +3,6 @@
 @inject ITargetedChargeSelector Target
 @inject ITargetedChargePreview Preview
 @inject IVehicleTelemetry Vehicle
-@inject IVehicleStateRefresh VehicleRefresh
 @inject VehicleDisplayOptions VehicleDisplay
 @inject IForecastRuntimeSettings ForecastSettings
 @inject TargetedDisplayOptions Display
@@ -37,11 +36,6 @@
     The plan takes every kilowatt-hour of forecast surplus the home battery has not already claimed,
     and buys the rest from the grid as late as it can and still finish in time.
 </p>
-
-@if (_askingCar)
-{
-    <p class="muted" id="asking-car">Asking the car for its battery before you plan…</p>
-}
 
 @if (_vehicle is not null)
 {
@@ -282,7 +276,6 @@ else
     private ChargeControlStatus? _seenStatus;
     private VehicleState? _vehicle;
     private bool _vehicleStale;
-    private bool _askingCar;
 
     // The preview and what it was built for. Held together so Start commits the figures that were on
     // screen, and so any edit can drop both at once -- it must never be possible to confirm a plan
@@ -324,40 +317,6 @@ else
         // reading that was on screen, and moving it under the owner would be the one thing this whole
         // preview step exists to prevent.
         RefreshVehicle();
-    }
-
-    /// <summary>
-    /// Asks the car as the tab opens (#212), so the SOC the form converts from is the car's now rather
-    /// than its last charge's. After the first interactive render rather than in OnInitialized, which
-    /// also runs for the prerender and would ask twice. The form is usable meanwhile.
-    /// </summary>
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender || !VehicleRefresh.CanRefresh)
-        {
-            return;
-        }
-
-        _askingCar = true;
-        StateHasChanged();
-
-        try
-        {
-            await VehicleRefresh.PrepareForPlanningAsync();
-        }
-        finally
-        {
-            _askingCar = false;
-
-            // A preview already on screen was built from the reading it showed; it stays, as a poll's
-            // reading would leave it (OnParametersSet above).
-            if (!_previewed)
-            {
-                RefreshVehicle();
-            }
-
-            StateHasChanged();
-        }
     }
 
     private void OnRequestChanged(TargetedChargeRequest? request)

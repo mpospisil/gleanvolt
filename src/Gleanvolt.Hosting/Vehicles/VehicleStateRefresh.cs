@@ -19,27 +19,8 @@ namespace Gleanvolt.Hosting.Vehicles;
 public sealed class VehicleStateRefresh(
     ConfiguredVehicleFeed feed,
     VehicleStateHolder holder,
-    ILogger<VehicleStateRefresh>? logger = null,
-    TimeProvider? time = null) : IVehicleStateRefresh
+    ILogger<VehicleStateRefresh>? logger = null) : IVehicleStateRefresh
 {
-    /// <summary>
-    /// How long an ask — or a reading the car captured — is good enough to plan from (#212). A preview
-    /// is meant to be pressed several times over ("what if I leave at eight?"), and each press sending
-    /// a request would spend a volkswagen.de session, or MyŠkoda's twenty an hour, on the same answer.
-    /// </summary>
-    public static readonly TimeSpan PlanningReuse = TimeSpan.FromMinutes(5);
-
-    /// <summary>
-    /// The longest a plan waits for the car before going on with the held reading. A sign-in to
-    /// volkswagen.de can take several round trips, and a form that hangs is worse than one that says
-    /// how old its figure is.
-    /// </summary>
-    public static readonly TimeSpan PlanningWait = TimeSpan.FromSeconds(20);
-
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
-    private readonly SemaphoreSlim _planning = new(1, 1);
-    private DateTimeOffset? _lastAskedAt;
-
     public bool CanRefresh => feed.Service is not null;
 
     public async Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default)
@@ -49,7 +30,6 @@ public sealed class VehicleStateRefresh(
             return VehicleRefreshResult.NoFeed;
         }
 
-        _lastAskedAt = _time.GetUtcNow();
         string failure;
 
         try
@@ -83,55 +63,5 @@ public sealed class VehicleStateRefresh(
         // use an old number -- a plan, which would rather be built on something than nothing -- can,
         // and one that cannot simply ignores it.
         return VehicleRefreshResult.Failed(failure, holder.GetCurrentState());
-    }
-
-    public async Task PrepareForPlanningAsync(CancellationToken cancellationToken = default)
-    {
-        // A feed waiting on its owner is not asked on the owner's behalf: replaying a password nobody
-        // is there to follow with a code is how accounts get locked. The card already says what to do.
-        if (feed.Service is not { Health.IsBlocked: false })
-        {
-            return;
-        }
-
-        // One ask at a time, so two tabs opening together share it rather than sending two.
-        await _planning.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var now = _time.GetUtcNow();
-
-            if (now - _lastAskedAt < PlanningReuse
-                || now - holder.GetCurrentState()?.CapturedAt < PlanningReuse)
-            {
-                return;
-            }
-
-            // On the injected clock, so the wait is the same clock everything else here is measured on.
-            using var timeout = new CancellationTokenSource(PlanningWait, _time);
-            using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-
-            try
-            {
-                var result = await RefreshAsync(wait.Token).ConfigureAwait(false);
-
-                if (!result.Succeeded)
-                {
-                    logger?.LogInformation(
-                        "Asked the car before planning and it did not answer ({Reason}); planning from the "
-                        + "reading held.", result.Message);
-                }
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                logger?.LogInformation(
-                    "The car did not answer within {Wait} before planning; planning from the reading held.",
-                    PlanningWait);
-            }
-        }
-        finally
-        {
-            _planning.Release();
-        }
     }
 }
