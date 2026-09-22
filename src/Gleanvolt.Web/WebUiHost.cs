@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +59,10 @@ public static class WebUiHost
         // it has been registered.
         services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
         services.TryAddSingleton<IVehicleAccountSignIn, NoVehicleAccountSignIn>();
+
+        // The one feed (#212). Gleanvolt.Hosting registers it with its startup note; a host that has
+        // not gets whatever update service is registered, or none.
+        services.TryAddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
 
         // The scheme is registered whenever the UI is enabled, whether or not RequireAuthentication
         // is on: the login and logout endpoints need it to exist either way, and it is DefaultPolicy

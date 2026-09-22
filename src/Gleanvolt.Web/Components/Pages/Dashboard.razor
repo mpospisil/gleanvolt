@@ -7,8 +7,7 @@
 @inject VehicleDisplayOptions VehicleDisplay
 @inject IVehicleStateRefresh VehicleRefresh
 @inject EvInfo Car
-@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
-@inject VehicleFeedComparison Comparison
+@inject ConfiguredVehicleFeed VehicleFeed
 @inject ISolarForecastService Forecasts
 @inject TimeProvider Time
 
@@ -26,8 +25,8 @@
                          rather than in hover hints: these figures are read against each other --
                          tomorrow against today, the cautious band against the median -- not one at a time.
       Vehicle         -- the car: the charger's own view of whether one is connected, plus whatever
-                         the car's own feed last said about itself (#73, #140). Read-only, and
-                         nothing in the control logic consumes the cloud half yet.
+                         the car's one feed last said about itself (#73, #140, #212). Read-only,
+                         and nothing in the control logic consumes the cloud half yet.
       Charging session-- what is happening at the charger right now, shown only while something is
                          happening: a mode is driving, or the car is drawing power under nobody's
                          control. Off with an idle charger gets one line and a way to start, not a
@@ -134,6 +133,10 @@ else
 
         The age is shown next to the SOC rather than tucked into a hint because it is the number that
         decides whether the SOC means anything: readings are routinely hours old while the car sleeps.
+
+        One feed, one health, one action (#212): the installation reads its car from exactly one
+        manufacturer feed, so the health beside the reading is the health of the feed that produced
+        it, and a blocked feed says what fixes it with a link to where that is done.
     *@
     @if (Car.IsConfigured)
     {
@@ -142,8 +145,9 @@ else
 
     @if (_feed is { IsBlocked: true } blocked)
     {
-        <p class="error">
-            <strong>Sign-in required</strong> — @blocked.Message
+        <p class="error" id="vehicle-feed-blocked">
+            <strong>Sign-in required</strong> — @(_service?.OwnerAction ?? blocked.Message)
+            <a href="/vehicle-portal">Open the vehicle page</a>
         </p>
     }
     else if (_vehicle is null && _feed is not null)
@@ -192,9 +196,15 @@ else
 
     @if (Showing is not null)
     {
-        <p class="muted">
-            Reported by the car @VehicleAge(Showing) ago@(Showing.SourceId is null ? "" : $" via {Showing.SourceId}")
-            @if (IsStale(Showing))
+        <p class="muted" id="vehicle-reading-age">
+            Reported by the car @VehicleAge(Showing) ago@(Via(Showing) is { } via ? $" via {via}" : "")
+            @if (FromLastCharge(Showing))
+            {
+                @* volkswagen.de is read only while charging (#170), so a parked car's reading is its
+                   last charge's -- days old is expected, and must not look like a dropout (#212). *@
+                <span> — from the last charge; @_service!.DisplayName is read only while charging</span>
+            }
+            else if (IsStale(Showing))
             {
                 <strong> — stale, older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h</strong>
             }
@@ -219,78 +229,6 @@ else
                   Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
         }
     </section>
-
-    @*
-        One section per feed, while more than one has ever reported (#141).
-
-        The card above is *the* reading -- whichever feed saw the car most recently, and the one every
-        other surface quotes. These are what each feed says on its own, and they exist because the
-        holder keeps one state: the feed that came second leaves nothing behind but a count, so
-        "the portal is healthy" and "the portal is delivering" are indistinguishable from up there.
-        They are not the same question, and on the reference install they had different answers within
-        two hours of both feeds being switched on.
-
-        Shown once two feeds have been seen and *kept* shown afterwards, even if one goes quiet: a feed
-        that stopped still has a last reading and a visibly growing age, which is the whole point of
-        looking. With a single feed there is nothing to compare and the card above already says it all.
-
-        Re-framed for the steady state (#180). The gate is unchanged -- two feeds is still the
-        arrangement -- but the point of the comparison is not: portal-against-MQTT was "which of these
-        is right", and portal-against-volkswagen.de is "each carries what the other does not, and one
-        is quiet unless the car is charging". A section that still invited the old reading would have
-        an owner diagnosing a dropout every time the car sat on the drive.
-    *@
-    @if (_feedReport.BothFeedsSeen)
-    {
-        <h2>What each feed says</h2>
-
-        <p class="muted">
-            The card above quotes whichever feed saw the car most recently; these are their own
-            accounts, side by side. <strong>Not a contest between them</strong> (#180) — they carry
-            different fields on different clocks, and one of them reports only while a charge is
-            running, so an age that has grown to hours there is usually the car being parked. Counted
-            over time on <a href="/vehicle-feeds">the feeds page</a>.
-        </p>
-
-        @foreach (var feed in _feedReport.Sources)
-        {
-            if (feed.LastReading is not { } reading)
-            {
-                continue;
-            }
-
-            <h3>
-                @feed.SourceId
-                @if (InUse(feed))
-                {
-                    <span class="muted"> — the reading shown above</span>
-                }
-                else
-                {
-                    <span class="muted"> — @feed.Superseded reading@(feed.Superseded == 1 ? "" : "s") held back as older</span>
-                }
-                @if (ChargeGated(feed))
-                {
-                    <span class="muted"> · while charging only</span>
-                }
-            </h3>
-
-            <section class="stat-grid">
-                <Stat Label="Car battery" Value="@Percent(reading.SocPercent)"
-                      Hint="This feed's own state of charge for the car. The other feed's may differ, and usually should: they were captured at different moments by feeds on different clocks." />
-                <Stat Label="Car reading age" Value="@VehicleAge(reading)"
-                      Hint="How long ago the car produced THIS feed's reading. An age growing here while the other stays small means either a feed that has stopped or one that only reports during a charge — the marker beside the name says which." />
-                <Stat Label="Car range" Value="@Km(reading.RangeKm)"
-                      Hint="The car's own range estimate, when this feed carries one. A dash means this feed does not report it." />
-                <Stat Label="Time left" Value="@ChargeTime(reading)"
-                      Hint="The car's own estimate of how much longer it needs. A dash means this feed does not carry the field — expected rather than a fault, and which feed carries what is on the feeds page." />
-                <Stat Label="Car charge state" Value="@reading.ChargeState.ToString()"
-                      Hint="What this feed says the car is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
-                <Stat Label="Car plug state" Value="@reading.PlugState.ToString()"
-                      Hint="Whether this feed says a cable is in the car's socket. Unknown means this feed does not report it." />
-            </section>
-        }
-    }
 
     <h2>Charging session</h2>
 
@@ -347,10 +285,6 @@ else
     private bool _asking;
     private bool _vehicleStale;
 
-    // What each feed has said on its own (#141). Read on the same tick as everything else; Report()
-    // is a snapshot, so a render never sees a tally change under it.
-    private VehicleFeedReport _feedReport = VehicleFeedReport.Empty;
-
     // The manufacturer feed's health, or null when no update service is configured -- which is itself
     // one of the four states, and the one that must read as "nothing is wrong".
     private VehicleSourceHealth? _feed;
@@ -365,10 +299,8 @@ else
         _status = StatusHolder.Current;
         StatusHolder.Updated += OnStatusUpdated;
 
-        // One service today, and the contract says the manufacturer is never dispatched on -- so the
-        // page takes the first rather than choosing, and a second car is the phase that gives this
-        // page a card each.
-        _service = VehicleFeeds.FirstOrDefault();
+        // The installation's one feed, settled by the composition root (#212) -- not chosen here.
+        _service = VehicleFeed.Service;
 
         RefreshVehicle();
         ReadDayForecasts();
@@ -414,7 +346,6 @@ else
         _vehicle = Vehicle.GetCurrentState();
         _vehicleStale = _vehicle is not null
             && _vehicle.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);
-        _feedReport = Comparison.Report();
 
         // Read on the poll's cadence like the reading itself: Health is a cheap property by contract,
         // and a feed whose state changed a few seconds ago changed nothing anyone can act on sooner.
@@ -422,7 +353,7 @@ else
     }
 
     /// <summary>Which feed is being waited on, named the way its log lines name it.</summary>
-    private string FeedName => _service is null ? "The feed" : $"The {_service.Manufacturer} feed";
+    private string FeedName => _service is null ? "The feed" : _service.DisplayName;
 
     // The car, because it is configured -- shown whether or not anything reports on it. Name first
     // (an owner's own word for it), then what it is, then the pack, since the pack is what decides
@@ -450,26 +381,28 @@ else
     // the two pages disagree over a reading they agree on.
     private static string Km(double? km) => VehicleFormatting.Km(km);
 
-    private static string ChargeTime(VehicleState reading) => VehicleFormatting.ChargeTime(reading);
+    /// <summary>
+    /// Whether this reading came from the configured feed. Matched on the name the feed puts on its
+    /// readings, which begins with its <see cref="IVehicleUpdateService.Manufacturer"/> -- display
+    /// only; nothing is dispatched on it. An MQTT reading beside it keeps its own name.
+    /// </summary>
+    private bool FromTheFeed(VehicleState reading) =>
+        _service is not null
+        && reading.SourceId is { } source
+        && source.StartsWith(_service.Manufacturer, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The feed in the owner's words (#212), or the reading's own name when it is not the feed's.</summary>
+    private string? Via(VehicleState reading) =>
+        FromTheFeed(reading) ? _service!.DisplayName : reading.SourceId;
 
     /// <summary>
-    /// Whether this feed only delivers while a charge is running (#180), so that an age grown to
-    /// hours reads as a parked car rather than as a dropout. Same join, and the same reasoning, as
-    /// <c>/vehicle-feeds</c>: both services compose the source id from the manufacturer name, and a
-    /// feed that fails to match is described as an ordinary one.
+    /// A charge-gated feed's reading while nothing is charging: its last charge's, and expected to
+    /// age (#212). Once power flows again the feed is polled and the ordinary stale rule applies.
     /// </summary>
-    private bool ChargeGated(VehicleFeedTally feed) =>
-        VehicleFeeds.Any(service =>
-            service.DeliversOnlyWhileCharging
-            && feed.SourceId.StartsWith(service.Manufacturer, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>
-    /// Whether the card above is currently quoting this feed. Matched on the name the feed put on its
-    /// reading, which is the same thing the card prints after "via" — so the two can never disagree.
-    /// </summary>
-    private bool InUse(VehicleFeedTally feed) =>
-        _vehicle is not null
-        && string.Equals(_vehicle.SourceId, feed.SourceId, StringComparison.OrdinalIgnoreCase);
+    private bool FromLastCharge(VehicleState reading) =>
+        _service is { DeliversOnlyWhileCharging: true }
+        && FromTheFeed(reading)
+        && _status is { EvChargerPowerWatts: <= 0 };
 
     private bool IsStale(VehicleState state) =>
         state.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);

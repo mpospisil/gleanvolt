@@ -43,7 +43,6 @@ public class DashboardOnDemandTests : PageTest
         Services.AddSingleton(status);
         Services.AddSingleton(holder);
         Services.AddSingleton<IVehicleTelemetry>(holder);
-        Services.AddSingleton(holder.Comparison);
         Services.AddSingleton<IVehicleStateRefresh>(refresh);
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), 77, 0.9, onDemand));
         Services.AddSingleton(EvInfo.Unknown);

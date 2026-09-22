@@ -64,18 +64,24 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly TimeProvider _time;
     private readonly bool _mqttFeedConfigured;
     private readonly bool _onDemandOnly;
+    private readonly string? _setAside;
 
     /// <param name="vehicleOptions">
     /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
     /// both feeds should be told so at startup, because "two sources, newest wins" is worth knowing
     /// before you wonder why the card sometimes moves between readings.
     /// </param>
+    /// <param name="configured">
+    /// Read for its <see cref="ConfiguredVehicleFeed.SetAside"/> alone (#212): a feed that was switched
+    /// on and deliberately not started is said once at startup, or its silence reads as a fault.
+    /// </param>
     public VehicleUpdateWorker(
         IEnumerable<IVehicleUpdateService> services,
         VehicleStateHolder holder,
         ILogger<VehicleUpdateWorker> logger,
         IOptions<VehicleOptions>? vehicleOptions = null,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        ConfiguredVehicleFeed? configured = null)
     {
         _services = services.ToList();
         _holder = holder;
@@ -83,10 +89,16 @@ public sealed class VehicleUpdateWorker : BackgroundService
         _mqttFeedConfigured = vehicleOptions?.Value.Enabled ?? false;
         _onDemandOnly = vehicleOptions?.Value.OnDemandOnly ?? false;
         _time = time ?? TimeProvider.System;
+        _setAside = configured?.SetAside;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_setAside is not null)
+        {
+            _logger.LogInformation("{SetAside}", _setAside);
+        }
+
         if (_services.Count == 0)
         {
             // The ordinary case, and deliberately not a warning: a car with no manufacturer feed

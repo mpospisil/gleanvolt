@@ -53,6 +53,23 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
     }
 
     [Fact]
+    public void With_no_key_the_card_is_told_to_paste_one()
+    {
+        // #212: the dashboard's sentence, with the link to the page where the key goes.
+        Assert.Equal("MyŠkoda", _service.DisplayName);
+        Assert.Equal(SkodaApiSentences.OwnerAction, _service.OwnerAction);
+    }
+
+    [Fact]
+    public async Task A_healthy_feed_has_no_fix_to_offer()
+    {
+        PasteKey();
+        await _service.FetchAsync(CancellationToken.None);
+
+        Assert.Null(_service.OwnerAction);
+    }
+
+    [Fact]
     public async Task One_request_per_reading_labelled_with_the_source()
     {
         PasteKey();

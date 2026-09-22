@@ -1545,7 +1545,7 @@ description or tooltip field. The meanings live here instead.
 | **Grid power** | W | Positive while importing from the grid, negative while exporting. This is the opposite of the sign the SolaX register uses; it's negated on read so positive always means power flowing into the house. With `Pv:Inverter:UnmeteredGridPhase` set it is an **estimate** — the meter's two seen phases plus the blind one worked out from the inverter's output — and will disagree with the meter by design; see [the `Pv` section](#the-pv-system-the-pv-section). |
 | **Battery hold target** | W | The power target commanded at the inverter's grid connection point to keep the battery out of house load: minus whichever is smaller, house load or PV. `Unknown` when no hold is armed. |
 | **Car connected** | on/off | `ON` while a vehicle is plugged in — the charger reporting `Preparing`, `Charging`, `Suspended*`, `ChargePaused` or `Finishing`. Says nothing about whether the car is drawing. |
-| **Car feed** | — | How the [manufacturer's vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) is doing, with the sentence as a `reason` attribute. `Ok`: the last read produced a reading. `Degraded`: it is trying and not currently succeeding — a 5xx, a timeout, an expired session, or a delivery not filled yet; it backs off and clears itself. `NeedsOwner`: a refused password, a consent screen, an OTP or a portal setting only you can make — **the feed has stopped asking** and will not resume until you have cleared it and restarted the controller. That last state is the one worth a notification; the other two are not. Absent entirely on an installation with no such feed. |
+| **Car feed** | — | How the installation's one [manufacturer vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) — volkswagen.de, MyŠkoda or the Data Act portal, whichever is configured ([#212](https://github.com/mpospisil/gleanvolt/issues/212)) — is doing, with the sentence as a `reason` attribute. `Ok`: the last read produced a reading. `Degraded`: it is trying and not currently succeeding — a 5xx, a timeout, an expired session, or a delivery not filled yet; it backs off and clears itself. `NeedsOwner`: a refused password, a consent screen, an OTP or a portal setting only you can make — **the feed has stopped asking** and will not resume until you have cleared it and restarted the controller. That last state is the one worth a notification; the other two are not. Absent entirely on an installation with no such feed. |
 | **Charging now** | on/off | `ON` while *the controller* is commanding a charging current, as opposed to having paused or never taken control. This is our own decision, not the car's behaviour — a car can be plugged in and idle while this is `ON`. See **EV charging power** for what's actually flowing. |
 | **Stop service** | button | Shuts the controller down gracefully: the charger is returned to its pause current, the open session is closed and written, and the store is flushed — none of which happens if the process is killed. **One-way from here.** The service is what speaks MQTT, so this device goes unavailable and nothing in Home Assistant can start it again; that needs a shell on the Pi (`docker compose start gleanvolt-controller`). Lives in the device's *Configuration* section rather than on the dashboard card, and only an exact `PRESS` on its topic triggers it. See [Stopping and starting the controller](deploy/README.md#stopping-and-starting-the-controller). |
 
@@ -1783,8 +1783,11 @@ looks; but if you want them, leave this off.
 Off by default. On, the car is asked **only while a charging session is open** — so the state of
 charge is recorded as it actually moves, and nothing is fetched while the car sits idle.
 
-**Why this exists beside the [EU Data Act portal](docs/VW_PORTAL_SETUP.md).** Measured on the
-reference ID.4, both asked within a minute of each other:
+**With this configured, the [EU Data Act portal](docs/VW_PORTAL_SETUP.md) is not used**
+([#212](https://github.com/mpospisil/gleanvolt/issues/212)): one car, one feed. `Vehicle:DataAct:Enabled`
+may stay on — an ID.4 `.env` that has carried both since #170 keeps booting — and the startup log says
+*"Vehicle:Website is configured, so the Data Act portal is not used"*. Why this one wins, measured on
+the reference ID.4, both asked within a minute of each other:
 
 | Source | SOC | Captured | Age |
 |---|---|---|---|
@@ -1792,9 +1795,15 @@ reference ID.4, both asked within a minute of each other:
 | EU Data Act portal | 55% | 21:16Z the day before | **~12.5 h** |
 
 The car had reported; the portal had not yet published it. Portal publication runs **1h48m–7h16m**
-behind the car, so a charge is over before its first in-charge reading appears there. The two are kept
-because neither is a superset — the portal carries `settings.target_soc`, which this source reported as
-null for the same car at the same moment.
+behind the car, so a charge is over before its first in-charge reading appears there. What is given up:
+the car's own **target SOC**, which only the portal carries for the ID.4 — nothing plans on it, so it is
+simply unknown.
+
+**A parked car shows its last charge.** Between charges nothing is polled, so the dashboard's reading
+is the one from the end of the last charge, and its age line says *from the last charge; volkswagen.de
+is read only while charging* rather than *stale* — days old is what a parked ID.4 looks like. **Ask the
+car** on the dashboard reads volkswagen.de once whether or not the car is charging: one request per
+press, and the clock is still gated to a charge.
 
 **Signing in is a page, not a setting.** A cold login *always* wants a one-time code emailed to the
 account owner. That makes it hostile to a background service and perfectly ordinary at the moment you
@@ -1807,15 +1816,15 @@ grant — that file is why a restart does not cost another code. **Treat it as a
 holding it is signed in as you. It is written owner-only and never logged.
 
 If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
-portal keeps answering with its aged reading, and nothing that writes to hardware depends on either.
+dashboard's card says *volkswagen.de wants a one-time code — sign in again on the vehicle page* with a
+link to it, and nothing that writes to hardware depends on the feed.
 
 #### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
 
 ```jsonc
 "Ev":      { "Vehicles": [ { "Id": "enyaq", "Name": "The Enyaq", "Make": "Škoda", "Model": "Enyaq 85", "BatteryCapacityKWh": 77 } ] },
 "Vehicle": {
-  "Skoda":   { "Enabled": true, "Vin": "TMBJ…" },   // SKODA_ENABLED / SKODA_VIN in deploy/.env
-  "DataAct": { "Enabled": false }                   // optional, beside it: VW_BRAND=skoda
+  "Skoda":   { "Enabled": true, "Vin": "TMBJ…" }    // SKODA_ENABLED / SKODA_VIN in deploy/.env
 }
 ```
 
@@ -1850,7 +1859,10 @@ hour idle and twelve while charging, stops the clock for the window once only th
 different *Degraded* sentences; a key problem is *sign-in required* until a new key is pasted.
 
 **`Vehicle:Website` and `Vehicle:Skoda` both enabled stops startup**, naming both: they are live sources
-for two different cars, and an installation has one. The Data Act portal may run beside either.
+for two different cars, and an installation has one. **With either configured, the Data Act portal is
+not started** ([#212](https://github.com/mpospisil/gleanvolt/issues/212)) — skipped with one startup
+log line rather than refused. With no key yet, or an expired one, the dashboard's card says *No MyŠkoda
+API key yet, or it has expired — paste one on the vehicle page*, with a link to it.
 
 ### Vehicle telemetry (the `Vehicle` section)
 
@@ -1925,9 +1937,7 @@ Everything except `captured_at` is optional, and absent is a supported configura
 error. `captured_at` is required because it is the **car's** capture time, not the arrival time, and
 without it staleness cannot be judged.
 
-`source` names the feed on the dashboard (*"reported by the car 12 min ago via id4"*) and is what
-[`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) groups a week's tally by. It is
-still optional: a payload that omits it is labelled `mqtt`, so a reading off this topic can always be
+`source` names the feed on the dashboard (*"reported by the car 12 min ago via id4"*). It is optional: a payload that omits it is labelled `mqtt`, so a reading off this topic can always be
 told apart from the manufacturer feed's.
 
 `range_km` is the car's own estimate off its own recent consumption — nothing here could compute it, and
@@ -2083,7 +2093,11 @@ alive. The full argument is under
 
 The second way to feed the same card: the controller signs in to VW's own **EU Data Act portal** on a
 schedule and writes what it finds into the same reading everything else reads. One car, one
-manufacturer, and **off by default**:
+manufacturer, and **off by default** — and **only for a car with no live feed**: with
+[`Vehicle:Website`](#vehiclewebsite--volkswagende-the-live-source) or
+[`Vehicle:Skoda`](#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) configured, it is
+not started ([#212](https://github.com/mpospisil/gleanvolt/issues/212)). It is the feed for a Cupra, a
+SEAT or another Group brand:
 
 ```jsonc
 "Vehicle": {
@@ -2186,9 +2200,10 @@ keep new-device challenges rare.
 > controller says at startup when both are on, and the dashboard names which feed the reading on screen
 > came from.
 
-**This is the reference site's baseline vehicle source, as of 2026-09-08** — alongside
-[`vw-website`](#vehiclewebsite--volkswagende-the-live-source), which reads volkswagen.de live while the car
-is charging and is silent when it is not. The portal is the one that answers all day.
+**This was the reference site's baseline vehicle source from 2026-09-08** until
+[#212](https://github.com/mpospisil/gleanvolt/issues/212) settled on one feed per car: the reference
+ID.4 now reads [`vw-website`](#vehiclewebsite--volkswagende-the-live-source) alone. What follows is the
+history of that choice.
 
 [#141](https://github.com/mpospisil/gleanvolt/issues/141) ran both feeds side by side for six days and
 handed over on what they delivered. The finding that decided it: **the two feeds carry the same car
@@ -2278,8 +2293,7 @@ SOC** and its own **time left**.
 
 Under it, what the feed is holding at that moment and how far apart the two are. They are different
 sessions asking at different moments, so a couple of points is the expected outcome rather than a
-fault; [`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered) is where a persistent
-difference gets counted instead of eyeballed. An install with no feed switched on is told it has
+fault. An install with no feed switched on is told it has
 nothing to compare against, which is a supported answer and not an error.
 
 **Diagnostics**, collapsed, holds everything the page used to lead with: the delivery it arrived in
@@ -2299,76 +2313,6 @@ The feed with its own clock is a separate switch,
 [`Vehicle:DataAct:Enabled`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section), and
 it holds a session rather than replaying the password. Setup — the credentials and the browser steps
 the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md).
-
-#### `/vehicle-feeds` — what each feed actually delivered
-
-Two feeds run at once, and this is the page that says what each one actually delivered. It reports and
-changes nothing.
-
-**Running two is the steady state, not a trial** ([#180](https://github.com/mpospisil/gleanvolt/issues/180)).
-The page was written for #141's bake-off — the MQTT topic against the manufacturer's portal, for a
-week, with a handover at the end — and the handover happened without leaving one feed. It left two with
-different jobs:
-
-| | `vw-group` (EU Data Act portal) | `vw-website` (volkswagen.de) |
-|---|---|---|
-| **Asked** | always, every 15 min | only while a charge is running |
-| **Lag behind the car** | hours — the car's own batch cadence | seconds |
-| **Plug state** | never seen one | yes |
-| **Target SOC, time left** | yes | — |
-
-So neither feed carries everything, and one of them is **silent most of the day by design**. That is
-the single thing this page has to get right, because a feed asked only during a charge has a longest
-gap the length of a weekend: its rows are marked *while charging only*, its longest gap is labelled
-*between charges*, and the cadence bands past two hours are one entry per charging session rather than
-a count of dropouts. A feed that has not declared itself charge-gated is described as an ordinary one,
-which is the safe way round.
-
-- **Cadence.** Per feed: deliveries, repeats, steps backwards, superseded, and the shortest, mean and
-  longest interval between deliveries, with the intervals also counted into bands. A *delivery* is a
-  reading carrying a capture time that feed had not produced before; asking the portal every quarter of
-  an hour and being handed the same bundle back is a **repeat**, and so is a retained MQTT message
-  replayed on reconnect — counting those would report a cadence the car never had. **Went back** is
-  counted separately and is not ordinary: the feed produced a capture time *older* than one it had
-  already shown us, with the worst step backwards beside the count. A portal whose continuous data
-  request has stopped filling looks exactly like that and like nothing else — from every other angle it
-  is a quiet car — which is why it does not share a column with repeats. **Superseded** counts the
-  readings the holder declined because the other feed was already ahead: a feed that is nearly always
-  superseded is one the dashboard is not showing, however healthy its own page looks.
-- **Agreement.** Where the two feeds' capture times land within half an hour of each other, their
-  states of charge are compared: the mean *signed* difference (the systematic offset — the direction is
-  the finding), its mean size, the worst one, and how far apart in time the two captures typically
-  were. Shown twice, and the **parked** row is the one that answers the question: a parked car's SOC
-  does not drift, so a difference there is one of the two feeds being read wrong, whereas a difference
-  measured across twenty minutes of charging is the car doing its job. Samples are **scarce by
-  design** now: one feed is asked only during a charge and the other runs hours behind, so the pair
-  only has something to compare while a charge is live. A long run of nothing here means the car has
-  not charged, not that a feed has stopped.
-- **Coverage.** The share of deliveries that carried each field. A missing field is a supported answer
-  rather than a fault — and this is now the **standing reference for which feed carries what** rather
-  than a week's finding. It is what showed that the portal has never once reported a plug state while
-  `vw-website` does, which is precisely why both feeds still run.
-- **Survival.** For the manufacturer feed: reads of attempts, **sign-ins** (one, however long the
-  controller has been up, is the healthy answer), the current session's age, and whether the car's own
-  **target SOC** ever arrives — the field that is not part of a reading, and the one whose absence
-  deferred [#101](https://github.com/mpospisil/gleanvolt/issues/101).
-
-**Everything on it is since the controller started, and that is deliberate.** It measures an
-*unattended run*: a gap that spans a restart is the restart rather than the feed, and folding the two
-together would turn a redeployment into evidence against a portal. A week means a week of one process,
-and the page says how long it has been counting before it says anything else.
-
-Feeds are grouped by the name they put on their readings. The MQTT payload's `source` is optional, so a
-reading that arrives without one is labelled `mqtt`; the manufacturer feeds label their own —
-`vw-group …1234` and `vw-website`. That leading name is also how a row is matched to the feed that
-declared itself charge-gated, since both services compose the id from it.
-
-**Every feed's readings are logged at the same level**
-([#180](https://github.com/mpospisil/gleanvolt/issues/180)). They were not: the portal's every reading
-was `Information` and the MQTT feed's were `Debug`, which is off in production — so through #141's
-comparison week one feed was fully recorded and the other was invisible, and the two were then
-compared as though the record were even. Whatever the level is, it has to be the same for every feed,
-or the log is evidence about logging rather than about feeds.
 
 #### `/pv-system` — the installation, and editing it
 
@@ -2453,7 +2397,7 @@ Those phases left the UI in three places for one question. The dashboard was fou
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Vehicle portal · Vehicle feeds · Health.** `/forecast` and
+**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Vehicle portal · Health.** `/forecast` and
 `/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
 
 **`/` reports and no longer decides.** It carries no button, no input and no select at all — three
@@ -2465,18 +2409,12 @@ sections, in the order the questions are actually asked:
 - **Vehicle** — the car, because it is *configured*: its name and pack, then the charger's own view of
   whether one is connected, then whatever feed reports on it. The feed is an attachment, and the card
   names which of four situations it is in — no feed configured (nothing is wrong), a reading and its
-  age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying which
-  screen to open. The last two must never look alike: *stale* clears itself and *sign-in required* never
-  will. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
-- **What each feed says** — appears only once **two** feeds have reported, and then stays. The card
-  above quotes whichever feed saw the car most recently; this is each feed's own account beside the
-  other's, headed by the name it puts on its readings, with the section for the one being quoted
-  marked as such and the other saying how many of its readings were held back as older. It exists
-  because the holder keeps a single reading, so the feed that came second otherwise leaves nothing
-  behind but a count — and *the portal is healthy* and *the portal is delivering* are then
-  indistinguishable. On the reference install those had different answers within two hours of both
-  feeds being switched on. Counted over time on
-  [`/vehicle-feeds`](#vehicle-feeds--what-each-feed-actually-delivered).
+  age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying what
+  fixes it and a link to **Vehicle portal**. The last two must never look alike: *stale* clears itself
+  and *sign-in required* never will. **One car, one feed** ([#212](https://github.com/mpospisil/gleanvolt/issues/212)):
+  the health is that of the installation's one feed, and *via …* names it in your words — volkswagen.de,
+  MyŠkoda, Data Act portal. A volkswagen.de reading on a parked car says *from the last charge* instead
+  of *stale*. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the

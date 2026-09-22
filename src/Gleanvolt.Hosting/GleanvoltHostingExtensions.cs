@@ -534,30 +534,12 @@ public static class GleanvoltHostingExtensions
         // UI can inject the read side unconditionally and render "no reading" rather than having to know
         // about the configuration. Only the worker checks Enabled.
         services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
-        services.AddSingleton(provider => new VehicleStateHolder(provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(_ => new VehicleStateHolder());
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
 
-        // What the two feeds have each delivered, counted (issue #141). Taken from the holder rather
-        // than constructed here: it has to see every reading offered, including the ones the holder
-        // discards for being older than what it already has, and only the holder is on that path.
-        services.AddSingleton(provider => provider.GetRequiredService<VehicleStateHolder>().Comparison);
-
-        // Whether the manufacturer's own portal is read on a clock (issue #140). Decided here, before
-        // anything is registered, because it is what settles which of two feeds owns the holder.
-        var manufacturerFeed = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration);
-
-        // Both feeds may run, and the freshest reading wins.
-        //
-        // This started as "the manufacturer service wins, so do not subscribe the other at all" --
-        // the only way to make one win over a holder that took whatever arrived last. The reference
-        // install then showed why picking a winner in advance is the wrong shape: the portal's state
-        // of charge for that car is coarser and lags, while the same manufacturer's app API through
-        // Home Assistant is live to the percent. Whichever source is better is a fact about a car and
-        // a moment, not something a configuration file can be right about once.
-        //
-        // So VehicleStateHolder keeps the reading with the newest capture time and both workers write
-        // to it. A feed that stops stops advancing, so the other takes over within one reading and
-        // precedence corrects itself.
+        // The MQTT topic may run beside the manufacturer feed, and the freshest reading wins
+        // (VehicleStateHolder keeps the newest capture time). Out of #212's scope: that issue settles
+        // which *manufacturer* feed reads the car, not whether an owner's own topic may.
         services.AddHostedService<VehicleMqttWorker>();
 
         // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
@@ -579,7 +561,23 @@ public static class GleanvoltHostingExtensions
         // asked for.
         //
         // The service, not the host, owns the cadence: nothing here states an interval.
-        if (manufacturerFeed)
+        //
+        // One car, one feed (issue #212): a live feed for this car -- volkswagen.de for a VW, MyŠkoda
+        // for a Škoda -- is more precise than the portal's delayed batch, so with one configured the
+        // portal is not started at all. Skipped with a startup log line rather than refused, so an
+        // ID.4 .env that has carried both since #170 keeps booting.
+        var website = configuration.GetSection(VwWebsiteOptions.SectionName).Get<VwWebsiteOptions>()
+            ?? new VwWebsiteOptions();
+
+        // MyŠkoda's public API -- the live source for a Škoda (issue #193), in vw-website's place.
+        var skoda = configuration.GetSection(SkodaApiOptions.SectionName).Get<SkodaApiOptions>()
+            ?? new SkodaApiOptions();
+
+        var portalSetAside = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration)
+            ? LiveFeedSettingAside(website, skoda)
+            : null;
+
+        if (VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null)
         {
             services.AddSingleton<IVehicleUpdateService>(provider => new VwGroupUpdateService(
                 provider.GetRequiredService<EvInfo>().Id,
@@ -588,22 +586,14 @@ public static class GleanvoltHostingExtensions
                 provider.GetService<ILogger<VwGroupUpdateService>>()));
         }
 
-        // volkswagen.de -- the live source, asked only while a charge runs (issue #170). A cold login
+        // volkswagen.de -- the live source, polled only while a charge runs (issue #170). A cold login
         // always wants an emailed one-time code, so the sign-in seam is registered too and the web UI
         // drives it while a person is there to read the email. The client is shared between the two:
         // one cookie jar for the whole flow is not optional, and two of them lose the session.
-        var website = configuration.GetSection(VwWebsiteOptions.SectionName).Get<VwWebsiteOptions>()
-            ?? new VwWebsiteOptions();
-
-        // MyŠkoda's public API -- the live source for a Škoda (issue #193), in vw-website's place.
-        var skoda = configuration.GetSection(SkodaApiOptions.SectionName).Get<SkodaApiOptions>()
-            ?? new SkodaApiOptions();
-
         if (website.Enabled && skoda.Enabled)
         {
             // Refused rather than both run: they are live sources for two different cars, and one
-            // installation has one car -- the reasoning that refuses a second Ev:Vehicles entry. The
-            // Data Act portal may run beside either.
+            // installation has one car -- the reasoning that refuses a second Ev:Vehicles entry.
             throw new InvalidOperationException(
                 "Vehicle:Website and Vehicle:Skoda are both enabled, but they read two different cars "
                 + "(volkswagen.de and the MyŠkoda API) and an installation has one. Switch off whichever "
@@ -663,8 +653,14 @@ public static class GleanvoltHostingExtensions
         // Asking the car because somebody wants to know, as opposed to because a clock said so
         // (issue #168). Registered unconditionally: the page injects it and renders "nothing to ask"
         // itself, rather than the container deciding whether a control may exist.
+        // The one feed, resolved once (#212), so that every surface quoting its health -- the dashboard,
+        // the sign-in banner, Health, Home Assistant -- quotes the feed behind the reading. At most one
+        // IVehicleUpdateService is ever registered above; this makes that a type rather than a habit.
+        services.AddSingleton(provider => new ConfiguredVehicleFeed(
+            provider.GetService<IVehicleUpdateService>(), portalSetAside));
+
         services.AddSingleton<IVehicleStateRefresh>(provider => new VehicleStateRefresh(
-            provider.GetServices<IVehicleUpdateService>(),
+            provider.GetRequiredService<ConfiguredVehicleFeed>(),
             provider.GetRequiredService<VehicleStateHolder>(),
             provider.GetService<ILogger<VehicleStateRefresh>>()));
 
@@ -743,6 +739,20 @@ public static class GleanvoltHostingExtensions
     // The resolver's refusal, with one thing added when it applies: that some of what it refused was
     // saved from the web UI. The resolver checks every save, so this takes a change underneath it --
     // an .env edited afterwards -- but when it happens, the file is the thing nobody thinks to look at.
+    /// <summary>
+    /// Why the Data Act portal is not started although it is switched on, or null when nothing
+    /// better reads this car (issue #212). A live feed that is configured wins; one merely enabled
+    /// without a VIN registers nothing, so it sets nothing aside either.
+    /// </summary>
+    private static string? LiveFeedSettingAside(VwWebsiteOptions website, SkodaApiOptions skoda) =>
+        website.IsConfigured
+            ? "Vehicle:Website is configured, so the Data Act portal is not used: volkswagen.de reads "
+              + "this car live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
+            : skoda.IsConfigured
+                ? "Vehicle:Skoda is configured, so the Data Act portal is not used: MyŠkoda reads this "
+                  + "car live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
+                : null;
+
     private static PvSystemInfo ResolveSite(IConfiguration configuration)
     {
         try

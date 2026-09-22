@@ -11,9 +11,8 @@ using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
-/// Which vehicle feed the composition root turns on (issue #140), and the one decision that cannot
-/// live in either worker: <b>two sources must not write to one holder</b>, so when the manufacturer's
-/// service is configured the MQTT feed is not subscribed at all.
+/// Which vehicle feed the composition root turns on (issues #140, #212): <b>one car, one feed</b> —
+/// volkswagen.de for a VW, MyŠkoda for a Škoda, and the Data Act portal only for a car with neither.
 ///
 /// <para>Asserted on the registrations rather than by resolving hosted services, because resolving
 /// them all would build a Modbus stack this test has no use for.</para>
@@ -153,19 +152,88 @@ public class VehicleFeedRegistrationTests
         Assert.Contains("Vehicle:Skoda", error.Message);
     }
 
+    /// <summary>A Volkswagen read from volkswagen.de (issue #170).</summary>
+    private static readonly (string Key, string? Value)[] TheWebsite =
+    [
+        ("Vehicle:Website:Enabled", "true"),
+        ("Vehicle:Website:Username", "owner@example.com"),
+        ("Vehicle:Website:Password", "hunter2"),
+        ("Vehicle:Website:Vin", "WVGZZZE2ZPE999999"),
+        ("Vehicle:Website:SessionPath", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir", "vw-website-session.json")),
+    ];
+
+    private static readonly (string Key, string? Value)[] ThePortalSwitchedOn =
+        Credentials.Concat([("Vehicle:DataAct:Enabled", "true")]).ToArray();
+
     [Fact]
-    public void The_week_is_counted_on_the_holder_the_feeds_write_to()
+    public async Task A_VW_with_volkswagen_de_runs_that_feed_alone_and_says_why_the_portal_is_not_used()
     {
-        // Issue #141 measures both feeds against each other, and the readings the holder *discards*
-        // are half the measurement -- so the comparison has to be the holder's own, not a second one
-        // registered beside it that would never see them.
-        var services = Services(TheCar);
+        // One car, one feed (#212). An ID.4 .env that has carried both since #170 keeps booting: the
+        // portal is set aside, not refused, and the reason is on the startup log.
+        var services = Services(TheCar.Concat(TheWebsite).Concat(ThePortalSwitchedOn).ToArray());
 
-        using var provider = services.BuildServiceProvider();
+        var feed = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
 
-        Assert.Same(
-            provider.GetRequiredService<VehicleStateHolder>().Comparison,
-            provider.GetRequiredService<VehicleFeedComparison>());
+        await using var provider = services.BuildServiceProvider();
+        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
+
+        Assert.Equal("vw-website", configured.Service!.Manufacturer);
+        Assert.Same(provider.GetRequiredService<IVehicleUpdateService>(), configured.Service);
+        Assert.Equal(
+            "Vehicle:Website is configured, so the Data Act portal is not used: volkswagen.de reads this car "
+            + "live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off.",
+            configured.SetAside);
+
+        // The portal button stays: it is on the Vehicle portal page whatever runs on the clock.
+        Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
+    }
+
+    [Fact]
+    public async Task A_Skoda_with_MySkoda_runs_that_feed_alone()
+    {
+        var services = Services(
+            TheSkoda.Concat([("Vehicle:Skoda:Enabled", "true")]).Concat(ThePortalSwitchedOn).ToArray());
+
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
+
+        await using var provider = services.BuildServiceProvider();
+        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
+
+        Assert.Equal("skoda", configured.Service!.Manufacturer);
+        Assert.StartsWith("Vehicle:Skoda is configured, so the Data Act portal is not used", configured.SetAside);
+    }
+
+    [Fact]
+    public async Task A_car_with_no_live_feed_reads_the_portal_as_before()
+    {
+        // A Cupra, or another Group brand: the portal is the feed, and nothing is set aside.
+        var services = Services(TheCar.Concat(ThePortalSwitchedOn).ToArray());
+
+        await using var provider = services.BuildServiceProvider();
+        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
+
+        Assert.Equal("vw-group", configured.Service!.Manufacturer);
+        Assert.Null(configured.SetAside);
+    }
+
+    [Fact]
+    public async Task A_live_feed_without_the_portal_switched_on_sets_nothing_aside()
+    {
+        var services = Services(TheCar.Concat(TheWebsite).ToArray());
+
+        await using var provider = services.BuildServiceProvider();
+        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
+
+        Assert.Equal("vw-website", configured.Service!.Manufacturer);
+        Assert.Null(configured.SetAside);
+    }
+
+    [Fact]
+    public async Task With_no_feed_the_configured_feed_is_none()
+    {
+        await using var provider = Services(TheCar).BuildServiceProvider();
+
+        Assert.Null(provider.GetRequiredService<ConfiguredVehicleFeed>().Service);
     }
 
     [Fact]

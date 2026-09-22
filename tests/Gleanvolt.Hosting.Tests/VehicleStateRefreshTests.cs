@@ -1,4 +1,3 @@
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Vehicles;
@@ -6,44 +5,55 @@ using Gleanvolt.Hosting.Vehicles;
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
-/// Asking the car because somebody wants to know (issue #168).
+/// Asking the car because somebody wants to know (issue #168), of the one feed an installation has
+/// (issue #212).
 ///
-/// <para>The same <c>FetchAsync</c> the polling worker calls on a clock, called for a different
-/// reason. What these pin is the behaviour that differs from polling: every feed is asked rather than
-/// the first that answers, and a failure hands back the last known reading rather than nothing —
-/// because the caller is often a plan, which would rather be built on an old number that says so.</para>
+/// <para>What these pin is the behaviour that differs from polling: the feed is asked through
+/// <c>AskAsync</c>, which a charge-gated feed answers while parked, and a failure hands back the last
+/// known reading rather than nothing — because the caller is often a plan, which would rather be built
+/// on an old number that says so.</para>
 /// </summary>
 public class VehicleStateRefreshTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 8, 0, 0, TimeSpan.Zero);
 
-    private sealed class Feed(string manufacturer, VehicleState? answer, Exception? throws = null)
-        : IVehicleUpdateService
+    private sealed class Feed(VehicleState? answer, Exception? throws = null) : IVehicleUpdateService
     {
-        public int Fetches { get; private set; }
+        public int Asks { get; private set; }
 
         public string VehicleId => "id4";
 
-        public string Manufacturer => manufacturer;
+        public string Manufacturer => "vw-website";
+
+        public string DisplayName => "volkswagen.de";
 
         public VehicleSourceHealth Health => VehicleSourceHealth.Ok("answering");
 
-        public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
+        public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
 
-        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
+        public bool DeliversOnlyWhileCharging => true;
+
+        // The clock's path: a parked car's gated feed returns nothing here.
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<VehicleState?>(null);
+
+        public Task<VehicleState?> AskAsync(CancellationToken cancellationToken)
         {
-            Fetches++;
+            Asks++;
             return throws is not null ? Task.FromException<VehicleState?>(throws) : Task.FromResult(answer);
         }
     }
 
-    private static VehicleState At(DateTimeOffset when, double soc, string source) =>
-        new(when, SocPercent: soc, SourceId: source);
+    private static VehicleState At(DateTimeOffset when, double soc) =>
+        new(when, SocPercent: soc, SourceId: "vw-website");
+
+    private static VehicleStateRefresh Refresh(IVehicleUpdateService? feed, VehicleStateHolder? holder = null) =>
+        new(new ConfiguredVehicleFeed(feed), holder ?? new VehicleStateHolder());
 
     [Fact]
     public async Task With_no_feed_there_is_nothing_to_ask()
     {
-        var refresh = new VehicleStateRefresh([], new VehicleStateHolder());
+        var refresh = Refresh(null);
 
         Assert.False(refresh.CanRefresh);
         var result = await refresh.RefreshAsync();
@@ -52,36 +62,18 @@ public class VehicleStateRefreshTests
         Assert.Null(result.State);
     }
 
-    /// <summary>
-    /// Every feed, not the first that answers: they carry different fields, and the holder keeps the
-    /// newest reading rather than the newest source.
-    /// </summary>
     [Fact]
-    public async Task Every_feed_is_asked()
+    public async Task A_parked_car_s_charge_gated_feed_is_asked_rather_than_polled()
     {
-        var first = new Feed("vw-group", At(Now.AddMinutes(-30), 40, "vw-group"));
-        var second = new Feed("mqtt", At(Now.AddMinutes(-5), 41, "mqtt"));
+        // #212: with the portal gone, a parked ID.4 has only volkswagen.de. The owner's ask reads it
+        // once; the clock (FetchAsync) would have returned nothing.
+        var feed = new Feed(At(Now, 55));
 
-        await new VehicleStateRefresh([first, second], new VehicleStateHolder()).RefreshAsync();
+        var result = await Refresh(feed).RefreshAsync();
 
-        Assert.Equal(1, first.Fetches);
-        Assert.Equal(1, second.Fetches);
-    }
-
-    [Fact]
-    public async Task The_newest_reading_wins_regardless_of_the_order_asked()
-    {
-        var newest = At(Now.AddMinutes(-5), 41, "mqtt");
-        var refresh = new VehicleStateRefresh(
-            [new Feed("mqtt", newest), new Feed("vw-group", At(Now.AddHours(-3), 40, "vw-group"))],
-            new VehicleStateHolder());
-
-        var result = await refresh.RefreshAsync();
-
+        Assert.Equal(1, feed.Asks);
         Assert.True(result.Succeeded);
-        Assert.True(result.IsFresh);
-        Assert.Equal(41, result.State!.SocPercent);
-        Assert.Equal("mqtt", result.Source);
+        Assert.Equal(55, result.State!.SocPercent);
     }
 
     [Fact]
@@ -89,24 +81,9 @@ public class VehicleStateRefreshTests
     {
         var holder = new VehicleStateHolder();
 
-        await new VehicleStateRefresh([new Feed("vw-group", At(Now, 55, "vw-group"))], holder).RefreshAsync();
+        await Refresh(new Feed(At(Now, 55)), holder).RefreshAsync();
 
         Assert.Equal(55, holder.GetCurrentState()!.SocPercent);
-    }
-
-    /// <summary>One feed failing must not cost the answer another one gave.</summary>
-    [Fact]
-    public async Task A_broken_feed_does_not_lose_a_good_answer()
-    {
-        var refresh = new VehicleStateRefresh(
-            [new Feed("broken", null, new InvalidOperationException("boom")),
-             new Feed("vw-group", At(Now, 55, "vw-group"))],
-            new VehicleStateHolder());
-
-        var result = await refresh.RefreshAsync();
-
-        Assert.True(result.Succeeded);
-        Assert.Equal(55, result.State!.SocPercent);
     }
 
     /// <summary>
@@ -117,14 +94,23 @@ public class VehicleStateRefreshTests
     public async Task A_failed_ask_hands_back_the_last_known_reading()
     {
         var holder = new VehicleStateHolder();
-        holder.Set(At(Now.AddHours(-4), 62, "vw-group"));
+        holder.Set(At(Now.AddHours(-4), 62));
 
-        var result = await new VehicleStateRefresh(
-            [new Feed("vw-group", null, new InvalidOperationException("unreachable"))], holder).RefreshAsync();
+        var result = await Refresh(new Feed(null, new InvalidOperationException("unreachable")), holder)
+            .RefreshAsync();
 
         Assert.False(result.Succeeded);
         Assert.False(result.IsFresh);
         Assert.Equal(62, result.State!.SocPercent);
         Assert.Contains("unreachable", result.Message);
+    }
+
+    [Fact]
+    public async Task An_empty_answer_names_the_feed_in_the_owner_s_words()
+    {
+        var result = await Refresh(new Feed(null)).RefreshAsync();
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("volkswagen.de", result.Message);
     }
 }

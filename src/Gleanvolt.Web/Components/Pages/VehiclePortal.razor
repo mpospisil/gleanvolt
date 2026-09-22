@@ -205,8 +205,7 @@ else if (_reading is { Succeeded: true, State: { } state })
             The dashboard's card is showing @VehicleFormatting.Percent(held.SocPercent) from
             @(string.IsNullOrWhiteSpace(held.SourceId) ? "the feed" : held.SourceId), captured
             @Age(held) ago@(Difference(state, held)). That is a different session asking at a different
-            moment, so a difference is not by itself a fault —
-            <a href="/vehicle-feeds">the feeds page</a> is where a persistent one is counted.
+            moment, so a difference is not by itself a fault.
         </p>
     }
     else

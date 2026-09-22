@@ -48,7 +48,6 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         // builds a minimal host rather than calling AddGleanvolt, so it owns the UI's dependencies.
         var vehicle = new VehicleStateHolder();
         builder.Services.AddSingleton<IVehicleTelemetry>(vehicle);
-        builder.Services.AddSingleton(vehicle.Comparison);
 
         // The dashboard's whole-day forecast tile reads this. Holding nothing is the install before its
         // first refresh, which is all an auth suite needs.

@@ -108,10 +108,16 @@ public class VehicleUpdateWorkerTests
     private sealed class CapturingLogger : ILogger<VehicleUpdateWorker>
     {
         private readonly List<string> _warnings = [];
+        private readonly List<string> _information = [];
 
         public IReadOnlyList<string> Warnings
         {
             get { lock (_warnings) { return _warnings.ToList(); } }
+        }
+
+        public IReadOnlyList<string> Information
+        {
+            get { lock (_warnings) { return _information.ToList(); } }
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -122,14 +128,9 @@ public class VehicleUpdateWorkerTests
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            if (logLevel < LogLevel.Warning)
-            {
-                return;
-            }
-
             lock (_warnings)
             {
-                _warnings.Add(formatter(state, exception));
+                (logLevel < LogLevel.Warning ? _information : _warnings).Add(formatter(state, exception));
             }
         }
     }
@@ -165,6 +166,24 @@ public class VehicleUpdateWorkerTests
         await worker.StartAsync(CancellationToken.None);
         await service.Asked.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task A_feed_set_aside_for_a_better_one_is_said_once_at_startup()
+    {
+        // #212: an ID.4 .env with the portal still switched on keeps booting, and the log says why the
+        // portal is silent rather than leaving it to look like a fault.
+        const string setAside = "Vehicle:Website is configured, so the Data Act portal is not used.";
+        var logger = new CapturingLogger();
+        var worker = new VehicleUpdateWorker(
+            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
+            configured: new ConfiguredVehicleFeed(Service: null, SetAside: setAside));
+
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Single(logger.Information, line => line == setAside);
+        Assert.Empty(logger.Warnings);
     }
 
     [Fact]

@@ -155,6 +155,9 @@ public static class SkodaApiSentences
 {
     public const string NoKey = "Paste an API key on the Vehicle portal page.";
 
+    /// <summary>What the dashboard's card says when the key is what stands in the way (#212).</summary>
+    public const string OwnerAction = "No MyŠkoda API key yet, or it has expired — paste one on the vehicle page.";
+
     public static string ForSignIn(SkodaApiOutcome outcome, string vin) => outcome switch
     {
         SkodaApiOutcome.KeyExpired => "That key has expired — create a new one in the app.",

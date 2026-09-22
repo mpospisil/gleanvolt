@@ -36,6 +36,21 @@ public interface IVehicleUpdateService
     string Manufacturer { get; }
 
     /// <summary>
+    /// The feed in the owner's words — <i>volkswagen.de</i>, <i>MyŠkoda</i>, <i>Data Act portal</i> —
+    /// for the dashboard's "via …" (issue #212). The raw <see cref="Manufacturer"/> is a log key, not
+    /// something an owner recognises. Defaulted to it for a feed that has no better name.
+    /// </summary>
+    string DisplayName => Manufacturer;
+
+    /// <summary>
+    /// What fixes this feed when it is <see cref="Enums.VehicleSourceState.NeedsOwner"/>, as one sentence
+    /// for the dashboard's card (issue #212); null to show <see cref="Health"/>'s own sentence. A
+    /// fixed sentence, because the card is where an owner decides <i>what to do</i>, and the health
+    /// message is written for the log, where it says <i>what happened</i>.
+    /// </summary>
+    string? OwnerAction => null;
+
+    /// <summary>
     /// Whether this feed can currently produce a reading, with a sentence for the UI. Cheap and
     /// synchronous: it is read on a Blazor render and on the Home Assistant publish tick, so it
     /// reports what the last fetch found rather than going and finding out.
@@ -54,13 +69,11 @@ public interface IVehicleUpdateService
     ///
     /// <para>Declared by the service because only the service knows: volkswagen.de is asked while a
     /// session is live and not at all between sessions (#170), and that is its design rather than a
-    /// limitation. Without this, a feed behaving exactly as intended reads as the worst one on
-    /// <c>/vehicle-feeds</c> — its longest gap is the length of a night, and every cadence band past
-    /// two hours fills up with the hours the car sat parked.</para>
+    /// limitation. Without this, a parked car's days-old reading from its last charge would look like
+    /// a feed that has died; the dashboard says <i>from the last charge</i> instead (#212).</para>
     ///
     /// <para><b>Reporting only.</b> Nothing dispatches on it and no charging decision reads it; it
-    /// exists so a page can tell a designed silence from a dropout instead of counting both as
-    /// downtime. Defaulted to <c>false</c>, which is the ordinary case: a feed on its own clock is
+    /// exists so a page can tell a designed silence from a dropout. Defaulted to <c>false</c>, which is the ordinary case: a feed on its own clock is
     /// expected to keep it whatever the car is doing.</para>
     /// </summary>
     bool DeliversOnlyWhileCharging => false;
@@ -76,4 +89,16 @@ public interface IVehicleUpdateService
     /// on charging whether or not the manufacturer's cloud is reachable.</para>
     /// </summary>
     Task<VehicleState?> FetchAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ask the manufacturer because somebody wants to know now — the dashboard's <i>Ask the car</i>
+    /// (issue #168) — rather than because <see cref="NextDelay"/> came round. The same answer as
+    /// <see cref="FetchAsync"/> for a feed on its own clock, which is why it defaults to it.
+    ///
+    /// <para>A feed that is gated to a charge overrides it (issue #212): with one feed per car, a
+    /// parked ID.4 has only volkswagen.de, and a feed that refused an owner's explicit ask would
+    /// leave the car's last-charge reading as the only thing a plan could start from. One request per
+    /// owner action; the polling gate is unchanged.</para>
+    /// </summary>
+    Task<VehicleState?> AskAsync(CancellationToken cancellationToken) => FetchAsync(cancellationToken);
 }

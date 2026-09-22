@@ -38,6 +38,14 @@ public sealed class VwWebsiteUpdateService(
 
     public string Manufacturer => "vw-website";
 
+    public string DisplayName => "volkswagen.de";
+
+    public string? OwnerAction => _health.IsBlocked ? OwnerActionSentence : null;
+
+    /// <summary>What the dashboard's card says when the session wants a one-time code (#212).</summary>
+    public const string OwnerActionSentence =
+        "volkswagen.de wants a one-time code — sign in again on the vehicle page.";
+
     public VehicleSourceHealth Health => _health;
 
     /// <summary>
@@ -61,15 +69,22 @@ public sealed class VwWebsiteUpdateService(
         && current.CarConnected
         && !current.SessionCompleted;
 
-    public async Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
+    public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
     {
-        if (!IsCharging)
-        {
-            // No network call at all. "Nothing is fetched while idle" has to be true of the wire, not
-            // just of the dashboard.
-            return null;
-        }
+        // No network call at all while idle. "Nothing is polled while idle" has to be true of the
+        // wire, not just of the dashboard.
+        return IsCharging ? ReadAsync(cancellationToken) : Task.FromResult<VehicleState?>(null);
+    }
 
+    /// <summary>
+    /// Read once whether or not a charge is running (#212). With one feed per car this is the only
+    /// way a parked ID.4 gets a reading newer than its last charge, and it is one request per owner
+    /// action — the clock above is still gated to a charge.
+    /// </summary>
+    public Task<VehicleState?> AskAsync(CancellationToken cancellationToken) => ReadAsync(cancellationToken);
+
+    private async Task<VehicleState?> ReadAsync(CancellationToken cancellationToken)
+    {
         try
         {
             var state = await client.GetVehicleStateAsync(cancellationToken).ConfigureAwait(false);

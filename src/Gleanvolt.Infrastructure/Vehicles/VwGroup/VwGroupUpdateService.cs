@@ -117,6 +117,9 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
     public string Manufacturer => ManufacturerName;
 
     /// <inheritdoc />
+    public string DisplayName => "Data Act portal";
+
+    /// <inheritdoc />
     public VehicleSourceHealth Health
     {
         get => _health;

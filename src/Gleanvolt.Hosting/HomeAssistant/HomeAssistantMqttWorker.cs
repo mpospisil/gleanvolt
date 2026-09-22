@@ -77,7 +77,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IOptions<VehicleOptions> vehicleOptions,
         HaDiscovery discovery,
         IVehicleTelemetry? vehicle = null,
-        IEnumerable<IVehicleUpdateService>? vehicleFeeds = null,
+        ConfiguredVehicleFeed? vehicleFeed = null,
         TimeProvider? timeProvider = null,
         ISolarGridSettings? solarGrid = null)
     {
@@ -91,7 +91,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _target = target;
         _fast = fast;
         _vehicle = vehicle;
-        _vehicleFeed = vehicleFeeds?.FirstOrDefault();
+        _vehicleFeed = vehicleFeed?.Service;
         _vehicleOptions = vehicleOptions.Value;
         _targetedOptions = targetedOptions.Value;
         _pendingRestSocPercent = _targetedOptions.JustInTime.RestSocPercent;

@@ -42,9 +42,6 @@ public class DashboardPageTests : PageTest
         Services.AddSingleton<IVehicleStateRefresh>(_refresh);
         Services.AddSingleton<ISolarForecastService>(_forecast);
 
-        // The per-feed sections read the holder's own tally (#141), so it has to be the same object
-        // the tests push readings into -- a second comparison would see nothing.
-        Services.AddSingleton(_vehicle.Comparison);
         Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
         Services.AddSingleton(_ => _car);
     }
@@ -63,6 +60,8 @@ public class DashboardPageTests : PageTest
 
         public string Manufacturer => "vw-group";
 
+        public string DisplayName => "Data Act portal";
+
         public VehicleSourceHealth Health => health;
 
         public TimeSpan NextDelay => TimeSpan.FromMinutes(15);
@@ -75,13 +74,18 @@ public class DashboardPageTests : PageTest
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed(health));
 
     /// <summary>volkswagen.de's shape: asked only while a charge runs (#170/#180).</summary>
-    private sealed class ChargeGatedFeed : IVehicleUpdateService
+    private sealed class ChargeGatedFeed(VehicleSourceHealth? health = null) : IVehicleUpdateService
     {
         public string VehicleId => "id4";
 
         public string Manufacturer => "vw-website";
 
-        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("used while a charge is running");
+        public string DisplayName => "volkswagen.de";
+
+        public string? OwnerAction =>
+            Health.IsBlocked ? "volkswagen.de wants a one-time code — sign in again on the vehicle page." : null;
+
+        public VehicleSourceHealth Health => health ?? VehicleSourceHealth.Ok("used while a charge is running");
 
         public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
 
@@ -91,8 +95,8 @@ public class DashboardPageTests : PageTest
             throw new NotSupportedException("A render must never fetch.");
     }
 
-    private void ChargeGatedFeedConfigured() =>
-        Services.AddSingleton<IVehicleUpdateService>(new ChargeGatedFeed());
+    private void ChargeGatedFeedConfigured(VehicleSourceHealth? health = null) =>
+        Services.AddSingleton<IVehicleUpdateService>(new ChargeGatedFeed(health));
 
     /// <summary>Markup with whitespace collapsed, so a prose assertion need not know where it wrapped.</summary>
     private static string Prose(IRenderedComponent<Dashboard> page) =>
@@ -173,7 +177,7 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         Assert.Contains("has not delivered a reading yet", page.Markup);
-        Assert.Contains("vw-group", page.Markup);
+        Assert.Contains("Data Act portal", page.Markup);
         Assert.DoesNotContain("No feed is configured", page.Markup);
         Assert.DoesNotContain("Sign-in required", page.Markup);
     }
@@ -555,133 +559,129 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void Says_nothing_per_feed_while_only_one_has_ever_reported()
+    public void Has_no_per_feed_section_even_when_two_sources_have_reported()
     {
-        // With one feed the card above already is that feed. A section repeating it would be the
-        // dashboard saying the same thing twice.
+        // #212: one car, one feed. "What each feed says" was the comparison instrument (#141/#180),
+        // and the comparison is over.
         _car = Id4();
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-22), SocPercent: 60, SourceId: "mqtt"));
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "vw-website"));
 
         var page = Render<Dashboard>();
 
         Assert.DoesNotContain("What each feed says", page.Markup);
+        Assert.DoesNotContain("60%", page.Markup);
+        Assert.DoesNotContain("/vehicle-feeds", page.Markup);
     }
 
     [Fact]
-    public void Gives_each_feed_its_own_section_once_two_have_reported()
+    public void A_lapsed_one_time_code_says_what_fixes_it_and_links_to_the_vehicle_page()
     {
-        // The reason this exists: the holder keeps one state, so the feed that came second leaves
-        // nothing behind but a count -- and "the portal is healthy" and "the portal is delivering"
-        // are then indistinguishable from the card above.
         _car = Id4();
+        ChargeGatedFeedConfigured(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-22), SocPercent: 60, SourceId: "vw-group"));
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("What each feed says", page.Markup);
-        Assert.Contains("id4", page.Markup);
-        Assert.Contains("vw-group", page.Markup);
-
-        // Both accounts are on the page, including the one the holder threw away.
-        Assert.Contains("62%", page.Markup);
-        Assert.Contains("60%", page.Markup);
+        var blocked = page.Find("#vehicle-feed-blocked");
+        Assert.Contains("Sign-in required", blocked.TextContent);
+        Assert.Contains("sign in again on the vehicle page", blocked.TextContent);
+        Assert.Equal("/vehicle-portal", blocked.QuerySelector("a")!.GetAttribute("href"));
     }
 
     [Fact]
-    public void Names_the_feed_the_card_above_is_quoting()
+    public void A_feed_with_no_fix_sentence_of_its_own_shows_its_health_sentence()
     {
         _car = Id4();
+        Feed(VehicleSourceHealth.NeedsOwner("The portal refused the sign-in: check the password."));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-22), SocPercent: 60, SourceId: "vw-group"));
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("the reading shown above", page.Markup);
-        Assert.Contains("held back as older", page.Markup);
+        var blocked = page.Find("#vehicle-feed-blocked");
+        Assert.Contains("check the password", blocked.TextContent);
+        Assert.Equal("/vehicle-portal", blocked.QuerySelector("a")!.GetAttribute("href"));
     }
 
     [Fact]
-    public void A_feed_that_has_gone_quiet_keeps_its_section_and_shows_its_age_growing()
+    public void Health_comes_from_the_configured_feed_not_the_first_registered()
     {
-        // The one thing worth looking at after a feed stops: its own last reading, ageing, beside the
-        // other feed's fresh one. A section that vanished would take the evidence with it.
+        // The sign-in line used to be VehicleFeeds.FirstOrDefault() -- the first *registered* service,
+        // which need not be the one behind the reading (#212).
         _car = Id4();
+        Feed(VehicleSourceHealth.Ok("The portal answered."));
+        Services.AddSingleton(new ConfiguredVehicleFeed(
+            new ChargeGatedFeed(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."))));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-group"));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "id4"));
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("What each feed says", page.Markup);
-        Assert.Contains("9.0 h", page.Markup);
+        Assert.Contains("sign in again on the vehicle page", page.Find("#vehicle-feed-blocked").TextContent);
     }
 
     [Fact]
-    public void Shows_a_field_one_feed_carries_and_the_other_does_not()
-    {
-        // Coverage, on the card rather than only in the week's tally: the portal carries a
-        // charge-time-remaining for the reference car and the MQTT feed does not, and a dash beside a
-        // figure is how that is seen at a glance.
-        _car = Id4();
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-10), SocPercent: 62, SourceId: "id4"));
-        _vehicle.Set(new VehicleState(
-            _time.Now.AddMinutes(-22),
-            SocPercent: 60,
-            ChargeTimeRemaining: TimeSpan.FromMinutes(95),
-            SourceId: "vw-group"));
-
-        var page = Render<Dashboard>();
-
-        Assert.Contains("Time left", page.Markup);
-        Assert.Contains("95 min", page.Markup);
-    }
-
-    /// <summary>
-    /// The re-framing #180 asks for. "What each feed says" was written for portal-against-MQTT,
-    /// where the open question was which of the two was right. Portal-against-volkswagen.de is a
-    /// different comparison: they carry different fields on different clocks, and one is silent
-    /// unless the car is charging — so a section that still invited the old reading would have an
-    /// owner diagnosing a dropout every time the car sat on the drive.
-    /// </summary>
-    [Fact]
-    public void Presents_the_per_feed_sections_as_complementary_rather_than_a_contest()
+    public void Names_the_feed_in_the_owner_s_words()
     {
         _car = Id4();
         ChargeGatedFeedConfigured();
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-website"));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "vw-group …1234"));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { EvChargerPowerWatts = 7_000 });
+        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "vw-website"));
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("What each feed says", page.Markup);
-        Assert.Contains("Not a contest between them", Prose(page));
-
-        // The nine-hour age is the car being parked, and the marker is what says so.
-        Assert.Contains("while charging only", Prose(page));
-        Assert.DoesNotContain("which is right is what a week of both answers", Prose(page));
+        var age = Prose(page);
+        Assert.Contains("via volkswagen.de", age);
+        Assert.DoesNotContain("via vw-website", age);
     }
 
-    /// <summary>
-    /// The safe way round: a feed on its own clock gets no marker, because its growing age really is
-    /// something to look into.
-    /// </summary>
     [Fact]
-    public void Leaves_a_feed_on_its_own_clock_unmarked()
+    public void A_parked_car_s_reading_is_from_its_last_charge_rather_than_stale()
     {
+        // volkswagen.de is read only while charging, so days old is what a parked ID.4 looks like.
         _car = Id4();
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
-        _vehicle.Set(new VehicleState(_time.Now.AddHours(-9), SocPercent: 55, SourceId: "vw-group"));
-        _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "id4"));
+        ChargeGatedFeedConfigured();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off) with { EvChargerPowerWatts = 0 });
+        _vehicle.Set(new VehicleState(_time.Now.AddDays(-3), SocPercent: 71, SourceId: "vw-website"));
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("What each feed says", page.Markup);
-        Assert.DoesNotContain("while charging only", Prose(page));
+        var age = page.Find("#vehicle-reading-age").TextContent;
+        Assert.Contains("from the last charge", age);
+        Assert.Contains("volkswagen.de is read only while charging", age);
+        Assert.DoesNotContain("stale", age);
+        Assert.Contains("71%", page.Markup);
+    }
+
+    [Fact]
+    public void An_old_reading_during_a_charge_is_still_stale()
+    {
+        // While power flows the feed is polled, so an old reading then really is a fault.
+        _car = Id4();
+        ChargeGatedFeedConfigured();
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { EvChargerPowerWatts = 7_000 });
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-20), SocPercent: 71, SourceId: "vw-website"));
+
+        var page = Render<Dashboard>();
+
+        var age = page.Find("#vehicle-reading-age").TextContent;
+        Assert.Contains("stale", age);
+        Assert.DoesNotContain("from the last charge", age);
+    }
+
+    [Fact]
+    public void A_feed_on_its_own_clock_is_never_described_as_from_the_last_charge()
+    {
+        _car = Id4();
+        Feed(VehicleSourceHealth.Ok("The portal answered."));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off));
+        _vehicle.Set(new VehicleState(_time.Now.AddHours(-20), SocPercent: 41, SourceId: "vw-group ...1234"));
+
+        var page = Render<Dashboard>();
+
+        var age = page.Find("#vehicle-reading-age").TextContent;
+        Assert.Contains("via Data Act portal", System.Text.RegularExpressions.Regex.Replace(age, @"\s+", " "));
+        Assert.Contains("stale", age);
+        Assert.DoesNotContain("from the last charge", age);
     }
 }
