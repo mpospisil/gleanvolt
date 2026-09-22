@@ -121,7 +121,6 @@ public class VehicleFeedRegistrationTests
 
         Assert.Equal("skoda", feed.Manufacturer);
         Assert.Equal("enyaq", feed.VehicleId);
-        Assert.False(feed.DeliversOnlyWhileCharging);
         Assert.True(feed.Health.IsBlocked);
 
         var signIn = Assert.IsType<SkodaApiSignIn>(provider.GetRequiredService<IVehicleAccountSignIn>());

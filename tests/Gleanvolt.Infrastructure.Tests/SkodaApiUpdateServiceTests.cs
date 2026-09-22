@@ -88,12 +88,6 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
     }
 
     [Fact]
-    public void It_is_on_its_own_clock_between_charges_too()
-    {
-        Assert.False(_service.DeliversOnlyWhileCharging);
-    }
-
-    [Fact]
     public async Task Idle_it_asks_every_fifteen_minutes_and_while_charging_every_five()
     {
         PasteKey();

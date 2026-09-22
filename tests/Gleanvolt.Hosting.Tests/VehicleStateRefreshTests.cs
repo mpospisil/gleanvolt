@@ -8,8 +8,7 @@ namespace Gleanvolt.Hosting.Tests;
 /// Asking the car because somebody wants to know (issue #168), of the one feed an installation has
 /// (issue #212).
 ///
-/// <para>What these pin is the behaviour that differs from polling: the feed is asked through
-/// <c>AskAsync</c>, which a charge-gated feed answers while parked, and a failure hands back the last
+/// <para>What these pin is the behaviour that differs from polling: a failure hands back the last
 /// known reading rather than nothing — because the caller is often a plan, which would rather be built
 /// on an old number that says so.</para>
 /// </summary>
@@ -31,13 +30,7 @@ public class VehicleStateRefreshTests
 
         public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
 
-        public bool DeliversOnlyWhileCharging => true;
-
-        // The clock's path: a parked car's gated feed returns nothing here.
-        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<VehicleState?>(null);
-
-        public Task<VehicleState?> AskAsync(CancellationToken cancellationToken)
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
         {
             Asks++;
             return throws is not null ? Task.FromException<VehicleState?>(throws) : Task.FromResult(answer);
@@ -63,10 +56,8 @@ public class VehicleStateRefreshTests
     }
 
     [Fact]
-    public async Task A_parked_car_s_charge_gated_feed_is_asked_rather_than_polled()
+    public async Task The_one_feed_is_asked_once()
     {
-        // #212: with the portal gone, a parked ID.4 has only volkswagen.de. The owner's ask reads it
-        // once; the clock (FetchAsync) would have returned nothing.
         var feed = new Feed(At(Now, 55));
 
         var result = await Refresh(feed).RefreshAsync();

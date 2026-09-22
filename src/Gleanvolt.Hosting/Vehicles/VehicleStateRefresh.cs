@@ -7,10 +7,9 @@ namespace Gleanvolt.Hosting.Vehicles;
 /// <summary>
 /// Asks the car's feed for its state, now (issue #168).
 ///
-/// <para>Calls <see cref="IVehicleUpdateService.AskAsync"/> rather than the polling worker's
-/// <see cref="IVehicleUpdateService.FetchAsync"/>: the same request, but one a charge-gated feed
-/// answers while the car is parked (issue #212). That is the whole of the on-demand idea: nothing new
-/// to fetch with, only a different reason to fetch.</para>
+/// <para>The same <see cref="IVehicleUpdateService.FetchAsync"/> the polling worker calls on a clock —
+/// called instead because somebody asked. That is the whole of the on-demand idea: nothing new to
+/// fetch with, only a different reason to fetch.</para>
 ///
 /// <para><b>One feed.</b> This used to ask every registered feed and keep the newest answer, back when
 /// an ID.4 ran the Data Act portal beside volkswagen.de. An installation now has exactly one
@@ -34,7 +33,7 @@ public sealed class VehicleStateRefresh(
 
         try
         {
-            var state = await service.AskAsync(cancellationToken).ConfigureAwait(false);
+            var state = await service.FetchAsync(cancellationToken).ConfigureAwait(false);
 
             if (state is not null)
             {

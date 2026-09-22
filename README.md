@@ -1777,11 +1777,13 @@ looks; but if you want them, leave this off.
 #### `Vehicle:Website` — volkswagen.de, the live source
 
 ```jsonc
-"Vehicle": { "Website": { "Enabled": true, "Vin": "WVGZZZ…", "PollInterval": "00:05:00" } }
+"Vehicle": { "Website": { "Enabled": true, "Vin": "WVGZZZ…", "PollInterval": "00:05:00", "IdlePollInterval": "00:15:00" } }
 ```
 
-Off by default. On, the car is asked **only while a charging session is open** — so the state of
-charge is recorded as it actually moves, and nothing is fetched while the car sits idle.
+Off by default. On, the car is read **continuously**: every `PollInterval` (5 min) while a charging
+session is open, so the state of charge is recorded as it moves, and every `IdlePollInterval` (15 min)
+otherwise, so the SOC a plan starts from — after a drive, before any charge — is the car's own and
+recent.
 
 **With this configured, the [EU Data Act portal](docs/VW_PORTAL_SETUP.md) is not used**
 ([#212](https://github.com/mpospisil/gleanvolt/issues/212)): one car, one feed. `Vehicle:DataAct:Enabled`
@@ -1799,11 +1801,11 @@ behind the car, so a charge is over before its first in-charge reading appears t
 the car's own **target SOC**, which only the portal carries for the ID.4 — nothing plans on it, so it is
 simply unknown.
 
-**A parked car shows its last charge.** Between charges nothing is polled, so the dashboard's reading
-is the one from the end of the last charge, and its age line says *from the last charge; volkswagen.de
-is read only while charging* rather than *stale* — days old is what a parked ID.4 looks like. **Ask the
-car** on the dashboard reads volkswagen.de once whether or not the car is charging: one request per
-press, and the clock is still gated to a charge.
+**Any failure stops the feed and asks you to sign in again.** A one-time code wanted, an answer
+that is not a reading, or no answer at all: the feed goes to *sign-in required*, stops asking, and
+replays nothing at VW's identity provider on a clock — that is how accounts get locked. The dashboard's
+card, the band across every page and the `Car feed` entity all say so, with a link to **Vehicle
+portal**. Sign in there and the feed is back on its clock within a minute, **without a restart**.
 
 **Signing in is a page, not a setting.** A cold login *always* wants a one-time code emailed to the
 account owner. That makes it hostile to a background service and perfectly ordinary at the moment you
@@ -1818,6 +1820,11 @@ holding it is signed in as you. It is written owner-only and never logged.
 If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
 dashboard's card says *volkswagen.de wants a one-time code — sign in again on the vehicle page* with a
 link to it, and nothing that writes to hardware depends on the feed.
+
+| Setting | Default | |
+|---|---|---|
+| `PollInterval` | `00:05:00` | While a charging session is open (`VW_WEBSITE_POLL_INTERVAL`) |
+| `IdlePollInterval` | `00:15:00` | Otherwise (`VW_WEBSITE_IDLE_POLL_INTERVAL`) |
 
 #### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
 
@@ -1837,7 +1844,7 @@ the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs) Škoda 
 |---|---|---|
 | `Enabled`, `Vin` | off, empty | Both required. **This section chooses the feed** — `Ev:Vehicles[].Make` never does |
 | `ChargingPollInterval` | `00:05:00` | While a charge is running |
-| `IdlePollInterval` | `00:15:00` | Between charges. Unlike volkswagen.de, it does keep asking: a key has no session to spend, and the state of charge before a charge starts is what a % target is planned from |
+| `IdlePollInterval` | `00:15:00` | Between charges: the state of charge before a charge starts is what a % target is planned from |
 | `KeyPath` | `data/skoda-api-key.json` | Where the pasted key is kept, owner-only |
 | `BaseUrl`, `SourceId` | Škoda's API, `skoda` | A hedge, not an abstraction: the test environment, or another VW Group brand if one ever publishes the same API |
 
@@ -2413,8 +2420,7 @@ sections, in the order the questions are actually asked:
   fixes it and a link to **Vehicle portal**. The last two must never look alike: *stale* clears itself
   and *sign-in required* never will. **One car, one feed** ([#212](https://github.com/mpospisil/gleanvolt/issues/212)):
   the health is that of the installation's one feed, and *via …* names it in your words — volkswagen.de,
-  MyŠkoda, Data Act portal. A volkswagen.de reading on a parked car says *from the last charge* instead
-  of *stale*. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
+  MyŠkoda, Data Act portal. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).
 - **Charging session** — charge mode, control state, charger status, session energy, EV charging power
   and current, target and active current, battery loan power. Shown **only while there is a session to
   report**: a mode is driving, or the car is drawing power under no mode at all (somebody put the

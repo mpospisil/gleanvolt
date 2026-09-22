@@ -29,18 +29,22 @@ it. It also carries the set-aside sentence the worker logs at startup.
 for a feed blocked on its owner. Both are defaulted, and both are display only: nothing dispatches on
 them, which keeps the rule that `Manufacturer` is never dispatched on.
 
-**Decision — an owner's ask may read a charge-gated feed while parked.** `IVehicleUpdateService.AskAsync`
-defaults to `FetchAsync`. volkswagen.de overrides it to read once whether or not a charge is running,
-so *Ask the car* on a parked ID.4 gets a reading newer than its last charge. The polling gate is
-unchanged: that is one request per owner action, not a clock.
+**Decision — volkswagen.de is read continuously, and any failure stops it for the owner.** It is now
+the ID.4's only feed, and a plan is made before the charge, after a drive, so a feed gated to charging
+would leave plans on the last charge's SOC. It is read every `PollInterval` (5 min) while charging and
+every `IdlePollInterval` (15 min) otherwise. A one-time code wanted, an answer that is not a reading,
+or no answer at all sets *NeedsOwner* and the worker stops asking. The client counts successful
+sign-ins; the feed unblocks when the count moves, so signing in again on the vehicle page resumes it
+without a restart. Rejected: asking the car once before each plan, which spread the question over
+every planning surface (tabs, API, Home Assistant) instead of answering it in the feed.
 
 **Consequences.**
 
 - The ID.4 loses the car's own target SOC, which only the portal carried. Nothing reads it today, so it
   becomes unknown.
-- A parked ID.4's reading is its last charge's, and may be past `MaxAge`. The dashboard says *from the
-  last charge* rather than *stale*, and #179's guard can still refuse it as a plan's target until the
-  owner asks the car.
+- A lapsed volkswagen.de session now stops the feed even when no charge is running, so the owner is
+  asked to sign in again more often than before, when only a charge could reveal a lapse.
+- `DeliversOnlyWhileCharging` is removed from the feed contract: no feed is gated to charging any more.
 - "What each feed says", `/vehicle-feeds`, `VehicleFeedComparison` and `VehicleFeedReport` are removed.
   With one feed there is nothing to put side by side, and the comparison had no other reader.
 

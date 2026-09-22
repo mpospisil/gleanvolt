@@ -73,8 +73,8 @@ public class DashboardPageTests : PageTest
     private void Feed(VehicleSourceHealth health) =>
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed(health));
 
-    /// <summary>volkswagen.de's shape: asked only while a charge runs (#170/#180).</summary>
-    private sealed class ChargeGatedFeed(VehicleSourceHealth? health = null) : IVehicleUpdateService
+    /// <summary>volkswagen.de's shape (#170, #212): the owner's words, and a fix sentence when blocked.</summary>
+    private sealed class WebsiteFeed(VehicleSourceHealth? health = null) : IVehicleUpdateService
     {
         public string VehicleId => "id4";
 
@@ -89,14 +89,12 @@ public class DashboardPageTests : PageTest
 
         public TimeSpan NextDelay => TimeSpan.FromMinutes(1);
 
-        public bool DeliversOnlyWhileCharging => true;
-
         public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
             throw new NotSupportedException("A render must never fetch.");
     }
 
-    private void ChargeGatedFeedConfigured(VehicleSourceHealth? health = null) =>
-        Services.AddSingleton<IVehicleUpdateService>(new ChargeGatedFeed(health));
+    private void WebsiteFeedConfigured(VehicleSourceHealth? health = null) =>
+        Services.AddSingleton<IVehicleUpdateService>(new WebsiteFeed(health));
 
     /// <summary>Markup with whitespace collapsed, so a prose assertion need not know where it wrapped.</summary>
     private static string Prose(IRenderedComponent<Dashboard> page) =>
@@ -579,7 +577,7 @@ public class DashboardPageTests : PageTest
     public void A_lapsed_one_time_code_says_what_fixes_it_and_links_to_the_vehicle_page()
     {
         _car = Id4();
-        ChargeGatedFeedConfigured(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."));
+        WebsiteFeedConfigured(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
@@ -612,7 +610,7 @@ public class DashboardPageTests : PageTest
         _car = Id4();
         Feed(VehicleSourceHealth.Ok("The portal answered."));
         Services.AddSingleton(new ConfiguredVehicleFeed(
-            new ChargeGatedFeed(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."))));
+            new WebsiteFeed(VehicleSourceHealth.NeedsOwner("volkswagen.de wants a one-time code."))));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
@@ -624,7 +622,7 @@ public class DashboardPageTests : PageTest
     public void Names_the_feed_in_the_owner_s_words()
     {
         _car = Id4();
-        ChargeGatedFeedConfigured();
+        WebsiteFeedConfigured();
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { EvChargerPowerWatts = 7_000 });
         _vehicle.Set(new VehicleState(_time.Now.AddMinutes(-5), SocPercent: 62, SourceId: "vw-website"));
 
@@ -636,41 +634,7 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void A_parked_car_s_reading_is_from_its_last_charge_rather_than_stale()
-    {
-        // volkswagen.de is read only while charging, so days old is what a parked ID.4 looks like.
-        _car = Id4();
-        ChargeGatedFeedConfigured();
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off) with { EvChargerPowerWatts = 0 });
-        _vehicle.Set(new VehicleState(_time.Now.AddDays(-3), SocPercent: 71, SourceId: "vw-website"));
-
-        var page = Render<Dashboard>();
-
-        var age = page.Find("#vehicle-reading-age").TextContent;
-        Assert.Contains("from the last charge", age);
-        Assert.Contains("volkswagen.de is read only while charging", age);
-        Assert.DoesNotContain("stale", age);
-        Assert.Contains("71%", page.Markup);
-    }
-
-    [Fact]
-    public void An_old_reading_during_a_charge_is_still_stale()
-    {
-        // While power flows the feed is polled, so an old reading then really is a fault.
-        _car = Id4();
-        ChargeGatedFeedConfigured();
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { EvChargerPowerWatts = 7_000 });
-        _vehicle.Set(new VehicleState(_time.Now.AddHours(-20), SocPercent: 71, SourceId: "vw-website"));
-
-        var page = Render<Dashboard>();
-
-        var age = page.Find("#vehicle-reading-age").TextContent;
-        Assert.Contains("stale", age);
-        Assert.DoesNotContain("from the last charge", age);
-    }
-
-    [Fact]
-    public void A_feed_on_its_own_clock_is_never_described_as_from_the_last_charge()
+    public void An_old_reading_is_stale_whichever_feed_produced_it()
     {
         _car = Id4();
         Feed(VehicleSourceHealth.Ok("The portal answered."));
@@ -682,6 +646,5 @@ public class DashboardPageTests : PageTest
         var age = page.Find("#vehicle-reading-age").TextContent;
         Assert.Contains("via Data Act portal", System.Text.RegularExpressions.Regex.Replace(age, @"\s+", " "));
         Assert.Contains("stale", age);
-        Assert.DoesNotContain("from the last charge", age);
     }
 }

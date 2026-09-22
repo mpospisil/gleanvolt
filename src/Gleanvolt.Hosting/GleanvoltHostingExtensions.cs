@@ -586,7 +586,7 @@ public static class GleanvoltHostingExtensions
                 provider.GetService<ILogger<VwGroupUpdateService>>()));
         }
 
-        // volkswagen.de -- the live source, polled only while a charge runs (issue #170). A cold login
+        // volkswagen.de -- the live source, read continuously (issues #170, #212). A cold login
         // always wants an emailed one-time code, so the sign-in seam is registered too and the web UI
         // drives it while a person is there to read the email. The client is shared between the two:
         // one cookie jar for the whole flow is not optional, and two of them lose the session.

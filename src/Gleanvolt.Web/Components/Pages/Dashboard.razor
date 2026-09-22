@@ -198,13 +198,7 @@ else
     {
         <p class="muted" id="vehicle-reading-age">
             Reported by the car @VehicleAge(Showing) ago@(Via(Showing) is { } via ? $" via {via}" : "")
-            @if (FromLastCharge(Showing))
-            {
-                @* volkswagen.de is read only while charging (#170), so a parked car's reading is its
-                   last charge's -- days old is expected, and must not look like a dropout (#212). *@
-                <span> — from the last charge; @_service!.DisplayName is read only while charging</span>
-            }
-            else if (IsStale(Showing))
+            @if (IsStale(Showing))
             {
                 <strong> — stale, older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h</strong>
             }
@@ -394,15 +388,6 @@ else
     /// <summary>The feed in the owner's words (#212), or the reading's own name when it is not the feed's.</summary>
     private string? Via(VehicleState reading) =>
         FromTheFeed(reading) ? _service!.DisplayName : reading.SourceId;
-
-    /// <summary>
-    /// A charge-gated feed's reading while nothing is charging: its last charge's, and expected to
-    /// age (#212). Once power flows again the feed is polled and the ordinary stale rule applies.
-    /// </summary>
-    private bool FromLastCharge(VehicleState reading) =>
-        _service is { DeliversOnlyWhileCharging: true }
-        && FromTheFeed(reading)
-        && _status is { EvChargerPowerWatts: <= 0 };
 
     private bool IsStale(VehicleState state) =>
         state.IsStaleAt(Time.GetUtcNow(), VehicleDisplay.MaxAge);

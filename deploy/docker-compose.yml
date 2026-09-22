@@ -159,14 +159,15 @@ services:
       Vehicle__Password: ${MQTT_PASSWORD:-}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
       Vehicle__OnDemandOnly: ${VEHICLE_ON_DEMAND_ONLY:-false}
-      # volkswagen.de -- the live source, polled only while a charge runs (issue #170). The session
-      # it signs in with is persisted under data/, which is already a bind mount, so a restart does
-      # not need another emailed code.
+      # volkswagen.de -- the live source, polled every 5 min while charging and every 15 otherwise
+      # (issues #170, #212). The session it signs in with is persisted under data/, which is already a
+      # bind mount, so a restart does not need another emailed code.
       Vehicle__Website__Enabled: ${VW_WEBSITE_ENABLED:-false}
       Vehicle__Website__Username: ${VW_WEBSITE_USERNAME:-}
       Vehicle__Website__Password: ${VW_WEBSITE_PASSWORD:-}
       Vehicle__Website__Vin: ${VW_WEBSITE_VIN:-}
       Vehicle__Website__PollInterval: ${VW_WEBSITE_POLL_INTERVAL:-00:05:00}
+      Vehicle__Website__IdlePollInterval: ${VW_WEBSITE_IDLE_POLL_INTERVAL:-00:15:00}
       # MyŠkoda's public API -- the live source for a Škoda, in place of the block above (issue #193).
       # No key here: it is pasted on the Vehicle portal page and kept in data/skoda-api-key.json.
       # Enabling this and VW_WEBSITE_ENABLED together stops startup -- one installation, one car.

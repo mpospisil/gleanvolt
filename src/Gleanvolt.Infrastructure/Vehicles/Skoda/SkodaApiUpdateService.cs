@@ -92,9 +92,6 @@ public sealed class SkodaApiUpdateService(
             ? SkodaApiSentences.OwnerAction
             : null;
 
-    /// <summary>False: this feed is on its own clock whatever the car is doing. See the class remarks.</summary>
-    public bool DeliversOnlyWhileCharging => false;
-
     public VehicleSourceHealth Health
     {
         get

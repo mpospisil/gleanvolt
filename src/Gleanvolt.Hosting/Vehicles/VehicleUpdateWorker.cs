@@ -25,7 +25,8 @@ namespace Gleanvolt.Hosting.Vehicles;
 /// again cannot help and replaying a password on a clock is how accounts get locked. The loop ends,
 /// the dashboard says <i>sign-in required</i>, and it is a restart (after the owner has done their
 /// part) that puts the feed back on its clock — unless the service itself stops reporting blocked,
-/// as the Škoda feed does the moment a new API key is pasted (#193), in which case the loop picks up
+/// as the Škoda feed does the moment a new API key is pasted (#193) and volkswagen.de does once the
+/// owner has signed in again (#212), in which case the loop picks up
 /// again on its own.</para>
 ///
 /// <para>Nothing here is on any hardware path. The car is advisory data: a manufacturer's cloud that
