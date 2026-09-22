@@ -44,6 +44,12 @@ internal sealed class ApiTestHost : IAsyncDisposable
     internal VehicleStateHolder Vehicle { get; } = new();
 
     /// <summary>
+    /// Asking the car before a plan (#212). Unregistered unless a test sets it, which is also what an
+    /// API host without the vehicle seam looks like: the endpoints take it as optional.
+    /// </summary>
+    internal IVehicleStateRefresh? Refresh { get; set; }
+
+    /// <summary>
     /// The configured car (#124) — what it <em>is</em>, as opposed to <see cref="Vehicle"/>, which is
     /// what it last <em>said</em>. Unknown unless a test describes one.
     /// </summary>
@@ -79,6 +85,11 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<IEnergyIntervalStore>(Energy);
         builder.Services.AddSingleton<IChargingSessionStore>(Sessions);
         builder.Services.AddSingleton<IVehicleTelemetry>(Vehicle);
+
+        if (Refresh is not null)
+        {
+            builder.Services.AddSingleton(Refresh);
+        }
         builder.Services.AddSingleton(new ApiHostInfo("1.2.3-test", TimeSpan.FromHours(12)));
         builder.Services.AddSingleton(Fixtures.Site);
         builder.Services.AddSingleton(Car);

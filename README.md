@@ -1801,9 +1801,14 @@ simply unknown.
 
 **A parked car shows its last charge.** Between charges nothing is polled, so the dashboard's reading
 is the one from the end of the last charge, and its age line says *from the last charge; volkswagen.de
-is read only while charging* rather than *stale* — days old is what a parked ID.4 looks like. **Ask the
-car** on the dashboard reads volkswagen.de once whether or not the car is charging: one request per
-press, and the clock is still gated to a charge.
+is read only while charging* rather than *stale* — days old is what a parked ID.4 looks like, and after
+a drive it is simply wrong. So **a plan asks the car first**: the Targeted and Fast tabs as they open,
+the API's targeted preview and start and a battery-target fast start, and the Home Assistant presses
+that convert a state of charge. Each reads volkswagen.de once whether or not the car is charging. An
+answer is reused for five minutes, so a run of previews costs one request. A plan waits up to 20 s and
+then goes on with the held reading. A feed that needs you to sign in is not asked on your behalf. A
+target in kilowatt-hours needs nothing from the car and is not held up by it. **Ask the car** on the
+dashboard does the same on demand. The polling clock is still gated to a charge.
 
 **Signing in is a page, not a setting.** A cold login *always* wants a one-time code emailed to the
 account owner. That makes it hostile to a background service and perfectly ordinary at the moment you

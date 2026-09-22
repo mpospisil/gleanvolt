@@ -80,6 +80,33 @@ public class TargetedTabTests : PageTest
         Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "targeted"));
 
     [Fact]
+    public void Asks_the_car_as_it_opens_and_plans_from_what_it_says()
+    {
+        // #212: between charges volkswagen.de is not polled, so the held reading is the last charge's
+        // -- here three days old and from before a drive. The tab asks before the owner plans.
+        WithAKnownPack();
+        CarReports(socPercent: 71, age: TimeSpan.FromDays(3));
+        var refresh = new FakeVehicleStateRefresh(onPrepare: () => _vehicle.Set(new VehicleState(
+            Now, SocPercent: 38, PlugState: VehiclePlugState.Connected, SourceId: "vw-website")));
+        Services.AddSingleton<Core.Interfaces.IVehicleStateRefresh>(refresh);
+
+        var page = RenderTab();
+
+        page.WaitForAssertion(() => Assert.Contains("38%", page.Find("#vehicle-card").TextContent));
+        Assert.Equal(1, refresh.Prepares);
+        Assert.Empty(page.FindAll("#asking-car"));
+    }
+
+    [Fact]
+    public void Asks_nothing_where_there_is_no_feed()
+    {
+        var page = RenderTab();
+
+        Assert.Empty(page.FindAll("#asking-car"));
+        Assert.Contains("Ready by", page.Markup);
+    }
+
+    [Fact]
     public void Prefills_tomorrow_morning_when_nothing_has_been_requested()
     {
         var page = RenderTab();

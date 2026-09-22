@@ -26,6 +26,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly ITargetedChargeSelector _target;
     private readonly IFastChargeSelector _fast;
     private readonly IVehicleTelemetry? _vehicle;
+    private readonly IVehicleStateRefresh? _vehicleRefresh;
     private readonly VehicleOptions _vehicleOptions;
 
     // The manufacturer feed whose health the Car feed entity carries (issue #140), or null when none
@@ -79,8 +80,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IVehicleTelemetry? vehicle = null,
         ConfiguredVehicleFeed? vehicleFeed = null,
         TimeProvider? timeProvider = null,
-        ISolarGridSettings? solarGrid = null)
+        ISolarGridSettings? solarGrid = null,
+        IVehicleStateRefresh? vehicleRefresh = null)
     {
+        _vehicleRefresh = vehicleRefresh;
         _solarGrid = solarGrid;
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
@@ -399,6 +402,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // The amount, before the mode and in that order, for the reason the targeted request is set
         // first: the controller reads both in one cycle. A rejection stops the press here rather than
         // starting a charge that would run to full when a number was asked for.
+        // A battery target is converted from the car's SOC now, not its last charge's (#212).
+        if (mode == ChargeControlMode.FastNoBattery && _pendingFastBasis == FastChargeBasis.Soc)
+        {
+            await PrepareVehicleForPlanningAsync().ConfigureAwait(false);
+        }
+
         if (mode == ChargeControlMode.FastNoBattery && !ApplyPendingFastLimit())
         {
             return;
@@ -733,6 +742,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // silently ignored, because a hold that quietly did not happen is the worst of the three.
         if (_pendingPriority == TargetedChargePriority.JustInTime)
         {
+            // The rest point is measured from the car's SOC now, not its last charge's (#212).
+            await PrepareVehicleForPlanningAsync().ConfigureAwait(false);
+
             var socNow = _vehicle?.GetCurrentState()?.SocPercent;
             var capacityWh = _vehicleOptions.BatteryCapacityKWh * 1000;
             var endSoc = VehicleTargetEnergy.ResultingSocPercent(
@@ -760,6 +772,28 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         _target.Set(request, "Home Assistant");
         await OnStartAsync(ChargeControlMode.Targeted, payload).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the car before a press that plans from its state of charge (#212). Never throws for the
+    /// car being unreachable; a genuine fault is logged and the press goes on with the held reading,
+    /// because a button that silently does nothing is worse than one that plans from an older figure.
+    /// </summary>
+    private async Task PrepareVehicleForPlanningAsync()
+    {
+        if (_vehicleRefresh is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _vehicleRefresh.PrepareForPlanningAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Asking the car before planning failed; planning from the reading held.");
+        }
     }
 
     private async Task PublishAsync(string topic, string payload, bool retain, CancellationToken cancellationToken)

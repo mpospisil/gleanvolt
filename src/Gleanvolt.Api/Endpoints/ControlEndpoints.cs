@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace Gleanvolt.Api.Endpoints;
@@ -28,6 +29,7 @@ internal static class ControlEndpoints
             TargetedChargeRequestLimits limits,
             TimeProvider time,
             ApiHostInfo host,
+            [FromServices] IVehicleStateRefresh? refresh,
             CancellationToken cancellationToken) =>
         {
             var source = http.Source();
@@ -51,6 +53,12 @@ internal static class ControlEndpoints
 
             if (body.Mode == ChargeControlMode.FastNoBattery)
             {
+                // A battery target is converted from the car's SOC now, not its last charge's (#212).
+                if (body.Fast?.Basis == FastChargeBasis.Soc && refresh is not null)
+                {
+                    await refresh.PrepareForPlanningAsync(cancellationToken);
+                }
+
                 // The same factory the web tab and the Home Assistant button go through: the SOC to
                 // kilowatt-hours conversion and every refusal live there, so all three doors reject the
                 // same things for the same reasons.
@@ -164,9 +172,12 @@ internal static class ControlEndpoints
             TargetedChargeRequestLimits limits,
             TimeProvider time,
             ApiHostInfo host,
+            [FromServices] IVehicleStateRefresh? refresh,
             CancellationToken cancellationToken) =>
         {
             var source = http.Source();
+
+            await TargetedRequests.AskTheCarIfNeededAsync(body, refresh, cancellationToken);
 
             if (!TargetedRequests.TryCompose(
                     body, vehicle, limits, time, host.VehicleMaxAge, out var request, out var error))

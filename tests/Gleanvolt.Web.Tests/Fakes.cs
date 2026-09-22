@@ -721,11 +721,22 @@ internal sealed class FakeSolarForecastService : ISolarForecastService
 /// person asks and at no other time, and only a count can hold it to that.</para>
 /// </summary>
 internal sealed class FakeVehicleStateRefresh(
-    VehicleState? answer = null, string? failure = null, bool canRefresh = true) : IVehicleStateRefresh
+    VehicleState? answer = null, string? failure = null, bool canRefresh = true, Action? onPrepare = null)
+    : IVehicleStateRefresh
 {
     public int Asks { get; private set; }
 
+    /// <summary>How often a plan asked for the car to be read first (#212).</summary>
+    public int Prepares { get; private set; }
+
     public bool CanRefresh => canRefresh;
+
+    public Task PrepareForPlanningAsync(CancellationToken cancellationToken = default)
+    {
+        Prepares++;
+        onPrepare?.Invoke();
+        return Task.CompletedTask;
+    }
 
     public Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default)
     {

@@ -29,18 +29,23 @@ it. It also carries the set-aside sentence the worker logs at startup.
 for a feed blocked on its owner. Both are defaulted, and both are display only: nothing dispatches on
 them, which keeps the rule that `Manufacturer` is never dispatched on.
 
-**Decision — an owner's ask may read a charge-gated feed while parked.** `IVehicleUpdateService.AskAsync`
-defaults to `FetchAsync`. volkswagen.de overrides it to read once whether or not a charge is running,
-so *Ask the car* on a parked ID.4 gets a reading newer than its last charge. The polling gate is
-unchanged: that is one request per owner action, not a clock.
+**Decision — a plan asks the car first, and that ask may read a charge-gated feed while parked.**
+`IVehicleUpdateService.AskAsync` defaults to `FetchAsync`. volkswagen.de overrides it to read once
+whether or not a charge is running. `IVehicleStateRefresh.PrepareForPlanningAsync` runs before a plan
+converts a state of charge: the Targeted and Fast tabs as they open, the API's targeted preview and
+start and a battery-target fast start, and the Home Assistant presses that need an SOC. It reuses an
+ask or a car capture from the last five minutes, waits at most 20 s, and never asks a feed that is
+blocked on its owner. A kilowatt-hour target does not ask at all. The polling gate is unchanged: these
+are requests tied to owner actions, not a clock. An idle poll was rejected because it would spend the
+volkswagen.de session all day to cover the one moment a plan is made.
 
 **Consequences.**
 
 - The ID.4 loses the car's own target SOC, which only the portal carried. Nothing reads it today, so it
   becomes unknown.
-- A parked ID.4's reading is its last charge's, and may be past `MaxAge`. The dashboard says *from the
-  last charge* rather than *stale*, and #179's guard can still refuse it as a plan's target until the
-  owner asks the car.
+- A parked ID.4's held reading is its last charge's. The dashboard says *from the last charge* rather
+  than *stale*. A plan does not use that reading as it is: it asks the car first. Only if the car does
+  not answer does #179's guard see the old reading.
 - "What each feed says", `/vehicle-feeds`, `VehicleFeedComparison` and `VehicleFeedReport` are removed.
   With one feed there is nothing to put side by side, and the comparison had no other reader.
 

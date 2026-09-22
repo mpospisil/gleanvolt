@@ -662,7 +662,8 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IVehicleStateRefresh>(provider => new VehicleStateRefresh(
             provider.GetRequiredService<ConfiguredVehicleFeed>(),
             provider.GetRequiredService<VehicleStateHolder>(),
-            provider.GetService<ILogger<VehicleStateRefresh>>()));
+            provider.GetService<ILogger<VehicleStateRefresh>>(),
+            provider.GetRequiredService<TimeProvider>()));
 
         services.AddHostedService<VehicleUpdateWorker>();
 

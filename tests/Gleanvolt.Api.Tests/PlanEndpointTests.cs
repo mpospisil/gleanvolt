@@ -61,6 +61,55 @@ public sealed class PlanEndpointTests : IAsyncDisposable
         Assert.Equal(42, request.Number("vehicleSocPercentAtRequest"));
     }
 
+    /// <summary>Says the car is at 38% when asked, and counts the asks.</summary>
+    private sealed class AskingRefresh(VehicleStateHolder holder) : Core.Interfaces.IVehicleStateRefresh
+    {
+        public int Prepares { get; private set; }
+
+        public bool CanRefresh => true;
+
+        public Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("A plan prepares; it does not press the dashboard's button.");
+
+        public Task PrepareForPlanningAsync(CancellationToken cancellationToken = default)
+        {
+            Prepares++;
+            holder.Set(new VehicleState(Fixtures.Now, SocPercent: 38));
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task A_state_of_charge_target_is_converted_from_what_the_car_says_when_asked()
+    {
+        // #212: the held reading is the last charge's, three days and one drive ago.
+        var refresh = new AskingRefresh(_host.Vehicle);
+        _host.Refresh = refresh;
+        var client = await _host.StartAsync();
+        _host.Vehicle.Set(new VehicleState(Fixtures.Now.AddDays(-3), SocPercent: 71));
+
+        var body = await (await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", new
+        {
+            targetSocPercent = 80,
+            departBy = Fixtures.Now.AddHours(17).ToString("o"),
+        })).ReadAsync();
+
+        Assert.Equal(1, refresh.Prepares);
+        Assert.Equal(38, body.GetProperty("request").Number("vehicleSocPercentAtRequest"));
+    }
+
+    [Fact]
+    public async Task A_target_in_kilowatt_hours_does_not_wait_for_the_car()
+    {
+        var refresh = new AskingRefresh(_host.Vehicle);
+        _host.Refresh = refresh;
+        var client = await _host.StartAsync();
+
+        await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", EnergyAsk());
+
+        Assert.Equal(0, refresh.Prepares);
+    }
+
     [Fact]
     public async Task Refuses_a_state_of_charge_target_the_car_is_already_past()
     {

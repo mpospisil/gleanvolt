@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IFastChargeSelector Fast
 @inject IVehicleTelemetry Vehicle
+@inject IVehicleStateRefresh VehicleRefresh
 @inject VehicleDisplayOptions VehicleDisplay
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
@@ -36,6 +37,11 @@
     offered regardless, unlike on the targeted tab, because "full" and "20 kWh" need nothing from the
     car at all.
 *@
+@if (_askingCar)
+{
+    <p class="muted" id="asking-car">Asking the car for its battery before you plan…</p>
+}
+
 <div class="control">
     <label for="fast-basis">How much?</label>
     <select id="fast-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
@@ -149,6 +155,34 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     private string? _error;
 
     private VehicleState? _vehicle;
+    private bool _askingCar;
+
+    /// <summary>
+    /// Asks the car as the tab opens (#212), so a battery target is converted from the car's SOC now
+    /// rather than its last charge's. After the first interactive render, not in OnInitialized, which
+    /// also runs for the prerender and would ask twice.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !VehicleRefresh.CanRefresh)
+        {
+            return;
+        }
+
+        _askingCar = true;
+        StateHasChanged();
+
+        try
+        {
+            await VehicleRefresh.PrepareForPlanningAsync();
+        }
+        finally
+        {
+            _askingCar = false;
+            _vehicle = Vehicle.GetCurrentState();
+            StateHasChanged();
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -199,6 +233,12 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     // a charge that would run to full when a number was asked for.
     private async Task StartFast()
     {
+        // Reuses the ask the tab made as it opened, unless that was a while ago.
+        if (_basis == FastChargeBasis.Soc)
+        {
+            await VehicleRefresh.PrepareForPlanningAsync();
+        }
+
         _vehicle = Vehicle.GetCurrentState();
 
         var composed = FastChargeLimitFactory.Create(
