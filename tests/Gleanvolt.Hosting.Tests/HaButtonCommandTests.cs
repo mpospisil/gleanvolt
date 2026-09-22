@@ -378,7 +378,7 @@ public class HaButtonCommandTests
             _vehicle,
             // No manufacturer update service (#140): this suite is about the buttons, and the Car feed
             // entity is not published at all without one.
-            vehicleFeeds: null,
+            vehicleFeed: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")),
             _solarGrid);
 

@@ -4,6 +4,52 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-22 — One car, one feed: the live source when there is one, the Data Act portal otherwise
+
+**Context.** Issue #212. An ID.4 installation ran two manufacturer feeds, `vw-website` (live, only while
+charging, #170) and `vw-group` (the Data Act portal, a delayed batch), and a Škoda could do the same
+with `skoda` beside the portal. The holder kept the newest reading whoever produced it (#141), so the
+dashboard's source changed under the owner: volkswagen.de during a charge, the portal while parked. The
+feed health beside the reading was `FirstOrDefault()` of the registered services, which need not be
+the feed that produced it. The comparison those two feeds existed for (#141/#180) is over, and its
+answer was the live feed.
+
+**Decision — the configuration picks exactly one manufacturer feed.** `Vehicle:Website` configured
+means `vw-website`; `Vehicle:Skoda` configured means `skoda`; the portal runs only when neither is.
+A portal that is switched on beside a live feed is **skipped with one startup log line, not refused**,
+so an existing ID.4 `.env` with both keeps booting. The MQTT topic is out of scope and may still run
+beside the one feed; the holder's newest-wins rule stays for it.
+
+**Decision — the feed is a resolved type, `ConfiguredVehicleFeed`, not an enumerable a page picks
+from.** The dashboard, the sign-in banner, Health, Home Assistant and `IVehicleStateRefresh` all take
+it. It also carries the set-aside sentence the worker logs at startup.
+
+**Decision — owner-facing words live on the feed contract.** `IVehicleUpdateService` gains
+`DisplayName` (*volkswagen.de*, *MyŠkoda*, *Data Act portal*) and `OwnerAction`, the card's sentence
+for a feed blocked on its owner. Both are defaulted, and both are display only: nothing dispatches on
+them, which keeps the rule that `Manufacturer` is never dispatched on.
+
+**Decision — volkswagen.de is read continuously, and any failure stops it for the owner.** It is now
+the ID.4's only feed, and a plan is made before the charge, after a drive, so a feed gated to charging
+would leave plans on the last charge's SOC. It is read every `PollInterval` (5 min) while charging and
+every `IdlePollInterval` (15 min) otherwise. A one-time code wanted, an answer that is not a reading,
+or no answer at all sets *NeedsOwner* and the worker stops asking. The client counts successful
+sign-ins; the feed unblocks when the count moves, so signing in again on the vehicle page resumes it
+without a restart. Rejected: asking the car once before each plan, which spread the question over
+every planning surface (tabs, API, Home Assistant) instead of answering it in the feed.
+
+**Consequences.**
+
+- The ID.4 loses the car's own target SOC, which only the portal carried. Nothing reads it today, so it
+  becomes unknown.
+- A lapsed volkswagen.de session now stops the feed even when no charge is running, so the owner is
+  asked to sign in again more often than before, when only a charge could reveal a lapse.
+- `DeliversOnlyWhileCharging` is removed from the feed contract: no feed is gated to charging any more.
+- "What each feed says", `/vehicle-feeds`, `VehicleFeedComparison` and `VehicleFeedReport` are removed.
+  With one feed there is nothing to put side by side, and the comparison had no other reader.
+
+---
+
 ## 2026-09-21 — The installation is edited in the web UI into an overrides file, and applied by a restart
 
 **Context.** Issue #204. `/pv-system` was read-only because every value on it is resolved once at startup

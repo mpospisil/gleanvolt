@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Web.Tests;
@@ -14,6 +15,9 @@ public abstract class PageTest : BunitContext
     protected PageTest()
     {
         Services.AddSingleton(Sites.Home);
+
+        // Resolved lazily, so a fixture that registers a feed after this still gets it (#212).
+        Services.AddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
     }
 }
 

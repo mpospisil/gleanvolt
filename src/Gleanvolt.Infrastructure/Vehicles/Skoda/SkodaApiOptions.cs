@@ -28,7 +28,7 @@ public sealed class SkodaApiOptions
     /// </summary>
     public string BaseUrl { get; init; } = "https://public.api.connect.skoda-auto.cz";
 
-    /// <summary>What the readings are labelled with — the dashboard's <i>via</i> and <c>/vehicle-feeds</c>.</summary>
+    /// <summary>What the readings are labelled with — matched by the dashboard to say <i>via MyŠkoda</i>.</summary>
     public string SourceId { get; init; } = "skoda";
 
     /// <summary>

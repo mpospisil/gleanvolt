@@ -1,5 +1,5 @@
 @implements IDisposable
-@inject IEnumerable<IVehicleUpdateService> VehicleFeeds
+@inject ConfiguredVehicleFeed VehicleFeed
 @inject ChargeControlStatusHolder StatusHolder
 
 @*
@@ -18,19 +18,16 @@
 @if (_blocked is not null)
 {
     <div class="alert" role="alert">
-        <strong>Sign-in required</strong> — @_blocked.Message
+        <strong>Sign-in required</strong> — @(VehicleFeed.Service?.OwnerAction ?? _blocked.Message)
         <a href="/vehicle-portal">Check the portal</a>
     </div>
 }
 
 @code {
-    private IVehicleUpdateService? _service;
     private VehicleSourceHealth? _blocked;
 
     protected override void OnInitialized()
     {
-        _service = VehicleFeeds.FirstOrDefault();
-
         Refresh();
         StatusHolder.Updated += OnStatusUpdated;
     }
@@ -50,7 +47,7 @@
     }
 
     private void Refresh() =>
-        _blocked = _service?.Health is { IsBlocked: true } health ? health : null;
+        _blocked = VehicleFeed.Health is { IsBlocked: true } health ? health : null;
 
     public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
 }

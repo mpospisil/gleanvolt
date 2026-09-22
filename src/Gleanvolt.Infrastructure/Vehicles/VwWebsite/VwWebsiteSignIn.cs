@@ -17,9 +17,9 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
     public string AccountName => "volkswagen.de";
 
     public string Explanation =>
-        "The live source, as distinct from the portal below. Signing in here is what lets the car be "
-        + "followed while it charges; the code Volkswagen emails can only be answered by you, which is "
-        + "why this is a page and not a background job.";
+        "The car's live source. Signing in here is what lets the car be followed; if Volkswagen asks "
+        + "for a code again, the feed stops until you sign in here once more. The code Volkswagen "
+        + "emails can only be answered by you, which is why this is a page and not a background job.";
 
     public bool IsConfigured => options.IsConfigured;
 

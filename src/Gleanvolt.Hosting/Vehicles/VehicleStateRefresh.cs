@@ -5,83 +5,62 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Hosting.Vehicles;
 
 /// <summary>
-/// Asks every configured feed for the car's state, now, and keeps the best answer (issue #168).
+/// Asks the car's feed for its state, now (issue #168).
 ///
-/// <para>The same <see cref="IVehicleUpdateService.FetchAsync"/> the polling worker calls on a clock
-/// — called instead because somebody asked. That is the whole of the on-demand idea: nothing new to
+/// <para>The same <see cref="IVehicleUpdateService.FetchAsync"/> the polling worker calls on a clock —
+/// called instead because somebody asked. That is the whole of the on-demand idea: nothing new to
 /// fetch with, only a different reason to fetch.</para>
 ///
-/// <para><b>Every feed is asked, not the first that answers.</b> Feeds carry different fields — the
-/// portal's bundles routinely omit the plug state entirely — and the holder already keeps the newest
-/// reading rather than the newest source. Asking all of them costs one round trip more and is the
-/// difference between a card with a battery and a card with a battery and everything else.</para>
+/// <para><b>One feed.</b> This used to ask every registered feed and keep the newest answer, back when
+/// an ID.4 ran the Data Act portal beside volkswagen.de. An installation now has exactly one
+/// (<see cref="ConfiguredVehicleFeed"/>), so there is nothing to arbitrate.</para>
 /// </summary>
 public sealed class VehicleStateRefresh(
-    IEnumerable<IVehicleUpdateService> services,
+    ConfiguredVehicleFeed feed,
     VehicleStateHolder holder,
     ILogger<VehicleStateRefresh>? logger = null) : IVehicleStateRefresh
 {
-    private readonly List<IVehicleUpdateService> _services = services.ToList();
-
-    public bool CanRefresh => _services.Count > 0;
+    public bool CanRefresh => feed.Service is not null;
 
     public async Task<VehicleRefreshResult> RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (!CanRefresh)
+        if (feed.Service is not { } service)
         {
             return VehicleRefreshResult.NoFeed;
         }
 
-        VehicleState? newest = null;
-        string? source = null;
-        var failures = new List<string>();
+        string failure;
 
-        foreach (var service in _services)
+        try
         {
-            try
+            var state = await service.FetchAsync(cancellationToken).ConfigureAwait(false);
+
+            if (state is not null)
             {
-                var state = await service.FetchAsync(cancellationToken).ConfigureAwait(false);
-
-                if (state is null)
-                {
-                    failures.Add($"{service.Manufacturer} had nothing to give");
-                    continue;
-                }
-
                 holder.Set(state);
 
-                if (newest is null || state.CapturedAt > newest.CapturedAt)
-                {
-                    newest = state;
-                    source = state.SourceId ?? service.Manufacturer;
-                }
+                var source = state.SourceId ?? service.Manufacturer;
+                logger?.LogInformation(
+                    "Asked the car: {Source} answered, captured {CapturedAt:u}.", source, state.CapturedAt);
+
+                return VehicleRefreshResult.Fresh(state, source);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // One feed failing must not cost the answer another one gave. The reason is collected
-                // and reported only if nothing answered at all.
-                logger?.LogWarning(ex, "Asking {Manufacturer} for the car failed.", service.Manufacturer);
-                failures.Add($"{service.Manufacturer}: {ex.Message}");
-            }
+
+            failure = $"{service.DisplayName} had nothing to give — {service.Health.Message}";
         }
-
-        if (newest is not null)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger?.LogInformation(
-                "Asked the car: {Source} answered, captured {CapturedAt:u}.", source, newest.CapturedAt);
-
-            return VehicleRefreshResult.Fresh(newest, source);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Asking {Manufacturer} for the car failed.", service.Manufacturer);
+            failure = $"{service.DisplayName}: {ex.Message}";
         }
 
         // Nothing answered. The last known reading goes back with the failure so a caller that can
         // use an old number -- a plan, which would rather be built on something than nothing -- can,
         // and one that cannot simply ignores it.
-        return VehicleRefreshResult.Failed(
-            failures.Count > 0 ? string.Join("; ", failures) : "no feed answered",
-            holder.GetCurrentState());
+        return VehicleRefreshResult.Failed(failure, holder.GetCurrentState());
     }
 }

@@ -36,6 +36,21 @@ public interface IVehicleUpdateService
     string Manufacturer { get; }
 
     /// <summary>
+    /// The feed in the owner's words — <i>volkswagen.de</i>, <i>MyŠkoda</i>, <i>Data Act portal</i> —
+    /// for the dashboard's "via …" (issue #212). The raw <see cref="Manufacturer"/> is a log key, not
+    /// something an owner recognises. Defaulted to it for a feed that has no better name.
+    /// </summary>
+    string DisplayName => Manufacturer;
+
+    /// <summary>
+    /// What fixes this feed when it is <see cref="Enums.VehicleSourceState.NeedsOwner"/>, as one sentence
+    /// for the dashboard's card (issue #212); null to show <see cref="Health"/>'s own sentence. A
+    /// fixed sentence, because the card is where an owner decides <i>what to do</i>, and the health
+    /// message is written for the log, where it says <i>what happened</i>.
+    /// </summary>
+    string? OwnerAction => null;
+
+    /// <summary>
     /// Whether this feed can currently produce a reading, with a sentence for the UI. Cheap and
     /// synchronous: it is read on a Blazor render and on the Home Assistant publish tick, so it
     /// reports what the last fetch found rather than going and finding out.
@@ -47,23 +62,6 @@ public interface IVehicleUpdateService
     /// service can back off after a failure and return to its natural cadence after a success.
     /// </summary>
     TimeSpan NextDelay { get; }
-
-    /// <summary>
-    /// Whether this feed produces a reading <b>only while a charge is running</b> — so that hours of
-    /// silence are the car not charging rather than the feed failing (issue #180).
-    ///
-    /// <para>Declared by the service because only the service knows: volkswagen.de is asked while a
-    /// session is live and not at all between sessions (#170), and that is its design rather than a
-    /// limitation. Without this, a feed behaving exactly as intended reads as the worst one on
-    /// <c>/vehicle-feeds</c> — its longest gap is the length of a night, and every cadence band past
-    /// two hours fills up with the hours the car sat parked.</para>
-    ///
-    /// <para><b>Reporting only.</b> Nothing dispatches on it and no charging decision reads it; it
-    /// exists so a page can tell a designed silence from a dropout instead of counting both as
-    /// downtime. Defaulted to <c>false</c>, which is the ordinary case: a feed on its own clock is
-    /// expected to keep it whatever the car is doing.</para>
-    /// </summary>
-    bool DeliversOnlyWhileCharging => false;
 
     /// <summary>
     /// Ask the manufacturer for the car, once. Returns null when this attempt produced nothing —

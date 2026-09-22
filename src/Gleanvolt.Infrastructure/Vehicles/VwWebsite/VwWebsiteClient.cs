@@ -58,6 +58,15 @@ public sealed class VwWebsiteClient : IDisposable
     /// <summary>Whether a one-time code is what the client is waiting for.</summary>
     public bool AwaitingCode => _pendingCodeUrl is not null;
 
+    private int _signIns;
+
+    /// <summary>
+    /// How many times a sign-in has ended signed in, since this client was built (#212). The feed
+    /// notes it when it stops for the owner and resumes once it moves: the owner signing in again on
+    /// the vehicle page, without a restart.
+    /// </summary>
+    public int SignIns => Volatile.Read(ref _signIns);
+
     private static (HttpClientHandler, HttpClient) Build(CookieContainer jar, TimeSpan timeout)
     {
         var handler = new HttpClientHandler
@@ -102,6 +111,7 @@ public sealed class VwWebsiteClient : IDisposable
             {
                 _logger.LogInformation("The saved volkswagen.de session is still signed in.");
                 _session.Save(_jar);
+                Interlocked.Increment(ref _signIns);
                 return VwWebsiteLoginStep.SignedIn;
             }
 
@@ -150,6 +160,7 @@ public sealed class VwWebsiteClient : IDisposable
             else if (next.Step == VwWebsiteLoginStep.SignedIn)
             {
                 _session.Save(_jar);
+                Interlocked.Increment(ref _signIns);
                 _logger.LogInformation("Signed in to volkswagen.de without a code.");
             }
 
@@ -208,6 +219,7 @@ public sealed class VwWebsiteClient : IDisposable
             {
                 _pendingCodeUrl = null;
                 _pendingCodeState = null;
+                Interlocked.Increment(ref _signIns);
 
                 // Logged because it is the event the whole flow exists to reach, and because its
                 // absence is indistinguishable from a code that was never submitted: the first run

@@ -19,29 +19,8 @@ public sealed class VehicleStateHolder : IVehicleTelemetry
 {
     private volatile VehicleState? _current;
 
-    /// <param name="time">
-    /// The clock the comparison's observation window is measured against. Optional so that the many
-    /// tests which simply <c>new</c> this up keep working.
-    /// </param>
-    public VehicleStateHolder(TimeProvider? time = null) => Comparison = new VehicleFeedComparison(time);
-
     /// <inheritdoc />
     public VehicleState? GetCurrentState() => _current;
-
-    /// <summary>
-    /// What every feed has offered, counted (issue #141).
-    ///
-    /// <para><b>Owned by the holder rather than registered beside it</b>, for one reason: this is the
-    /// only place a reading that <i>lost</i> is still visible. <see cref="Set"/> discards an older
-    /// reading and returns false, so a feed that is consistently second leaves nothing behind
-    /// anywhere else — and whether one feed is consistently second is precisely what the week of
-    /// running both is meant to find out. Owning it here also means it cannot be missed by being
-    /// resolved from the container too late to see the first readings.</para>
-    ///
-    /// <para>Observation only. Nothing reads it but the page that reports it, and it is on no
-    /// hardware path.</para>
-    /// </summary>
-    public VehicleFeedComparison Comparison { get; }
 
     /// <summary>Raised whenever a new state is set.</summary>
     public event Action<VehicleState>? Updated;
@@ -63,8 +42,8 @@ public sealed class VehicleStateHolder : IVehicleTelemetry
     /// the other's keep arriving — so precedence corrects itself within one reading rather than being
     /// configured.</para>
     ///
-    /// <para>Every offer is counted into <see cref="Comparison"/> first, taken or not — the losing
-    /// readings are the ones that say which feed is actually leading (issue #141).</para>
+    /// <para>Since issue #212 an installation runs one manufacturer feed, so this mostly compares a
+    /// feed with itself; the rule stays for the MQTT topic, which may still run beside it.</para>
     /// </summary>
     /// <returns>Whether this reading was taken, i.e. whether it was newer than the one held.</returns>
     public bool Set(VehicleState state)
@@ -73,12 +52,10 @@ public sealed class VehicleStateHolder : IVehicleTelemetry
 
         if (current is not null && state.CapturedAt < current.CapturedAt)
         {
-            Comparison.Record(state, taken: false);
             return false;
         }
 
         _current = state;
-        Comparison.Record(state, taken: true);
         Updated?.Invoke(state);
         return true;
     }

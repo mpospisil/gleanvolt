@@ -68,6 +68,7 @@ public sealed class SkodaApiUpdateService(
     // references rather than cached, as VwGroupUpdateService's are.
     private volatile VehicleSourceHealth _health = VehicleSourceHealth.Starting;
     private volatile VehicleSourceHealth? _blocked;
+    private SkodaApiOutcome _blockedBy;
     private volatile VehicleState? _lastReading;
 
     private int _blockedAtVersion = -1;
@@ -80,8 +81,16 @@ public sealed class SkodaApiUpdateService(
 
     public string Manufacturer => options.SourceId;
 
-    /// <summary>False: this feed is on its own clock whatever the car is doing. See the class remarks.</summary>
-    public bool DeliversOnlyWhileCharging => false;
+    public string DisplayName => "MyŠkoda";
+
+    /// <summary>
+    /// The card's sentence for a key that is missing or no longer good (#212). Null for a VIN Škoda
+    /// does not know: no key fixes that, and <see cref="Health"/> already says to check the setting.
+    /// </summary>
+    public string? OwnerAction =>
+        Health.IsBlocked && (store.Current is null || _blockedBy != SkodaApiOutcome.VehicleNotFound)
+            ? SkodaApiSentences.OwnerAction
+            : null;
 
     public VehicleSourceHealth Health
     {
@@ -195,6 +204,7 @@ public sealed class SkodaApiUpdateService(
                 or SkodaApiOutcome.KeyUnknown
                 or SkodaApiOutcome.KeyNotAuthorized
                 or SkodaApiOutcome.VehicleNotFound:
+                _blockedBy = response.Outcome;
                 _blocked = VehicleSourceHealth.NeedsOwner(SkodaApiSentences.ForFeed(response.Outcome, options.Vin));
                 Volatile.Write(ref _blockedAtVersion, version);
 

@@ -3,9 +3,8 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 /// <summary>
 /// What the volkswagen.de client needs (issue #170). Bound from <c>Vehicle:Website</c>.
 ///
-/// <para>The live source, as distinct from the EU Data Act portal's batch delivery. Both are kept:
-/// this one tracks the car and needs a human to authorise; that one is hours behind and never asks
-/// for anything.</para>
+/// <para>The live source, as distinct from the EU Data Act portal's batch delivery. With this
+/// configured the portal is not used at all (#212): one car, one feed.</para>
 /// </summary>
 public sealed class VwWebsiteOptions
 {
@@ -45,12 +44,19 @@ public sealed class VwWebsiteOptions
     public string SessionPath { get; init; } = "data/vw-website-session.json";
 
     /// <summary>
-    /// How often to ask while a charging session is open. Nothing polls when none is.
+    /// How often to ask while a charging session is open.
     ///
     /// <para>The car reports to VW on its own schedule, so a shorter interval buys resolution up to a
     /// point and then only costs requests. Five minutes across a multi-hour charge is a curve.</para>
     /// </summary>
     public TimeSpan PollInterval { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// How often to ask between charges (#212). This is the car's only feed, so the state of charge a
+    /// plan starts from -- after a drive, before any charge -- has to come from here. A parked car's
+    /// SOC barely moves, so a quarter of an hour is plenty.
+    /// </summary>
+    public TimeSpan IdlePollInterval { get; init; } = TimeSpan.FromMinutes(15);
 
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 

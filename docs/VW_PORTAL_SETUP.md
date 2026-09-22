@@ -193,24 +193,12 @@ than as fresh.
 Do not switch the old feed off on the day you switch this one on. Run them together and decide on what
 they actually delivered.
 
-Open **`/vehicle-feeds`** in the web UI. It counts, per feed:
-
-- **Cadence** — deliveries (a reading whose capture time that feed had not produced before), repeats,
-  and the shortest, mean and longest interval between them, with the intervals also counted into bands.
-  Does the portal hold the fifteen minutes it claims, or does it drop out?
-- **Agreement** — where the two feeds' capture times land within half an hour of each other, the signed
-  difference between their states of charge. Read the **parked** row: a parked car's SOC does not
-  drift, so a difference there means one of the two is being read wrong. A difference measured across
-  twenty minutes of charging is just the car charging.
-- **Coverage** — the share of deliveries carrying each field. A field that never arrives is a
-  supported answer, not a fault, but it is an answer worth having written down.
-- **Survival** — reads of attempts, and **sign-ins**: one, however long the controller has been up, is
-  the healthy answer. More means portal sessions are expiring. Also whether the car's own **target
-  SOC** ever arrives.
-
-Everything on that page is **since the controller started**, on purpose: it is measuring an unattended
-run, and a gap that spans a restart is the restart rather than the feed. A week means a week without
-redeploying.
+The dashboard names the feed behind the reading on screen, and **`/health`** counts the portal's
+**Feed reads** (readings of attempts) and its **Portal session** — how many sign-ins there have been:
+one, however long the controller has been up, is the healthy answer, and more means portal sessions are
+expiring. Those counts are **since the controller started**, on purpose, so a week means a week without
+redeploying. (The per-feed tally page from #141 was removed in #212: an installation now runs one
+manufacturer feed, so there is nothing left to compare.)
 
 When the week is boring, the handover is a setting:
 
