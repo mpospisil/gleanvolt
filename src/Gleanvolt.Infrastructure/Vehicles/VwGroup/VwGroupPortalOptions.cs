@@ -83,6 +83,10 @@ public sealed class VwGroupPortalOptions
     /// on a field the car may simply never send. Lower it to 1 to have the newest delivery and nothing
     /// else; the log says what a read is still short of, which is how to tell whether raising it would
     /// buy anything.</para>
+    ///
+    /// <para>Only deliveries that carry readings count. A parked car's deliveries are empty, and a
+    /// budget that counted them lost the last real one to a morning's worth of nothing; empty ones are
+    /// passed over, and a client that has seen one empty does not download it again.</para>
     /// </summary>
     public int MaxDatasetsPerRead { get; init; } = 4;
 

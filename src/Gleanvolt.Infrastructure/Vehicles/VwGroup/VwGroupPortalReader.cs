@@ -65,6 +65,14 @@ public sealed class VwGroupPortalReader(
                     + "one alone need not hold the battery.");
             }
 
+            if (read.EmptyDeliveries > 0)
+            {
+                notes.Add(
+                    $"{read.EmptyDeliveries} of the portal's {read.DatasetsAvailable} deliveries carried "
+                    + "no readings and were passed over without spending the budget: a parked car's "
+                    + "deliveries are empty until it next reports.");
+            }
+
             if (read.StoppedEarly is { Length: > 0 } stopped)
             {
                 notes.Add(
