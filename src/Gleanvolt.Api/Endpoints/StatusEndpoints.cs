@@ -33,6 +33,7 @@ internal static class StatusEndpoints
             IWeatherService weather,
             IEnergyIntervalStore energy,
             IChargingSessionStore sessions,
+            ISecretStore secrets,
             PvSystemInfo site,
             ApiHostInfo host,
             TimeProvider time,
@@ -75,15 +76,20 @@ internal static class StatusEndpoints
                 VehicleAgeSeconds: vehicleAge?.TotalSeconds is { } vehicleSeconds ? Math.Max(0, vehicleSeconds) : null,
                 VehicleStale: reading?.IsStaleAt(now, host.VehicleMaxAge) ?? false,
                 EnergyHistoryAvailable: energyOk,
-                SessionHistoryAvailable: sessionsOk));
+                SessionHistoryAvailable: sessionsOk,
+                // Named, not judged: there is no "good" value here, only the true one. It is the
+                // answer to "is it safe to copy the data directory?", which is a question people
+                // answer while they are already copying it.
+                SecretStore: secrets.Describe()));
         })
             .WithName("getHealth")
             .WithSummary("Whether the controller is alive and what it can see")
             .WithDescription(
                 "Poll this to answer 'is it working?'. It reports which installation is answering, the "
                 + "running build, how long ago the last poll completed, whether a forecast and a "
-                + "vehicle reading are in hand, and whether the two history databases can be read. It "
-                + "never fails for a component being down -- that is what it is reporting.")
+                + "vehicle reading are in hand, whether the two history databases can be read, and what "
+                + "protects the secrets in the data directory. It never fails for a component being "
+                + "down -- that is what it is reporting.")
             .Produces<HealthResponse>();
     }
 

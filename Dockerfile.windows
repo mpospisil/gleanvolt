@@ -70,6 +70,14 @@ LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
 # No diagnostic IPC socket, for the same reason as the Linux image: nothing attaches a profiler.
 ENV DOTNET_EnableDiagnostics=0
 
+# Said here rather than relied on from the base image (issue #215). This is what stops the secret
+# store sealing the volkswagen.de session and the MyŠkoda key with DPAPI: a Windows container runs
+# under a built-in account that does not survive the container being recreated, and a secret sealed
+# to it is then undecryptable rather than merely stale -- "my session expired" becomes "my session is
+# gone forever". The secrets are plain files here, protected by the mounted volume's own ACLs, and
+# the startup log says exactly that.
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+
 # Nano Server ships no ICU, so .NET falls back to Windows NLS. Culture-aware formatting still works,
 # but the IANA-to-Windows timezone mapping does not -- it is an ICU feature. Configure the zone with
 # a WINDOWS id here ("Central Europe Standard Time"), not the IANA id the Linux deploy uses:

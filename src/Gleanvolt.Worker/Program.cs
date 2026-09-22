@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Options;
 using Serilog;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Web;
 using Gleanvolt.Web.Auth;
 using Gleanvolt.Worker;
@@ -69,6 +71,24 @@ log.LogInformation(
     "PV system: {System}{Overrides}.",
     host.Services.GetRequiredService<PvSystemInfo>().Describe(),
     PvSystemOverrides.DescribeLoaded(builder.Configuration));
+
+// Where the bearer-equivalent secrets live and what protects them (issue #215). On the startup log
+// because it is the answer to "is it safe to copy the data directory?", and the person asking that is
+// usually reading a log rather than the README. Said in words that do not overclaim: nothing here is
+// proof against a local root, because the service has to come back from a restart with nobody present.
+var secrets = host.Services.GetRequiredService<ISecretStore>();
+var secretStore = host.Services.GetRequiredService<SecretStoreChoice>();
+
+log.LogInformation(
+    "Secrets: {Protection}, because {Reason}. The data directory holds bearer-equivalent secrets; "
+    + "back it up accordingly.",
+    secrets.Describe(),
+    secretStore.Reason);
+
+if (secretStore.Warning is { } secretWarning)
+{
+    log.LogWarning("{Warning}", secretWarning);
+}
 
 // And the car, on the same terms (#124): "which installation was this, and what car did it think it
 // had" should both be answerable from a `docker logs` dump with no configuration file beside it.

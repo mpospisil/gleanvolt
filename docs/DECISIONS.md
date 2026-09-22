@@ -4,6 +4,67 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-22 — One secret store, owner-only on Linux, DPAPI on Windows, and no claim of encryption we cannot keep
+
+**Context.** Issue #215. Three files under the data directory are bearer-equivalent and were all
+plaintext, each with its own hand-rolled file I/O: `vw-website-session.json` (a live volkswagen.de
+session), `skoda-api-key.json` (a key that starts and stops charging), and — once #214 lands — a
+vehicle account password in `pv-system.json`. "Should we encrypt the password?" is the wrong question
+while the session cookies sit in plaintext beside it: whoever can read the directory reads the car
+either way. It is all three or none.
+
+**The constraint that decided the shape.** The controller must come back from a restart with nobody
+present — `Restart=on-failure`, and the point of #214's restart button — so the key that decrypts a
+stored secret has to be readable by this process, on this machine, at boot, unattended. Encryption a
+service can undo unattended is obfuscation. Rejected for that reason: a key file beside the data
+(file A encrypted with a key in file B, in the same backup), ASP.NET Data Protection (the same thing
+wearing a framework — on Linux its keyring is plaintext XML in the same directory), a passphrase at
+start (kills the unattended restart), and `systemd-creds`/TPM (the credential must be named in the
+unit, and `ProtectSystem=strict` stops the service writing under `/etc`, which is incompatible with
+editing it in the web UI). Full-disk encryption is the effective answer against a stolen SD card and
+is not ours to implement; it belongs in the install docs, where it now is.
+
+**Decision — one seam, `ISecretStore`, in `Gleanvolt.Core`.** `Read`/`Write`/`Delete`/`Describe`, by
+name. `SkodaApiKeyStore` and `VwWebsiteSessionStore` keep their own types and their own
+semantics — an expiring key, a cookie jar — and stop doing file I/O. Nothing throws out of the seam: a
+secret that cannot be read is null, which every caller already turns into *sign in again*, and a
+write that does not stick is false, which the caller reports as "a restart will ask for it again".
+
+**Decision — `FileSecretStore` is the default and not a stopgap.** Plaintext JSON, `0600`, atomic
+write, one file per secret named after it. On a Pi where the service user owns the data directory
+that defends against the one adversary a local key file would also defend against: another
+unprivileged account. Root is outside both. One file per secret, under the names the two hand-rolled
+stores already used, is also what makes the upgrade free — nothing moved, so nothing is migrated.
+
+**Decision — `DpapiSecretStore` on Windows installs, `CurrentUser`, and never in a container.** The
+zip and winget installs keep `data\` inside a package directory that an upgrade may replace and that
+people copy around wholesale; there DPAPI earns its place, because the key is the OS's and there is
+no key file to lose. `LocalMachine` scope is refused: it is decryptable by every account on the box,
+weaker than the `0600` it was meant to improve on. In a Windows container it is deliberately off —
+Nano Server runs under a built-in account that does not survive the container being recreated, and a
+secret sealed to it is *unrecoverable*, turning "my session expired" into "my session is gone
+forever". The selection is a pure function of (configured, isWindows, inContainer), logged with its
+reason, never inferred from `OperatingSystem.IsWindows()` alone; `Dockerfile.windows` sets
+`DOTNET_RUNNING_IN_CONTAINER` itself rather than trusting the base image. A payload marker
+(`GV-DPAPI-1:`) is what lets a plaintext file be recognised and re-sealed instead of being fed to
+`Unprotect` and coming back as a crypto exception.
+
+**Decision — honest naming, everywhere.** Nothing in the UI, the logs or the docs says *encrypted at
+rest*. `Describe()` returns what is true — *owner-only files (0600) in the data directory*, *Windows
+DPAPI, this user* — and the startup log, `/health` and the web health page all quote it. A claim of
+encryption that a local root can undo is worse than no claim, because it is the sentence someone
+repeats when deciding where to put a backup. Tests assert the absence of the word.
+
+**Consequences accepted.** `Vehicle:Website:SessionPath` and `Vehicle:Skoda:KeyPath` are retired in
+favour of one `Secrets:Directory`, and a build that still sets them refuses to start naming the
+replacement — silently reading secrets from somewhere else than the operator's file says would cost a
+fresh sign-in with nothing in the log to explain it. `System.Security.Cryptography.ProtectedData` is
+a new package reference (DPAPI is not in the shared framework, even on Windows). The DPAPI store's
+own behaviour can only be asserted on Windows; the decision that keeps it out of the container is a
+pure function, and that is tested everywhere.
+
+---
+
 ## 2026-09-22 — One car, one feed: the live source when there is one, the Data Act portal otherwise
 
 **Context.** Issue #212. An ID.4 installation ran two manufacturer feeds, `vw-website` (live, only while

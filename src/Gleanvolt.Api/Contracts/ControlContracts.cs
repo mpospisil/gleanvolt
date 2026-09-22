@@ -101,6 +101,14 @@ public sealed record ControlActionResponse(
 /// <param name="SessionHistoryAvailable">Whether the charging-session store answered a probe query.</param>
 /// <param name="SystemId">The installation's stable id — the MQTT topic segment and HA device id.</param>
 /// <param name="SystemName">What this installation is called.</param>
+/// <param name="SecretStore">
+/// What protects the secrets in the data directory (issue #215) — <c>owner-only files (0600) in the
+/// data directory</c>, <c>Windows DPAPI, this user</c>. Deliberately not the word <i>encrypted</i>: the
+/// controller must come back from a restart unattended, so whatever protects a stored secret is
+/// undoable by this process without a person, and a claim of encryption a local root can undo is the
+/// sentence someone repeats when deciding where to put a backup. <b>The data directory is
+/// secret-bearing whichever this says.</b>
+/// </param>
 public sealed record HealthResponse(
     bool Ok,
     string Version,
@@ -119,7 +127,8 @@ public sealed record HealthResponse(
     double? VehicleAgeSeconds,
     bool VehicleStale,
     bool EnergyHistoryAvailable,
-    bool SessionHistoryAvailable);
+    bool SessionHistoryAvailable,
+    string SecretStore);
 
 /// <summary>
 /// What this API is, and how to use it — the answer at <c>/api/v1/</c>, which is the first place

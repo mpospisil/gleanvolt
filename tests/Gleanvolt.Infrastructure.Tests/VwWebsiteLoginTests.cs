@@ -1,4 +1,6 @@
 using System.Net;
+using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -68,12 +70,13 @@ public class VwWebsiteLoginTests
 
 /// <summary>
 /// Keeping the session across restarts (issue #170) — the difference between a code once and a code
-/// every restart.
+/// every restart. What protects the bytes is <c>FileSecretStore</c>'s business now (issue #215) and is
+/// tested there; what is tested here is that a cookie jar survives the round trip.
 /// </summary>
 public class VwWebsiteSessionStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(
-        Path.GetTempPath(), $"gleanvolt-vw-session-{Guid.NewGuid():N}.json");
+    private readonly FileSecretStore _secrets = new(
+        Path.Combine(Path.GetTempPath(), $"gleanvolt-vw-session-{Guid.NewGuid():N}"));
 
     [Fact]
     public void A_saved_jar_comes_back()
@@ -82,7 +85,7 @@ public class VwWebsiteSessionStoreTests : IDisposable
         jar.Add(new Cookie("csrf_token", "abc", "/", "www.volkswagen.de"));
         jar.Add(new Cookie("auth0", "xyz", "/", "identity.vwgroup.io"));
 
-        var store = new VwWebsiteSessionStore(_path);
+        var store = new VwWebsiteSessionStore(_secrets);
         Assert.True(store.Save(jar));
 
         var loaded = store.Load().GetAllCookies();
@@ -101,27 +104,28 @@ public class VwWebsiteSessionStoreTests : IDisposable
             Expires = DateTime.UtcNow.AddDays(-1),
         });
 
-        var store = new VwWebsiteSessionStore(_path);
+        var store = new VwWebsiteSessionStore(_secrets);
         store.Save(jar);
 
         Assert.Empty(store.Load().GetAllCookies());
     }
 
     [Fact]
-    public void No_file_is_an_empty_jar_rather_than_a_failure()
+    public void No_saved_session_is_an_empty_jar_rather_than_a_failure()
     {
-        var store = new VwWebsiteSessionStore(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.json"));
+        var store = new VwWebsiteSessionStore(
+            new FileSecretStore(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}")));
 
         Assert.False(store.Exists);
         Assert.Empty(store.Load().GetAllCookies());
     }
 
     [Fact]
-    public void An_unreadable_file_is_an_empty_jar_rather_than_a_crash()
+    public void An_unreadable_session_is_an_empty_jar_rather_than_a_crash()
     {
-        File.WriteAllText(_path, "{ not json at all");
+        _secrets.Write(SecretNames.VwWebsiteSession, "{ not json at all");
 
-        Assert.Empty(new VwWebsiteSessionStore(_path).Load().GetAllCookies());
+        Assert.Empty(new VwWebsiteSessionStore(_secrets).Load().GetAllCookies());
     }
 
     [Fact]
@@ -130,16 +134,17 @@ public class VwWebsiteSessionStoreTests : IDisposable
         var jar = new CookieContainer();
         jar.Add(new Cookie("csrf_token", "abc", "/", "www.volkswagen.de"));
 
-        var store = new VwWebsiteSessionStore(_path);
+        var store = new VwWebsiteSessionStore(_secrets);
         store.Save(jar);
         store.Clear();
 
         Assert.False(store.Exists);
+        Assert.False(File.Exists(_secrets.PathFor(SecretNames.VwWebsiteSession)));
     }
 
     /// <summary>These cookies are bearer-equivalent: whoever holds the file is signed in as the owner.</summary>
     [Fact]
-    public void The_file_is_owner_only_where_the_platform_has_the_concept()
+    public void The_session_lands_in_an_owner_only_file()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -148,9 +153,9 @@ public class VwWebsiteSessionStoreTests : IDisposable
 
         var jar = new CookieContainer();
         jar.Add(new Cookie("csrf_token", "abc", "/", "www.volkswagen.de"));
-        new VwWebsiteSessionStore(_path).Save(jar);
+        new VwWebsiteSessionStore(_secrets).Save(jar);
 
-        var mode = File.GetUnixFileMode(_path);
+        var mode = File.GetUnixFileMode(_secrets.PathFor(SecretNames.VwWebsiteSession));
 
         Assert.False(mode.HasFlag(UnixFileMode.GroupRead));
         Assert.False(mode.HasFlag(UnixFileMode.OtherRead));
@@ -158,9 +163,9 @@ public class VwWebsiteSessionStoreTests : IDisposable
 
     public void Dispose()
     {
-        if (File.Exists(_path))
+        if (Directory.Exists(_secrets.Directory))
         {
-            File.Delete(_path);
+            Directory.Delete(_secrets.Directory, recursive: true);
         }
     }
 }

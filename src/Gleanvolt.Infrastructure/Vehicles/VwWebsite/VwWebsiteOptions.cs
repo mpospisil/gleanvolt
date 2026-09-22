@@ -30,20 +30,6 @@ public sealed class VwWebsiteOptions
     public string Vin { get; init; } = string.Empty;
 
     /// <summary>
-    /// Where the signed-in session is kept between restarts.
-    ///
-    /// <para><b>Load-bearing rather than a convenience.</b> A cold login always demands an email
-    /// one-time code — verified against the live account, not assumed — and the cookie jar is what
-    /// carries the "remember this browser" grant that stops it being asked again. Without persistence
-    /// every controller restart costs a code, and a restart during a charge would interrupt the very
-    /// session this exists to record.</para>
-    ///
-    /// <para>The file is <b>bearer-equivalent</b>: whoever holds it is signed in as the owner. It is
-    /// written with owner-only permissions and never logged.</para>
-    /// </summary>
-    public string SessionPath { get; init; } = "data/vw-website-session.json";
-
-    /// <summary>
     /// How often to ask while a charging session is open.
     ///
     /// <para>The car reports to VW on its own schedule, so a shorter interval buys resolution up to a

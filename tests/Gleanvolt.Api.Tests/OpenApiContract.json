@@ -337,6 +337,7 @@
       "mode": "any (required)",
       "now": "string(date-time) (required)",
       "ok": "boolean (required)",
+      "secretStore": "string (required)",
       "sessionHistoryAvailable": "boolean (required)",
       "systemId": "string (required)",
       "systemName": "string (required)",

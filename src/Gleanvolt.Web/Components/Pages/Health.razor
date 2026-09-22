@@ -7,6 +7,7 @@
 @inject TimeProvider Time
 @inject IServiceShutdown Shutdown
 @inject ConfiguredVehicleFeed VehicleFeed
+@inject ISecretStore Secrets
 
 @*
     The whole of phase 0's user interface. It exists to prove the two things no unit test can: that a
@@ -46,6 +47,18 @@
 
     <dt>Charge mode</dt>
     <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+
+    @*
+        What protects the volkswagen.de session and the MyŠkoda key on disk (#215). Here rather than
+        buried in a log because the question it answers -- "is it safe to copy the data directory?" --
+        is asked by someone who is usually already copying it. The sentence is the store's own and
+        deliberately never says "encrypted": nothing that a service restarts into unattended is.
+    *@
+    <dt>Secrets</dt>
+    <dd>
+        @Secrets.Describe()
+        <span class="muted">— the data directory is bearer-equivalent; back it up accordingly</span>
+    </dd>
 
     @*
         The manufacturer feed (#140), on the page where "is anything wrong?" is actually asked. A feed

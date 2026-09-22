@@ -3,8 +3,9 @@ namespace Gleanvolt.Infrastructure.Vehicles.Skoda;
 /// <summary>
 /// What the MyŠkoda Public API feed needs (issue #193). Bound from <c>Vehicle:Skoda</c>.
 ///
-/// <para><b>No API key here, on purpose.</b> The key is pasted on the Vehicle portal page and kept at
-/// <see cref="KeyPath"/>, and nowhere else. Keys expire, so renewing one is a recurring owner action;
+/// <para><b>No API key here, on purpose.</b> The key is pasted on the Vehicle portal page and kept in
+/// the secret store (<c>Secrets:Directory</c>, issue #215), and nowhere else. Keys expire, so renewing
+/// one is a recurring owner action;
 /// one place to do it beats a <c>.env</c> edit plus a restart, and a key in two places is two places
 /// for it to go stale.</para>
 ///
@@ -45,12 +46,6 @@ public sealed class SkodaApiOptions
     public TimeSpan IdlePollInterval { get; init; } = TimeSpan.FromMinutes(15);
 
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
-
-    /// <summary>
-    /// Where the pasted key is kept between restarts. <b>Bearer-equivalent</b> — the same key starts and
-    /// stops charging — so it is written owner-only and never logged or rendered.
-    /// </summary>
-    public string KeyPath { get; init; } = "data/skoda-api-key.json";
 
     public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(Vin);
 }

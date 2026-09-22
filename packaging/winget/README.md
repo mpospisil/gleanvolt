@@ -87,6 +87,18 @@ before it could reach WinGet.
 
 **`PortableCommandAlias: gleanvolt`.** What the command is called once WinGet has put it on `PATH`.
 
+**"Writes nothing outside its own directory" is also a warning.** The controller keeps its state in
+`data\` beside the executable, and two of those files are passwords in all but name: a live
+volkswagen.de session and the MyŠkoda API key
+([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)). Because that directory sits inside
+the package directory — which an upgrade may replace and which people zip up and copy around
+wholesale — the Windows build seals them with DPAPI at `CurrentUser` scope, and `/health` says so:
+`Windows DPAPI, this user`. Two consequences worth knowing before telling anyone to copy the folder:
+a copy taken to another machine, or restored under another Windows account, **will not decrypt** — the
+controller reports *sign in again* rather than failing, but the session is gone; and DPAPI protects
+against another account on the same box, not against anything running as you. It is not a substitute
+for BitLocker on the volume.
+
 **The licence is stated as it is.** PolyForm Noncommercial 1.0.0, with `LicenseUrl` pointing at the
 repository's own `LICENSE`. WinGet publishes proprietary and source-available software alike; what
 it requires is that the field says what is true.
