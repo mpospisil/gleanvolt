@@ -411,6 +411,182 @@ window.solaxCharts = (function () {
         charts.set(elementId, { chart, resize });
     }
 
+    // Today and tomorrow of solar forecast (issue #219): the median as a line, the p10-p90 range as a
+    // band behind it, a rule at the midnight between the two days and another at now.
+    //
+    // The band is the reason this chart exists rather than two more rows on the dashboard: on an
+    // uncertain day the width of that gap is the whole story, and a single line hides it. It is drawn
+    // by hand, like the session chart's hold bands, because a stepped envelope has to step exactly
+    // where the lines do -- a period is a half-hour rectangle, not a point in the middle of one.
+    //
+    // One payload object, the field names being what ForecastChartSeries serialises to. All the
+    // arithmetic is on the C# side; this decides colours and shapes only.
+    function renderForecastChart(elementId, forecast) {
+        const el = document.getElementById(elementId);
+        if (!el || typeof uPlot === "undefined") {
+            return;
+        }
+
+        dispose(elementId);
+
+        const ink = cssVar("--ink", "#1c1f23");
+        const line = cssVar("--line", "#e3e6ea");
+        const muted = cssVar("--muted", "#6b7280");
+        const solar = cssVar("--solar", "#f5b400");
+
+        const stepped = uPlot.paths.stepped({ align: 1 });
+        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
+
+        // The two edges are series of their own rather than only a shape: the cursor then reads all
+        // three figures into the legend at once, which is the question the table below answers row by
+        // row. Thin and faint, so the median stays the line the eye follows.
+        const edge = (label) => ({
+            label,
+            scale: "w",
+            stroke: solar + "99",
+            width: 1,
+            paths: stepped,
+            points: { show: false },
+            value: watts,
+        });
+
+        const opts = {
+            width: el.clientWidth || 600,
+            height: 320,
+            scales: {
+                // Both whole days, whatever part of them is held -- a forecast that only starts at
+                // 10:44 is a morning missing, not a chart that begins at the left edge.
+                x: { time: true, range: [forecast.windowStart, forecast.windowEnd] },
+                // From zero up: the roof cannot make negative power, and an auto-ranged floor would
+                // turn a night of zeroes into a baseline somewhere above the axis.
+                w: { range: (u, min, max) => uPlot.rangeNum(0, max, 0.1, true) },
+            },
+            cursor: { drag: { x: true, y: false } },
+            series: [
+                {},
+                {
+                    label: "Expected",
+                    scale: "w",
+                    stroke: solar,
+                    width: 2,
+                    paths: stepped,
+                    points: { show: false },
+                    value: watts,
+                },
+                edge("Low (p10)"),
+                edge("High (p90)"),
+            ],
+            axes: [
+                { stroke: ink, grid: { stroke: line } },
+                { scale: "w", stroke: ink, grid: { stroke: line }, size: 70, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+            ],
+            hooks: {
+                // Behind the series, not over them: the median line has to stay readable inside its
+                // own range. Same reasoning as the session chart's hold bands.
+                drawClear: [
+                    (u) => {
+                        const ctx = u.ctx;
+                        ctx.save();
+                        ctx.fillStyle = solar + "33";
+
+                        const xs = forecast.timestamps;
+                        const lo = forecast.low;
+                        const hi = forecast.high;
+                        const X = (i) => u.valToPos(xs[i], "x", true);
+                        const Y = (v) => u.valToPos(v, "w", true);
+
+                        let s = 0;
+                        while (s < xs.length) {
+                            if (lo[s] == null || hi[s] == null) {
+                                s++;
+                                continue;
+                            }
+
+                            // One run of consecutive periods. A gap in the data is a gap in the band,
+                            // for the same reason it is a gap in the line.
+                            let e = s;
+                            while (e + 1 < xs.length && lo[e + 1] != null && hi[e + 1] != null) {
+                                e++;
+                            }
+
+                            if (e > s) {
+                                // Stepped exactly as the lines are: a value holds from its own point
+                                // to the next one, so every segment is a horizontal then a vertical.
+                                ctx.beginPath();
+                                ctx.moveTo(X(s), Y(hi[s]));
+                                for (let j = s + 1; j <= e; j++) {
+                                    ctx.lineTo(X(j), Y(hi[j - 1]));
+                                    ctx.lineTo(X(j), Y(hi[j]));
+                                }
+                                ctx.lineTo(X(e), Y(lo[e]));
+                                for (let j = e; j > s; j--) {
+                                    ctx.lineTo(X(j), Y(lo[j - 1]));
+                                    ctx.lineTo(X(j - 1), Y(lo[j - 1]));
+                                }
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+
+                            s = e + 1;
+                        }
+
+                        ctx.restore();
+                    },
+                ],
+                draw: [
+                    (u) => {
+                        const ctx = u.ctx;
+                        ctx.save();
+
+                        // The midnight between the two days. Solid and full height: without it two
+                        // days on one axis are one long smear with two humps in it.
+                        const rule = (value, dashed) => {
+                            const x = Math.round(u.valToPos(value, "x", true)) + 0.5;
+                            if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) {
+                                return;
+                            }
+
+                            ctx.setLineDash(dashed ? [3, 3] : []);
+                            ctx.beginPath();
+                            ctx.moveTo(x, u.bbox.top);
+                            ctx.lineTo(x, u.bbox.top + u.bbox.height);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        };
+
+                        ctx.strokeStyle = ink;
+                        ctx.globalAlpha = 0.45;
+                        rule(forecast.midnight, false);
+
+                        // ...and now, so "the rest of today" needs no arithmetic. Dashed, because it
+                        // is a moving thing and the midnight is not.
+                        ctx.strokeStyle = muted;
+                        ctx.globalAlpha = 0.9;
+                        rule(forecast.now, true);
+
+                        ctx.restore();
+                    },
+                ],
+            },
+        };
+
+        // The site's zone, not the browser's, and probed before it is trusted -- see the day chart
+        // above for why an id Intl has never heard of must not cost the page its chart.
+        try {
+            uPlot.tzDate(new Date(), forecast.timeZoneId);
+            opts.tzDate = (ts) => uPlot.tzDate(new Date(ts * 1000), forecast.timeZoneId);
+        } catch {
+            // Left to uPlot's default, which is the browser's local time.
+        }
+
+        const chart = new uPlot(opts, [forecast.timestamps, forecast.expected, forecast.low, forecast.high], el);
+
+        const resize = () => chart.setSize({ width: el.clientWidth || 600, height: 320 });
+        window.addEventListener("resize", resize);
+
+        charts.set(elementId, { chart, resize });
+    }
+
     function dispose(elementId) {
         const entry = charts.get(elementId);
         if (!entry) {
@@ -422,5 +598,5 @@ window.solaxCharts = (function () {
         charts.delete(elementId);
     }
 
-    return { renderTimelineChart, renderEnergyDayChart, renderSessionChart, dispose };
+    return { renderTimelineChart, renderEnergyDayChart, renderSessionChart, renderForecastChart, dispose };
 })();

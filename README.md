@@ -35,7 +35,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Solar with grid help** — "take the sun, let the grid make a weak sun usable, and stop when the day's sun is over": the car follows the surplus while it clears a minimum you set, a surplus too small for the charger's 6 A floor is topped up to it from the grid with the home battery held out of it, and once the forecast has no sun left today that clears your minimum the mode switches itself off.
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
-- **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
+- **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history, the energy history, the solar forecast for today and tomorrow, and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
 - **HTTP API, described by OpenAPI** (off by default) — the same telemetry, history, forecast and
   actions the other two surfaces have, for programs rather than people: read the energies and the
   car, ask what a targeted charge *would* do without starting one, and start it when the answer is
@@ -2468,8 +2468,10 @@ Those phases left the UI in three places for one question. The dashboard was fou
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · PV system · Vehicle portal · Health.** `/forecast` and
-`/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**, one tab per mode.
+**The nav is now Dashboard · Charging plan · Sessions · Energy · Forecast · PV system · Vehicle portal · Health.** The
+**day plan** and `/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**,
+one tab per mode. (`/forecast` is a route again, and is a different page: the sun, not the car — see
+[Looking at the forecast](#looking-at-the-forecast) below.)
 
 **`/` reports and no longer decides.** It carries no button, no input and no select at all — three
 sections, in the order the questions are actually asked:
@@ -2661,6 +2663,58 @@ The chart uses [uPlot](https://github.com/leeoniya/uPlot) (MIT licensed), vendor
 `Gleanvolt.Web/wwwroot/lib/` rather than fetched from a CDN — issue #44's decision, so the history stays
 readable during an internet outage, which is exactly when a locally controlled system is most worth
 looking at.
+
+#### Looking at the forecast
+
+`/forecast` is **today and tomorrow, drawn and then printed**
+([issue #219](https://github.com/mpospisil/gleanvolt/issues/219)) — the two days the controller is
+deciding on, period by period, in the shape `/energy` uses for a recorded day. One list feeds the
+chart and the table, so the picture cannot disagree with the numbers.
+
+The **chart** is watts against one 48-hour time axis, 30-minute periods: the **median** as the line,
+**p10–p90 as a band** behind it, a solid rule at the midnight between the two days and a dashed one at
+now. The band is the reason the page is a picture — on an uncertain day the width of that gap is the
+whole story, and a single line hides it.
+
+The **table** below it is a row per period, grouped into the two days: the half hour it covers,
+expected, p10, p90 and the energy that power amounts to over thirty minutes. Each day opens with its
+own figures — expected, p10, p90 and peak — read from the same summary the dashboard's table reads, so
+the two can never disagree. **The night rows are kept**: a 0 W row at 02:00 *is* the forecast, and a
+table that drops rows is one you have to learn the rules of before a gap in it can mean anything.
+
+Three surfaces show forecast and each owns a different question:
+
+| Surface | Owns |
+|---|---|
+| The dashboard's **Solar forecast** table | **The glance** — two rows, four numbers, in a place somebody is already looking. Unchanged, plus a link here. |
+| **`/forecast`** | **The detail** — the shape of both days. The only place tomorrow has a shape. |
+| The **Forecasted** tab | **The car's share of today** — surplus after the house and the battery, the SOC floor, the charge window. Untouched. |
+
+Worth knowing, because each of these reads as a bug if it isn't written down:
+
+- **It never fetches.** The page reads `ISolarForecastService` in-process, the same cached forecast the
+  poll loop is deciding on. Solcast's free tier is about ten calls a day and the refresh worker already
+  spends half of them; a page that fetched on every visit is exactly what would exhaust that. What it
+  shows is what was last fetched, and it says when.
+- **After a restart, today's morning is missing.** A provider only ever answers *what is still to
+  come*, so the controller can say what this morning was expected to bring only if it was running
+  through it — `SolarForecastHistory` keeps what each refresh carried, and nothing more. A controller
+  started at 10:44 has nothing for today before then, and the page **says so** above the table rather
+  than leaving an empty morning to read as darkness.
+- **Two days, not seven.** Solcast returns about 97 half-hourly periods, so the day after tomorrow is
+  partial — and a chart that trails off mid-afternoon on its third day invites the question "why did
+  the sun stop?".
+- **p10 and p90 are per-period optional.** Where the provider sent no band, the chart's band collapses
+  onto the line and the table shows an em dash rather than repeating the median. The chart note says so
+  whenever it happened, because a band no wider than the line must not read as confidence.
+- **A period is counted under the day it *ends* on**, which is how the dashboard and the day plan count
+  it too — so each day's first row is the half hour that ends at its own midnight.
+- **Tomorrow's figures move.** Every refresh re-forecasts them until the day arrives.
+
+Nothing outside the web UI changed: the arithmetic behind the chart lives in `ForecastChartSeries`
+beside `EnergyChartSeries`, where the day boundary, a missing band and a half-covered day are tested
+rather than eyeballed. Weather (`GET /api/v1/forecast?weather=true`) is deliberately not here — it is a
+live third-party call with a quota, and a page that renders on every visit is the wrong caller for it.
 
 #### Browsing the energy history
 
