@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 
 namespace Gleanvolt.Api.Tests;
 
@@ -134,17 +135,63 @@ internal sealed class FakeTargetedChargePreview : ITargetedChargePreview
     }
 }
 
+/// <summary>
+/// A forecast source with the <b>two</b> stores a real one has: the live cache, which is the last thing
+/// the provider said, and the retained history, which is every period a refresh has ever carried.
+///
+/// <para>It used to have one, answering the same object to all three accessors — and that is precisely
+/// why issue #221 went unnoticed. A provider answers only <i>what is still to come</i>, so the two
+/// diverge the moment a second refresh lands, and a fake that cannot express that cannot catch an
+/// endpoint reading the wrong one.</para>
+///
+/// <para>The history is the real <see cref="SolarForecastHistory"/> rather than a stand-in for it, so
+/// "what a refresh retains" is not re-implemented here with a different set of bugs. Setting
+/// <see cref="Forecast"/> is one refresh: do it twice for a morning the live cache no longer reports.</para>
+/// </summary>
 internal sealed class FakeSolarForecastService : ISolarForecastService
 {
-    internal SolarForecast? Forecast { get; set; }
+    private readonly SolarForecastHistory _history = new();
 
-    public SolarForecast? GetForecastForToday() => Forecast;
+    private IReadOnlyDictionary<DateOnly, SolarDayForecastSummary> _summaries =
+        new Dictionary<DateOnly, SolarDayForecastSummary>();
 
-    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => Forecast is null
+    private SolarForecast? _cached;
+
+    /// <summary>The zone days are reckoned in — the host's own, so the fake and the endpoint agree.</summary>
+    internal TimeZoneInfo Zone { get; set; } = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
+
+    /// <summary>
+    /// The live cache. Assigning is a refresh: the forecast replaces the cache <i>and</i> is merged into
+    /// the history, exactly as <c>SolcastForecastService.RefreshAsync</c> does.
+    /// </summary>
+    internal SolarForecast? Forecast
+    {
+        get => _cached;
+        set
+        {
+            _cached = value;
+            if (value is null)
+            {
+                return;
+            }
+
+            _history.Merge(value);
+            _summaries = _history.DailySummaries(Zone);
+        }
+    }
+
+    public SolarForecast? GetForecastForToday() => _cached;
+
+    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) => _cached is null
         ? null
-        : new SolarForecast(Forecast.RetrievedAt, [.. Forecast.Periods.Where(p => p.PeriodEnd > from && p.PeriodEnd <= to)]);
+        : new SolarForecast(_cached.RetrievedAt, [.. _cached.Periods.Where(p => p.PeriodEnd > from && p.PeriodEnd <= to)]);
 
-    public SolarForecast? GetDayForecast(DateOnly localDate) => Forecast;
+    public SolarForecast? GetDayForecast(DateOnly localDate) => _history.ForDate(localDate, Zone);
+
+    public SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
+        _summaries.TryGetValue(localDate, out var summary) ? summary : null;
+
+    public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
 }
 
 internal sealed class FakeWeatherService : IWeatherService

@@ -309,6 +309,15 @@
       "shortfallEnergyWh": "number|string(double) (required)",
       "startNoLaterThan": "string(date-time) (required)"
     },
+    "ForecastDayResponse": {
+      "complete": "boolean (required)",
+      "date": "string(date) (required)",
+      "expectedWh": "number|string(double) (required)",
+      "heldFrom": "string(date-time)? (required)",
+      "highWh": "number|string(double) (required)",
+      "lowWh": "number|string(double) (required)",
+      "peakWatts": "number|string(double) (required)"
+    },
     "ForecastPeriodResponse": {
       "energyWh": "number|string(double) (required)",
       "estimatedPowerWatts": "number|string(double) (required)",
@@ -318,6 +327,7 @@
       "periodStart": "string(date-time) (required)"
     },
     "ForecastResponse": {
+      "days": "array\u003C$ForecastDayResponse\u003E (required)",
       "peakPowerWatts": "number|string(double) (required)",
       "periods": "array\u003C$ForecastPeriodResponse\u003E (required)",
       "retrievedAt": "string(date-time)? (required)",

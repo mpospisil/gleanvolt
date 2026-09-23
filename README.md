@@ -2843,7 +2843,7 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /energy/days/{date}` | One local day added up, so "how was Tuesday?" is one call rather than 96 rows. |
 | `GET /sessions?from=&to=&limit=` | Charging sessions, newest first, with the energy split by source. Defaults to the last 30 days. |
 | `GET /sessions/{id}` | One session in full: every recorded poll and every notable moment. |
-| `GET /forecast` | Today and tomorrow period by period, from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. |
+| `GET /forecast` | Today and tomorrow **in full** — period by period plus each day's own median, p10, p90 and peak — from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. See [The forecast agrees with itself](#the-forecast-agrees-with-itself). |
 | `GET /vehicle` | What the car last said — SOC, range, plug and charge state — **and how old the reading is**. |
 | `POST /plans/targeted/preview` | What a targeted charge *would* do. Writes to nothing. |
 | `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount and departure. |
@@ -2856,6 +2856,46 @@ year of quarter-hours, and this runs on a Raspberry Pi. And **staleness is repor
 hidden**: `/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a cloud
 reading arrives hours late as a matter of course and a caller that cannot see the clock will
 otherwise treat it as current.
+
+#### The forecast agrees with itself
+
+`GET /forecast` returns **two whole local days**, elapsed periods included, and every figure in the
+response comes from the same two days of retained forecast — so
+`sum(periods on a date) == days[date].expectedWh`, and `peakPowerWatts` is the peak of the periods
+beside it ([issue #221](https://github.com/mpospisil/gleanvolt/issues/221)).
+
+It did not used to. The period list was built from the **live cache** and the day totals from the
+**retained history**, and those are not the same forecast: a provider answers only *what is still to
+come*, so the cache at four in the afternoon has nothing to say about the morning while the history
+does. A caller summing the periods for today got a smaller number than the response's own
+`todayExpectedWh` beside it, and `peakPowerWatts` fell towards zero as the sun went down while the day
+had demonstrably peaked at six kilowatts. Both now read the history, which is what the web UI's
+`/forecast` page already read.
+
+**`days`** is a block per local day, carrying the four figures the dashboard's forecast table shows —
+worked out when the forecast landed rather than summed per request:
+
+```jsonc
+"days": [
+  { "date": "2026-09-23", "expectedWh": 24800, "lowWh": 18100, "highWh": 31400,
+    "peakWatts": 6200, "complete": false, "heldFrom": "2026-09-23T10:30:00+02:00" },
+  { "date": "2026-09-24", "expectedWh": 17400, "lowWh": 9600, "highWh": 26100,
+    "peakWatts": 4300, "complete": true, "heldFrom": null }
+]
+```
+
+`lowWh` and `highWh` are the answer to *"how sure is tomorrow?"*, which previously could not be had
+without summing forty-eight periods — the top-level `today…` fields carry the median alone.
+
+**Read `complete` before treating a day's periods as the whole day.** False is ordinary, not a fault:
+a controller started at 10:44 has nothing retained for today before then, and `heldFrom` says where
+that day's periods really begin. A caller that reads an incomplete day as a whole one will under-report
+production and be wrong about the day — which is why this is a field rather than something to be
+inferred from the first period's timestamp.
+
+A day nothing is held for is **absent from `days`** rather than present as zeroes, on the same terms as
+the null totals: "we don't know" and "no sun" are different facts. `todayRemainingWh` is deliberately
+the one figure that is not a whole day.
 
 #### Quoting a plan without starting one
 
