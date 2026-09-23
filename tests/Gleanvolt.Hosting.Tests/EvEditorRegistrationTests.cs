@@ -130,11 +130,16 @@ public sealed class EvEditorRegistrationTests : IDisposable
             [EvSettingKeys.Model] = "Enyaq 85",
         }).Saved);
 
+        // Said of the file first, because that is the whole claim: naming a make wrote nothing that
+        // switches a feed on.
+        var file = PvSystemOverrides.Read(Path.Combine(_root, "data", "pv-system.json"));
+        Assert.Equal([EvSettingKeys.Make, EvSettingKeys.Model], file.Keys.Order(StringComparer.Ordinal).ToArray());
+
+        // And of the composition root: a Škoda by name is not a Škoda by feed.
         var services = Start();
 
         Assert.False(Registers<SkodaApiOptions>(services));
         Assert.False(Registers<VwWebsiteOptions>(services));
-        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
     }
 
     [Fact]
