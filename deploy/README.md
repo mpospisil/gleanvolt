@@ -970,10 +970,12 @@ container, so the confirmation says this rather than checking.
 
 ### Settings saved from the web UI
 
-Values edited on **PV system** are kept in `data/pv-system.json` — `/opt/gleanvolt/data/pv-system.json`
-on the Pi, on the same bind mount as the session database, so they survive image upgrades and
-`docker compose down`. The file **overrides `.env` key by key**, and only for the keys it contains. If
-an `.env` edit seems to be ignored, the startup log names the file and every key it overrode:
+Values edited on **PV system** and on **Car** are kept in `data/pv-system.json` —
+`/opt/gleanvolt/data/pv-system.json` on the Pi, on the same bind mount as the session database, so
+they survive image upgrades and `docker compose down`. One file for both pages: it is a JSON document
+keyed by configuration path, and nothing in it is `Pv`-specific but the setting's name. The file
+**overrides `.env` key by key**, and only for the keys it contains. If an `.env` edit seems to be
+ignored, the startup log names the file and every key it overrode:
 
 ```
 PV system: …; overridden by /app/data/pv-system.json (saved from the web UI): Pv:Inverter:Host.
@@ -981,6 +983,12 @@ PV system: …; overridden by /app/data/pv-system.json (saved from the web UI): 
 
 Use **Revert** on the page to take a key out, or delete the file to go back to `.env` entirely. Its
 location is `Pv__OverridesPath`; the .deb sets it to `/var/lib/gleanvolt/pv-system.json`.
+
+**No password is in it.** A manufacturer account's password typed on **Car** goes to the secret store
+under `Secrets__Directory` instead — `data/vehicle-account-password.json`, written owner-only beside
+the volkswagen.de session and the MyŠkoda key, for the reason all three are kept together: hold any one
+of them and you are the owner at the other end. It wins over a `VW_PASSWORD` in `.env` the way the
+overrides file wins over everything else there, and **Remove** on the page is what clears it.
 
 ### How long a stop takes
 

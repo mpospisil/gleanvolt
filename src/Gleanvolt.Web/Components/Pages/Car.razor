@@ -1,0 +1,159 @@
+@page "/car"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject EvInfo Vehicle
+@inject ChargingLimits Limits
+@inject ConfiguredVehicleFeed Feed
+
+@*
+    The car, configured from a browser (issue #214). The other side of the cable from /pv-system, on
+    the same mechanism and with the same split: the form at the top edits what the NEXT start reads,
+    and everything under it is what this process resolved at startup and is running with.
+
+    Configuring the car used to be the last thing here that could only be done over ssh, and it is the
+    thing a new owner does first — spread across four configuration sections that nothing said were
+    about the same car, two of which together are a startup exception. A <select> makes that
+    unrepresentable.
+
+    What stays on /vehicle-portal, and why it did not move: this page is "which car, and which
+    account"; that one is "does that account work" — a sign-in that needs an emailed one-time code, a
+    MyŠkoda key pasted into a live store, and the field diagnostics that answer "why is battery blank
+    on this model". A save here cannot prove any of that, so it links there instead.
+*@
+
+<SiteTitle Page="Car" />
+
+<h1>Car</h1>
+
+<p class="muted">
+    Everything after the form is what the controller is running with, resolved from the configuration
+    at startup. The form changes what the next start reads; a restart applies it.
+</p>
+
+<CarEditorForm />
+
+<h2>Running</h2>
+
+@if (!Vehicle.IsConfigured)
+{
+    <p class="muted" id="car-unconfigured">
+        Nothing is described yet, so every charging limit is the installation's own and no target can be
+        asked for as a state of charge. That is a supported installation — the charge still runs — and
+        the form above is how to change it.
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <dt>Name</dt>
+        <dd>@Text(Vehicle.Name)</dd>
+
+        <dt>Id</dt>
+        <dd>@Text(Vehicle.Id)</dd>
+
+        <dt>Model</dt>
+        <dd>@Text(string.Join(" ", new[] { Vehicle.Make, Vehicle.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
+
+        <dt>Usable battery</dt>
+        <dd>@(Vehicle.CanTargetSoc ? $"{Vehicle.BatteryCapacityKWh.ToString("0.#", Invariant)} kWh" : Missing)</dd>
+
+        <dt>Charge efficiency</dt>
+        <dd>@Vehicle.ChargeEfficiency.ToString("P0", Invariant)</dd>
+    </dl>
+
+    @*
+        Three columns rather than one, because the interesting number is the third: what the car says,
+        what the installation says, and which of them the controller is actually working to.
+    *@
+    <table class="grid">
+        <thead>
+            <tr><th>&nbsp;</th><th>The car</th><th>The installation</th><th>In effect</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Minimum current</td>
+                <td>@Amps(Vehicle.MinChargingCurrentAmps)</td>
+                <td>@Amps(Limits.MinAmps == Vehicle.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
+                <td>@Amps(Limits.MinAmps)</td>
+            </tr>
+            <tr>
+                <td>Maximum current</td>
+                <td>@Amps(Vehicle.MaxChargingCurrentAmps)</td>
+                <td>@Amps(Limits.MaxAmps == Vehicle.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
+                <td>@Amps(Limits.MaxAmps)</td>
+            </tr>
+            <tr>
+                <td>Phases</td>
+                <td>@Count(Vehicle.Phases)</td>
+                <td>@Count(Limits.Phases == Vehicle.Phases ? null : Limits.Phases)</td>
+                <td>@Count(Limits.Phases)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="table-note muted">
+        The controller works to the narrower of the two. A car can only ever <em>lower</em> a limit —
+        the installation's maximum is the site's supply and the wiring in the wall, not a preference —
+        and anything the car leaves unstated is simply the installation's figure.
+    </p>
+}
+
+<h2>Feed</h2>
+
+@*
+    Which feed this process actually started, as opposed to which one the configuration asks for. They
+    differ in exactly one case worth showing: the Data Act portal beside a live feed, which #212 sets
+    aside with a log line nobody reads twice.
+*@
+@if (Feed.Service is { } service)
+{
+    <dl class="facts">
+        <dt>Reading the car</dt>
+        <dd>@service.DisplayName <span class="muted">(@service.Manufacturer)</span></dd>
+
+        <dt>For</dt>
+        <dd>@Text(service.VehicleId)</dd>
+
+        <dt>State</dt>
+        <dd>@service.Health.State — @service.Health.Message</dd>
+    </dl>
+}
+else
+{
+    <p class="muted" id="no-feed">
+        No manufacturer feed is running. Charging is unaffected; what is missing is the car's own state
+        of charge, so a target is asked for in kWh rather than as a percentage.
+    </p>
+}
+
+@if (Feed.SetAside is { } setAside)
+{
+    <p class="table-note muted" id="feed-set-aside">@setAside</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic))
+{
+    <p class="table-note muted" id="own-topic">
+        This car also has a topic of its own, <code>@Vehicle.TelemetryTopic</code>. It may run beside a
+        manufacturer feed — the freshest reading wins.
+    </p>
+}
+
+<p class="table-note muted">
+    None of this says whether the feed is <em>signed in</em>.
+    <a href="/vehicle-portal">Vehicle portal</a> is where an account is proved: sign in there, press
+    <em>Ask the car</em>, and what comes back is what this configuration is worth.
+</p>
+
+@code {
+    private const string Missing = "—";
+
+    private static readonly System.Globalization.CultureInfo Invariant =
+        System.Globalization.CultureInfo.InvariantCulture;
+
+    private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
+
+    private static string Amps(int? value) => value is { } amps ? $"{amps} A" : Missing;
+
+    private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
+}

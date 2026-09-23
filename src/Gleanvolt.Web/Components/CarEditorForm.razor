@@ -1,0 +1,540 @@
+@inject IEvEditor Editor
+@inject IOptions<WebOptions> Web
+
+@*
+    The car, editable (issue #214). Everything below this form on /car is what the process is running
+    with; this is what the next start will read — the same split, and the same overrides file, as
+    /pv-system's form (#204).
+
+    One <select> is the only control here that changes which fields exist. It removes two startup
+    failures by construction: two live feeds cannot both be enabled, because picking one disables the
+    others in the same save, and the Data Act portal cannot be arranged beside a live feed by accident.
+
+    What it cannot do is probe. The feed is built at startup out of these very keys, so there is
+    nothing running to test them against — and a cold volkswagen.de sign-in wants an emailed code
+    anyway. Save, restart, sign in on /vehicle-portal, ask the car; the page says so rather than
+    letting a green save look like a working feed.
+*@
+
+<section class="controls pv-editor car-editor" id="car-editor">
+    <h2>Edit</h2>
+
+    @if (_pending.Count > 0 || _pendingSecrets.Count > 0 || _settings.FeedIsPending)
+    {
+        <div class="alert pending" id="car-pending">
+            <p>
+                <strong>Saved, not applied</strong> —
+                @($"{PendingCount} {(PendingCount == 1 ? "change takes" : "changes take")} effect on restart.")
+            </p>
+            <ul>
+                @if (_settings.FeedIsPending)
+                {
+                    <li>Feed: @FeedName(_settings.RunningFeed) → @FeedName(_settings.Feed)</li>
+                }
+                @foreach (var setting in _pending)
+                {
+                    <li>@Label(setting.Key): @Show(setting.Running) → @Show(setting.Saved)</li>
+                }
+                @*
+                    Named, never valued. A pending-changes banner that printed "hunter2 → correct-horse"
+                    would undo every other precaution on this page in one line.
+                *@
+                @foreach (var secret in _pendingSecrets)
+                {
+                    <li>@Label(secret.Key): @(secret.Stored ? "set" : "removed")</li>
+                }
+            </ul>
+            <div class="control">
+                <RestartService Label="Apply them" />
+            </div>
+        </div>
+    }
+
+    @if (_settings.Unavailable is { } unavailable)
+    {
+        <p class="error" id="car-unavailable">@unavailable</p>
+    }
+    else if (ReadOnly)
+    {
+        <p class="muted" id="car-readonly">
+            Read-only, because this UI has no login. These fields include a manufacturer account's
+            password, and without a login anyone on the LAN could read the car or change which account
+            it is read from. Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and
+            they become editable here; until then, change them in <code>.env</code> and restart.
+        </p>
+    }
+    else
+    {
+        <p class="muted">
+            A save is checked the way startup checks the configuration, and writes only what differs to
+            <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key, so
+            each field says where its value comes from. Nothing changes until the controller restarts —
+            and a save cannot prove an account, because the feed is built at startup from these keys.
+            Restart, then prove it on <a href="/vehicle-portal">Vehicle portal</a>.
+        </p>
+    }
+
+    <h3>Manufacturer</h3>
+
+    <div class="pv-fields">
+        <div class="pv-field">
+            <label for="car-feed">What reads this car</label>
+            <select id="car-feed" disabled="@(!Editable)"
+                    value="@_feed.ToString()"
+                    @onchange="e => Choose(e.Value?.ToString())">
+                @foreach (var feed in VehicleFeeds.All)
+                {
+                    <option value="@feed.ToString()">@FeedName(feed)</option>
+                }
+            </select>
+            <span class="source">@FeedFreshness(_feed)</span>
+        </div>
+    </div>
+
+    <p class="table-note muted" id="car-feed-note">@FeedNote(_feed)</p>
+
+    @if (VehicleFeeds.Fields(_feed).Count > 0)
+    {
+        <div class="pv-fields">
+            @foreach (var key in VehicleFeeds.Fields(_feed))
+            {
+                @if (key == EvSettingKeys.DataActClientId)
+                {
+                    continue;
+                }
+
+                @if (EvSettingKeys.IsSecret(key))
+                {
+                    @Password(key)
+                }
+                else if (key == EvSettingKeys.DataActBrand)
+                {
+                    @Brand(key)
+                }
+                else
+                {
+                    @Field(key)
+                }
+            }
+        </div>
+
+        @if (_feed == VehicleFeed.DataAct)
+        {
+            @*
+                Documentation for a failure rather than a field to fill: the table above knows every
+                brand's sign-in id, and this is what to do on the day one of them changes.
+            *@
+            <details class="car-escape-hatch">
+                <summary>The brand's sign-in id has changed</summary>
+                <p class="muted">
+                    The portal's client ids are reverse-engineered rather than published, so one can go
+                    stale without warning — the symptom is a sign-in that fails as though the password
+                    were wrong. Stating an id here overrides the brand above.
+                </p>
+                <div class="pv-fields">
+                    @Field(EvSettingKeys.DataActClientId)
+                </div>
+            </details>
+        }
+    }
+
+    <h3>The car</h3>
+
+    <p class="muted">
+        These are the fields that make charging correct, and they are independent of any feed. The
+        installation allows @_settings.ChargerMinAmps–@_settings.ChargerMaxAmps A; the controller works
+        to the narrower of the two, and a car can only ever lower a limit.
+    </p>
+
+    <div class="pv-fields">
+        @Field(EvSettingKeys.Id)
+        @Field(EvSettingKeys.Name)
+        @Field(EvSettingKeys.Make)
+        @Field(EvSettingKeys.Model)
+        @Phases()
+        @Field(EvSettingKeys.MinChargingCurrentAmps)
+        @Field(EvSettingKeys.MaxChargingCurrentAmps)
+        @Field(EvSettingKeys.BatteryCapacityKWh)
+        @Field(EvSettingKeys.ChargeEfficiency)
+    </div>
+
+    @if (Editable)
+    {
+        <div class="control actions">
+            <button type="button" class="primary" id="car-save" disabled="@(_busy || !HasChanges)" @onclick="Save">
+                @(_busy ? "Checking…" : "Save")
+            </button>
+            <button type="button" class="secondary" disabled="@(_busy || !HasChanges)" @onclick="Discard">
+                Discard changes
+            </button>
+        </div>
+    }
+
+    @if (_problems.Count > 0)
+    {
+        <div id="car-problems">
+            <p class="error">Not saved — the controller would refuse to start with this:</p>
+            <ul class="error">
+                @foreach (var problem in _problems)
+                {
+                    <li>@problem</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="muted" id="car-message">
+            @message
+            <a href="/vehicle-portal">Prove it on Vehicle portal</a>.
+        </p>
+    }
+</section>
+
+@code {
+    private const string Missing = "—";
+
+    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [EvSettingKeys.Id] = "Id",
+        [EvSettingKeys.Name] = "Name",
+        [EvSettingKeys.Make] = "Make",
+        [EvSettingKeys.Model] = "Model",
+        [EvSettingKeys.BatteryCapacityKWh] = "Usable pack (kWh)",
+        [EvSettingKeys.ChargeEfficiency] = "Charge efficiency",
+        [EvSettingKeys.Phases] = "Phases",
+        [EvSettingKeys.MinChargingCurrentAmps] = "Minimum current (A)",
+        [EvSettingKeys.MaxChargingCurrentAmps] = "Maximum current (A)",
+        [EvSettingKeys.TelemetryTopic] = "Topic",
+        [EvSettingKeys.WebsiteEnabled] = "volkswagen.de",
+        [EvSettingKeys.WebsiteUsername] = "VW ID (e-mail)",
+        [EvSettingKeys.WebsitePassword] = "Password",
+        [EvSettingKeys.WebsiteVin] = "VIN",
+        [EvSettingKeys.SkodaEnabled] = "MyŠkoda",
+        [EvSettingKeys.SkodaVin] = "VIN",
+        [EvSettingKeys.DataActEnabled] = "Data Act portal",
+        [EvSettingKeys.DataActBrand] = "Brand",
+        [EvSettingKeys.DataActClientId] = "Client id",
+        [EvSettingKeys.DataActUsername] = "VW ID (e-mail)",
+        [EvSettingKeys.DataActPassword] = "Password",
+        [EvSettingKeys.DataActVin] = "VIN",
+        [EvSettingKeys.MqttEnabled] = "Own topic",
+    };
+
+    private static readonly Dictionary<string, string> Hints = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [EvSettingKeys.Id] = "a-z, 0-9, - and _",
+        [EvSettingKeys.BatteryCapacityKWh] = "usable, not the brochure's gross figure",
+        [EvSettingKeys.ChargeEfficiency] = "above 0, at most 1",
+        [EvSettingKeys.MinChargingCurrentAmps] = "the lowest the car will start on",
+        [EvSettingKeys.MaxChargingCurrentAmps] = "the on-board charger's ceiling",
+        [EvSettingKeys.TelemetryTopic] = "one concrete topic, no wildcards",
+        [EvSettingKeys.WebsiteVin] = "17 characters",
+        [EvSettingKeys.SkodaVin] = "17 characters",
+        [EvSettingKeys.DataActVin] = "17 characters",
+        [EvSettingKeys.DataActClientId] = "…@apps_vw-dilab_com",
+    };
+
+    private EvSettings _settings = Empty;
+    private Dictionary<string, string> _values = [];
+    private Dictionary<string, string> _passwords = [];
+    private VehicleFeed _feed;
+    private List<ConfiguredSetting> _pending = [];
+    private List<EvSecret> _pendingSecrets = [];
+    private IReadOnlyList<string> _problems = [];
+    private string? _message;
+    private bool _busy;
+
+    private static EvSettings Empty { get; } = new(
+        string.Empty, [], [], VehicleFeed.ChargeOnly, VehicleFeed.ChargeOnly, [], string.Empty, 0, 0);
+
+    // These fields are a manufacturer account, so the rule #204 set for the device addresses applies
+    // at least as strongly: an open UI shows the form without letting anyone use it.
+    private bool ReadOnly => !Web.Value.AuthenticationRequired;
+
+    private bool Editable => !ReadOnly && _settings.Unavailable is null;
+
+    private int PendingCount => _pending.Count + _pendingSecrets.Count + (_settings.FeedIsPending ? 1 : 0);
+
+    private bool HasChanges => _feed != _settings.Feed || Edits().Count > 0;
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _settings = Editor.Read();
+        _values = _settings.Settings.ToDictionary(
+            setting => setting.Key, setting => setting.Saved ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+
+        // Always empty, on every load and after every save: a password field that rendered its value
+        // back would put a bearer-equivalent secret on the wire for every browser that opened the page.
+        _passwords = EvSettingKeys.Secrets.ToDictionary(key => key, _ => string.Empty, StringComparer.OrdinalIgnoreCase);
+
+        _feed = _settings.Feed;
+        _pending = [.. _settings.Pending];
+        _pendingSecrets = [.. _settings.PendingSecrets];
+    }
+
+    private void Choose(string? value)
+    {
+        _message = null;
+        _problems = [];
+
+        if (Enum.TryParse<VehicleFeed>(value, out var feed))
+        {
+            _feed = feed;
+        }
+    }
+
+    // What the form holds that the next start would not already read. Hidden feeds contribute nothing:
+    // switching manufacturer leaves the old account's fields exactly as they were, so switching back
+    // does not mean typing a VIN in again.
+    private Dictionary<string, string> Edits()
+    {
+        var edits = _settings.Settings
+            .Where(setting => _values.TryGetValue(setting.Key, out var value)
+                && !string.Equals(value.Trim(), setting.Saved ?? string.Empty, StringComparison.Ordinal))
+            .ToDictionary(setting => setting.Key, setting => _values[setting.Key].Trim(), StringComparer.OrdinalIgnoreCase);
+
+        // An empty password box means unchanged, never cleared. Clearing is the Remove button, which
+        // goes through Revert.
+        foreach (var (key, typed) in _passwords)
+        {
+            if (!string.IsNullOrWhiteSpace(typed))
+            {
+                edits[key] = typed;
+            }
+        }
+
+        return edits;
+    }
+
+    private void Save()
+    {
+        var edits = Edits();
+        var switching = _feed != _settings.Feed;
+
+        if (!switching && edits.Count == 0)
+        {
+            return;
+        }
+
+        _message = null;
+        _problems = [];
+        _busy = true;
+
+        try
+        {
+            var result = switching ? Editor.SaveFeed(_feed, edits) : Editor.Save(edits);
+
+            if (!result.Saved)
+            {
+                _problems = result.Problems;
+                return;
+            }
+
+            Reload();
+            _message = PendingCount > 0
+                ? "Saved. Restart the controller to apply it, then sign in."
+                : "Saved. The controller is already running with these values.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Revert(string key)
+    {
+        _message = null;
+        var result = Editor.Revert(key);
+
+        if (!result.Saved)
+        {
+            _problems = result.Problems;
+            return;
+        }
+
+        _problems = [];
+        Reload();
+        _message = $"{Label(key)} removed; it comes from {SourceName(_settings[key])} again.";
+    }
+
+    private void RemoveSecret(string key)
+    {
+        _message = null;
+        var result = Editor.Revert(key);
+
+        if (!result.Saved)
+        {
+            _problems = result.Problems;
+            return;
+        }
+
+        _problems = [];
+        Reload();
+        _message = "The stored password was removed.";
+    }
+
+    private void Discard()
+    {
+        _problems = [];
+        _message = null;
+        Reload();
+    }
+
+    // The fields are Razor templates rather than markup repeated five times: every one of them has to
+    // carry the same provenance line and the same Revert, and the two that do not — a password, which
+    // is never read back, and a choice, which is a <select> — differ only where they must.
+
+    private RenderFragment Field(string key) => @<div class="pv-field">
+        <label for="@Id(key)">@Label(key)</label>
+        <input id="@Id(key)" type="text" spellcheck="false" autocomplete="off"
+               placeholder="@Hints.GetValueOrDefault(key)"
+               disabled="@(!Editable || _busy)"
+               value="@_values[key]"
+               @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
+        @Provenance(key)
+    </div>;
+
+    private RenderFragment Brand(string key) => @<div class="pv-field">
+        <label for="@Id(key)">@Label(key)</label>
+        <select id="@Id(key)" disabled="@(!Editable || _busy)"
+                value="@_values[key]"
+                @onchange="e => _values[key] = e.Value?.ToString() ?? string.Empty">
+            <option value="">—</option>
+            @foreach (var brand in _settings.Brands)
+            {
+                <option value="@brand.Name">@brand.Label</option>
+            }
+        </select>
+        @Provenance(key)
+    </div>;
+
+    // 1, 2 or 3, because the one that goes wrong quietly is a single-phase car behind a three-phase
+    // wallbox: unset, every power figure the controller reasons with is overstated threefold.
+    private RenderFragment Phases() => @<div class="pv-field">
+        <label for="@Id(EvSettingKeys.Phases)">@Label(EvSettingKeys.Phases)</label>
+        <select id="@Id(EvSettingKeys.Phases)" disabled="@(!Editable || _busy)"
+                value="@_values[EvSettingKeys.Phases]"
+                @onchange="e => _values[EvSettingKeys.Phases] = e.Value?.ToString() ?? string.Empty">
+            <option value="">Not stated — the installation's count is used</option>
+            <option value="1">1 — single-phase</option>
+            <option value="2">2</option>
+            <option value="3">3 — three-phase</option>
+        </select>
+        @Provenance(EvSettingKeys.Phases)
+    </div>;
+
+    private RenderFragment Password(string key) => @<div class="pv-field">
+        <label for="@Id(key)">@Label(key)</label>
+        <input id="@Id(key)" type="password" autocomplete="new-password" spellcheck="false"
+               placeholder="@(_settings.Secret(key).Stored ? "unchanged" : "not set")"
+               disabled="@(!Editable || _busy)"
+               value="@_passwords[key]"
+               @oninput="e => _passwords[key] = e.Value?.ToString() ?? string.Empty" />
+        <span class="source @(_settings.Secret(key).IsEdited ? "edited" : null)">@SecretSource(_settings.Secret(key))</span>
+        @if (_settings.Secret(key).IsEdited && Editable)
+        {
+            <button type="button" class="link revert" id="@(Id(key))-remove" disabled="@_busy" @onclick="() => RemoveSecret(key)">
+                Remove
+            </button>
+        }
+        @*
+            An owner typing a password into a browser deserves to be told where it ends up, in words
+            taken from the store itself so this cannot drift into claiming more than is true.
+        *@
+        <span class="hint">
+            Kept in the secret store — @_settings.SecretProtection. Left empty it is unchanged; Remove
+            clears it.
+        </span>
+    </div>;
+
+    private RenderFragment Provenance(string key) => @<text>
+        <span class="source @(_settings[key].IsEdited ? "edited" : null)" title="@SourceTitle(_settings[key])">
+            @SourceName(_settings[key])
+        </span>
+        @if (_settings[key].IsEdited && Editable)
+        {
+            <button type="button" class="link revert" id="@(Id(key))-revert" disabled="@_busy" @onclick="() => Revert(key)">
+                Revert to @Show(_settings[key].Underlying)
+            </button>
+        }
+    </text>;
+
+    private static string Label(string key) => Labels.GetValueOrDefault(key, key);
+
+    private static string Show(string? value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
+
+    private static string Id(string key) => "car-" + key.Replace(':', '-');
+
+    private static string FeedName(VehicleFeed feed) => feed switch
+    {
+        VehicleFeed.Volkswagen => "Volkswagen",
+        VehicleFeed.Skoda => "Škoda",
+        VehicleFeed.DataAct => "Audi · SEAT · Cupra · Bentley · VW commercial",
+        VehicleFeed.OwnTopic => "A feed I publish myself",
+        _ => "Another manufacturer — charge only",
+    };
+
+    private static string FeedFreshness(VehicleFeed feed) => feed switch
+    {
+        VehicleFeed.Volkswagen => "about 20 s, plug state, live while charging",
+        VehicleFeed.Skoda => "5–15 min, plug state",
+        VehicleFeed.DataAct => "hours behind; no plug state",
+        VehicleFeed.OwnTopic => "whatever publishes it",
+        _ => "no reading from the car",
+    };
+
+    private static string FeedNote(VehicleFeed feed) => feed switch
+    {
+        VehicleFeed.Volkswagen =>
+            "volkswagen.de, read live. The first sign-in always wants a one-time code e-mailed to this "
+            + "account, so it is done on the Vehicle portal page after the restart.",
+        VehicleFeed.Skoda =>
+            "The MyŠkoda Public API. It takes no password: create an API key in the MyŠkoda app and paste "
+            + "it on the Vehicle portal page. Keys expire, which is why they are renewed there rather "
+            + "than here.",
+        VehicleFeed.DataAct =>
+            "The EU Data Act portal — the route for a Group brand with no live feed of its own. It "
+            + "delivers batches rather than readings, so expect the car's state of charge to be hours "
+            + "old, and no plug state at all.",
+        VehicleFeed.OwnTopic =>
+            "An MQTT topic you publish to yourself. The broker and its credentials are the house "
+            + "broker's and stay in the Vehicle section; only the topic is the car's.",
+        _ =>
+            "No feed, which is a supported installation and not an unfinished form: every EV with a "
+            + "Type 2 inlet charges without one. It costs exactly one thing — a target is asked for in "
+            + "kWh rather than as a state of charge, because nothing reports what the pack already holds.",
+    };
+
+    private static string SecretSource(EvSecret secret) => secret.Source switch
+    {
+        SettingSource.SecretStore => "secret store",
+        SettingSource.Environment => $"environment ({secret.SourceDetail})",
+        SettingSource.CommandLine => "command line",
+        SettingSource.AppSettings => "appsettings.json",
+        _ => "not set",
+    };
+
+    private static string SourceName(ConfiguredSetting setting) => setting.Source switch
+    {
+        SettingSource.WebUi => "web UI",
+        SettingSource.SecretStore => "secret store",
+        SettingSource.Environment => "environment",
+        SettingSource.CommandLine => "command line",
+        SettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
+        _ => "default",
+    };
+
+    private static string SourceTitle(ConfiguredSetting setting) => setting.Source switch
+    {
+        SettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
+        SettingSource.Environment =>
+            $"{setting.SourceDetail}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.",
+        SettingSource.CommandLine => "A command-line argument, which wins over this page.",
+        SettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
+        _ => "Set nowhere; the built-in default applies.",
+    };
+}

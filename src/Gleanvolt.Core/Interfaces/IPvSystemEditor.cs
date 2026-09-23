@@ -27,14 +27,14 @@ public interface IPvSystemEditor
     /// the startup resolver. A value equal to what the key would be without the file is not stored,
     /// so the file only ever holds real differences.
     /// </summary>
-    PvSystemSaveResult Save(IReadOnlyDictionary<string, string> values);
+    SettingsSaveResult Save(IReadOnlyDictionary<string, string> values);
 
     /// <summary>
     /// Removes <paramref name="key"/> from the overrides file, so it comes from the environment or
     /// <c>appsettings.json</c> again. Checked by the resolver like a save; removing the last key
     /// deletes the file.
     /// </summary>
-    PvSystemSaveResult Revert(string key);
+    SettingsSaveResult Revert(string key);
 
     /// <summary>
     /// One read against a device address, to catch a swapped inverter and charger before a restart

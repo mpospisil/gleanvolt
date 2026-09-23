@@ -26,6 +26,33 @@ public class VwGroupBrandsTests
         Assert.Contains(brand, VwGroupBrands.Known);
     }
 
+    [Fact]
+    public void Every_brand_the_catalog_offers_resolves_and_has_a_portal_key()
+    {
+        // The catalog is what /car's Data Act choice is built from (#214), so an entry that does not
+        // resolve would be a brand somebody could pick and then fail to sign in with.
+        Assert.NotEmpty(VwGroupBrands.Catalog);
+
+        Assert.All(VwGroupBrands.Catalog, brand =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(VwGroupBrands.Resolve(brand.Name)));
+            Assert.False(string.IsNullOrWhiteSpace(VwGroupBrands.PortalKey(brand.Name)));
+            Assert.False(string.IsNullOrWhiteSpace(brand.Label));
+        });
+    }
+
+    [Fact]
+    public void The_catalog_names_each_brand_once()
+    {
+        // The aliases exist so a hand-typed .env is tolerated, not so a list shows the same car twice.
+        Assert.Equal(
+            VwGroupBrands.Catalog.Count,
+            VwGroupBrands.Catalog.Select(brand => brand.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        // Two pairs share a client id -- a fact about the portal -- so ids are deliberately not unique.
+        Assert.Contains(VwGroupBrands.Catalog, brand => brand.Name == "vwn");
+    }
+
     [Theory]
     [InlineData("VW")]
     [InlineData("Skoda")]

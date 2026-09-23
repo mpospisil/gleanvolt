@@ -64,8 +64,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
         {
             return new PvSystemSettings(
                 _overrides?.Path ?? string.Empty,
-                [.. PvSystemSettingKeys.All.Select(key => new PvSystemSetting(
-                    key, _running[key], _running[key], PvSettingSource.Default, string.Empty, _running[key]))],
+                [.. PvSystemSettingKeys.All.Select(key => new ConfiguredSetting(
+                    key, _running[key], _running[key], SettingSource.Default, string.Empty, _running[key]))],
                 "This host does not read a web UI overrides file, so an edit here would never be applied.");
         }
 
@@ -86,13 +86,13 @@ public sealed class PvSystemEditor : IPvSystemEditor
         }
     }
 
-    public PvSystemSaveResult Save(IReadOnlyDictionary<string, string> values)
+    public SettingsSaveResult Save(IReadOnlyDictionary<string, string> values)
     {
         var refused = values.Keys.Where(key => !PvSystemSettingKeys.IsEditable(key)).ToList();
 
         if (refused.Count > 0)
         {
-            return PvSystemSaveResult.Refused(
+            return SettingsSaveResult.Refused(
                 [.. refused.Select(key => $"{key} cannot be edited from the web UI.")]);
         }
 
@@ -119,11 +119,11 @@ public sealed class PvSystemEditor : IPvSystemEditor
         }, "saved");
     }
 
-    public PvSystemSaveResult Revert(string key)
+    public SettingsSaveResult Revert(string key)
     {
         if (!PvSystemSettingKeys.IsEditable(key))
         {
-            return PvSystemSaveResult.Refused([$"{key} cannot be edited from the web UI."]);
+            return SettingsSaveResult.Refused([$"{key} cannot be edited from the web UI."]);
         }
 
         return Change(stored => stored.Remove(key), "reverted");
@@ -172,11 +172,11 @@ public sealed class PvSystemEditor : IPvSystemEditor
     }
 
     // One read-modify-write of the file: apply the change, check the result would start, write it.
-    private PvSystemSaveResult Change(Action<Dictionary<string, string>> change, string verb)
+    private SettingsSaveResult Change(Action<Dictionary<string, string>> change, string verb)
     {
         if (_configuration is null || _overrides is null)
         {
-            return PvSystemSaveResult.Refused(
+            return SettingsSaveResult.Refused(
                 ["This host does not read a web UI overrides file, so an edit here would never be applied."]);
         }
 
@@ -190,7 +190,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
             }
             catch (InvalidOperationException ex)
             {
-                return PvSystemSaveResult.Refused([ex.Message]);
+                return SettingsSaveResult.Refused([ex.Message]);
             }
 
             var before = new Dictionary<string, string>(stored, StringComparer.OrdinalIgnoreCase);
@@ -199,14 +199,14 @@ public sealed class PvSystemEditor : IPvSystemEditor
             if (stored.Count == before.Count
                 && stored.All(entry => before.TryGetValue(entry.Key, out var old) && old == entry.Value))
             {
-                return PvSystemSaveResult.Success;
+                return SettingsSaveResult.Success;
             }
 
             var problems = Check(stored);
 
             if (problems.Count > 0)
             {
-                return PvSystemSaveResult.Refused(problems);
+                return SettingsSaveResult.Refused(problems);
             }
 
             try
@@ -215,7 +215,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return PvSystemSaveResult.Refused([$"Could not write {_overrides.Path}: {ex.Message}"]);
+                return SettingsSaveResult.Refused([$"Could not write {_overrides.Path}: {ex.Message}"]);
             }
 
             _logger.LogInformation(
@@ -225,7 +225,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 _overrides.Path,
                 stored.Count == 0 ? "none" : string.Join(", ", stored.Keys));
 
-            return PvSystemSaveResult.Success;
+            return SettingsSaveResult.Success;
         }
     }
 
@@ -264,16 +264,16 @@ public sealed class PvSystemEditor : IPvSystemEditor
         }
     }
 
-    private List<PvSystemSetting> Describe(IReadOnlyDictionary<string, string> stored) =>
+    private List<ConfiguredSetting> Describe(IReadOnlyDictionary<string, string> stored) =>
     [
         .. PvSystemSettingKeys.All.Select(key =>
         {
             var next = Next(key, stored);
-            return new PvSystemSetting(
+            return new ConfiguredSetting(
                 key,
                 next?.Value,
                 _running[key],
-                next?.Source ?? PvSettingSource.Default,
+                next?.Source ?? SettingSource.Default,
                 next?.Detail ?? string.Empty,
                 Underlying(key));
         }),
@@ -284,7 +284,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
     // The value the next start reads for `key`, and which provider supplies it: the last one that has
     // it wins, as in ConfigurationRoot itself.
-    private (string? Value, PvSettingSource Source, string Detail)? Next(string key, IReadOnlyDictionary<string, string> stored)
+    private (string? Value, SettingSource Source, string Detail)? Next(string key, IReadOnlyDictionary<string, string> stored)
     {
         foreach (var provider in _configuration!.Providers.Reverse())
         {
@@ -292,7 +292,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
             {
                 if (stored.TryGetValue(key, out var saved))
                 {
-                    return (saved, PvSettingSource.WebUi, _overrides!.Path);
+                    return (saved, SettingSource.WebUi, _overrides!.Path);
                 }
 
                 continue;
@@ -303,11 +303,11 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 return provider switch
                 {
                     EnvironmentVariablesConfigurationProvider =>
-                        (value, PvSettingSource.Environment, PvSystemSettingKeys.EnvironmentVariable(key)),
-                    CommandLineConfigurationProvider => (value, PvSettingSource.CommandLine, "command line"),
+                        (value, SettingSource.Environment, PvSystemSettingKeys.EnvironmentVariable(key)),
+                    CommandLineConfigurationProvider => (value, SettingSource.CommandLine, "command line"),
                     FileConfigurationProvider file =>
-                        (value, PvSettingSource.AppSettings, Path.GetFileName(file.Source.Path) ?? "a settings file"),
-                    _ => (value, PvSettingSource.AppSettings, provider.ToString() ?? string.Empty),
+                        (value, SettingSource.AppSettings, Path.GetFileName(file.Source.Path) ?? "a settings file"),
+                    _ => (value, SettingSource.AppSettings, provider.ToString() ?? string.Empty),
                 };
             }
         }

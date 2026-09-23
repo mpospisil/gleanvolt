@@ -819,18 +819,18 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
         {
             var running = Running.GetValueOrDefault(key);
             return Stored.TryGetValue(key, out var saved)
-                ? new PvSystemSetting(key, saved, running, PvSettingSource.WebUi, "/app/data/pv-system.json", running)
-                : new PvSystemSetting(key, running, running, PvSettingSource.Environment, PvSystemSettingKeys.EnvironmentVariable(key), running);
+                ? new ConfiguredSetting(key, saved, running, SettingSource.WebUi, "/app/data/pv-system.json", running)
+                : new ConfiguredSetting(key, running, running, SettingSource.Environment, PvSystemSettingKeys.EnvironmentVariable(key), running);
         })],
         Unavailable);
 
-    public PvSystemSaveResult Save(IReadOnlyDictionary<string, string> values)
+    public SettingsSaveResult Save(IReadOnlyDictionary<string, string> values)
     {
         Saves.Add(values);
 
         if (Refuse.Count > 0)
         {
-            return PvSystemSaveResult.Refused(Refuse);
+            return SettingsSaveResult.Refused(Refuse);
         }
 
         foreach (var (key, value) in values)
@@ -845,14 +845,14 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
             }
         }
 
-        return PvSystemSaveResult.Success;
+        return SettingsSaveResult.Success;
     }
 
-    public PvSystemSaveResult Revert(string key)
+    public SettingsSaveResult Revert(string key)
     {
         Reverts.Add(key);
         Stored.Remove(key);
-        return PvSystemSaveResult.Success;
+        return SettingsSaveResult.Success;
     }
 
     public Task<DeviceProbeResult> ProbeAsync(
@@ -860,6 +860,140 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     {
         Probes.Add((role, host, port, unitId));
         return Task.FromResult(ProbeResult);
+    }
+}
+
+/// <summary>
+/// The car's editor as the page sees it (issue #214): the overrides file and the secret store kept in
+/// two dictionaries, so a test can assert what a form submitted without going near a disk.
+///
+/// <para>Deliberately not a second implementation of the rules. <c>Refuse</c> stands in for every
+/// refusal the real editor can produce, which is what the form has to render; what makes those
+/// refusals correct is <c>EvEditorTests</c>.</para>
+/// </summary>
+internal sealed class FakeEvEditor : IEvEditor
+{
+    public Dictionary<string, string?> Running { get; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [EvSettingKeys.Id] = "id4",
+        [EvSettingKeys.Name] = "The ID.4",
+        [EvSettingKeys.Make] = "Volkswagen",
+        [EvSettingKeys.Model] = "ID.4 Pro",
+        [EvSettingKeys.BatteryCapacityKWh] = "77",
+        [EvSettingKeys.ChargeEfficiency] = "0.9",
+        [EvSettingKeys.Phases] = "3",
+        [EvSettingKeys.MinChargingCurrentAmps] = "6",
+        [EvSettingKeys.MaxChargingCurrentAmps] = "16",
+    };
+
+    public Dictionary<string, string> Stored { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether a password is held, by key. Never a value: the page may not be handed one.</summary>
+    public Dictionary<string, bool> Secrets { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether the running process had one — separate, so "saved, not applied" can be tested.</summary>
+    public Dictionary<string, bool> RunningSecrets { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The passwords a save was given, so a test can assert one never came back out.</summary>
+    public List<string> SavedPasswords { get; } = [];
+
+    public VehicleFeed RunningFeed { get; set; } = VehicleFeed.ChargeOnly;
+
+    public IReadOnlyList<string> Refuse { get; set; } = [];
+
+    public string? Unavailable { get; set; }
+
+    public List<IReadOnlyDictionary<string, string>> Saves { get; } = [];
+
+    public List<VehicleFeed> Switches { get; } = [];
+
+    public List<string> Reverts { get; } = [];
+
+    public EvSettings Read() => new(
+        "/app/data/pv-system.json",
+        [
+            .. EvSettingKeys.All.Where(key => !EvSettingKeys.IsSecret(key)).Select(key =>
+            {
+                var running = Running.GetValueOrDefault(key);
+                return Stored.TryGetValue(key, out var saved)
+                    ? new ConfiguredSetting(key, saved, running, SettingSource.WebUi, "/app/data/pv-system.json", running)
+                    : new ConfiguredSetting(key, running, running, SettingSource.Environment, EvSettingKeys.EnvironmentVariable(key), running);
+            }),
+        ],
+        [
+            .. EvSettingKeys.Secrets.Select(key => new EvSecret(
+                key,
+                Secrets.GetValueOrDefault(key),
+                RunningSecrets.GetValueOrDefault(key),
+                Secrets.GetValueOrDefault(key) ? SettingSource.SecretStore : SettingSource.Default,
+                Secrets.GetValueOrDefault(key) ? "owner-only files (0600) in the data directory" : string.Empty)),
+        ],
+        VehicleFeeds.Selected(key => Stored.TryGetValue(key, out var flag)
+            ? bool.TryParse(flag, out var parsed) && parsed
+            : bool.TryParse(Running.GetValueOrDefault(key), out var was) && was),
+        RunningFeed,
+        [new("vw", "Volkswagen"), new("audi", "Audi"), new("cupra", "Cupra")],
+        "owner-only files (0600) in the data directory",
+        6,
+        16,
+        Unavailable);
+
+    public SettingsSaveResult Save(IReadOnlyDictionary<string, string> values) => Apply(null, values);
+
+    public SettingsSaveResult SaveFeed(VehicleFeed feed, IReadOnlyDictionary<string, string> values)
+    {
+        Switches.Add(feed);
+        return Apply(feed, values);
+    }
+
+    public SettingsSaveResult Revert(string key)
+    {
+        Reverts.Add(key);
+        Stored.Remove(key);
+        Secrets[key] = false;
+        return SettingsSaveResult.Success;
+    }
+
+    private SettingsSaveResult Apply(VehicleFeed? feed, IReadOnlyDictionary<string, string> values)
+    {
+        Saves.Add(values);
+
+        if (Refuse.Count > 0)
+        {
+            return SettingsSaveResult.Refused(Refuse);
+        }
+
+        if (feed is { } chosen)
+        {
+            foreach (var candidate in VehicleFeeds.All)
+            {
+                if (VehicleFeeds.EnabledKey(candidate) is { } key)
+                {
+                    Stored[key] = candidate == chosen ? "true" : "false";
+                }
+            }
+        }
+
+        foreach (var (key, value) in values)
+        {
+            if (EvSettingKeys.IsSecret(key))
+            {
+                SavedPasswords.Add(value);
+                Secrets[key] = true;
+                continue;
+            }
+
+            if (value == (Running.GetValueOrDefault(key) ?? string.Empty))
+            {
+                Stored.Remove(key);
+            }
+            else
+            {
+                Stored[key] = value;
+            }
+        }
+
+        return SettingsSaveResult.Success;
     }
 }
 

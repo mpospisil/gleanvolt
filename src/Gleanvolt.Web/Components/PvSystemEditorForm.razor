@@ -209,7 +209,7 @@
 
     private PvSystemSettings _settings = new(string.Empty, []);
     private Dictionary<string, string> _values = [];
-    private List<PvSystemSetting> _pending = [];
+    private List<ConfiguredSetting> _pending = [];
     private IReadOnlyList<string> _problems = [];
     private List<string> _warnings = [];
     private List<(string Role, DeviceProbeResult Result)> _probes = [];
@@ -384,22 +384,22 @@
 
     private static string Show(string? value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
 
-    private static string SourceName(PvSystemSetting setting) => setting.Source switch
+    private static string SourceName(ConfiguredSetting setting) => setting.Source switch
     {
-        PvSettingSource.WebUi => "web UI",
-        PvSettingSource.Environment => "environment",
-        PvSettingSource.CommandLine => "command line",
-        PvSettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
+        SettingSource.WebUi => "web UI",
+        SettingSource.Environment => "environment",
+        SettingSource.CommandLine => "command line",
+        SettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
         _ => "default",
     };
 
-    private static string SourceTitle(PvSystemSetting setting) => setting.Source switch
+    private static string SourceTitle(ConfiguredSetting setting) => setting.Source switch
     {
-        PvSettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
-        PvSettingSource.Environment =>
+        SettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
+        SettingSource.Environment =>
             $"{setting.SourceDetail}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.",
-        PvSettingSource.CommandLine => "A command-line argument, which wins over this page.",
-        PvSettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
+        SettingSource.CommandLine => "A command-line argument, which wins over this page.",
+        SettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
         _ => "Set nowhere; the built-in default applies.",
     };
 }

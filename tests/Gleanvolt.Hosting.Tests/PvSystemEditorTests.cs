@@ -151,11 +151,11 @@ public sealed class PvSystemEditorTests : IDisposable
 
         var settings = Editor(Configuration()).Read();
 
-        Assert.Equal(PvSettingSource.WebUi, settings[PvSystemSettingKeys.TiltDegrees].Source);
+        Assert.Equal(SettingSource.WebUi, settings[PvSystemSettingKeys.TiltDegrees].Source);
         Assert.Equal("35", settings[PvSystemSettingKeys.TiltDegrees].Underlying);
-        Assert.Equal(PvSettingSource.Environment, settings[PvSystemSettingKeys.ChargerHost].Source);
-        Assert.Equal(PvSettingSource.AppSettings, settings[PvSystemSettingKeys.InverterHost].Source);
-        Assert.Equal(PvSettingSource.Default, settings[PvSystemSettingKeys.Latitude].Source);
+        Assert.Equal(SettingSource.Environment, settings[PvSystemSettingKeys.ChargerHost].Source);
+        Assert.Equal(SettingSource.AppSettings, settings[PvSystemSettingKeys.InverterHost].Source);
+        Assert.Equal(SettingSource.Default, settings[PvSystemSettingKeys.Latitude].Source);
         Assert.Equal(OverridesPath, settings.OverridesPath);
         Assert.Null(settings.Unavailable);
     }
@@ -260,7 +260,7 @@ public sealed class PvSystemEditorTests : IDisposable
 
         var host = editor.Read()[PvSystemSettingKeys.InverterHost];
         Assert.Equal("192.168.2.10", host.Saved);
-        Assert.Equal(PvSettingSource.Environment, host.Source);
+        Assert.Equal(SettingSource.Environment, host.Source);
         Assert.True(File.Exists(OverridesPath));
     }
 

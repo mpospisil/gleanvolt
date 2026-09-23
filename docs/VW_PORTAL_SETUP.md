@@ -31,6 +31,13 @@ How to get the four settings the **Vehicle portal** page needs, and what to do w
 **None of them requires looking anything up.** The first two are the credentials you already own; the
 third is the badge on the car.
 
+**You can fill them in from a browser instead.** [`/car`](../README.md#car--the-car-and-editing-it)
+in the web UI asks the same four things: pick your brand from the list, fill in the VW ID, the
+password and the VIN, and save. The brand list is the client's own, the password goes to the secret
+store rather than to a file beside the configuration, and the choice disables whichever other feed it
+replaces in the same save. Steps 1, 2 and 4 below are browser work in the portal itself and are the
+same either way; steps 3, 5 and 7 are what the page does for you.
+
 ## Step 1 — Sign in, consent, and link the car
 
 Open <https://eu-data-act.drivesomethinggreater.com/de/en> and sign in with your brand ID.
@@ -125,9 +132,13 @@ VehicleNotFound: the account can see 2 vehicles (WVW…1234, TMB…5678) and non
 Those are masked for the log. Take the full VIN from the portal's own vehicle list, or from the
 windscreen.
 
-## Step 5 — Put them in `.env`
+## Step 5 — Put them in `.env`, or on `/car`
 
-In the repository root — `.env` is gitignored, and the worker loads the nearest one at or above the
+**On `/car`**, the four fields and the switch in step 7 are one save, and a restart applies them.
+Choose **Audi · SEAT · Cupra · Bentley · VW commercial** — or **Volkswagen** if you also want
+volkswagen.de's live feed, which reads a VW better. Then carry on at step 6.
+
+Otherwise, in the repository root — `.env` is gitignored, and the worker loads the nearest one at or above the
 working directory, so it is found from the project folder too:
 
 ```bash
@@ -170,8 +181,8 @@ Once the button works, this is what makes it a feed:
 VW_ENABLED=true
 ```
 
-(`Vehicle__DataAct__Enabled=true` is the sectioned form, and wins where both are set.) Restart the
-controller. From then on it reads the portal **every fifteen minutes** — the portal's own delivery
+(`Vehicle__DataAct__Enabled=true` is the sectioned form, and wins where both are set.) On `/car` this
+is not a separate step: picking the brand *is* switching the feed on. Restart the controller. From then on it reads the portal **every fifteen minutes** — the portal's own delivery
 frequency, and not a setting: asking faster achieves nothing at all — and writes what it finds into the
 dashboard's vehicle card.
 
@@ -299,6 +310,13 @@ owner, not an application.
 What protects it here is that `.env` is gitignored, and the client never logs it, never renders it and
 never writes it anywhere. That is the whole of it, and it is worth saying plainly rather than dressing
 up: an untracked file is what a LAN appliance has to offer.
+
+Entered on `/car` instead, it goes to the
+[secret store](../README.md#the-data-directory-holds-secrets-the-secrets-section) — an owner-only file
+in the data directory, or Windows DPAPI — and the page says which, in the store's own words. That is a
+better answer than an untracked file and still not proof against a local root, which is why the page
+says what it is rather than the word *encrypted*. It is write-only there: the box renders empty
+always, empty on submit means *unchanged*, and **Remove** is what clears it.
 
 [#137](https://github.com/mpospisil/gleanvolt/issues/137) accepted this trade knowingly rather than
 casually, and records why: the alternative that stores no password cannot re-authenticate
