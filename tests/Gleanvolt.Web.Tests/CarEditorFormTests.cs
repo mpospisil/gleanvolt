@@ -310,7 +310,7 @@ public class CarEditorFormTests : BunitContext
         form.Find(Field(EvSettingKeys.Model)).Input("ID.4 GTX");
         form.Find("#car-save").Click();
 
-        Assert.Contains("/vehicle-portal", form.Find("#car-message a").GetAttribute("href"));
+        Assert.Contains("#account", form.Find("#car-message a").GetAttribute("href"));
     }
 
     // -- Refusals and the read-only rule.

@@ -21,7 +21,7 @@ namespace Gleanvolt.Hosting.Configuration;
 /// <para><b>One password, because it is one account.</b> volkswagen.de and the EU Data Act portal are
 /// both entered with the owner's VW ID, so <see cref="SecretNames.VehicleAccountPassword"/> fills
 /// <c>Vehicle:Website:Password</c> and <c>Vehicle:DataAct:Password</c> alike. The MyŠkoda feed takes
-/// no password at all — it takes a key, pasted on <c>/vehicle-portal</c> and kept under its own name.</para>
+/// no password at all — it takes a key, pasted on <c>/car</c> and kept under its own name.</para>
 ///
 /// <para><b>Where it sits in the order.</b> Beside the overrides file: after the environment, so that a
 /// password typed on <c>/car</c> wins over a stale <c>.env</c>, and before the command line. Anything

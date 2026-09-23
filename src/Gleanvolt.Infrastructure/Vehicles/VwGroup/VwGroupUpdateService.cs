@@ -32,8 +32,8 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <para><b>Blocked is a full stop, not a slower loop.</b> A refused password, a consent screen, an
 /// OTP, or a portal with no data request at all cannot be fixed by asking again — so
 /// <see cref="NextDelay"/> becomes <see cref="Timeout.InfiniteTimeSpan"/>, the worker stops, and the
-/// dashboard says <i>sign-in required</i>. The /vehicle-portal button is what re-tests it once the
-/// owner has done their part, and a restart is what puts the feed back on its clock.</para>
+/// dashboard says <i>sign-in required</i>. <i>Ask the car</i> on <c>/car</c> is what re-tests it once
+/// the owner has done their part, and a restart is what puts the feed back on its clock.</para>
 /// </summary>
 public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDiagnostics, IDisposable
 {

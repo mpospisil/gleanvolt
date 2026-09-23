@@ -10,8 +10,8 @@ namespace Gleanvolt.Core.Interfaces;
 /// <para><b>Saved is not applied</b>, and here it cannot even be probed. The feed is constructed at
 /// startup out of these very keys, so there is nothing running to test them against — and a cold
 /// volkswagen.de sign-in wants an emailed one-time code anyway. The sequence is <i>save → restart →
-/// sign in on <c>/vehicle-portal</c> → Ask the car</i>, and the page says so rather than implying that
-/// a green save means a working feed.</para>
+/// sign in → Ask the car</i>, all four of which are on <c>/car</c> since issue #227, and the page says
+/// so rather than implying that a green save means a working feed.</para>
 ///
 /// <para><b>Only a configuration that would start is saved.</b> A save runs the merged result through
 /// the same rules startup uses — <c>EvRules</c> against the charger's amp band, and the feed rules that

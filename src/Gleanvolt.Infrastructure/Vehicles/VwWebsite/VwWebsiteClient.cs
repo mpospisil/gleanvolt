@@ -63,7 +63,7 @@ public sealed class VwWebsiteClient : IDisposable
     /// <summary>
     /// How many times a sign-in has ended signed in, since this client was built (#212). The feed
     /// notes it when it stops for the owner and resumes once it moves: the owner signing in again on
-    /// the vehicle page, without a restart.
+    /// the Car page, without a restart.
     /// </summary>
     public int SignIns => Volatile.Read(ref _signIns);
 

@@ -67,7 +67,7 @@ public class VehicleFeedRegistrationTests
     [Fact]
     public void Credentials_alone_do_not_start_a_feed()
     {
-        // A .env that carries a VW ID because somebody pressed the Vehicle portal button once must not
+        // A .env that carries a VW ID because somebody pressed Ask the car once must not
         // become an unattended feed at the next restart. Signing in on a clock is a separate decision.
         var services = Services(Credentials.Concat(TheCar).ToArray());
 
@@ -185,7 +185,7 @@ public class VehicleFeedRegistrationTests
             + "live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off.",
             configured.SetAside);
 
-        // The portal button stays: it is on the Vehicle portal page whatever runs on the clock.
+        // The portal button stays: it is on /car whatever runs on the clock.
         Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
     }
 

@@ -355,7 +355,7 @@ is full-disk encryption, which is the installer's to arrange and not this progra
 
 **Back the directory up accordingly.** It belongs on an encrypted volume; it does not belong in a
 casual backup, an issue attachment or a shared drive; and `docker cp` of it hands over the car. To
-hand it over deliberately, don't — use **Sign out** on the [Vehicle portal](#the-car-the-ev-section)
+hand it over deliberately, don't — use **Sign out** on the [Car](#the-car-the-ev-section)
 page first, which deletes the value rather than leaving a tombstone holding it.
 
 **Windows is two deployments, not one.** On the zip and winget installs DPAPI earns its place: the
@@ -1385,8 +1385,7 @@ So the form says how old the reading is and what the limit is, and asks for kilo
 > car again, or ask in kilowatt-hours instead.
 
 Said **under the box as well as on Start**, so a hint promising "that is about 32.5 kWh" cannot sit
-above a button that refuses. Pressing **Read the car now** on
-[`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand) is the fix, and then the
+above a button that refuses. Pressing **Ask the car** on [`/car`](#car--the-car-and-editing-it) is the fix, and then the
 same request again.
 
 Three things this deliberately is not:
@@ -1903,7 +1902,7 @@ portal**. Sign in there and the feed is back on its clock within a minute, **wit
 
 **Signing in is a page, not a setting.** A cold login *always* wants a one-time code emailed to the
 account owner. That makes it hostile to a background service and perfectly ordinary at the moment you
-are preparing a charge, so it is done from **Vehicle portal → Sign in**, where the code box is. The
+are preparing a charge, so it is done from **Car → Account → Sign in**, where the code box is. The
 settings above only say which account and which car; nothing signs in on its own, and opening the page
 does not either.
 
@@ -1914,7 +1913,7 @@ protects it on disk is [the secret store](#the-data-directory-holds-secrets-the-
 owner-only on Linux, DPAPI on a Windows install, and named on the startup log and `/health`.
 
 If the session lapses mid-charge, the charge is unaffected: the feed reports *sign-in required*, the
-dashboard's card says *volkswagen.de wants a one-time code — sign in again on the vehicle page* with a
+dashboard's card says *volkswagen.de wants a one-time code — sign in again on the Car page* with a
 link to it, and nothing that writes to hardware depends on the feed.
 
 | Setting | Default | |
@@ -1925,8 +1924,8 @@ link to it, and nothing that writes to hardware depends on the feed.
 #### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
 
 **Or set it on [`/car`](#car--the-car-and-editing-it)**: pick **Škoda** and fill in the VIN. The API
-key is not asked for there — it is pasted on **Vehicle portal**, because keys expire and renewing one
-is a recurring owner action.
+key is not asked for in the form — it is pasted under **Account** further down the same page,
+because keys expire and renewing one is a recurring owner action.
 
 ```jsonc
 "Ev":      { "Vehicles": [ { "Id": "enyaq", "Name": "The Enyaq", "Make": "Škoda", "Model": "Enyaq 85", "BatteryCapacityKWh": 77 } ] },
@@ -1948,7 +1947,7 @@ the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs) Škoda 
 | `BaseUrl`, `SourceId` | Škoda's API, `skoda` | A hedge, not an abstraction: the test environment, or another VW Group brand if one ever publishes the same API |
 
 **The key is pasted on a page, and is in no setting.** Create an API key for this car in the MySkoda
-app, then paste it on **Vehicle portal**. One request (`?include=info`) proves the key, the VIN and that
+app, then paste it under **Account** on [`/car`](#car--the-car-and-editing-it). One request (`?include=info`) proves the key, the VIN and that
 one covers the other; the page then says *Key valid until … · your car's name*, and the feed starts
 without a restart. An expired key, an unknown key, a key that does not cover the VIN and an unknown VIN
 each get their own sentence and nothing is stored. Keys expire: from a week before, the feed is
@@ -1970,7 +1969,7 @@ different *Degraded* sentences; a key problem is *sign-in required* until a new 
 for two different cars, and an installation has one. **With either configured, the Data Act portal is
 not started** ([#212](https://github.com/mpospisil/gleanvolt/issues/212)) — skipped with one startup
 log line rather than refused. With no key yet, or an expired one, the dashboard's card says *No MyŠkoda
-API key yet, or it has expired — paste one on the vehicle page*, with a link to it.
+API key yet, or it has expired — paste one on the Car page*, with a link to it.
 
 ### Vehicle telemetry (the `Vehicle` section)
 
@@ -2232,8 +2231,8 @@ there is no scoped token to use instead, and what protects it here is that `.env
 client never logs or renders it. That is genuinely all the protection a LAN appliance offers, and
 [#137](https://github.com/mpospisil/gleanvolt/issues/137) took the trade knowingly rather than casually.
 
-**Having credentials is not switching it on.** The [`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand)
-button works as soon as they are set; reading the portal *on a clock* waits for `Enabled`. Press the
+**Having credentials is not switching it on.** The **Ask the car** button on [`/car`](#car--the-car-and-editing-it)
+works as soon as they are set; reading the portal *on a clock* waits for `Enabled`. Press the
 button first — that is what proves the credentials and that this car's fields are understood — and
 switch the feed on afterwards.
 
@@ -2398,37 +2397,6 @@ The header carries the installation's name beside the product's, and so does the
 is for; the product name is the one thing both of them already agree on. The sign-in page is the
 exception, and keeps the product name: it is reached before anyone has signed in.
 
-#### `/vehicle-portal` — the car from the manufacturer, on demand
-
-A button that asks VW's own [EU Data Act portal](docs/VW_PORTAL_SETUP.md) for the car, and then **one
-card**: battery, range, reading age, charge state and plug state — the dashboard vehicle card's own
-figures, in its own labels and the same rounding, so the two pages can be read side by side without
-translating — plus the two the portal carries and the card has no source for, the car's own **target
-SOC** and its own **time left**.
-
-Under it, what the feed is holding at that moment and how far apart the two are. They are different
-sessions asking at different moments, so a couple of points is the expected outcome rather than a
-fault. An install with no feed switched on is told it has
-nothing to compare against, which is a supported answer and not an error.
-
-**Diagnostics**, collapsed, holds everything the page used to lead with: the delivery it arrived in
-(snapshots, their span, the odometer), every field the build recognised with the raw value and the
-moment the *car* reported it, and every field in the bundle that nothing here reads yet. That is the
-only thing that answers *why is that figure a dash* when a car starts reporting something new, so it
-is kept rather than dropped — and it **opens by itself when the read failed**, because a bundle in
-which nothing matched is a failure whose field list is the whole diagnosis.
-
-**A diagnostic, and the way you prove the credentials.** Nothing polls *this*: each press signs in
-afresh, with its own session, and the reading it shows is not written into the dashboard's vehicle card
-or into any charging decision. That is what makes it the right thing to press before switching the feed
-on — and the right thing to press again after clearing a consent screen, since it costs nothing and
-answers the same question.
-
-The feed with its own clock is a separate switch,
-[`Vehicle:DataAct:Enabled`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section), and
-it holds a session rather than replaying the password. Setup — the credentials and the browser steps
-the portal needs first — is [docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md).
-
 #### `/pv-system` — the installation, and editing it
 
 What this controller is and what it is talking to, from a browser rather than from the startup log:
@@ -2522,7 +2490,7 @@ beside a live feed by accident.
 | Choice | Feed it configures | What you then fill in | Freshness |
 |---|---|---|---|
 | **Volkswagen** | [`Vehicle:Website`](#vehiclewebsite--volkswagende-the-live-source) | VW ID e-mail, password, VIN | ~20 s, plug state, live while charging |
-| **Škoda** | [`Vehicle:Skoda`](#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) | VIN, then an API key on `/vehicle-portal` | 5–15 min, plug state |
+| **Škoda** | [`Vehicle:Skoda`](#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) | VIN, then an API key under **Account** | 5–15 min, plug state |
 | **Audi · SEAT · Cupra · Bentley · VW commercial** | [`Vehicle:DataAct`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) | Brand, VW ID, password, VIN | hours behind; no plug state |
 | **A feed I publish myself** | [`Vehicle`](#vehicle-telemetry-the-vehicle-section) | Topic | whatever publishes it |
 | **Another manufacturer — charge only** | none | nothing | — |
@@ -2558,8 +2526,9 @@ and the Data Act portal are entered with the same VW ID, so there is one stored 
 **A save cannot prove an account**, and the page says so rather than letting a green save look like a
 working feed. The feed is built at startup out of these very keys, so there is nothing running to test
 them against — and a cold volkswagen.de sign-in wants an emailed one-time code anyway. The sequence is
-*save → restart → sign in on [`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand)
-→ Ask the car*, and the **Saved, not applied** banner carries the **Restart** that begins it.
+*save → restart → sign in → Ask the car*, all four of them on this one page since
+[#227](https://github.com/mpospisil/gleanvolt/issues/227), and the **Saved, not applied** banner carries
+the **Restart** that begins it.
 
 **Below the form is what is running**: the resolved car with the three-column limits table, and the
 feed this process actually started — which is not always the feed the configuration asks for, since a
@@ -2567,13 +2536,75 @@ live feed sets the Data Act portal aside. `Ev:Vehicles:0:Make` still selects not
 writes the make *and* the feed's `Enabled` key as two separate edits, and the composition root goes on
 reading only the second.
 
+**One page, in the order the work is done** ([issue
+#227](https://github.com/mpospisil/gleanvolt/issues/227)). `/vehicle-portal` used to hold the second
+half of this — the sign-in and the on-demand read — on the grounds that this page was *which car, and
+which account* and that one was *does that account work*. That reads well as a sentence and badly as a
+journey: the sequence is *save → restart → sign in → ask the car*, and it crossed the navigation twice
+for one sitting. The sections are now **Edit · Account · Ask the car · Running · Feed · Diagnostics**,
+and `/vehicle-portal` redirects here so bookmarks and the docs' links do not 404.
+
+**Account answers for every manufacturer.** It used to be rendered only where a sign-in seam was
+registered, which is two of the five choices; for the other three the block vanished with no heading
+and no sentence, and silence is indistinguishable from a bug.
+
+| Chosen feed | What Account shows |
+|---|---|
+| **Volkswagen** | **Sign in** → the one-time code box → **Signed in** / **Sign out** |
+| **Škoda** | the API key box: a password input, empty on render, emptied after every submit |
+| **Data Act** | *this portal signs in on each read, so there is no session to establish here* — the account is the VW ID and password in the form above |
+| **A feed I publish myself** | *nothing here signs in: you publish the readings yourself* |
+| **Charge only** | *no account, because nothing reads this car* — charging is unaffected |
+
+A feed switched on with too few of its fields filled in for the host to have built a sign-in gets a
+sentence too, rather than the heading over a gap it used to get.
+
+**Ask the car asks whatever feed this installation has.** The button used to be the Data Act portal's
+alone, so four of five installations met a red *not configured* and a hint telling them to set
+`VW_BRAND`, `VW_USERNAME` and `VW_PASSWORD` — advice that was wrong for them, since following it
+arranges a Data Act portal beside their live feed that
+[#212](https://github.com/mpospisil/gleanvolt/issues/212) then sets aside. What generalises it is that
+`IVehicleUpdateService.FetchAsync` is the same call the polling worker makes, asked because a person
+wants to know rather than because a clock said so.
+
+**The two sources differ in one way the page says out loud rather than papers over.** A Data Act read
+signs in afresh per press and is fed to nothing — not the dashboard's card, not any charging decision —
+which is what makes it the right thing to press before switching a feed on. A live feed's press is the
+feed's own fetch, so what comes back **does** reach the dashboard: an owner pressing a button is asking
+the whole UI to catch up. Neither is ever triggered by a render: opening this page does not replay a
+password or email anybody a code. Charge-only and own-topic get no button and a sentence — for an own
+topic, what to publish and what last arrived on it.
+
+Then **one card** for whatever answered: battery, range, reading age, charge state and plug state — the
+dashboard vehicle card's own figures, in its own labels and the same rounding, so the two pages can be
+read side by side without translating — plus the two only the Data Act portal carries, the car's own
+**target SOC** and its own **time left**.
+
+Under a Data Act read, what the feed is holding at that moment and how far apart the two are. They are
+different sessions asking at different moments, so a couple of points is the expected outcome rather
+than a fault. An install with no feed switched on is told it has nothing to compare against, which is a
+supported answer and not an error.
+
+**Diagnostics**, collapsed, holds everything that page used to lead with: the delivery it arrived in
+(snapshots, their span, the odometer), every field the build recognised with the raw value and the
+moment the *car* reported it, and every field in the bundle that nothing here reads yet. That is the
+only thing that answers *why is that figure a dash* when a car starts reporting something new, so it is
+kept rather than dropped — and it **opens by itself when the read failed**, because a bundle in which
+nothing matched is a failure whose field list is the whole diagnosis. It is Data-Act-shaped and appears
+only for a Data Act read; a live feed's equivalent is the **Feed** section's health, on the same page.
+
+Setup for the Data Act portal — the credentials and the browser steps it needs first — is
+[docs/VW_PORTAL_SETUP.md](docs/VW_PORTAL_SETUP.md). The feed with its own clock is a separate switch,
+[`Vehicle:DataAct:Enabled`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section), and
+it holds a session rather than replaying the password.
+
 #### The dashboard reports; the plan page decides
 
 Those phases left the UI in three places for one question. The dashboard was fourteen telemetry tiles
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · Forecast · PV system · Car · Vehicle portal · Health.** The
+**The nav is now Dashboard · Charging plan · Sessions · Energy · Forecast · PV system · Car · Health.** The
 **day plan** and `/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**,
 one tab per mode. (`/forecast` is a route again, and is a different page: the sun, not the car — see
 [Looking at the forecast](#looking-at-the-forecast) below.)
@@ -2588,7 +2619,7 @@ sections, in the order the questions are actually asked:
   whether one is connected, then whatever feed reports on it. The feed is an attachment, and the card
   names which of four situations it is in — no feed configured (nothing is wrong), a reading and its
   age, a reading marked **stale** past `MaxAge`, or **sign-in required** with the sentence saying what
-  fixes it and a link to **Vehicle portal**. The last two must never look alike: *stale* clears itself
+  fixes it and a link to **Car**, where signing in is. The last two must never look alike: *stale* clears itself
   and *sign-in required* never will. **One car, one feed** ([#212](https://github.com/mpospisil/gleanvolt/issues/212)):
   the health is that of the installation's one feed, and *via …* names it in your words — volkswagen.de,
   MyŠkoda, Data Act portal. See [the car on a clock](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section).

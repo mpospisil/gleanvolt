@@ -117,7 +117,7 @@ volume, not into a shared drive, an issue attachment or a support bundle. A copy
 `/var/lib/gleanvolt` hands over the car. Against a stolen SD card the effective answer is full-disk
 encryption, which is yours to arrange and not something this package can do for you.
 
-To stop handing it over, use **Sign out** on the web UI's Vehicle portal page: it deletes the stored
+To stop handing it over, use **Sign out** on the web UI's Car page: it deletes the stored
 value rather than leaving a tombstone holding it.
 
 ## Running it

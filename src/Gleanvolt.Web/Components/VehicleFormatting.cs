@@ -5,8 +5,8 @@ namespace Gleanvolt.Web.Components;
 /// <summary>
 /// The car's own figures, formatted once (issue #178).
 ///
-/// <para>Shared by the dashboard's vehicle card and <c>/vehicle-portal</c>, and not as tidiness: the
-/// portal page exists to be held up against the card, and two copies of "how old is this reading"
+/// <para>Shared by the dashboard's vehicle card and <c>/car</c>, and not as tidiness: the read on
+/// <c>/car</c> exists to be held up against the card, and two copies of "how old is this reading"
 /// that round differently would have the two pages disagreeing over a reading they agree on.</para>
 ///
 /// <para>Coarse on purpose throughout. This data is routinely hours old, so precision past the first

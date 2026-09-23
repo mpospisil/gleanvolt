@@ -1,0 +1,196 @@
+@inject IVehicleAccountSignIn Account
+
+@*
+    The manufacturer account, on /car (issues #170, #193, #227).
+
+    It sat on /vehicle-portal until #227 folded that page into this one. The sequence an owner works
+    through is save → restart → sign in → ask the car, and two of those steps used to be on the other
+    side of the navigation: neither page was useful without the other.
+
+    It lives on a page rather than behind a settings screen because of when it is needed:
+    volkswagen.de's cold login always emails a one-time code, so it can only be answered while a
+    person is here to read it -- and the moment a person wants the car's state is exactly that moment.
+    The session it establishes is what the live feed then polls on. Nothing here is required for
+    charging: a controller with no account signed in charges exactly as before.
+
+    A Škoda installation (#193) puts a different sign-in in the same seat: no code, but an API key
+    created in the MySkoda app and pasted once. The state says which box to draw, and the paragraph
+    above it is the sign-in's own, so neither car reads about the other's account. The key box is a
+    password input and is emptied after every submission, accepted or not: a key is bearer-equivalent
+    and must never be rendered back.
+
+    Three of the five feeds have no session to establish, and until #227 the whole block simply
+    vanished for them -- no heading, no sentence, nothing to distinguish "this feed has no account"
+    from a page that had failed to render. It now answers for every choice, which is why it takes the
+    feed as a parameter: the sign-in seam cannot say what is true of an installation that did not
+    register one.
+*@
+
+<section id="account">
+    <h2>Account</h2>
+
+    @if (Account.IsConfigured)
+    {
+        <p class="muted" id="account-explanation">
+            <strong>@Account.AccountName</strong> — @Account.Explanation
+        </p>
+
+        @if (_signIn.IsSignedIn)
+        {
+            <p class="muted"><strong>Signed in</strong> — @_signIn.Message</p>
+            <div class="actions">
+                <button type="button" class="secondary" id="account-signout" @onclick="SignOutAsync">Sign out</button>
+            </div>
+        }
+        else
+        {
+            @if (_signIn.Status != VehicleSignInStatus.Unknown)
+            {
+                <p class="@(_signIn.Status == VehicleSignInStatus.Failed ? "error" : "muted")">@_signIn.Message</p>
+            }
+
+            @if (_signIn.WantsCode)
+            {
+                <div class="control">
+                    <label for="account-code">One-time code</label>
+                    <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                           @bind="_answer" @bind:event="oninput" />
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="secondary" id="account-code-submit"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
+                        @(_busy ? "Checking…" : "Submit code")
+                    </button>
+                </div>
+            }
+            else if (_signIn.WantsKey)
+            {
+                <div class="control">
+                    <label for="account-key">API key</label>
+                    <input id="account-key" type="password" autocomplete="off" spellcheck="false"
+                           @bind="_answer" @bind:event="oninput" />
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="secondary" id="account-key-submit"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
+                        @(_busy ? "Checking…" : "Save key")
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="actions">
+                    <button type="button" class="secondary" id="account-signin"
+                            disabled="@_busy" @onclick="SignInAsync">
+                        @(_busy ? "Signing in…" : "Sign in")
+                    </button>
+                </div>
+            }
+        }
+    }
+    else
+    {
+        <p class="muted" id="account-none">@NoAccount</p>
+    }
+</section>
+
+@code {
+    /// <summary>
+    /// The feed this process started, which is what decides whether there is an account at all. The
+    /// feed the <i>form</i> is set to would be the wrong one: a save that has not been restarted into
+    /// has changed nothing about what can be signed in to right now.
+    /// </summary>
+    [Parameter]
+    public VehicleFeed Feed { get; set; }
+
+    private VehicleSignInState _signIn = VehicleSignInState.Unknown;
+    private string _answer = string.Empty;
+    private bool _busy;
+
+    protected override void OnInitialized() => _signIn = Account.State;
+
+    /// <summary>
+    /// What to say when there is no session to establish — one sentence per feed, and never nothing.
+    ///
+    /// <para>Written here rather than on the sign-in seam because there is no sign-in to ask: these
+    /// are exactly the installations where none is registered. The last case is the one where a feed
+    /// that <i>does</i> want an account has not been given enough of one to try, and that sentence is
+    /// <see cref="NoVehicleAccountSignIn"/>'s own.</para>
+    /// </summary>
+    private string NoAccount => Feed switch
+    {
+        VehicleFeed.DataAct =>
+            "This portal signs in on each read, so there is no session to establish here. The account "
+            + "is the VW ID and password in the form above, and asking the car below is what proves "
+            + "them.",
+        VehicleFeed.OwnTopic =>
+            "Nothing here signs in: you publish the readings yourself, so there is no manufacturer "
+            + "account in between. The broker's own credentials are the house broker's and stay in the "
+            + "Vehicle section.",
+        VehicleFeed.ChargeOnly =>
+            "No account, because nothing reads this car. Charging is unaffected — a target is asked for "
+            + "in kWh rather than as a state of charge.",
+        _ => string.IsNullOrWhiteSpace(Account.Explanation)
+            ? "There is no account to sign in to yet."
+            : Account.Explanation,
+    };
+
+    /// <summary>
+    /// Starts a sign-in. Never called on render: opening a page must not replay a password, and a
+    /// refresh must not email the owner a code they did not ask for.
+    /// </summary>
+    private async Task SignInAsync()
+    {
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            _signIn = await Account.SignInAsync();
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        var wasKey = _signIn.WantsKey;
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            _signIn = await Account.SubmitAsync(_answer);
+
+            if (_signIn.IsSignedIn)
+            {
+                _answer = string.Empty;
+            }
+        }
+        finally
+        {
+            // A code is kept after a rejection so a typo can be fixed; a key never is, whatever
+            // happened, because what stays in the box stays in the page.
+            if (wasKey)
+            {
+                _answer = string.Empty;
+            }
+
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task SignOutAsync()
+    {
+        Account.SignOut();
+        _signIn = Account.State;
+        _answer = string.Empty;
+        return Task.CompletedTask;
+    }
+}

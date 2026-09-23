@@ -809,7 +809,7 @@ encryption. It cannot be: the service has to come back from a reboot with nobody
 So a `docker cp gleanvolt:/app/data .`, an `rsync` of `/opt/gleanvolt` to a laptop, or a tarball
 attached to an issue all hand over the car. Copy `data/` the way you would copy `.env`: onto an
 encrypted volume, and nowhere public. Against a stolen SD card what actually helps is full-disk
-encryption on the Pi, which is outside this stack. **Sign out** on the web UI's Vehicle portal page
+encryption on the Pi, which is outside this stack. **Sign out** on the web UI's Car page
 deletes the stored value rather than leaving a tombstone holding it.
 
 ### Updating the controller also updates Home Assistant and the broker

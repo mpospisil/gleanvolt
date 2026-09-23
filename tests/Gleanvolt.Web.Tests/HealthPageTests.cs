@@ -78,7 +78,7 @@ public class HealthPageTests : PageTest
         Assert.Contains("Car feed", page.Markup);
         Assert.Contains("NeedsOwner", page.Markup);
         Assert.Contains("consent screen", page.Markup);
-        Assert.Contains("/vehicle-portal", page.Markup);
+        Assert.Contains("/car", page.Markup);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class HealthPageTests : PageTest
 
         Assert.Contains("Car feed", page.Markup);
         Assert.Contains("reported at 09:45", page.Markup);
-        Assert.DoesNotContain("/vehicle-portal", page.Markup);
+        Assert.DoesNotContain("/car", page.Markup);
     }
 
     [Fact]

@@ -1,0 +1,19 @@
+@page "/vehicle-portal"
+@inject NavigationManager Navigation
+
+@*
+    /vehicle-portal, which is now /car (issue #227).
+
+    The route survives because the addresses that point at it are not all ours to edit:
+    docs/VW_PORTAL_SETUP.md has been sending owners here since #137, the README's anchors name it, and
+    a bookmark is somebody's muscle memory. A redirect is cheaper than chasing every one of them, and
+    it cannot rot the way a page kept alive "for compatibility" does.
+
+    No [Authorize] and no render mode: there is nothing here to protect and nothing to be interactive
+    about. The redirect happens during the first render, on the server, and /car's own [Authorize] is
+    what decides whether the owner gets to see anything.
+*@
+
+@code {
+    protected override void OnInitialized() => Navigation.NavigateTo("/car", replace: true);
+}

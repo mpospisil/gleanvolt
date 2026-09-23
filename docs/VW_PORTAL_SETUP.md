@@ -1,8 +1,8 @@
 # Reading your car from the VW Group EU Data Act portal
 
-How to get the four settings the **Vehicle portal** page needs, and what to do when it does not work.
+How to get the four settings the **Car** page needs, and what to do when it does not work.
 
-> **Two things, in order.** Steps 1–6 below get the **Vehicle portal** page showing your car when you
+> **Two things, in order.** Steps 1–6 below get the **Car** page showing your car when you
 > press its button — which is how you prove the credentials and that this car's fields are understood.
 > [Step 7](#step-7--switch-the-feed-on) then switches on the *feed*: the same portal read on the
 > controller's own clock, feeding the dashboard's vehicle card and a Home Assistant entity. The feed is
@@ -158,8 +158,10 @@ credentials written twice; where both are set, the sectioned form wins.
 
 ## Step 6 — Press the button
 
-Restart the controller, open the web UI and go to **Vehicle portal** in the navigation. Press
-**Read the car now**.
+Restart the controller, open the web UI and go to **Car** in the navigation. Under **Ask the car**,
+press **Ask the car**. (That section was its own **Vehicle portal** page until
+[#227](https://github.com/mpospisil/gleanvolt/issues/227); the old address still works and redirects
+here.)
 
 The page shows what the car said — battery, range, charge state, plug state, and the *car's* capture
 time rather than this moment's — then the delivery it came in, and then the fields nothing here
@@ -264,7 +266,7 @@ code`, `security code`, `one-time password`, `Einmalcode`) and by a field asking
 first does not cover, and it is also what stops the client mistaking a code page for a login page when
 the page happens to carry your address in a hidden field.
 
-Enter the code once in a browser, press **Read the car now** to confirm the sign-in works, and restart
+Enter the code once in a browser, press **Ask the car** to confirm the sign-in works, and restart
 the controller. On the reference account this has not come up — six cold sign-ins with only an email
 and a password — and holding one session rather than signing in ninety-six times a day is partly there
 to keep new-device challenges rare.

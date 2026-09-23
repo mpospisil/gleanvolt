@@ -71,7 +71,7 @@ public class VehicleFeedAlertTests : PageTest
 
         Assert.Contains("Sign-in required", page.Markup);
         Assert.Contains("a one-time code", page.Markup);
-        Assert.Equal("/vehicle-portal", page.Find("a").GetAttribute("href"));
+        Assert.Equal("/car", page.Find("a").GetAttribute("href"));
     }
 
     [Fact]

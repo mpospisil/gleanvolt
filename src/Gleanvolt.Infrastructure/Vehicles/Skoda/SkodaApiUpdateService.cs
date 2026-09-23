@@ -296,7 +296,7 @@ public sealed class SkodaApiUpdateService(
     private string? ExpiringSoon(SkodaApiKey key) =>
         key.ExpiresAt is { } expires && expires - _time.GetUtcNow() <= ExpiryWarning
             ? $"The Škoda API key expires on {expires.LocalDateTime:yyyy-MM-dd} — create a new one in the "
-              + "MySkoda app and paste it on the Vehicle portal page."
+              + "MySkoda app and paste it on the Car page."
             : null;
 
     /// <summary>Doubling from the idle interval, capped. Deterministic, so a test can state it.</summary>

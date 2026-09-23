@@ -142,7 +142,7 @@ public sealed class VwWebsiteUpdateServiceTests : IDisposable
         await _service.FetchAsync(CancellationToken.None);
         Assert.True(_service.Health.IsBlocked);
 
-        // What the Vehicle portal page's Sign in does.
+        // What /car's Sign in does.
         Assert.Equal(VwWebsiteLoginStep.SignedIn, await _client.SignInAsync());
 
         Assert.False(_service.Health.IsBlocked);

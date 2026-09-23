@@ -8,7 +8,7 @@ using static Gleanvolt.Infrastructure.Tests.SkodaFixtures;
 namespace Gleanvolt.Infrastructure.Tests;
 
 /// <summary>
-/// Pasting a MyŠkoda API key on the Vehicle portal page (issue #193): one request proves it, only a
+/// Pasting a MyŠkoda API key on the car page (issue #193): one request proves it, only a
 /// key that passes is kept, and each refusal is its own sentence.
 /// </summary>
 public sealed class SkodaApiSignInTests : IDisposable

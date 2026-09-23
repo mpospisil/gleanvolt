@@ -4,21 +4,34 @@
 @inject EvInfo Vehicle
 @inject ChargingLimits Limits
 @inject ConfiguredVehicleFeed Feed
+@inject IEvEditor Editor
+@inject IVehiclePortalReader Portal
+@inject IVehicleStateRefresh Refresh
+@inject IVehicleTelemetry Telemetry
+@inject TimeProvider Time
 
 @*
-    The car, configured from a browser (issue #214). The other side of the cable from /pv-system, on
-    the same mechanism and with the same split: the form at the top edits what the NEXT start reads,
-    and everything under it is what this process resolved at startup and is running with.
+    The car: the whole of it, on one page (issues #214, #227).
 
-    Configuring the car used to be the last thing here that could only be done over ssh, and it is the
-    thing a new owner does first — spread across four configuration sections that nothing said were
-    about the same car, two of which together are a startup exception. A <select> makes that
-    unrepresentable.
+    #214 gave the car a form and put "does that account work" on a second page, /vehicle-portal, on the
+    grounds that this page was "which car, and which account" and that one was "does it work". That
+    reads well as a sentence and badly as a journey: the sequence #214 itself prescribes is save →
+    restart → sign in → ask the car, and it crossed the navigation twice for one sitting. Neither page
+    was useful without the other, and nothing on either was long enough to need a page of its own.
 
-    What stays on /vehicle-portal, and why it did not move: this page is "which car, and which
-    account"; that one is "does that account work" — a sign-in that needs an emailed one-time code, a
-    MyŠkoda key pasted into a live store, and the field diagnostics that answer "why is battery blank
-    on this model". A save here cannot prove any of that, so it links there instead.
+    So the sections are in the order the work is done: Edit → Account → Ask the car → Running → Feed →
+    Diagnostics. The form at the top edits what the NEXT start reads; everything under it is what this
+    process resolved at startup and is running with.
+
+    /vehicle-portal survives as a redirect (VehiclePortalRedirect.razor) rather than a 404, because
+    docs/VW_PORTAL_SETUP.md has been telling owners to go there since #137.
+
+    The other half of #227: what an owner saw on the old page depended on the manufacturer, and no
+    choice got both halves of it. The sign-in was registered only for volkswagen.de and MyŠkoda, so
+    for the other three the block vanished silently; the read button was the Data Act portal's alone,
+    so the other four landed on a red "not configured" and a hint telling them to set VW_* keys — which
+    for a live feed would arrange a Data Act portal that #212 then sets aside. Both halves now key on
+    the feed this installation actually runs, and both say something for every one of the five.
 *@
 
 <SiteTitle Page="Car" />
@@ -27,10 +40,214 @@
 
 <p class="muted">
     Everything after the form is what the controller is running with, resolved from the configuration
-    at startup. The form changes what the next start reads; a restart applies it.
+    at startup. The form changes what the next start reads; a restart applies it, and then the account
+    below is where it gets proved.
 </p>
 
 <CarEditorForm />
+
+<VehicleAccount Feed="_runningFeed" />
+
+<h2>Ask the car</h2>
+
+@*
+    One button, against whatever feed this installation has (#227).
+
+    It used to be the Data Act portal's reader and nothing else, which is why four of the five choices
+    met a red error. What generalises it is that IVehicleUpdateService.FetchAsync -- the call the
+    polling worker makes on a clock -- is the same call made because somebody asked, which is exactly
+    what IVehicleStateRefresh already is (#168).
+
+    The two differ in one way that has to be said out loud rather than papered over: a Data Act read is
+    fed to nothing, and a live feed's fetch writes to the holder like any other fetch. That is the
+    better behaviour -- an owner pressing a button wants the dashboard to catch up -- but it makes one
+    sentence about "what this shows is fed to nothing" false for two of the five, so each source says
+    what its own press does.
+
+    Neither one happens on a render. Opening this page must never replay a password or email anybody a
+    code.
+*@
+@if (_runningFeed == VehicleFeed.DataAct)
+{
+    <p class="muted">
+        Asks @Portal.PortalName for @CarName, once, when you press the button. <em>This press</em> runs
+        on no schedule and what it shows is fed to nothing — not the dashboard's card, not any charging
+        decision — so it is how you check that the credentials work and that the portal's fields are
+        understood, whether or not the feed on its own clock is switched on.
+    </p>
+
+    @if (!Portal.IsConfigured)
+    {
+        @*
+            Red here and nowhere else: this is the one installation that asked for this portal, so
+            something missing from it really is missing. The old hint named VW_BRAND, VW_USERNAME and
+            VW_PASSWORD in .env; since #214 those are fields in the form above, which is where an owner
+            who has just read this can actually go.
+        *@
+        <p class="error" id="portal-unconfigured">
+            Not configured: needs @Portal.DescribeWhatIsMissing().
+        </p>
+
+        <p class="hint">
+            Those are the <em>Brand</em>, <em>VW ID</em>, <em>Password</em> and <em>VIN</em> fields in
+            the form above; fill them in and restart. The portal also needs a <em>continuous data
+            request</em> enabling by hand before it delivers anything — see
+            <code>docs/VW_PORTAL_SETUP.md</code>.
+        </p>
+    }
+    else
+    {
+        <div class="actions">
+            <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="ReadPortalAsync">
+                @(_busy ? "Asking the car…" : "Ask the car")
+            </button>
+        </div>
+
+        <p class="hint">
+            Each press signs in afresh. That is fine by hand and is why this is not a poll: repeatedly
+            replaying a password at a real identity provider is how accounts get locked.
+        </p>
+    }
+}
+else if (_runningFeed is VehicleFeed.Volkswagen or VehicleFeed.Skoda)
+{
+    @if (Feed.Service is { } service)
+    {
+        <p class="muted">
+            Asks @service.DisplayName for @CarName, once, now — the same call the feed makes on its own
+            clock, made because you asked rather than because the clock said so. Unlike a Data Act
+            read, what comes back <em>does</em> reach the dashboard's card: an owner who presses a
+            button is asking the whole UI to catch up, not just this page. It does not disturb the
+            feed's own cadence.
+        </p>
+
+        <div class="actions">
+            <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="AskFeedAsync">
+                @(_busy ? "Asking the car…" : "Ask the car")
+            </button>
+        </div>
+
+        <p class="hint">
+            If the account above is not signed in, this is what says so: the feed answers with what is
+            stopping it rather than with a reading.
+        </p>
+    }
+    else
+    {
+        @*
+            The feed is switched on and did not start — its fields are not all filled in, so nothing
+            was registered to ask. Not an error about a portal nobody chose, which is what this page
+            used to show: a sentence about the feed that was chosen.
+        *@
+        <p class="muted" id="car-ask-unavailable">
+            Nothing to ask yet: this feed is switched on but did not start, so the controller has no
+            client for it. Fill in the fields it needs in the form above and restart.
+        </p>
+    }
+}
+else if (_runningFeed == VehicleFeed.OwnTopic)
+{
+    <p class="muted" id="car-ask-own-topic">
+        Nothing to press, because nothing here fetches: you publish this car's readings yourself on
+        @(string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic)
+            ? (MarkupString)"the topic in the form above"
+            : (MarkupString)$"<code>{System.Net.WebUtility.HtmlEncode(Vehicle.TelemetryTopic)}</code>")
+        — one JSON object per reading, with the <em>car's</em> own capture time in
+        <code>captured_at</code> and <code>soc_percent</code>, <code>range_km</code>,
+        <code>charge_state</code> and <code>plug_state</code> as far as your source carries them.
+        @if (Telemetry.GetCurrentState() is { } published)
+        {
+            <text>
+                The last one arrived carrying @VehicleFormatting.Percent(published.SocPercent), captured
+                @Age(published) ago.
+            </text>
+        }
+        else
+        {
+            <text>Nothing has arrived on it yet.</text>
+        }
+    </p>
+}
+else
+{
+    <p class="muted" id="car-ask-charge-only">
+        Nothing to ask, because nothing reads this car — and nothing here needs to. Whether a cable is
+        in the socket comes from the charger rather than from the car, so the dashboard answers that
+        either way; what no feed costs is the pack's own state of charge, and a target is asked for in
+        kWh instead.
+    </p>
+}
+
+@*
+    A Data Act read's failure, and its card. Kept apart from the live feed's below because the two
+    carry different things: the portal's reading knows the bundle it came out of and whether pressing
+    again could help, and a feed's fetch knows neither.
+*@
+@if (_reading is { Succeeded: false } failed)
+{
+    <p class="error">
+        <strong>@failed.FailureKind</strong> — @failed.Message
+    </p>
+
+    <p class="hint">
+        @(failed.IsWorthRetrying
+            ? "Worth pressing again — this one is expected and usually clears itself."
+            : "Pressing again will not help. This one needs something changed, or a browser.")
+    </p>
+}
+else if (_reading is { Succeeded: true, State: { } state })
+{
+    @Card(state, _reading.TargetSocPercent)
+
+    @*
+        This press against what the feed is holding (#178).
+
+        They are different sessions, asking at different moments, and the point of saying so out loud
+        is that a small disagreement here is the expected outcome rather than evidence of a fault.
+        A large or persistent one is a real finding, and the feeds page is where it gets counted
+        rather than eyeballed.
+    *@
+    @if (Telemetry.GetCurrentState() is { } held)
+    {
+        <p class="muted" id="against-the-feed">
+            The dashboard's card is showing @VehicleFormatting.Percent(held.SocPercent) from
+            @(string.IsNullOrWhiteSpace(held.SourceId) ? "the feed" : held.SourceId), captured
+            @Age(held) ago@(Difference(state, held)). That is a different session asking at a different
+            moment, so a difference is not by itself a fault.
+        </p>
+    }
+    else
+    {
+        <p class="muted" id="against-the-feed">
+            Nothing has reached the dashboard's card yet, so there is nothing to hold this against.
+            That is what an install with no feed switched on looks like, and it is not a fault: this
+            press is the whole reading.
+        </p>
+    }
+}
+
+@*
+    A live feed's press. A failure here keeps whatever the holder had on screen rather than blanking
+    it -- an answer now known to be old is worth more than no answer, provided its age is beside it.
+*@
+@if (_asked is { } answer)
+{
+    @if (!answer.Succeeded)
+    {
+        <p class="error" id="car-ask-failed">The car did not answer — @answer.Message</p>
+    }
+
+    @if (answer.State is { } reading)
+    {
+        @Card(reading, null)
+
+        <p class="muted table-note" id="car-ask-source">
+            @(answer.IsFresh
+                ? $"Fresh, from {answer.Source ?? "the feed"}, and the dashboard's card is now showing it too."
+                : "That is the reading the feed was already holding, not a new one.")
+        </p>
+    }
+}
 
 <h2>Running</h2>
 
@@ -105,17 +322,17 @@ else
     differ in exactly one case worth showing: the Data Act portal beside a live feed, which #212 sets
     aside with a log line nobody reads twice.
 *@
-@if (Feed.Service is { } service)
+@if (Feed.Service is { } running)
 {
     <dl class="facts">
         <dt>Reading the car</dt>
-        <dd>@service.DisplayName <span class="muted">(@service.Manufacturer)</span></dd>
+        <dd>@running.DisplayName <span class="muted">(@running.Manufacturer)</span></dd>
 
         <dt>For</dt>
-        <dd>@Text(service.VehicleId)</dd>
+        <dd>@Text(running.VehicleId)</dd>
 
         <dt>State</dt>
-        <dd>@service.Health.State — @service.Health.Message</dd>
+        <dd>@running.Health.State — @running.Health.Message</dd>
     </dl>
 }
 else
@@ -139,17 +356,144 @@ else
     </p>
 }
 
-<p class="table-note muted">
-    None of this says whether the feed is <em>signed in</em>.
-    <a href="/vehicle-portal">Vehicle portal</a> is where an account is proved: sign in there, press
-    <em>Ask the car</em>, and what comes back is what this configuration is worth.
-</p>
+<PortalDiagnostics Reading="_reading" />
 
 @code {
     private const string Missing = "—";
 
     private static readonly System.Globalization.CultureInfo Invariant =
         System.Globalization.CultureInfo.InvariantCulture;
+
+    /// <summary>
+    /// The feed this process started, which is what the account and the button key on. Read once:
+    /// nothing can change it while the page is open, because changing it is a restart.
+    ///
+    /// <para>The running feed rather than the saved one, deliberately. A save that has not been
+    /// restarted into has changed nothing about what can be signed in to or asked; the form's own
+    /// <i>Saved, not applied</i> banner is where that difference belongs.</para>
+    /// </summary>
+    private VehicleFeed _runningFeed;
+
+    /// <summary>What a Data Act press came back with, or null before one.</summary>
+    private VehiclePortalReading? _reading;
+
+    /// <summary>What a live feed's press came back with, or null before one.</summary>
+    private VehicleRefreshResult? _asked;
+
+    private bool _busy;
+
+    protected override void OnInitialized() => _runningFeed = Editor.Read().RunningFeed;
+
+    /// <summary>The owner's word for the car, falling back to something that reads as a sentence.</summary>
+    private string CarName => string.IsNullOrWhiteSpace(Vehicle.Name) ? "the car" : Vehicle.Name;
+
+    /// <summary>
+    /// The car in the dashboard card's own figures and its own component (#178).
+    ///
+    /// <para>Same Stat component and the same formatters as the dashboard, deliberately: the reason to
+    /// look at this page beside that one is to compare them, and a difference in rounding would read
+    /// as a difference in the reading. <paramref name="targetSoc"/> is the Data Act portal's — no live
+    /// feed carries one — and a dash there means this source did not say.</para>
+    /// </summary>
+    private RenderFragment Card(VehicleState state, double? targetSoc) => @<text>
+        <h3>@CarName</h3>
+
+        <section class="stat-grid" id="car">
+            <Stat Label="Car battery" Value="@VehicleFormatting.Percent(state.SocPercent)"
+                  Hint="The car's own state of charge, as the source answered this press. Not the home battery." />
+            <Stat Label="Car range" Value="@VehicleFormatting.Km(state.RangeKm)"
+                  Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
+            <Stat Label="Car reading age" Value="@Age(state)"
+                  Hint="How long ago the car itself produced this reading — not how long ago you pressed the button. Hours old is normal for a parked car." />
+            <Stat Label="Car charge state" Value="@state.ChargeState.ToString()"
+                  Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+            <Stat Label="Car plug state" Value="@state.PlugState.ToString()"
+                  Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
+            <Stat Label="Target SOC" Value="@VehicleFormatting.Percent(targetSoc)"
+                  Hint="The car's own charge limit, set in the car or its app. The Data Act portal carries it and no live feed does: no plan reads it yet (#101). A dash means this source did not carry it." />
+            <Stat Label="Time left" Value="@VehicleFormatting.ChargeTime(state)"
+                  Hint="The car's own estimate of how much longer it needs, not one of ours. A dash means the source did not carry it — which is itself a finding." />
+        </section>
+
+        <p class="muted table-note">
+            The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago
+            is normal and not a fault — its state of charge does not drift.
+        </p>
+    </text>;
+
+    /// <summary>
+    /// The Data Act portal, once. Its reading is not written to the holder: that is the one thing
+    /// about this source that has not changed, and the sentence above the button says so.
+    /// </summary>
+    private async Task ReadPortalAsync()
+    {
+        _busy = true;
+        _reading = null;
+        _asked = null;
+        StateHasChanged();
+
+        try
+        {
+            // The reader does not throw for an expected failure -- a refused password, a consent
+            // screen, a portal with nothing to give all come back as an unsuccessful reading. Only a
+            // genuine bug would escape, and swallowing that here would hide it.
+            _reading = await Portal.ReadAsync();
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// The configured live feed, once, now. The same call the worker makes, so what comes back reaches
+    /// the holder and with it the dashboard — which is what an owner pressing a button is asking for.
+    /// </summary>
+    private async Task AskFeedAsync()
+    {
+        _busy = true;
+        _asked = null;
+        _reading = null;
+        StateHasChanged();
+
+        try
+        {
+            _asked = await Refresh.RefreshAsync();
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private string Age(VehicleState state) => VehicleFormatting.Age(state, Time.GetUtcNow());
+
+    /// <summary>
+    /// How far this press and the feed's held reading are apart, as a clause to hang off the end of
+    /// the sentence. Empty when there is nothing to compare — one of the two carrying no state of
+    /// charge is a fact about the sources, not a disagreement between them.
+    /// </summary>
+    private static string Difference(VehicleState pressed, VehicleState held)
+    {
+        if (pressed.SocPercent is not { } here || held.SocPercent is not { } there)
+        {
+            return string.Empty;
+        }
+
+        // Compared at the precision both are displayed at. Two readings that print as 64% must not be
+        // described as differing, whatever their third decimal places are doing.
+        var gap = Math.Round(here) - Math.Round(there);
+
+        if (gap == 0)
+        {
+            return " — the same state of charge";
+        }
+
+        var size = Math.Abs(gap);
+        return $" — {size:F0} point{(size == 1 ? "" : "s")} {(gap > 0 ? "below" : "above")} this press";
+    }
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
 

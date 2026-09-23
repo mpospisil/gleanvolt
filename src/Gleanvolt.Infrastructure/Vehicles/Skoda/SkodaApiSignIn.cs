@@ -155,10 +155,10 @@ public sealed class SkodaApiSignIn(
 /// </summary>
 public static class SkodaApiSentences
 {
-    public const string NoKey = "Paste an API key on the Vehicle portal page.";
+    public const string NoKey = "Paste an API key on the Car page.";
 
     /// <summary>What the dashboard's card says when the key is what stands in the way (#212).</summary>
-    public const string OwnerAction = "No MyŠkoda API key yet, or it has expired — paste one on the vehicle page.";
+    public const string OwnerAction = "No MyŠkoda API key yet, or it has expired — paste one on the Car page.";
 
     public static string ForSignIn(SkodaApiOutcome outcome, string vin) => outcome switch
     {
@@ -175,12 +175,12 @@ public static class SkodaApiSentences
     public static string ForFeed(SkodaApiOutcome outcome, string vin) => outcome switch
     {
         SkodaApiOutcome.KeyExpired =>
-            "The Škoda API key has expired — create a new one in the app and paste it on the Vehicle portal page.",
+            "The Škoda API key has expired — create a new one in the app and paste it on the Car page.",
         SkodaApiOutcome.KeyUnknown =>
-            "Škoda no longer recognises the stored API key — paste a new one on the Vehicle portal page.",
+            "Škoda no longer recognises the stored API key — paste a new one on the Car page.",
         SkodaApiOutcome.KeyNotAuthorized =>
             $"The stored Škoda API key is not allowed for VIN {vin} — create one that includes this car and "
-            + "paste it on the Vehicle portal page.",
+            + "paste it on the Car page.",
         SkodaApiOutcome.VehicleNotFound =>
             $"Škoda has no car with VIN {vin} — check Vehicle:Skoda:Vin.",
         _ => ForSignIn(outcome, vin),
