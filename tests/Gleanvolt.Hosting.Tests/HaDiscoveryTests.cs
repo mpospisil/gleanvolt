@@ -423,6 +423,8 @@ public class HaDiscoveryTests
         RequiredSocFloorPercent: 62,
         // Lower than the floor in force: the 62% is the owner's clamp, not the forecast's own line.
         TrajectorySocFloorPercent: 20,
+        SpillWh: 1500,
+        LoanableWh: 2700,
         ShortfallWh: 4400,
         BiasFactor: 0.94,
         Deadline: new DateTimeOffset(2026, 7, 27, 19, 0, 0, TimeSpan.Zero),
@@ -436,6 +438,8 @@ public class HaDiscoveryTests
     [InlineData("homeassistant/sensor/solax_controller/charge_window/config")]
     [InlineData("homeassistant/sensor/solax_controller/ev_budget/config")]
     [InlineData("homeassistant/sensor/solax_controller/shortfall/config")]
+    [InlineData("homeassistant/sensor/solax_controller/spill/config")]
+    [InlineData("homeassistant/sensor/solax_controller/loan_headroom/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor_traj/config")]
     [InlineData("homeassistant/sensor/solax_controller/forecast_power/config")]
@@ -482,6 +486,10 @@ public class HaDiscoveryTests
         Assert.Equal("12:30-15:50", s.GetProperty("window").GetString());
         Assert.Equal(10.5, s.GetProperty("ev_budget_kwh").GetDouble());
         Assert.Equal(4.4, s.GetProperty("shortfall_kwh").GetDouble());
+        // The pair that says why the pack is or is not lending (#223): 1.5kWh it has no room for, and a
+        // headroom bounded by it rather than by the 2.7kWh of room above the floor.
+        Assert.Equal(1.5, s.GetProperty("spill_kwh").GetDouble());
+        Assert.Equal(1.5, s.GetProperty("loan_headroom_kwh").GetDouble());
         Assert.Equal(62, s.GetProperty("soc_floor").GetDouble());
         Assert.Equal(20, s.GetProperty("soc_floor_traj").GetDouble());
         Assert.Equal(11, s.GetProperty("forecast_remaining_kwh").GetDouble());

@@ -44,7 +44,10 @@ public class SessionChartSeriesTests
         double? forecastPowerWatts = null,
         double? vehicleSocPercent = null,
         DateTimeOffset? vehicleSocCapturedAt = null,
-        bool batteryHoldActive = false) =>
+        bool batteryHoldActive = false,
+        double? surplusWatts = 2_000,
+        double loanPowerWatts = 0,
+        double? planRequiredSocFloorPercent = null) =>
         TestSessions.Sample(
             SessionId,
             At(minutes),
@@ -56,7 +59,10 @@ public class SessionChartSeriesTests
             forecastPowerWatts,
             vehicleSocPercent,
             vehicleSocCapturedAt,
-            batteryHoldActive);
+            batteryHoldActive,
+            surplusWatts,
+            loanPowerWatts,
+            planRequiredSocFloorPercent);
 
     [Fact]
     public void The_meters_are_drawn_with_the_signs_the_sample_recorded()
@@ -280,4 +286,62 @@ public class SessionChartSeriesTests
 
     private static ChargingSessionEvent Event(double minutes, ChargingSessionEventKind kind, string detail) =>
         new(SessionId, At(minutes), kind, detail);
+
+    // Issue #223: a session that paused with a full pack and sun on the roof could not be read from this
+    // chart at all, because the two figures that explain it -- the floor the SOC is judged against and
+    // the loan under the surplus -- were on the samples and on nothing else.
+    [Fact]
+    public void The_plans_floor_is_drawn_beside_the_soc_it_is_judged_against()
+    {
+        var series = Build([
+            Sample(0, batterySocPercent: 100, planRequiredSocFloorPercent: 74),
+            Sample(5, batterySocPercent: 96, planRequiredSocFloorPercent: 78)]);
+
+        Assert.True(series.HasPlanFloor);
+        Assert.Equal([74, 78], series.SocFloor);
+        Assert.Equal([100, 96], series.Soc);
+    }
+
+    [Fact]
+    public void A_session_with_no_plan_behind_it_offers_no_floor_line()
+    {
+        // Another mode was driving: there is no floor, which is a different fact from a floor of zero.
+        var series = Build([Sample(0), Sample(5)]);
+
+        Assert.False(series.HasPlanFloor);
+        Assert.All(series.SocFloor, v => Assert.Null(v));
+    }
+
+    [Fact]
+    public void The_loan_is_drawn_under_the_surplus_it_bridged_from()
+    {
+        var series = Build([Sample(0, surplusWatts: 1_600, loanPowerWatts: 2_740)]);
+
+        Assert.True(series.HasSurplus);
+        Assert.True(series.HasLoan);
+        Assert.Equal(1_600, series.Surplus[0]);
+        Assert.Equal(2_740, series.Loan[0]);
+    }
+
+    [Fact]
+    public void A_session_that_never_borrowed_offers_no_loan_series()
+    {
+        var series = Build([Sample(0), Sample(5)]);
+
+        Assert.False(series.HasLoan);
+    }
+
+    [Fact]
+    public void A_recording_gap_breaks_the_floor_and_the_loan_like_every_other_meter()
+    {
+        var series = Build([
+            Sample(0, loanPowerWatts: 500, planRequiredSocFloorPercent: 60),
+            Sample(30, loanPowerWatts: 500, planRequiredSocFloorPercent: 70)]);
+
+        // The inserted null is the hole: nothing was sampled across it, so nothing is claimed about what
+        // the pack was lending or what the plan was asking for.
+        Assert.Equal(3, series.Timestamps.Length);
+        Assert.Null(series.Loan[1]);
+        Assert.Null(series.SocFloor[1]);
+    }
 }

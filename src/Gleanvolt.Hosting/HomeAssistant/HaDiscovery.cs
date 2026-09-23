@@ -391,6 +391,11 @@ public sealed class HaDiscovery
         yield return Sensor("charge_window", "Charge window", template: Optional("window"), icon: "mdi:clock-outline");
         yield return Sensor("ev_budget", "EV energy budget", template: Optional("ev_budget_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("shortfall", "Projected shortfall", template: Optional("shortfall_kwh"), unit: "kWh", deviceClass: "energy");
+        // The pair that says why the battery is or is not lending: what the pack has no room for, and
+        // how much of that it may actually lend. Without them "paused with a full battery and sun on the
+        // roof" took a code read to explain (issue #223).
+        yield return Sensor("spill", "Surplus spill", template: Optional("spill_kwh"), unit: "kWh", deviceClass: "energy");
+        yield return Sensor("loan_headroom", "Loan headroom", template: Optional("loan_headroom_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("soc_floor", "Required SOC floor", template: Optional("soc_floor"), unit: "%", icon: "mdi:battery-arrow-down");
         // The unclamped floor next to the one in force: together they say whether the car is being held
         // back by the forecast or merely by the configured minimum, which is the first thing to look at
@@ -600,6 +605,8 @@ public sealed class HaDiscovery
                 : "none";
             payload["ev_budget_kwh"] = Math.Round(plan.FeasibleEvEnergyWh / 1000, 1);
             payload["shortfall_kwh"] = Math.Round(plan.ShortfallWh / 1000, 1);
+            payload["spill_kwh"] = Math.Round(plan.SpillWh / 1000, 1);
+            payload["loan_headroom_kwh"] = Math.Round(plan.LoanHeadroomWh / 1000, 1);
             payload["soc_floor"] = Math.Round(plan.RequiredSocFloorPercent);
             payload["soc_floor_traj"] = Math.Round(plan.TrajectorySocFloorPercent);
             payload["forecast_remaining_kwh"] = Math.Round(plan.RemainingPvWh / 1000, 1);

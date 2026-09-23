@@ -4,6 +4,71 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-23 — The loan is measured against what the pack cannot absorb, not against a constant
+
+**Context.** Issue #223, from a session chart: charging stopped for want of surplus while the home
+battery was full or nearly so. The instinct behind the report — *lend it and recharge the pack later* —
+is what the battery loan already exists for, and `RequiredSocFloorPercent` already is the "100 % by the
+end of daylight" condition, recomputed every poll. The wiring was what was wrong, in two ways.
+
+**The bug: a paused session could never restart on a loan.** The loan was sized to reach exactly
+`MinChargePowerWatts` (4140 W on three phases) and never more — deliberately, it is a bridge. But a
+restart had to clear `MinChargePowerWatts + ResumeHysteresisWatts` = 4340 W. Both rules were sensible
+and jointly fatal: **the loan could sustain a charge and could never start one**, whatever the state of
+the pack. No test caught it because every loan test passed `charging: true`; with these numbers the
+restart path had no behaviour to exercise. The loan now bridges to the threshold actually in force. The
+hysteresis exists to stop a marginal *surplus* flapping the charger, and a loan is not marginal
+surplus — it is a decision, steady for as long as it is granted.
+
+**Decision — the plan gains a spill term, and it is the loan's real question.**
+`SpillWh = max(0, Σ slice.SurplusWh − BatteryToFullWh)`: remaining surplus the pack has no room for. At
+100 % SOC that is every watt still coming, and each of those watts goes to the car or out of the meter.
+The old reasoning behind `MinBridgeSurplusWatts` — "lending into no sun would be a battery-to-car
+transfer, paying a round trip for nothing" — assumes the energy lent would otherwise have been *kept*.
+On a spilling day it would not, so the round trip buys back energy that was leaving the house. Hence
+two floors: `MinBridgeSurplusWatts` (2 kW) when the pack has room, `SpillBridgeSurplusWatts` (400 W)
+when it has not. Not zero, because cycling the pack to chase noise is wear either way.
+
+**Decision — one helper for the effective minimum charge power.** `SolarDayPlanner.IsFeasible` counted
+a period chargeable from `MinChargePowerWatts − MaxLoanPowerWatts` (1.64 kW) while the controller
+refused to lend under 2 kW. Every slice between the two was **drawn as chargeable on the forecast page
+and silently was not**. `BatteryLoanRules` now owns both figures and both callers use it, so a window
+the plan promises is a window the controller enters.
+
+**Decision — the shortfall veto goes; the floor was already doing the work.** "No loan on a shortfall
+day" read as prudence and was mostly a veto on the midday spill: at 100 % SOC shortfall reduces to "the
+evening house load outruns the remaining sun", true on most afternoons after 16:00. Where it did
+describe a real inability to repay, the floor gate has already stopped the session — a day that cannot
+refill the pack puts the *trajectory* floor above the current SOC by construction, which is a harder
+stop than refusing a loan. Likewise the plan-level "no deliverable budget left today" stop, which ran
+*before* the loan was considered and wrote off exactly the day the loan exists for: it no longer applies
+while the day spills, because "nothing deliverable" is a statement about the forecast and a pack with no
+room is entitled to let the live surplus answer for itself.
+
+**Decision — the daily cap counts outstanding lending, not cumulative.** `MaxDailyLoanKWh` measured
+everything ever lent in the day, so a pack that lent 4 kWh in the morning, was refilled to 100 % by one
+o'clock and met a 3 kW afternoon was refused while physically in the state it started in. `BatteryLoanLedger`
+keeps both halves — lent, for the owner's figure, and lent minus recovered, for the cap. Recovery is
+clamped every cycle rather than netted over the day, so charging *before* a loan earns no credit against
+lending nobody has asked for. `MaxLoanPowerWatts` rises 2500 → 3800 in the same breath: at 2500 against
+a 4.14 kW floor nothing under 1.64 kW could ever charge, whatever the spill floor said.
+
+**Why no new safety argument is needed.** Lending down to the floor is, by that floor's definition,
+lending exactly what the day can repay. Repayment needs no machinery either: lending drops SOC, which
+grows `BatteryToFullWh`, which books more of the late production for the pack in the backward pass,
+which raises the floor, which squeezes the car out earlier. The loop was already there and already
+self-correcting; what was missing was permission to enter it. `BatteryLoanDaySimulationTests` runs the
+real planner and the real controller through a whole day at the poll cadence and checks the pack still
+ends it full — the floor is undershot by no more than the dwell timer is entitled to hold for, which is
+the one inherent slack in enforcing a floor per poll.
+
+**Observability, because this took a code read to answer.** `SpillWh` and the loan headroom are on the
+plan, in `SolarDayPlanResponse`, on the Forecasted tab, in the day-plan log line and as two Home
+Assistant sensors; the session chart draws the plan's floor beside the SOC it judges and shades the loan
+under the surplus. Every one of those figures was already on disk.
+
+---
+
 ## 2026-09-23 — `Forecasted` stops asking how much the car wants; a request is what `Targeted` is for
 
 **Context.** Issue #217. `Forecasted` carried a **daily EV target** and `Targeted` takes an amount by
@@ -3150,6 +3215,14 @@ exported. It is refused below `MinBridgeSurplusWatts` (2 kW), on any shortfall d
 transfer: a round trip and a cycle on both packs, buying nothing. Enforcement is not left to the
 arithmetic — at the floor the #20 discharge hold is armed automatically, so the grid covers an
 estimate error rather than the pack.
+
+> **Partly superseded on 2026-09-23** by
+> [the record above](#2026-09-23--the-loan-is-measured-against-what-the-pack-cannot-absorb-not-against-a-constant):
+> the loan is still a bridge and still never funds a session, but three of the four refusals have moved.
+> The shortfall veto is gone (the floor gate already stops that day, harder), the daily cap counts
+> outstanding rather than cumulative lending, and `MinBridgeSurplusWatts` applies only while the pack has
+> room for the surplus — on a day it cannot absorb, `SpillBridgeSurplusWatts` does. The floor, and the
+> hold armed at it, are unchanged.
 
 **Decision 6 — on a shortfall the car gives way, and we report rather than act.** Priority is fixed:
 house → battery to 100 % → EV. Chosen deliberately over the alternatives (grid top-up to a daily

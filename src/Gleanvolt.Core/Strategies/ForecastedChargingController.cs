@@ -18,7 +18,9 @@ namespace Gleanvolt.Core.Strategies;
 /// lighter touch when the floor in force is the owner's clamp rather than the forecast's
 /// trajectory;</description></item>
 /// <item><description>a bounded <b>battery loan</b> that bridges a real-but-insufficient surplus up to
-/// the charger's 6 A floor, repaid later from sun that would otherwise have been exported;</description></item>
+/// the charger's 6 A floor, repaid later from sun that would otherwise have been exported — and
+/// granted from a much thinner surplus once the plan says the pack has no room for what is
+/// coming;</description></item>
 /// <item><description><b>dwell timers</b>, so a passing cloud can't start and stop the session every few
 /// minutes;</description></item>
 /// <item><description>a <b>final guard</b> before the deadline, and a per-session energy ceiling.</description></item>
@@ -152,7 +154,13 @@ public sealed class ForecastedChargingController : IChargingController
         // the battery's evening guarantee, the final guard and the session ceiling, and a day that
         // never clears the charger's floor is none of those. So it pauses through the dwell timers
         // like a passing cloud rather than ending the session outright.
-        if (plan.NextFeasibleWindow is null || plan.FeasibleEvEnergyWh <= 0)
+        //
+        // Not on a spill day, though (issue #223). This ran before the loan was even considered, so a
+        // day whose forecast never reaches the charger's floor was written off wholesale — including
+        // the case the loan exists for, a pack with no room left and a surplus going out of the meter.
+        // "Nothing deliverable" is a statement about the *forecast*; when the pack cannot absorb what
+        // is coming, the live surplus below is entitled to answer for itself.
+        if (!plan.WillSpill && (plan.NextFeasibleWindow is null || plan.FeasibleEvEnergyWh <= 0))
         {
             return SoftPause(input, $"No deliverable budget left today ({plan.Reason}).");
         }
@@ -166,16 +174,22 @@ public sealed class ForecastedChargingController : IChargingController
         var inGuardBand = soc < plan.RequiredSocFloorPercent + FloorResumeMarginPercent;
         var reserveWatts = inGuardBand ? Math.Max(0, _options.FloorGuardReserveWatts) : 0;
 
-        var loanWatts = inGuardBand ? 0 : LoanWatts(input, plan, surplusWatts);
+        // Asymmetric threshold: keep charging down to the minimum, but only (re)start a hysteresis
+        // margin above it.
+        var startThresholdWatts = input.Charging ? MinChargePowerWatts : MinChargePowerWatts + _options.ResumeHysteresisWatts;
+
+        // The loan bridges to the threshold actually in force, not always to the bare minimum. The two
+        // rules were individually sensible and jointly fatal (issue #223): a loan sized to reach 4140W
+        // could sustain a charge and could never start one, because a restart asked for 4340W. The
+        // hysteresis is there to stop a marginal *surplus* flapping the charger, and a loan is not
+        // marginal surplus — it is a decision, and it is steady for as long as it is granted.
+        var loanWatts = inGuardBand ? 0 : LoanWatts(input, plan, surplusWatts, startThresholdWatts);
         var availableWatts = Math.Max(0, surplusWatts + loanWatts - reserveWatts);
 
         var reserveText = reserveWatts > 0
             ? $" − {reserveWatts:F0}W reserved for the battery inside the {FloorResumeMarginPercent:F0}% guard band"
             : string.Empty;
 
-        // Asymmetric threshold: keep charging down to the minimum, but only (re)start a hysteresis
-        // margin above it.
-        var startThresholdWatts = input.Charging ? MinChargePowerWatts : MinChargePowerWatts + _options.ResumeHysteresisWatts;
         if (availableWatts < startThresholdWatts)
         {
             return SoftPause(
@@ -190,7 +204,7 @@ public sealed class ForecastedChargingController : IChargingController
         }
 
         var loanText = loanWatts > 0
-            ? $" (loan +{loanWatts:F0}W bridging {surplusWatts:F0}W to {MinChargePowerWatts:F0}W)"
+            ? $" (loan +{loanWatts:F0}W bridging {surplusWatts:F0}W to {startThresholdWatts:F0}W{(plan.WillSpill ? $", spill {plan.SpillWh / 1000:F1}kWh" : string.Empty)})"
             : reserveText;
 
         return new ChargingControlDecision(
@@ -203,25 +217,34 @@ public sealed class ForecastedChargingController : IChargingController
     /// <summary>
     /// How much the battery may lend right now. The loan exists for one reason: on three phases the
     /// charger's 6 A floor is ~4.2 kW, so a perfectly good 3 kW surplus charges nothing at all and is
-    /// exported. Lending the difference converts that spill into charge, and the forecast is what makes
-    /// it safe to repay. It is therefore sized to reach exactly the floor — never more — and refused
-    /// unless the surplus is already real.
+    /// exported. Lending the difference converts that into charge, and the forecast is what makes it
+    /// safe to repay — lending down to <see cref="SolarDayPlan.RequiredSocFloorPercent"/> is, by that
+    /// floor's definition, lending exactly what the rest of the day can put back.
+    ///
+    /// <para>Sized to reach <paramref name="bridgeToWatts"/> and not a watt past it: a bridge, not a
+    /// booster. What it is refused for depends on whether the pack has room for the energy at all —
+    /// see <see cref="BatteryLoanRules"/>.</para>
     /// </summary>
-    private double LoanWatts(ChargingControlInput input, SolarDayPlan plan, double surplusWatts)
+    private double LoanWatts(
+        ChargingControlInput input,
+        SolarDayPlan plan,
+        double surplusWatts,
+        double bridgeToWatts)
     {
         if (!_options.EnableBatteryLoan)
         {
             return 0;
         }
 
-        // A shortfall day has, by definition, no capacity to repay: every watt is already spoken for by
-        // the house and the battery's own evening target.
-        if (plan.HasShortfall)
-        {
-            return 0;
-        }
+        // No shortfall test here any more (issue #223). It read as prudence and was mostly a veto on
+        // the midday spill: shortfall reduces to "the evening house load outruns the remaining sun",
+        // true on most afternoons after 16:00. And where it did describe a real inability to repay, the
+        // floor gate above has already stopped the session — a day that cannot refill the pack puts the
+        // trajectory floor *above* the current SOC by construction, which is a harder stop than this.
 
-        if (input.LoanedTodayWh >= _options.MaxDailyLoanWh)
+        // The wear backstop, measured against lending not yet recovered rather than against everything
+        // lent today: a pack back at 100% has repaid its morning and is not still serving its sentence.
+        if (input.LoanOutstandingWh >= _options.MaxDailyLoanWh)
         {
             return 0;
         }
@@ -231,22 +254,25 @@ public sealed class ForecastedChargingController : IChargingController
             return 0;
         }
 
-        // Only a genuine surplus gets topped up. Below this line the sun isn't really contributing and
-        // the "loan" would just be running the car off the house battery.
-        if (surplusWatts < _options.MinBridgeSurplusWatts)
+        // Only a genuine surplus gets topped up — unless the pack has no room for the surplus anyway,
+        // in which case "is the sun really contributing?" is the wrong question: the energy is leaving
+        // the house either way, and the round trip buys it back instead of paying for nothing.
+        var bridgeFloorWatts = BatteryLoanRules.BridgeSurplusFloorWatts(
+            plan.WillSpill, _options.MinBridgeSurplusWatts, _options.SpillBridgeSurplusWatts);
+
+        if (surplusWatts < bridgeFloorWatts)
         {
             return 0;
         }
 
-        var gapWatts = MinChargePowerWatts - surplusWatts;
+        var gapWatts = bridgeToWatts - surplusWatts;
         if (gapWatts <= 0)
         {
-            // The sun already clears the floor; there is nothing to bridge. Deliberately no top-up
-            // beyond it — the loan is a bridge, not a booster.
+            // The sun already clears the threshold; there is nothing to bridge.
             return 0;
         }
 
-        return Math.Min(gapWatts, _options.MaxLoanPowerWatts);
+        return Math.Min(gapWatts, Math.Max(0, _options.MaxLoanPowerWatts));
     }
 
     /// <summary>

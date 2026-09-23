@@ -275,6 +275,8 @@ window.solaxCharts = (function () {
         const battery = cssVar("--accent", "#0b6b3a");
         const ev = cssVar("--ev", "#b45309");
         const vehicle = cssVar("--vehicle", "#2563eb");
+        const surplus = cssVar("--surplus", "#0891b2");
+        const socFloor = cssVar("--soc-floor", "#9333ea");
 
         const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
         const percent = (u, v) => (v == null ? "-" : Math.round(v) + "%");
@@ -302,8 +304,31 @@ window.solaxCharts = (function () {
         series.push(power("Grid", gridColour, false), power("Battery", battery, false), power("EV charger", ev));
         data.push(session.grid, session.battery, session.ev);
 
+        // The surplus the controller decided on, and under it the part of the charge the pack was
+        // lending (#223). Together they answer "why 6 A and not more" and "why anything at all": a loan
+        // is the gap between a surplus too thin for the charger's floor and the floor, so it is drawn as
+        // a filled band under the line it was bridging from rather than as a fifth power trace.
+        if (session.hasSurplus) {
+            series.push({ label: "Surplus", scale: "w", stroke: surplus, width: 1, dash: [6, 3], value: watts });
+            data.push(session.surplus);
+        }
+
+        if (session.hasLoan) {
+            series.push({ label: "Battery loan", scale: "w", stroke: battery, width: 1, fill: battery + "33", value: watts });
+            data.push(session.loan);
+        }
+
         series.push({ label: "Battery SOC", scale: "p", stroke: battery, width: 1, dash: [2, 3], value: percent });
         data.push(session.soc);
+
+        if (session.hasPlanFloor) {
+            // The floor the SOC line above is judged against. Same scale, same colour family, drawn
+            // thinner: a chart that shows SOC without it cannot distinguish "the pack was below the
+            // floor" from "the pack was full and the car was refused anyway", which are the two
+            // explanations a paused session on a sunny afternoon has.
+            series.push({ label: "SOC floor", scale: "p", stroke: socFloor, width: 1, dash: [5, 4], value: percent });
+            data.push(session.socFloor);
+        }
 
         if (session.hasVehicleSoc) {
             // Stepped, and stepped alone among these series: the car reports a reading taken at a time

@@ -21,6 +21,15 @@ namespace Gleanvolt.Core.Models;
 /// widen the feasible window; the loan itself is granted by the controller.
 /// </param>
 /// <param name="EnableBatteryLoan">Whether loan-bridged periods count as feasible at all.</param>
+/// <param name="MinBridgeSurplusWatts">
+/// The live surplus the controller refuses to lend below on a day the pack can still absorb its own
+/// surplus. Planned here for one reason: a window drawn from a bridge the controller would not grant
+/// is a window nothing can enter — see <see cref="Strategies.BatteryLoanRules"/>.
+/// </param>
+/// <param name="SpillBridgeSurplusWatts">
+/// The same floor on a day whose surplus the pack has no room for, where the loan costs the house
+/// nothing. Much lower, and the reason a full pack on a thin afternoon has a window at all.
+/// </param>
 /// <param name="MinViableWindow">The shortest stretch of chargeable weather worth starting a session for.</param>
 /// <param name="MinBatterySocFloorPercent">The hard floor the computed SOC trajectory is clamped to.</param>
 /// <param name="Confidence">Which forecast band to plan on. P10 by default — see <see cref="ForecastConfidence"/>.</param>
@@ -30,6 +39,8 @@ public sealed record SolarDayPlannerOptions(
     double MinChargePowerWatts,
     double MaxLoanPowerWatts,
     bool EnableBatteryLoan,
+    double MinBridgeSurplusWatts,
+    double SpillBridgeSurplusWatts,
     TimeSpan MinViableWindow,
     double MinBatterySocFloorPercent,
     ForecastConfidence Confidence = ForecastConfidence.P10);

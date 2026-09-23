@@ -469,6 +469,7 @@
       "feasibleEvEnergyWh": "number|string(double) (required)",
       "forecastAsOf": "string(date-time)? (required)",
       "isUsable": "boolean (required)",
+      "loanHeadroomWh": "number|string(double) (required)",
       "plateauClaimedByBatteryWh": "number|string(double) (required)",
       "plateauEnergyWh": "number|string(double) (required)",
       "reason": "string (required)",
@@ -476,6 +477,7 @@
       "requiredSocFloorPercent": "number|string(double) (required)",
       "shortfallWh": "number|string(double) (required)",
       "shoulderEnergyWh": "number|string(double) (required)",
+      "spillWh": "number|string(double) (required)",
       "trajectorySocFloorPercent": "number|string(double) (required)"
     },
     "StartChargingRequest": {

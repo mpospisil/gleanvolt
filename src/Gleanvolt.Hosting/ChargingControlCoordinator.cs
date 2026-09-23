@@ -46,7 +46,10 @@ public sealed class ChargingControlCoordinator
     // battery has lent it today (reset at local midnight): the two budgets the forecast-driven strategy
     // is metered against.
     private readonly EnergyIntegrator _sessionEnergy = new();
-    private readonly EnergyIntegrator _loanedToday = new();
+
+    // Both halves of today's lending: the cumulative total the owner is shown, and the part the pack has
+    // not charged back yet, which is what the daily cap is measured against (#223).
+    private readonly BatteryLoanLedger _loanedToday = new();
     private DateOnly _loanDay;
     private bool _carWasConnected;
 
@@ -96,7 +99,10 @@ public sealed class ChargingControlCoordinator
     public double SessionEnergyWh => _sessionEnergy.EnergyWattHours;
 
     /// <summary>Energy lent out of the home battery to the car today, in watt-hours.</summary>
-    public double LoanedTodayWh => _loanedToday.EnergyWattHours;
+    public double LoanedTodayWh => _loanedToday.LentWattHours;
+
+    /// <summary>The part of that lending the pack has not recovered yet, in watt-hours.</summary>
+    public double LoanOutstandingWh => _loanedToday.OutstandingWattHours;
 
     /// <param name="state">The latest telemetry reading.</param>
     /// <param name="mode">The mode selected at runtime; picks which controller decides this cycle.</param>
@@ -161,7 +167,7 @@ public sealed class ChargingControlCoordinator
                 targetedPlan,
                 TimeInCurrentState(state.Timestamp),
                 _sessionEnergy.EnergyWattHours,
-                _loanedToday.EnergyWattHours,
+                _loanedToday.LentWattHours,
                 _evDrewPower,
                 EvIdleFor(state.Timestamp),
                 fastCharge,
@@ -169,12 +175,14 @@ public sealed class ChargingControlCoordinator
                 ChargerNotFastFor(state.Timestamp),
                 _waitReleased,
                 solarGrid,
-                ChargedThisMode: _chargedThisMode));
+                ChargedThisMode: _chargedThisMode,
+                LoanOutstandingWh: _loanedToday.OutstandingWattHours));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
                 + "({SampleCount} samples) Setpoint={SetpointAmps}A Action={Action} Target={TargetAmps} Loan={LoanWatts:F0}W "
-                + "Bridge={BridgeWatts:F0}W Session={SessionKWh:F1}kWh LoanedToday={LoanedKWh:F1}kWh. {Reason}",
+                + "Bridge={BridgeWatts:F0}W Session={SessionKWh:F1}kWh LoanedToday={LoanedKWh:F1}kWh "
+                + "Outstanding={OutstandingKWh:F1}kWh. {Reason}",
                 mode,
                 settings.Mode,
                 rawSurplus,
@@ -186,7 +194,8 @@ public sealed class ChargingControlCoordinator
                 decision.LoanPowerWatts,
                 decision.GridBridgeWatts,
                 _sessionEnergy.EnergyWattHours / 1000,
-                _loanedToday.EnergyWattHours / 1000,
+                _loanedToday.LentWattHours / 1000,
+                _loanedToday.OutstandingWattHours / 1000,
                 decision.Reason);
 
             switch (decision.Action)
@@ -237,7 +246,9 @@ public sealed class ChargingControlCoordinator
 
             // Metered on what was commanded rather than on the battery's measured discharge: the loan is
             // our own decision, while the battery's actual power also carries house load and PV swings.
-            _loanedToday.Add(state.Timestamp, decision.LoanPowerWatts);
+            // The pack's measured power comes along all the same, because recovery -- the half that
+            // decides how much of the lending is still outstanding -- is exactly what it did measure.
+            _loanedToday.Add(state.Timestamp, decision.LoanPowerWatts, state.BatteryPowerWatts);
 
             var reportedState = decision.Action switch
             {

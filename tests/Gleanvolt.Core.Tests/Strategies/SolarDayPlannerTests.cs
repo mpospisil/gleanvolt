@@ -38,13 +38,17 @@ public class SolarDayPlannerTests
     private static SolarDayPlannerOptions Options(
         bool enableLoan = false,
         double maxLoanPowerWatts = 0,
-        double minSocFloorPercent = 50) =>
+        double minSocFloorPercent = 50,
+        double minBridgeSurplusWatts = 2000,
+        double spillBridgeSurplusWatts = 400) =>
         new(
             BatteryCapacityWh: CapacityWh,
             ChargeEfficiency: 0.95,
             MinChargePowerWatts: MinChargePowerWatts,
             MaxLoanPowerWatts: maxLoanPowerWatts,
             EnableBatteryLoan: enableLoan,
+            MinBridgeSurplusWatts: minBridgeSurplusWatts,
+            SpillBridgeSurplusWatts: spillBridgeSurplusWatts,
             MinViableWindow: TimeSpan.FromMinutes(30),
             MinBatterySocFloorPercent: minSocFloorPercent);
 
@@ -120,6 +124,95 @@ public class SolarDayPlannerTests
         Assert.Null(withoutLoan.NextFeasibleWindow);
         Assert.NotNull(withLoan.NextFeasibleWindow);
         Assert.True(withLoan.FeasibleEvEnergyWh > 0);
+    }
+
+    // Issue #223. The spill is the term that says whether a battery loan costs the house anything: what
+    // the pack has no room for goes to the car or out of the meter, and nowhere else.
+    [Fact]
+    public void TheSpillIsTheSurplusThePackHasNoRoomFor()
+    {
+        // A full pack can absorb nothing, so every remaining watt of surplus is spill.
+        var full = Plan(socPercent: 100);
+
+        Assert.Equal(full.RemainingPvWh - full.ExpectedHouseWh, full.SpillWh, 1);
+        Assert.True(full.WillSpill);
+    }
+
+    [Fact]
+    public void ThereIsNoSpillWhileThePackCanStillTakeEverythingTheDayMakes()
+    {
+        // 9.25kWh of surplus to come against a pack 10kWh short of full, losses included: it all has a home.
+        var empty = Plan(socPercent: 0);
+
+        Assert.Equal(0, empty.SpillWh, 1);
+        Assert.False(empty.WillSpill);
+    }
+
+    [Fact]
+    public void TheLoanableEnergyIsTheRoomBetweenTheSocAndTheFloor()
+    {
+        // The bell day leaves the clamp binding at 50%, so a pack at 80% may lend 30% of 10kWh.
+        var plan = Plan(socPercent: 80);
+
+        Assert.Equal(50, plan.RequiredSocFloorPercent, 1);
+        Assert.Equal(3000, plan.LoanableWh, 1);
+    }
+
+    [Fact]
+    public void TheLoanHeadroomIsTheFreePartOfTheLoanableRoom()
+    {
+        // Lending that costs the house nothing: the room above the floor, capped by what the pack could
+        // not have kept anyway. The cap is a statement rather than a constraint in practice -- the floor
+        // is derived from the same remaining surplus the spill is, so it never permits lending more than
+        // the day was going to give away -- and zero spill is what makes it zero, which is the reading
+        // that matters on the dashboard.
+        var spilling = Plan(socPercent: 100);
+        var absorbing = Plan(socPercent: 55, forecast: Forecast([1000, 1000]));
+
+        Assert.True(spilling.LoanHeadroomWh > 0);
+        Assert.Equal(spilling.LoanableWh, spilling.LoanHeadroomWh, 1);
+        Assert.Equal(0, absorbing.LoanHeadroomWh, 1);
+    }
+
+    // The disagreement the shared helper exists to end: the plan used to count a period feasible from
+    // MinChargePowerWatts - MaxLoanPowerWatts while the controller refused to lend below
+    // MinBridgeSurplusWatts, so every slice between the two was drawn as chargeable and silently was not.
+    [Fact]
+    public void TheFeasibilityThresholdIsNeverBelowTheSurplusFloorALoanIsGrantedFrom()
+    {
+        var options = Options(enableLoan: true, maxLoanPowerWatts: 3800);
+
+        Assert.Equal(2000, SolarDayPlanner.MinSolarPowerWatts(options, spilling: false), 1);
+        Assert.Equal(400, SolarDayPlanner.MinSolarPowerWatts(options, spilling: true), 1);
+    }
+
+    [Fact]
+    public void WithoutTheLoanTheThresholdIsTheChargersOwnFloor()
+    {
+        Assert.Equal(
+            MinChargePowerWatts,
+            SolarDayPlanner.MinSolarPowerWatts(Options(enableLoan: false), spilling: true),
+            1);
+    }
+
+    [Fact]
+    public void AFullPackGetsAWindowOnADayNoPeriodOfWhichClearsTheBridgeFloor()
+    {
+        // 1.5kW of surplus all afternoon: under the charger's 4.14kW floor, under the 2kW a loan is
+        // normally granted from, and every watt of it export while the pack is full. That is the day the
+        // request behind #223 described, and it has a window now.
+        var forecast = Forecast([2000, 2000, 2000, 2000]);
+        var options = Options(enableLoan: true, maxLoanPowerWatts: 3800);
+
+        var full = Plan(socPercent: 100, forecast, options);
+        var roomToSpare = Plan(socPercent: 40, forecast, options);
+
+        Assert.NotNull(full.NextFeasibleWindow);
+        Assert.True(full.FeasibleEvEnergyWh > 0);
+
+        // The same weather with room in the pack stays the battery's: nothing spills, so the thin-surplus
+        // rules never open, and the shoulder belongs to the pack as it always did.
+        Assert.Null(roomToSpare.NextFeasibleWindow);
     }
 
     [Fact]

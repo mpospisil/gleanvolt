@@ -39,6 +39,17 @@ namespace Gleanvolt.Web.Components;
 /// <param name="Battery">Charging positive, discharging negative, W — the sample's own sign.</param>
 /// <param name="Ev">Measured power at the charger, W.</param>
 /// <param name="Soc">Home battery SOC, %.</param>
+/// <param name="SocFloor">
+/// The plan's required SOC floor at each sample, %, or null where the sample carried no plan. The line
+/// the home battery's SOC is judged against: a session that paused with a full pack and sun on the roof
+/// was unreadable without it (issue #223), because "below the floor" and "above it and still refused"
+/// are different faults with the same picture.
+/// </param>
+/// <param name="Surplus">Solar surplus the controller decided on, W; null where the sample recorded none.</param>
+/// <param name="Loan">
+/// The part of the charge the home battery was lending, W — shaded under the surplus, because that is
+/// what it is: the bridge between a surplus too thin for the charger's floor and the floor itself.
+/// </param>
 /// <param name="VehicleSoc">The car's own SOC, %, stepped at the time the <em>car</em> captured it.</param>
 /// <param name="HoldStarts">Start of each stretch the battery discharge hold was armed for, unix seconds.</param>
 /// <param name="HoldEnds">End of each such stretch. Same length as <paramref name="HoldStarts"/>.</param>
@@ -49,6 +60,9 @@ namespace Gleanvolt.Web.Components;
 /// <param name="TimeZoneId">The zone the axis is labelled in, as an IANA id, so the chart agrees with the facts above it.</param>
 /// <param name="HasForecast">Whether any sample carried a forecast at all.</param>
 /// <param name="HasVehicleSoc">Whether the car ever reported its SOC.</param>
+/// <param name="HasPlanFloor">Whether any sample carried a plan, i.e. whether the floor line has anything to draw.</param>
+/// <param name="HasSurplus">Whether any sample recorded the surplus it decided on.</param>
+/// <param name="HasLoan">Whether the battery lent anything at all during the session.</param>
 internal sealed record SessionChartSeries(
     long[] Timestamps,
     double?[] Solar,
@@ -57,6 +71,9 @@ internal sealed record SessionChartSeries(
     double?[] Battery,
     double?[] Ev,
     double?[] Soc,
+    double?[] SocFloor,
+    double?[] Surplus,
+    double?[] Loan,
     double?[] VehicleSoc,
     long[] HoldStarts,
     long[] HoldEnds,
@@ -66,7 +83,10 @@ internal sealed record SessionChartSeries(
     long WindowEnd,
     string TimeZoneId,
     bool HasForecast,
-    bool HasVehicleSoc)
+    bool HasVehicleSoc,
+    bool HasPlanFloor,
+    bool HasSurplus,
+    bool HasLoan)
 {
     /// <summary>
     /// Samples further apart than this were not a quiet stretch, they were an absence: ten times the
@@ -109,6 +129,9 @@ internal sealed record SessionChartSeries(
         var battery = new List<double?>(timestamps.Capacity);
         var ev = new List<double?>(timestamps.Capacity);
         var soc = new List<double?>(timestamps.Capacity);
+        var socFloor = new List<double?>(timestamps.Capacity);
+        var surplus = new List<double?>(timestamps.Capacity);
+        var loan = new List<double?>(timestamps.Capacity);
         var vehicleSoc = new List<double?>(timestamps.Capacity);
 
         var capture = 0;
@@ -122,6 +145,12 @@ internal sealed record SessionChartSeries(
             battery.Add(sample?.BatteryPowerWatts);
             ev.Add(sample?.EvChargerPowerWatts);
             soc.Add(sample?.BatterySocPercent);
+            socFloor.Add(sample?.PlanRequiredSocFloorPercent);
+            surplus.Add(sample?.SurplusWatts);
+
+            // Null rather than zero across a hole, like every other meter: a stretch nobody sampled lent
+            // nothing we know of, and a shaded band drawn across it would claim otherwise.
+            loan.Add(sample?.LoanPowerWatts);
 
             // The car's line is stepped over the same x values, so it holds the last reading the car
             // had captured by this instant -- not the one the sample happened to be carrying, which is
@@ -173,6 +202,9 @@ internal sealed record SessionChartSeries(
             [.. battery],
             [.. ev],
             [.. soc],
+            [.. socFloor],
+            [.. surplus],
+            [.. loan],
             [.. vehicleSoc],
             holdStarts,
             holdEnds,
@@ -184,7 +216,13 @@ internal sealed record SessionChartSeries(
             // Null rather than zero everywhere, so the legend does not offer a "Forecast" line that is
             // nothing but a gap: no forecast for this session is a different fact from a flat zero.
             samples.Any(s => s.ForecastPowerWatts is not null),
-            captures.Count > 0);
+            captures.Count > 0,
+            // Each of the three the same way round as the forecast's flag above: a series with nothing in
+            // it is left out of the legend rather than offered as a flat zero. A session run in another
+            // mode carries no plan and never lends, and both are facts rather than zeroes.
+            samples.Any(s => s.PlanRequiredSocFloorPercent is not null),
+            samples.Any(s => s.SurplusWatts is not null),
+            samples.Any(s => s.LoanPowerWatts > 0));
     }
 
     /// <summary>

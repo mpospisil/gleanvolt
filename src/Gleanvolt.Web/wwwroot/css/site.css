@@ -25,6 +25,11 @@
     /* The car's own SOC on the session chart (#175) -- the charger's power is already --ev, and the
        two are different things: what the wall delivered, and what the battery on the other end says. */
     --vehicle: #2563eb;
+    /* The surplus the controller decided on, and the plan's SOC floor beside the SOC it judges (#223).
+       Each gets a colour of its own: --grid-flow and --muted are the same grey, so a surplus line in
+       either would read as a second grid trace, and a floor in --ev would read as charger power. */
+    --surplus: #0891b2;
+    --soc-floor: #9333ea;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,6 +46,8 @@
         --ev: #fb923c;
         --house: #a78bfa;
         --vehicle: #60a5fa;
+        --surplus: #22d3ee;
+        --soc-floor: #c084fc;
     }
 }
 

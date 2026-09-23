@@ -89,6 +89,11 @@ public class ForecastedTabTests : PageTest
         Assert.Contains("4.5 kWh", page.Markup);
         Assert.Contains("Projected shortfall", page.Markup);
         Assert.Contains("1.0 kWh", page.Markup);
+        // The two figures that explain a loan, or its absence (#223): what the pack cannot absorb, and how
+        // much of that it may lend.
+        Assert.Contains("Surplus spill", page.Markup);
+        Assert.Contains("Loan headroom", page.Markup);
+        Assert.Contains("1.5 kWh", page.Markup);
         Assert.Contains("Required SOC floor", page.Markup);
         Assert.Contains("62%", page.Markup);
         Assert.Contains("Forecast remaining today", page.Markup);

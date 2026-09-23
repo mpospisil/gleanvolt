@@ -49,6 +49,18 @@ namespace Gleanvolt.Core.Models;
 /// controller treats a breach of the two differently — see
 /// <see cref="Strategies.ForecastedChargingController"/>.
 /// </param>
+/// <param name="SpillWh">
+/// Remaining surplus the home battery has <b>no room for</b>: the sum of every slice's surplus less
+/// <see cref="BatteryToFullWh"/>, floored at zero. On a pack already at 100% that is the whole of the
+/// remaining surplus, and it is the honest statement of the situation that makes a battery loan free
+/// — the energy is leaving the house whatever happens, so lending against it buys back watts that
+/// were going to be exported rather than spending watts the pack would have kept (issue #223).
+/// </param>
+/// <param name="LoanableWh">
+/// How much energy sits between the current SOC and <see cref="RequiredSocFloorPercent"/> — what the
+/// pack may lend and still be repaid to 100% by <see cref="Deadline"/>, by the definition of that
+/// floor. The controller's own margin comes off this before it lends.
+/// </param>
 /// <param name="ShortfallWh">
 /// How far the forecast falls short of house + battery-to-full. Positive means the evening 100% is at
 /// risk; the battery keeps priority over the car regardless.
@@ -81,6 +93,8 @@ public sealed record SolarDayPlan(
     (DateTimeOffset Start, DateTimeOffset End)? NextFeasibleWindow,
     double RequiredSocFloorPercent,
     double TrajectorySocFloorPercent,
+    double SpillWh,
+    double LoanableWh,
     double ShortfallWh,
     double BiasFactor,
     DateTimeOffset Deadline,
@@ -89,8 +103,28 @@ public sealed record SolarDayPlan(
     string Reason,
     IReadOnlyList<SolarDayPlanTimelinePoint> Timeline)
 {
-    /// <summary>Whether the day cannot cover the house and the battery to 100% together.</summary>
+    /// <summary>
+    /// Whether the day cannot cover the house and the battery to 100% together. A reading for the log
+    /// and the dashboard, and no longer a gate on anything: it used to veto the battery loan, which on a
+    /// full pack vetoed exactly the case the loan exists for (issue #223). What stops a session on a day
+    /// that cannot refill the pack is <see cref="TrajectorySocFloorPercent"/> rising above the SOC, which
+    /// is the same fact stated where it can be acted on.
+    /// </summary>
     public bool HasShortfall => ShortfallWh > 0;
+
+    /// <summary>
+    /// Whether the rest of today makes more surplus than the pack can absorb. The question the battery
+    /// loan actually turns on: not "is this surplus real?" but "has this energy anywhere else to go?".
+    /// </summary>
+    public bool WillSpill => SpillWh > 0;
+
+    /// <summary>
+    /// What the pack may lend right now for free: the smaller of what it may lend at all and what it
+    /// could not have kept anyway. Zero either when SOC is already on the floor or when every
+    /// remaining watt has a home in the pack — reported so "why is nothing being lent?" is one figure
+    /// rather than a code read.
+    /// </summary>
+    public double LoanHeadroomWh => Math.Max(0, Math.Min(LoanableWh, SpillWh));
 
     /// <summary>
     /// Whether the floor in force is the owner's configured clamp rather than the forecast's own
@@ -116,6 +150,8 @@ public sealed record SolarDayPlan(
         NextFeasibleWindow: null,
         RequiredSocFloorPercent: 100,
         TrajectorySocFloorPercent: 100,
+        SpillWh: 0,
+        LoanableWh: 0,
         ShortfallWh: 0,
         BiasFactor: 1,
         Deadline: deadline,
