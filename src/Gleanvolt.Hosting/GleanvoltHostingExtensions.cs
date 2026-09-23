@@ -108,13 +108,12 @@ public static class GleanvoltHostingExtensions
 
             // Resolved against the content root, as the SQLite stores and pv-system.json are, so a
             // relative path means the same thing under `dotnet run`, the debugger and the container.
-            // The .deb sets it absolutely: its content root is a read-only /opt/gleanvolt.
-            var directory = Path.IsPathRooted(secrets.Directory)
-                ? secrets.Directory
-                : Path.Combine(environment.ContentRootPath, secrets.Directory);
-
+            // The .deb sets it absolutely: its content root is a read-only /opt/gleanvolt. Shared with
+            // VehicleAccountSecret, which has to open the same store before the container exists.
             return SecretStoreSelection.Create(
-                secretStore, directory, provider.GetRequiredService<ILoggerFactory>());
+                secretStore,
+                VehicleAccountSecret.Directory(secrets, environment.ContentRootPath),
+                provider.GetRequiredService<ILoggerFactory>());
         });
 
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
@@ -234,6 +233,25 @@ public static class GleanvoltHostingExtensions
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
             return EvResolver.Resolve(
                 configuration, chargeControl.MinChargingCurrentAmps, chargeControl.MaxChargingCurrentAmps);
+        });
+
+        // The same section, editable from /car (issue #214) -- and with it the Vehicle:* sections, which
+        // describe the same car and which no owner could be expected to know are related. The running
+        // values are taken on first resolution, while they are still the ones EvInfo was resolved from;
+        // nothing but this editor ever writes them, so there is nothing that could have moved in
+        // between. The password is not among them: EvRunningState carries whether there is one.
+        services.AddSingleton<IEvEditor>(provider =>
+        {
+            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var secretStore = provider.GetRequiredService<ISecretStore>();
+
+            return new EvEditor(
+                configuration,
+                EvEditor.Snapshot(configuration, secretStore),
+                secretStore,
+                chargeControl.MinChargingCurrentAmps,
+                chargeControl.MaxChargingCurrentAmps,
+                provider.GetRequiredService<ILogger<EvEditor>>());
         });
 
         // What the charger and the car will BOTH accept. Every current and every phase count downstream
@@ -756,6 +774,11 @@ public static class GleanvoltHostingExtensions
         // command line. Added here rather than in the service registration because it is a
         // configuration source, and has to be in place before anything below reads the Pv section.
         builder.Configuration.AddPvSystemOverrides(builder.Environment.ContentRootPath);
+
+        // The manufacturer account's password, from the secret store rather than from that file
+        // (issues #214, #215). Beside it in the order, and for the same reason: a password typed on
+        // /car has to beat the one a long-forgotten .env still carries. See VehicleAccountSecret.
+        builder.Configuration.AddVehicleAccountPassword(builder.Environment.ContentRootPath);
 
         builder.Services.AddGleanvolt(builder.Configuration);
 

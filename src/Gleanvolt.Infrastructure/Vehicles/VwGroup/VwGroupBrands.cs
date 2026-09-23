@@ -1,3 +1,5 @@
+using Gleanvolt.Core.Models;
+
 namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 /// <summary>
@@ -60,8 +62,26 @@ public static class VwGroupBrands
         string.IsNullOrWhiteSpace(brand) ? null
             : PortalKeys.TryGetValue(brand.Trim(), out var key) ? key : null;
 
+    /// <summary>
+    /// The brands to offer, each under the name the configuration takes. One canonical name per brand
+    /// — the aliases above exist so a hand-typed <c>.env</c> is tolerated, not so a list has to show
+    /// the same car twice — and this is what <c>/car</c>'s Data Act choice is built from (issue #214),
+    /// so a brand added to the tables above appears on the page rather than in a second literal
+    /// somebody has to remember.
+    /// </summary>
+    public static IReadOnlyList<VehicleBrand> Catalog { get; } =
+    [
+        new("vw", "Volkswagen"),
+        new("vwn", "Volkswagen commercial vehicles"),
+        new("audi", "Audi"),
+        new("skoda", "Škoda"),
+        new("seat", "SEAT"),
+        new("cupra", "Cupra"),
+        new("bentley", "Bentley"),
+    ];
+
     /// <summary>The brand names that resolve, for a message that has to list them.</summary>
-    public static string Known => "vw, audi, skoda, seat, cupra, bentley";
+    public static string Known => string.Join(", ", Catalog.Select(brand => brand.Name));
 
     /// <summary>
     /// The client id for a brand name, or <c>null</c> when the name is empty or unrecognised. An

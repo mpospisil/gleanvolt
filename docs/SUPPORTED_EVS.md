@@ -34,16 +34,23 @@ That makes the list of chargeable cars simple: **every EV and plug-in hybrid sol
 Type 2 AC inlet.** No manufacturer account, no cloud and no internet connection is involved, and a
 dead car feed changes nothing about how the charger is driven.
 
-What does differ from car to car is what it will accept. Describe it in the
-[`Ev` section](../README.md#the-car-the-ev-section) (or `EV_*` in `deploy/.env`), and the controller
-works to the narrower of the car and the installation:
+What does differ from car to car is what it will accept. **Describe it on
+[`/car`](../README.md#car--the-car-and-editing-it) in the web UI** — pick the manufacturer, fill in
+what that choice needs, and restart — or in the [`Ev` section](../README.md#the-car-the-ev-section)
+(`EV_*` in `deploy/.env`) if you would rather edit a file. Either way the controller works to the
+narrower of the car and the installation:
 
-| Setting | Why it matters for your car |
-|---|---|
-| `EV_PHASES` | **The one that goes wrong quietly.** A single-phase car behind a three-phase charger that does not say so has every power figure overstated threefold. |
-| `EV_MIN_CHARGING_CURRENT_AMPS` | A car that refuses 6 A draws nothing at all when offered it, and a connected car drawing nothing reads as *finished*. |
-| `EV_MAX_CHARGING_CURRENT_AMPS` | The on-board charger's ceiling. An ID.4 takes 16 A per phase even from a 32 A wallbox. |
-| `VEHICLE_BATTERY_CAPACITY_KWH` | The **usable** pack. Needed only to ask for a target as a percentage. |
+| On `/car` | In `.env` | Why it matters for your car |
+|---|---|---|
+| **Phases** | `EV_PHASES` | **The one that goes wrong quietly.** A single-phase car behind a three-phase charger that does not say so has every power figure overstated threefold. The page offers 1, 2 or 3 rather than free text. |
+| **Minimum current** | `EV_MIN_CHARGING_CURRENT_AMPS` | A car that refuses 6 A draws nothing at all when offered it, and a connected car drawing nothing reads as *finished*. |
+| **Maximum current** | `EV_MAX_CHARGING_CURRENT_AMPS` | The on-board charger's ceiling. An ID.4 takes 16 A per phase even from a 32 A wallbox. Never raises the installation's. |
+| **Usable pack (kWh)** | `VEHICLE_BATTERY_CAPACITY_KWH` | The **usable** pack, not the brochure's gross figure. Needed only to ask for a target as a percentage. |
+
+A value saved on `/car` goes to the overrides file and **wins over `.env`**, key by key. A save is
+refused — naming the key — when it describes a car the charger could never serve, so *"the car's
+minimum 8 A is above the installation's maximum 6 A"* is caught at the form rather than at 2 a.m. on
+the next restart.
 
 ### Cars that need a closer look
 
@@ -90,10 +97,11 @@ to VW Group's statutory portal as the owner and reads it every fifteen minutes.
 | **Freshness** | **Hours behind the car**: 1 h 48 m to 7 h 16 m measured. Good for planning, too late to follow a charge |
 | **Needs you** | A one-off consent in a browser, and a continuous data request set up in the portal |
 | **Tested** | VW ID.4 Pro only. Field names come from a real ID.4 (MEB) download; the flat layout older plug-in hybrids use is from a description, not a capture |
-| **Setup** | [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md) |
+| **Setup** | **`/car` → the brand** (the list is the client's own, so there is no GUID to find), then [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md) for the browser steps the portal needs first |
 
 A brand missing from the table, or one whose sign-in id has changed, can still be used with
-`VW_CLIENT_ID` — see the setup guide. If battery or range comes back blank on a model other than an
+`VW_CLIENT_ID` — on `/car` it is behind the disclosure under the brand list, and in `.env` it is the
+same key; see the setup guide. If battery or range comes back blank on a model other than an
 ID.4, the **Vehicle portal** page lists the field names it did not recognise, and those are what
 `VwGroupFieldNames` is missing.
 
@@ -110,7 +118,7 @@ on volkswagen.de show, and it asks **only while a charging session is open**.
 | **Reads** | State of charge, range, charge state, charging power, **plug state** |
 | **Freshness** | About 20 seconds behind the car |
 | **Needs you** | An email one-time code on every cold sign-in, entered on **Vehicle portal → Sign in**. The remembered session survives restarts |
-| **Setup** | [`Vehicle:Website`](../README.md#vehiclewebsite--volkswagende-the-live-source) in the README |
+| **Setup** | **`/car` → Volkswagen**: VW ID, password, VIN — or [`Vehicle:Website`](../README.md#vehiclewebsite--volkswagende-the-live-source) in the README |
 
 Routes A and B complement each other and run side by side on the reference install: the portal carries
 the target SOC and time remaining, the website carries plug state and a curve while charging, and the
@@ -138,9 +146,11 @@ typed problem responses and rate-limit headers.
 | **Needs you** | An API key created in the MySkoda app, pasted once on **Vehicle portal**. It expires; renewing is pasting a new one |
 | **Quota** | 20 requests an hour per VIN, shared with *Ask the car* |
 | **Tested** | **No.** Built from the published spec with spec-built fixtures; nobody has run it against a Škoda yet. Reports in [issue #193](https://github.com/mpospisil/gleanvolt/issues/193) are very welcome |
-| **Setup** | [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
+| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted on **Vehicle portal**, not here. Or [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
 
 Route C and Route B cannot run together — they read two different cars, and an installation has one.
+Picking a manufacturer on `/car` makes that unarrangeable: the choice disables whichever feed it
+replaces in the same save.
 Route A (`VW_BRAND=skoda`) may run beside Route C, and the freshest reading wins. The key Route C uses
 is scoped to the cars it names, expires, and is revocable in the app — a much smaller secret than a
 brand password — and it clears Gleanvolt's bar below more comfortably than Route B: a documented

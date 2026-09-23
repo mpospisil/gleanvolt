@@ -895,9 +895,9 @@ button.link:hover {
     white-space: nowrap;
 }
 
-/* The PV system's edit form (#204). Two columns of label-over-input where there is room, one on a
-   phone; each field carries where its value comes from, because the web UI's file overrides .env and
-   that is otherwise invisible. */
+/* The settings forms (#204 on /pv-system, #214 on /car). Two columns of label-over-input where there
+   is room, one on a phone; each field carries where its value comes from, because the web UI's file
+   overrides .env and that is otherwise invisible. */
 .pv-fields {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
@@ -923,8 +923,40 @@ button.link:hover {
     font-variant-numeric: tabular-nums;
 }
 
-.pv-field input:disabled {
+.pv-field select {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 1rem;
+}
+
+.pv-field input:disabled,
+.pv-field select:disabled {
     color: var(--muted);
+}
+
+/* Where a password ends up, said under the box that takes it (#214). A line rather than a tooltip:
+   somebody typing a manufacturer account's password into a browser should not have to hover to
+   learn what protects it. */
+.pv-field .hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+/* The escape hatch under the Data Act brand list: documentation for a failure, folded away until it
+   is the failure somebody has. */
+.car-escape-hatch {
+    margin: 0.25rem 0 0.75rem;
+}
+
+.car-escape-hatch summary {
+    cursor: pointer;
+    font-size: 0.9rem;
 }
 
 .pv-field .source {

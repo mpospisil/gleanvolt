@@ -1769,6 +1769,10 @@ that belong to something else.
 **Nothing here is required, and an absent section changes nothing.** Every figure falls back to the
 installation's, which is exactly how the controller behaved before this section existed.
 
+**Or edit it on [`/car`](#car--the-car-and-editing-it)**, which covers every key above and the feed
+sections below it, checks a save against the same rules startup applies, and writes to the overrides
+file that wins over `.env`. The routes below still work and are what a fresh install is seeded from.
+
 #### Where to put it
 
 Three routes, and which one you want depends on where the controller is running. All of them end at
@@ -1862,6 +1866,10 @@ looks; but if you want them, leave this off.
 
 #### `Vehicle:Website` — volkswagen.de, the live source
 
+**Or set it on [`/car`](#car--the-car-and-editing-it)**: pick **Volkswagen**, and fill in the VW ID,
+the password and the VIN. The password goes to the secret store rather than to a file beside the
+configuration, and whichever feed it replaces is disabled in the same save.
+
 ```jsonc
 "Vehicle": { "Website": { "Enabled": true, "Vin": "WVGZZZ…", "PollInterval": "00:05:00", "IdlePollInterval": "00:15:00" } }
 ```
@@ -1916,6 +1924,10 @@ link to it, and nothing that writes to hardware depends on the feed.
 
 #### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
 
+**Or set it on [`/car`](#car--the-car-and-editing-it)**: pick **Škoda** and fill in the VIN. The API
+key is not asked for there — it is pasted on **Vehicle portal**, because keys expire and renewing one
+is a recurring owner action.
+
 ```jsonc
 "Ev":      { "Vehicles": [ { "Id": "enyaq", "Name": "The Enyaq", "Make": "Škoda", "Model": "Enyaq 85", "BatteryCapacityKWh": 77 } ] },
 "Vehicle": {
@@ -1961,6 +1973,9 @@ log line rather than refused. With no key yet, or an expired one, the dashboard'
 API key yet, or it has expired — paste one on the vehicle page*, with a link to it.
 
 ### Vehicle telemetry (the `Vehicle` section)
+
+**Or set it on [`/car`](#car--the-car-and-editing-it)**: pick *A feed I publish myself* and name the
+topic. The broker and its credentials stay here — they are the house broker's, not the car's.
 
 The **feed** that reports on the car above — as distinct from the car itself, and from the home battery
 the inverter reports. Off by default:
@@ -2186,6 +2201,10 @@ alive. The full argument is under
 [Setting a target](#setting-a-target).
 
 #### The car from the manufacturer, on a clock (the `Vehicle:DataAct` section)
+
+**Or set it on [`/car`](#car--the-car-and-editing-it)**: the brand comes from the list the client
+itself knows, so there is no GUID to fetch out of a redirect URL, and `ClientId` is behind a
+disclosure for the day one of those ids goes stale.
 
 The second way to feed the same card: the controller signs in to VW's own **EU Data Act portal** on a
 schedule and writes what it finds into the same reading everything else reads. One car, one
@@ -2487,13 +2506,74 @@ to the index and the OpenAPI document, the configured keys by name, and the `cur
 this installation's address and key already in it. The keys are shown on the same terms as the broker
 password: only behind a login, masked, with *Reveal* and *Copy*.
 
+#### `/car` — the car, and editing it
+
+The other side of the cable from [`/pv-system`](#pv-system--the-installation-and-editing-it), on the
+same mechanism ([issue #214](https://github.com/mpospisil/gleanvolt/issues/214)). Configuring the car
+used to be the last thing here that could only be done over ssh, and it is the thing a new owner does
+first — spread across four configuration sections that nothing said were about the same car, two of
+which together are a startup failure.
+
+**One `<select>`: the manufacturer.** It is the only control on the page that changes which fields
+exist, and it is what makes the bad combinations unrepresentable — one feed is selected, so
+`Vehicle:Website` and `Vehicle:Skoda` cannot both be enabled, and `Vehicle:DataAct` cannot be arranged
+beside a live feed by accident.
+
+| Choice | Feed it configures | What you then fill in | Freshness |
+|---|---|---|---|
+| **Volkswagen** | [`Vehicle:Website`](#vehiclewebsite--volkswagende-the-live-source) | VW ID e-mail, password, VIN | ~20 s, plug state, live while charging |
+| **Škoda** | [`Vehicle:Skoda`](#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) | VIN, then an API key on `/vehicle-portal` | 5–15 min, plug state |
+| **Audi · SEAT · Cupra · Bentley · VW commercial** | [`Vehicle:DataAct`](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) | Brand, VW ID, password, VIN | hours behind; no plug state |
+| **A feed I publish myself** | [`Vehicle`](#vehicle-telemetry-the-vehicle-section) | Topic | whatever publishes it |
+| **Another manufacturer — charge only** | none | nothing | — |
+
+The brand list under the Data Act choice is the client's own table, so a brand added there appears
+here. `ClientId` is behind a disclosure rather than in the form: it is the escape hatch for a brand
+whose sign-in id has changed, which is documentation for a failure rather than a field to fill.
+
+**The last row is not an error state.** Every EV with a Type 2 inlet charges without any feed at all.
+It costs exactly one thing: targets are asked for in kWh instead of per cent.
+
+**The car's own fields are always there** — id, name, make, model, phases, the two currents, the usable
+pack and the charge efficiency — because they are what make charging correct and they are independent
+of any feed. Phases is a choice rather than free text, since that is
+the one that goes wrong quietly. What the installation allows
+is printed beside the currents, so the narrower-of-the-two rule is visible while the number is typed
+rather than discovered in a startup refusal.
+
+**The same overrides file, the same rules as `/pv-system`.** A save writes only what differs to
+`Pv:OverridesPath` (`data/pv-system.json`), which wins over `.env` key by key; every field says where
+its value comes from, and a field set here has **Revert**. A save is checked by the same rules startup
+applies — `EvRules` against the charger's amp band, so *"the car's minimum 8 A is above the
+installation's maximum 6 A"* is refused at the form — and nothing is written when anything is refused.
+With no login configured the form is read-only: these fields are a manufacturer account.
+
+**Passwords never go in that file.** A password typed here goes to the
+[secret store](#the-data-directory-holds-secrets-the-secrets-section) under `Secrets:Directory`, written owner-only, and the page
+says which store and what protects it. It is **write-only**: the box renders empty always, empty on
+submit means *unchanged* and never *clear*, clearing is the explicit **Remove** button, and nothing —
+the provenance line, the pending-changes banner, a log line, an error — ever echoes it. volkswagen.de
+and the Data Act portal are entered with the same VW ID, so there is one stored password for both.
+
+**A save cannot prove an account**, and the page says so rather than letting a green save look like a
+working feed. The feed is built at startup out of these very keys, so there is nothing running to test
+them against — and a cold volkswagen.de sign-in wants an emailed one-time code anyway. The sequence is
+*save → restart → sign in on [`/vehicle-portal`](#vehicle-portal--the-car-from-the-manufacturer-on-demand)
+→ Ask the car*, and the **Saved, not applied** banner carries the **Restart** that begins it.
+
+**Below the form is what is running**: the resolved car with the three-column limits table, and the
+feed this process actually started — which is not always the feed the configuration asks for, since a
+live feed sets the Data Act portal aside. `Ev:Vehicles:0:Make` still selects nothing: the `<select>`
+writes the make *and* the feed's `Enabled` key as two separate edits, and the composition root goes on
+reading only the second.
+
 #### The dashboard reports; the plan page decides
 
 Those phases left the UI in three places for one question. The dashboard was fourteen telemetry tiles
 followed by a column of inputs; `/forecast` held the plan those inputs shape; `/targeted` held a mode
 with a form of its own. Reading an outcome and adjusting its input meant changing pages.
 
-**The nav is now Dashboard · Charging plan · Sessions · Energy · Forecast · PV system · Vehicle portal · Health.** The
+**The nav is now Dashboard · Charging plan · Sessions · Energy · Forecast · PV system · Car · Vehicle portal · Health.** The
 **day plan** and `/targeted` are gone as destinations; what was on them lives on **`/charging-plan`**,
 one tab per mode. (`/forecast` is a route again, and is a different page: the sun, not the car — see
 [Looking at the forecast](#looking-at-the-forecast) below.)
