@@ -83,13 +83,25 @@ public static class SolarDayPlanner
         // deeper discharge simply grows the need, which the battery outranks the car to satisfy.
         var batteryRefillableWh = slices.Sum(s => s.SurplusWh);
 
+        // What the pack cannot absorb between now and the horizon, whatever it does with the rest. At
+        // 100% SOC this is every remaining watt of surplus: the pack is closed, so each of those watts
+        // goes to the car or out of the house, and nowhere else. It is what decides whether a battery
+        // loan costs anything, and therefore how thin a surplus is worth bridging (issue #223).
+        var spillWh = Math.Max(0, batteryRefillableWh - batteryToFullWh);
+
         var trajectoryFloor = TrajectorySocFloor(batteryRefillableWh, options);
         var socFloor = ClampFloor(trajectoryFloor, options);
 
-        var feasibleEnergyWh = slices.Where(s => IsFeasible(s, options)).Sum(s => s.AvailableWh);
+        // The floor already means "lend no deeper than this and the day still repays it", so the room
+        // above it *is* the loan budget. Reported rather than enforced here: the controller owns the
+        // decision, and applies its own margin and daily backstop on top.
+        var loanableWh = Math.Max(0, (state.BatterySocPercent - socFloor) / 100 * options.BatteryCapacityWh);
+
+        var minSolarWatts = MinSolarPowerWatts(options, spilling: spillWh > 0);
+        var feasibleEnergyWh = slices.Where(s => s.IsChargeable(minSolarWatts)).Sum(s => s.AvailableWh);
         var evBudgetWh = Math.Max(0, remainingPvWh - expectedHouseWh - batteryToFullWh);
         var usableEvWh = Math.Min(evBudgetWh, feasibleEnergyWh);
-        var window = FirstViableWindow(slices, options);
+        var window = FirstViableWindow(slices, minSolarWatts, options.MinViableWindow);
 
         // How far today falls short of the house plus a full battery: above zero, the evening 100% is
         // at risk. The car is not in this sum — it is only ever given what is left over, so it can
@@ -108,6 +120,8 @@ public static class SolarDayPlanner
             NextFeasibleWindow: window,
             RequiredSocFloorPercent: socFloor,
             TrajectorySocFloorPercent: trajectoryFloor,
+            SpillWh: spillWh,
+            LoanableWh: loanableWh,
             ShortfallWh: shortfallWh,
             BiasFactor: biasFactor,
             Deadline: deadline,
@@ -172,16 +186,17 @@ public static class SolarDayPlanner
     // the first infeasible slice or a gap in the timeline.
     private static (DateTimeOffset Start, DateTimeOffset End)? FirstViableWindow(
         List<ForecastSlice> slices,
-        SolarDayPlannerOptions options)
+        double minSolarWatts,
+        TimeSpan minViableWindow)
     {
         DateTimeOffset? runStart = null;
         DateTimeOffset runEnd = default;
 
-        bool RunIsViable() => runStart is not null && runEnd - runStart.Value >= options.MinViableWindow;
+        bool RunIsViable() => runStart is not null && runEnd - runStart.Value >= minViableWindow;
 
         foreach (var slice in slices)
         {
-            if (!IsFeasible(slice, options))
+            if (!slice.IsChargeable(minSolarWatts))
             {
                 if (RunIsViable())
                 {
@@ -231,16 +246,23 @@ public static class SolarDayPlanner
     }
 
     /// <summary>
-    /// Whether the car could actually charge in this slice: the power left after the battery's booking
-    /// must clear the charger's minimum — or come within a loan's reach of it, when the battery is
-    /// allowed to bridge the gap.
+    /// The surplus a slice must reach for the car to be able to charge in it: the charger's minimum,
+    /// or as far below it as a loan can bridge when the battery is allowed to bridge the gap.
+    ///
+    /// <para><see cref="BatteryLoanRules"/> rather than the arithmetic inline, because
+    /// <see cref="ForecastedChargingController"/> grants the loan against the same two figures. When
+    /// the two were computed separately they disagreed, and the plan drew windows the controller
+    /// refused to enter (issue #223).</para>
     /// </summary>
-    private static bool IsFeasible(ForecastSlice slice, SolarDayPlannerOptions options)
+    public static double MinSolarPowerWatts(SolarDayPlannerOptions options, bool spilling)
     {
-        var threshold = options.EnableBatteryLoan
-            ? options.MinChargePowerWatts - options.MaxLoanPowerWatts
-            : options.MinChargePowerWatts;
+        ArgumentNullException.ThrowIfNull(options);
 
-        return slice.IsChargeable(threshold);
+        return BatteryLoanRules.MinSolarPowerWatts(
+            options.MinChargePowerWatts,
+            options.EnableBatteryLoan,
+            options.MaxLoanPowerWatts,
+            BatteryLoanRules.BridgeSurplusFloorWatts(
+                spilling, options.MinBridgeSurplusWatts, options.SpillBridgeSurplusWatts));
     }
 }

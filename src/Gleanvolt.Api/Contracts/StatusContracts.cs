@@ -133,6 +133,15 @@ public sealed record BatteryHoldResponse(bool Enabled, bool Requested, bool Acti
 /// <param name="FeasibleEvEnergyWh">Of that budget, what the charger can physically deliver in the time left.</param>
 /// <param name="RequiredSocFloorPercent">The SOC the home battery must not be drawn below.</param>
 /// <param name="TrajectorySocFloorPercent">The same floor as a trajectory over the day rather than a single number.</param>
+/// <param name="SpillWh">
+/// Remaining surplus the home battery has no room for: what is coming less what it can still absorb.
+/// At 100% SOC that is all of it, and every watt of it leaves the house unless the car takes it — which
+/// is what makes the battery loan free, and what opens the loan's thin-surplus rules.
+/// </param>
+/// <param name="LoanHeadroomWh">
+/// How much the pack may lend right now for free: the room between SOC and the floor, capped by the
+/// spill. Zero either when SOC sits on the floor or when every remaining watt has a home in the pack.
+/// </param>
 /// <param name="ShortfallWh">How far the day falls short of the house plus filling the battery by its deadline.</param>
 /// <param name="BiasFactor">The learned correction applied to the raw forecast: 1.0 is "believe it as given".</param>
 /// <param name="Deadline">When the home battery is expected to be full by.</param>
@@ -153,6 +162,8 @@ public sealed record SolarDayPlanResponse(
     double FeasibleEvEnergyWh,
     double RequiredSocFloorPercent,
     double TrajectorySocFloorPercent,
+    double SpillWh,
+    double LoanHeadroomWh,
     double ShortfallWh,
     double BiasFactor,
     DateTimeOffset Deadline,
@@ -171,6 +182,8 @@ public sealed record SolarDayPlanResponse(
         plan.FeasibleEvEnergyWh,
         plan.RequiredSocFloorPercent,
         plan.TrajectorySocFloorPercent,
+        plan.SpillWh,
+        plan.LoanHeadroomWh,
         plan.ShortfallWh,
         plan.BiasFactor,
         plan.Deadline,

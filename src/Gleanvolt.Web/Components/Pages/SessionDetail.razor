@@ -147,6 +147,17 @@ else
                 Click a name in the legend to take that series out. A shaded band marks the stretches
                 the battery hold was armed for, and a stretch with no samples in it is a hole rather
                 than a line drawn across it.
+                @if (_chart.HasPlanFloor)
+                {
+                    @:<strong>SOC floor</strong> is the line the home battery's SOC is judged against:
+                    @:above it the pack may lend to the car, below it the sun belongs to the pack.
+                }
+                @if (_chart.HasLoan)
+                {
+                    @:The shaded <strong>Battery loan</strong> under the surplus is how much of the
+                    @:charge the pack was funding so a surplus below the charger's floor could still
+                    @:reach the car.
+                }
                 @if (_chart.HasVehicleSoc)
                 {
                     @:<strong>Car SOC</strong> steps at the time the car captured each reading, which

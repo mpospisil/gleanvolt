@@ -18,8 +18,9 @@ public class ForecastedChargingControllerTests
 
     private static ForecastedChargingOptions Options(
         bool enableLoan = true,
-        double maxLoanPowerWatts = 2500,
+        double maxLoanPowerWatts = 3800,
         double minBridgeSurplusWatts = 2000,
+        double spillBridgeSurplusWatts = 400,
         double maxDailyLoanWh = 4000,
         double sessionTargetWh = 0,
         double floorResumeMarginPercent = 0,
@@ -36,6 +37,7 @@ public class ForecastedChargingControllerTests
             EnableBatteryLoan: enableLoan,
             MaxLoanPowerWatts: maxLoanPowerWatts,
             MinBridgeSurplusWatts: minBridgeSurplusWatts,
+            SpillBridgeSurplusWatts: spillBridgeSurplusWatts,
             MaxDailyLoanWh: maxDailyLoanWh,
             LoanSocMarginPercent: 2,
             MinRunTime: minRunTime ?? TimeSpan.FromMinutes(10),
@@ -52,7 +54,9 @@ public class ForecastedChargingControllerTests
         double shortfallWh = 0,
         bool usable = true,
         bool hasWindow = true,
-        double? trajectoryFloor = null) =>
+        double? trajectoryFloor = null,
+        double spillWh = 0,
+        double loanableWh = 2000) =>
         new(
             RemainingPvWh: 20_000,
             ShoulderEnergyWh: 2000,
@@ -67,6 +71,10 @@ public class ForecastedChargingControllerTests
             // Defaults to the floor in force, i.e. the forecast's own trajectory is what binds: a
             // breach is then the serious kind. Tests about the configured clamp pass a lower one.
             TrajectorySocFloorPercent: trajectoryFloor ?? socFloor,
+            // Zero by default: the pack can absorb everything the day still makes, which is the case the
+            // loan's original "is this surplus real?" floor was written for. The spill cases pass their own.
+            SpillWh: spillWh,
+            LoanableWh: loanableWh,
             ShortfallWh: shortfallWh,
             BiasFactor: 1,
             Deadline: Deadline,
@@ -84,6 +92,7 @@ public class ForecastedChargingControllerTests
         TimeSpan timeInState = default,
         double sessionEnergyWh = 0,
         double loanedTodayWh = 0,
+        double? loanOutstandingWh = null,
         DateTimeOffset? now = null,
         bool chargedThisMode = false) =>
         new(
@@ -97,7 +106,9 @@ public class ForecastedChargingControllerTests
             TimeInCurrentState: timeInState,
             SessionEnergyWh: sessionEnergyWh,
             LoanedTodayWh: loanedTodayWh,
-            ChargedThisMode: chargedThisMode);
+            ChargedThisMode: chargedThisMode,
+            // Nothing recovered unless a test says so, which is the pessimistic reading of what was lent.
+            LoanOutstandingWh: loanOutstandingWh ?? loanedTodayWh);
 
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()
@@ -347,24 +358,103 @@ public class ForecastedChargingControllerTests
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
+    // Issue #223 removed the shortfall veto: what stops lending on a day that cannot refill the pack is
+    // the floor, and it stops the whole session rather than merely the loan. A shortfall *is* a
+    // trajectory floor above the current SOC -- that is what the two words mean -- so this is the only
+    // shape a real shortfall day has, and the veto it replaced was mostly refusing the midday spill on
+    // afternoons whose evening load outran the sun.
     [Fact]
-    public void NoLoanOnAShortfallDay_BecauseThereIsNothingToRepayItWith()
+    public void ADayThatCannotRefillThePackIsStoppedByTheFloor_NotByTheLoanRule()
+    {
+        var decision = Controller().Decide(Input(
+            3000, socPercent: 70, charging: true, timeInState: TimeSpan.FromMinutes(20),
+            plan: Plan(shortfallWh: 5000, socFloor: 80, trajectoryFloor: 80)));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.LoanPowerWatts);
+        Assert.Contains("floor the forecast requires", decision.Reason);
+    }
+
+    [Fact]
+    public void NoLoanOnceTheOutstandingLendingReachesTheDailyCap()
+    {
+        var decision = Controller().Decide(Input(3000, charging: true, timeInState: TimeSpan.FromMinutes(20), loanedTodayWh: 4000));
+
+        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(0, decision.LoanPowerWatts);
+    }
+
+    // The cap counts what the pack is *still* down, not what it lent this morning: a pack that lent 6kWh
+    // and has been charged back to where it started is physically able to lend again, and used to spend
+    // the rest of the day refused (issue #223).
+    [Fact]
+    public void LendingResumesOnceThePackHasRecoveredWhatItLent()
     {
         var decision = Controller().Decide(Input(
             3000, charging: true, timeInState: TimeSpan.FromMinutes(20),
-            plan: Plan(shortfallWh: 5000)));
+            loanedTodayWh: 6000, loanOutstandingWh: 0));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(MinChargePowerWatts - 3000, decision.LoanPowerWatts, 1);
+    }
+
+    // The bug the issue was opened for, measured: the loan reached exactly 4140W while a restart asked
+    // for 4140 + 200, so the loan could sustain a charge and could never start one. The whole of its
+    // operating range was closed to a paused session, whatever the state of the pack.
+    [Fact]
+    public void APausedSessionRestartsOnALoan_TheBridgeReachesTheStartThreshold()
+    {
+        var controller = Controller();
+        var startThresholdWatts = MinChargePowerWatts + 200;
+
+        var decision = controller.Decide(Input(
+            2500, socPercent: 100, charging: false, timeInState: TimeSpan.FromHours(1),
+            plan: Plan(spillWh: 2500), chargedThisMode: true));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Equal(startThresholdWatts - 2500, decision.LoanPowerWatts, 1);
+    }
+
+    // The substance of the request behind the issue: a full pack, a thin afternoon, and a surplus being
+    // exported because it cannot reach the charger's floor on its own. The plan offers no window and no
+    // budget -- both statements about the forecast -- and on a pack with no room left the live surplus is
+    // entitled to answer for itself.
+    [Fact]
+    public void OnASpillDay_AThinSurplusIsBridgedEvenWithNoPlannedWindow()
+    {
+        var decision = Controller().Decide(Input(
+            1600, socPercent: 100, charging: false, timeInState: TimeSpan.FromHours(1),
+            plan: Plan(feasibleEvWh: 0, hasWindow: false, spillWh: 2500), chargedThisMode: true));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Equal(MinChargePowerWatts + 200 - 1600, decision.LoanPowerWatts, 1);
+    }
+
+    // ...and the other half of that rule, which is the behaviour that was right before: with room in the
+    // pack the energy lent is energy it would have kept, so the round trip has to be earned by a surplus
+    // that is really there.
+    [Fact]
+    public void WithRoomInThePack_AThinSurplusIsStillRefused()
+    {
+        var decision = Controller().Decide(Input(
+            1600, socPercent: 80, charging: true, timeInState: TimeSpan.FromMinutes(20),
+            plan: Plan(spillWh: 0)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
     [Fact]
-    public void NoLoanOnceTheDailyLoanBudgetIsSpent()
+    public void WithRoomInThePack_ADayWithNoDeliverableBudgetStillStopsTheCar()
     {
-        var decision = Controller().Decide(Input(3000, charging: true, timeInState: TimeSpan.FromMinutes(20), loanedTodayWh: 4000));
+        var decision = Controller().Decide(Input(
+            3000, socPercent: 80, charging: true, timeInState: TimeSpan.FromMinutes(20),
+            plan: Plan(feasibleEvWh: 0, hasWindow: false, spillWh: 0)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
-        Assert.Equal(0, decision.LoanPowerWatts);
+        Assert.Contains("No deliverable budget", decision.Reason);
     }
 
     [Fact]

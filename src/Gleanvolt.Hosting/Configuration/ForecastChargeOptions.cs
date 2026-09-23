@@ -86,20 +86,37 @@ public sealed class ForecastChargeOptions
     public bool EnableBatteryLoan { get; init; } = true;
 
     /// <summary>
-    /// Ceiling on that bridge. Must be big enough to actually reach the minimum charge power from a
-    /// realistic surplus — on three phases the floor is ~4.2 kW, so bridging a 2 kW surplus needs
-    /// ~2.2 kW. It doubles as the cap on how fast the battery is asked to discharge.
+    /// Ceiling on that bridge, and the cap on how fast the battery is asked to discharge. It must be
+    /// able to reach the minimum charge power from the thinnest surplus a loan is granted for, or it
+    /// quietly reimposes a floor of its own: at 2500 W against a 4.14 kW minimum nothing under 1.64 kW
+    /// could ever charge, whatever <see cref="SpillBridgeSurplusWatts"/> said (issue #223). The default
+    /// covers the whole gap on three phases; on one phase the minimum is ~1.4 kW and far less is needed.
+    /// Set it to the inverter's discharge limit if that is the binding figure on your install.
     /// </summary>
-    public double MaxLoanPowerWatts { get; init; } = 2500;
+    public double MaxLoanPowerWatts { get; init; } = 3800;
 
     /// <summary>
-    /// Minimum live surplus before any loan is granted. The loan tops up a genuine surplus that just
-    /// falls short of the charger's floor; it never funds a session on its own, which would be a
-    /// battery-to-car transfer paying a round trip and a cycle on both packs for nothing.
+    /// Minimum live surplus before any loan is granted <b>on a day the pack can still absorb its own
+    /// surplus</b>. The loan tops up a genuine surplus that just falls short of the charger's floor; it
+    /// never funds a session on its own, which would be a battery-to-car transfer paying a round trip
+    /// and a cycle on both packs for nothing.
     /// </summary>
     public double MinBridgeSurplusWatts { get; init; } = 2000;
 
-    /// <summary>Total energy the battery may lend in one day, in kWh. Reset at local midnight.</summary>
+    /// <summary>
+    /// The same floor on a day whose remaining surplus the pack has <b>no room for</b> — the plan's
+    /// spill above zero, which at 100% SOC is the whole of it. The reasoning above fails there: the
+    /// energy lent is not energy the pack would have kept, it is energy about to leave the house, so the
+    /// round trip buys it back rather than paying for nothing. Low, but deliberately not zero: cycling
+    /// the pack to chase a few hundred watts of noise is wear bought for nothing either way.
+    /// </summary>
+    public double SpillBridgeSurplusWatts { get; init; } = 400;
+
+    /// <summary>
+    /// Ceiling on <b>outstanding</b> lending in one day, in kWh — lent minus what the pack has charged
+    /// back — reset at local midnight. A backstop against wear, not the binding constraint: what the
+    /// pack is still down is the wear, and a pack refilled to 100% by lunchtime is where it started.
+    /// </summary>
     public double MaxDailyLoanKWh { get; init; } = 4;
 
     /// <summary>How far above the required floor the SOC must sit before the battery will lend at all.</summary>

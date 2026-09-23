@@ -833,15 +833,35 @@ each time. Two things prevent that:
 #### The battery loan
 
 On three phases a 3 kW surplus charges nothing. If the forecast shows the day can repay it, the
-battery lends the difference — sized to reach **exactly** the 6 A floor, never more — turning
-would-be export into charge. It is bounded four ways:
+battery lends the difference — sized to reach **exactly** the threshold in force, never more — turning
+would-be export into charge. Lending down to the plan's SOC floor *is* lending what the day can repay,
+because that is what the floor means, so the bounds are about wear and about whether the round trip
+buys anything:
 
-- never below the plan's SOC floor, nor below `MinBatterySocFloorPercent` (default 50 %);
-- `MaxLoanPowerWatts` (default 2500) caps the bridge and the discharge rate;
-- `MaxDailyLoanKWh` (default 4) caps a day's lending, reset at local midnight;
-- **no loan below `MinBridgeSurplusWatts`** (default 2000) and **none at all on a shortfall day** —
-  the loan tops up a genuine surplus, it never funds a session from the pack, which would pay a round
-  trip and a cycle on both batteries for nothing.
+- **never below the plan's SOC floor**, nor below `MinBatterySocFloorPercent` (default 50 %), with
+  `LoanSocMarginPercent` of clearance above it before lending starts at all. The floor rises as the day runs out, the discharge hold arms at it,
+  and the repayment needs no scheduling: lending drops SOC, which books more of the late production for
+  the pack, which raises the floor, which squeezes the car out earlier.
+- **`MaxLoanPowerWatts`** (default 3800) caps the bridge and the discharge rate. It has to be able to
+  reach the charger's floor from the thinnest surplus a loan is granted for, or it silently imposes a
+  floor of its own.
+- **`MaxDailyLoanKWh`** (default 4) caps *outstanding* lending — lent minus what the pack has charged
+  back, reset at local midnight. A backstop against wear, not the binding constraint: a pack that lent
+  2 kWh in the morning and is full again by one o'clock is physically where it started.
+- **a minimum live surplus, and which one depends on whether the pack has room for the energy.** With
+  room, `MinBridgeSurplusWatts` (default 2000): the loan tops up a genuine surplus and never funds a
+  session from the pack, which would pay a round trip and a cycle on both batteries for nothing. With
+  the pack full — or more generally with the day making more surplus than it can absorb by the
+  deadline, published as **surplus spill** — that reasoning fails, because the energy lent is not
+  energy the pack would have kept, it is energy about to be exported. There
+  `SpillBridgeSurplusWatts` (default 400) applies instead, so a thin overcast afternoon on a full pack
+  charges the car rather than giving the day to the meter
+  ([#223](https://github.com/mpospisil/gleanvolt/issues/223)). Low but not zero: cycling the pack to
+  chase noise is wear bought for nothing either way.
+
+The same two floors decide what the plan calls a **charge window**, so a window drawn on the Forecasted
+tab is one the controller will enter — the two used to be computed separately and disagreed by the
+width of a whole band of weather.
 
 With `BatteryHold:Enabled` on, the [battery discharge hold](#battery-discharge-hold-writes-to-the-inverter)
 is armed automatically once SOC reaches the floor, so an estimate error can't dig below it — the grid
@@ -923,9 +943,10 @@ deadline.
     "SessionEnergyTargetKWh": 0,     // per-session ceiling, 0 = unlimited (stands in for "charge to 80%")
                                      //   a ceiling, not a request — to ask for an amount, use Targeted
     "EnableBatteryLoan": true,
-    "MaxLoanPowerWatts": 2500,       // must be able to bridge a real surplus up to ~4.2 kW
-    "MinBridgeSurplusWatts": 2000,   // no loan below this — never fund a session from the pack
-    "MaxDailyLoanKWh": 4,
+    "MaxLoanPowerWatts": 3800,       // must be able to bridge the thinnest allowed surplus up to ~4.2 kW
+    "MinBridgeSurplusWatts": 2000,   // no loan below this while the pack has room for the surplus
+    "SpillBridgeSurplusWatts": 400,  // ...and below this when it has not: the energy was leaving anyway
+    "MaxDailyLoanKWh": 4,            // a wear backstop, counted on OUTSTANDING lending (lent − recovered)
     "LoanSocMarginPercent": 2,
     "MinViableWindow": "00:30:00",   // shortest forecast window worth starting a session for
     "MinRunTime": "00:10:00",        // dwell timers: no start/stop churn faster than these
@@ -1535,7 +1556,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
 - sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power**, **Forecast solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
 - forecast-plan sensors, populated while the **Forecasted** mode is driving:
   **Plan state**, **Charge window**, **EV energy budget**,
-  **Projected shortfall**, **Required SOC floor**, **Trajectory SOC floor**, **Forecast remaining today**,
+  **Projected shortfall**, **Surplus spill**, **Loan headroom**, **Required SOC floor**,
+  **Trajectory SOC floor**, **Forecast remaining today**,
   **Tomorrow forecast**, **Forecast accuracy**, **Session energy**, **Battery loaned today** and
   **Battery loan power**. `Charge window` and `EV energy budget` are what a "not much sun for the car
   today" notification automation keys off. A previous version published a **Daily EV target** number
@@ -1622,6 +1644,8 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **Charge window** | — | The next stretch of today in which the surplus is forecast to clear the charger's minimum power for long enough to be worth starting. `none` when today offers no such window. |
 | **EV energy budget** | kWh | How much of today's remaining sun the car may have: what's left once the house and a 100% battery by evening are served, then restricted to the periods where the surplus actually clears the charger's minimum power. The restriction matters because the car can't sip a budget slowly. |
 | **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full home battery. Above zero means the evening 100% is at risk. The car is **not** in this sum — it only ever gets what is left once both are served, so it can neither cause this shortfall nor be measured against it. |
+| **Surplus spill** | kWh | Remaining surplus the home battery has no room for: what is still coming, less what it can absorb by the evening deadline. At 100% it is all of it, and every watt of it leaves the house unless the car takes it. Above zero it is what lets the pack lend against a much thinner surplus than usual, because the energy lent is not energy it would have kept. |
+| **Loan headroom** | kWh | How much the pack may lend right now for free: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, and zero when every remaining watt has a home in the pack — which is the answer to "why is nothing being lent while the sun is out?". |
 | **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what arms the discharge hold automatically. |
 | **Trajectory SOC floor** | % | The same figure before the **Minimum battery SOC** clamp is applied: what the forecast on its own says the battery could be drawn down to. Well below the floor in force on a sunny morning, equal to it once the day is short. The pair is the first thing to read when a session pauses — it says whether the car is being held back by the forecast or merely by your configured minimum, and the controller stops the session harder in the first case. |
 | **Forecast remaining today** | kWh | Forecast PV still to come today, at the configured confidence band and already scaled by **Forecast accuracy**. |
@@ -2328,8 +2352,9 @@ reported read-only beside them, the **battery discharge hold** switch (shown onl
 `BatteryHold:Enabled` is on) and the runtime numbers (**session energy target**, **minimum battery
 SOC**, **SOC resume margin**). Phase 5 adds the `Forecasted` mode's day plan as one
 coherent view instead of the loosely related entities Home Assistant renders it as: plan state,
-charge window, EV energy budget, projected shortfall, required SOC floor, forecast remaining today,
-tomorrow's forecast, forecast accuracy and battery loaned today, each with an explanation next to it, plus a timeline chart plotting forecast surplus
+charge window, EV energy budget, projected shortfall, surplus spill, loan headroom, required SOC floor,
+forecast remaining today, tomorrow's forecast, forecast accuracy and battery loaned today, each with an
+explanation next to it, plus a timeline chart plotting forecast surplus
 against the charge window with the required-SOC-floor projection overlaid on a second axis. The
 chart's data is computed once, in `Gleanvolt.Core`, by the same `SolarDayPlanner` that builds the plan
 itself — the floor projection is the identical formula the live figure uses, evaluated at every
@@ -2653,6 +2678,11 @@ session asks:
 - **A shaded band marks the stretches the battery discharge hold was armed for**, with the battery's
   own line inside it. Whether a hold actually held is a question about what the pack did while it was
   armed, and this is where that is now visible rather than inferred.
+- **The plan's SOC floor is drawn beside the SOC it judges**, and the **battery loan** is shaded under
+  the surplus the controller decided on. Without them, "why did it stop while the pack was full?" could
+  not be answered from the picture at all, though every figure was already on the rows
+  ([#223](https://github.com/mpospisil/gleanvolt/issues/223)). A session run in another mode carries no
+  plan, and one that never borrowed carries no loan, so neither line is offered as a flat zero.
 
 A dashed rule marks each moment that changed the shape — a mode change, a pause, a plan going
 unusable or usable again — and the list under the chart says what each one was. The setpoint changes

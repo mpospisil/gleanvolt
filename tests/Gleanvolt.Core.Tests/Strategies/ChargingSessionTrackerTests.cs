@@ -582,6 +582,8 @@ public class ChargingSessionTrackerTests
         NextFeasibleWindow: (Noon, Noon.AddHours(4)),
         RequiredSocFloorPercent: 55,
         TrajectorySocFloorPercent: 55,
+        SpillWh: 1500,
+        LoanableWh: 2700,
         ShortfallWh: 0,
         BiasFactor: 1.0,
         Deadline: Noon.AddHours(7),

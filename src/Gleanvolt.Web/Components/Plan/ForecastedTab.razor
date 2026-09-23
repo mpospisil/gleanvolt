@@ -122,6 +122,10 @@ else
               Hint="How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power." />
         <Stat Label="Projected shortfall" Value="@Kwh(plan.ShortfallWh)"
               Hint="How far today's forecast falls short of the house plus a full home battery. Above zero, the evening 100% is at risk. The car is not in this sum — it only ever gets what is left over." />
+        <Stat Label="Surplus spill" Value="@Kwh(plan.SpillWh)"
+              Hint="Remaining surplus the home battery has no room for — what is still coming less what it can absorb. At 100% it is all of it, and every watt leaves the house unless the car takes it, which is what lets the battery lend against a much thinner surplus." />
+        <Stat Label="Loan headroom" Value="@Kwh(plan.LoanHeadroomWh)"
+              Hint="How much the pack may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, or when every remaining watt has a home in the pack." />
         <Stat Label="Required SOC floor" Value="@Percent(plan.RequiredSocFloorPercent)"
               Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what arms the discharge hold automatically." />
         <Stat Label="Forecast remaining today" Value="@Kwh(plan.RemainingPvWh)"

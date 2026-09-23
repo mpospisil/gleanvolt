@@ -29,6 +29,11 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 /// <param name="SessionEnergyWh">Energy delivered to the car in the current session (since it was plugged in).</param>
 /// <param name="LoanedTodayWh">Energy lent out of the home battery to the car so far today.</param>
+/// <param name="LoanOutstandingWh">
+/// Of that, the part not yet recovered — lending less everything the pack has charged back since, never
+/// below zero. What the daily cap is measured against (issue #223): a pack refilled to 100% by lunchtime
+/// is physically where it started, and owes nothing.
+/// </param>
 /// <param name="EvDrewPower">
 /// Whether the car has drawn meaningful power at least once since it was plugged in. Distinguishes a
 /// car that has finished from one that has not started yet (still Preparing, or waiting on its own
@@ -103,7 +108,8 @@ public sealed record ChargingControlInput(
     TimeSpan ChargerNotFastFor = default,
     bool WaitAlreadyReleased = false,
     SolarGridOutlook? SolarGrid = null,
-    bool ChargedThisMode = false);
+    bool ChargedThisMode = false,
+    double LoanOutstandingWh = 0);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for

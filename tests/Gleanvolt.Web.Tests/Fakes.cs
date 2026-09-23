@@ -323,7 +323,10 @@ internal static class TestSessions
         double? forecastPowerWatts = null,
         double? vehicleSocPercent = null,
         DateTimeOffset? vehicleSocCapturedAt = null,
-        bool batteryHoldActive = false) =>
+        bool batteryHoldActive = false,
+        double? surplusWatts = 2_000,
+        double loanPowerWatts = 0,
+        double? planRequiredSocFloorPercent = null) =>
         new(
             SessionId: sessionId,
             Timestamp: timestamp,
@@ -353,13 +356,13 @@ internal static class TestSessions
             VehicleSocCapturedAt: vehicleSocCapturedAt,
             VehicleChargeTimeRemainingMinutes: 0,
             VehicleChargeTimeRemainingReported: false,
-            SurplusWatts: 2_000,
-            LoanPowerWatts: 0,
+            SurplusWatts: surplusWatts,
+            LoanPowerWatts: loanPowerWatts,
             BatteryHoldActive: batteryHoldActive,
             ForecastPowerWatts: forecastPowerWatts,
             PlanRemainingPvWh: null,
             PlanFeasibleEvEnergyWh: null,
-            PlanRequiredSocFloorPercent: null);
+            PlanRequiredSocFloorPercent: planRequiredSocFloorPercent);
 }
 
 /// <summary>Plausible <see cref="SolarDayPlan"/> values for tests, standing in for <c>SolarDayPlanner</c>'s output.</summary>
@@ -380,6 +383,8 @@ internal static class TestPlans
             NextFeasibleWindow: window ?? (now.AddHours(1), now.AddHours(3)),
             RequiredSocFloorPercent: 62,
             TrajectorySocFloorPercent: 62,
+            SpillWh: 1500,
+            LoanableWh: 2700,
             ShortfallWh: 1_000,
             BiasFactor: 0.97,
             Deadline: now.AddHours(6),

@@ -30,9 +30,21 @@ namespace Gleanvolt.Core.Models;
 /// <param name="MinBridgeSurplusWatts">
 /// The loan tops up a genuine surplus; it never funds a session on its own. Below this much live
 /// surplus, no loan is granted — lending the full minimum into no sun at all would just be a
-/// battery-to-car transfer, paying a round trip and a cycle on both packs for nothing.
+/// battery-to-car transfer, paying a round trip and a cycle on both packs for nothing. Applies on a
+/// day the pack can still absorb its own surplus, which is what makes that reasoning hold.
 /// </param>
-/// <param name="MaxDailyLoanWh">Total energy the battery may lend in a day, reset at local midnight.</param>
+/// <param name="SpillBridgeSurplusWatts">
+/// The same floor on a day whose remaining surplus the pack has no room for
+/// (<see cref="SolarDayPlan.WillSpill"/>). Much lower, because the argument above fails there: the
+/// energy lent would not have been kept, it would have been exported, so the round trip buys back
+/// watts that were leaving the house rather than spending watts the pack wanted. Not zero — cycling
+/// the pack to chase noise is still wear for nothing.
+/// </param>
+/// <param name="MaxDailyLoanWh">
+/// Ceiling on <b>outstanding</b> lending — lent minus recovered, reset at local midnight. A wear
+/// backstop rather than the binding constraint: a pack that lends 2 kWh in the morning and is back at
+/// 100% by lunchtime is physically where it started, and used to spend the rest of the day refused.
+/// </param>
 /// <param name="LoanSocMarginPercent">How far above the trajectory floor the SOC must sit before lending.</param>
 /// <param name="MinRunTime">Once charging, the shortest time to keep going before a soft reason may stop it.</param>
 /// <param name="MinPauseTime">Once paused, the shortest time before charging may restart.</param>
@@ -54,6 +66,7 @@ public sealed record ForecastedChargingOptions(
     bool EnableBatteryLoan,
     double MaxLoanPowerWatts,
     double MinBridgeSurplusWatts,
+    double SpillBridgeSurplusWatts,
     double MaxDailyLoanWh,
     double LoanSocMarginPercent,
     TimeSpan MinRunTime,

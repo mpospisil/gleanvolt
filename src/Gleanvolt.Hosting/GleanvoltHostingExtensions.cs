@@ -312,6 +312,7 @@ public static class GleanvoltHostingExtensions
                     EnableBatteryLoan: forecast.EnableBatteryLoan,
                     MaxLoanPowerWatts: forecast.MaxLoanPowerWatts,
                     MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts,
+                    SpillBridgeSurplusWatts: forecast.SpillBridgeSurplusWatts,
                     MaxDailyLoanWh: forecast.MaxDailyLoanKWh * 1000,
                     LoanSocMarginPercent: forecast.LoanSocMarginPercent,
                     MinRunTime: forecast.MinRunTime,

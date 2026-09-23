@@ -131,6 +131,11 @@ public sealed class DayPlanProvider
             MinChargePowerWatts: _power.AmpsToWatts(_minChargingCurrentAmps),
             MaxLoanPowerWatts: _options.EnableBatteryLoan ? _options.MaxLoanPowerWatts : 0,
             EnableBatteryLoan: _options.EnableBatteryLoan,
+            // The controller's own two bridge floors, so a window this plan draws is one the controller
+            // will actually enter: it refuses to lend below them, and a period that only clears the
+            // charger's minimum with a loan that would be refused is not a period the car can use.
+            MinBridgeSurplusWatts: _options.MinBridgeSurplusWatts,
+            SpillBridgeSurplusWatts: _options.SpillBridgeSurplusWatts,
             MinViableWindow: _options.MinViableWindow,
             // The floor is the one planning input worth changing from Home Assistant without a
             // restart, so it comes from the runtime settings when those are wired up.
@@ -227,7 +232,8 @@ public sealed class DayPlanProvider
             changed ? LogLevel.Information : LogLevel.Debug,
             "Day plan: Shoulder={ShoulderKWh:F1}kWh Plateau={PlateauKWh:F1}kWh House={HouseKWh:F1}kWh BattToFull={BatteryKWh:F1}kWh "
             + "Claimed={ClaimedKWh:F1}kWh EvBudget={BudgetKWh:F1}kWh Feasible={FeasibleKWh:F1}kWh Window={Window} "
-            + "Short={ShortfallKWh:F1}kWh SocFloor={SocFloor:F0}% Bias={Bias:F2} Baseline={BaselineWatts:F0}W ({Confidence})",
+            + "Short={ShortfallKWh:F1}kWh Spill={SpillKWh:F1}kWh Loanable={LoanableKWh:F1}kWh "
+            + "SocFloor={SocFloor:F0}% Bias={Bias:F2} Baseline={BaselineWatts:F0}W ({Confidence})",
             plan.ShoulderEnergyWh / 1000,
             plan.PlateauEnergyWh / 1000,
             plan.ExpectedHouseWh / 1000,
@@ -239,6 +245,8 @@ public sealed class DayPlanProvider
                 ? $"{window.Start.LocalDateTime:HH:mm}-{window.End.LocalDateTime:HH:mm}"
                 : "none",
             plan.ShortfallWh / 1000,
+            plan.SpillWh / 1000,
+            plan.LoanHeadroomWh / 1000,
             plan.RequiredSocFloorPercent,
             plan.BiasFactor,
             _houseLoad.DailyMeanWatts,
