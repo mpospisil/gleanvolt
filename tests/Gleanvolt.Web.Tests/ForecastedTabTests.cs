@@ -63,18 +63,16 @@ public class ForecastedTabTests : PageTest
         Assert.Contains("only shown while", page.Markup);
         Assert.Contains("Solar", page.Markup);
 
-        // The stat grid, not the words in it: the controls above now name the figures they feed
-        // ("it sets Day outlook"), so a text search would find the label without a plan behind it.
         Assert.Empty(page.FindAll(".stat-grid"));
 
         // The controls the mode reads are not part of the plan, and stay reachable whatever is driving.
-        Assert.NotEmpty(page.FindAll("#daily-ev-target"));
+        Assert.NotEmpty(page.FindAll("#session-energy-target"));
     }
 
     [Fact]
-    public void Shows_all_eleven_plan_figures_when_forecasted_is_driving()
+    public void Shows_the_plan_figures_when_forecasted_is_driving()
     {
-        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Tight);
+        var plan = TestPlans.Usable(_time.Now);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
         {
             Plan = plan,
@@ -84,15 +82,11 @@ public class ForecastedTabTests : PageTest
 
         var page = RenderTab();
 
-        Assert.Contains("Day outlook", page.Markup);
-        Assert.Contains("Tight", page.Markup);
         Assert.Contains("Plan state", page.Markup);
         Assert.Contains(plan.Reason, page.Markup);
         Assert.Contains("Charge window", page.Markup);
         Assert.Contains("EV energy budget", page.Markup);
         Assert.Contains("4.5 kWh", page.Markup);
-        Assert.Contains("EV energy expected today", page.Markup);
-        Assert.Contains("6.0 kWh", page.Markup);
         Assert.Contains("Projected shortfall", page.Markup);
         Assert.Contains("1.0 kWh", page.Markup);
         Assert.Contains("Required SOC floor", page.Markup);
@@ -185,7 +179,7 @@ public class ForecastedTabTests : PageTest
         var plan = TestPlans.Usable(_time.Now);
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
-        page.WaitForAssertion(() => Assert.Contains("Day outlook", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("EV energy budget", page.Markup));
     }
 
     [Fact]
@@ -202,28 +196,15 @@ public class ForecastedTabTests : PageTest
     [Fact]
     public void Shows_the_runtime_numbers_from_the_forecast_settings()
     {
-        _forecast.SetDailyEvTargetWh(12_000, "test setup");
         _forecast.SetSessionEnergyTargetWh(5_000, "test setup");
         _forecast.SetMinBatterySocFloorPercent(55, "test setup");
         _forecast.SetFloorResumeMarginPercent(6, "test setup");
 
         var page = RenderTab();
 
-        Assert.Equal("12", page.Find("#daily-ev-target").GetAttribute("value"));
         Assert.Equal("5", page.Find("#session-energy-target").GetAttribute("value"));
         Assert.Equal("55", page.Find("#min-battery-soc").GetAttribute("value"));
         Assert.Equal("6", page.Find("#resume-margin").GetAttribute("value"));
-    }
-
-    [Fact]
-    public void Changing_the_daily_ev_target_drives_the_settings_in_watt_hours()
-    {
-        var page = RenderTab();
-
-        page.Find("#daily-ev-target").Change("18.5");
-
-        Assert.Equal(18_500, _forecast.DailyEvTargetWh, precision: 3);
-        Assert.Contains(_forecast.Sets, s => s.Setting == "DailyEvTargetWh" && s.Source == "Web UI");
     }
 
     [Fact]
@@ -263,72 +244,55 @@ public class ForecastedTabTests : PageTest
     public void Picks_up_a_runtime_number_changed_by_another_surface()
     {
         var page = RenderTab();
-        Assert.Equal("15", page.Find("#daily-ev-target").GetAttribute("value"));
+        Assert.Equal("50", page.Find("#min-battery-soc").GetAttribute("value"));
 
         // Home Assistant (or another browser tab) changes it; the next poll should carry it here.
-        _forecast.SetDailyEvTargetWh(9_000, "Home Assistant");
+        _forecast.SetMinBatterySocFloorPercent(40, "Home Assistant");
         _holder.Set(Statuses.Sample(_time.Now));
 
-        page.WaitForAssertion(() => Assert.Equal("9", page.Find("#daily-ev-target").GetAttribute("value")));
+        page.WaitForAssertion(() => Assert.Equal("40", page.Find("#min-battery-soc").GetAttribute("value")));
     }
 
-    // The two energy numbers read alike and behave nothing alike (#173): the daily target is a
-    // yardstick the plan reports against, the session target is the only hard stop. The verdict is
-    // what the daily target buys -- one sentence instead of three tiles -- and the session line is
-    // what the ceiling has left.
+    // Issue #217: the headline above the plan is a forecast of what today gives the car, never a
+    // verdict on whether it is enough. The mode has nothing to be enough *for* -- an owner who wants
+    // an amount is asking Targeted a question.
     [Fact]
-    public void Says_in_one_sentence_how_today_stands_against_what_the_owner_drives()
+    public void Says_in_one_sentence_what_today_gives_the_car_and_when()
     {
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
         {
-            Plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Tight),
+            Plan = TestPlans.Usable(
+                _time.Now,
+                window: (
+                    new DateTimeOffset(2026, 8, 12, 8, 20, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 8, 12, 13, 40, 0, TimeSpan.Zero))),
         });
 
         var page = RenderTab();
 
-        // The sample plan expects 6 kWh into the car against a 15 kWh target.
-        Assert.Contains("Today covers 6.0 kWh of the 15.0 kWh you drive — 9.0 kWh short", page.Markup);
+        Assert.Contains("Today gives the car about 4.5 kWh, in a window from 10:20 to 15:40.", page.Markup);
+        Assert.DoesNotContain("you drive", page.Markup);
     }
 
     [Fact]
-    public void Calls_a_day_that_reaches_the_target_covered_rather_than_short()
+    public void Says_the_car_waits_on_a_day_with_no_window()
     {
-        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Surplus) with
-        {
-            EvExpectedTodayWh = 15_000,
-            EvTargetWh = 15_000,
-        };
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
-
-        var page = RenderTab();
-
-        Assert.Contains("Today covers the full 15.0 kWh you drive", page.Markup);
-        Assert.DoesNotContain("kWh short", page.Markup);
-    }
-
-    [Fact]
-    public void Says_the_car_gets_nothing_on_a_day_with_no_window()
-    {
-        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.NoChargeToday) with { NextFeasibleWindow = null };
+        var plan = TestPlans.Usable(_time.Now) with { NextFeasibleWindow = null };
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
 
         var page = RenderTab();
 
         Assert.Contains("no chargeable window", page.Markup);
-        Assert.Contains("the battery keeps priority", page.Markup);
+        Assert.Contains("The car waits", page.Markup);
     }
 
     [Fact]
-    public void Judges_nothing_when_no_daily_target_is_set()
+    public void Points_an_owner_who_wants_to_name_an_amount_at_targeted()
     {
-        // 0 makes the outlook permanently Surplus, so a verdict phrased against the target would be
-        // a lie dressed as good news.
-        var plan = TestPlans.Usable(_time.Now, outlook: DayOutlook.Surplus) with { EvTargetWh = 0 };
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = plan });
-
         var page = RenderTab();
 
-        Assert.Contains("No daily target set", page.Markup);
+        Assert.Contains("/charging-plan/targeted", page.Markup);
+        Assert.Contains("takes no request for an amount", page.Markup);
     }
 
     [Fact]

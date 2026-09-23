@@ -50,8 +50,8 @@ public class ForecastedChargingControllerTests
         double feasibleEvWh = 8000,
         double socFloor = 50,
         double shortfallWh = 0,
-        DayOutlook outlook = DayOutlook.Surplus,
         bool usable = true,
+        bool hasWindow = true,
         double? trajectoryFloor = null) =>
         new(
             RemainingPvWh: 20_000,
@@ -62,15 +62,12 @@ public class ForecastedChargingControllerTests
             BatteryToFullWh: 1000,
             EvBudgetWh: feasibleEvWh,
             FeasibleEvEnergyWh: feasibleEvWh,
-            NextFeasibleWindow: (Now, Now.AddHours(3)),
+            NextFeasibleWindow: hasWindow ? (Now, Now.AddHours(3)) : null,
             RequiredSocFloorPercent: socFloor,
             // Defaults to the floor in force, i.e. the forecast's own trajectory is what binds: a
             // breach is then the serious kind. Tests about the configured clamp pass a lower one.
             TrajectorySocFloorPercent: trajectoryFloor ?? socFloor,
             ShortfallWh: shortfallWh,
-            EvExpectedTodayWh: feasibleEvWh,
-            EvTargetWh: 15_000,
-            Outlook: outlook,
             BiasFactor: 1,
             Deadline: Deadline,
             ForecastAsOf: Now.AddHours(-1),
@@ -305,12 +302,27 @@ public class ForecastedChargingControllerTests
     }
 
     [Fact]
-    public void NoChargeToday_Pauses()
+    public void ADayWithNoChargeableWindowPauses()
     {
-        var decision = Controller().Decide(Input(8000, plan: Plan(feasibleEvWh: 0, outlook: DayOutlook.NoChargeToday)));
+        var decision = Controller().Decide(Input(8000, plan: Plan(feasibleEvWh: 0, hasWindow: false)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
-        Assert.Contains("No chargeable window", decision.Reason);
+        Assert.Contains("No deliverable budget", decision.Reason);
+    }
+
+    // Issue #217: this used to be a hard stop that ended the session outright. The hard stops are
+    // promises -- the battery's evening guarantee, the final guard, the session ceiling -- and a day
+    // the sun never gets going on is weather, not a promise, so it waits out the dwell timer like a
+    // passing cloud instead.
+    [Fact]
+    public void ADayWithNoChargeableWindowHoldsAtMinimumInsideTheMinimumRunTime()
+    {
+        var decision = Controller().Decide(Input(
+            8000, plan: Plan(feasibleEvWh: 0, hasWindow: false), charging: true, timeInState: TimeSpan.FromMinutes(2)));
+
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
+        Assert.Equal(6, decision.ChargeCurrentAmps);
+        Assert.Contains("minimum run time", decision.Reason);
     }
 
     [Fact]
@@ -340,7 +352,7 @@ public class ForecastedChargingControllerTests
     {
         var decision = Controller().Decide(Input(
             3000, charging: true, timeInState: TimeSpan.FromMinutes(20),
-            plan: Plan(shortfallWh: 5000, outlook: DayOutlook.Shortfall)));
+            plan: Plan(shortfallWh: 5000)));
 
         Assert.Equal(ChargingControlAction.Pause, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);

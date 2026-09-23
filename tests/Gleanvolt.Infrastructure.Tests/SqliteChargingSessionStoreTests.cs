@@ -434,7 +434,6 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         // The value tuple is the part a default JSON configuration would silently drop, taking the
         // charging window with it.
         Assert.Equal(plan.NextFeasibleWindow, stored.StartPlan!.NextFeasibleWindow);
-        Assert.Equal(plan.Outlook, stored.StartPlan.Outlook);
         Assert.Equal(plan.RequiredSocFloorPercent, stored.StartPlan.RequiredSocFloorPercent);
         Assert.Equal(18_000, stored.ForecastRemainingAtStartWh);
     }
@@ -701,9 +700,6 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         RequiredSocFloorPercent: 55,
         TrajectorySocFloorPercent: 55,
         ShortfallWh: 0,
-        EvExpectedTodayWh: 12_000,
-        EvTargetWh: 15_000,
-        Outlook: DayOutlook.Surplus,
         BiasFactor: 1.0,
         Deadline: Noon.AddHours(7),
         ForecastAsOf: Noon.AddHours(-1),

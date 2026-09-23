@@ -133,10 +133,7 @@ public sealed record BatteryHoldResponse(bool Enabled, bool Requested, bool Acti
 /// <param name="FeasibleEvEnergyWh">Of that budget, what the charger can physically deliver in the time left.</param>
 /// <param name="RequiredSocFloorPercent">The SOC the home battery must not be drawn below.</param>
 /// <param name="TrajectorySocFloorPercent">The same floor as a trajectory over the day rather than a single number.</param>
-/// <param name="ShortfallWh">How far the day falls short of filling the battery by its deadline.</param>
-/// <param name="EvExpectedTodayWh">What the car is expected to take today.</param>
-/// <param name="EvTargetWh">What the car was asked for today.</param>
-/// <param name="Outlook">The day's coarse character.</param>
+/// <param name="ShortfallWh">How far the day falls short of the house plus filling the battery by its deadline.</param>
 /// <param name="BiasFactor">The learned correction applied to the raw forecast: 1.0 is "believe it as given".</param>
 /// <param name="Deadline">When the home battery is expected to be full by.</param>
 /// <param name="ForecastAsOf">When the forecast behind this plan was fetched, or null when there was none.</param>
@@ -157,9 +154,6 @@ public sealed record SolarDayPlanResponse(
     double RequiredSocFloorPercent,
     double TrajectorySocFloorPercent,
     double ShortfallWh,
-    double EvExpectedTodayWh,
-    double EvTargetWh,
-    DayOutlook Outlook,
     double BiasFactor,
     DateTimeOffset Deadline,
     DateTimeOffset? ForecastAsOf,
@@ -178,9 +172,6 @@ public sealed record SolarDayPlanResponse(
         plan.RequiredSocFloorPercent,
         plan.TrajectorySocFloorPercent,
         plan.ShortfallWh,
-        plan.EvExpectedTodayWh,
-        plan.EvTargetWh,
-        plan.Outlook,
         plan.BiasFactor,
         plan.Deadline,
         plan.ForecastAsOf,

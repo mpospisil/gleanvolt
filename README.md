@@ -854,12 +854,20 @@ The priority order is fixed and not configurable:
 > **1. House load → 2. Battery to 100 % by the deadline → 3. EV.**
 
 The car absorbs the entire shortfall, and **no grid charging is ever initiated**. A partial charge
-does an EV pack no harm — an NMC pack is happier at mid SOC than topped up daily — but a shortfall
-discovered at dusk with a silently paused charger is unhelpful, so it is announced instead: a
-`Day outlook` of `Surplus | Tight | Shortfall | NoChargeToday`, a projected shortfall in kWh, and what
-the car can still expect today, all published to HA and logged as soon as the day can be judged.
+does an EV pack no harm — an NMC pack is happier at mid SOC than topped up daily — but a thin day
+discovered at dusk with a silently paused charger is unhelpful, so the plan is published instead:
+the **charge window**, the **EV energy budget** in it, the **projected shortfall** (how far the day
+falls short of the house plus a full battery — the evening 100%, which the car is never part of),
+and the **plan state** sentence, all on HA and in the log as soon as the forecast allows.
 Tomorrow's forecast rides along in the same Solcast response, so a bad day comes with the context of
 whether waiting is worth it.
+
+The mode takes no request for an amount. It reports what the day can give; it does not accept an
+answer to "how much do you want?" — that is what [`Targeted`](#targeted-charging-the-targeted-mode) is for,
+and only `Targeted` paces a charge, buys grid for the remainder and reports the gap when the time
+will not stretch. The per-session **energy ceiling** stays here, because a ceiling is not a request:
+it resets per plug-in, stands in for "charge to 80%" on a charger that cannot read the car's SOC, and
+"stop at 10 kWh, whenever that happens" has no departure time for `Targeted` to work to.
 
 #### Forecast versus reality
 
@@ -889,16 +897,16 @@ against the free tier's 10.
 #### What it logs
 
 ```
-Day outlook: Shortfall — Forecast=7.2kWh House=4.1kWh BattToFull=5.3kWh EvTarget=15.0kWh Short=17.2kWh …
-Day plan: Shoulder=3.4kWh Plateau=11.0kWh … EvBudget=10.5kWh Feasible=10.5kWh Window=12:30-15:50 SocFloor=62% Bias=0.94 (P10)
+Day plan: Shoulder=3.4kWh Plateau=11.0kWh … EvBudget=10.5kWh Feasible=10.5kWh Window=12:30-15:50 Short=0.0kWh SocFloor=62% Bias=0.94 (P10)
 Forecast check: Period=12:00-12:30 Forecast=3120Wh Actual=2890Wh Delta=-230Wh (-7%) … Bias=0.94
 Charge control: Mode=Forecasted … Action=Charge Target=6A Loan=1140W Session=8.4kWh LoanedToday=1.8kWh. …
 Day summary: ForecastToday=28.1kWh ActualToday=26.4kWh (-6%) BatterySoc@19:00=100% EvDelivered=14.2kWh …
 ```
 
 The day plan logs at `Information` only when it actually changes (at a 5-second poll, anything else
-would bury the log) and at `Debug` otherwise; the outlook logs on transitions; the summary once, at
-the deadline.
+would bury the log) and at `Debug` otherwise — a change being the plan becoming usable or unusable,
+the window appearing or going, or the budget moving by a whole kWh. The summary logs once, at the
+deadline.
 
 ```jsonc
 "ChargeControl": {
@@ -912,9 +920,8 @@ the deadline.
     "MinBatterySocFloorPercent": 50, // hard floor, whatever the forecast says
     "FloorResumeMarginPercent": 5,   // SOC recovery required before a paused session restarts
     "FloorGuardReserveWatts": 750,   // surplus kept for the battery inside that band, 0 = off
-    "DailyEvTargetKWh": 15,          // what a good day looks like; the outlook and shortfall are measured
-                                     //   against it, but nothing stops charging on it
     "SessionEnergyTargetKWh": 0,     // per-session ceiling, 0 = unlimited (stands in for "charge to 80%")
+                                     //   a ceiling, not a request — to ask for an amount, use Targeted
     "EnableBatteryLoan": true,
     "MaxLoanPowerWatts": 2500,       // must be able to bridge a real surplus up to ~4.2 kW
     "MinBridgeSurplusWatts": 2000,   // no loan below this — never fund a session from the pack
@@ -1526,15 +1533,16 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   [Battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) above for what it does and
   why its state reflects the last successful write rather than a device read-back.
 - sensors: **Control state**, **Charger status** (Available / Charging / ChargePaused / …), **Solar power**, **Forecast solar power** and **Solar surplus**, **EV charging power** and **EV charging current** (actual draw), **Target/Active charging current** (setpoint), **Battery SOC**, **Battery power**, **Grid power** (positive = importing, negative = exporting), and **Battery hold target** (while the hold is enabled).
-- forecast-plan sensors, populated while the **Forecasted** mode is driving: **Day outlook**,
-  **Plan state**, **Charge window**, **EV energy budget**, **EV energy expected today**,
+- forecast-plan sensors, populated while the **Forecasted** mode is driving:
+  **Plan state**, **Charge window**, **EV energy budget**,
   **Projected shortfall**, **Required SOC floor**, **Trajectory SOC floor**, **Forecast remaining today**,
   **Tomorrow forecast**, **Forecast accuracy**, **Session energy**, **Battery loaned today** and
-  **Battery loan power**. `Day outlook` and `Projected shortfall` are what a "not enough sun for the
-  car today" notification automation keys off.
-- numbers, settable at runtime: **Daily EV target** (kWh), **Session energy target** (kWh, 0 =
-  unlimited), **Minimum battery SOC** (%) and **SOC resume margin** (%). Like the mode, changes don't
-  persist across restarts.
+  **Battery loan power**. `Charge window` and `EV energy budget` are what a "not much sun for the car
+  today" notification automation keys off. A previous version published a **Daily EV target** number
+  with a **Day outlook** and an **EV energy expected today** sensor reporting against it; upgrading
+  retires all three, and Home Assistant removes them on its own.
+- numbers, settable at runtime: **Session energy target** (kWh, 0 = unlimited), **Minimum battery
+  SOC** (%) and **SOC resume margin** (%). Like the mode, changes don't persist across restarts.
 - the fast-charge controls — the **Fast basis** select, the **Fast energy** and **Fast target SOC**
   numbers and the **Fast departure** text, applied by the **Charge fast** button that was already
   there — plus its sensors: **Fast delivered**, **Fast target** and **Fast start**. All absent while
@@ -1575,8 +1583,7 @@ description or tooltip field. The meanings live here instead.
 | **Charge solar + grid** | button | The same, for `SolarGrid`. Reads **Min solar surplus** on every poll rather than at the press, so the number can be moved while it runs. Switches itself off at the end of the day's useful sun, when the car stops drawing, or when it is unplugged. |
 | **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` and `SolarGrid` are different: they arm their own hold only while the car draws more than the sun gives — `Targeted`'s grid block, the grid bridge, or a cloud the 3-minute average has not caught up with — keep it for `BatteryHold:BridgeReleaseDwell` after the last of those while charging, and never touch this switch. |
-| **Daily EV target** | kWh | What you would like the car to have taken by the end of the day — a yardstick, not a limit. **Day outlook**, **Projected shortfall** and **EV energy expected today** are all measured against it, and nothing stops on it: past the target the car goes on taking whatever surplus the plan still allows, and lowering it sends the car no less. **Session energy target** is the one that caps a charge. Doesn't persist across restarts. |
-| **Session energy target** | kWh | The only hard stop in the `Forecasted` mode: the car is paused the moment the charger's meter passes this much, ahead of the dwell timers and whatever the forecast says. Stands in for "charge to 80%", since the charger cannot see the car's own SOC. Counted per plug-in — unplugging the car and plugging it back in starts the count at zero, and nothing else resets it. `0` means no limit. Doesn't persist across restarts. |
+| **Session energy target** | kWh | The one hard stop in the `Forecasted` mode: the car is paused the moment the charger's meter passes this much, ahead of the dwell timers and whatever the forecast says. A **ceiling, not a request** — it stands in for "charge to 80%", since the charger cannot see the car's own SOC, and it has no idea when you are leaving. To *ask* for an amount by a time, use `Targeted`. Counted per plug-in — unplugging the car and plugging it back in starts the count at zero, and nothing else resets it. `0` means no limit. Doesn't persist across restarts. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
@@ -1611,12 +1618,10 @@ nothing rather than stale numbers from a plan nobody is acting on.
 
 | Entity | Unit | What it means |
 | --- | --- | --- |
-| **Day outlook** | — | How the rest of today looks for the car. `Surplus`: the day covers the house, the battery to 100% and the whole EV target. `Tight`: the car gets something, but less than its target. `Shortfall`: substantially less — the battery keeps priority. `NoChargeToday`: no window in which the car could charge at all. `Unknown`: no usable forecast. |
 | **Plan state** | — | One line on why the day plan says what it says — the same explanation the log carries. |
 | **Charge window** | — | The next stretch of today in which the surplus is forecast to clear the charger's minimum power for long enough to be worth starting. `none` when today offers no such window. |
 | **EV energy budget** | kWh | How much of today's remaining sun the car may have: what's left once the house and a 100% battery by evening are served, then restricted to the periods where the surplus actually clears the charger's minimum power. The restriction matters because the car can't sip a budget slowly. |
-| **EV energy expected today** | kWh | What the car can realistically receive in total today, including what it has already taken. |
-| **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full battery plus the daily EV target. Above zero means the car won't get everything it wanted; the battery keeps priority regardless. |
+| **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full home battery. Above zero means the evening 100% is at risk. The car is **not** in this sum — it only ever gets what is left once both are served, so it can neither cause this shortfall nor be measured against it. |
 | **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what arms the discharge hold automatically. |
 | **Trajectory SOC floor** | % | The same figure before the **Minimum battery SOC** clamp is applied: what the forecast on its own says the battery could be drawn down to. Well below the floor in force on a sunny morning, equal to it once the day is short. The pair is the first thing to read when a session pauses — it says whether the car is being held back by the forecast or merely by your configured minimum, and the controller stops the session harder in the first case. |
 | **Forecast remaining today** | kWh | Forecast PV still to come today, at the configured confidence band and already scaled by **Forecast accuracy**. |
@@ -2320,12 +2325,11 @@ hardware.
 
 Phase 3 adds the same controls Home Assistant has — a button per strategy with the running mode
 reported read-only beside them, the **battery discharge hold** switch (shown only while
-`BatteryHold:Enabled` is on) and the runtime numbers (**daily EV target**, **session energy target**,
-**minimum battery SOC**, **SOC resume margin**). Phase 5 adds the `Forecasted` mode's day plan as one
-coherent view instead of the dozen loosely related entities Home Assistant renders it as: day
-outlook, plan state, charge window, EV energy budget, EV energy expected today, projected shortfall,
-required SOC floor, forecast remaining today, tomorrow's forecast, forecast accuracy and battery
-loaned today, each with an explanation next to it, plus a timeline chart plotting forecast surplus
+`BatteryHold:Enabled` is on) and the runtime numbers (**session energy target**, **minimum battery
+SOC**, **SOC resume margin**). Phase 5 adds the `Forecasted` mode's day plan as one
+coherent view instead of the loosely related entities Home Assistant renders it as: plan state,
+charge window, EV energy budget, projected shortfall, required SOC floor, forecast remaining today,
+tomorrow's forecast, forecast accuracy and battery loaned today, each with an explanation next to it, plus a timeline chart plotting forecast surplus
 against the charge window with the required-SOC-floor projection overlaid on a second axis. The
 chart's data is computed once, in `Gleanvolt.Core`, by the same `SolarDayPlanner` that builds the plan
 itself — the floor projection is the identical formula the live figure uses, evaluated at every

@@ -76,10 +76,10 @@ public sealed class ForecastChargeOptions
     /// </summary>
     public double FloorGuardReserveWatts { get; init; } = 750;
 
-    /// <summary>What the owner would like the car to receive on a normal day, in kWh.</summary>
-    public double DailyEvTargetKWh { get; init; } = 15;
-
-    /// <summary>Ceiling on energy per charging session, in kWh. 0 = unlimited.</summary>
+    /// <summary>
+    /// Ceiling on energy per charging session, in kWh. 0 = unlimited. A ceiling, not a request — an
+    /// owner asking for an amount by a time wants the Targeted mode.
+    /// </summary>
     public double SessionEnergyTargetKWh { get; init; }
 
     /// <summary>Whether the home battery may bridge a sub-minimum surplus up to the charger's floor.</summary>

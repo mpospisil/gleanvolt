@@ -185,7 +185,6 @@ internal sealed class FakeSolarGridSettings : ISolarGridSettings
 
 internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 {
-    public double DailyEvTargetWh { get; private set; } = 15_000;
 
     public double SessionEnergyTargetWh { get; private set; }
 
@@ -194,12 +193,6 @@ internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
     public double FloorResumeMarginPercent { get; private set; } = 5;
 
     public List<(string Setting, double Value, string Source)> Sets { get; } = [];
-
-    public void SetDailyEvTargetWh(double wattHours, string source)
-    {
-        DailyEvTargetWh = Math.Max(0, wattHours);
-        Sets.Add((nameof(DailyEvTargetWh), DailyEvTargetWh, source));
-    }
 
     public void SetSessionEnergyTargetWh(double wattHours, string source)
     {
@@ -374,7 +367,6 @@ internal static class TestPlans
 {
     public static SolarDayPlan Usable(
         DateTimeOffset now,
-        DayOutlook outlook = DayOutlook.Tight,
         (DateTimeOffset Start, DateTimeOffset End)? window = null,
         IReadOnlyList<SolarDayPlanTimelinePoint>? timeline = null) => new(
             RemainingPvWh: 9_000,
@@ -389,9 +381,6 @@ internal static class TestPlans
             RequiredSocFloorPercent: 62,
             TrajectorySocFloorPercent: 62,
             ShortfallWh: 1_000,
-            EvExpectedTodayWh: 6_000,
-            EvTargetWh: 15_000,
-            Outlook: outlook,
             BiasFactor: 0.97,
             Deadline: now.AddHours(6),
             ForecastAsOf: now.AddHours(-1),

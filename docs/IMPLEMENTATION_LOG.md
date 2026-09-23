@@ -4,6 +4,101 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-09-23 — The daily EV target comes out of `Forecasted`; a request is what `Targeted` is for (issue #217)
+
+`Forecasted` carried a **daily EV target** and `Targeted` takes an amount by a departure time. Both
+asked the same question in the same units, and only one did anything with the answer. The daily
+target never stopped the charger, never paced anything and never bought a watt — it printed a
+sentence. A yardstick wearing a request's clothes, and the clothes taught owners that `Forecasted`
+takes requests. This issue only subtracts: nothing new is added, and the loan, the floor, the guard
+band, the deadline and the dwell timers are untouched.
+
+### What came out
+
+- **The daily EV target, everywhere.** `IForecastRuntimeSettings.DailyEvTargetWh` and its setter,
+  `ChargeControl:Forecast:DailyEvTargetKWh`, `ForecastChargeOptions.DailyEvTargetKWh`,
+  `SolarDayPlannerOptions.DailyEvTargetWh`, the `daily_ev_target` HA number and the web input.
+- **`evDeliveredTodayWh` as a planner parameter.** It fed the shortfall maths and nothing else.
+  `DayPlanProvider` keeps its day integrator for the daily summary line — "the car took 9.4 kWh
+  today" is worth having in the journal — and its unread `EvDeliveredTodayWh` property goes.
+- **`DayOutlook` entirely**, rather than shrinking it to fit. `Surplus`, `Tight` and `Shortfall` are
+  verdicts on sufficiency, and two of them became unreachable the moment the target was gone. What
+  would have been left — is there a window, how much is in it — is already `NextFeasibleWindow` and
+  `FeasibleEvEnergyWh`, so keeping the enum would be the same overlap one layer down.
+  `TightOutlookFraction`, `OutlookHysteresisFraction`, the `previousOutlook` parameter and
+  `DayPlanProvider._lastOutlook` went with it, hysteresis and all: it was earned (three changes in
+  three minutes on the boundary) but it was hysteresis on the verdict being deleted.
+- **`EvExpectedTodayWh` and `EvTargetWh`** from `SolarDayPlan`, `SolarDayPlanResponse` and the tab.
+  The first collapses to `delivered + FeasibleEvEnergyWh` once nothing caps it, and the budget tile
+  already says that.
+
+### The two gates became one, and it is soft
+
+`ForecastedChargingController` gated the car twice on the same fact: `Outlook == NoChargeToday` hard,
+above the dwell timers, and `FeasibleEvEnergyWh <= 0` soft, subject to them — with the hard gate
+already swallowing the soft one, since the energy it tested was `min(want, feasible)`. One gate now,
+on `NextFeasibleWindow is null || FeasibleEvEnergyWh <= 0`, and it is the **soft** one. The hard
+stops are promises — the battery's evening guarantee, the final guard, the session ceiling — and "no
+window right now" is weather.
+
+**Behaviour change to expect:** a day with no chargeable window used to end the session outright and
+now pauses through `MinRunTime` like a passing cloud. The floor gate, the final guard and the session
+ceiling are untouched and still cut a session short on their own terms.
+
+### What the surviving figures mean
+
+- **`ShortfallWh`** lost its EV term: `expectedHouse + batteryToFull − remainingPv`, i.e. how far
+  today falls short of the house plus a full battery. Above zero the evening 100% is at risk. This is
+  what the API's own doc comment already claimed — the code had drifted from the description, and
+  this closes the gap rather than widening it.
+- **The tab's headline changed kind.** A verdict — *"Today covers 9 of the 15 kWh you drive"* —
+  became a forecast: *"Today gives the car about 9 kWh, in a window from 10:20 to 15:40."*
+
+### What stays, and why it is not the same thing
+
+The **session energy target**. A strict reading of "amounts live in `Targeted`" would take it too,
+so the reason is now written in three places (the interface, the README table and `DECISIONS.md`) to
+stop it being removed later by that argument: it is a **ceiling on one session**, not a request. It
+resets per plug-in, it stands in for "charge to 80%" on a charger that cannot see the car's SOC, and
+`Targeted` cannot express it at all — `Targeted` needs a departure time, and *"stop at 10 kWh,
+whenever that happens"* has none. `Forecasted` is left with three runtime numbers, no two of which
+answer the same question: one ceiling and two battery-protection numbers.
+
+### Leaving cleanly
+
+- **Three HA entities are retired, not merely dropped.** `daily_ev_target`, `day_outlook` and
+  `ev_expected_today` are added to `RetiredDiscoveryTopics()`, the way the charge-mode select was in
+  #89. Their configs are retained on the broker, so without that every existing installation keeps
+  three ghosts nothing ever writes to again. `ev_expected_today` is not named in the issue but had to
+  go with them: its figure left the plan, so nothing could publish it.
+- **A breaking API change.** `evTargetWh`, `evExpectedTodayWh` and `outlook` leave
+  `SolarDayPlanResponse`, and the `DayOutlook` schema leaves the document.
+  `tests/Gleanvolt.Api.Tests/OpenApiContract.json` regenerated — the diff is exactly those four
+  removals. The MCP repo's `contract/openapi.json` was refreshed with it and picked up two earlier
+  drifts nobody had refreshed: `secretStore` on the health response (#215) and the four appended
+  session-end reasons (#198).
+- **`DailyEvTargetKWh` dropped from `appsettings.json` with no migration.** Bound options ignore
+  unknown keys, so a leftover entry in an existing config file is silently ignored.
+
+### The honest limit, written down
+
+"No grid" is only as tight as the meter. The mode never *decides* to import — it modulates against
+measured surplus and has no grid bridge. But on the reference installation the grid meter reads 0 W
+on phase T, so roughly a third of the EV's load is invisible and the surplus the mode acts on is
+optimistic while the car is drawing. Some import at the margin is a property of the measurement, not
+of the plan.
+
+### Tests
+
+The suite is green at `-m:1` (1,850 across five projects: 95 / 538 / 456 / 388 / 373). Changed: the planner's two hysteresis
+tests deleted with the thing they tested; its shortfall test split into the new meaning and its
+complement; the controller's `NoChargeToday_Pauses` replaced by a pair that prove the pause and the
+dwell-timer hold; the tab's verdict tests replaced by ones for the forecast sentence, the no-window
+sentence and the pointer to `Targeted`; and a new theory in `HaDiscoveryTests` that each of the three
+retired topics is in `RetiredDiscoveryTopics()` and in no discovery message.
+
+---
+
 ## 2026-09-22 — One secret store: owner-only on Linux, DPAPI on Windows, and nothing called "encrypted" (issue #215)
 
 Three files under the data directory were bearer-equivalent and plaintext, each doing its own file

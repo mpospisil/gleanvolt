@@ -26,9 +26,6 @@ namespace Gleanvolt.Core.Strategies;
 /// </summary>
 public static class SolarDayPlanner
 {
-    /// <summary>Below this the car's remaining expectation is treated as nothing worth planning for.</summary>
-    private const double NegligibleEnergyWh = 100;
-
     /// <summary>
     /// Builds the plan. <paramref name="forecast"/> should be today's periods; pass null (or an empty
     /// forecast) when none has been fetched yet and the caller gets an unusable plan back.
@@ -38,12 +35,6 @@ public static class SolarDayPlanner
     /// <param name="deadline">When the home battery is required to be at 100%.</param>
     /// <param name="houseLoad">Expected household load excluding the EV, per instant (see <see cref="IHouseLoadProfile"/>).</param>
     /// <param name="biasFactor">Realised forecast bias to scale the remaining forecast by (1.0 = trust it as-is).</param>
-    /// <param name="evDeliveredTodayWh">How much the car has already had today, for the shortfall maths.</param>
-    /// <param name="previousOutlook">
-    /// The outlook reported last cycle. Used only for hysteresis around the classification
-    /// thresholds: without it the outlook flips between Tight and Shortfall on a rounding wobble --
-    /// three changes inside three minutes were observed in validation.
-    /// </param>
     /// <param name="options">Planning parameters.</param>
     public static SolarDayPlan Plan(
         EnergyState state,
@@ -51,9 +42,7 @@ public static class SolarDayPlanner
         DateTimeOffset deadline,
         IHouseLoadProfile houseLoad,
         double biasFactor,
-        double evDeliveredTodayWh,
-        SolarDayPlannerOptions options,
-        DayOutlook previousOutlook = DayOutlook.Unknown)
+        SolarDayPlannerOptions options)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(houseLoad);
@@ -102,10 +91,10 @@ public static class SolarDayPlanner
         var usableEvWh = Math.Min(evBudgetWh, feasibleEnergyWh);
         var window = FirstViableWindow(slices, options);
 
-        var evWantRemainingWh = Math.Max(0, options.DailyEvTargetWh - evDeliveredTodayWh);
-        var shortfallWh = Math.Max(0, expectedHouseWh + batteryToFullWh + evWantRemainingWh - remainingPvWh);
-        var evExpectedRemainingWh = window is null ? 0 : Math.Min(evWantRemainingWh, usableEvWh);
-        var outlook = Classify(evWantRemainingWh, evExpectedRemainingWh, window, previousOutlook, options);
+        // How far today falls short of the house plus a full battery: above zero, the evening 100% is
+        // at risk. The car is not in this sum — it is only ever given what is left over, so it can
+        // neither cause this shortfall nor be measured against it.
+        var shortfallWh = Math.Max(0, expectedHouseWh + batteryToFullWh - remainingPvWh);
 
         return new SolarDayPlan(
             RemainingPvWh: remainingPvWh,
@@ -120,14 +109,11 @@ public static class SolarDayPlanner
             RequiredSocFloorPercent: socFloor,
             TrajectorySocFloorPercent: trajectoryFloor,
             ShortfallWh: shortfallWh,
-            EvExpectedTodayWh: evDeliveredTodayWh + evExpectedRemainingWh,
-            EvTargetWh: options.DailyEvTargetWh,
-            Outlook: outlook,
             BiasFactor: biasFactor,
             Deadline: deadline,
             ForecastAsOf: forecast.RetrievedAt,
             IsUsable: true,
-            Reason: Describe(outlook, usableEvWh, shortfallWh, socFloor, window),
+            Reason: Describe(usableEvWh, shortfallWh, socFloor, window),
             Timeline: BuildTimeline(slices, options));
     }
 
@@ -225,66 +211,23 @@ public static class SolarDayPlanner
         return RunIsViable() ? (runStart!.Value, runEnd) : null;
     }
 
-    // Classification with hysteresis: a threshold crossed by a rounding wobble must not flip the
-    // reported outlook, because the outlook is what notifications and dashboards key off. Leaving a
-    // state needs the margin; entering it does not.
-    private static DayOutlook Classify(
-        double evWantRemainingWh,
-        double evExpectedRemainingWh,
-        (DateTimeOffset Start, DateTimeOffset End)? window,
-        DayOutlook previous,
-        SolarDayPlannerOptions options)
-    {
-        if (evWantRemainingWh <= NegligibleEnergyWh)
-        {
-            // Nothing left to want: the car has had its target already.
-            return DayOutlook.Surplus;
-        }
-
-        if (window is null || evExpectedRemainingWh < NegligibleEnergyWh)
-        {
-            return DayOutlook.NoChargeToday;
-        }
-
-        if (evExpectedRemainingWh >= evWantRemainingWh - NegligibleEnergyWh)
-        {
-            return DayOutlook.Surplus;
-        }
-
-        var fraction = evExpectedRemainingWh / evWantRemainingWh;
-        var margin = Math.Max(0, options.OutlookHysteresisFraction);
-
-        // Sitting exactly on the boundary (the common case: half the target) is what chattered, so the
-        // threshold moves depending on which side we were on last cycle.
-        var threshold = previous == DayOutlook.Tight
-            ? options.TightOutlookFraction - margin
-            : options.TightOutlookFraction + margin;
-
-        return fraction >= threshold ? DayOutlook.Tight : DayOutlook.Shortfall;
-    }
-
     private static string Describe(
-        DayOutlook outlook,
         double usableEvWh,
         double shortfallWh,
         double socFloorPercent,
         (DateTimeOffset Start, DateTimeOffset End)? window)
     {
-        var windowText = window is null
-            ? "no chargeable window"
-            : $"window {window.Value.Start.LocalDateTime:HH:mm}-{window.Value.End.LocalDateTime:HH:mm}";
-
-        return outlook switch
+        if (window is null || usableEvWh <= 0)
         {
-            DayOutlook.NoChargeToday =>
-                $"No EV charging today ({windowText}); the battery has priority. Short {shortfallWh / 1000:F1}kWh.",
-            DayOutlook.Shortfall =>
-                $"Shortfall {shortfallWh / 1000:F1}kWh: the car gets {usableEvWh / 1000:F1}kWh, {windowText}, SOC floor {socFloorPercent:F0}%.",
-            DayOutlook.Tight =>
-                $"Tight day: {usableEvWh / 1000:F1}kWh for the car, {windowText}, SOC floor {socFloorPercent:F0}%.",
-            _ =>
-                $"{usableEvWh / 1000:F1}kWh available for the car, {windowText}, SOC floor {socFloorPercent:F0}%.",
-        };
+            return $"No chargeable window today; the battery has priority. SOC floor {socFloorPercent:F0}%.";
+        }
+
+        var windowText = $"window {window.Value.Start.LocalDateTime:HH:mm}-{window.Value.End.LocalDateTime:HH:mm}";
+        var shortfallText = shortfallWh > 0
+            ? $" The day is {shortfallWh / 1000:F1}kWh short of a full battery by the deadline."
+            : string.Empty;
+
+        return $"{usableEvWh / 1000:F1}kWh available for the car, {windowText}, SOC floor {socFloorPercent:F0}%.{shortfallText}";
     }
 
     /// <summary>

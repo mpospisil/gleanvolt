@@ -215,7 +215,6 @@
       "succeeded": "boolean (required)",
       "target": "any (required)"
     },
-    "DayOutlook": "enum[unknown|surplus|tight|shortfall|noChargeToday]",
     "EditablePlanBody": {
       "forbiddenWindows": "array\u003C$TimeWindowBody\u003E?",
       "maxGridEnergyWh": "number|string(double)?",
@@ -456,13 +455,10 @@
       "biasFactor": "number|string(double) (required)",
       "deadline": "string(date-time) (required)",
       "evBudgetWh": "number|string(double) (required)",
-      "evExpectedTodayWh": "number|string(double) (required)",
-      "evTargetWh": "number|string(double) (required)",
       "expectedHouseWh": "number|string(double) (required)",
       "feasibleEvEnergyWh": "number|string(double) (required)",
       "forecastAsOf": "string(date-time)? (required)",
       "isUsable": "boolean (required)",
-      "outlook": "$DayOutlook (required)",
       "plateauClaimedByBatteryWh": "number|string(double) (required)",
       "plateauEnergyWh": "number|string(double) (required)",
       "reason": "string (required)",
