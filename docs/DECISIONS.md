@@ -4,6 +4,88 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-09-23 — `Forecasted` stops asking how much the car wants; a request is what `Targeted` is for
+
+**Context.** Issue #217. `Forecasted` carried a **daily EV target** and `Targeted` takes an amount by
+a departure time. Both asked the owner the same question in the same units, and only one of them did
+anything with the answer: `Targeted` paces the charge to meet it, buys grid for the remainder, places
+that grid as late as it can and reports the gap when the time will not stretch. The daily target
+printed a sentence. It never stopped the charger, never paced anything and never bought a watt — past
+it the car went on taking whatever surplus the plan allowed, and lowering it sent the car no less. A
+yardstick wearing a request's clothes, and the clothes were the problem: they taught the owner that
+`Forecasted` takes requests, which it does not.
+
+**Decision — one mode takes a request; the other reports what the day can give.** The daily EV target
+is removed everywhere it appeared: `IForecastRuntimeSettings.DailyEvTargetWh` and its setter,
+`ChargeControl:Forecast:DailyEvTargetKWh`, the Home Assistant number, the web input and
+`SolarDayPlannerOptions.DailyEvTargetWh`. `evDeliveredTodayWh` goes with it — it was a parameter of
+`SolarDayPlanner.Plan` for the shortfall maths and nothing else. `DayPlanProvider` keeps its day
+integrator for the daily summary line ("the car took 9.4 kWh today" is worth having in the journal)
+but stops feeding it to the planner.
+
+What is left is the mode in one line: **charge the car from the surplus the forecast says the home
+battery will not need, and keep the battery above the floor that still gets it to 100% by the
+deadline.** Nothing load-bearing left with the target. The forecast slicing, the battery loan, the
+trajectory floor, the dwell timers and the evening deadline all implement that sentence already.
+
+**Decision — `DayOutlook` goes entirely, rather than shrinking to fit.** `Surplus`, `Tight` and
+`Shortfall` are verdicts on sufficiency; with no request there is nothing to be sufficient *for*, and
+two of the four became unreachable the moment the target was gone. What would have been left — is
+there a window, and how much is in it — is already on the plan as `NextFeasibleWindow` and
+`FeasibleEvEnergyWh`, so keeping a three-value enum that restates two existing fields would be the
+same overlap one layer down. `TightOutlookFraction`, `OutlookHysteresisFraction`, the
+`previousOutlook` parameter and `DayPlanProvider._lastOutlook` go with it. The hysteresis was
+earned — the outlook chattered on the boundary, three changes inside three minutes — but it was
+hysteresis on a verdict, and the verdict is what is being deleted. `DayPlanProvider`'s "material
+change" log trigger keyed on the outlook moving; it now keys on the plan becoming usable or unusable,
+the window appearing or going, and the budget moving by a whole kWh.
+
+**Decision — the two overlapping gates in `ForecastedChargingController` collapse into one, and it is
+soft.** The controller gated the car twice on the same fact: `Outlook == NoChargeToday` was a hard
+pause above the dwell timers, and `FeasibleEvEnergyWh <= 0` a soft one subject to them — and the hard
+gate already swallowed the soft one, since the expected energy it tested was `min(want, feasible)`.
+One gate now, on `NextFeasibleWindow is null || FeasibleEvEnergyWh <= 0`, and it is the **soft** one.
+"No window right now" is a weather condition like any other and belongs on the dwell timers with the
+rest of them; the hard stops above it are promises — the battery's evening guarantee, the final guard,
+the session ceiling — and weather is not a promise. **Behaviour change:** a day with no chargeable
+window used to end the session outright and now pauses through `MinRunTime` like a passing cloud.
+
+**Decision — the session energy target stays, because a ceiling is not a request.** A strict reading
+of "amounts live in `Targeted`" would take it too, and this is the reason it does not. It is a ceiling
+on one session rather than a request for an amount: it resets per plug-in, it stands in for "charge to
+80%" on a charger that cannot see the car's own SOC, and `Targeted` cannot express it at all —
+`Targeted` needs a departure time, and *"stop at 10 kWh, whenever that happens"* has none. `Forecasted`
+is left with three runtime numbers, no two of which answer the same question: one ceiling, and two
+battery-protection numbers (the SOC floor and the resume margin).
+
+**`ShortfallWh` loses its EV term** and becomes `expectedHouse + batteryToFull − remainingPv`: how far
+today falls short of the house plus a full battery, with above zero meaning the evening 100% is at
+risk. That is what the API contract's own doc comment already claimed it was; the code had drifted
+from the description, and this closes the gap rather than widening it.
+
+Consequences, deliberately accepted:
+
+- **A breaking API change.** `EvTargetWh`, `EvExpectedTodayWh` and `Outlook` leave `SolarDayPlanResponse`,
+  and the `DayOutlook` enum leaves the document. The MCP server's checked-in OpenAPI copy regenerates
+  with it.
+- **Three Home Assistant entities are retired, not merely dropped.** The `daily_ev_target` number, the
+  `day_outlook` sensor and the `ev_expected_today` sensor are added to `RetiredDiscoveryTopics()`, the
+  way the charge-mode select was in #89. Their configs are retained on the broker, so without that
+  every existing installation would keep three ghosts nothing ever writes to again.
+- **`DailyEvTargetKWh` is dropped from `appsettings.json` with no migration.** Bound options ignore
+  unknown keys, so a leftover entry in an existing config file is silently ignored.
+- **The Forecasted tab's headline changes kind.** It was a verdict — *"Today covers 9 of the 15 kWh you
+  drive"* — and is now a forecast: *"Today gives the car about 9 kWh, in a window from 10:20 to
+  15:40."* Which is the only sentence the mode was ever entitled to.
+
+**The honest limit, written down rather than left to be re-discovered as a bug report.** "No grid" is
+only as tight as the meter. The mode never *decides* to import — it modulates against measured surplus
+and has no grid bridge at all. But on the reference installation the grid meter reads 0 W on phase T,
+so roughly a third of the EV's load is invisible and the surplus the mode acts on is optimistic while
+the car is drawing. Some import at the margin is a property of the measurement, not of the plan.
+
+---
+
 ## 2026-09-22 — One secret store, owner-only on Linux, DPAPI on Windows, and no claim of encryption we cannot keep
 
 **Context.** Issue #215. Three files under the data directory are bearer-equivalent and were all
@@ -3077,6 +3159,13 @@ and because grid-charging an EV is a decision worth making deliberately rather t
 `Day outlook`, `Projected shortfall` and `EV energy expected today` are published as soon as the day
 can be judged, so the decision — drive less, charge elsewhere, plug in on a night tariff — stays with
 a person.
+
+> **Partly superseded on 2026-09-23** by
+> [the record above](#2026-09-23--forecasted-stops-asking-how-much-the-car-wants-a-request-is-what-targeted-is-for):
+> the priority order and "no code path initiates grid charging" are unchanged, but the early warning
+> is no longer phrased as a verdict against a daily EV target. `Day outlook` and `EV energy expected
+> today` are gone; the charge window, the EV energy budget and a `Projected shortfall` that now
+> measures only the house plus a full battery are what is published.
 
 Consequences, deliberately accepted:
 

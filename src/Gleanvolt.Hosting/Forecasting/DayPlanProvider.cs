@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
@@ -38,7 +37,8 @@ public sealed class DayPlanProvider
     private string? _lastPlanSignature;
     private DateTimeOffset _lastPlanLoggedAt = DateTimeOffset.MinValue;
     private bool _lastPlanUsable;
-    private DayOutlook _lastOutlook = DayOutlook.Unknown;
+    private bool _lastPlanHadWindow;
+    private double _lastPlanFeasibleKWh;
     private bool _summaryLogged;
 
     public DayPlanProvider(
@@ -67,9 +67,6 @@ public sealed class DayPlanProvider
             _options.TrustBandMax,
             _options.TrustBreachPeriods);
     }
-
-    /// <summary>Energy delivered to the car so far today, in watt-hours.</summary>
-    public double EvDeliveredTodayWh => _evDeliveredToday.EnergyWattHours;
 
     /// <summary>The learned household-load profile the plan is built on.</summary>
     public IHouseLoadProfile HouseLoad => _houseLoad;
@@ -135,21 +132,12 @@ public sealed class DayPlanProvider
             MaxLoanPowerWatts: _options.EnableBatteryLoan ? _options.MaxLoanPowerWatts : 0,
             EnableBatteryLoan: _options.EnableBatteryLoan,
             MinViableWindow: _options.MinViableWindow,
-            // The floor and the day's EV target are the two things worth changing from Home Assistant
-            // without a restart, so they come from the runtime settings when those are wired up.
+            // The floor is the one planning input worth changing from Home Assistant without a
+            // restart, so it comes from the runtime settings when those are wired up.
             MinBatterySocFloorPercent: _runtime?.MinBatterySocFloorPercent ?? _options.MinBatterySocFloorPercent,
-            DailyEvTargetWh: _runtime?.DailyEvTargetWh ?? _options.DailyEvTargetKWh * 1000,
             Confidence: _options.ForecastConfidence);
 
-        return SolarDayPlanner.Plan(
-            state,
-            todaysForecast,
-            deadline,
-            _houseLoad,
-            _accuracy.BiasFactor,
-            _evDeliveredToday.EnergyWattHours,
-            plannerOptions,
-            _lastOutlook);
+        return SolarDayPlanner.Plan(state, todaysForecast, deadline, _houseLoad, _accuracy.BiasFactor, plannerOptions);
     }
 
     private void RollDayIfNeeded(DateOnly today)
@@ -166,7 +154,7 @@ public sealed class DayPlanProvider
         _accuracy.Reset();
         _lastPlanSignature = null;
         _lastPlanLoggedAt = DateTimeOffset.MinValue;
-        _lastOutlook = DayOutlook.Unknown;
+        _lastPlanFeasibleKWh = 0;
         _summaryLogged = false;
     }
 
@@ -209,13 +197,21 @@ public sealed class DayPlanProvider
     {
         var signature = string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{plan.Outlook}|{plan.FeasibleEvEnergyWh / 1000:F0}|{plan.RequiredSocFloorPercent:F0}|{plan.NextFeasibleWindow?.Start:HH:mm}-{plan.NextFeasibleWindow?.End:HH:mm}|{plan.IsUsable}");
+            $"{plan.FeasibleEvEnergyWh / 1000:F0}|{plan.RequiredSocFloorPercent:F0}|{plan.NextFeasibleWindow?.Start:HH:mm}-{plan.NextFeasibleWindow?.End:HH:mm}|{plan.IsUsable}");
 
-        // A material change -- the outlook moving, or the plan becoming usable/unusable -- always logs.
-        // The interval only damps the incremental drift, so the first real plan after startup, or after
-        // a forecast finally arrives, is never held back.
-        var material = plan.Outlook != _lastOutlook || plan.IsUsable != _lastPlanUsable;
+        // A material change -- the plan becoming usable or unusable, a window appearing or going, the
+        // budget moving by a whole kWh -- always logs. This is what the outlook used to stand in for.
+        // The interval only damps the incremental drift, so the first real plan after startup, or
+        // after a forecast finally arrives, is never held back.
+        var hasWindow = plan.NextFeasibleWindow is not null;
+        var feasibleKWh = Math.Round(plan.FeasibleEvEnergyWh / 1000);
+        var material = plan.IsUsable != _lastPlanUsable
+            || hasWindow != _lastPlanHadWindow
+            || Math.Abs(feasibleKWh - _lastPlanFeasibleKWh) >= 1;
+
         _lastPlanUsable = plan.IsUsable;
+        _lastPlanHadWindow = hasWindow;
+        _lastPlanFeasibleKWh = feasibleKWh;
 
         var changed = signature != _lastPlanSignature
             && (material || _timeProvider.GetUtcNow() - _lastPlanLoggedAt >= MinimumPlanLogInterval);
@@ -227,27 +223,11 @@ public sealed class DayPlanProvider
 
         _lastPlanSignature = signature;
 
-        if (plan.Outlook != _lastOutlook)
-        {
-            _lastOutlook = plan.Outlook;
-            _logger.LogInformation(
-                "Day outlook: {Outlook} — Forecast={RemainingKWh:F1}kWh House={HouseKWh:F1}kWh BattToFull={BatteryKWh:F1}kWh "
-                + "EvTarget={EvTargetKWh:F1}kWh Short={ShortfallKWh:F1}kWh EvExpectedToday={EvExpectedKWh:F1}kWh. {Reason}",
-                plan.Outlook,
-                plan.RemainingPvWh / 1000,
-                plan.ExpectedHouseWh / 1000,
-                plan.BatteryToFullWh / 1000,
-                plan.EvTargetWh / 1000,
-                plan.ShortfallWh / 1000,
-                plan.EvExpectedTodayWh / 1000,
-                plan.Reason);
-        }
-
         _logger.Log(
             changed ? LogLevel.Information : LogLevel.Debug,
             "Day plan: Shoulder={ShoulderKWh:F1}kWh Plateau={PlateauKWh:F1}kWh House={HouseKWh:F1}kWh BattToFull={BatteryKWh:F1}kWh "
             + "Claimed={ClaimedKWh:F1}kWh EvBudget={BudgetKWh:F1}kWh Feasible={FeasibleKWh:F1}kWh Window={Window} "
-            + "SocFloor={SocFloor:F0}% Bias={Bias:F2} Baseline={BaselineWatts:F0}W ({Confidence})",
+            + "Short={ShortfallKWh:F1}kWh SocFloor={SocFloor:F0}% Bias={Bias:F2} Baseline={BaselineWatts:F0}W ({Confidence})",
             plan.ShoulderEnergyWh / 1000,
             plan.PlateauEnergyWh / 1000,
             plan.ExpectedHouseWh / 1000,
@@ -258,6 +238,7 @@ public sealed class DayPlanProvider
             plan.NextFeasibleWindow is { } window
                 ? $"{window.Start.LocalDateTime:HH:mm}-{window.End.LocalDateTime:HH:mm}"
                 : "none",
+            plan.ShortfallWh / 1000,
             plan.RequiredSocFloorPercent,
             plan.BiasFactor,
             _houseLoad.DailyMeanWatts,

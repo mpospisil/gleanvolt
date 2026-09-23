@@ -36,7 +36,6 @@ public class SolarDayPlannerTests
             GridPowerWatts: 0, EvChargerStatus.Available, EvChargerPowerWatts: 0);
 
     private static SolarDayPlannerOptions Options(
-        double dailyEvTargetWh = 15_000,
         bool enableLoan = false,
         double maxLoanPowerWatts = 0,
         double minSocFloorPercent = 50) =>
@@ -47,8 +46,7 @@ public class SolarDayPlannerTests
             MaxLoanPowerWatts: maxLoanPowerWatts,
             EnableBatteryLoan: enableLoan,
             MinViableWindow: TimeSpan.FromMinutes(30),
-            MinBatterySocFloorPercent: minSocFloorPercent,
-            DailyEvTargetWh: dailyEvTargetWh);
+            MinBatterySocFloorPercent: minSocFloorPercent);
 
     private static SolarDayPlan Plan(
         double socPercent,
@@ -56,7 +54,6 @@ public class SolarDayPlannerTests
         SolarDayPlannerOptions? options = null,
         DateTimeOffset? now = null,
         double biasFactor = 1.0,
-        double evDeliveredTodayWh = 0,
         DateTimeOffset? deadline = null) =>
         SolarDayPlanner.Plan(
             State(socPercent, now),
@@ -64,7 +61,6 @@ public class SolarDayPlannerTests
             deadline ?? Deadline,
             new FlatHouseLoad(HouseBaselineWatts),
             biasFactor,
-            evDeliveredTodayWh,
             options ?? Options());
 
     [Fact]
@@ -85,10 +81,6 @@ public class SolarDayPlannerTests
 
         Assert.Equal(0, plan.PlateauClaimedByBatteryWh, 1);
         Assert.Equal(8250, plan.FeasibleEvEnergyWh, 1);
-
-        // 8.25kWh against a 15kWh target is a tight day, not a shortfall: the car gets everything the
-        // plateau has, which is the most this strategy can do for it.
-        Assert.Equal(DayOutlook.Tight, plan.Outlook);
     }
 
     [Fact]
@@ -112,7 +104,7 @@ public class SolarDayPlannerTests
         Assert.Equal(0, plan.PlateauEnergyWh, 1);
         Assert.Equal(0, plan.FeasibleEvEnergyWh, 1);
         Assert.Null(plan.NextFeasibleWindow);
-        Assert.Equal(DayOutlook.NoChargeToday, plan.Outlook);
+        Assert.Contains("No chargeable window", plan.Reason);
     }
 
     [Fact]
@@ -190,10 +182,9 @@ public class SolarDayPlannerTests
     [Fact]
     public void AMissingForecastYieldsAnUnusablePlanRatherThanAnOptimisticOne()
     {
-        var plan = SolarDayPlanner.Plan(State(50), forecast: null, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, Options());
+        var plan = SolarDayPlanner.Plan(State(50), forecast: null, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, Options());
 
         Assert.False(plan.IsUsable);
-        Assert.Equal(DayOutlook.Unknown, plan.Outlook);
         Assert.Equal(0, plan.FeasibleEvEnergyWh);
         Assert.Equal(100, plan.RequiredSocFloorPercent);
     }
@@ -208,24 +199,27 @@ public class SolarDayPlannerTests
         Assert.Equal(full.RemainingPvWh * 0.5, halved.RemainingPvWh, 1);
     }
 
+    // Issue #217: the shortfall lost its EV term with the daily target. It measures the day against
+    // the house plus a full battery -- the evening 100% -- and nothing else. The car is not in the
+    // sum at all, because the car only ever gets what is left over once both are served.
     [Fact]
-    public void AShortfallIsReportedWhenTheDayCannotCoverHouseBatteryAndCar()
+    public void AShortfallIsReportedWhenTheDayCannotCoverTheHouseAndFillTheBattery()
     {
-        // A thin day against a 15kWh EV target: the car cannot have what the sun won't make.
         var plan = Plan(socPercent: 40, Forecast([1000, 5000, 5000, 1000]));
 
         Assert.True(plan.HasShortfall);
-        Assert.True(plan.EvExpectedTodayWh < plan.EvTargetWh);
-        Assert.NotEqual(DayOutlook.Surplus, plan.Outlook);
+        Assert.Equal(plan.ExpectedHouseWh + plan.BatteryToFullWh - plan.RemainingPvWh, plan.ShortfallWh, 1);
     }
 
     [Fact]
-    public void MeetingTheDailyTargetAlreadyReadsAsSurplus()
+    public void NoShortfallWhenTheDayCoversTheHouseAndTheBatteryToFull()
     {
-        var plan = Plan(socPercent: 96, evDeliveredTodayWh: 15_000);
+        // A nearly full battery on a bell day: the sun has both covered with room to spare, so the
+        // evening 100% is not at risk however little the car ends up getting.
+        var plan = Plan(socPercent: 96);
 
-        Assert.Equal(DayOutlook.Surplus, plan.Outlook);
         Assert.False(plan.HasShortfall);
+        Assert.Equal(0, plan.ShortfallWh);
     }
 
     [Fact]
@@ -254,7 +248,6 @@ public class SolarDayPlannerTests
         var plan = Plan(socPercent: 96, Forecast([1000, 6000, 1000, 1000]), options);
 
         Assert.Null(plan.NextFeasibleWindow);
-        Assert.Equal(DayOutlook.NoChargeToday, plan.Outlook);
     }
 
     // A profile with a different load per hour, to show the plan uses the load expected *then*.
@@ -273,44 +266,14 @@ public class SolarDayPlannerTests
         var shaped = new ShapedHouseLoad(hour => hour >= 11 ? 5000 : 500);
 
         var withShape = SolarDayPlanner.Plan(
-            State(96), forecast, Deadline, shaped, 1.0, 0, Options());
+            State(96), forecast, Deadline, shaped, 1.0, Options());
         var withAfternoonEverywhere = SolarDayPlanner.Plan(
-            State(96), forecast, Deadline, new FlatHouseLoad(5000), 1.0, 0, Options());
+            State(96), forecast, Deadline, new FlatHouseLoad(5000), 1.0, Options());
 
         Assert.True(
             withShape.FeasibleEvEnergyWh > withAfternoonEverywhere.FeasibleEvEnergyWh,
             "pricing the quiet morning at the busy afternoon's load throws away the car's window");
         Assert.NotNull(withShape.NextFeasibleWindow);
-    }
-
-    [Fact]
-    public void TheOutlookDoesNotFlipOnARoundingWobbleAtTheThreshold()
-    {
-        // Exactly half the target is the boundary between Tight and Shortfall -- and the common case,
-        // which is why it chattered three times in three minutes in the field.
-        var forecast = Forecast([1000, 6000, 6000, 1000]);
-        var options = Options(dailyEvTargetWh: 11_000);
-
-        var fromTight = SolarDayPlanner.Plan(
-            State(96), forecast, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, options, DayOutlook.Tight);
-        var fromShortfall = SolarDayPlanner.Plan(
-            State(96), forecast, Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0, options, DayOutlook.Shortfall);
-
-        // Same inputs, different history: each side holds its ground rather than flipping.
-        Assert.Equal(DayOutlook.Tight, fromTight.Outlook);
-        Assert.Equal(DayOutlook.Shortfall, fromShortfall.Outlook);
-    }
-
-    [Fact]
-    public void AClearMoveAcrossTheThresholdStillChangesTheOutlook()
-    {
-        // Hysteresis must damp noise, not freeze the state: a genuinely good day reads Surplus even
-        // when the previous cycle said Shortfall.
-        var plan = SolarDayPlanner.Plan(
-            State(96), Forecast(BellDay), Deadline, new FlatHouseLoad(HouseBaselineWatts), 1.0, 0,
-            Options(dailyEvTargetWh: 4000), DayOutlook.Shortfall);
-
-        Assert.Equal(DayOutlook.Surplus, plan.Outlook);
     }
 
     // The web UI's plan timeline (issue #50) is built from SolarDayPlan.Timeline rather than a

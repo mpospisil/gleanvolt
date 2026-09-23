@@ -5,24 +5,26 @@
 
 @*
     The forecast-driven mode, and the only one with a day plan behind it -- so this tab carries both
-    the four runtime numbers the plan reads and the plan it publishes while it drives. They used to
+    the three runtime numbers the mode reads and the plan it publishes while it drives. They used to
     live a nav item apart, on the dashboard and on /forecast, which meant reading the outcome on one
     page and adjusting the input on another.
 
-    The plan half is the old /forecast page unchanged: the same eleven figures with their meanings
-    inline, and the same timeline chart (vendored uPlot, #44) drawn from SolarDayPlanner's own
-    timeline, so the picture cannot disagree with the numbers beside it. Populated only while
-    Forecasted is the active mode -- status.Plan is null otherwise -- so a different mode driving the
-    charger shows an explicit empty state here rather than the last stale plan.
+    The plan half is the old /forecast page: the figures with their meanings inline, and the timeline
+    chart (vendored uPlot, #44) drawn from SolarDayPlanner's own timeline, so the picture cannot
+    disagree with the numbers beside it. Populated only while Forecasted is the active mode --
+    status.Plan is null otherwise -- so a different mode driving the charger shows an explicit empty
+    state here rather than the last stale plan.
 
     The numbers are written through IForecastRuntimeSettings, the seam the MQTT worker's number
     entities write, and re-read whenever a new status lands: Home Assistant or a second browser can
     move any of them, and this tab shows what the controller is actually using.
 
-    They are grouped by what they act on rather than listed as four boxes, because the pair that reads
-    alike behaves least alike: the daily EV target is a yardstick the plan reports against and never a
-    limit, while the session target is the only hard stop here. The verdict the daily target buys --
-    "today covers 9 of the 15 kWh you drive" -- is one sentence above the plan, said once.
+    They are grouped by what they act on -- one ceiling, two battery-protection numbers -- and no two
+    of them answer the same question. The daily EV target used to sit alongside the session target
+    and read like its twin while behaving nothing like it: a yardstick wearing a request's clothes,
+    which taught owners this mode takes requests. It does not, and it is gone (#217). The headline
+    above the plan changed kind with it -- a forecast of what the day gives, not a verdict on whether
+    it is enough, because only Targeted is entitled to the second sentence.
 *@
 
 <p class="muted">
@@ -43,18 +45,14 @@
 </div>
 
 <section class="plan" id="ev-energy">
-    <h2>How much the car gets</h2>
+    <h2>Where a charge stops</h2>
 
-    <div class="control">
-        <label for="daily-ev-target">Daily EV target (kWh)</label>
-        <input id="daily-ev-target" type="number" step="0.1" min="0"
-               @bind="_dailyEvTargetKWh" @bind:event="onchange" @bind:after="OnDailyEvTargetSelected" />
-        <span class="hint">
-            What you drive on a normal day. The plan judges the day against it — the verdict is the
-            line above <strong>The plan</strong> below — but <strong>it never stops the charger</strong>.
-            To cap a charge, use the session target. Doesn't persist across restarts.
-        </span>
-    </div>
+    <p class="hint">
+        This mode takes no request for an amount: it charges the car from whatever surplus the
+        forecast says the home battery will not need. To <em>ask</em> for an amount by a time, use
+        <a href="/charging-plan/targeted">Targeted</a>, which paces the charge and buys grid for the
+        remainder. The ceiling below is a different thing: a stop, not a request.
+    </p>
 
     <div class="control">
         <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
@@ -109,25 +107,21 @@ else
 {
     <h2>The plan</h2>
 
-    <p><strong>@Verdict(plan)</strong></p>
+    <p><strong>@Headline(plan)</strong></p>
 
     <p class="muted">
         Updated @TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
     </p>
 
     <section class="stat-grid">
-        <Stat Label="Day outlook" Value="@plan.Outlook.ToString()"
-              Hint="How the rest of today looks for the car. Surplus: the day covers the house, the battery to 100% and the whole EV target. Tight: less than target. Shortfall: substantially less; the battery keeps priority. NoChargeToday: no window at all." />
         <Stat Label="Plan state" Value="@plan.Reason"
               Hint="Why the plan decided what it decided -- the same line the log carries." />
         <Stat Label="Charge window" Value="@FormatWindow(plan.NextFeasibleWindow)"
               Hint="The next stretch of today forecast to clear the charger's minimum power for long enough to be worth starting. 'none' when today offers no such window." />
         <Stat Label="EV energy budget" Value="@Kwh(plan.FeasibleEvEnergyWh)"
               Hint="How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power." />
-        <Stat Label="EV energy expected today" Value="@Kwh(plan.EvExpectedTodayWh)"
-              Hint="What the car can realistically receive in total today, including what it has already taken." />
         <Stat Label="Projected shortfall" Value="@Kwh(plan.ShortfallWh)"
-              Hint="How far today's forecast falls short of the house plus a full battery plus the daily EV target. The battery keeps priority regardless." />
+              Hint="How far today's forecast falls short of the house plus a full home battery. Above zero, the evening 100% is at risk. The car is not in this sum — it only ever gets what is left over." />
         <Stat Label="Required SOC floor" Value="@Percent(plan.RequiredSocFloorPercent)"
               Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what arms the discharge hold automatically." />
         <Stat Label="Forecast remaining today" Value="@Kwh(plan.RemainingPvWh)"
@@ -160,14 +154,9 @@ else
 
     [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
 
-    private double _dailyEvTargetKWh;
     private double _sessionEnergyTargetKWh;
     private double _minBatterySocPercent;
     private double _resumeMarginPercent;
-
-    // A tenth of a kWh: what Kwh() rounds to, so a difference the sentence would print as "0.0 kWh
-    // short" is called covered instead.
-    private const double NegligibleWh = 50;
 
     private bool _chartRendered;
 
@@ -249,9 +238,6 @@ else
 
     private Task StartForecasted() => Start(ChargeControlMode.Forecasted);
 
-    private void OnDailyEvTargetSelected() =>
-        ForecastSettings.SetDailyEvTargetWh(_dailyEvTargetKWh * 1000, "Web UI");
-
     private void OnSessionEnergyTargetSelected() =>
         ForecastSettings.SetSessionEnergyTargetWh(_sessionEnergyTargetKWh * 1000, "Web UI");
 
@@ -263,38 +249,34 @@ else
 
     private void RefreshRuntimeNumbers()
     {
-        _dailyEvTargetKWh = Math.Round(ForecastSettings.DailyEvTargetWh / 1000, 1);
         _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
         _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
     }
 
-    // The whole point of the daily EV target, in the one sentence it is worth: the plan's verdict on
-    // today against what the owner actually drives. The stats below carry the same figures apart --
-    // outlook here, expected there, shortfall a tile further on -- and nobody reads three tiles to
-    // answer "is the car going to be ready?".
-    private string Verdict(SolarDayPlan plan)
+    // What the mode is entitled to say, in the one sentence it is worth: a forecast of what today
+    // gives the car and when, never a verdict on whether that is enough. The tiles below carry the
+    // same two figures apart -- budget here, window there -- and nobody reads two tiles to answer
+    // "is it worth plugging in this morning?".
+    private string Headline(SolarDayPlan plan)
     {
         if (!plan.IsUsable)
         {
-            return "No usable forecast, so no verdict on today; the mode is charging on live surplus instead.";
+            return "No usable forecast, so no plan for today; the mode is charging on live surplus instead.";
         }
 
-        if (plan.EvTargetWh <= 0)
+        if (plan.NextFeasibleWindow is not { } window || plan.FeasibleEvEnergyWh <= 0)
         {
-            return $"No daily target set, so today is not judged against anything. {Kwh(plan.EvExpectedTodayWh)} expected into the car.";
+            return "Today has no chargeable window: the sun never clears the charger's floor for long enough, "
+                + "or the home battery needs all of it. The car waits.";
         }
 
-        if (plan.Outlook == DayOutlook.NoChargeToday)
-        {
-            return $"Today has no chargeable window: the car gets nothing of the {Kwh(plan.EvTargetWh)} you drive, and the battery keeps priority.";
-        }
+        // "from 10:20 to 15:40" rather than the tile's "10:20–15:40": this is a sentence, and a dash
+        // reads as a range inside one.
+        var start = TimeZoneInfo.ConvertTime(window.Start, Time.LocalTimeZone);
+        var end = TimeZoneInfo.ConvertTime(window.End, Time.LocalTimeZone);
 
-        var shortWh = plan.EvTargetWh - plan.EvExpectedTodayWh;
-
-        return shortWh <= NegligibleWh
-            ? $"Today covers the full {Kwh(plan.EvTargetWh)} you drive."
-            : $"Today covers {Kwh(plan.EvExpectedTodayWh)} of the {Kwh(plan.EvTargetWh)} you drive — {Kwh(shortWh)} short. The battery keeps priority.";
+        return $"Today gives the car about {Kwh(plan.FeasibleEvEnergyWh)}, in a window from {start:HH:mm} to {end:HH:mm}.";
     }
 
     private string SessionTargetProgress()

@@ -139,11 +139,6 @@ public sealed class ForecastedChargingController : IChargingController
             return soc < plan.TrajectorySocFloorPercent ? Pause(reason) : SoftPause(input, reason);
         }
 
-        if (plan.Outlook == DayOutlook.NoChargeToday)
-        {
-            return Pause($"No chargeable window today; the battery has priority. {plan.Reason}");
-        }
-
         // --- Soft reasons: subject to the dwell timers. ---
 
         // A restart only, never this mode's first charge: the dwell used to count from the moment the
@@ -153,7 +148,11 @@ public sealed class ForecastedChargingController : IChargingController
             return Pause(RestartDwell.Reason(input, _options.MinPauseTime));
         }
 
-        if (plan.FeasibleEvEnergyWh <= 0)
+        // No window, or nothing deliverable in it. Weather, not a promise: the hard stops above are
+        // the battery's evening guarantee, the final guard and the session ceiling, and a day that
+        // never clears the charger's floor is none of those. So it pauses through the dwell timers
+        // like a passing cloud rather than ending the session outright.
+        if (plan.NextFeasibleWindow is null || plan.FeasibleEvEnergyWh <= 0)
         {
             return SoftPause(input, $"No deliverable budget left today ({plan.Reason}).");
         }

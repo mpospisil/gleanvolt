@@ -369,6 +369,19 @@ public class HaDiscoveryTests
         Assert.Contains("homeassistant/switch/solax_controller/charge_control/config", Discovery.RetiredDiscoveryTopics());
     }
 
+    // Issue #217. Dropping them from discovery is not enough: their configs are retained on the
+    // broker, so without retiring them every existing installation keeps three entities that nothing
+    // will ever write to again.
+    [Theory]
+    [InlineData("homeassistant/number/solax_controller/daily_ev_target/config")]
+    [InlineData("homeassistant/sensor/solax_controller/day_outlook/config")]
+    [InlineData("homeassistant/sensor/solax_controller/ev_expected_today/config")]
+    public void RetiredDiscoveryTopics_IncludeTheDailyEvTargetAndWhatReportedAgainstIt(string topic)
+    {
+        Assert.Contains(topic, Discovery.RetiredDiscoveryTopics());
+        Assert.DoesNotContain(topic, Discovery.DiscoveryMessages().Select(m => m.Topic));
+    }
+
     [Fact]
     public void StateJson_SerialisesEveryFieldTheSensorsReference()
     {
@@ -395,7 +408,7 @@ public class HaDiscoveryTests
         Assert.Equal("Disabled", json.RootElement.GetProperty("state").GetString());
     }
 
-    private static SolarDayPlan TestPlan(DayOutlook outlook = DayOutlook.Tight) => new(
+    private static SolarDayPlan TestPlan() => new(
         RemainingPvWh: 11_000,
         ShoulderEnergyWh: 3400,
         PlateauEnergyWh: 11_000,
@@ -411,9 +424,6 @@ public class HaDiscoveryTests
         // Lower than the floor in force: the 62% is the owner's clamp, not the forecast's own line.
         TrajectorySocFloorPercent: 20,
         ShortfallWh: 4400,
-        EvExpectedTodayWh: 10_500,
-        EvTargetWh: 15_000,
-        Outlook: outlook,
         BiasFactor: 0.94,
         Deadline: new DateTimeOffset(2026, 7, 27, 19, 0, 0, TimeSpan.Zero),
         ForecastAsOf: new DateTimeOffset(2026, 7, 27, 9, 0, 0, TimeSpan.Zero),
@@ -422,11 +432,9 @@ public class HaDiscoveryTests
         Timeline: []);
 
     [Theory]
-    [InlineData("homeassistant/sensor/solax_controller/day_outlook/config")]
     [InlineData("homeassistant/sensor/solax_controller/plan_state/config")]
     [InlineData("homeassistant/sensor/solax_controller/charge_window/config")]
     [InlineData("homeassistant/sensor/solax_controller/ev_budget/config")]
-    [InlineData("homeassistant/sensor/solax_controller/ev_expected_today/config")]
     [InlineData("homeassistant/sensor/solax_controller/shortfall/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor/config")]
     [InlineData("homeassistant/sensor/solax_controller/soc_floor_traj/config")]
@@ -441,7 +449,6 @@ public class HaDiscoveryTests
         Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
 
     [Theory]
-    [InlineData("daily_ev_target")]
     [InlineData("session_energy_target")]
     [InlineData("min_battery_soc")]
     [InlineData("resume_margin")]
@@ -462,8 +469,8 @@ public class HaDiscoveryTests
     [Fact]
     public void NumberTopics_FollowTheConfiguredPrefixes()
     {
-        Assert.Equal("solax/home-roof/daily_ev_target/set", Discovery.NumberCommandTopic("daily_ev_target"));
-        Assert.Equal("solax/home-roof/daily_ev_target/state", Discovery.NumberStateTopic("daily_ev_target"));
+        Assert.Equal("solax/home-roof/session_energy_target/set", Discovery.NumberCommandTopic("session_energy_target"));
+        Assert.Equal("solax/home-roof/session_energy_target/state", Discovery.NumberStateTopic("session_energy_target"));
     }
 
     [Fact]
@@ -472,7 +479,6 @@ public class HaDiscoveryTests
         using var json = JsonDocument.Parse(Discovery.StateJson(Status(mode: ChargeControlMode.Forecasted, plan: TestPlan(), loanWatts: 1140)));
         var s = json.RootElement;
 
-        Assert.Equal("Tight", s.GetProperty("outlook").GetString());
         Assert.Equal("12:30-15:50", s.GetProperty("window").GetString());
         Assert.Equal(10.5, s.GetProperty("ev_budget_kwh").GetDouble());
         Assert.Equal(4.4, s.GetProperty("shortfall_kwh").GetDouble());
@@ -496,7 +502,7 @@ public class HaDiscoveryTests
 
         Assert.Equal(7010, s.GetProperty("solar_w").GetDouble());
         Assert.Equal(6489, s.GetProperty("forecast_solar_w").GetDouble());
-        Assert.False(s.TryGetProperty("outlook", out _));
+        Assert.False(s.TryGetProperty("plan_reason", out _));
     }
 
     [Fact]
@@ -505,7 +511,7 @@ public class HaDiscoveryTests
         // Reporting a stale plan nothing is acting on would be worse than reporting nothing.
         using var json = JsonDocument.Parse(Discovery.StateJson(Status()));
 
-        Assert.False(json.RootElement.TryGetProperty("outlook", out _));
+        Assert.False(json.RootElement.TryGetProperty("plan_reason", out _));
         Assert.False(json.RootElement.TryGetProperty("soc_floor", out _));
     }
 

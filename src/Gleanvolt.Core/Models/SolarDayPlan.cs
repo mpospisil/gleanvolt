@@ -1,5 +1,3 @@
-using Gleanvolt.Core.Enums;
-
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -52,12 +50,9 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="Strategies.ForecastedChargingController"/>.
 /// </param>
 /// <param name="ShortfallWh">
-/// How far the forecast falls short of house + battery-to-full + the day's EV target. Positive means
-/// the car will not get everything it wanted; the battery keeps priority regardless.
+/// How far the forecast falls short of house + battery-to-full. Positive means the evening 100% is at
+/// risk; the battery keeps priority over the car regardless.
 /// </param>
-/// <param name="EvExpectedTodayWh">What the car can realistically expect to receive today in total.</param>
-/// <param name="EvTargetWh">The day's EV target the shortfall is measured against.</param>
-/// <param name="Outlook">The coarse, reportable summary of the four figures above.</param>
 /// <param name="BiasFactor">
 /// The realised forecast bias applied to the remaining forecast (actual ÷ forecast so far today,
 /// clamped). 1.0 when there aren't enough samples yet to judge.
@@ -87,9 +82,6 @@ public sealed record SolarDayPlan(
     double RequiredSocFloorPercent,
     double TrajectorySocFloorPercent,
     double ShortfallWh,
-    double EvExpectedTodayWh,
-    double EvTargetWh,
-    DayOutlook Outlook,
     double BiasFactor,
     DateTimeOffset Deadline,
     DateTimeOffset? ForecastAsOf,
@@ -97,7 +89,7 @@ public sealed record SolarDayPlan(
     string Reason,
     IReadOnlyList<SolarDayPlanTimelinePoint> Timeline)
 {
-    /// <summary>Whether the day cannot cover the house, the battery and the car's target together.</summary>
+    /// <summary>Whether the day cannot cover the house and the battery to 100% together.</summary>
     public bool HasShortfall => ShortfallWh > 0;
 
     /// <summary>
@@ -109,8 +101,8 @@ public sealed record SolarDayPlan(
 
     /// <summary>
     /// An unusable plan: no forecast, a stale one, or one whose accuracy has broken the trust band.
-    /// Everything is zeroed and <see cref="Outlook"/> is <see cref="DayOutlook.Unknown"/>, so a caller
-    /// that ignores <see cref="IsUsable"/> gets "no budget" rather than an optimistic guess.
+    /// Everything is zeroed, so a caller that ignores <see cref="IsUsable"/> gets "no budget" rather
+    /// than an optimistic guess.
     /// </summary>
     public static SolarDayPlan Unavailable(DateTimeOffset deadline, string reason) => new(
         RemainingPvWh: 0,
@@ -125,9 +117,6 @@ public sealed record SolarDayPlan(
         RequiredSocFloorPercent: 100,
         TrajectorySocFloorPercent: 100,
         ShortfallWh: 0,
-        EvExpectedTodayWh: 0,
-        EvTargetWh: 0,
-        Outlook: DayOutlook.Unknown,
         BiasFactor: 1,
         Deadline: deadline,
         ForecastAsOf: null,

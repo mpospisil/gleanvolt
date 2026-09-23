@@ -99,7 +99,6 @@ public sealed class HaDiscovery
     public string StopServiceCommandTopic => $"{TopicPrefix}/stop_service/set";
 
     /// <summary>Object ids of the settable numbers, so the worker can subscribe and publish generically.</summary>
-    public const string DailyEvTargetNumber = "daily_ev_target";
     public const string SessionEnergyTargetNumber = "session_energy_target";
     public const string MinBatterySocNumber = "min_battery_soc";
     public const string ResumeMarginNumber = "resume_margin";
@@ -110,7 +109,7 @@ public sealed class HaDiscovery
     public const string MinSolarSurplusNumber = "min_solar_surplus";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
-        [DailyEvTargetNumber, SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
+        [SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
          TargetRestSocNumber, FastEnergyNumber, FastTargetSocNumber, MinSolarSurplusNumber];
 
     /// <summary>
@@ -273,6 +272,15 @@ public sealed class HaDiscovery
         // Home Assistant delete the entity on its own, so nobody has to go and remove it by hand.
         yield return $"{_options.DiscoveryPrefix}/select/{_deviceId}/charge_mode/config";
 
+        // The Forecasted mode's daily EV target and the entities that reported against it (issue
+        // #217). The mode no longer takes a request for an amount -- an owner who wants to name one
+        // wants Targeted -- so the number, the verdict it bought and the expectation it capped all
+        // go. Retiring the configs is what makes Home Assistant delete the entities; without it every
+        // existing installation keeps three ghosts that nothing will ever write to again.
+        yield return $"{_options.DiscoveryPrefix}/number/{_deviceId}/daily_ev_target/config";
+        yield return $"{_options.DiscoveryPrefix}/sensor/{_deviceId}/day_outlook/config";
+        yield return $"{_options.DiscoveryPrefix}/sensor/{_deviceId}/ev_expected_today/config";
+
         // Also retire the battery-hold entities while the feature is off, so turning it off actually
         // removes the switch from HA rather than leaving a retained config behind that does nothing.
         if (!_batteryHoldEnabled)
@@ -379,11 +387,9 @@ public sealed class HaDiscovery
         // Forecast-driven mode (issue #22). Published unconditionally: the mode is selectable at
         // runtime, so the entities have to exist before it is picked. They simply report nothing while
         // another mode is active.
-        yield return Sensor("day_outlook", "Day outlook", template: Optional("outlook"), icon: "mdi:weather-partly-cloudy");
         yield return Sensor("plan_state", "Plan state", template: Optional("plan_reason"), icon: "mdi:text-box-outline");
         yield return Sensor("charge_window", "Charge window", template: Optional("window"), icon: "mdi:clock-outline");
         yield return Sensor("ev_budget", "EV energy budget", template: Optional("ev_budget_kwh"), unit: "kWh", deviceClass: "energy");
-        yield return Sensor("ev_expected_today", "EV energy expected today", template: Optional("ev_expected_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("shortfall", "Projected shortfall", template: Optional("shortfall_kwh"), unit: "kWh", deviceClass: "energy");
         yield return Sensor("soc_floor", "Required SOC floor", template: Optional("soc_floor"), unit: "%", icon: "mdi:battery-arrow-down");
         // The unclamped floor next to the one in force: together they say whether the car is being held
@@ -397,7 +403,6 @@ public sealed class HaDiscovery
         yield return Sensor("loaned_today", "Battery loaned today", template: "{{ value_json.loaned_kwh }}", unit: "kWh", deviceClass: "energy");
         yield return Sensor("loan_power", "Battery loan power", template: "{{ value_json.loan_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
 
-        yield return Number(DailyEvTargetNumber, "Daily EV target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:car-electric");
         yield return Number(SessionEnergyTargetNumber, "Session energy target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:battery-charging-80");
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
         yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
@@ -589,13 +594,11 @@ public sealed class HaDiscovery
         // unavailable rather than reporting stale numbers from a plan nothing is acting on.
         if (s.Plan is { } plan)
         {
-            payload["outlook"] = plan.Outlook.ToString();
             payload["plan_reason"] = plan.Reason;
             payload["window"] = plan.NextFeasibleWindow is { } window
                 ? $"{window.Start.LocalDateTime:HH:mm}-{window.End.LocalDateTime:HH:mm}"
                 : "none";
             payload["ev_budget_kwh"] = Math.Round(plan.FeasibleEvEnergyWh / 1000, 1);
-            payload["ev_expected_kwh"] = Math.Round(plan.EvExpectedTodayWh / 1000, 1);
             payload["shortfall_kwh"] = Math.Round(plan.ShortfallWh / 1000, 1);
             payload["soc_floor"] = Math.Round(plan.RequiredSocFloorPercent);
             payload["soc_floor_traj"] = Math.Round(plan.TrajectorySocFloorPercent);

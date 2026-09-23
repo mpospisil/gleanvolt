@@ -45,7 +45,7 @@ public class HaSystemTopicTests
         Assert.Equal("gleanvolt/home-roof/battery_hold/set", discovery.BatteryHoldCommandTopic);
         Assert.Equal("gleanvolt/home-roof/stop_service/set", discovery.StopServiceCommandTopic);
         Assert.Equal("gleanvolt/home-roof/start_solar/set", discovery.ButtonCommandTopic("start_solar"));
-        Assert.Equal("gleanvolt/home-roof/daily_ev_target/state", discovery.NumberStateTopic("daily_ev_target"));
+        Assert.Equal("gleanvolt/home-roof/session_energy_target/state", discovery.NumberStateTopic("session_energy_target"));
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class HaSystemTopicTests
         Assert.Contains("solax/solax_controller/state", retired);
         Assert.Contains("solax/solax_controller/battery_hold/state", retired);
         Assert.Contains("solax/solax_controller/target_departure/state", retired);
-        Assert.Contains("solax/solax_controller/daily_ev_target/state", retired);
+        Assert.Contains("solax/solax_controller/session_energy_target/state", retired);
 
         // A command topic is published by Home Assistant, never retained by us; clearing one would be
         // claiming to own something we do not.
