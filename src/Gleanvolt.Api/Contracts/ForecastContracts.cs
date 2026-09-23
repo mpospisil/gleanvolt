@@ -35,7 +35,8 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="Periods">
 /// The periods themselves, oldest first, covering the whole of today and tomorrow — <b>elapsed periods
 /// included</b>. Each carries the median estimate and, when the provider supplies them, the p10 and p90
-/// bands. Today's can begin after midnight; see <see cref="ForecastDayResponse.Complete"/>.
+/// bands. Today's can begin after midnight; read 'complete' on the day before treating its periods as
+/// the whole of it.
 /// </param>
 /// <param name="Weather">The current conditions, or null when no weather provider is configured or the fetch failed.</param>
 public sealed record ForecastResponse(
@@ -60,10 +61,10 @@ public sealed record ForecastResponse(
 /// <param name="ExpectedWh">The median estimate for the whole day, in watt-hours.</param>
 /// <param name="LowWh">
 /// The p10 estimate for the day: a figure it should beat about nine times in ten. A period the provider
-/// sent no p10 for counts at its median, as <see cref="SolarForecastPeriod.PowerWatts"/> does, so a
-/// partial response cannot read as darkness.
+/// sent no p10 for counts at its median, exactly as a period's own band does, so a partial response
+/// cannot read as darkness.
 /// </param>
-/// <param name="HighWh">The p90 estimate, with the same fallback. The gap to <paramref name="LowWh"/> is how sure the sky is.</param>
+/// <param name="HighWh">The p90 estimate, with the same fallback. The gap to 'lowWh' is how sure the sky is.</param>
 /// <param name="PeakWatts">The strongest half hour the median expects, in watts.</param>
 /// <param name="Complete">
 /// Whether the whole day is held. <b>False is ordinary, not a fault</b>: a provider answers only what
