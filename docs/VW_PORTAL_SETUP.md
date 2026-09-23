@@ -38,6 +38,13 @@ Open <https://eu-data-act.drivesomethinggreater.com/de/en> and sign in with your
 On first use the portal shows a **consent screen** — the legal grant that lets it release your
 vehicle's data. Accept it, then link the vehicle.
 
+**If the car is not in the portal's list, connect it here first.** Being linked in the brand app is
+not the same thing: this portal keeps its own list, and a car missing from it cannot be consented to,
+cannot be given a data request in [step 2](#step-2--enable-a-continuous-data-request), and will not
+appear in the VIN list in [step 4](#step-4--your-vin-if-you-need-it). Add it on the portal's own
+vehicle page, by VIN, before going any further. Until it shows up there the client reports
+`VehicleNotFound`, which is the truth and not a fault to debug.
+
 > **This step can never be automated.** A consent screen is a legal act, and the client treats one
 > appearing mid-flow as `OwnerActionRequired` and refuses to retry, because retrying a consent screen
 > has never once helped anybody. The same applies to terms updates, an email OTP or a CAPTCHA.
