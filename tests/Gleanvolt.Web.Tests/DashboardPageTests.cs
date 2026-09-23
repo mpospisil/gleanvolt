@@ -83,7 +83,7 @@ public class DashboardPageTests : PageTest
         public string DisplayName => "volkswagen.de";
 
         public string? OwnerAction =>
-            Health.IsBlocked ? "volkswagen.de wants a one-time code — sign in again on the vehicle page." : null;
+            Health.IsBlocked ? "volkswagen.de wants a one-time code — sign in again on the Car page." : null;
 
         public VehicleSourceHealth Health => health ?? VehicleSourceHealth.Ok("used while a charge is running");
 
@@ -584,8 +584,8 @@ public class DashboardPageTests : PageTest
 
         var blocked = page.Find("#vehicle-feed-blocked");
         Assert.Contains("Sign-in required", blocked.TextContent);
-        Assert.Contains("sign in again on the vehicle page", blocked.TextContent);
-        Assert.Equal("/vehicle-portal", blocked.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Contains("sign in again on the Car page", blocked.TextContent);
+        Assert.Equal("/car", blocked.QuerySelector("a")!.GetAttribute("href"));
     }
 
     [Fact]
@@ -599,7 +599,7 @@ public class DashboardPageTests : PageTest
 
         var blocked = page.Find("#vehicle-feed-blocked");
         Assert.Contains("check the password", blocked.TextContent);
-        Assert.Equal("/vehicle-portal", blocked.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("/car", blocked.QuerySelector("a")!.GetAttribute("href"));
     }
 
     [Fact]
@@ -615,7 +615,7 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("sign in again on the vehicle page", page.Find("#vehicle-feed-blocked").TextContent);
+        Assert.Contains("sign in again on the Car page", page.Find("#vehicle-feed-blocked").TextContent);
     }
 
     [Fact]

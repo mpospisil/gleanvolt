@@ -69,7 +69,7 @@ public sealed record VehicleSocBasis(
     ///
     /// <para>Callers that mean to tell the two apart must ask <see cref="IsStale"/> <b>first</b>: they
     /// need opposite things from an owner. One wants a feed, or asking in kilowatt-hours for good; the
-    /// other wants the button on <c>/vehicle-portal</c> pressed, and then the same request again.</para>
+    /// other wants <i>Ask the car</i> pressed, and then the same request again.</para>
     /// </summary>
     public double? ConvertibleSocPercent => IsStale ? null : SocPercent;
 

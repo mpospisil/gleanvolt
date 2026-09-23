@@ -169,7 +169,7 @@ services:
       Vehicle__Website__PollInterval: ${VW_WEBSITE_POLL_INTERVAL:-00:05:00}
       Vehicle__Website__IdlePollInterval: ${VW_WEBSITE_IDLE_POLL_INTERVAL:-00:15:00}
       # MyŠkoda's public API -- the live source for a Škoda, in place of the block above (issue #193).
-      # No key here: it is pasted on the Vehicle portal page and kept in data/skoda-api-key.json.
+      # No key here: it is pasted on the Car page and kept in data/skoda-api-key.json.
       # Enabling this and VW_WEBSITE_ENABLED together stops startup -- one installation, one car.
       Vehicle__Skoda__Enabled: ${SKODA_ENABLED:-false}
       Vehicle__Skoda__Vin: ${SKODA_VIN:-}
@@ -178,7 +178,7 @@ services:
       # the same reading, and the only manufacturer integration in the codebase.
       #
       # VW_ENABLED is the feed: the portal read on the controller's own fifteen-minute clock. The
-      # credentials alone only enable the web UI's "Vehicle portal" button, which is deliberate --
+      # credentials alone only enable the web UI's "Ask the car" button, which is deliberate --
       # pressing it is how you prove them before anything signs in unattended.
       #
       # WITH VW_ENABLED=true THE MQTT VEHICLE FEED ABOVE IS NOT SUBSCRIBED. Two sources writing one

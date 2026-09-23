@@ -3,9 +3,9 @@ namespace Gleanvolt.Infrastructure.Vehicles.Skoda;
 /// <summary>
 /// What the MyŠkoda Public API feed needs (issue #193). Bound from <c>Vehicle:Skoda</c>.
 ///
-/// <para><b>No API key here, on purpose.</b> The key is pasted on the Vehicle portal page and kept in
-/// the secret store (<c>Secrets:Directory</c>, issue #215), and nowhere else. Keys expire, so renewing
-/// one is a recurring owner action;
+/// <para><b>No API key here, on purpose.</b> The key is pasted on the Car page and kept in the secret
+/// store (<c>Secrets:Directory</c>, issue #215), and nowhere else. Keys expire, so renewing one is a
+/// recurring owner action;
 /// one place to do it beats a <c>.env</c> edit plus a restart, and a key in two places is two places
 /// for it to go stale.</para>
 ///

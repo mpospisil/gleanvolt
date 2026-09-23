@@ -675,7 +675,7 @@ public static class GleanvoltHostingExtensions
                 provider.GetService<ILogger<VwWebsiteUpdateService>>()));
         }
 
-        // Registered on Enabled and a VIN, not on a key: the key is pasted on the Vehicle portal page,
+        // Registered on Enabled and a VIN, not on a key: the key is pasted on the Car page,
         // and until it is the feed is there, fetches nothing and says NeedsOwner. The store is shared
         // by the sign-in and the feed, so a pasted key is in use without a restart; the client is
         // shared so both spend -- and read -- one quota. The feed is chosen by this section alone;

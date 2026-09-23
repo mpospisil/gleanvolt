@@ -149,7 +149,7 @@ else
     {
         <p class="error" id="vehicle-feed-blocked">
             <strong>Sign-in required</strong> — @(_service?.OwnerAction ?? blocked.Message)
-            <a href="/vehicle-portal">Open the vehicle page</a>
+            <a href="/car">Sign in on the car page</a>
         </p>
     }
     else if (_vehicle is null && _feed is not null)
@@ -372,7 +372,7 @@ else
             : described;
     }
 
-    // The car's figures are formatted in VehicleFormatting rather than here (#178): /vehicle-portal
+    // The car's figures are formatted in VehicleFormatting rather than here (#178): /car
     // shows the same ones, and it exists to be compared against this card. Two roundings would let
     // the two pages disagree over a reading they agree on.
     private static string Km(double? km) => VehicleFormatting.Km(km);

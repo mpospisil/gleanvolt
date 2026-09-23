@@ -224,8 +224,8 @@ public sealed class VehicleUpdateWorker : BackgroundService
             {
                 _logger.LogWarning(
                     "The {Manufacturer} feed for {Vehicle} has stopped and needs you: {Reason} It will not "
-                    + "be asked again until you have cleared it — on the Vehicle portal page — and, for a "
-                    + "feed that cannot see that, restarted the controller.",
+                    + "be asked again until you have cleared it — on the Car page — and, for a feed that "
+                    + "cannot see that, restarted the controller.",
                     service.Manufacturer, service.VehicleId, service.Health.Message);
 
                 sinceReminder = TimeSpan.Zero;

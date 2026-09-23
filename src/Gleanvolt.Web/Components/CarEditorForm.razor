@@ -12,8 +12,9 @@
 
     What it cannot do is probe. The feed is built at startup out of these very keys, so there is
     nothing running to test them against — and a cold volkswagen.de sign-in wants an emailed code
-    anyway. Save, restart, sign in on /vehicle-portal, ask the car; the page says so rather than
-    letting a green save look like a working feed.
+    anyway. Save, restart, sign in, ask the car; the page says so rather than letting a green save look
+    like a working feed. Since #227 all four of those are on this one page, so what used to be a link
+    to /vehicle-portal is a pointer down the page.
 *@
 
 <section class="controls pv-editor car-editor" id="car-editor">
@@ -70,7 +71,7 @@
             <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key, so
             each field says where its value comes from. Nothing changes until the controller restarts —
             and a save cannot prove an account, because the feed is built at startup from these keys.
-            Restart, then prove it on <a href="/vehicle-portal">Vehicle portal</a>.
+            Restart, then <a href="#account">sign in below</a> and ask the car.
         </p>
     }
 
@@ -187,7 +188,7 @@
     {
         <p class="muted" id="car-message">
             @message
-            <a href="/vehicle-portal">Prove it on Vehicle portal</a>.
+            <a href="#account">Prove it below</a>.
         </p>
     }
 </section>
@@ -491,11 +492,11 @@
     {
         VehicleFeed.Volkswagen =>
             "volkswagen.de, read live. The first sign-in always wants a one-time code e-mailed to this "
-            + "account, so it is done on the Vehicle portal page after the restart.",
+            + "account, so it is done under Account below, after the restart.",
         VehicleFeed.Skoda =>
             "The MyŠkoda Public API. It takes no password: create an API key in the MyŠkoda app and paste "
-            + "it on the Vehicle portal page. Keys expire, which is why they are renewed there rather "
-            + "than here.",
+            + "it under Account below. Keys expire, which is why they are renewed there rather than "
+            + "here.",
         VehicleFeed.DataAct =>
             "The EU Data Act portal — the route for a Group brand with no live feed of its own. It "
             + "delivers batches rather than readings, so expect the car's state of charge to be hours "

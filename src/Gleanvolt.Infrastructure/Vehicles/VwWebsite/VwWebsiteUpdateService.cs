@@ -18,7 +18,7 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 /// <para><b>Any failure stops it and asks the owner.</b> A one-time code wanted, no usable answer, or
 /// no answer at all: the feed reports <see cref="VehicleSourceState.NeedsOwner"/>, the worker stops
 /// asking, and nothing is replayed at VW's identity provider on a clock — that is how accounts get
-/// locked. Signing in again on the vehicle page moves <see cref="VwWebsiteClient.SignIns"/>, which is
+/// locked. Signing in again on the Car page moves <see cref="VwWebsiteClient.SignIns"/>, which is
 /// what puts the feed back on its clock without a restart.</para>
 ///
 /// <para>The charge never depends on this: a recording is not a control input.</para>
@@ -32,7 +32,7 @@ public sealed class VwWebsiteUpdateService(
 {
     /// <summary>What the dashboard's card says when the feed has stopped for the owner (#212).</summary>
     public const string OwnerActionSentence =
-        "volkswagen.de wants a one-time code — sign in again on the vehicle page.";
+        "volkswagen.de wants a one-time code — sign in again on the Car page.";
 
     private readonly ILogger _logger = logger ?? (ILogger)NullLogger.Instance;
 
@@ -50,7 +50,7 @@ public sealed class VwWebsiteUpdateService(
 
     /// <summary>
     /// Blocked until the owner has signed in again since it stopped. Read by the worker every minute
-    /// while it waits, so a sign-in on the vehicle page resumes the feed within one.
+    /// while it waits, so a sign-in on the Car page resumes the feed within one.
     /// </summary>
     public VehicleSourceHealth Health =>
         _blocked is { } blocked && client.SignIns == Volatile.Read(ref _blockedAtSignIns) ? blocked : _health;
@@ -101,8 +101,8 @@ public sealed class VwWebsiteUpdateService(
     {
         Volatile.Write(ref _blockedAtSignIns, client.SignIns);
         _blocked = VehicleSourceHealth.NeedsOwner(
-            $"{what} Sign in again on the Vehicle portal page; the feed resumes once you have. "
-            + "The charge is unaffected.");
+            $"{what} Sign in again on the Car page; the feed resumes once you have. The charge is "
+            + "unaffected.");
 
         return null;
     }

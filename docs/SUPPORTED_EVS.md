@@ -102,7 +102,7 @@ to VW Group's statutory portal as the owner and reads it every fifteen minutes.
 A brand missing from the table, or one whose sign-in id has changed, can still be used with
 `VW_CLIENT_ID` — on `/car` it is behind the disclosure under the brand list, and in `.env` it is the
 same key; see the setup guide. If battery or range comes back blank on a model other than an
-ID.4, the **Vehicle portal** page lists the field names it did not recognise, and those are what
+ID.4, the **Diagnostics** disclosure on `/car` lists the field names it did not recognise, and those are what
 `VwGroupFieldNames` is missing.
 
 ### Route B — volkswagen.de (built in)
@@ -117,7 +117,7 @@ on volkswagen.de show, and it asks **only while a charging session is open**.
 | **Account** | A Czech Volkswagen ID works on volkswagen.de; other countries' accounts are expected to, and are not tested |
 | **Reads** | State of charge, range, charge state, charging power, **plug state** |
 | **Freshness** | About 20 seconds behind the car |
-| **Needs you** | An email one-time code on every cold sign-in, entered on **Vehicle portal → Sign in**. The remembered session survives restarts |
+| **Needs you** | An email one-time code on every cold sign-in, entered on **`/car` → Account → Sign in**. The remembered session survives restarts |
 | **Setup** | **`/car` → Volkswagen**: VW ID, password, VIN — or [`Vehicle:Website`](../README.md#vehiclewebsite--volkswagende-the-live-source) in the README |
 
 Routes A and B complement each other and run side by side on the reference install: the portal carries
@@ -143,10 +143,10 @@ typed problem responses and rate-limit headers.
 | **Cars** | A connected Škoda EV or plug-in hybrid in your MySkoda account |
 | **Reads** | State of charge, range, charge state, charge time remaining, **plug state** (derived: `CONNECT_CABLE` means unplugged) |
 | **Freshness** | As fresh as Škoda's cloud: every 15 minutes idle, every 5 while charging. How often the car itself reports while charging is not yet known |
-| **Needs you** | An API key created in the MySkoda app, pasted once on **Vehicle portal**. It expires; renewing is pasting a new one |
+| **Needs you** | An API key created in the MySkoda app, pasted once under **`/car` → Account**. It expires; renewing is pasting a new one |
 | **Quota** | 20 requests an hour per VIN, shared with *Ask the car* |
 | **Tested** | **No.** Built from the published spec with spec-built fixtures; nobody has run it against a Škoda yet. Reports in [issue #193](https://github.com/mpospisil/gleanvolt/issues/193) are very welcome |
-| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted on **Vehicle portal**, not here. Or [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
+| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted under **Account** on the same page, not in the form. Or [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
 
 Route C and Route B cannot run together — they read two different cars, and an installation has one.
 Picking a manufacturer on `/car` makes that unarrangeable: the choice disables whichever feed it

@@ -112,7 +112,7 @@ public enum VehicleFeed
     /// <summary>volkswagen.de, live (<c>Vehicle:Website</c>).</summary>
     Volkswagen,
 
-    /// <summary>The MyŠkoda Public API (<c>Vehicle:Skoda</c>); the key is pasted on <c>/vehicle-portal</c>.</summary>
+    /// <summary>The MyŠkoda Public API (<c>Vehicle:Skoda</c>); the key is pasted on <c>/car</c>.</summary>
     Skoda,
 
     /// <summary>The EU Data Act portal (<c>Vehicle:DataAct</c>), for the Group brands with no live feed.</summary>

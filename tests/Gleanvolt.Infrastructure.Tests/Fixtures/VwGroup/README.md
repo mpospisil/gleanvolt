@@ -23,7 +23,7 @@ they pin are the ones #139 specifies. The *spellings* in `VwGroupFieldNames` are
 genuine download settles them.
 
 **There is no longer a capture command.** The `vw-probe` console harness that wrote a sanitised bundle
-with `--save-fixture` was removed once the web UI's **Vehicle portal** page took over the job of
+with `--save-fixture` was removed once the web UI's **Car** page took over the job of
 proving a sign-in; it is recoverable from git history (`src/Gleanvolt.Worker/VwProbe.cs`, commit
 `27e17ab`) if the sanitiser is wanted back.
 

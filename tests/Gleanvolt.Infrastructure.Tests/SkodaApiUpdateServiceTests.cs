@@ -45,7 +45,7 @@ public sealed class SkodaApiUpdateServiceTests : IDisposable
     public async Task With_no_key_it_needs_the_owner_and_sends_nothing()
     {
         Assert.True(_service.Health.IsBlocked);
-        Assert.Contains("Vehicle portal", _service.Health.Message);
+        Assert.Contains("Car page", _service.Health.Message);
 
         Assert.Null(await _service.FetchAsync(CancellationToken.None));
         Assert.Empty(_api.Requests);

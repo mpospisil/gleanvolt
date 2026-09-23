@@ -298,7 +298,7 @@ public class VehicleUpdateWorkerTests
             warning =>
             {
                 Assert.Contains("consent screen", warning);
-                Assert.Contains("Vehicle portal", warning);
+                Assert.Contains("Car page", warning);
             });
 
         static bool Blocked(string warning) => warning.Contains("has stopped and needs you");
@@ -311,7 +311,7 @@ public class VehicleUpdateWorkerTests
         // the feed must pick up on its own -- a restart to use a key already in hand would be absurd.
         var service = new StubService(count => count == 2 ? Reading(63) : null)
         {
-            Health = VehicleSourceHealth.NeedsOwner("Paste an API key on the Vehicle portal page."),
+            Health = VehicleSourceHealth.NeedsOwner("Paste an API key on the Car page."),
             AskedEnough = 2,
         };
 

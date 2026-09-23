@@ -779,6 +779,37 @@ internal sealed class FakeVehicleAccountSignIn(
     public void SignOut() => State = VehicleSignInState.Unknown;
 }
 
+/// <summary>A sign-in that wants an API key, as the Škoda one does (issue #193).</summary>
+internal sealed class FakeKeySignIn(VehicleSignInState? afterKey = null) : IVehicleAccountSignIn
+{
+    public int Submissions { get; private set; }
+
+    public string? LastAnswer { get; private set; }
+
+    public string AccountName => "MyŠkoda API";
+
+    public string Explanation => "Create an API key in the MySkoda app and paste it here once.";
+
+    public bool IsConfigured => true;
+
+    public VehicleSignInState State { get; private set; } =
+        VehicleSignInState.KeyRequired("Create an API key for this car in the MySkoda app and paste it here.");
+
+    public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(State);
+
+    public Task<VehicleSignInState> SubmitAsync(string answer, CancellationToken cancellationToken = default)
+    {
+        Submissions++;
+        LastAnswer = answer;
+        State = afterKey ?? VehicleSignInState.SignedIn("Key valid until 2027-03-01 · My Enyaq");
+        return Task.FromResult(State);
+    }
+
+    public void SignOut() =>
+        State = VehicleSignInState.KeyRequired("Signed out; the key works until revoked in the app.");
+}
+
 /// <summary>
 /// A stand-in for the host's <c>PvSystemEditor</c> (issue #204): the file is a dictionary, every key not
 /// in it comes from "the environment" with its running value, and a save is refused on request rather

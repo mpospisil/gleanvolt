@@ -26,7 +26,7 @@ public static class VwGroupPortalOptionsResolver
     ///
     /// <para><b>Off by default, like everything that leaves the LAN</b>, and separate from having
     /// credentials on purpose: a <c>.env</c> that carries a VW ID because somebody pressed the
-    /// <i>Vehicle portal</i> button once must not become an unattended feed at the next restart.
+    /// <i>Ask the car</i> button once must not become an unattended feed at the next restart.
     /// Signing in on a schedule with an owner's real password is a decision, and this is where it is
     /// taken.</para>
     ///
