@@ -596,7 +596,8 @@ h1 {
     instead of from the fixed box above -- which the legend would otherwise spill out of.
 */
 .chart.day,
-.chart.session {
+.chart.session,
+.chart.forecast {
     height: auto;
 }
 
@@ -679,6 +680,45 @@ h1 {
     .forecast-days th {
         padding-left: 0.3rem;
         padding-right: 0.3rem;
+    }
+}
+
+/*
+    The forecast table (#219): forty-eight rows a day, grouped into a tbody per day with the day's own
+    figures on a heading row above them. The heading is what makes ninety-six rows navigable, so it
+    stays put under the sticky column header rather than scrolling away with its day.
+*/
+.forecast-periods tbody tr.day-heading th {
+    position: sticky;
+    top: 2.4rem;
+    text-align: left;
+    background: var(--panel);
+    border-top: 2px solid var(--line);
+    z-index: 1;
+}
+
+/*
+    The date belongs beside the day's name here, not under it as on the dashboard: this heading spans
+    the whole table rather than sharing a narrow first column with four figures.
+*/
+.forecast-periods .forecast-date {
+    display: inline;
+    font-weight: 400;
+}
+
+/*
+    The day's four figures, beside its name on a wide screen and under it on a phone -- a sentence
+    that wraps mid-figure is harder to read than one on its own line.
+*/
+.forecast-periods .day-totals {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+
+@media (min-width: 40rem) {
+    .forecast-periods .day-totals {
+        float: right;
     }
 }
 

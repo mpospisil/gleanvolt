@@ -877,3 +877,69 @@ internal sealed class FakeSecretStore : ISecretStore
 
     public string Describe() => Protection;
 }
+
+/// <summary>
+/// A forecast source that holds whole days of periods, as the retained history does (#219).
+///
+/// <para>Deliberately not <see cref="FakeSolarForecastService"/>, which throws for the periods: the
+/// dashboard's contract is that it reads the day totals and never the periods, and this page's is the
+/// opposite — the periods <i>are</i> what it is for. Both surfaces keep their own fake so neither
+/// contract can quietly be relaxed by a test of the other.</para>
+///
+/// <para>The live accessors still throw. <c>/forecast</c> must read the history, not the live cache:
+/// a provider only ever answers what is still to come, so the cache cannot say what this morning was
+/// forecast to bring.</para>
+/// </summary>
+internal sealed class FakeSolarDayForecasts : ISolarForecastService
+{
+    public Dictionary<DateOnly, SolarForecast> Days { get; } = [];
+
+    /// <summary>
+    /// Day figures the source worked out when its forecast landed. A day absent here is summarised
+    /// from its periods, which is what the real source's own summaries amount to — a test that cares
+    /// which of the two a render read sets this one and not the other.
+    /// </summary>
+    public Dictionary<DateOnly, SolarDayForecastSummary> Summaries { get; } = [];
+
+    public SolarForecast? GetForecastForToday() =>
+        throw new NotSupportedException("The forecast page reads whole days from the history, not the live cache.");
+
+    public SolarForecast? GetForecast(DateTimeOffset from, DateTimeOffset to) =>
+        throw new NotSupportedException("The forecast page reads whole days from the history, not the live cache.");
+
+    public SolarForecast? GetDayForecast(DateOnly localDate) =>
+        Days.TryGetValue(localDate, out var day) ? day : null;
+
+    public SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
+        Summaries.TryGetValue(localDate, out var summary) ? summary
+            : Days.TryGetValue(localDate, out var day) ? SolarDayForecastSummary.Of(day)
+            : null;
+
+    public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
+}
+
+/// <summary>Plausible <see cref="SolarForecastPeriod"/> values for tests.</summary>
+internal static class TestForecasts
+{
+    /// <summary>The provider's half hour.</summary>
+    public static readonly TimeSpan Period = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// One period, named by the instant it <b>ends</b> at — which is how providers identify one, and
+    /// how a day's periods are attributed to their day.
+    /// </summary>
+    public static SolarForecastPeriod At(
+        DateTimeOffset periodEnd,
+        double watts,
+        double? p10 = null,
+        double? p90 = null) =>
+        new(periodEnd, Period, watts, p10, p90);
+
+    /// <summary>
+    /// A run of consecutive half hours ending at <paramref name="firstPeriodEnd"/> and after, each
+    /// carrying a band 20% either side of its median so a test that is not about the band can ignore it.
+    /// </summary>
+    public static SolarForecast Run(DateTimeOffset retrievedAt, DateTimeOffset firstPeriodEnd, params double[] watts) =>
+        new(retrievedAt, [.. watts.Select((w, i) =>
+            At(firstPeriodEnd.AddMinutes(30 * i), w, w * 0.8, w * 1.2))]);
+}

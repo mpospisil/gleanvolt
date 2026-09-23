@@ -1,0 +1,266 @@
+@page "/forecast"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject ISolarForecastService Forecasts
+@inject IJSRuntime JS
+@inject TimeProvider Time
+
+@*
+    What the roof is going to do, today and tomorrow (#219). The Energy page's shape on purpose: the
+    two days drawn, then the same two days printed, one row per forecast period, both built from one
+    list so the picture cannot disagree with the numbers.
+
+    It reads ISolarForecastService in-process, as the dashboard does -- the cached forecast the poll
+    loop is already deciding on -- and *never triggers a fetch*. Solcast's free tier is about ten calls
+    a day and the refresh worker spends half of them; a page that fetched on every visit would be the
+    one thing that could exhaust that.
+
+    Three surfaces show forecast and each owns a different question. The dashboard's table owns the
+    glance: two rows, four numbers, in a place somebody is already looking. This page owns the detail,
+    and is the only place tomorrow has a *shape*. The Forecasted tab owns the car's share of today --
+    surplus after the house and the battery. A day total and a day's shape are different objects.
+*@
+
+<SiteTitle Page="Forecast" />
+
+<h1>Forecast</h1>
+
+@if (!_anything)
+{
+    @* Not an error: a controller with no Solcast key is a supported installation, and so is one that
+       started a minute ago. Both look identical from here, so the sentence names both. *@
+    <p class="muted">
+        No forecast is held yet. Either no Solcast account is configured for this installation, or
+        nothing has been fetched since the controller started — the startup log says which, and an
+        unconfigured provider says so in as many words. The forecast is refreshed on its own schedule
+        in daylight; this page shows whatever was last fetched and never asks for one itself.
+    </p>
+}
+else
+{
+    <section class="chart-section">
+        <h2>The two days</h2>
+        <div id="forecast-chart" class="chart forecast"></div>
+        <p class="muted chart-note">
+            Expected PV power against time, 30-minute periods, in @Time.LocalTimeZone.Id time.
+            The line is <strong>Expected</strong> — the median, as likely to be beaten as missed — and
+            the band behind it is <strong>p10 to p90</strong>: the width of that gap is how sure the
+            sky is, and it is the reason this is a picture rather than four numbers. The solid rule is
+            the midnight between the two days; the dashed one is now. Click a name in the legend to
+            take that series out.
+            @if (!_fullBand)
+            {
+                <text>
+                    <strong>Some periods carry no range of their own</strong> — the provider sent only
+                    a median for them, and the band collapses onto the line there. A band no wider
+                    than the line is not a promise; the table below shows a dash in those rows.
+                </text>
+            }
+        </p>
+    </section>
+
+    @if (_morningMissing is { } from)
+    {
+        <p class="muted table-note">
+            <strong>Today starts at @Local(from).</strong> A forecast provider only ever answers what
+            is still to come, so the controller can say what this morning was expected to bring only
+            if it was running through it — and this one has nothing retained before then. The empty
+            stretch on the left of the chart is a gap in what is known, not a dark morning.
+        </p>
+    }
+
+    <table class="sessions energy forecast-periods">
+        <thead>
+            <tr>
+                <th>Period</th>
+                <th class="num">Expected</th>
+                <th class="num">Low (p10)</th>
+                <th class="num">High (p90)</th>
+                <th class="num">Energy</th>
+            </tr>
+        </thead>
+        @foreach (var day in _days)
+        {
+            <tbody>
+                @*
+                    The day's figures above its periods rather than below them: they are the dashboard's
+                    own row, read from the same GetDaySummary the dashboard reads, and written out in
+                    words so that energy in kWh and peak in kW can sit in a table whose columns are
+                    watts without either having to pretend to be the other.
+                *@
+                <tr class="day-heading">
+                    <th colspan="5">
+                        @day.Label
+                        <span class="muted forecast-date">@day.Date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
+                        @if (day.Summary is { } summary)
+                        {
+                            <span class="day-totals">
+                                @Kwh(summary.ExpectedWh) kWh expected
+                                (@Kwh(summary.LowWh)–@Kwh(summary.HighWh) at p10–p90), peak
+                                @Kw(summary.PeakWatts) kW
+                            </span>
+                        }
+                    </th>
+                </tr>
+                @if (day.Periods.Count == 0)
+                {
+                    <tr class="empty-day">
+                        <td colspan="5" class="muted">Nothing is held for this day.</td>
+                    </tr>
+                }
+                @foreach (var period in day.Periods)
+                {
+                    <tr>
+                        <td>@Local(period.PeriodStart)–@Local(period.PeriodEnd)</td>
+                        <td class="num">@Watts(period.EstimatedPowerWatts)</td>
+                        @* An em dash, not the median: the provider sent no p10 for this half hour,
+                           which is a different fact from one it is as sure of as its middle guess. *@
+                        <td class="num">@(period.EstimatedPowerWattsP10 is { } low ? Watts(low) : "—")</td>
+                        <td class="num">@(period.EstimatedPowerWattsP90 is { } high ? Watts(high) : "—")</td>
+                        <td class="num">@Kwh(period.EnergyWattHours)</td>
+                    </tr>
+                }
+            </tbody>
+        }
+    </table>
+
+    <p class="muted table-note">
+        Power in W, energy in kWh, times in @Time.LocalTimeZone.Id time. Each row is the half hour it
+        names, and every figure on it is the average power the provider expects across that half hour —
+        so the energy column is simply that power over thirty minutes. The night rows are kept: a 0 W
+        row at 02:00 <em>is</em> the forecast, and a table that drops rows is one you have to learn the
+        rules of before you can trust a gap in it.
+        A period is counted under the day it <strong>ends</strong> on, which is how the dashboard and
+        the day plan count it too, so each day opens with the half hour that ends at its own midnight.
+        <strong>Tomorrow's figures keep moving</strong> — every refresh re-forecasts them until the day
+        arrives.
+        @if (_retrievedAt is { } retrieved)
+        {
+            <text> Last fetched <strong>@Local(retrieved)</strong> on @retrieved.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture).</text>
+        }
+        The horizon is about 48 hours, which is why this is two days and not a week.
+        The dashboard's <a href="/#solar-forecast">Solar forecast</a> table is the same two days in four
+        numbers each.
+    </p>
+}
+
+@code {
+    /// <summary>One day of the page: its name, its date, the periods held for it and the day's figures.</summary>
+    private sealed record Day(
+        string Label,
+        DateOnly Date,
+        IReadOnlyList<SolarForecastPeriod> Periods,
+        SolarDayForecastSummary? Summary);
+
+    private IReadOnlyList<Day> _days = [];
+    private ForecastChartSeries? _chart;
+    private DateTimeOffset? _retrievedAt;
+
+    // Where today's held forecast actually begins, when that is after local midnight. Null when the
+    // whole day is covered -- which is the ordinary case for a controller that has been up overnight.
+    private DateTimeOffset? _morningMissing;
+
+    private bool _anything;
+    private bool _fullBand = true;
+
+    // See Energy.razor for why these are two flags and not one: _chartRendered guards the draw,
+    // _chartCreated is the only thing that can answer whether there is anything to tear down.
+    private bool _chartRendered;
+    private bool _chartCreated;
+
+    protected override void OnInitialized()
+    {
+        var zone = Time.LocalTimeZone;
+        var now = Time.GetUtcNow();
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        var tomorrow = today.AddDays(1);
+
+        var todayForecast = Forecasts.GetDayForecast(today);
+        var tomorrowForecast = Forecasts.GetDayForecast(tomorrow);
+
+        _days =
+        [
+            new Day("Today", today, todayForecast?.Periods ?? [], Forecasts.GetDaySummary(today)),
+            new Day("Tomorrow", tomorrow, tomorrowForecast?.Periods ?? [], Forecasts.GetDaySummary(tomorrow)),
+        ];
+
+        _retrievedAt = todayForecast?.RetrievedAt ?? tomorrowForecast?.RetrievedAt;
+
+        var periods = _days.SelectMany(d => d.Periods).ToList();
+        _anything = periods.Count > 0;
+        if (!_anything)
+        {
+            return;
+        }
+
+        _fullBand = periods.All(p => p is { EstimatedPowerWattsP10: not null, EstimatedPowerWattsP90: not null });
+
+        var (windowStart, midnight, windowEnd) = Window(today, zone);
+
+        // The earliest period *of today's block*, which is the one that can be missing a morning:
+        // tomorrow is always forecast whole, being entirely ahead of every refresh that has landed.
+        var earliest = _days[0].Periods.Count == 0 ? null : (DateTimeOffset?)_days[0].Periods.Min(p => p.PeriodStart);
+        _morningMissing = earliest > windowStart ? earliest : null;
+
+        _chart = ForecastChartSeries.From(periods, windowStart, midnight, windowEnd, now, zone);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartRendered || _chart is null)
+        {
+            return;
+        }
+
+        _chartRendered = true;
+
+        // Set before the call, not after: if the interop is cut off mid-flight the chart may already
+        // exist on the other side, and disposing one that isn't there is a no-op anyway.
+        _chartCreated = true;
+
+        await JS.InvokeVoidAsync("solaxCharts.renderForecastChart", "forecast-chart", _chart);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_chartCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "forecast-chart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is already gone (e.g. the browser tab closed) -- nothing left to clean up.
+        }
+    }
+
+    /// <summary>
+    /// Today's midnight, tomorrow's, and the one after — as instants. Built from the zone's offset at
+    /// each boundary rather than from fixed 24-hour steps, so a clocks-change day is the 23 or 25
+    /// hours it really is and the divider lands on the midnight it means.
+    /// </summary>
+    private static (DateTimeOffset Start, DateTimeOffset Midnight, DateTimeOffset End) Window(DateOnly today, TimeZoneInfo zone)
+    {
+        DateTimeOffset At(int days)
+        {
+            var local = today.AddDays(days).ToDateTime(TimeOnly.MinValue);
+            return new DateTimeOffset(local, zone.GetUtcOffset(local));
+        }
+
+        return (At(0), At(1), At(2));
+    }
+
+    private string Local(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("HH:mm");
+
+    private static string Watts(double value) => value.ToString("N0");
+
+    private static string Kwh(double wattHours) => (wattHours / 1000).ToString("F2");
+
+    private static string Kw(double watts) => (watts / 1000).ToString("F2");
+}
