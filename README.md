@@ -897,8 +897,10 @@ A plan is only as good as the forecast under it, so the controller checks contin
   strong daily shape, and a trailing average of it is always wrong in the same direction: measured at
   15:00 it reports the afternoon peak, which then gets projected across the evening. On the reference
   site that turned a 05:00 plan of "33.6 kWh available, window 08:00–16:30" into "no EV charging
-  today" by noon, on a day whose forecast was accurate to within 5%. The profile is seeded from
-  `BaselineHouseLoadWatts` and logged once a day (`House profile:`) so the learned shape is visible.
+  today" by noon, on a day whose forecast was accurate to within 5%. At startup each hour is rebuilt
+  from the last `HouseLoadHistoryDays` (14) of the energy history, so a deploy doesn't send the plan
+  back to guessing. An hour with less than two days of history starts from `BaselineHouseLoadWatts`.
+  The profile is logged at startup and once a day (`House profile:`) so the learned shape is visible.
 - **Realised bias** — `actual ÷ forecast` over elapsed daylight, clamped to `[0.5, 1.2]` and applied
   to the remaining forecast. Asymmetric on purpose: under-production scales the rest of the day down
   (raising the floor, throttling the car early — the conservative direction), while a sunny morning
@@ -935,7 +937,8 @@ deadline.
     "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
     "BatteryCapacityKWh": 9.0,       // REQUIRED: USABLE capacity (see the warning below), not nameplate
     "ChargeEfficiency": 0.95,
-    "BaselineHouseLoadWatts": 350,   // seed for the learned hour-of-day house-load profile
+    "BaselineHouseLoadWatts": 350,   // house load for an hour neither the history nor the live profile knows yet
+    "HouseLoadHistoryDays": 14,      // energy history the house-load profile is rebuilt from at startup, 0 = off
     "ForecastConfidence": "P10",     // P10 | P50 | P90 — P10 is what makes the guarantee honest
     "MinBatterySocFloorPercent": 50, // hard floor, whatever the forecast says
     "FloorResumeMarginPercent": 5,   // SOC recovery required before a paused session restarts

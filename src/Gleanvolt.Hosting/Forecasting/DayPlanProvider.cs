@@ -32,6 +32,10 @@ public sealed class DayPlanProvider
     private readonly EnergyIntegrator _evDeliveredToday = new();
     private readonly EnergyIntegrator _exportedToday = new();
 
+    // Stored history waiting to be folded into the profile. Read from the store on the energy monitor's
+    // thread and applied on the poll's, at the next Update, so the profile is only ever touched from one.
+    private IReadOnlyList<EnergyInterval>? _pendingHouseLoadHistory;
+
     private DateOnly _day;
     private DateTimeOffset? _firstSampleToday;
     private string? _lastPlanSignature;
@@ -75,6 +79,36 @@ public sealed class DayPlanProvider
     public double BiasFactor => _accuracy.BiasFactor;
 
     /// <summary>
+    /// Reads the last <see cref="ForecastChargeOptions.HouseLoadHistoryDays"/> of stored energy history
+    /// for the house-load profile to be rebuilt from (issue #229). Called once, by the energy monitor,
+    /// when its store is open. Best-effort: a failure leaves the profile learning from the seed, which is
+    /// what it did before there was any history to read.
+    /// </summary>
+    public async Task SeedHouseLoadAsync(IEnergyIntervalStore store, CancellationToken cancellationToken)
+    {
+        if (_options.HouseLoadHistoryDays <= 0)
+        {
+            return;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        try
+        {
+            var history = await store
+                .GetIntervalsAsync(now.AddDays(-_options.HouseLoadHistoryDays), now, cancellationToken)
+                .ConfigureAwait(false);
+            Interlocked.Exchange(ref _pendingHouseLoadHistory, history);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "Could not read the energy history for the house-load profile; it learns from the {Seed}W seed instead.",
+                _options.BaselineHouseLoadWatts);
+        }
+    }
+
+    /// <summary>
     /// Folds one telemetry reading into today's picture and returns the current plan. Called every
     /// poll, in every mode: the accuracy tracking and the day totals are worth having even when the
     /// forecast-driven mode isn't the one driving the charger.
@@ -87,6 +121,7 @@ public sealed class DayPlanProvider
         RollDayIfNeeded(DateOnly.FromDateTime(localNow.DateTime));
         _firstSampleToday ??= state.Timestamp;
 
+        ApplyHouseLoadHistory();
         _houseLoad.Add(state.Timestamp, state.OtherLoadsPowerWatts);
         _evDeliveredToday.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
         _exportedToday.Add(state.Timestamp, Math.Max(0, -state.GridPowerWatts));
@@ -102,6 +137,23 @@ public sealed class DayPlanProvider
         LogDaySummaryIfDue(state, todaysForecast, plan, loanedTodayWh);
 
         return plan;
+    }
+
+    private void ApplyHouseLoadHistory()
+    {
+        if (Interlocked.Exchange(ref _pendingHouseLoadHistory, null) is not { } history)
+        {
+            return;
+        }
+
+        var seeded = _houseLoad.SeedFrom(history);
+        _logger.LogInformation(
+            "House profile rebuilt from {Days} days of energy history: {Seeded} of 24 hours seeded, the rest "
+            + "on the {Seed}W seed until observed.",
+            _options.HouseLoadHistoryDays,
+            seeded,
+            _options.BaselineHouseLoadWatts);
+        LogHouseProfile();
     }
 
     private SolarDayPlan BuildPlan(EnergyState state, SolarForecast? todaysForecast, DateTimeOffset deadline)
@@ -292,13 +344,15 @@ public sealed class DayPlanProvider
             loanedTodayWh / 1000,
             _exportedToday.EnergyWattHours / 1000);
 
-        // The learned shape of the house, hour by hour. This is what the plan subtracts from the
-        // forecast before the car sees any of it, so when a day's decisions look wrong this is the
-        // first line to read.
+        LogHouseProfile();
+    }
+
+    // The learned shape of the house, hour by hour. This is what the plan subtracts from the forecast
+    // before the car sees any of it, so when a day's decisions look wrong this is the first line to read.
+    private void LogHouseProfile() =>
         _logger.LogInformation(
             "House profile ({Learned}, mean {MeanWatts:F0}W): {Hourly}",
             _houseLoad.IsFullyLearned ? "learned" : "still learning; unobserved hours use the configured seed",
             _houseLoad.DailyMeanWatts,
             string.Join(" ", _houseLoad.HourlyWatts.Select((w, h) => $"{h:00}:{w:F0}W")));
-    }
 }

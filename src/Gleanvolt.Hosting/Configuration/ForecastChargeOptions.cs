@@ -38,10 +38,18 @@ public sealed class ForecastChargeOptions
     public double ChargeEfficiency { get; init; } = 0.95;
 
     /// <summary>
-    /// Household load excluding the EV, used until the rolling estimator has enough samples of its
-    /// own. Also the value the estimator is seeded from after a restart.
+    /// Household load excluding the EV, for any hour neither the stored energy history nor the live
+    /// estimator has seen enough of.
     /// </summary>
     public double BaselineHouseLoadWatts { get; init; } = 350;
+
+    /// <summary>
+    /// Days of stored energy history the house-load profile is rebuilt from at startup (issue #229),
+    /// so a deploy does not send the day plan back to <see cref="BaselineHouseLoadWatts"/>. Two weeks:
+    /// long enough that one odd evening is a fourteenth of an hour's figure, short enough to follow the
+    /// season. 0 turns it off. Needs the energy monitor; with it disabled the seed is used as before.
+    /// </summary>
+    public int HouseLoadHistoryDays { get; init; } = 14;
 
     /// <summary>Which forecast band to plan on. P10 by default; see <see cref="ForecastConfidence"/>.</summary>
     public ForecastConfidence ForecastConfidence { get; init; } = ForecastConfidence.P10;
