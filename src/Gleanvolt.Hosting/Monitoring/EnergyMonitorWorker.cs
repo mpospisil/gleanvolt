@@ -4,6 +4,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using Gleanvolt.Hosting.Forecasting;
 
 namespace Gleanvolt.Hosting.Monitoring;
 
@@ -47,6 +48,7 @@ public sealed class EnergyMonitorWorker : BackgroundService
     private readonly IEnergyIntervalStore _store;
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ISolarForecastService _forecast;
+    private readonly DayPlanProvider? _dayPlan;
     private readonly EnergyIntervalTracker _tracker;
     private readonly ILogger<EnergyMonitorWorker> _logger;
     private readonly TimeProvider _timeProvider;
@@ -61,12 +63,14 @@ public sealed class EnergyMonitorWorker : BackgroundService
         ChargeControlStatusHolder statusHolder,
         ISolarForecastService forecast,
         ILogger<EnergyMonitorWorker> logger,
+        DayPlanProvider? dayPlan = null,
         TimeProvider? timeProvider = null)
     {
         _options = options.Value;
         _store = store;
         _statusHolder = statusHolder;
         _forecast = forecast;
+        _dayPlan = dayPlan;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _tracker = new EnergyIntervalTracker(_options.Interval, _options.MaxGap, _timeProvider);
@@ -113,6 +117,14 @@ public sealed class EnergyMonitorWorker : BackgroundService
                 "Could not open the energy interval store; the energy history will not be recorded this run. "
                 + "Everything else — polling, charge control, session recording, Home Assistant — is unaffected.");
             return;
+        }
+
+        // The one thing read back out of the history rather than written to it: the house-load profile
+        // the day plan is built on, which would otherwise start every deploy from its seed (issue #229).
+        // Best-effort inside, and on its own it cannot stop recording.
+        if (_dayPlan is not null)
+        {
+            await _dayPlan.SeedHouseLoadAsync(_store, stoppingToken).ConfigureAwait(false);
         }
 
         _logger.LogInformation(
