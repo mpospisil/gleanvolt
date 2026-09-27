@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: MartinPospisil.Gleanvolt
-PackageVersion: 1.0.1
+PackageVersion: 1.0.5
 # The release ships a zip, not an installer: a self-contained build that needs no .NET and writes
 # nothing outside its own directory. WinGet installs it as a portable, which is what it is.
 InstallerType: zip
 NestedInstallerType: portable
-ReleaseDate: '2026-09-03'
+ReleaseDate: '2026-09-23'
 Installers:
 - Architecture: x64
   NestedInstallerFiles:
@@ -14,7 +14,7 @@ Installers:
   # deliberate in release.yml, and this path depends on it.
   - RelativeFilePath: win-x64\Gleanvolt.Worker.exe
     PortableCommandAlias: gleanvolt
-  InstallerUrl: https://github.com/mpospisil/gleanvolt/releases/download/v1.0.1/gleanvolt-1.0.1-win-x64.zip
-  InstallerSha256: 803EEE3EFC76978198B4984198B119ED788588CADC8B4000979D905118491B4E
+  InstallerUrl: https://github.com/mpospisil/gleanvolt/releases/download/v1.0.5/gleanvolt-1.0.5-win-x64.zip
+  InstallerSha256: 38EF6EF9A75CAB7E08DEF1CFA08D686C801DA30526FCF17765F7E8F8CFC3C0DE
 ManifestType: installer
 ManifestVersion: 1.12.0
