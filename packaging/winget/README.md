@@ -72,6 +72,27 @@ rather than by anything here.
 Once that pull request is merged, `.github/workflows/publish-winget.yml` takes over and no further
 manual step exists.
 
+## The privacy policy is not optional
+
+winget-pkgs applies its [Personal Information
+policy](https://github.com/microsoft/winget-pkgs/blob/master/doc/Policies.md) to Gleanvolt, because
+energy and charging history reveals household activity — when someone is home, when a car comes and
+goes. A moderator asked for this directly on the first submission.
+
+So `PrivacyUrl` in the locale manifest is required, and it must point at a policy that
+
+- is public and specific to this product, not a generic template;
+- describes **the submitted version's** behaviour;
+- stays available independently of the installer;
+- covers what is accessed, stored and transmitted; the SQLite retention and deletion behaviour; every
+  external service, including Solcast, the weather service, MQTT/Home Assistant and any vehicle
+  account; how credentials are handled; and whether anything leaves the local network.
+
+`docs/PRIVACY.md` is that policy. **A release that changes any of those answers needs the policy
+updated in the same breath** — a new outbound host, a new stored field, a changed retention default, a
+change to how secrets are held. It carries the version it describes at the top, so a stale one is
+visible rather than merely wrong.
+
 ## Why the manifest looks the way it does
 
 **`InstallerType: zip` with `NestedInstallerType: portable`.** The release ships a self-contained
