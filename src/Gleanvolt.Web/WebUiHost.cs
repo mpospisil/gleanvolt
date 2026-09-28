@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Web.Components;
+using Gleanvolt.Web.Auth;
 
 namespace Gleanvolt.Web;
 
@@ -83,14 +84,27 @@ public static class WebUiHost
         // page's [Authorize] attribute both depend on this being registered.
         services.AddCascadingAuthenticationState();
 
+        // The hash actually in force, seeded from configuration. An operator who already set
+        // Web__PasswordHash never sees a setup page; everyone else gets one until they do.
+        services.TryAddSingleton(new WebPasswordState(web.PasswordHash));
+
+        // Refuses by default, so a host that wires no persistence says so rather than losing a
+        // password on the next restart. Gleanvolt.Hosting registers the real one.
+        services.TryAddSingleton<IWebPasswordStore, NoWebPasswordStore>();
+
         services.AddAuthorization(options =>
         {
-            // [Authorize] with no policy name resolves to DefaultPolicy: this one toggle is what
-            // makes the login optional rather than merely documented as such. The login page carries
-            // [AllowAnonymous], which wins regardless of what this is set to.
-            options.DefaultPolicy = web.AuthenticationRequired
-                ? new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build()
-                : new AuthorizationPolicyBuilder().RequireAssertion(_ => true).Build();
+            // [Authorize] with no policy name resolves to DefaultPolicy. It now asks for a signed-in
+            // user unless authentication was explicitly switched off -- note the difference from
+            // AuthenticationRequired, which is false merely because no password has been configured
+            // *yet*. That case is the setup gate's, not this policy's: the gate holds the UI on the
+            // setup page until a password exists, and once one does this policy is already the strict
+            // one, with no restart needed to make it so.
+            //
+            // The login and setup pages carry [AllowAnonymous], which wins regardless.
+            options.DefaultPolicy = web.RequireAuthentication == false
+                ? new AuthorizationPolicyBuilder().RequireAssertion(_ => true).Build()
+                : new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
 
             // Separate from DefaultPolicy on purpose: "is somebody actually signed in" has to stay
             // accurate for the sign-out control even when RequireAuthentication is off and
@@ -108,6 +122,10 @@ public static class WebUiHost
     /// </summary>
     public static void MapGleanvoltWebUi(this WebApplication app, WebOptions web)
     {
+        // Before authentication, deliberately: with no password set there is nothing to authenticate
+        // against, so the login page would be a dead end and the gate has to answer first.
+        app.UseGleanvoltSetupGate(web);
+
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -127,12 +145,21 @@ public static class WebUiHost
         // Said out loud on every start, not only when someone opted out: an open control surface is
         // exactly the sort of thing an operator should be able to establish from a log file after
         // the fact, and the default being open is what makes that worth logging rather than assuming.
-        if (!web.AuthenticationRequired)
+        if (web.RequireAuthentication == false)
         {
+            // Only reachable by asking for it. Worth a warning every start, because the thing being
+            // opted out of is "anyone who can reach this port can drive the charger".
             app.Logger.LogWarning(
-                "Web UI has no login: every page is reachable by anyone who can reach the port. "
-                + "Keep it to a trusted LAN, or set Web__PasswordHash to require a sign-in "
-                + "(hash-password generates one).");
+                "Web UI authentication is switched off by Web__RequireAuthentication=false: every page "
+                + "is reachable by anyone who can reach the port, including the controls that drive the "
+                + "charger. Only do this on a network where that is acceptable.");
+        }
+        else if (!web.AuthenticationRequired)
+        {
+            app.Logger.LogInformation(
+                "Web UI has no password yet, so it is serving only the setup page at {Path}. "
+                + "Open it to choose one; nothing else is reachable until you do.",
+                SetupGate.Path);
         }
     }
 }

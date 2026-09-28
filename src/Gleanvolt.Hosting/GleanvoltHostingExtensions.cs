@@ -869,6 +869,12 @@ public static class GleanvoltHostingExtensions
         services.Configure<WebOptions>(configuration.GetSection(WebOptions.SectionName));
         services.Configure<ApiOptions>(configuration.GetSection(ApiOptions.SectionName));
 
+        // Where a password set through the UI's setup page goes, so that the next start reads it.
+        // Registered whether or not the UI is on: nothing asks for it unless the UI is serving.
+        services.AddSingleton<IWebPasswordStore>(provider => new WebPasswordStore(
+            configuration,
+            provider.GetService<ILoggerFactory>()?.CreateLogger<WebPasswordStore>()));
+
         var web = ReadWebOptions(configuration);
         var api = ReadApiOptions(configuration);
 

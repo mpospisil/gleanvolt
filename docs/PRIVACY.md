@@ -58,9 +58,18 @@ Only these, and every one of them is **off until you configure it**.
   publishes the live figures and its own status to topics under a prefix you choose. The broker
   address is yours: it defaults to `localhost`, and if you point it at a broker outside your network
   then that is where those figures go. Gleanvolt does not choose that for you.
-- **The web interface**, on port 8090 by default, over plain HTTP. **It has no login unless you set
-  one.** Anyone who can reach that port can see your energy and charging history and change how the
-  charger is driven. Keep it on a trusted network, or set a password — `Web:PasswordHash`.
+- **The web interface**, on port 8090 by default, over plain HTTP. It shows your energy and charging
+  history and can change how the charger is driven, so **it will not show any of that until a password
+  is set**. A fresh installation serves one page — the one that asks you to choose a password — and
+  nothing else. Once set, the UI behaves normally and asks you to sign in.
+
+  The traffic is plain HTTP, so the password and the pages are readable by anything that can watch
+  the network between your browser and the controller. Keep it on a network you trust; put it behind
+  a reverse proxy with TLS if you need more than that.
+
+  Authentication can be switched off deliberately with `Web:RequireAuthentication=false`, which
+  restores the open behaviour for an isolated network. It is not the default, and the controller says
+  so loudly in its log on every start.
 - **The HTTP API**, which is **off by default**. When switched on it requires an API key, and it
   refuses to start if it is enabled without one.
 
