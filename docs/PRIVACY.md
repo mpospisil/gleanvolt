@@ -93,7 +93,7 @@ Vehicle-account passwords, the MQTT broker password, the Solcast key and the Ope
 secrets, and Gleanvolt is built so they never need to be in a configuration file you might commit or
 copy.
 
-- On **Windows**, they are sealed with the Data Protection API and readable only by the Windows
+- On **Windows**, they are sealed with the Data Protection API (DPAPI) and readable only by the Windows
   account that wrote them.
 - On **Linux and macOS**, they are written `0600` — readable only by the user Gleanvolt runs as.
 - They may instead be supplied as environment variables or through a local `.env` file, which is never
