@@ -2439,8 +2439,9 @@ charger — and nothing else: secrets, `ChargeControl`, `BatteryHold`, `Ev` and 
 - **Saved is not applied.** Until a restart, the page shows *Saved, not applied — N changes take
   effect on restart*, each as *running → saved*, with **Restart** beside it. The banner survives a
   reload and disappears once the restarted controller is running with those values.
-- **With no login configured the form is read-only**, and says why: it includes the addresses the
-  controller writes Modbus commands to, and anyone on the LAN could redirect them.
+- **With authentication switched off the form is read-only**, and says why: it includes the addresses
+  the controller writes Modbus commands to, and anyone on the LAN could redirect them. Since the setup
+  page this is only reachable by setting `Web:RequireAuthentication=false` deliberately.
 
 It is also where the **deprecation notices** live: any older key still supplying a value is listed
 under *Configuration to move*. The same lines are logged once at startup, where nobody ever sees them
@@ -2517,7 +2518,7 @@ rather than discovered in a startup refusal.
 its value comes from, and a field set here has **Revert**. A save is checked by the same rules startup
 applies — `EvRules` against the charger's amp band, so *"the car's minimum 8 A is above the
 installation's maximum 6 A"* is refused at the form — and nothing is written when anything is refused.
-With no login configured the form is read-only: these fields are a manufacturer account.
+With authentication switched off the form is read-only: these fields are a manufacturer account.
 
 **Passwords never go in that file.** A password typed here goes to the
 [secret store](#the-data-directory-holds-secrets-the-secrets-section) under `Secrets:Directory`, written owner-only, and the page
@@ -2696,8 +2697,8 @@ the controller — one more reason to consider [Authentication](#authentication)
   image, from the compose stack — and the UI is at `http://<host>:8090`. This is the surface a fresh
   install is operated through, and unlike the Home Assistant integration it needs no broker, no
   credentials and no onboarding to be useful, so there is nothing to gain by making it opt-in.
-- **No login until you configure one.** See [Authentication](#authentication) below: it is an
-  advanced option, off out of the box, and turning it on is a single setting.
+- **A password before anything is served.** See [Authentication](#authentication) below: a fresh
+  installation serves only the page that sets one, so "on by default" does not mean "open by default".
 - **`Web:Enabled=false` means nothing is listening** — not "listening but empty". An ASP.NET host
   would otherwise fall back to a default port; this one installs a server that binds nothing, so with
   the UI off the process is the same headless worker it has always been. `ss -ltnp` shows no socket
@@ -2708,18 +2709,25 @@ the controller — one more reason to consider [Authentication](#authentication)
 
 #### Authentication
 
-**There is no login by default.** The UI serves every page to anyone who can reach the port. That is
-the right default for a LAN appliance — it is what makes the thing work the moment it starts, with no
-secret to generate first — and the wrong one if that LAN has guests on it, or if the port is reachable
-from anywhere beyond it. Which of those you have is something only you know, so it is a setting rather
-than an assumption.
+**A login is required, and an installation with no password set serves only the page that sets one.**
+Nothing else: no dashboard, no history, no controls, until a password exists. Once it does, the UI
+behaves as it always did and asks anonymous visitors to sign in.
 
-Turning the login on is **one setting**: configure `Web:PasswordHash` and every page — including the
-read-only dashboard — starts redirecting anonymous visitors to a login form. There is no second
-switch to remember, and therefore no way to set a password and have it quietly not enforced. There is
-also no per-user account: one shared password gates the whole UI, hashed with ASP.NET Core's
-`PasswordHasher`, matching a LAN appliance with one or two operators rather than a multi-tenant
-system.
+This used to be the other way around — the UI served every page to anyone who could reach the port,
+and logged a warning saying so. The warning was accurate and protected nobody, which is the whole
+argument: the surface shows what the household is doing and can change how the charger is driven, so
+it does not get to be open because opening it was convenient. A winget-pkgs reviewer made the same
+point about the same default, and was right.
+
+The choice of *how* to close it matters for an appliance. Binding to loopback would leave a headless
+Pi's UI unreachable from the browser that operates it, with nothing on the box to say why; refusing to
+boot would break a running installation on upgrade. Asking the first visitor for a password costs
+neither, and cannot be skipped by not reading a log.
+
+There is no per-user account: one shared password gates the whole UI, hashed with ASP.NET Core's
+`PasswordHasher`, matching a LAN appliance with one or two operators rather than a multi-tenant system.
+The setup page can only *set* a first password — never change an existing one, which an
+unauthenticated page has no business doing.
 
 The hash is a secret and must never live in `appsettings.json` — supply it via `.env` / an
 environment variable, exactly like the MQTT broker credentials:
@@ -2728,8 +2736,9 @@ environment variable, exactly like the MQTT broker credentials:
 Web__PasswordHash=<hash>
 ```
 
-Generate one with the worker binary itself, or with the image, without configuring anything (it
-prints the hash and exits — no listening socket involved):
+Setting it ahead of time means no setup page is ever shown. Generate one with the worker binary
+itself, or with the image, without configuring anything (it prints the hash and exits — no listening
+socket involved):
 
 ```bash
 dotnet Gleanvolt.Worker.dll hash-password '<your password>'
@@ -2740,11 +2749,11 @@ docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password
 
 | `RequireAuthentication` | `PasswordHash` | Result |
 |---|---|---|
-| unset (default) | not set | UI served openly; a warning is logged at every startup |
-| unset (default) | set | login required — **the normal way to protect the UI** |
+| unset (default) | not set | **only the setup page is served**, until a password is set there |
+| unset (default) | set | login required — **the normal way to run it** |
 | `true` | set | login required; identical to the row above |
 | `true` | not set | **host refuses to start** — nobody could ever sign in |
-| `false` | either | UI served openly even with a password configured; warning logged |
+| `false` | either | UI served openly, no setup page; a warning is logged at every startup |
 
 The one refusal is the combination that cannot be honoured: a login demanded with nothing to check it
 against would leave the UI permanently unreachable, and a host that stops says so immediately where a
@@ -2962,7 +2971,7 @@ All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-an
 that second line with this installation's own address and key already substituted in. The key itself is
 shown only when the UI is behind a [login](#authentication); without one the page shows the names and
 says what makes the secrets readable, because a key is bearer-equivalent to the stop button on the
-wallbox and the UI is open on the LAN by default.
+wallbox, and the UI is reachable by anything on the LAN once its password is set.
 
 **Why the API defaults off when the UI defaults on.** Two of these endpoints write to hardware, and
 the project's rule for anything that writes is that an operator switches it on knowingly. The UI can
