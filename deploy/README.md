@@ -123,8 +123,9 @@ EV_CHARGER_HOST=192.168.2.6   # your charger's address
 ```
 
 Nothing about the web UI needs setting: it is on by default, on port 8090, and `docker-compose.yml`
-publishes that port, so the deploy ends at a working `http://192.168.2.7:8090` with no login. Adding
-a password is a [later, optional step](#putting-a-password-on-the-web-ui-optional).
+publishes that port, so the deploy ends at a working `http://192.168.2.7:8090`. The first page it
+serves asks you to choose a password, and nothing else is reachable until you do — see
+[Setting the web UI password](#setting-the-web-ui-password).
 
 Deploy with `./deploy/deploy-controller-only.sh`. In [Prepare the Pi](#prepare-the-pi-once), **skip
 step 7** — this script never looks for a broker password file — and skip the Home Assistant
@@ -209,13 +210,19 @@ Nothing about charge control reads any of it, so turning it on cannot change wha
 does to your car or your battery. A refused key or an outage costs one null column and a warning in
 the log, never a delayed or missing session.
 
-## Putting a password on the web UI (optional)
+## Setting the web UI password
 
-Out of the box the UI has **no login**: anyone who can reach `:8090` gets the dashboard and every
-control on it, including the charge mode and the battery hold. On a household LAN that is usually
-what you want, and it is what lets a fresh deploy work with nothing configured. It is the wrong
-default if the LAN has guests on it, if the Pi's port is forwarded, or if you would simply rather it
-asked.
+**A fresh installation serves one page: the one that asks you to set a password.** The dashboard, the
+history and every control — the charge mode, the battery hold — stay unreachable until you have. Open
+`http://192.168.2.7:8090`, choose a password, and the UI behaves normally from then on.
+
+That is the default because anyone who can reach `:8090` would otherwise get every one of those
+controls, and a warning in a log file protects nobody. You can still set `WEB_PASSWORD_HASH` ahead of
+time, in which case no setup page ever appears.
+
+If you would rather have the old open behaviour on an isolated network, set
+`WEB_REQUIRE_AUTHENTICATION=false`. It is a deliberate choice, and the controller logs a warning
+about it on every start.
 
 Adding one is a single `.env` line. Generate the hash — this runs the image with no configuration and
 no listening socket; it prints the hash and exits — then put the **hash**, never the password, in
@@ -271,8 +278,8 @@ nothing than to say something wrong.
 The same page carries an **MQTT** section: the broker each of the two links dials, the username and
 client id it connects with, the topic prefix everything is published under — `gleanvolt/$PV_ID`, which
 no single setting spells out — and the topics themselves. The broker password appears there too, but
-only once `WEB_PASSWORD_HASH` is set: without a login the UI is open on the LAN, and that password is
-the account that can publish to the `.../set` topics.
+only once `WEB_PASSWORD_HASH` is set: with authentication switched off the UI is open on the LAN, and
+that password is the account that can publish to the `.../set` topics.
 
 A value that cannot be used **stops the controller at startup**, with every problem named at once — a
 latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
@@ -397,7 +404,8 @@ are now stale and one of them is actively harmful:
   hash, the container refused to start before this release too, so it can't be the state you're
   running.
 
-An `.env` from before the web UI existed at all needs nothing: no `WEB_*` line means UI on, no login.
+An `.env` from before the web UI existed at all needs nothing: no `WEB_*` line means the UI is on and
+asks you to set a password the first time you open it.
 
 ## Letting a program drive it: the HTTP API (optional)
 
@@ -436,9 +444,9 @@ session will say. Rename it, or add more `Api__Keys__<name>` lines, if more than
 `/pv-system` in the web UI carries all of it: whether the API is on, the base URL **with the port**,
 links to the index and the document (both answer without a key, so opening either is the quickest proof
 it is up), the key names, and a `curl` line with this installation's own address already in it. The key
-itself appears there only once `WEB_PASSWORD_HASH` is set — without a login the UI admits anyone on the
-LAN, and a key is bearer-equivalent to the stop button on the wallbox — so with a password configured
-the key can be read back in the browser rather than only out of `.env`.
+itself appears there only once `WEB_PASSWORD_HASH` is set — with authentication switched off the UI
+admits anyone on the LAN, and a key is bearer-equivalent to the stop button on the wallbox — so with a
+password configured the key can be read back in the browser rather than only out of `.env`.
 
 ## Prepare the Pi (once)
 
@@ -733,8 +741,9 @@ All three work identically on either script.
 
 ## First run
 
-**The web UI** is at `http://192.168.2.7:8090` — no login unless you configured one (see
-[Putting a password on the web UI](#putting-a-password-on-the-web-ui-optional)). The dashboard, the
+**The web UI** is at `http://192.168.2.7:8090`. The first time you open it, it asks you to set a
+password; nothing else is served until you do (see
+[Setting the web UI password](#setting-the-web-ui-password)). The dashboard, the
 controls, session history and the forecast plan are all there; see the root README's
 [Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
 does. This is true of either deploy script — the UI runs inside `gleanvolt-controller` itself, so Home
@@ -1239,7 +1248,7 @@ obsolete, `docker-compose.yml` publishes the port itself now — and redeploy.
 No `Web UI enabled` line at all means `WEB_ENABLED=false` is set in `.env`. A startup failure instead
 means `WEB_REQUIRE_AUTHENTICATION=true` was set with no `WEB_PASSWORD_HASH`; the log says so
 explicitly, and the fix is to set a hash or drop the line (see
-[Putting a password on the web UI](#putting-a-password-on-the-web-ui-optional)).
+[Setting the web UI password](#setting-the-web-ui-password)).
 
 **No charging sessions are being recorded.** Look for this at startup:
 

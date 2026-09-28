@@ -225,7 +225,11 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
     {
         // Two tabs onto two roofs is the case this exists for: the header carries the system's name,
         // and so does the browser tab, because "Gleanvolt" is the one thing both tabs already agree on.
-        var client = await StartAsync(new WebOptions { Enabled = true });
+        //
+        // Explicitly opted out of authentication rather than merely unconfigured: since the setup gate
+        // an unconfigured UI serves nothing but its setup page, and this test is about what a served
+        // page says, not about whether one is served.
+        var client = await StartAsync(new WebOptions { Enabled = true, RequireAuthentication = false });
 
         var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
 
@@ -234,16 +238,19 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Serves_the_dashboard_with_no_authentication_configured_at_all()
+    public async Task Serves_no_dashboard_at_all_with_no_authentication_configured()
     {
         // The out-of-the-box deployment, through the real pipeline: no password, no
-        // RequireAuthentication, nothing. WebOptionsTests asserts the inference; this asserts that
-        // the pipeline built from it actually serves a page rather than redirecting to /login.
+        // RequireAuthentication, nothing. This used to assert that a dashboard was served, which is
+        // exactly the open control surface a winget-pkgs review objected to -- anyone who could reach
+        // the port could read the household's history and drive the charger. It now asserts the
+        // opposite, and WebUiSetupGateTests covers the setup page that replaces it.
         var client = await StartAsync(new WebOptions { Enabled = true });
 
         var dashboard = await client.GetAsync("/");
 
-        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, dashboard.StatusCode);
+        Assert.Equal(SetupGate.Path, dashboard.Headers.Location?.OriginalString);
     }
 
     [Fact]

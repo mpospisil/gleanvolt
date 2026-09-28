@@ -1,0 +1,114 @@
+@page "/setup"
+@attribute [AllowAnonymous]
+@using System.ComponentModel.DataAnnotations
+@using Gleanvolt.Core.Interfaces
+@using Gleanvolt.Web.Auth
+@using Microsoft.AspNetCore.Components.Forms
+@inject WebPasswordState Password
+@inject IWebPasswordStore Store
+@inject NavigationManager Navigation
+
+@*
+    Static server-side rendering, like the login page and for the same reason: the form is a real HTTP
+    POST handled inside the request, which is what a page that has to work before any circuit exists
+    needs. See App.razor.
+*@
+
+<PageTitle>Set a password — Gleanvolt</PageTitle>
+
+<div class="login-card">
+    @if (Password.IsSet)
+    {
+        @* Reachable by typing the URL after setup is done. Says so rather than offering to
+           re-set the password: changing it is not this page's job, and an unauthenticated page
+           that could change it would be the hole this one closes. *@
+        <h1>Already set up</h1>
+        <p>This installation already has a password. <a href="/login">Sign in</a>.</p>
+    }
+    else
+    {
+        <h1>Set a password</h1>
+
+        <p>
+            Gleanvolt can show this installation's energy and charging history, and change how the
+            charger is driven. It is reachable by anything on this network, so it needs a password
+            before it will show any of that.
+        </p>
+
+        @if (_error is not null)
+        {
+            <p class="error">@_error</p>
+        }
+
+        <EditForm Model="Input" method="post" FormName="setup" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <label>
+                Password
+                <InputText type="password" @bind-Value="Input!.Password" autofocus />
+            </label>
+
+            <label>
+                Repeat it
+                <InputText type="password" @bind-Value="Input!.Confirm" />
+            </label>
+
+            <ValidationSummary />
+
+            <button type="submit">Set the password</button>
+        </EditForm>
+
+        <p class="muted">
+            One password for this installation, not an account per person. Keep it somewhere you can
+            find it: there is no reset from inside the UI, only editing the settings file on the
+            machine itself.
+        </p>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private SetupInput? Input { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private void SaveAsync()
+    {
+        var password = Input?.Password ?? "";
+
+        if (password != (Input?.Confirm ?? ""))
+        {
+            _error = "The two passwords are not the same.";
+            return;
+        }
+
+        var hash = WebPasswordHasher.Hash(password);
+
+        // Persisted before it is believed. A hash held only in memory would be a password that
+        // quietly stopped existing on the next restart, leaving the UI open again with nobody told.
+        if (!Store.Save(hash))
+        {
+            _error = "The password could not be saved on this installation, so it has not been set. "
+                + "Set Web__PasswordHash in the configuration instead.";
+            return;
+        }
+
+        Password.Set(hash);
+
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    private sealed class SetupInput
+    {
+        // Eight is not a policy so much as a floor. This guards one appliance on a home network, and
+        // a length rule long enough to be annoying is a length rule people write on the router.
+        [Required]
+        [MinLength(8, ErrorMessage = "Use at least 8 characters.")]
+        public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Repeat the password.")]
+        public string Confirm { get; set; } = "";
+    }
+}

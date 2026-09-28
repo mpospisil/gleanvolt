@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Http
-@inject IOptions<WebOptions> Options
+@inject Gleanvolt.Web.Auth.WebPasswordState Password
 @inject NavigationManager Navigation
 
 @*
@@ -58,7 +58,9 @@
 
     private async Task SignInAsync()
     {
-        if (!WebPasswordHasher.Verify(Options.Value.PasswordHash, Input?.Password ?? ""))
+        // The live hash rather than the startup snapshot: a password set through /setup in this
+        // same process has to work without a restart, which is the point of the state holder.
+        if (!WebPasswordHasher.Verify(Password.Hash, Input?.Password ?? ""))
         {
             _failed = true;
             return;

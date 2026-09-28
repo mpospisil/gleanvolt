@@ -24,6 +24,11 @@ Description: >-
   battery back when the forecast says it will be needed, and targeting a departure time. A web UI is
   built in, and it can publish itself to Home Assistant over MQTT.
 
+  The built-in web interface requires a password. A fresh installation serves only the page that asks
+  you to set one, and shows no history and no controls until you have; it then asks you to sign in.
+  Authentication can be switched off deliberately for an isolated network, which is not the default.
+  The interface speaks plain HTTP, so it belongs on a network you trust or behind a TLS proxy.
+
   This build is free for any noncommercial purpose under the PolyForm Noncommercial License 1.0.0.
   Commercial use requires a separate licence -- see the LICENSE file.
 Moniker: gleanvolt
