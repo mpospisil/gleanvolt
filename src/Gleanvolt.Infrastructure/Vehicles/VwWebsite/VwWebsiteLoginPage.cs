@@ -108,4 +108,11 @@ public enum VwWebsiteLoginStep
 
     /// <summary>Refused, or the session was lost mid-flow.</summary>
     Failed,
+
+    /// <summary>
+    /// A code was offered with no challenge open. Distinct from <see cref="Failed"/> on purpose:
+    /// nothing was sent to Volkswagen, nothing about the account is at risk, and the remedy is to
+    /// start a sign-in rather than to wait and worry about a lockout.
+    /// </summary>
+    NoChallenge,
 }

@@ -79,6 +79,14 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
         VwWebsiteLoginStep.CredentialsRequired => VehicleSignInState.Failed(
             "The credentials were not accepted. Check Vehicle:Website:Username and :Password."),
 
+        // Nothing left our machine, so none of the lockout advice below applies. Said separately
+        // because the old catch-all sent an owner to wait and worry about their Volkswagen account
+        // over what was purely local state.
+        VwWebsiteLoginStep.NoChallenge => VehicleSignInState.Failed(
+            "There is no code challenge open, so that code was not sent anywhere. Press Sign in to "
+            + "start one. If Volkswagen does not email a new code, press Sign out first and then "
+            + "Sign in: that discards a challenge left over from an earlier attempt."),
+
         _ => VehicleSignInState.Failed(
             "The sign-in did not complete. If this repeats, wait a few minutes rather than retrying: "
             + "a replayed login at a real identity provider risks locking the account."),
