@@ -26,6 +26,9 @@ using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Api;
 using Gleanvolt.Web;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 
 namespace Gleanvolt.Hosting;
 
@@ -115,6 +118,34 @@ public static class GleanvoltHostingExtensions
                 VehicleAccountSecret.Directory(secrets, environment.ContentRootPath),
                 provider.GetRequiredService<ILoggerFactory>());
         });
+
+        // Data protection keys beside the secrets, not inside the container.
+        //
+        // ASP.NET generates these on first start and encrypts the auth cookie and every antiforgery
+        // token with them. By default they land under the running user's home directory, which in a
+        // container is destroyed on every recreate -- so a deploy signed everyone out and made any
+        // form submitted from a page loaded before it fail to decrypt. That was diagnosed the hard
+        // way: a deploy mid-login produced "an exception was thrown while deserializing the token"
+        // and a sign-in that could not be completed.
+        //
+        // The data directory is already the one thing a deployment is expected to persist, so the
+        // keys go there. Same resolution as the secret store above, for the same reason.
+        // A fixed application name so the keys stay readable across restarts and image rebuilds --
+        // the default is derived from the content root, which the .deb and the container disagree on.
+        services.AddDataProtection().SetApplicationName("Gleanvolt");
+
+        // Configured through options rather than PersistKeysToFileSystem because the directory is not
+        // known until IHostEnvironment exists: it is resolved against the content root exactly as the
+        // secret store above is.
+        services.AddOptions<KeyManagementOptions>().Configure<IHostEnvironment, ILoggerFactory>(
+            (options, environment, loggers) =>
+            {
+                var keys = Path.Combine(
+                    VehicleAccountSecret.Directory(secrets, environment.ContentRootPath), "keys");
+
+                System.IO.Directory.CreateDirectory(keys);
+                options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(keys), loggers);
+            });
 
         services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
         {

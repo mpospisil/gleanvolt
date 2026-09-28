@@ -115,8 +115,35 @@ public sealed class VwWebsiteClient : IDisposable
                 return VwWebsiteLoginStep.SignedIn;
             }
 
+            if (page.Step == VwWebsiteLoginStep.OneTimeCodeRequired)
+            {
+                // The saved jar can already hold a challenge: volkswagen.de remembers one across our
+                // restarts, so the landing page asks for a code without our ever posting credentials.
+                // Capturing it here is what makes that answerable. Without this the page rendered a
+                // code box, SubmitCodeAsync found no pending URL, and every code -- correct or not --
+                // came back as "the sign-in did not complete", forever, logging nothing at either
+                // end. The only escape was a sign-out, which is not a thing anyone would guess.
+                _pendingCodeUrl = landing.Url;
+                _pendingCodeState = page.State;
+                _session.Save(_jar);
+
+                _logger.LogInformation(
+                    "volkswagen.de is already waiting for a one-time code from an earlier attempt; "
+                    + "answering that challenge rather than starting a new one. If no code arrived, "
+                    + "sign out on the Car page and sign in again to force a fresh one.");
+
+                return page.Step;
+            }
+
             if (page.Step != VwWebsiteLoginStep.CredentialsRequired)
             {
+                // Silence here is what made this class hard to diagnose from a log file: an owner
+                // consent screen and an outright failure both looked like nothing happening at all.
+                _logger.LogWarning(
+                    "volkswagen.de's login page came back as {Step} rather than asking for "
+                    + "credentials, so the sign-in stopped there.",
+                    page.Step);
+
                 return page.Step;
             }
 
@@ -184,7 +211,15 @@ public sealed class VwWebsiteClient : IDisposable
     {
         if (_pendingCodeUrl is null)
         {
-            return VwWebsiteLoginStep.Failed;
+            // Logged, and distinguished from every other failure, because the two are nothing alike:
+            // this one means there is no challenge to answer -- nothing was sent to Volkswagen and
+            // nothing about the account is at risk -- while the generic failure it used to return
+            // warned about locking the account and sent the owner looking at the wrong thing.
+            _logger.LogWarning(
+                "A one-time code was submitted with no challenge open, so it was not sent anywhere. "
+                + "Press Sign in on the Car page to start one.");
+
+            return VwWebsiteLoginStep.NoChallenge;
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);

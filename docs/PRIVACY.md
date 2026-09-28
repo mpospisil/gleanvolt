@@ -31,6 +31,7 @@ All of it is on the machine running Gleanvolt, under the working directory, in f
 | Energy history | `data/energy.db` (SQLite) | One row per 15 minutes: solar generated, grid imported, grid exported, EV charging, home battery charged and discharged, and battery state of charge | **Forever by default** (`EnergyMonitor:RetentionDays` is `0`, meaning keep everything) |
 | Logs | `logs/gleanvolt-*.log` | What the controller decided and why; Modbus and network errors | **14 daily files**, then deleted |
 | Secrets | the secrets directory (`data` by default) | See [Credentials](#credentials) | Until you remove them |
+| Web session keys | `data/keys` | The keys that encrypt your web-interface sign-in cookie. Not a credential, but whoever holds them can forge a session | Until you remove them |
 | Site configuration | `pv-system.json` | Site settings changed through the web interface, which may include your installation's name, its coordinates, and the inverter and charger addresses | Until you remove it |
 
 No personal name, email address, postal address, telephone number or payment information is ever
