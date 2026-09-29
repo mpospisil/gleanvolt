@@ -312,12 +312,20 @@ public sealed class ChargingSessionTracker
     {
         var now = status.Timestamp;
         var evPower = Math.Max(0, status.EvChargerPowerWatts);
-        var split = ChargingSourceAttribution.Split(status);
 
-        _delivered.Add(now, evPower);
-        _fromSolar.Add(now, split.SolarWatts);
-        _fromGrid.Add(now, split.GridWatts);
-        _fromBattery.Add(now, split.BatteryWatts);
+        // A charger that did not answer reports 0W, which is no reading rather than a car that stopped.
+        // Skipped, the integrators hold the last real draw and its split across the gap (up to their
+        // own limit), so a session with dozens of blinks is not filed short by dozens of them.
+        if (status.ChargerStatus.IsConnectionKnown())
+        {
+            var split = ChargingSourceAttribution.Split(status);
+
+            _delivered.Add(now, evPower);
+            _fromSolar.Add(now, split.SolarWatts);
+            _fromGrid.Add(now, split.GridWatts);
+            _fromBattery.Add(now, split.BatteryWatts);
+        }
+
         _loaned.Add(now, status.LoanPowerWatts);
 
         _solar.Add(now, Math.Max(0, status.SolarPowerWatts));

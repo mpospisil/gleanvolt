@@ -135,6 +135,7 @@ internal sealed record SessionChartSeries(
         var vehicleSoc = new List<double?>(timestamps.Capacity);
 
         var capture = 0;
+        double? lastEvPower = null;
 
         void Append(long seconds, ChargingSessionSample? sample)
         {
@@ -143,7 +144,21 @@ internal sealed record SessionChartSeries(
             forecast.Add(sample?.ForecastPowerWatts);
             grid.Add(sample?.GridPowerWatts);
             battery.Add(sample?.BatteryPowerWatts);
-            ev.Add(sample?.EvChargerPowerWatts);
+
+            // A charger that did not answer is stored at 0W, and drawn as such a flaky Modbus link turns
+            // a steady charge into a comb of fake pauses. It holds the last real reading instead -- the
+            // same thing the session's energy total counted across the blink -- and a hole still breaks
+            // it, so nothing is carried over a stretch nobody sampled.
+            if (sample is not null && sample.ChargerStatus.IsConnectionKnown())
+            {
+                lastEvPower = sample.EvChargerPowerWatts;
+            }
+            else if (sample is null)
+            {
+                lastEvPower = null;
+            }
+
+            ev.Add(sample is null ? null : lastEvPower);
             soc.Add(sample?.BatterySocPercent);
             socFloor.Add(sample?.PlanRequiredSocFloorPercent);
             surplus.Add(sample?.SurplusWatts);
