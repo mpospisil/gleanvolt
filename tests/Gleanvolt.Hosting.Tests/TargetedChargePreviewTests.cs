@@ -132,6 +132,19 @@ public class TargetedChargePreviewTests
     }
 
     [Fact]
+    public void ADroppedChargerReading_IsNotCountedAsTheCarDrawingNothing()
+    {
+        // 2026-09-29: a third of polls lost, each read as 0W, and an 8.6kWh request ran on to 11.8kWh
+        // before this total caught up. The car drew straight through every blink.
+        _selector.Set(new TargetedChargeRequest(20_000, Now.AddHours(9), Now), "test");
+        _provider.Update(Drawing(Now, 6_000));
+        _provider.Update(Drawing(Now.AddMinutes(2), 0) with { EvChargerStatus = EvChargerStatus.Unknown });
+        _provider.Update(Drawing(Now.AddMinutes(4), 6_000));
+
+        Assert.Equal(400, _provider.DeliveredWh, 0);   // 6kW for four minutes
+    }
+
+    [Fact]
     public void KeepsAnsweringWhileNoTargetIsRunning()
     {
         // Update returns null with no request, and used to return before recording the reading. That

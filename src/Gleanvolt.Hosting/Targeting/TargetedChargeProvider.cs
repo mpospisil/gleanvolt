@@ -114,7 +114,13 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
             return null;
         }
 
-        _delivered.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
+        // A charger that did not answer reads 0W, which is no reading rather than a car that stopped.
+        // Skipped, the integrator holds the last real draw across the gap; counted, a third of polls
+        // lost on 2026-09-29 let an 8.6kWh request run on to 11.8kWh before this total caught up.
+        if (state.EvChargerStatus.IsConnectionKnown())
+        {
+            _delivered.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
+        }
 
         var plan = BuildPlan(state, request, _delivered.EnergyWattHours);
 
