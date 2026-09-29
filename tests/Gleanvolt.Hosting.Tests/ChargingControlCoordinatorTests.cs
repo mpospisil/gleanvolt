@@ -437,6 +437,59 @@ public class ChargingControlCoordinatorTests
         Assert.True(_coordinator.SessionEnergyWh > 207);
     }
 
+    [Fact]
+    public async Task ADroppedChargerReading_IsNotCountedAsTheCarDrawingNothing()
+    {
+        // The reader fills in 0W for a charger that did not answer. The car drew straight through the
+        // blink, so five minutes at 4140W is what the session took -- not four.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Unreachable(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // Nor did the blink start the car's idle clock.
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.EvIdleFor);
+
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(345, _coordinator.SessionEnergyWh, 0);
+    }
+
+    [Fact]
+    public async Task ADroppedChargerReading_StaysOutOfTheSurplusAverage()
+    {
+        // 2026-09-28 13:01: the car drawing 4.2kW, the charger blinked, and its 0W put the car in the
+        // house load -- a -4238W sample that dragged the average under the floor and paused the charge
+        // for fifteen minutes of full sun.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(SunnyCharging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(5000, _controller.LastInput!.SurplusWatts, 0);
+
+        var blink = SunnyCharging(Now.AddSeconds(10)) with { EvChargerStatus = EvChargerStatus.Unknown, EvChargerPowerWatts = 0 };
+        await _coordinator.RunCycleAsync(blink, ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(5000, _controller.LastInput!.SurplusWatts, 0);
+    }
+
+    [Fact]
+    public async Task ADroppedChargerReading_WithNothingInTheWindow_DecidesOnTheRawSurplus()
+    {
+        var blink = SunnyCharging(Now) with { EvChargerStatus = EvChargerStatus.Unknown, EvChargerPowerWatts = 0 };
+
+        await _coordinator.RunCycleAsync(blink, ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(blink.SolarSurplusPowerWatts, _controller.LastInput!.SurplusWatts, 0);
+    }
+
+    // 6kW of sun: 1kW to the house, 4.2kW to the car and the last 0.8kW exported.
+    private static EnergyState SunnyCharging(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 6000, GridPowerWatts: -800,
+            EvChargerStatus.Charging, EvChargerPowerWatts: 4200);
+
     private static EnergyState State(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Available, EvChargerPowerWatts: 0);

@@ -95,6 +95,27 @@ public class SurplusMovingAverageTests
     }
 
     [Fact]
+    public void Average_ReportsTheWindowWithoutAddingToIt()
+    {
+        var average = new SurplusMovingAverage(TimeSpan.FromMinutes(3));
+        average.Add(Start, 4000);
+        average.Add(Start.AddSeconds(15), 5000);
+
+        Assert.Equal(4500, average.Average(Start.AddSeconds(30)));
+        Assert.Equal(2, average.Count);
+    }
+
+    [Fact]
+    public void Average_IsNullOnceEverySampleHasAgedOut()
+    {
+        var average = new SurplusMovingAverage(TimeSpan.FromMinutes(3));
+        average.Add(Start, 4000);
+
+        Assert.Null(average.Average(Start.AddMinutes(4)));
+        Assert.Equal(0, average.Count);
+    }
+
+    [Fact]
     public void NonPositiveWindow_Throws() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new SurplusMovingAverage(TimeSpan.Zero));
 }

@@ -155,8 +155,15 @@ public sealed class ChargingControlCoordinator
 
             // Decide on the smoothed surplus, not the instantaneous value, so a passing cloud can't
             // interrupt a long charging session.
+            //
+            // A poll the charger did not answer reads its power as 0W, so the car's draw lands in the
+            // house load and the surplus comes out short by exactly what the car was taking. That
+            // sample stays out of the average; only when nothing is left in the window does the raw
+            // value stand in, and then it errs low, which is the safe way to err.
             var rawSurplus = state.SolarSurplusPowerWatts;
-            var averagedSurplus = _surplusAverage.Add(state.Timestamp, rawSurplus);
+            var averagedSurplus = state.EvChargerStatus.IsConnectionKnown()
+                ? _surplusAverage.Add(state.Timestamp, rawSurplus)
+                : _surplusAverage.Average(state.Timestamp) ?? rawSurplus;
 
             var decision = controller.Decide(new ChargingControlInput(
                 state,
@@ -373,25 +380,32 @@ public sealed class ChargingControlCoordinator
             _carWasConnected = connected;
         }
 
-        _sessionEnergy.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
-
-        // The status is consulted alongside the power because a car can announce it is done while
-        // still drawing a trickle (conditioning, cell balancing); waiting for the power alone would
-        // then never call the session finished.
-        var drawing = state.EvChargerPowerWatts > _idlePowerThresholdWatts && !state.EvChargerStatus.IsChargeWindingDown();
-        if (drawing)
+        // Nor is Unknown news about the power: the reader fills in 0W for a charger that did not answer,
+        // and counting that would take the car's draw out of the session's energy for every blink and
+        // start its idle clock besides. Skipping the sample leaves the integrator holding the last real
+        // reading across the gap, which it already refuses to do across one long enough to doubt.
+        if (state.EvChargerStatus.IsConnectionKnown())
         {
-            _evDrewPower = true;
-            _evIdleSince = null;
+            _sessionEnergy.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
 
-            if (_askedToChargeThisMode)
+            // The status is consulted alongside the power because a car can announce it is done while
+            // still drawing a trickle (conditioning, cell balancing); waiting for the power alone would
+            // then never call the session finished.
+            var drawing = state.EvChargerPowerWatts > _idlePowerThresholdWatts && !state.EvChargerStatus.IsChargeWindingDown();
+            if (drawing)
             {
-                _chargedThisMode = true;
+                _evDrewPower = true;
+                _evIdleSince = null;
+
+                if (_askedToChargeThisMode)
+                {
+                    _chargedThisMode = true;
+                }
             }
-        }
-        else
-        {
-            _evIdleSince ??= state.Timestamp;
+            else
+            {
+                _evIdleSince ??= state.Timestamp;
+            }
         }
 
         var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(state.Timestamp, _timeProvider.LocalTimeZone).DateTime);

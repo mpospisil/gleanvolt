@@ -37,15 +37,29 @@ public sealed class SurplusMovingAverage
     {
         _samples.Enqueue((timestamp, surplusWatts));
         _sum += surplusWatts;
+        Evict(timestamp);
 
-        // Evict anything that has aged out of the window.
+        return _sum / _samples.Count;
+    }
+
+    /// <summary>
+    /// The average over the window as it stands at <paramref name="timestamp"/>, without adding a sample,
+    /// or null when every sample has aged out. For a poll whose reading cannot be trusted as a sample.
+    /// </summary>
+    public double? Average(DateTimeOffset timestamp)
+    {
+        Evict(timestamp);
+        return _samples.Count > 0 ? _sum / _samples.Count : null;
+    }
+
+    // Evict anything that has aged out of the window.
+    private void Evict(DateTimeOffset timestamp)
+    {
         var cutoff = timestamp - _window;
         while (_samples.Count > 0 && _samples.Peek().Timestamp < cutoff)
         {
             _sum -= _samples.Dequeue().Watts;
         }
-
-        return _sum / _samples.Count;
     }
 
     /// <summary>Discards all samples (e.g. when control is released and history is no longer relevant).</summary>

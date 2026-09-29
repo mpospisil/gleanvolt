@@ -65,6 +65,29 @@ public class SessionChartSeriesTests
             planRequiredSocFloorPercent);
 
     [Fact]
+    public void A_charger_that_did_not_answer_holds_the_last_reading_rather_than_dropping_to_zero()
+    {
+        // Stored at 0W because the read failed, not because the car stopped: drawn as zero, a flaky
+        // Modbus link paints a steady charge as dozens of pauses.
+        var blink = Sample(0.5, evChargerPowerWatts: 0) with { ChargerStatus = EvChargerStatus.Unknown };
+
+        var series = Build([Sample(0, evChargerPowerWatts: 4_200), blink, Sample(1, evChargerPowerWatts: 4_150)]);
+
+        Assert.Equal([4_200, 4_200, 4_150], series.Ev);
+    }
+
+    [Fact]
+    public void A_charger_that_did_not_answer_after_a_hole_carries_nothing_across_it()
+    {
+        var blink = Sample(20, evChargerPowerWatts: 0) with { ChargerStatus = EvChargerStatus.Unknown };
+
+        var series = Build([Sample(0, evChargerPowerWatts: 4_200), blink]);
+
+        // The sample, the hole's null, then the blink with no reading of its own side of the hole.
+        Assert.Equal([4_200, null, null], series.Ev);
+    }
+
+    [Fact]
     public void The_meters_are_drawn_with_the_signs_the_sample_recorded()
     {
         // Exporting 1.4 kW while the battery discharges 800 W: both belong below the line, and the

@@ -608,6 +608,22 @@ public class ChargingSessionTrackerTests
     }
 
     [Fact]
+    public void ADroppedChargerReading_DoesNotCountAsZeroDelivered()
+    {
+        // 2026-09-28: 79 blinks in one Targeted charge, each read as 0W, and the session was filed at
+        // 10.4kWh when the car had taken closer to 12. The car kept drawing through every one of them.
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon, evWatts: 4000, solarWatts: 6000));
+        tracker.Observe(Status(
+            Noon.AddMinutes(1), carConnected: false, chargerStatus: EvChargerStatus.Unknown, evWatts: 0));
+        var update = tracker.Observe(Status(Noon.AddMinutes(2), evWatts: 4000, solarWatts: 6000));
+
+        var sample = update.Sample!;
+        Assert.Equal(4000 * 2 / 60.0, sample.EnergyDeliveredWh, 3);
+        Assert.Equal(sample.EnergyDeliveredWh, sample.FromSolarWh, 3);
+    }
+
+    [Fact]
     public void AnActualUnplugStillClosesTheSession()
     {
         var tracker = NewTracker();
