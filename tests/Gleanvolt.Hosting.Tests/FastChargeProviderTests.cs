@@ -45,6 +45,19 @@ public class FastChargeProviderTests
     }
 
     [Fact]
+    public void ADroppedChargerReading_IsNotCountedAsTheCarDrawingNothing()
+    {
+        // The reader fills in 0W for a charger that did not answer; the car drew straight through it.
+        _selector.Set(new FastChargeLimit(20_000, Now), "test");
+
+        _provider.Update(Drawing(Now, 12_000));
+        _provider.Update(Drawing(Now.AddMinutes(2), 0) with { EvChargerStatus = EvChargerStatus.Unknown });
+        var progress = _provider.Update(Drawing(Now.AddMinutes(5), 12_000));
+
+        Assert.Equal(1_000, progress!.DeliveredWh, 0);
+    }
+
+    [Fact]
     public void CountsFromActivation_NotFromWhenTheCarWasPluggedIn()
     {
         // Energy the car took under some earlier mode is not part of this promise.

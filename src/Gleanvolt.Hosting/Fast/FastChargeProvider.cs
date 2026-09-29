@@ -124,7 +124,13 @@ public sealed class FastChargeProvider
             return null;
         }
 
-        _delivered.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
+        // A charger that did not answer reads 0W, which is no reading rather than a car that stopped.
+        // Skipped, the integrator holds the last real draw across the gap, so a flaky link cannot carry
+        // a limited charge past its limit the way it did a Targeted one on 2026-09-29.
+        if (state.EvChargerStatus.IsConnectionKnown())
+        {
+            _delivered.Add(state.Timestamp, Math.Max(0, state.EvChargerPowerWatts));
+        }
 
         // Only while the car is actually drawing. A reading taken through a pause -- which is most of a
         // deferred charge -- describes our own setpoint, not the car's capability.
