@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-13 — `Forecasted` drops the session energy target too; the car's own limit is the ceiling
+
+**Context.** Issue #249. #217 took the daily EV target out of `Forecasted` and kept the **session
+energy target**, on the argument that a ceiling is not a request. That leaves the mode with one
+number in kilowatt-hours beside `Targeted`'s, and an owner can't see a difference between them
+that the UI never explains. So the three reasons it stayed were checked again:
+
+| #217's reason | Why it no longer holds |
+|---|---|
+| It stands in for "charge to 80%" on a charger that cannot read the car's SOC | The car has a charge limit of its own and stops drawing at it. That is the decisive action, and nothing here needs to predict it. With vehicle telemetry, `Targeted` takes an SOC directly. |
+| `Targeted` needs a departure, and "stop at 10 kWh, whenever that happens" has none | A departure can be up to `MaxHorizon` ahead. When the forecast covers the amount in that window, the pace is zero and the grid bridge is refused, because the plan imports nothing. The car waits for the sun and buys nothing. |
+| It resets per plug-in | So does a `Targeted` request. It ends when the target is reached or the departure passes. |
+
+**Decision — `Forecasted` takes no amount at all.** It reports what the day can give, and `Targeted`
+takes requests. The ceiling goes everywhere it appears: the hard stop in
+`ForecastedChargingController`, `ForecastedChargingOptions.SessionEnergyTargetWh`,
+`IForecastRuntimeSettings`, `ChargeControl:Forecast:SessionEnergyTargetKWh`, the Home Assistant
+number and the Forecasted tab's input. The mode is left with two runtime numbers, both protecting
+the battery: the SOC floor and the resume margin. Its hard stops are now the floor, the final guard
+and the evening guarantee — promises about the home battery, none of them about the car.
+
+**Nothing is lost, but one case moves out of reach of the web UI and Home Assistant.**
+*"Solar only, stop at X kWh, and I don't mind falling short"* is `Targeted` with
+`maxGridEnergyWh: 0`. The plan is then met from the roof or not at all, and the gap is reported as
+shortfall rather than bought. That limit is only settable through the API today (and so through the
+MCP server), and it still needs a departure, which can be up to `MaxHorizon` ahead. From the web UI or
+Home Assistant, the nearest thing is `Forecasted` plus the car's own charge limit.
+
+Consequences, deliberately accepted:
+
+- **The `session_energy_target` number is retired, not merely dropped.** Its config topic joins
+  #217's in `RetiredDiscoveryTopics()`, so Home Assistant deletes the entity on its own.
+- **`SessionEnergyTargetKWh` is dropped from `appsettings.json` with no migration.** Bound options
+  ignore unknown keys.
+- **Behaviour change:** a `Forecasted` session no longer stops on an amount. The car takes surplus
+  until the plan, the floor, the final guard or its own charge limit stops it.
+- The **Session energy** sensor stays. It is a measurement, not a limit. The API never exposed the
+  ceiling, so the OpenAPI contract does not change.
+
+---
+
 ## 2026-09-23 — The loan is measured against what the pack cannot absorb, not against a constant
 
 **Context.** Issue #223, from a session chart: charging stopped for want of surplus while the home
@@ -122,6 +163,11 @@ on one session rather than a request for an amount: it resets per plug-in, it st
 `Targeted` needs a departure time, and *"stop at 10 kWh, whenever that happens"* has none. `Forecasted`
 is left with three runtime numbers, no two of which answer the same question: one ceiling, and two
 battery-protection numbers (the SOC floor and the resume margin).
+
+> **Superseded on 2026-10-13** by
+> [the record at the top](#2026-10-13--forecasted-drops-the-session-energy-target-too-the-cars-own-limit-is-the-ceiling):
+> the ceiling goes as well. The car's own charge limit is the "charge to 80%", and `Targeted` with a
+> far departure charges from the sun alone when the forecast covers the amount.
 
 **`ShortfallWh` loses its EV term** and becomes `expectedHouse + batteryToFull − remainingPv`: how far
 today falls short of the house plus a full battery, with above zero meaning the evening 100% is at

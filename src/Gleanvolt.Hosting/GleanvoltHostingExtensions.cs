@@ -366,8 +366,7 @@ public static class GleanvoltHostingExtensions
                     LoanSocMarginPercent: forecast.LoanSocMarginPercent,
                     MinRunTime: forecast.MinRunTime,
                     MinPauseTime: forecast.MinPauseTime,
-                    FinalGuardBefore: forecast.FinalGuardBefore,
-                    SessionEnergyTargetWh: forecast.SessionEnergyTargetKWh * 1000),
+                    FinalGuardBefore: forecast.FinalGuardBefore),
                 provider.GetRequiredService<IForecastRuntimeSettings>());
         });
 

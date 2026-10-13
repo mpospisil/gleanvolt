@@ -99,7 +99,6 @@ public sealed class HaDiscovery
     public string StopServiceCommandTopic => $"{TopicPrefix}/stop_service/set";
 
     /// <summary>Object ids of the settable numbers, so the worker can subscribe and publish generically.</summary>
-    public const string SessionEnergyTargetNumber = "session_energy_target";
     public const string MinBatterySocNumber = "min_battery_soc";
     public const string ResumeMarginNumber = "resume_margin";
     public const string TargetEnergyNumber = "target_energy";
@@ -109,7 +108,7 @@ public sealed class HaDiscovery
     public const string MinSolarSurplusNumber = "min_solar_surplus";
 
     public static readonly IReadOnlyList<string> NumberObjectIds =
-        [SessionEnergyTargetNumber, MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
+        [MinBatterySocNumber, ResumeMarginNumber, TargetEnergyNumber,
          TargetRestSocNumber, FastEnergyNumber, FastTargetSocNumber, MinSolarSurplusNumber];
 
     /// <summary>
@@ -281,6 +280,11 @@ public sealed class HaDiscovery
         yield return $"{_options.DiscoveryPrefix}/sensor/{_deviceId}/day_outlook/config";
         yield return $"{_options.DiscoveryPrefix}/sensor/{_deviceId}/ev_expected_today/config";
 
+        // The Forecasted mode's session energy target (issue #249), for the same reason: the mode
+        // takes no amount at all now. Capping the car is its own charge limit; an amount by a time is
+        // Targeted.
+        yield return $"{_options.DiscoveryPrefix}/number/{_deviceId}/session_energy_target/config";
+
         // Also retire the battery-hold entities while the feature is off, so turning it off actually
         // removes the switch from HA rather than leaving a retained config behind that does nothing.
         if (!_batteryHoldEnabled)
@@ -408,7 +412,6 @@ public sealed class HaDiscovery
         yield return Sensor("loaned_today", "Battery loaned today", template: "{{ value_json.loaned_kwh }}", unit: "kWh", deviceClass: "energy");
         yield return Sensor("loan_power", "Battery loan power", template: "{{ value_json.loan_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
 
-        yield return Number(SessionEnergyTargetNumber, "Session energy target", min: 0, max: 100, step: 1, unit: "kWh", icon: "mdi:battery-charging-80");
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
         yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
 

@@ -4,6 +4,45 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-10-13 — The session energy target comes out of `Forecasted` too (issue #249)
+
+#217 kept the session energy target, on the grounds that a ceiling is not a request. #249 drops it
+anyway. A stop on the car is the car's own charge limit, which it enforces itself by no longer
+drawing. And `Targeted`, given a departure up to `MaxHorizon` ahead, charges from the sun alone and
+buys nothing when the forecast covers the amount. `Forecasted` now takes no amount for the car. Its
+two runtime numbers both protect the home battery. The reasoning is in `DECISIONS.md`.
+
+The one case the ceiling seemed to cover alone, *"this much from the sun, and I'll accept falling
+short"*, is `Targeted` with `maxGridEnergyWh: 0`. That limit is API-only today, so the MCP server's
+instructions now say so when they guide a model to a mode.
+
+### What came out
+
+- **The hard stop** in `ForecastedChargingController.Decide` (*"Session target reached: …"*). The
+  hard stops left are the final guard and the evening guarantee, and none of them is about the car.
+- `ForecastedChargingOptions.SessionEnergyTargetWh`, `IForecastRuntimeSettings.SessionEnergyTargetWh`
+  and its setter, `ForecastChargeOptions.SessionEnergyTargetKWh` and the `appsettings.json` key. Bound
+  options ignore unknown keys, so a leftover entry is harmless, with no migration needed.
+- **The `session_energy_target` HA number**, retired rather than just dropped: its config topic joins
+  #217's three in `RetiredDiscoveryTopics()`. Its retained state topic is left alone, as #217 left
+  `daily_ev_target`'s.
+- **The Forecasted tab's input** and its progress hint. The section now explains where a charge stops
+  (the car's limit, or `Targeted` for an amount) and keeps one line of the session's delivered
+  energy.
+
+### What stays
+
+The **Session energy** sensor, `ChargeControlStatus.SessionEnergyWh` and the dashboard tile. They
+measure, they do not limit, and the session tracker and other modes use them. The API never exposed
+the ceiling, so the OpenAPI contract and the MCP repo's copy are unchanged.
+
+**Behaviour change:** a `Forecasted` session no longer pauses on an amount. Tests: the
+session-target pause became `HowMuchTheSessionHasDeliveredNeverStopsTheCar`. Added
+`RetiredDiscoveryTopics_IncludeTheSessionEnergyTarget` and tab tests for the missing input and the
+delivered-energy line.
+
+---
+
 ## 2026-09-23 — The daily EV target comes out of `Forecasted`; a request is what `Targeted` is for (issue #217)
 
 `Forecasted` carried a **daily EV target** and `Targeted` takes an amount by a departure time. Both

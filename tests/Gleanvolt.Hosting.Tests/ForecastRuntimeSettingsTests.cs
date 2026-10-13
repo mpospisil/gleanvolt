@@ -15,12 +15,10 @@ public class ForecastRuntimeSettingsTests
     {
         var settings = Settings(new ForecastChargeOptions
         {
-            SessionEnergyTargetKWh = 30,
             MinBatterySocFloorPercent = 55,
             FloorResumeMarginPercent = 7,
         });
 
-        Assert.Equal(30_000, settings.SessionEnergyTargetWh);
         Assert.Equal(55, settings.MinBatterySocFloorPercent);
         Assert.Equal(7, settings.FloorResumeMarginPercent);
     }
@@ -30,11 +28,9 @@ public class ForecastRuntimeSettingsTests
     {
         var settings = Settings();
 
-        settings.SetSessionEnergyTargetWh(25_000, "test");
         settings.SetMinBatterySocFloorPercent(70, "test");
         settings.SetFloorResumeMarginPercent(8, "test");
 
-        Assert.Equal(25_000, settings.SessionEnergyTargetWh);
         Assert.Equal(70, settings.MinBatterySocFloorPercent);
         Assert.Equal(8, settings.FloorResumeMarginPercent);
     }

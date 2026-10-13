@@ -382,6 +382,16 @@ public class HaDiscoveryTests
         Assert.DoesNotContain(topic, Discovery.DiscoveryMessages().Select(m => m.Topic));
     }
 
+    // Issue #249: the session energy target goes the same way, and for the same reason.
+    [Fact]
+    public void RetiredDiscoveryTopics_IncludeTheSessionEnergyTarget()
+    {
+        const string topic = "homeassistant/number/solax_controller/session_energy_target/config";
+
+        Assert.Contains(topic, Discovery.RetiredDiscoveryTopics());
+        Assert.DoesNotContain(topic, Discovery.DiscoveryMessages().Select(m => m.Topic));
+    }
+
     [Fact]
     public void StateJson_SerialisesEveryFieldTheSensorsReference()
     {
@@ -453,7 +463,6 @@ public class HaDiscoveryTests
         Assert.Contains(Discovery.DiscoveryMessages(), m => m.Topic == topic);
 
     [Theory]
-    [InlineData("session_energy_target")]
     [InlineData("min_battery_soc")]
     [InlineData("resume_margin")]
     [InlineData("min_solar_surplus")]
@@ -473,8 +482,8 @@ public class HaDiscoveryTests
     [Fact]
     public void NumberTopics_FollowTheConfiguredPrefixes()
     {
-        Assert.Equal("solax/home-roof/session_energy_target/set", Discovery.NumberCommandTopic("session_energy_target"));
-        Assert.Equal("solax/home-roof/session_energy_target/state", Discovery.NumberStateTopic("session_energy_target"));
+        Assert.Equal("solax/home-roof/min_battery_soc/set", Discovery.NumberCommandTopic("min_battery_soc"));
+        Assert.Equal("solax/home-roof/min_battery_soc/state", Discovery.NumberStateTopic("min_battery_soc"));
     }
 
     [Fact]

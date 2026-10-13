@@ -5,7 +5,7 @@
 
 @*
     The forecast-driven mode, and the only one with a day plan behind it -- so this tab carries both
-    the three runtime numbers the mode reads and the plan it publishes while it drives. They used to
+    the two runtime numbers the mode reads and the plan it publishes while it drives. They used to
     live a nav item apart, on the dashboard and on /forecast, which meant reading the outcome on one
     page and adjusting the input on another.
 
@@ -19,12 +19,11 @@
     entities write, and re-read whenever a new status lands: Home Assistant or a second browser can
     move any of them, and this tab shows what the controller is actually using.
 
-    They are grouped by what they act on -- one ceiling, two battery-protection numbers -- and no two
-    of them answer the same question. The daily EV target used to sit alongside the session target
-    and read like its twin while behaving nothing like it: a yardstick wearing a request's clothes,
-    which taught owners this mode takes requests. It does not, and it is gone (#217). The headline
-    above the plan changed kind with it -- a forecast of what the day gives, not a verdict on whether
-    it is enough, because only Targeted is entitled to the second sentence.
+    Both protect the home battery; none is an amount for the car. The daily EV target was a yardstick
+    wearing a request's clothes, which taught owners this mode takes requests, and went in #217. The
+    session energy target followed in #249: a stop on the car is the car's own charge limit, and an
+    amount by a time is Targeted. The headline above the plan is a forecast of what the day gives,
+    not a verdict on whether it is enough, because only Targeted is entitled to the second sentence.
 *@
 
 <p class="muted">
@@ -48,23 +47,14 @@
     <h2>Where a charge stops</h2>
 
     <p class="hint">
-        This mode takes no request for an amount: it charges the car from whatever surplus the
-        forecast says the home battery will not need. To <em>ask</em> for an amount by a time, use
-        <a href="/charging-plan/targeted">Targeted</a>, which paces the charge and buys grid for the
-        remainder. The ceiling below is a different thing: a stop, not a request.
+        This mode takes no amount: it charges the car from whatever surplus the forecast says the home
+        battery will not need, until the car's own charge limit stops it. To keep the car below full,
+        set that limit in the car. To <em>ask</em> for an amount by a time, use
+        <a href="/charging-plan/targeted">Targeted</a>: when the forecast covers it in time, it charges
+        from the sun alone, and it buys grid only if the sun falls short.
     </p>
 
-    <div class="control">
-        <label for="session-energy-target">Session energy target (kWh, 0 = unlimited)</label>
-        <input id="session-energy-target" type="number" step="0.1" min="0"
-               @bind="_sessionEnergyTargetKWh" @bind:event="onchange" @bind:after="OnSessionEnergyTargetSelected" />
-        <span class="hint">
-            The one hard stop: the car is paused as soon as this much has gone into it. Counted per
-            plug-in, so unplugging the car resets it. Stands in for "charge to 80%", since the charger
-            cannot see the car's own SOC. Doesn't persist across restarts.
-        </span>
-        <span class="hint">@SessionTargetProgress()</span>
-    </div>
+    <p class="hint">@SessionProgress()</p>
 </section>
 
 <section class="plan" id="battery-floor">
@@ -160,7 +150,6 @@ else
 
     [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
 
-    private double _sessionEnergyTargetKWh;
     private double _minBatterySocPercent;
     private double _resumeMarginPercent;
 
@@ -244,9 +233,6 @@ else
 
     private Task StartForecasted() => Start(ChargeControlMode.Forecasted);
 
-    private void OnSessionEnergyTargetSelected() =>
-        ForecastSettings.SetSessionEnergyTargetWh(_sessionEnergyTargetKWh * 1000, "Web UI");
-
     private void OnMinBatterySocSelected() =>
         ForecastSettings.SetMinBatterySocFloorPercent(_minBatterySocPercent, "Web UI");
 
@@ -255,7 +241,6 @@ else
 
     private void RefreshRuntimeNumbers()
     {
-        _sessionEnergyTargetKWh = Math.Round(ForecastSettings.SessionEnergyTargetWh / 1000, 1);
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
         _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
     }
@@ -285,25 +270,10 @@ else
         return $"Today gives the car about {Kwh(plan.FeasibleEvEnergyWh)}, in a window from {start:HH:mm} to {end:HH:mm}.";
     }
 
-    private string SessionTargetProgress()
-    {
-        if (Status is null)
-        {
-            return "No poll has completed yet.";
-        }
-
-        var deliveredWh = Status.SessionEnergyWh;
-        var targetWh = _sessionEnergyTargetKWh * 1000;
-
-        if (targetWh <= 0)
-        {
-            return $"No limit set. {Kwh(deliveredWh)} into the car since it was plugged in.";
-        }
-
-        return deliveredWh >= targetWh
-            ? $"{Kwh(deliveredWh)} of {Kwh(targetWh)} in — reached, so the car stays paused until you unplug it or raise this."
-            : $"{Kwh(deliveredWh)} of {Kwh(targetWh)} in this session.";
-    }
+    private string SessionProgress() =>
+        Status is null
+            ? "No poll has completed yet."
+            : $"{Kwh(Status.SessionEnergyWh)} into the car since it was plugged in.";
 
     private string FormatWindow((DateTimeOffset Start, DateTimeOffset End)? window) =>
         window is { } w

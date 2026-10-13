@@ -12,7 +12,8 @@ namespace Gleanvolt.Api.Contracts;
 /// </summary>
 /// <param name="Mode">
 /// Which strategy to run. <c>solar</c> follows live surplus once the home battery is full;
-/// <c>forecasted</c> lets today's forecast decide how much of the sun the car may have;
+/// <c>forecasted</c> lets today's forecast decide how much of the sun the car may have, takes no
+/// amount, and charges until the car's own limit stops it;
 /// <c>fastNoBattery</c> charges flat out from PV and grid with the home battery held out of it, and
 /// ends itself when the car is full; <c>targeted</c> delivers a stated amount by a stated time and
 /// needs <c>target</c>; <c>solarGrid</c> follows the surplus while it clears the configured minimum,

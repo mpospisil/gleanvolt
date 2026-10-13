@@ -6,8 +6,8 @@ namespace Gleanvolt.Core.Models;
 /// One recorded charging session: the header row that a session's samples and events hang off.
 ///
 /// <para><b>Which "session" this is.</b> The word is already used in this codebase for the span since
-/// the car was plugged in — that is what <see cref="ChargeControlStatus.SessionEnergyWh"/> and the
-/// forecast mode's session energy target mean. This type is the <em>controlled</em> span: it opens
+/// the car was plugged in — that is what <see cref="ChargeControlStatus.SessionEnergyWh"/> means.
+/// This type is the <em>controlled</em> span: it opens
 /// when a controlling mode is driving a connected car and closes when that stops being true, so one
 /// plugged-in car can produce several of these (or none at all).</para>
 ///

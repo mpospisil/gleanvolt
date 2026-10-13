@@ -15,7 +15,6 @@ public sealed class ForecastRuntimeSettings : IForecastRuntimeSettings
     private readonly ILogger<ForecastRuntimeSettings> _logger;
     private readonly Lock _gate = new();
 
-    private double _sessionEnergyTargetWh;
     private double _minBatterySocFloorPercent;
     private double _floorResumeMarginPercent;
 
@@ -30,16 +29,10 @@ public sealed class ForecastRuntimeSettings : IForecastRuntimeSettings
     public ForecastRuntimeSettings(IOptions<ForecastChargeOptions> options, ILogger<ForecastRuntimeSettings> logger)
     {
         var value = options.Value;
-        _sessionEnergyTargetWh = Math.Max(0, value.SessionEnergyTargetKWh * 1000);
         _minBatterySocFloorPercent = Math.Clamp(value.MinBatterySocFloorPercent, 0, 100);
         _minResumeMarginPercent = value.AutoArmBatteryHoldAtFloor ? Math.Clamp(value.HoldReleaseMarginPercent, 0, 100) : 0;
         _floorResumeMarginPercent = ClampMargin(value.FloorResumeMarginPercent);
         _logger = logger;
-    }
-
-    public double SessionEnergyTargetWh
-    {
-        get { lock (_gate) { return _sessionEnergyTargetWh; } }
     }
 
     public double MinBatterySocFloorPercent
@@ -51,9 +44,6 @@ public sealed class ForecastRuntimeSettings : IForecastRuntimeSettings
     {
         get { lock (_gate) { return _floorResumeMarginPercent; } }
     }
-
-    public void SetSessionEnergyTargetWh(double wattHours, string source) =>
-        Set(ref _sessionEnergyTargetWh, Math.Max(0, wattHours), "Session energy target", $"{wattHours / 1000:F1}kWh", source);
 
     public void SetMinBatterySocFloorPercent(double percent, string source) =>
         Set(ref _minBatterySocFloorPercent, Math.Clamp(percent, 0, 100), "Minimum battery SOC", $"{percent:F0}%", source);

@@ -885,9 +885,14 @@ whether waiting is worth it.
 The mode takes no request for an amount. It reports what the day can give; it does not accept an
 answer to "how much do you want?" — that is what [`Targeted`](#targeted-charging-the-targeted-mode) is for,
 and only `Targeted` paces a charge, buys grid for the remainder and reports the gap when the time
-will not stretch. The per-session **energy ceiling** stays here, because a ceiling is not a request:
-it resets per plug-in, stands in for "charge to 80%" on a charger that cannot read the car's SOC, and
-"stop at 10 kWh, whenever that happens" has no departure time for `Targeted` to work to.
+will not stretch. Nor does it cap one: there is no per-session energy limit either. To keep the car
+from filling up, set the charge limit in the car — it stops drawing on its own, and the session ends
+the way any other does. To name an amount, give `Targeted` a departure: when the forecast covers the
+amount in time, it charges from the sun alone and buys nothing — and if the sun then falls short,
+it buys the rest rather than miss the departure, which is the one thing this mode never does. To
+forbid that too, cap its grid at zero (`maxGridEnergyWh: 0`, through the API): the amount is then
+met from the roof or reported as shortfall, never bought. See
+[Editing a quoted plan](#editing-a-quoted-plan-and-charging-to-it).
 
 #### Forecast versus reality
 
@@ -943,8 +948,6 @@ deadline.
     "MinBatterySocFloorPercent": 50, // hard floor, whatever the forecast says
     "FloorResumeMarginPercent": 5,   // SOC recovery required before a paused session restarts
     "FloorGuardReserveWatts": 750,   // surplus kept for the battery inside that band, 0 = off
-    "SessionEnergyTargetKWh": 0,     // per-session ceiling, 0 = unlimited (stands in for "charge to 80%")
-                                     //   a ceiling, not a request — to ask for an amount, use Targeted
     "EnableBatteryLoan": true,
     "MaxLoanPowerWatts": 3800,       // must be able to bridge the thinnest allowed surplus up to ~4.2 kW
     "MinBridgeSurplusWatts": 2000,   // no loan below this while the pack has room for the surplus
@@ -1564,9 +1567,10 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   **Battery loan power**. `Charge window` and `EV energy budget` are what a "not much sun for the car
   today" notification automation keys off. A previous version published a **Daily EV target** number
   with a **Day outlook** and an **EV energy expected today** sensor reporting against it; upgrading
-  retires all three, and Home Assistant removes them on its own.
-- numbers, settable at runtime: **Session energy target** (kWh, 0 = unlimited), **Minimum battery
-  SOC** (%) and **SOC resume margin** (%). Like the mode, changes don't persist across restarts.
+  retires all three, and Home Assistant removes them on its own. The **Session energy target** number
+  went the same way later, for the same reason.
+- numbers, settable at runtime: **Minimum battery SOC** (%) and **SOC resume margin** (%). Like the
+  mode, changes don't persist across restarts.
 - the fast-charge controls — the **Fast basis** select, the **Fast energy** and **Fast target SOC**
   numbers and the **Fast departure** text, applied by the **Charge fast** button that was already
   there — plus its sensors: **Fast delivered**, **Fast target** and **Fast start**. All absent while
@@ -1607,7 +1611,6 @@ description or tooltip field. The meanings live here instead.
 | **Charge solar + grid** | button | The same, for `SolarGrid`. Reads **Min solar surplus** on every poll rather than at the press, so the number can be moved while it runs. Switches itself off at the end of the day's useful sun, when the car stops drawing, or when it is unplugged. |
 | **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` and `SolarGrid` are different: they arm their own hold only while the car draws more than the sun gives — `Targeted`'s grid block, the grid bridge, or a cloud the 3-minute average has not caught up with — keep it for `BatteryHold:BridgeReleaseDwell` after the last of those while charging, and never touch this switch. |
-| **Session energy target** | kWh | The one hard stop in the `Forecasted` mode: the car is paused the moment the charger's meter passes this much, ahead of the dwell timers and whatever the forecast says. A **ceiling, not a request** — it stands in for "charge to 80%", since the charger cannot see the car's own SOC, and it has no idea when you are leaving. To *ask* for an amount by a time, use `Targeted`. Counted per plug-in — unplugging the car and plugging it back in starts the count at zero, and nothing else resets it. `0` means no limit. Doesn't persist across restarts. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
@@ -2370,8 +2373,8 @@ hardware.
 
 Phase 3 adds the same controls Home Assistant has — a button per strategy with the running mode
 reported read-only beside them, the **battery discharge hold** switch (shown only while
-`BatteryHold:Enabled` is on) and the runtime numbers (**session energy target**, **minimum battery
-SOC**, **SOC resume margin**). Phase 5 adds the `Forecasted` mode's day plan as one
+`BatteryHold:Enabled` is on) and the runtime numbers (**minimum battery SOC**, **SOC resume
+margin**). Phase 5 adds the `Forecasted` mode's day plan as one
 coherent view instead of the loosely related entities Home Assistant renders it as: plan state,
 charge window, EV energy budget, projected shortfall, surplus spill, loan headroom, required SOC floor,
 forecast remaining today, tomorrow's forecast, forecast accuracy and battery loaned today, each with an

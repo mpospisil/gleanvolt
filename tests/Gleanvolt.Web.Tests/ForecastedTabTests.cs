@@ -66,7 +66,7 @@ public class ForecastedTabTests : PageTest
         Assert.Empty(page.FindAll(".stat-grid"));
 
         // The controls the mode reads are not part of the plan, and stay reachable whatever is driving.
-        Assert.NotEmpty(page.FindAll("#session-energy-target"));
+        Assert.NotEmpty(page.FindAll("#min-battery-soc"));
     }
 
     [Fact]
@@ -201,26 +201,13 @@ public class ForecastedTabTests : PageTest
     [Fact]
     public void Shows_the_runtime_numbers_from_the_forecast_settings()
     {
-        _forecast.SetSessionEnergyTargetWh(5_000, "test setup");
         _forecast.SetMinBatterySocFloorPercent(55, "test setup");
         _forecast.SetFloorResumeMarginPercent(6, "test setup");
 
         var page = RenderTab();
 
-        Assert.Equal("5", page.Find("#session-energy-target").GetAttribute("value"));
         Assert.Equal("55", page.Find("#min-battery-soc").GetAttribute("value"));
         Assert.Equal("6", page.Find("#resume-margin").GetAttribute("value"));
-    }
-
-    [Fact]
-    public void Changing_the_session_energy_target_drives_the_settings()
-    {
-        var page = RenderTab();
-
-        page.Find("#session-energy-target").Change("0");
-
-        Assert.Equal(0, _forecast.SessionEnergyTargetWh);
-        Assert.Contains(_forecast.Sets, s => s.Setting == "SessionEnergyTargetWh" && s.Source == "Web UI");
     }
 
     [Fact]
@@ -297,40 +284,25 @@ public class ForecastedTabTests : PageTest
         var page = RenderTab();
 
         Assert.Contains("/charging-plan/targeted", page.Markup);
-        Assert.Contains("takes no request for an amount", page.Markup);
+        Assert.Contains("This mode takes no amount", page.Markup);
     }
 
     [Fact]
-    public void Counts_the_session_off_against_its_ceiling()
+    public void Has_no_session_energy_target_to_set()
     {
-        _forecast.SetSessionEnergyTargetWh(10_000, "test setup");
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 4_000 });
-
+        // Issue #249: the mode takes no amount, so there is nothing here to stop the car at one.
         var page = RenderTab();
 
-        Assert.Contains("4.0 kWh of 10.0 kWh in this session", page.Markup);
+        Assert.Empty(page.FindAll("#session-energy-target"));
     }
 
     [Fact]
-    public void Says_the_ceiling_is_what_is_holding_the_car_once_it_is_reached()
+    public void Says_how_much_the_car_has_taken_since_it_was_plugged_in()
     {
-        _forecast.SetSessionEnergyTargetWh(10_000, "test setup");
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 10_400 });
-
-        var page = RenderTab();
-
-        Assert.Contains("reached, so the car stays paused until you unplug it", page.Markup);
-    }
-
-    [Fact]
-    public void Reports_a_zero_session_target_as_no_limit_rather_than_a_0_kwh_one()
-    {
-        // 0 is unlimited, so "0.0 kWh of 0.0 kWh" would read as a charge that can never run.
-        _forecast.SetSessionEnergyTargetWh(0, "test setup");
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { SessionEnergyWh = 3_000 });
 
         var page = RenderTab();
 
-        Assert.Contains("No limit set. 3.0 kWh into the car since it was plugged in", page.Markup);
+        Assert.Contains("3.0 kWh into the car since it was plugged in", page.Markup);
     }
 }
