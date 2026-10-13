@@ -49,7 +49,7 @@
     }
 
     <Stat Label="Battery SOC floor" Value="@Percent(Plan.SocFloorPercent)"
-          Hint="The home battery is not drawn below this to feed the car; the grid covers the gap instead." />
+          Hint="Below this, the sun goes to the home battery and the car gets only what the deadline needs, from the grid. Never lower than your Minimum battery SOC; higher when the forecast leaves the battery too little sun to refill." />
     <Stat Label="Ready by" Value="@Clock(Plan.Deadline)"
           Hint="The finish line the plan works to: your departure less the safety margin." />
 </section>
