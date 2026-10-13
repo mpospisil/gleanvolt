@@ -80,10 +80,11 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         <input id="fast-departure" type="datetime-local" step="900"
                @bind="_departBy" @bind:event="onchange" @bind:after="OnFormEdited" />
         <span class="hint">
-            Leave it empty to charge straight away. With a time, the charge is held back and starts as
-            late as it can while still finishing before you go — so a car asked to go above 80% spends
+            No time set: the charge starts straight away. With a time, the charge is held back and starts
+            as late as it can while still finishing before you go — so a car asked to go above 80% spends
             minutes there rather than the whole night, which is what actually ages the pack. It still
-            charges flat out when it runs; only the start moves.
+            charges flat out when it runs; only the start moves. To remove a time you have set, open the
+            calendar and press its Clear button.
         </span>
     </div>
 }
