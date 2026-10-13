@@ -1,0 +1,76 @@
+# escape=`
+#
+# Not a production image -- see Dockerfile.windows for that. This one exists to answer a narrower
+# question before each win-x64 release ships to WinGet: does the exact artifact WinGet distributes
+# (self-contained, single-file, win-x64 -- see .github/workflows/release.yml's win-x64 leg) actually
+# run on a machine with no .NET installed? The runtime stage is bare Nano Server, not one of the
+# dotnet/aspnet base images, so there is no shared framework for a broken self-contained build to
+# quietly fall back onto.
+#
+#   docker build -f Dockerfile.winget-smoketest -t gleanvolt-winget-smoketest .
+#   docker run --rm -p 8090:8090 gleanvolt-winget-smoketest
+#
+# Requires Docker Desktop switched to Windows containers (right-click the tray icon -> "Switch to
+# Windows containers..."); a Linux-containers daemon cannot pull or run a Nano Server base image.
+#
+# All data stays in the container's own writable layer -- no volume is declared, so `docker rm` is a
+# clean slate. That is the opposite of Dockerfile.windows's deployment advice, on purpose: this image
+# is for a one-off "does it start" check, not for anything meant to survive a restart.
+#
+# ltsc2022 for the same reason as Dockerfile.windows: it runs on both 2022 and 2025 hosts. See
+# docs/DECISIONS.md.
+
+ARG DOTNET_VERSION=10.0
+ARG WINDOWS_VERSION=ltsc2022
+
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
+
+ARG VERSION=1.0.0-dev
+ARG SOURCE_REVISION=
+
+WORKDIR C:\source
+
+# Same restore-layer split as both other Dockerfiles: project files first, so this layer survives a
+# source edit. See DockerfileTests -- a project added under src/ must be copied here too.
+COPY Gleanvolt.slnx ./
+COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj src/Gleanvolt.Core/
+COPY src/Gleanvolt.Api/Gleanvolt.Api.csproj src/Gleanvolt.Api/
+COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
+COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj src/Gleanvolt.Web/
+COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj src/Gleanvolt.Hosting/
+COPY src/Gleanvolt.Worker/Gleanvolt.Worker.csproj src/Gleanvolt.Worker/
+RUN dotnet restore src\Gleanvolt.Worker\Gleanvolt.Worker.csproj -r win-x64
+
+COPY src/ src/
+
+# The one line that makes this a different build from Dockerfile.windows's: self-contained AND
+# single-file, matching release.yml's win-x64 leg exactly, rather than the framework-dependent build
+# the production container image uses.
+RUN dotnet publish src\Gleanvolt.Worker\Gleanvolt.Worker.csproj `
+        -c Release `
+        --no-restore `
+        -r win-x64 `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:Version=%VERSION% `
+        -p:SourceRevisionId=%SOURCE_REVISION% `
+        -o C:\app
+
+# Bare Nano Server, deliberately not mcr.microsoft.com/dotnet/aspnet or dotnet/runtime: a
+# self-contained build that is missing something would otherwise find it on the shared framework
+# layer instead of failing the way it would on a real end-user machine.
+FROM mcr.microsoft.com/windows/nanoserver:${WINDOWS_VERSION} AS runtime
+
+WORKDIR C:\app
+COPY --from=build C:\app .
+
+COPY LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md C:\app\
+
+ENV DOTNET_EnableDiagnostics=0
+
+# Undocumented on purpose: this image is not the one the "set Controller__TimeZone" advice in
+# Dockerfile.windows is about. Pass it the same way if the default UTC clock matters for a given run.
+
+EXPOSE 8090
+
+ENTRYPOINT ["C:\\app\\Gleanvolt.Worker.exe"]
