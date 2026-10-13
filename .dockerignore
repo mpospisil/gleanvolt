@@ -27,5 +27,9 @@ docs/
 # LICENSE is deliberately NOT excluded: the runtime stage copies it into the image so the terms
 # travel with the artifact rather than only with the repository.
 
-# Runtime state that only exists on a developer machine.
+# Runtime state that only exists on a developer machine. Matches .gitignore's own exclusion of this
+# path: a local `dotnet run` leaves session/energy databases, saved PV overrides and the DPAPI-sealed
+# vehicle secrets here, and without this line they get copied into the image by `COPY src/ src/` and
+# published alongside the app -- found by actually inspecting a built image.
 logs/
+src/Gleanvolt.Worker/data/
