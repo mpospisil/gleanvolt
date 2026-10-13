@@ -75,8 +75,10 @@
         <input id="min-battery-soc" type="number" step="1" min="0" max="100"
                @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
         <span class="hint">
-            The hard floor the plan may never take the home battery below. Shared with
-            <a href="/charging-plan/targeted">Targeted</a>, which works to the same floor. Doesn't persist
+            The lowest the home battery may go while it helps charge the car. When it gets there the
+            car pauses until the battery has recovered by the resume margin below. The plan may keep a
+            higher floor when the forecast says the battery needs it to be full by the plan's deadline.
+            Shared with the Targeted mode, so changing it here changes it there too. Doesn't persist
             across restarts.
         </span>
     </div>
