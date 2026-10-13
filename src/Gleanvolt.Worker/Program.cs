@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Settings.Configuration;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting;
@@ -43,8 +44,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSystemd();
 
 builder.Logging.ClearProviders();
+
+// Serilog.Settings.Configuration normally finds "Console" and "File" in the WriteTo section by
+// scanning the output directory for Serilog.Sinks.*.dll -- there is no such directory to scan once
+// the worker is published single-file, and it throws instead of logging anything. Naming the sink
+// assemblies here skips that scan.
+var serilogAssemblies = new ConfigurationReaderOptions(
+    typeof(ConsoleLoggerConfigurationExtensions).Assembly,
+    typeof(FileLoggerConfigurationExtensions).Assembly);
 builder.Services.AddSerilog(config => config
-    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Configuration(builder.Configuration, serilogAssemblies)
     .Enrich.FromLogContext());
 
 // Everything the controller is: polling, the control strategies, the session store, the Home
