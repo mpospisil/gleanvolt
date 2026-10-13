@@ -39,7 +39,7 @@ COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj src/Gleanvolt.Web/
 COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj src/Gleanvolt.Hosting/
 COPY src/Gleanvolt.Worker/Gleanvolt.Worker.csproj src/Gleanvolt.Worker/
-RUN dotnet restore src\Gleanvolt.Worker\Gleanvolt.Worker.csproj
+RUN dotnet restore src\Gleanvolt.Worker\Gleanvolt.Worker.csproj -r win-x64
 
 COPY src/ src/
 
