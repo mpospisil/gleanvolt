@@ -25,10 +25,12 @@ number and the Forecasted tab's input. The mode is left with two runtime numbers
 the battery: the SOC floor and the resume margin. Its hard stops are now the floor, the final guard
 and the evening guarantee — promises about the home battery, none of them about the car.
 
-**What is lost, accepted:** *"solar only, stop at X kWh, and I don't mind falling short."* `Targeted`
-keeps its promise when the sun under-delivers, so it buys grid to finish on time. A capped
-`Forecasted` session would never import and would just deliver less. The car's charge limit covers
-the "don't overfill" half, and the other half is `Forecasted` without a cap.
+**Nothing is lost, but one case moves out of reach of the web UI and Home Assistant.**
+*"Solar only, stop at X kWh, and I don't mind falling short"* is `Targeted` with
+`maxGridEnergyWh: 0`. The plan is then met from the roof or not at all, and the gap is reported as
+shortfall rather than bought. That limit is only settable through the API today (and so through the
+MCP server), and it still needs a departure, which can be up to `MaxHorizon` ahead. From the web UI or
+Home Assistant, the nearest thing is `Forecasted` plus the car's own charge limit.
 
 Consequences, deliberately accepted:
 

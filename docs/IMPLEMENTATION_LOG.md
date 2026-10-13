@@ -12,6 +12,10 @@ drawing. And `Targeted`, given a departure up to `MaxHorizon` ahead, charges fro
 buys nothing when the forecast covers the amount. `Forecasted` now takes no amount for the car. Its
 two runtime numbers both protect the home battery. The reasoning is in `DECISIONS.md`.
 
+The one case the ceiling seemed to cover alone, *"this much from the sun, and I'll accept falling
+short"*, is `Targeted` with `maxGridEnergyWh: 0`. That limit is API-only today, so the MCP server's
+instructions now say so when they guide a model to a mode.
+
 ### What came out
 
 - **The hard stop** in `ForecastedChargingController.Decide` (*"Session target reached: …"*). The

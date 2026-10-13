@@ -889,7 +889,10 @@ will not stretch. Nor does it cap one: there is no per-session energy limit eith
 from filling up, set the charge limit in the car — it stops drawing on its own, and the session ends
 the way any other does. To name an amount, give `Targeted` a departure: when the forecast covers the
 amount in time, it charges from the sun alone and buys nothing — and if the sun then falls short,
-it buys the rest rather than miss the departure, which is the one thing this mode never does.
+it buys the rest rather than miss the departure, which is the one thing this mode never does. To
+forbid that too, cap its grid at zero (`maxGridEnergyWh: 0`, through the API): the amount is then
+met from the roof or reported as shortfall, never bought. See
+[Editing a quoted plan](#editing-a-quoted-plan-and-charging-to-it).
 
 #### Forecast versus reality
 
