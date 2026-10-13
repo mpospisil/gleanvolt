@@ -19,26 +19,39 @@
     {
         <span class="site">@Site.Name</span>
     }
-    <nav>
-        <a href="/">Dashboard</a>
-        <a href="/charging-plan">Charging plan</a>
-        <a href="/sessions">Sessions</a>
-        <a href="/energy">Energy</a>
-        <a href="/forecast">Forecast</a>
-        <a href="/pv-system">PV system</a>
-        <a href="/car">Car</a>
-        <a href="/health">Health</a>
-    </nav>
-    @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
-       stay true regardless of Web:RequireAuthentication, or this control would show for an
-       anonymous visitor once RequireAuthentication is off and DefaultPolicy allows everyone. *@
-    <AuthorizeView Policy="Authenticated">
-        <Authorized>
-            <form method="post" action="/logout" class="signout">
-                <button type="submit">Sign out</button>
-            </form>
-        </Authorized>
-    </AuthorizeView>
+    @*
+        On a phone the links don't fit beside the brand, so below the breakpoint in site.css they
+        fold behind a Menu button. The toggle is a checkbox rather than a Blazor handler for the same
+        reason the sign-out control is a form: this layout also wraps the static sign-in page, and a
+        checkbox opens the menu whether or not a circuit is live. menu.js closes it again after a link
+        is followed, since enhanced navigation keeps the header -- and the box's checked state.
+    *@
+    <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="Menu" />
+    <label for="menu-toggle" class="menu-button" aria-hidden="true">
+        <span class="menu-icon"></span>Menu
+    </label>
+    <div class="menu">
+        <nav>
+            <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="/charging-plan">Charging plan</NavLink>
+            <NavLink href="/sessions">Sessions</NavLink>
+            <NavLink href="/energy">Energy</NavLink>
+            <NavLink href="/forecast">Forecast</NavLink>
+            <NavLink href="/pv-system">PV system</NavLink>
+            <NavLink href="/car">Car</NavLink>
+            <NavLink href="/health">Health</NavLink>
+        </nav>
+        @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
+           stay true regardless of Web:RequireAuthentication, or this control would show for an
+           anonymous visitor once RequireAuthentication is off and DefaultPolicy allows everyone. *@
+        <AuthorizeView Policy="Authenticated">
+            <Authorized>
+                <form method="post" action="/logout" class="signout">
+                    <button type="submit">Sign out</button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </div>
 </header>
 
 <main class="content">

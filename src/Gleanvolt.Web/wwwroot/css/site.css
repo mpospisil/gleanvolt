@@ -65,6 +65,7 @@ body {
 }
 
 .topbar {
+    position: relative;
     background: var(--panel);
     border-bottom: 1px solid var(--line);
     padding: 0.75rem 1.25rem;
@@ -86,6 +87,13 @@ body {
     margin-left: -1rem;
 }
 
+.menu {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex: 1;
+}
+
 .topbar nav {
     display: flex;
     gap: 1rem;
@@ -97,7 +105,8 @@ body {
     text-decoration: none;
 }
 
-.topbar nav a:hover {
+.topbar nav a:hover,
+.topbar nav a.active {
     color: var(--accent);
 }
 
@@ -118,6 +127,152 @@ body {
 .signout button:hover {
     color: var(--ink);
     border-color: var(--accent);
+}
+
+/* The Menu button and the checkbox behind it (MainLayout.razor). Out of sight on a screen wide
+   enough for the links; the box stays in the accessibility tree and focusable, so a keyboard opens
+   the menu with Space even though the visible thing is the label. */
+.menu-toggle {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.menu-button {
+    display: none;
+}
+
+/* Eight links, the brand and Sign out need about 62rem in one row; below that the links fold behind
+   the button into a panel under the bar, one per row with a thumb-sized target. */
+@media (max-width: 64rem) {
+    .topbar {
+        gap: 1rem;
+        padding: 0.6rem 1rem;
+    }
+
+    .site {
+        margin-left: -0.5rem;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .menu-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
+        padding: 0.35rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--ink);
+        font-size: 0.95rem;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .menu-toggle:focus-visible + .menu-button {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .menu-toggle:checked + .menu-button {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    /* Three bars drawn from one element, crossing into an X while the menu is open. */
+    .menu-icon,
+    .menu-icon::before,
+    .menu-icon::after {
+        display: block;
+        width: 1.1rem;
+        height: 2px;
+        border-radius: 1px;
+        background: currentColor;
+        transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+
+    .menu-icon {
+        position: relative;
+    }
+
+    .menu-icon::before,
+    .menu-icon::after {
+        content: "";
+        position: absolute;
+        left: 0;
+    }
+
+    .menu-icon::before {
+        top: -6px;
+    }
+
+    .menu-icon::after {
+        top: 6px;
+    }
+
+    .menu-toggle:checked + .menu-button .menu-icon {
+        background: transparent;
+    }
+
+    .menu-toggle:checked + .menu-button .menu-icon::before {
+        transform: translateY(6px) rotate(45deg);
+    }
+
+    .menu-toggle:checked + .menu-button .menu-icon::after {
+        transform: translateY(-6px) rotate(-45deg);
+    }
+
+    .menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 10;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 8px 16px rgb(0 0 0 / 0.12);
+        padding: 0.25rem 0 0.75rem;
+    }
+
+    .menu-toggle:checked ~ .menu {
+        display: flex;
+    }
+
+    .topbar nav {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .topbar nav a {
+        padding: 0.7rem 1.25rem;
+        border-left: 3px solid transparent;
+    }
+
+    .topbar nav a.active {
+        border-left-color: var(--accent);
+        font-weight: 600;
+    }
+
+    .signout {
+        margin: 0.5rem 1.25rem 0;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .signout button {
+        width: 100%;
+        padding: 0.55rem;
+        font-size: 1rem;
+    }
 }
 
 .content {
