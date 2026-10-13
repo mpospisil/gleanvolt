@@ -241,6 +241,12 @@ jobs:
           - rid: win-x64
             runner: windows-latest
             exe: Gleanvolt.Worker.exe
+            # WinGet's portable command alias runs this through a Links\gleanvolt.exe shim rather
+            # than the real install path. The .NET apphost locates its companion .dll next to
+            # whatever path it was invoked as, not the resolved target, so a split exe+dll build
+            # looks for the dll inside Links\ and fails. Single-file removes the companion dll
+            # entirely, so there is nothing to mislocate (#428803).
+            publish_args: -p:PublishSingleFile=true
 
     steps:
       - name: Checkout
@@ -275,6 +281,7 @@ jobs:
             -p:BuildNumber=${{ needs.version.outputs.build }} \
             -p:SourceRevisionId=${{ github.sha }} \
             ${{ needs.version.outputs.suffix }} \
+            ${{ matrix.publish_args }} \
             --output publish/${{ matrix.rid }}
 
       # The terms travel with this artifact too, exactly as they do with the images and the packages
