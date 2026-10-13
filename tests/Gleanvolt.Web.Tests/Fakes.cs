@@ -185,20 +185,11 @@ internal sealed class FakeSolarGridSettings : ISolarGridSettings
 
 internal sealed class FakeForecastRuntimeSettings : IForecastRuntimeSettings
 {
-
-    public double SessionEnergyTargetWh { get; private set; }
-
     public double MinBatterySocFloorPercent { get; private set; } = 50;
 
     public double FloorResumeMarginPercent { get; private set; } = 5;
 
     public List<(string Setting, double Value, string Source)> Sets { get; } = [];
-
-    public void SetSessionEnergyTargetWh(double wattHours, string source)
-    {
-        SessionEnergyTargetWh = Math.Max(0, wattHours);
-        Sets.Add((nameof(SessionEnergyTargetWh), SessionEnergyTargetWh, source));
-    }
 
     public void SetMinBatterySocFloorPercent(double percent, string source)
     {

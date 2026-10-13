@@ -52,10 +52,6 @@ namespace Gleanvolt.Core.Models;
 /// How long before the deadline the car is paused outright while the battery is under 100% — the
 /// belt-and-braces guard for an afternoon the forecast got wrong.
 /// </param>
-/// <param name="SessionEnergyTargetWh">
-/// Ceiling on energy delivered per session, 0 for unlimited. Stands in for "charge to 80%": the
-/// charger exposes no vehicle SOC, so the only lever on the car's pack is how much is put into it.
-/// </param>
 public sealed record ForecastedChargingOptions(
     int MinChargingCurrentAmps,
     int MaxChargingCurrentAmps,
@@ -71,5 +67,4 @@ public sealed record ForecastedChargingOptions(
     double LoanSocMarginPercent,
     TimeSpan MinRunTime,
     TimeSpan MinPauseTime,
-    TimeSpan FinalGuardBefore,
-    double SessionEnergyTargetWh);
+    TimeSpan FinalGuardBefore);

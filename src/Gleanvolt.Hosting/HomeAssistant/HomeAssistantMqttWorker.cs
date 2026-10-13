@@ -272,7 +272,6 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     private IEnumerable<(string ObjectId, double Value)> CurrentNumberValues()
     {
-        yield return (HaDiscovery.SessionEnergyTargetNumber, _forecastSettings.SessionEnergyTargetWh / 1000);
         yield return (HaDiscovery.MinBatterySocNumber, _forecastSettings.MinBatterySocFloorPercent);
         yield return (HaDiscovery.ResumeMarginNumber, _forecastSettings.FloorResumeMarginPercent);
 
@@ -533,9 +532,6 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         switch (objectId)
         {
-            case HaDiscovery.SessionEnergyTargetNumber:
-                _forecastSettings.SetSessionEnergyTargetWh(value * 1000, "Home Assistant");
-                break;
             case HaDiscovery.MinBatterySocNumber:
                 _forecastSettings.SetMinBatterySocFloorPercent(value, "Home Assistant");
                 break;

@@ -23,7 +23,7 @@ namespace Gleanvolt.Core.Strategies;
 /// coming;</description></item>
 /// <item><description><b>dwell timers</b>, so a passing cloud can't start and stop the session every few
 /// minutes;</description></item>
-/// <item><description>a <b>final guard</b> before the deadline, and a per-session energy ceiling.</description></item>
+/// <item><description>a <b>final guard</b> before the deadline.</description></item>
 /// </list>
 ///
 /// <para>Whenever the plan is missing, stale or untrusted it delegates to the live-solar controller —
@@ -104,13 +104,8 @@ public sealed class ForecastedChargingController : IChargingController
         var soc = state.BatterySocPercent;
 
         // --- Hard stops: these ignore the dwell timers, because "keep the session tidy" must never
-        // outrank the battery's evening guarantee or the car's energy ceiling. ---
-
-        var sessionTargetWh = _runtime?.SessionEnergyTargetWh ?? _options.SessionEnergyTargetWh;
-        if (sessionTargetWh > 0 && input.SessionEnergyWh >= sessionTargetWh)
-        {
-            return Pause($"Session target reached: {input.SessionEnergyWh / 1000:F1}kWh of {sessionTargetWh / 1000:F1}kWh delivered.");
-        }
+        // outrank the battery's evening guarantee. None of them is about the car: how much it takes is
+        // the car's own charge limit, and an amount by a time is Targeted (issue #249). ---
 
         if (state.Timestamp >= plan.Deadline - _options.FinalGuardBefore
             && state.Timestamp <= plan.Deadline

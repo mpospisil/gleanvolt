@@ -22,7 +22,6 @@ public class ForecastedChargingControllerTests
         double minBridgeSurplusWatts = 2000,
         double spillBridgeSurplusWatts = 400,
         double maxDailyLoanWh = 4000,
-        double sessionTargetWh = 0,
         double floorResumeMarginPercent = 0,
         double floorGuardReserveWatts = 0,
         TimeSpan? minRunTime = null,
@@ -42,8 +41,7 @@ public class ForecastedChargingControllerTests
             LoanSocMarginPercent: 2,
             MinRunTime: minRunTime ?? TimeSpan.FromMinutes(10),
             MinPauseTime: minPauseTime ?? TimeSpan.Zero,
-            FinalGuardBefore: TimeSpan.FromHours(1),
-            SessionEnergyTargetWh: sessionTargetWh);
+            FinalGuardBefore: TimeSpan.FromHours(1));
 
     private ForecastedChargingController Controller(ForecastedChargingOptions? options = null) =>
         new(new ChargePowerConverter(230, 3), _fallback, options ?? Options());
@@ -302,14 +300,13 @@ public class ForecastedChargingControllerTests
     }
 
     [Fact]
-    public void ReachingTheSessionTargetEndsTheSession()
+    public void HowMuchTheSessionHasDeliveredNeverStopsTheCar()
     {
-        var controller = Controller(Options(sessionTargetWh: 10_000));
+        // Issue #249: the mode takes no amount. Stopping the car at a level is its own charge limit,
+        // and an amount by a time is Targeted -- so a big session on a good day just keeps charging.
+        var decision = Controller().Decide(Input(8000, sessionEnergyWh: 60_000));
 
-        var decision = controller.Decide(Input(8000, sessionEnergyWh: 10_500));
-
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
-        Assert.Contains("Session target reached", decision.Reason);
+        Assert.Equal(ChargingControlAction.Charge, decision.Action);
     }
 
     [Fact]
