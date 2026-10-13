@@ -20,6 +20,8 @@ public enum ChargeControlMode
     /// power is left to the house and battery, the midday plateau is released to the car, and the
     /// battery may lend power briefly when the forecast can repay it. Falls back to
     /// <see cref="Solar"/> behaviour whenever no usable forecast is available.
+    /// Takes no amount: the car charges until its own charge limit stops it, or the sun runs out. For
+    /// an amount by a time, use <see cref="Targeted"/>.
     /// </summary>
     Forecasted,
 
