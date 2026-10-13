@@ -159,9 +159,11 @@ else
     <input id="min-battery-soc" type="number" step="1" min="0" max="100"
            @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
     <span class="hint">
-        The floor the home battery is not drawn below to feed the car; the grid covers the gap
-        instead. The same number the <a href="/charging-plan/forecasted">Forecasted</a> plan works to.
-        Doesn't persist across restarts.
+        Below this level the home battery comes first: the sun charges it, and the car gets only
+        what it needs to be ready on time, from the grid. At or above it, the car also takes the
+        solar surplus. The home battery never charges the car in this mode. On a poor-sun day the
+        plan may keep a higher floor so the battery can still refill. Shared with the Forecasted
+        mode, so changing it here changes it there too. Doesn't persist across restarts.
     </span>
 </div>
 
