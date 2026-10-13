@@ -20,6 +20,20 @@ if (args is ["hash-password", var plainPassword])
     return 0;
 }
 
+// The default content root is the process's current directory, not the exe's own -- fine for
+// `dotnet run` (already the project directory) and for the systemd unit and the container image
+// (each pins or coincides with the right directory another way), but not for a single-file publish
+// run through WinGet's PortableCommandAlias: that launches Links\gleanvolt.exe, a symlink whose
+// directory has none of appsettings.json, wwwroot or data/, only the real install directory does.
+// Assembly.GetEntryAssembly().Location is empty only for a single-file publish, so this changes
+// nothing for every other way the worker runs.
+#pragma warning disable IL3000 // Read only for emptiness, as the single-file marker it always is -- never used as a path.
+if (string.IsNullOrEmpty(System.Reflection.Assembly.GetEntryAssembly()?.Location))
+#pragma warning restore IL3000
+{
+    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+}
+
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
 // the VS Code debugger -- without living in any committed file. Real env vars still take priority.
