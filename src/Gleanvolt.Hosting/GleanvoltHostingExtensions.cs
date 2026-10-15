@@ -876,11 +876,20 @@ public static class GleanvoltHostingExtensions
             // The manifest path is explicit rather than left to MapStaticAssets()'s own default: that default
             // resolves against AppContext.BaseDirectory, which -- like Environment.ProcessPath -- is the path a
             // single-file publish was *invoked as*, not the resolved path, when invoked through a reparse-point
-            // symlink such as WinGet's PortableCommandAlias. ContentRootPath is already correct by this point
-            // (Program.cs resolves the real directory before the host is even built), so anchor to that instead.
+            // symlink such as WinGet's PortableCommandAlias. For a single-file publish ContentRootPath is
+            // already correct by this point (Program.cs resolves the real directory before the host is even
+            // built), so anchor to that instead.
+            //
+            // Only for a single-file publish, though. Everywhere else the manifest sits beside the dll in
+            // bin/, while the content root is the current directory -- the project directory under
+            // `dotnet run` and the VS Code debugger -- and anchoring to it there fails at startup.
+            var entry = System.Reflection.Assembly.GetEntryAssembly()!;
+            var manifestDirectory = string.IsNullOrEmpty(entry.Location)
+                ? app.Environment.ContentRootPath
+                : AppContext.BaseDirectory;
             app.MapStaticAssets(Path.Combine(
-                app.Environment.ContentRootPath,
-                $"{System.Reflection.Assembly.GetEntryAssembly()!.GetName().Name}.staticwebassets.endpoints.json"));
+                manifestDirectory,
+                $"{entry.GetName().Name}.staticwebassets.endpoints.json"));
             app.MapGleanvoltWebUi(web);
         }
 
