@@ -13,6 +13,12 @@ window.solaxCharts = (function () {
         return value || fallback;
     }
 
+    // The axes are drawn on canvas, so they don't inherit the page's face the way the HTML legend
+    // does; uPlot's own default is a system sans, which sits badly under a serif page.
+    function axisFont() {
+        return "12px " + cssVar("--font-body", "serif");
+    }
+
     // The forecast plan timeline (issue #50): forecast surplus against the charge window, with the
     // required-SOC-floor projection overlaid on a second axis -- one picture for what the entity list
     // on its own can't communicate. Recreated (not patched via setData) on every poll like the rest of
@@ -26,10 +32,10 @@ window.solaxCharts = (function () {
 
         dispose(elementId);
 
-        const accent = cssVar("--accent", "#0b6b3a");
-        const amber = cssVar("--amber", "#f5b400");
-        const ink = cssVar("--ink", "#1c1f23");
-        const line = cssVar("--line", "#e3e6ea");
+        const accent = cssVar("--accent", "#b68235");
+        const amber = cssVar("--amber", "#c98f1a");
+        const ink = cssVar("--ink", "#201f1d");
+        const line = cssVar("--line", "#dcd9d6");
 
         const opts = {
             width: el.clientWidth || 600,
@@ -60,11 +66,11 @@ window.solaxCharts = (function () {
                 },
             ],
             axes: [
-                { stroke: ink, grid: { stroke: line } },
+                { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Explicit size: uPlot's auto-sizing left a 4-digit "6000 W" label clipped against the
                 // canvas edge at the default gutter width.
-                { scale: "w", stroke: ink, grid: { stroke: line }, size: 64, values: (u, vals) => vals.map((v) => v + " W") },
-                { scale: "p", side: 1, stroke: ink, grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 64, values: (u, vals) => vals.map((v) => v + " W") },
+                { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
                 // A shaded band for the charge window, drawn behind the series -- the picture the
@@ -113,14 +119,14 @@ window.solaxCharts = (function () {
 
         dispose(elementId);
 
-        const ink = cssVar("--ink", "#1c1f23");
-        const line = cssVar("--line", "#e3e6ea");
-        const muted = cssVar("--muted", "#6b7280");
-        const solar = cssVar("--solar", "#f5b400");
-        const gridColour = cssVar("--grid-flow", "#6b7280");
-        const battery = cssVar("--accent", "#0b6b3a");
-        const ev = cssVar("--ev", "#b45309");
-        const house = cssVar("--house", "#7c3aed");
+        const ink = cssVar("--ink", "#201f1d");
+        const line = cssVar("--line", "#dcd9d6");
+        const muted = cssVar("--muted", "#5f5b56");
+        const solar = cssVar("--solar", "#d9a514");
+        const gridColour = cssVar("--grid-flow", "#7d7872");
+        const battery = cssVar("--battery", "#5f8a3a");
+        const ev = cssVar("--ev", "#b4532a");
+        const house = cssVar("--house", "#6d5a9e");
 
         // A bucket is a rectangle over a quarter hour, not a point in the middle of one. Stepped
         // paths draw what was recorded; a linear interpolation would draw slopes nothing did.
@@ -190,11 +196,11 @@ window.solaxCharts = (function () {
             cursor: { drag: { x: true, y: false } },
             series,
             axes: [
-                { stroke: ink, grid: { stroke: line } },
+                { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Wider than the plan chart's gutter: this axis goes below zero, and a "-4,000 W" label
                 // that does not fit loses its minus sign against the canvas edge rather than wrapping.
-                { scale: "w", stroke: ink, grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
-                { scale: "p", side: 1, stroke: ink, grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
                 draw: [
@@ -267,16 +273,16 @@ window.solaxCharts = (function () {
 
         dispose(elementId);
 
-        const ink = cssVar("--ink", "#1c1f23");
-        const line = cssVar("--line", "#e3e6ea");
-        const muted = cssVar("--muted", "#6b7280");
-        const solar = cssVar("--solar", "#f5b400");
-        const gridColour = cssVar("--grid-flow", "#6b7280");
-        const battery = cssVar("--accent", "#0b6b3a");
-        const ev = cssVar("--ev", "#b45309");
-        const vehicle = cssVar("--vehicle", "#2563eb");
-        const surplus = cssVar("--surplus", "#0891b2");
-        const socFloor = cssVar("--soc-floor", "#9333ea");
+        const ink = cssVar("--ink", "#201f1d");
+        const line = cssVar("--line", "#dcd9d6");
+        const muted = cssVar("--muted", "#5f5b56");
+        const solar = cssVar("--solar", "#d9a514");
+        const gridColour = cssVar("--grid-flow", "#7d7872");
+        const battery = cssVar("--battery", "#5f8a3a");
+        const ev = cssVar("--ev", "#b4532a");
+        const vehicle = cssVar("--vehicle", "#3b6ea5");
+        const surplus = cssVar("--surplus", "#1f8a8f");
+        const socFloor = cssVar("--soc-floor", "#a3447c");
 
         const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
         const percent = (u, v) => (v == null ? "-" : Math.round(v) + "%");
@@ -358,11 +364,11 @@ window.solaxCharts = (function () {
             cursor: { drag: { x: true, y: false } },
             series,
             axes: [
-                { stroke: ink, grid: { stroke: line } },
+                { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Wide gutter, as on the day chart: this axis goes below zero, and a "-4,000 W" label
                 // that does not fit loses its minus sign against the canvas edge rather than wrapping.
-                { scale: "w", stroke: ink, grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
-                { scale: "p", side: 1, stroke: ink, grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
                 // The stretches the discharge hold was armed for. drawClear, not draw: this one is a
@@ -454,10 +460,10 @@ window.solaxCharts = (function () {
 
         dispose(elementId);
 
-        const ink = cssVar("--ink", "#1c1f23");
-        const line = cssVar("--line", "#e3e6ea");
-        const muted = cssVar("--muted", "#6b7280");
-        const solar = cssVar("--solar", "#f5b400");
+        const ink = cssVar("--ink", "#201f1d");
+        const line = cssVar("--line", "#dcd9d6");
+        const muted = cssVar("--muted", "#5f5b56");
+        const solar = cssVar("--solar", "#d9a514");
 
         const stepped = uPlot.paths.stepped({ align: 1 });
         const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
@@ -502,8 +508,8 @@ window.solaxCharts = (function () {
                 edge("High (p90)"),
             ],
             axes: [
-                { stroke: ink, grid: { stroke: line } },
-                { scale: "w", stroke: ink, grid: { stroke: line }, size: 70, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { stroke: ink, font: axisFont(), grid: { stroke: line } },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 70, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
             ],
             hooks: {
                 // Behind the series, not over them: the median line has to stay readable inside its
