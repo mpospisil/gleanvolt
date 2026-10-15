@@ -4,8 +4,8 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Web.Components;
 
 /// <summary>
-/// The overview's headline (#255): what the controller is doing right now and why, as prose, ahead of
-/// the figures that say the same thing one number at a time.
+/// The overview's headline (#255): what the controller is doing about the car right now and why, as
+/// prose, ahead of the figures.
 ///
 /// <para>Only what the status actually carries. It never guesses at a reason the controller did not
 /// give: a paused mode says it is waiting, and the why comes from the plan the mode itself published
@@ -38,8 +38,8 @@ public static class OverviewNarrative
             sentences.Add(why);
         }
 
-        sentences.Add(House(status));
-
+        // The house is not in it: the figures right under the headline already say what the roof,
+        // the battery and the grid are doing, and saying it twice made the headline five lines long.
         return sentences;
     }
 
@@ -101,30 +101,6 @@ public static class OverviewNarrative
         }
 
         return null;
-    }
-
-    // The house second: true whatever is plugged in.
-    private static string House(ChargeControlStatus status)
-    {
-        var roof = status.SolarPowerWatts > 0
-            ? $"The roof is making {Kw(status.SolarPowerWatts)}"
-            : "The roof is making nothing";
-
-        var battery = status.BatteryPowerWatts switch
-        {
-            > 0 => $"the home battery is at {status.BatterySocPercent:F0}% and charging at {Kw(status.BatteryPowerWatts)}",
-            < 0 => $"the home battery is at {status.BatterySocPercent:F0}% and supplying {Kw(-status.BatteryPowerWatts)}",
-            _ => $"the home battery is at {status.BatterySocPercent:F0}%",
-        };
-
-        var grid = status.GridPowerWatts switch
-        {
-            > 0 => $", and {Kw(status.GridPowerWatts)} is coming in from the grid",
-            < 0 => $", and {Kw(-status.GridPowerWatts)} is going out to the grid",
-            _ => "",
-        };
-
-        return $"{roof}; {battery}{grid}.";
     }
 
     private static string Kw(double watts) => $"{watts / 1000:0.0} kW";

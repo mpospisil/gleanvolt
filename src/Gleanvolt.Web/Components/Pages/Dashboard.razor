@@ -80,41 +80,55 @@ else
             <section class="figures" aria-label="Power now and energy today">
                 <div class="figure solar">
                     <div class="figure-label">Solar</div>
-                    <div class="figure-now">@Watts(_status.SolarPowerWatts)</div>
-                    <div class="figure-sub">forecast @Watts(_status.ForecastSolarPowerWatts)</div>
+                    <div class="figure-now">@Kw(_status.SolarPowerWatts)</div>
+                    <div class="figure-sub">forecast @Kw(_status.ForecastSolarPowerWatts)</div>
                     @if (_status.SurplusWatts is { } surplus)
                     {
-                        <div class="figure-sub">surplus @Watts(surplus)</div>
+                        <div class="figure-sub">surplus @Kw(surplus)</div>
                     }
                     <div class="figure-today">@Today(t => t.SolarKwh)</div>
                 </div>
                 <div class="figure house">
                     <div class="figure-label">House</div>
-                    <div class="figure-now">@Watts(house)</div>
-                    <div class="figure-sub">without the car</div>
+                    @* Below zero is not a house exporting: the grid meter cannot see one phase, so while the
+                       car draws, part of its load is missing from the sum. A dash, not a wrong number. *@
+                    @if (house >= 0)
+                    {
+                        <div class="figure-now">@Kw(house)</div>
+                        <div class="figure-sub">without the car</div>
+                    }
+                    else
+                    {
+                        <div class="figure-now">—</div>
+                        <div class="figure-sub">not measurable</div>
+                    }
                     <div class="figure-today">@Today(t => t.HouseKwh)</div>
                 </div>
                 <div class="figure battery">
                     <div class="figure-label">Battery</div>
-                    <div class="figure-now">@Watts(_status.BatteryPowerWatts)</div>
-                    <div class="figure-sub">@Percent(_status.BatterySocPercent) charged</div>
+                    <div class="figure-now">@Kw(_status.BatteryPowerWatts)</div>
+                    <div class="figure-sub">@(_status.BatteryPowerWatts switch { > 0 => "charging", < 0 => "supplying", _ => "idle" }) · @Percent(_status.BatterySocPercent)</div>
                     <div class="figure-today">@TodayInOut(t => t.BatteryInKwh, t => t.BatteryOutKwh, "in", "out")</div>
                 </div>
                 <div class="figure ev">
                     <div class="figure-label">Car</div>
-                    <div class="figure-now">@Watts(_status.EvChargerPowerWatts)</div>
+                    <div class="figure-now">@Kw(_status.EvChargerPowerWatts)</div>
                     <div class="figure-sub">@(_status.CarConnected ? "plugged in" : "not plugged in")</div>
                     <div class="figure-today">@Today(t => t.EvKwh)</div>
                 </div>
                 <div class="figure grid-flow">
                     <div class="figure-label">Grid</div>
-                    <div class="figure-now">@Watts(_status.GridPowerWatts)</div>
+                    <div class="figure-now">@Kw(_status.GridPowerWatts)</div>
                     <div class="figure-sub">@(_status.GridPowerWatts switch { > 0 => "importing", < 0 => "exporting", _ => "balanced" })</div>
                     <div class="figure-today">@TodayInOut(t => t.ImportKwh, t => t.ExportKwh, "in", "out")</div>
                 </div>
             </section>
 
-            @if (_today is null)
+            @if (_today is { Count: > 0 })
+            {
+                <p class="muted figures-note">Power now; under it, kWh since midnight.</p>
+            }
+            else if (_today is null)
             {
                 <p class="muted figures-note">
                     Today's energy needs the energy monitor, which is off on this installation; the figures
@@ -203,10 +217,20 @@ else
                 }
                 else
                 {
-                    <div class="session-energy">@Kwh(_status.SessionEnergyWh)</div>
-                    <p class="muted session-energy-note">
-                        into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {carSoc:F0}%" : "")
-                    </p>
+                    @* Nothing counted yet with the car drawing (a car the charger started on plug-in, or the
+                       first poll of a session) puts the power first: a large 0.0 kWh reads as broken. *@
+                    @if (_status.SessionEnergyWh <= 0 && _status.EvChargerPowerWatts > 0)
+                    {
+                        <div class="session-energy">@Kw(_status.EvChargerPowerWatts)</div>
+                        <p class="muted session-energy-note">drawing now; no session energy counted yet</p>
+                    }
+                    else
+                    {
+                        <div class="session-energy">@Kwh(_status.SessionEnergyWh)</div>
+                        <p class="muted session-energy-note">
+                            into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {carSoc:F0}%" : "")
+                        </p>
+                    }
                     <dl class="session-facts">
                         <dt>Charge mode</dt><dd>@_status.Mode</dd>
                         <dt>Control state</dt><dd>@_status.State</dd>
@@ -221,7 +245,11 @@ else
                 }
             </section>
         </aside>
-    </div>
+
+        @* The car and the forecast stay in the main column's width, with the side cards running on
+           beside them on a desktop: at the overview's full width a five-column table spreads into
+           islands of figures. After the cards on a phone. *@
+        <div class="overview-lower">
 
     <h2>Vehicle</h2>
 
@@ -378,6 +406,9 @@ else
         day's shape are different things, and this is the total.
     </p>
 
+        </div>
+    </div>
+
     @* What each figure means, kept on the page (#255): the strip above has no room for a sentence under
        every number, and these are the sentences README's entity table is drawn from. *@
     <details class="diagnostics glossary">
@@ -390,7 +421,7 @@ else
             <dt>Solar surplus</dt>
             <dd>PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Shown only while the selected mode decides on surplus.</dd>
             <dt>House</dt>
-            <dd>What the house is drawing apart from the car: solar plus grid import, less what the battery takes and the car draws. The same residual the Energy page calls House.</dd>
+            <dd>What the house is drawing apart from the car: solar plus grid import, less what the battery takes and the car draws. The same residual the Energy page calls House. A dash when the sum comes out below zero: the grid meter does not see every phase, so while the car charges part of its load can be missing from it.</dd>
             <dt>Battery SOC</dt>
             <dd>Home battery state of charge as the inverter reports it.</dd>
             <dt>Battery power</dt>
@@ -553,7 +584,7 @@ else
     /// <summary>The day so far, summed from the energy monitor's quarter hours.</summary>
     private sealed record TodayTotals(
         double SolarKwh, double HouseKwh, double BatteryInKwh, double BatteryOutKwh,
-        double EvKwh, double ImportKwh, double ExportKwh)
+        double EvKwh, double ImportKwh, double ExportKwh, int Count)
     {
         public static TodayTotals From(IReadOnlyList<EnergyInterval> intervals) => new(
             intervals.Sum(i => i.SolarKwh),
@@ -562,14 +593,17 @@ else
             intervals.Sum(i => i.BatteryDischargeKwh),
             intervals.Sum(i => i.EvKwh),
             intervals.Sum(i => i.GridImportKwh),
-            intervals.Sum(i => i.GridExportKwh));
+            intervals.Sum(i => i.GridExportKwh),
+            intervals.Count);
     }
 
+    // Nothing recorded yet today (a fresh install, or the first quarter hour after midnight) leaves
+    // the line off rather than printing a row of zeros that reads as a dark day.
     private string Today(Func<TodayTotals, double> pick) =>
-        _today is null ? "" : $"{pick(_today):F1} kWh today";
+        _today is not { Count: > 0 } ? "" : $"{pick(_today):F1} kWh";
 
     private string TodayInOut(Func<TodayTotals, double> into, Func<TodayTotals, double> outOf, string inWord, string outWord) =>
-        _today is null ? "" : $"{into(_today):F1} {inWord} · {outOf(_today):F1} {outWord} kWh today";
+        _today is not { Count: > 0 } ? "" : $"{into(_today):F1} {inWord} · {outOf(_today):F1} {outWord}";
 
     // The house apart from the car, from the same live readings the figures beside it show: what the
     // roof makes and the grid brings in, less what the battery takes and the car draws. The Energy
@@ -723,6 +757,9 @@ else
         VehicleFormatting.Age(vehicle, Time.GetUtcNow());
 
     private static string Watts(double watts) => $"{watts:F0} W";
+
+    // The strip's figures: kilowatts without a sign, since the word under each says which way it flows.
+    private static string Kw(double watts) => $"{Math.Abs(watts) / 1000:0.0} kW";
 
     private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
 

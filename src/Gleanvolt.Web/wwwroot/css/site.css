@@ -206,7 +206,7 @@ body {
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-body);
-    font-size: 16px;
+    font-size: 15px;
     line-height: 1.6;
     font-variant-numeric: lining-nums;
     -webkit-font-smoothing: antialiased;
@@ -314,7 +314,7 @@ textarea {
     align-items: center;
     gap: var(--space-2);
     font-family: var(--font-display);
-    font-size: 1.6rem;
+    font-size: 1.45rem;
     line-height: 1;
     color: var(--ink);
     white-space: nowrap;
@@ -413,7 +413,7 @@ textarea {
     }
 
     .brand {
-        font-size: 1.4rem;
+        font-size: 1.3rem;
     }
 
     .site {
@@ -551,7 +551,7 @@ textarea {
 }
 
 h1 {
-    font-size: 2.3rem;
+    font-size: 1.9rem;
     margin: 0 0 var(--space-4);
 }
 
@@ -693,7 +693,7 @@ h1 {
 
 .stat .value {
     font-family: var(--font-display);
-    font-size: 2rem;
+    font-size: 1.55rem;
     line-height: 1.15;
 }
 
@@ -767,7 +767,7 @@ h1 {
 }
 
 .sign-in h1 {
-    font-size: 2.6rem;
+    font-size: 2.2rem;
     margin: var(--space-2) 0 0;
 }
 
@@ -865,7 +865,7 @@ h1 {
 }
 
 .controls h2 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     margin: 0 0 var(--space-3);
 }
 
@@ -1278,7 +1278,7 @@ h1 {
     browser's default near-h1. .controls h2 keeps its own smaller rule, being a card title.
 */
 h2 {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
     margin: var(--space-6) 0 var(--space-3);
 }
 
@@ -1288,7 +1288,7 @@ h2 {
     reads backwards on the one page that has both.
 */
 h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     margin: var(--space-5) 0 var(--space-2);
 }
 
@@ -1705,26 +1705,38 @@ button.link:hover {
     gap: var(--space-5) var(--space-6);
 }
 
+/* The side cards span both rows on a desktop, so the car and the forecast under the main column run
+   on beside them rather than below everything at full width. */
 @media (min-width: 64rem) {
     .overview {
         grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-areas: "main side" "lower side";
+        grid-template-rows: auto 1fr;
         align-items: start;
     }
+
+    .overview-main { grid-area: main; }
+    .overview-side { grid-area: side; }
+    .overview-lower { grid-area: lower; }
+}
+
+.overview-lower > h2:first-child {
+    margin-top: 0;
 }
 
 /* What is happening and why, in words: the display face at reading size, the first thing on the page
    after its name. */
 .headline {
     font-family: var(--font-display);
-    font-size: 1.65rem;
-    line-height: 1.35;
+    font-size: 1.3rem;
+    line-height: 1.4;
     margin: 0 0 var(--space-5);
-    max-width: 46ch;
+    max-width: 52ch;
 }
 
 @media (max-width: 40rem) {
     .headline {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
     }
 }
 
@@ -1765,7 +1777,7 @@ button.link:hover {
 
 .figure-now {
     font-family: var(--font-display);
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     line-height: 1.2;
     font-variant-numeric: lining-nums tabular-nums;
     white-space: nowrap;
@@ -1785,7 +1797,8 @@ button.link:hover {
 }
 
 .figures-note {
-    font-size: 0.85rem;
+    margin: var(--space-2) 0 0;
+    font-size: 0.8rem;
 }
 
 @media (max-width: 40rem) {
@@ -1864,7 +1877,7 @@ a.seg-opt {
 }
 
 .overview-side .card h2 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     margin: 0 0 var(--space-3);
 }
 
@@ -1903,7 +1916,7 @@ a.seg-opt {
 
 .session-energy {
     font-family: var(--font-display);
-    font-size: 2.6rem;
+    font-size: 1.9rem;
     line-height: 1.1;
     font-variant-numeric: lining-nums tabular-nums;
 }

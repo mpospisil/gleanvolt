@@ -68,14 +68,13 @@ public class OverviewNarrativeTests
     }
 
     [Fact]
-    public void Describes_the_house_from_the_live_readings()
+    public void Leaves_the_house_to_the_figures()
     {
-        // Statuses.Sample: 1200 W of sun, the battery at 64% taking 400 W, 150 W exported.
+        // The strip under the headline carries the roof, the battery and the grid; the headline is
+        // only about the car.
         var text = Describe(Statuses.Sample(Now));
 
-        Assert.EndsWith(
-            "The roof is making 1.2 kW; the home battery is at 64% and charging at 0.4 kW, and 0.2 kW is going out to the grid.",
-            text);
+        Assert.Equal("Nothing is charging, and no car is plugged in.", text);
     }
 
     [Fact]

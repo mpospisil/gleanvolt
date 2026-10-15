@@ -338,14 +338,17 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("Solar", page.Markup);
-        Assert.Contains("3200 W", page.Markup);
-        Assert.Contains("1800 W", page.Markup);
-        Assert.Contains("72%", page.Markup);
-        Assert.Contains("450 W", page.Markup);
-        Assert.Contains("-300 W", page.Markup);
-        Assert.Contains("2760 W", page.Markup);
-        Assert.Contains("12 A", page.Markup);
+        // The strip shows kilowatts with the direction as a word (#255); the session card keeps watts
+        // and amps, which is where the precision is read.
+        Assert.Contains("3.2 kW", page.Find(".figure.solar").TextContent);
+        Assert.Contains("surplus 1.8 kW", page.Find(".figure.solar").TextContent);
+        Assert.Contains("72%", page.Find(".figure.battery").TextContent);
+        Assert.Contains("0.5 kW", page.Find(".figure.battery").TextContent);
+        Assert.Contains("charging", page.Find(".figure.battery").TextContent);
+        Assert.Contains("0.3 kW", page.Find(".figure.grid-flow").TextContent);
+        Assert.Contains("exporting", page.Find(".figure.grid-flow").TextContent);
+        Assert.Contains("2760 W", page.Find("#this-session").TextContent);
+        Assert.Contains("12 A", page.Find("#this-session").TextContent);
         Assert.Contains("Charging", page.Markup);
         Assert.Contains("Yes", page.Markup);
     }
@@ -450,8 +453,8 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         var solar = page.Find(".figure.solar").TextContent;
-        Assert.Contains("3200 W", solar);
-        Assert.Contains("forecast 4100 W", solar);
+        Assert.Contains("3.2 kW", solar);
+        Assert.Contains("forecast 4.1 kW", solar);
     }
 
     [Fact]
@@ -467,7 +470,7 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("forecast 0 W", page.Find(".figure.solar").TextContent);
+        Assert.Contains("forecast 0.0 kW", page.Find(".figure.solar").TextContent);
     }
 
     [Fact]
@@ -485,7 +488,40 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("800 W", page.Find(".figure.house").TextContent);
+        Assert.Contains("0.8 kW", page.Find(".figure.house").TextContent);
+    }
+
+    [Fact]
+    public void Shows_no_house_figure_when_the_sum_comes_out_below_zero()
+    {
+        // The grid meter is blind on one phase, so while the car draws, its load can be missing from
+        // the sum and the house works out negative. That is a measurement gap, not a house exporting.
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            SolarPowerWatts = 1351,
+            GridPowerWatts = 2738,
+            BatteryPowerWatts = -74,
+            EvChargerPowerWatts = 4589,
+        });
+
+        var page = Render<Dashboard>();
+
+        var house = page.Find(".figure.house").TextContent;
+        Assert.Contains("—", house);
+        Assert.Contains("not measurable", house);
+        Assert.DoesNotContain("-", house);
+    }
+
+    [Fact]
+    public void Leads_the_session_card_with_the_power_while_no_energy_is_counted()
+    {
+        // A car the charger started on plug-in draws power with nothing counted: a large 0.0 kWh would
+        // read as broken.
+        _holder.Set(Statuses.Sample(_time.Now) with { CarConnected = true, EvChargerPowerWatts = 4589 });
+
+        var page = Render<Dashboard>();
+
+        Assert.Equal("4.6 kW", page.Find(".session-energy").TextContent.Trim());
     }
 
     [Fact]
@@ -501,9 +537,9 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        page.WaitForAssertion(() => Assert.Contains("3.2 kWh today", page.Find(".figure.solar").TextContent));
-        Assert.Contains("0.8 kWh today", page.Find(".figure.ev").TextContent);
-        Assert.Contains("0.2 in · 0.4 out kWh today", page.Find(".figure.grid-flow").TextContent);
+        page.WaitForAssertion(() => Assert.Contains("3.2 kWh", page.Find(".figure.solar").TextContent));
+        Assert.Contains("0.8 kWh", page.Find(".figure.ev").TextContent);
+        Assert.Contains("0.2 in · 0.4 out", page.Find(".figure.grid-flow").TextContent);
         Assert.DoesNotContain("needs the energy monitor", page.Markup);
     }
 
@@ -517,7 +553,21 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         Assert.Contains("needs the energy monitor", page.Markup);
-        Assert.DoesNotContain("kWh today", page.Markup);
+        Assert.DoesNotContain("kWh since midnight", page.Markup);
+    }
+
+    [Fact]
+    public void Leaves_today_off_while_nothing_is_recorded_yet()
+    {
+        // The monitor is on but has no quarter hour for today yet: no line, rather than zeros that
+        // read as a dark day -- and no claim that the monitor is off.
+        Services.AddSingleton<IEnergyIntervalStore>(new FakeEnergyIntervalStore());
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.DoesNotContain("kWh since midnight", page.Markup);
+        Assert.DoesNotContain("needs the energy monitor", page.Markup);
     }
 
     [Fact]
