@@ -872,7 +872,15 @@ public static class GleanvoltHostingExtensions
             // Static assets come from Gleanvolt.Web's wwwroot, served at /_content/Gleanvolt.Web/... Reads the
             // manifest UseStaticWebAssets() above wires up, which is why this stays here rather than moving
             // into WebUiHost with everything else -- a test host has no such manifest.
-            app.MapStaticAssets();
+            //
+            // The manifest path is explicit rather than left to MapStaticAssets()'s own default: that default
+            // resolves against AppContext.BaseDirectory, which -- like Environment.ProcessPath -- is the path a
+            // single-file publish was *invoked as*, not the resolved path, when invoked through a reparse-point
+            // symlink such as WinGet's PortableCommandAlias. ContentRootPath is already correct by this point
+            // (Program.cs resolves the real directory before the host is even built), so anchor to that instead.
+            app.MapStaticAssets(Path.Combine(
+                app.Environment.ContentRootPath,
+                $"{System.Reflection.Assembly.GetEntryAssembly()!.GetName().Name}.staticwebassets.endpoints.json"));
             app.MapGleanvoltWebUi(web);
         }
 
