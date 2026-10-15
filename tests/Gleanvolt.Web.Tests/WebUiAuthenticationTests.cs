@@ -234,7 +234,7 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
 
         Assert.Contains("Home Roof", html);
-        Assert.Contains("<title>Dashboard — Home Roof</title>", html);
+        Assert.Contains("<title>Overview — Home Roof</title>", html);
     }
 
     [Fact]
@@ -262,6 +262,21 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
 
         Assert.Contains("href=\"/charging-plan\"", html);
         Assert.Contains("id=\"menu-toggle\"", html);
+    }
+
+    [Fact]
+    public async Task Names_seven_links_with_settings_in_place_of_pv_system_and_health()
+    {
+        // #255's navigation: Overview for Dashboard, and the two pages an owner opens least behind one
+        // Settings link.
+        var client = await StartAsync(new WebOptions { Enabled = true, RequireAuthentication = false });
+
+        var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
+
+        var links = System.Text.RegularExpressions.Regex.Matches(html, "<nav>(.*?)</nav>", System.Text.RegularExpressions.RegexOptions.Singleline)[0].Groups[1].Value;
+        Assert.Equal(
+            ["Overview", "Charging plan", "Sessions", "Energy", "Forecast", "Car", "Settings"],
+            System.Text.RegularExpressions.Regex.Matches(links, ">([^<]+)</a>").Select(m => m.Groups[1].Value));
     }
 
     [Fact]
