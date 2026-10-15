@@ -25,7 +25,7 @@ package.
 | [uPlot](https://github.com/leeoniya/uPlot) (vendored) | 1.6.31 | MIT | 2022 Leon Sorokin |
 | [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant) (vendored font) | Fontsource 5.3.0 | OFL-1.1 | 2015 The Cormorant Project Authors |
 | [Lora](https://github.com/cyrealtype/Lora-Cyrillic) (vendored font) | Fontsource 5.3.0 | OFL-1.1 | 2011 The Lora Project Authors, Reserved Font Name "Lora" |
-| [Lucide](https://lucide.dev/) (the `sun` icon, inlined) | lucide-static 1.57.0 | ISC | 2026 Lucide Icons and Contributors |
+| [Lucide](https://lucide.dev/) (the `sun` and `chevron-down` icons, inlined) | lucide-static 1.57.0 | ISC | 2026 Lucide Icons and Contributors |
 | [Serilog](https://serilog.net/) | 4.3.0 | Apache-2.0 | Serilog Contributors |
 | [Serilog.Extensions.Hosting](https://github.com/serilog/serilog-extensions-hosting) | 10.0.0 | Apache-2.0 | Serilog Contributors |
 | [Serilog.Extensions.Logging](https://github.com/serilog/serilog-extensions-logging) | 10.0.0 | Apache-2.0 | Serilog Contributors |
@@ -44,7 +44,8 @@ The two fonts are vendored the same way, unmodified, under `src/Gleanvolt.Web/ww
 each folder with its SIL Open Font License; `VENDORED.md` there records the source. They are bundled
 with the software, not sold on their own, as the OFL requires.
 
-Lucide's `sun` icon is copied inline as SVG markup into `src/Gleanvolt.Web/Components/SunMark.razor`. Lucide's
+Lucide's `sun` icon is copied inline as SVG markup into `src/Gleanvolt.Web/Components/SunMark.razor`, and
+its `chevron-down` path into `wwwroot/css/site.css` as the select arrow. Lucide's
 ISC licence:
 
 > Permission to use, copy, modify, and/or distribute this software for any purpose with or without
