@@ -23,6 +23,9 @@ package.
 | [Microsoft.Extensions.DependencyModel](https://dot.net/) | 10.0.0 | MIT | Microsoft Corporation |
 | [Microsoft.AspNetCore.App.Internal.Assets](https://asp.net/) | 10.0.10 | MIT | Microsoft Corporation |
 | [uPlot](https://github.com/leeoniya/uPlot) (vendored) | 1.6.31 | MIT | 2022 Leon Sorokin |
+| [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant) (vendored font) | Fontsource 5.3.0 | OFL-1.1 | 2015 The Cormorant Project Authors |
+| [Lora](https://github.com/cyrealtype/Lora-Cyrillic) (vendored font) | Fontsource 5.3.0 | OFL-1.1 | 2011 The Lora Project Authors, Reserved Font Name "Lora" |
+| [Lucide](https://lucide.dev/) (the `sun` icon, inlined) | lucide-static 1.57.0 | ISC | 2026 Lucide Icons and Contributors |
 | [Serilog](https://serilog.net/) | 4.3.0 | Apache-2.0 | Serilog Contributors |
 | [Serilog.Extensions.Hosting](https://github.com/serilog/serilog-extensions-hosting) | 10.0.0 | Apache-2.0 | Serilog Contributors |
 | [Serilog.Extensions.Logging](https://github.com/serilog/serilog-extensions-logging) | 10.0.0 | Apache-2.0 | Serilog Contributors |
@@ -36,6 +39,23 @@ package.
 
 uPlot is vendored rather than restored — the files and their own `LICENSE` live in
 `src/Gleanvolt.Web/wwwroot/lib/uplot/`, and `VENDORED.md` there records why and how to upgrade it.
+
+The two fonts are vendored the same way, unmodified, under `src/Gleanvolt.Web/wwwroot/lib/fonts/`,
+each folder with its SIL Open Font License; `VENDORED.md` there records the source. They are bundled
+with the software, not sold on their own, as the OFL requires.
+
+Lucide's `sun` icon is copied inline as SVG markup into `Components/Layout/MainLayout.razor`. Lucide's
+ISC licence:
+
+> Permission to use, copy, modify, and/or distribute this software for any purpose with or without
+> fee is hereby granted, provided that the above copyright notice and this permission notice appear
+> in all copies.
+>
+> THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE
+> INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE
+> LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+> TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## Derived material: the Modbus register maps
 

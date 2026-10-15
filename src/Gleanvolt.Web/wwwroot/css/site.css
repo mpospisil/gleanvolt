@@ -2,52 +2,198 @@
    Served from the library, at /_content/Gleanvolt.Web/css/site.css. Nothing is fetched from a CDN --
    the UI has to render during an internet outage, which is exactly when a locally controlled
    system is worth looking at.
+
+   The look is the Classical design system (issue #255): Cormorant Garamond headings over Lora body
+   text, a near-white ground and dark ink, one gold accent drawn as strokes and rules rather than as
+   fills. Its tokens and component classes are merged in here rather than linked as a second
+   stylesheet, so there is one set of base styles, not two fighting over the same elements.
 */
+
+/* The two faces, vendored under lib/fonts (see VENDORED.md there). Variable weight, latin and
+   latin-ext only -- the second carries Czech, which is half of what a site name here is written in. */
+@font-face {
+    font-family: "Cormorant Garamond";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 300 700;
+    src: url("../lib/fonts/cormorant-garamond/cormorant-garamond-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Cormorant Garamond";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 300 700;
+    src: url("../lib/fonts/cormorant-garamond/cormorant-garamond-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Lora";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url("../lib/fonts/lora/lora-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Lora";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url("../lib/fonts/lora/lora-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Lora";
+    font-style: italic;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url("../lib/fonts/lora/lora-latin-ext-wght-italic.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Lora";
+    font-style: italic;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url("../lib/fonts/lora/lora-latin-wght-italic.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 :root {
     color-scheme: light dark;
-    --bg: #f6f7f9;
-    --panel: #ffffff;
-    --ink: #1c1f23;
-    --muted: #6b7280;
-    --line: #e3e6ea;
-    --accent: #0b6b3a;
-    --amber: #f5b400;
+
+    /* Classical's own tokens. The accent is one gold in a tonal ramp; 500 is the stroke colour, and
+       only 3:1 against the ground, so text set in the accent uses 700 (--accent-ink below). */
+    --color-accent-100: #f6eddf;
+    --color-accent-200: #ecd8b8;
+    --color-accent-300: #dcbb88;
+    --color-accent-400: #c99d5a;
+    --color-accent-500: #b68235;
+    --color-accent-600: #9a6c2a;
+    --color-accent-700: #7c5622;
+    --color-accent-800: #5e411a;
+    --color-accent-900: #412d12;
+
+    --color-neutral-50: #f3f2f2;
+    --color-neutral-100: #e9e7e5;
+    --color-neutral-200: #dcd9d6;
+    --color-neutral-300: #c4c0bb;
+    --color-neutral-400: #a29d97;
+    --color-neutral-500: #7d7872;
+    --color-neutral-600: #5f5b56;
+    --color-neutral-700: #46433f;
+    --color-neutral-800: #302e2b;
+    --color-neutral-900: #201f1d;
+
+    --font-display: "Cormorant Garamond", "Garamond", "Times New Roman", serif;
+    --font-body: "Lora", "Georgia", "Times New Roman", serif;
+
+    /* An airy scale at 1.15x density: 4.6px steps rather than 4px. */
+    --space-1: 0.2875rem;
+    --space-2: 0.575rem;
+    --space-3: 0.8625rem;
+    --space-4: 1.15rem;
+    --space-5: 1.725rem;
+    --space-6: 2.3rem;
+    --space-7: 3.45rem;
+    --space-8: 4.6rem;
+
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 7px;
+
+    --shadow-1: 0 1px 2px rgb(32 31 29 / 0.05);
+    --shadow-2: 0 6px 18px rgb(32 31 29 / 0.08);
+
+    /*
+        The names the rest of this file and charts.js read. They predate Classical and are kept, each
+        pointed at a Classical value, because the uPlot charts look these up by name at render time
+        and a variable that quietly disappears breaks a chart without an error anywhere.
+
+        --panel is the ground itself: a Classical card is a border with no fill. It stays a variable
+        because sticky table headers and the phone menu still need something opaque to paint with.
+    */
+    --bg: var(--color-neutral-50);
+    --panel: var(--color-neutral-50);
+    --field: #fbfaf9;
+    --ink: var(--color-neutral-900);
+    --muted: var(--color-neutral-600);
+    --line: var(--color-neutral-200);
+    --rule: var(--color-neutral-400);
+    --accent: #b68235;
+    --accent-ink: var(--color-accent-700);
+    --accent-wash: var(--color-accent-100);
+    --amber: #c98f1a;
+    --danger: #a63d2c;
     /*
         The energy chart's series (#173). Named after what they carry rather than after the colour,
         so the day chart, the swatches and any later view can't drift apart -- and so the dark theme
         below can lift each one without a second palette living in JavaScript.
+
+        The plan timeline can be gold and ink alone, but the energy and session charts draw up to
+        seven series at once, so these stay separable hues -- chosen to sit beside the gold, earthy and
+        a little desaturated, rather than dropped for a monochrome set. Six-digit hex on purpose:
+        charts.js appends an alpha byte for its fills.
     */
-    --solar: #f5b400;
-    --grid-flow: #6b7280;
-    --ev: #b45309;
-    --house: #7c3aed;
+    --solar: #d9a514;
+    --grid-flow: #7d7872;
+    /* The house battery. It used to borrow --accent, which was green; with the accent now gold it
+       would read as a second solar line, so it has a colour of its own. */
+    --battery: #5f8a3a;
+    --ev: #b4532a;
+    --house: #6d5a9e;
     /* The car's own SOC on the session chart (#175) -- the charger's power is already --ev, and the
        two are different things: what the wall delivered, and what the battery on the other end says. */
-    --vehicle: #2563eb;
+    --vehicle: #3b6ea5;
     /* The surplus the controller decided on, and the plan's SOC floor beside the SOC it judges (#223).
        Each gets a colour of its own: --grid-flow and --muted are the same grey, so a surplus line in
        either would read as a second grid trace, and a floor in --ev would read as charger power. */
-    --surplus: #0891b2;
-    --soc-floor: #9333ea;
+    --surplus: #1f8a8f;
+    --soc-floor: #a3447c;
 }
 
+/*
+    Classical is light only, so the dark theme is derived: a warm near-black ground under warm off-white
+    ink, the neutral ramp turned over, and the gold lifted a step -- its readme's own rule for dark is
+    that pressed states use accent-400, and text in the accent goes one lighter again to keep its
+    contrast.
+*/
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #16181c;
-        --panel: #1f2227;
-        --ink: #e8eaed;
-        --muted: #9aa2ad;
-        --line: #2c3138;
-        --accent: #4ade80;
-        --amber: #f7c948;
-        --solar: #f7c948;
-        --grid-flow: #9aa2ad;
-        --ev: #fb923c;
-        --house: #a78bfa;
-        --vehicle: #60a5fa;
-        --surplus: #22d3ee;
-        --soc-floor: #c084fc;
+        --color-neutral-50: #1a1917;
+        --color-neutral-100: #23221f;
+        --color-neutral-200: #36332f;
+        --color-neutral-300: #4a4742;
+        --color-neutral-400: #6a665f;
+        --color-neutral-500: #8a857e;
+        --color-neutral-600: #a8a39b;
+        --color-neutral-700: #c4bfb7;
+        --color-neutral-800: #dcd8d1;
+        --color-neutral-900: #ece9e4;
+
+        --field: #211f1d;
+        --accent: #c99d5a;
+        --accent-ink: var(--color-accent-300);
+        --accent-wash: #2c2418;
+        --amber: #e0b04a;
+        --danger: #e0826f;
+        --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
+        --shadow-2: 0 6px 18px rgb(0 0 0 / 0.45);
+
+        --solar: #e8bd4a;
+        --grid-flow: #a8a39b;
+        --battery: #93bf6a;
+        --ev: #e07f55;
+        --house: #a493d4;
+        --vehicle: #7ea6d6;
+        --surplus: #5bbfc0;
+        --soc-floor: #d27aae;
     }
 }
 
@@ -59,55 +205,169 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-body);
     font-size: 16px;
-    line-height: 1.5;
+    line-height: 1.6;
+    font-variant-numeric: lining-nums;
+    -webkit-font-smoothing: antialiased;
 }
 
+/* Figures are tabular wherever they are figures: a column of kilowatts lines up, and a live value
+   ticking from 9 to 10 doesn't shuffle the words after it. Not on the body as a whole -- Lora's tnum
+   also widens the word space at bold weights, which opens a visible gap in every bold label. */
+td,
+dd,
+time,
+input,
+.stat .value,
+.split-legend {
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Buttons and fields the rules below don't name still look like Classical's, not the browser's.
+   :where() keeps these at zero specificity, so every named button or field rule wins outright. */
+:where(button) {
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    font-size: inherit;
+    cursor: pointer;
+}
+
+:where(button):hover {
+    border-color: var(--accent);
+}
+
+:where(button):disabled {
+    color: var(--color-neutral-400);
+    border-color: var(--line);
+    cursor: default;
+}
+
+:where(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+    background: var(--field);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+}
+
+/* uPlot's legend is HTML, so it takes the page's face here; the axes are canvas and take it from
+   charts.js. */
+.u-legend {
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+}
+
+.u-legend th {
+    font-weight: 400;
+}
+
+/* Large text is set in the display face at its regular weight, never bold. */
+h1,
+h2,
+h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0.005em;
+}
+
+a {
+    color: var(--ink);
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+}
+
+a:hover {
+    color: var(--accent-ink);
+}
+
+/* Form controls don't inherit the page's face by default; in a serif page a sans-serif button reads
+   as a widget from another site. */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* The header, as Classical's .nav: the name in the display face, the links small and quiet, and the
+   current page underlined in gold rather than recoloured -- the accent as a stroke, not as text. */
 .topbar {
     position: relative;
-    background: var(--panel);
+    background: var(--bg);
     border-bottom: 1px solid var(--line);
-    padding: 0.75rem 1.25rem;
+    padding: var(--space-3) var(--space-5);
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: var(--space-5);
 }
 
 .brand {
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+/* The sun mark beside the name: a stroke icon, so it is drawn in the accent like any other rule. */
+.brand svg {
+    width: 1.25rem;
+    height: 1.25rem;
     color: var(--accent);
+    flex: 0 0 auto;
 }
 
 /* The installation's name, beside the product's. Quieter than the brand: it identifies the page
    rather than announcing it, and on a single-system install it is simply background. */
 .site {
     color: var(--muted);
-    font-size: 0.9rem;
-    margin-left: -1rem;
+    font-style: italic;
+    font-size: 0.95rem;
+    margin-left: calc(-1 * var(--space-3));
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--line);
 }
 
 .menu {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: var(--space-5);
     flex: 1;
 }
 
 .topbar nav {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-4);
     flex: 1;
+    justify-content: flex-end;
 }
 
 .topbar nav a {
-    color: var(--ink);
+    color: var(--muted);
     text-decoration: none;
+    font-size: 0.95rem;
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid transparent;
 }
 
-.topbar nav a:hover,
+.topbar nav a:hover {
+    color: var(--ink);
+}
+
 .topbar nav a.active {
-    color: var(--accent);
+    color: var(--ink);
+    border-bottom-color: var(--accent);
 }
 
 .signout {
@@ -116,16 +376,15 @@ body {
 
 .signout button {
     background: none;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    color: var(--muted);
-    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: var(--space-1) var(--space-3);
     cursor: pointer;
     font-size: 0.9rem;
 }
 
 .signout button:hover {
-    color: var(--ink);
     border-color: var(--accent);
 }
 
@@ -144,16 +403,20 @@ body {
     display: none;
 }
 
-/* Eight links, the brand and Sign out need about 62rem in one row; below that the links fold behind
-   the button into a panel under the bar, one per row with a thumb-sized target. */
-@media (max-width: 64rem) {
+/* Eight links, the brand and Sign out need about 64rem in one row at this face's width; below that
+   the links fold behind the button into a panel under the bar, one per row with a thumb-sized
+   target. */
+@media (max-width: 68rem) {
     .topbar {
-        gap: 1rem;
-        padding: 0.6rem 1rem;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-4);
+    }
+
+    .brand {
+        font-size: 1.4rem;
     }
 
     .site {
-        margin-left: -0.5rem;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -163,11 +426,11 @@ body {
     .menu-button {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--space-2);
         margin-left: auto;
-        padding: 0.35rem 0.75rem;
-        border: 1px solid var(--line);
-        border-radius: 6px;
+        padding: var(--space-1) var(--space-3);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-sm);
         color: var(--ink);
         font-size: 0.95rem;
         cursor: pointer;
@@ -181,7 +444,6 @@ body {
 
     .menu-toggle:checked + .menu-button {
         border-color: var(--accent);
-        color: var(--accent);
     }
 
     /* Three bars drawn from one element, crossing into an X while the menu is open. */
@@ -190,7 +452,7 @@ body {
     .menu-icon::after {
         display: block;
         width: 1.1rem;
-        height: 2px;
+        height: 1.5px;
         border-radius: 1px;
         background: currentColor;
         transition: transform 0.15s ease, background-color 0.15s ease;
@@ -239,8 +501,8 @@ body {
         gap: 0;
         background: var(--panel);
         border-bottom: 1px solid var(--line);
-        box-shadow: 0 8px 16px rgb(0 0 0 / 0.12);
-        padding: 0.25rem 0 0.75rem;
+        box-shadow: var(--shadow-2);
+        padding: var(--space-1) 0 var(--space-3);
     }
 
     .menu-toggle:checked ~ .menu {
@@ -253,48 +515,55 @@ body {
     }
 
     .topbar nav a {
-        padding: 0.7rem 1.25rem;
-        border-left: 3px solid transparent;
+        padding: var(--space-3) var(--space-5);
+        border-bottom: none;
+        border-left: 2px solid transparent;
+        font-size: 1rem;
     }
 
     .topbar nav a.active {
         border-left-color: var(--accent);
-        font-weight: 600;
     }
 
     .signout {
-        margin: 0.5rem 1.25rem 0;
-        padding-top: 0.75rem;
+        margin: var(--space-2) var(--space-5) 0;
+        padding-top: var(--space-3);
         border-top: 1px solid var(--line);
     }
 
     .signout button {
         width: 100%;
-        padding: 0.55rem;
+        padding: var(--space-2);
         font-size: 1rem;
     }
 }
 
 .content {
-    max-width: 46rem;
+    max-width: 48rem;
     margin: 0 auto;
-    padding: 1.5rem 1.25rem;
+    padding: var(--space-6) var(--space-5) var(--space-7);
+}
+
+@media (max-width: 40rem) {
+    .content {
+        padding: var(--space-5) var(--space-4) var(--space-6);
+    }
 }
 
 h1 {
-    font-size: 1.4rem;
-    margin: 0 0 1rem;
+    font-size: 2.3rem;
+    margin: 0 0 var(--space-4);
 }
 
 .facts {
     display: grid;
     grid-template-columns: minmax(8rem, max-content) 1fr;
-    gap: 0.4rem 1.5rem;
+    gap: var(--space-2) var(--space-5);
     margin: 0;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
 }
 
 .facts dt {
@@ -320,7 +589,7 @@ h1 {
     margin: 0;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 1rem 1.25rem;
 }
 
@@ -362,7 +631,7 @@ h1 {
     margin: 1.5rem 0;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 0 1.25rem;
 }
 
@@ -386,7 +655,7 @@ h1 {
 /* The sections inside are h3 under the disclosure's own weight, and the first must not push the
    panel open with a heading margin the border already spaces. */
 .diagnostics h3 {
-    font-size: 1rem;
+    font-size: 1.2rem;
     margin: 1.5rem 0 0.75rem;
 }
 
@@ -403,24 +672,29 @@ h1 {
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-    gap: 1rem;
+    gap: var(--space-4);
 }
 
 .stat {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
 }
 
+/* A label over a figure: the label small and spaced like a running head, the figure in the display
+   face -- large text, so regular weight. */
 .stat .label {
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .stat .value {
-    font-size: 1.4rem;
-    font-variant-numeric: tabular-nums;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    line-height: 1.15;
 }
 
 .stat .hint {
@@ -431,12 +705,13 @@ h1 {
 }
 
 .login-card {
-    max-width: 20rem;
-    margin: 3rem auto 0;
+    max-width: 22rem;
+    margin: var(--space-7) auto 0;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-5) var(--space-5) var(--space-4);
 }
 
 .login-card label {
@@ -449,59 +724,64 @@ h1 {
 .login-card input {
     display: block;
     width: 100%;
-    margin-top: 0.35rem;
-    padding: 0.5rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    background: var(--field);
     color: var(--ink);
     font-size: 1rem;
 }
 
+/* The primary action: outlined in gold, never filled with it. */
 .login-card button {
     width: 100%;
-    padding: 0.6rem;
-    border: none;
-    border-radius: 6px;
-    background: var(--accent);
-    color: var(--panel);
+    padding: var(--space-2);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink);
     font-size: 1rem;
     cursor: pointer;
 }
 
+.login-card button:hover {
+    background: var(--accent-wash);
+}
+
 .error {
-    color: #d64545;
+    color: var(--danger);
 }
 
 /* The one feed state that needs a person (#140). A band rather than a line of red text: it is shown
    above whatever page you are on, and it has to survive being scrolled past on the dashboard, where
    the same sentence already sits inside the vehicle card. */
 .alert {
-    margin-bottom: 1.25rem;
-    padding: 0.75rem 1rem;
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) var(--space-4);
     background: var(--panel);
-    border: 1px solid #d64545;
-    border-left-width: 4px;
-    border-radius: 6px;
+    border: 1px solid var(--danger);
+    border-left-width: 3px;
+    border-radius: var(--radius-sm);
     color: var(--ink);
 }
 
 .alert a {
     margin-left: 0.5rem;
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .controls {
-    margin-top: 1.5rem;
+    margin-top: var(--space-5);
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
 }
 
 .controls h2 {
-    font-size: 1.1rem;
-    margin: 0 0 1rem;
+    font-size: 1.5rem;
+    margin: 0 0 var(--space-3);
 }
 
 .control {
@@ -523,10 +803,10 @@ h1 {
 .control select,
 .control input[type="datetime-local"],
 .control input[type="number"] {
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    background: var(--field);
     color: var(--ink);
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
@@ -537,20 +817,20 @@ h1 {
 }
 
 /* The affirmative action of a tab -- the button that starts that mode, and Targeted's "Activate" --
-   in the accent the nav already uses rather than a fourth colour. A Cancel sits beside it as
-   .secondary, like every other pairing. */
+   outlined in the gold the nav underlines with, Classical's primary button: the accent as a stroke,
+   never a fill. A Cancel sits beside it as .secondary, like every other pairing. */
 .control button.primary {
-    background: var(--accent);
+    background: transparent;
     border: 1px solid var(--accent);
-    border-radius: 6px;
-    color: #fff;
-    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: var(--space-1) var(--space-4);
     font-size: 1rem;
     cursor: pointer;
 }
 
 .control button.primary:hover {
-    filter: brightness(0.92);
+    background: var(--accent-wash);
 }
 
 /* What used to be the dashboard's row of four strategy buttons (#89) is now one Off above the tabs
@@ -586,28 +866,28 @@ h1 {
 }
 
 /* The only destructive control in the UI (Health's "Stop service"), so it is the only thing coloured
-   like one -- red enough to read as a warning, still a button rather than an alarm. */
+   like one -- red enough to read as a warning, still a button rather than an alarm. Outlined like
+   the rest, its words in the same red. */
 .control button.danger {
-    background: #d64545;
-    border: 1px solid #d64545;
-    border-radius: 6px;
-    color: #fff;
-    padding: 0.4rem 0.9rem;
+    background: transparent;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    color: var(--danger);
+    padding: var(--space-1) var(--space-4);
     font-size: 1rem;
     cursor: pointer;
 }
 
 .control button.danger:hover {
-    background: #bf3a3a;
-    border-color: #bf3a3a;
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .control button.secondary {
     background: none;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    color: var(--muted);
-    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: var(--space-1) var(--space-4);
     margin-left: 0.5rem;
     font-size: 1rem;
     cursor: pointer;
@@ -649,27 +929,32 @@ h1 {
     font-size: 0.9rem;
 }
 
+/* Classical's table: no box, a firmer rule under the head and a hairline between rows, closed by
+   the same firmer rule underneath. */
 .sessions {
     width: 100%;
     border-collapse: collapse;
     background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    overflow: hidden;
+    border-bottom: 1px solid var(--rule);
 }
 
 .sessions th,
 .sessions td {
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--line);
-    font-variant-numeric: tabular-nums;
+}
+
+.sessions thead th {
+    border-bottom-color: var(--rule);
 }
 
 .sessions th {
     color: var(--muted);
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: 400;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .sessions tbody tr:last-child td {
@@ -678,12 +963,12 @@ h1 {
 
 .sessions a {
     color: var(--ink);
-    text-decoration: none;
-    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
 }
 
 .sessions a:hover {
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .split {
@@ -693,21 +978,21 @@ h1 {
 .split-bar {
     display: flex;
     height: 1.25rem;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     background: var(--line);
 }
 
 .split-bar .solar {
-    background: #f5b400;
+    background: var(--solar);
 }
 
 .split-bar .grid {
-    background: #6b7280;
+    background: var(--grid-flow);
 }
 
 .split-bar .battery {
-    background: var(--accent);
+    background: var(--battery);
 }
 
 .split-legend {
@@ -724,20 +1009,20 @@ h1 {
     display: inline-block;
     width: 0.7rem;
     height: 0.7rem;
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     margin-right: 0.35rem;
 }
 
 .swatch.solar {
-    background: #f5b400;
+    background: var(--solar);
 }
 
 .swatch.grid {
-    background: #6b7280;
+    background: var(--grid-flow);
 }
 
 .swatch.battery {
-    background: var(--accent);
+    background: var(--battery);
 }
 
 .chart-section {
@@ -747,7 +1032,7 @@ h1 {
 .chart {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 1rem;
     height: 280px;
 }
@@ -798,11 +1083,17 @@ h1 {
 
 .energy td,
 .energy th {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.9rem;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.85rem;
+}
+
+/* Lora's figures are wider than a system sans's; a reading like "40 → 41%" must stay on one line. */
+.energy td {
+    white-space: nowrap;
 }
 
 .energy thead th {
+    font-size: 0.75rem;
     position: sticky;
     top: 0;
     background: var(--panel);
@@ -811,7 +1102,7 @@ h1 {
 
 .energy tfoot th,
 .energy tfoot td {
-    border-top: 2px solid var(--line);
+    border-top: 1px solid var(--rule);
     border-bottom: none;
     font-weight: 600;
 }
@@ -855,7 +1146,7 @@ h1 {
     top: 2.4rem;
     text-align: left;
     background: var(--panel);
-    border-top: 2px solid var(--line);
+    border-top: 1px solid var(--rule);
     z-index: 1;
 }
 
@@ -902,8 +1193,8 @@ h1 {
     browser's default near-h1. .controls h2 keeps its own smaller rule, being a card title.
 */
 h2 {
-    font-size: 1.05rem;
-    margin: 1.75rem 0 0.75rem;
+    font-size: 1.6rem;
+    margin: var(--space-6) 0 var(--space-3);
 }
 
 /*
@@ -912,8 +1203,8 @@ h2 {
     reads backwards on the one page that has both.
 */
 h3 {
-    font-size: 0.95rem;
-    margin: 1.5rem 0 0.5rem;
+    font-size: 1.25rem;
+    margin: var(--space-5) 0 var(--space-2);
 }
 
 /*
@@ -938,19 +1229,21 @@ h3 {
     color: var(--muted);
     text-decoration: none;
     border: 1px solid transparent;
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
 .tabs .tab:hover {
     color: var(--ink);
 }
 
+/* The open tab carries a gold rule along its top edge -- the accent as a stroke, where the old style
+   used weight. */
 .tabs .tab.active {
     background: var(--panel);
     border-color: var(--line);
     border-bottom-color: var(--panel);
+    box-shadow: inset 0 2px 0 var(--accent);
     color: var(--ink);
-    font-weight: 600;
 }
 
 .tabs .running {
@@ -969,8 +1262,8 @@ h3 {
     background: var(--panel);
     border: 1px solid var(--line);
     border-top: none;
-    border-radius: 0 0 8px 8px;
-    padding: 1rem 1.25rem 1.25rem;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    padding: var(--space-4) var(--space-5) var(--space-5);
 }
 
 .tab-panel > p:first-child {
@@ -1014,7 +1307,7 @@ h3 {
     padding: 0.5rem 0.75rem;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     overflow-x: auto;
 }
 
@@ -1033,7 +1326,7 @@ button.link {
 }
 
 button.link:hover {
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 /*
@@ -1070,9 +1363,9 @@ button.link:hover {
 .pv-field input {
     width: 100%;
     padding: 0.4rem 0.5rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    background: var(--field);
     color: var(--ink);
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
@@ -1081,9 +1374,9 @@ button.link:hover {
 .pv-field select {
     width: 100%;
     padding: 0.4rem 0.5rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    background: var(--field);
     color: var(--ink);
     font-size: 1rem;
 }
@@ -1133,7 +1426,7 @@ button.link:hover {
 }
 
 .pv-editor h3 {
-    font-size: 1rem;
+    font-size: 1.2rem;
     margin: 1.25rem 0 0.5rem;
 }
 
@@ -1159,4 +1452,143 @@ button.link:hover {
 .probes {
     margin: 0.75rem 0 0.25rem;
     padding-left: 1.25rem;
+}
+
+/*
+    Classical's component classes (#255), for the pages restyled after this one. The older classes
+    above (.stat, .controls, .control button.primary ...) are drawn to the same rules, so a page can
+    move over a piece at a time.
+*/
+
+/* A card is a border with no fill. */
+.card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
+}
+
+.card > h2:first-child,
+.card > h3:first-child {
+    margin-top: 0;
+}
+
+/* Buttons are outlined; the primary one in gold. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: var(--space-1) var(--space-4);
+    font-size: 1rem;
+    line-height: 1.5;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn:hover {
+    border-color: var(--accent);
+}
+
+.btn-primary {
+    border-color: var(--accent);
+}
+
+.btn-primary:hover {
+    background: var(--accent-wash);
+}
+
+.btn:disabled {
+    color: var(--muted);
+    border-color: var(--line);
+    background: transparent;
+    cursor: default;
+}
+
+/*
+    A segmented control on native radios: each .seg-opt is a label wrapping a radio and its text, so
+    keyboard, form posting and a missing circuit all behave as the browser already makes them. The
+    chosen option takes the gold as an outline -- accent-400's ink on a dark ground, per Classical.
+*/
+.seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+}
+
+.seg-opt {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-4);
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.seg-opt + .seg-opt {
+    border-left: 1px solid var(--line);
+}
+
+.seg-opt input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.seg-opt:hover {
+    color: var(--ink);
+}
+
+.seg-opt:has(input:checked) {
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    background: var(--accent-wash);
+}
+
+.seg-opt:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* A tag: a small outlined word, for a state beside a figure ("Live", "Running"). */
+.tag {
+    display: inline-block;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    vertical-align: 0.15em;
+}
+
+.tag.accent {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+/* The native <dialog>. */
+.dialog {
+    max-width: min(32rem, calc(100vw - 2 * var(--space-4)));
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+    padding: var(--space-5);
+}
+
+.dialog::backdrop {
+    background: rgb(32 31 29 / 0.35);
+}
+
+.dialog h2:first-child {
+    margin-top: 0;
 }
