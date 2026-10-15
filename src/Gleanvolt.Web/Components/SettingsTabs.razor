@@ -1,0 +1,18 @@
+@*
+    The Settings page's two halves (#255's navigation): the installation -- the PV system, the charger,
+    the integrations -- and the controller's own health. Two pages behind one header link rather than
+    one component, because they render differently: Health follows the poll live, the installation is
+    a form. Links, like the Charging plan tabs, so each half is a real URL. The old /pv-system and
+    /health addresses still answer, for bookmarks.
+*@
+<nav class="tabs settings-tabs" aria-label="Settings">
+    <a class="tab @(Current == SettingsTab.Installation ? "active" : null)" href="/settings"
+       aria-current="@(Current == SettingsTab.Installation ? "page" : null)">Installation</a>
+    <a class="tab @(Current == SettingsTab.Health ? "active" : null)" href="/settings/health"
+       aria-current="@(Current == SettingsTab.Health ? "page" : null)">Health</a>
+</nav>
+
+@code {
+    /// <summary>Which half is open.</summary>
+    [Parameter, EditorRequired] public SettingsTab Current { get; set; }
+}

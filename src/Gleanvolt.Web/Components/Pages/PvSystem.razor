@@ -1,3 +1,4 @@
+@page "/settings"
 @page "/pv-system"
 @attribute [Authorize]
 @rendermode InteractiveServer
@@ -22,9 +23,11 @@
     the question the startup log answers once and then buries.
 *@
 
-<SiteTitle Page="PV system" />
+<SiteTitle Page="Settings" />
 
-<h1>PV system</h1>
+<h1>Settings</h1>
+
+<SettingsTabs Current="SettingsTab.Installation" />
 
 <p class="muted">
     Everything after the form is what the controller is running with, read from the configuration at
@@ -265,7 +268,7 @@ else
         here that is expensive to change: Home Assistant keys an entity to its <code>unique_id</code>,
         so a new one is a new entity, created beside the old one, and every graph starts again. The
         topics and the names can be changed freely. The status interval is how often the state topic
-        is republished, which is usually the answer to "why is the dashboard behind?".
+        is republished, which is usually the answer to "why is the Home Assistant dashboard behind?".
     </p>
 
     <table class="sessions topics">
@@ -323,7 +326,7 @@ else
 @if (!Mqtt.Vehicle.Connection.Enabled)
 {
     <p class="muted" id="vehicle-mqtt-off">
-        Off, which is the default: the car's own state of charge is not read, and the dashboard shows
+        Off, which is the default: the car's own state of charge is not read, and the Overview shows
         only what the charger can see. Set <code>Vehicle__Enabled</code> to <code>true</code> and name
         the topic your publisher writes to under
         <code>Ev__Vehicles__0__Telemetry__Topic</code>.
@@ -357,7 +360,7 @@ else
     {
         <p class="table-note muted" id="vehicle-mqtt-no-topic">
             The feed is on with nothing to subscribe to, so it connects to no broker and reads nothing
-            — which from the dashboard is indistinguishable from a car that never reports. Set
+            — which from the Overview is indistinguishable from a car that never reports. Set
             <code>Ev__Vehicles__0__Telemetry__Topic</code> to the topic your publisher writes to.
         </p>
     }
@@ -382,7 +385,7 @@ else
 
 <p class="table-note muted">
     None of this says whether either link is <em>up</em>. Everything on this page was read once at
-    startup; <a href="/health">Health</a> reports the polling loop rather than the broker, so until it
+    startup; <a href="/settings/health">Health</a> reports the polling loop rather than the broker, so until it
     reports this too, the broker's own log — or Home Assistant showing the device as unavailable — is
     what answers that.
 </p>

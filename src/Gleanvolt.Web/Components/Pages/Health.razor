@@ -1,3 +1,4 @@
+@page "/settings/health"
 @page "/health"
 @attribute [Authorize]
 @rendermode InteractiveServer
@@ -23,7 +24,9 @@
 
 <SiteTitle Page="Health" />
 
-<h1>Health</h1>
+<h1>Settings</h1>
+
+<SettingsTabs Current="SettingsTab.Health" />
 
 <dl class="facts">
     <dt>Build</dt>
@@ -170,7 +173,7 @@
     @if (!_stopping)
     {
         <div class="control">
-            <RestartService Hint="The same graceful shutdown as Stop, ending with the exit code that tells Docker or systemd to start it again. The new process reads its configuration afresh, which is how a change saved on the PV system page is applied." />
+            <RestartService Hint="The same graceful shutdown as Stop, ending with the exit code that tells Docker or systemd to start it again. The new process reads its configuration afresh, which is how a change saved in Settings is applied." />
         </div>
     }
 </section>

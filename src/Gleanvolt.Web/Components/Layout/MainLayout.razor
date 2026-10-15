@@ -16,7 +16,7 @@
         Which installation this is (issue #111). The product name says what the software is; on a
         second tab onto a second roof, that is the one thing you already know. Shown to anyone who can
         reach the port, including on the sign-in page: it is a name, and the address and coordinates
-        stay behind the authorised /pv-system page.
+        stay behind the authorised Settings page.
     *@
     @if (!string.IsNullOrWhiteSpace(Site.Name))
     {
@@ -42,14 +42,15 @@
             </label>
             <div class="menu">
                 <nav>
-                    <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
+                    <NavLink href="/" Match="NavLinkMatch.All">Overview</NavLink>
                     <NavLink href="/charging-plan">Charging plan</NavLink>
                     <NavLink href="/sessions">Sessions</NavLink>
                     <NavLink href="/energy">Energy</NavLink>
                     <NavLink href="/forecast">Forecast</NavLink>
-                    <NavLink href="/pv-system">PV system</NavLink>
                     <NavLink href="/car">Car</NavLink>
-                    <NavLink href="/health">Health</NavLink>
+                    @* The installation and the controller's health, behind one link (#255): the two pages
+                       an owner opens least, and the reason seven links fit beside the name. *@
+                    <NavLink href="/settings">Settings</NavLink>
                 </nav>
                 @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
                    stay true regardless of Web:RequireAuthentication, or this control would show for an
