@@ -7,6 +7,7 @@
 @inject IForecastRuntimeSettings ForecastSettings
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
+@inject IJSRuntime JS
 
 @*
     The old /targeted page, the fourth tab since #98, and since #99 a tab that asks the car before it
@@ -78,12 +79,21 @@
 *@
 @if (CanTargetSoc)
 {
+    @* A segmented control on native radios (#255): two answers to one question, both visible. *@
     <div class="control">
-        <label for="target-basis">What are you aiming at?</label>
-        <select id="target-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
-            <option value="@TargetBasis.Energy">Energy to add (kWh)</option>
-            <option value="@TargetBasis.Soc">Battery target (%)</option>
-        </select>
+        <span class="control-label" id="target-basis-label">What are you aiming at?</span>
+        <div class="seg" role="radiogroup" id="target-basis" aria-labelledby="target-basis-label">
+            <label class="seg-opt">
+                <input type="radio" name="target-basis" id="target-basis-energy"
+                       checked="@(_basis == TargetBasis.Energy)" @onchange="() => SetBasis(TargetBasis.Energy)" />
+                Energy to add (kWh)
+            </label>
+            <label class="seg-opt">
+                <input type="radio" name="target-basis" id="target-basis-soc"
+                       checked="@(_basis == TargetBasis.Soc)" @onchange="() => SetBasis(TargetBasis.Soc)" />
+                Battery target (%)
+            </label>
+        </div>
         <span class="hint">
             Either way the promise is metered in kilowatt-hours at the charger. A battery target is
             converted once, when you start it — a later reading from the car does not move a target
@@ -119,11 +129,21 @@ else
 @if (CanTargetSoc)
 {
     <div class="control">
-        <label for="charge-priority">Charging priority</label>
-        <select id="charge-priority" @bind="_priority" @bind:event="onchange" @bind:after="OnFormEdited">
-            <option value="@TargetedChargePriority.Cheapest">Cheapest — use as much sun as possible</option>
-            <option value="@TargetedChargePriority.JustInTime">Just in time — reach the target right before departure</option>
-        </select>
+        <span class="control-label" id="charge-priority-label">Pacing</span>
+        <div class="seg" role="radiogroup" id="charge-priority" aria-labelledby="charge-priority-label">
+            <label class="seg-opt">
+                <input type="radio" name="charge-priority" id="charge-priority-cheapest"
+                       checked="@(_priority == TargetedChargePriority.Cheapest)"
+                       @onchange="() => SetPriority(TargetedChargePriority.Cheapest)" />
+                Cheapest
+            </label>
+            <label class="seg-opt">
+                <input type="radio" name="charge-priority" id="charge-priority-justintime"
+                       checked="@(_priority == TargetedChargePriority.JustInTime)"
+                       @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
+                Just in time
+            </label>
+        </div>
         <span class="hint">
             Both meet the departure. <strong>Cheapest</strong> paces the charge across the window and
             takes every watt of sun above that pace, so the target is usually met well before you
@@ -184,22 +204,67 @@ else
 </div>
 
 @*
-    The preview and the button that commits it, in that order and inside the same section: what you
+    The preview and the button that commits it, in that order and inside the same box: what you
     confirm should be the thing you have just read, not a button somewhere above it.
+
+    A modal <dialog> since #255 (direction 1d): titled with the request itself, the plan in a sentence,
+    where the energy comes from as a sun/grid bar, the pacing as a choice priced against the other one,
+    then Back or Start. Every figure is still there, folded under the bar. Opened by dialog.js, since
+    only the browser can make a dialog modal; Escape is routed to Back, so the two always agree.
 *@
 @if (_previewed)
 {
-    <section class="plan" id="target-preview">
-        <h2>The plan, if you start now</h2>
+    <dialog class="dialog targeted-dialog" id="target-preview" aria-labelledby="target-preview-title">
+        <h2 id="target-preview-title">@(_previewRequest is { } titled ? Title(titled) : "The plan, if you start now")</h2>
 
         @if (_previewRequest is { } asked)
         {
-            <p class="muted">@Asking(asked)</p>
+            <p class="muted dialog-asking">@Asking(asked)</p>
         }
 
         @if (_preview is { } preview)
         {
-            <TargetedPlanView Plan="preview" />
+            <TargetedPlanView Plan="preview" ShowFigures="false" />
+
+            @if (preview.SolarEnergyWh + preview.GridEnergyWh > 0)
+            {
+                <div class="split" id="target-split">
+                    <div class="split-bar" aria-hidden="true">
+                        <span class="solar" style="width:@Share(preview.SolarEnergyWh, preview)"></span>
+                        <span class="grid" style="width:@Share(preview.GridEnergyWh, preview)"></span>
+                    </div>
+                    <ul class="split-legend">
+                        <li><span class="swatch solar"></span>Sun @Kwh(preview.SolarEnergyWh)</li>
+                        <li><span class="swatch grid"></span>Grid @Kwh(preview.GridEnergyWh)</li>
+                    </ul>
+                </div>
+            }
+
+            @*
+                The pacing, priced: the other choice's grid cost is the one thing the owner cannot see
+                without trying it, so it is worked out up front and written on the option. Changing it
+                here rebuilds the plan in place rather than closing the dialog.
+            *@
+            @if (CanTargetSoc)
+            {
+                <div class="dialog-pacing">
+                    <span class="control-label" id="dialog-pacing-label">Pacing</span>
+                    <div class="seg" role="radiogroup" id="dialog-pacing" aria-labelledby="dialog-pacing-label">
+                        <label class="seg-opt">
+                            <input type="radio" name="dialog-pacing" id="dialog-pacing-cheapest"
+                                   checked="@(_priority == TargetedChargePriority.Cheapest)"
+                                   @onchange="() => SetPriority(TargetedChargePriority.Cheapest)" />
+                            Cheapest
+                        </label>
+                        <label class="seg-opt">
+                            <input type="radio" name="dialog-pacing" id="dialog-pacing-justintime"
+                                   checked="@(_priority == TargetedChargePriority.JustInTime)"
+                                   @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
+                            Just in time@(JustInTimeExtraWh() is { } extra ? $" · +{extra / 1000:F1} kWh grid" : "")
+                        </label>
+                    </div>
+                </div>
+            }
 
             @*
                 The cost of the choice, said before the button that commits it. A hold is worth making
@@ -209,6 +274,11 @@ else
             {
                 <p class="muted" id="hold-cost">@cost</p>
             }
+
+            <details class="dialog-figures">
+                <summary>Every figure</summary>
+                <TargetedPlanView Plan="preview" ShowNarrative="false" />
+            </details>
         }
         else
         {
@@ -219,11 +289,11 @@ else
             </p>
         }
 
-        <div class="control">
-            <button type="button" class="primary" id="activate-target" disabled="@Busy" @onclick="Activate">Start charging</button>
-            <button type="button" class="secondary" id="discard-preview" disabled="@Busy" @onclick="DiscardPreview">Back to the form</button>
+        <div class="dialog-actions">
+            <button type="button" class="btn" id="discard-preview" data-dialog-cancel disabled="@Busy" @onclick="DiscardPreview">Back to the form</button>
+            <button type="button" class="btn btn-primary" id="activate-target" disabled="@Busy" @onclick="Activate">Start this plan</button>
         </div>
-    </section>
+    </dialog>
 }
 
 @if (Status?.TargetedPlan is { } plan)
@@ -290,6 +360,14 @@ else
     // preview and nowhere else: running two plans on every poll to report a counterfactual is not worth
     // the cycles on a Pi, and a running plan should report what it is doing, not what it declined to do.
     private TargetedChargePlan? _cheapestPreview;
+
+    // The same request paced just in time, kept only to price that option on the dialog's pacing
+    // control while Cheapest is the one chosen. Built in the preview and nowhere else, like the above.
+    private TargetedChargePlan? _justInTimePreview;
+
+    // Whether the open preview's <dialog> has been made modal yet: once per opening, since showModal
+    // on a dialog already open throws.
+    private bool _dialogShown;
 
     protected override void OnInitialized()
     {
@@ -384,7 +462,41 @@ else
         _preview = null;
         _previewRequest = null;
         _cheapestPreview = null;
+        _justInTimePreview = null;
         _previewed = false;
+        _dialogShown = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_previewed || _dialogShown)
+        {
+            return;
+        }
+
+        _dialogShown = true;
+        await JS.InvokeVoidAsync("gleanvoltDialog.show", "target-preview");
+    }
+
+    private void SetBasis(TargetBasis basis)
+    {
+        _basis = basis;
+        OnFormEdited();
+    }
+
+    /// <summary>
+    /// The pacing, from the form or from the open dialog. In the form it is an edit like any other and
+    /// drops nothing, because there is no preview to drop; in the dialog it rebuilds the plan in place,
+    /// so the owner sees the other choice without closing and reopening it.
+    /// </summary>
+    private void SetPriority(TargetedChargePriority priority)
+    {
+        _priority = priority;
+
+        if (_previewed)
+        {
+            BuildPreview();
+        }
     }
 
     private void BuildPreview()
@@ -410,6 +522,16 @@ else
         _cheapestPreview = request.HoldsTail
             ? Preview.Preview(request with { Priority = TargetedChargePriority.Cheapest, TailEnergyWh = 0 })
             : null;
+
+        // And the other way round, to price Just in time on the dialog while Cheapest is chosen. Only
+        // where pacing is offered at all, and only when the hold would actually hold something.
+        _justInTimePreview = null;
+        if (CanTargetSoc && _priority == TargetedChargePriority.Cheapest
+            && TryCompose(Time.GetUtcNow(), TargetedChargePriority.JustInTime, out var heldRequest, out _)
+            && heldRequest.HoldsTail)
+        {
+            _justInTimePreview = Preview.Preview(heldRequest);
+        }
 
         _previewed = true;
     }
@@ -464,7 +586,11 @@ else
     /// and Start go through, so the two can never disagree about what is valid — and, since the API
     /// composes requests too, no more than a translation of this form into the shared factory's terms.
     /// </summary>
-    private bool TryCompose(DateTimeOffset now, out TargetedChargeRequest request, out string? error)
+    private bool TryCompose(DateTimeOffset now, out TargetedChargeRequest request, out string? error) =>
+        TryCompose(now, _priority, out request, out error);
+
+    private bool TryCompose(
+        DateTimeOffset now, TargetedChargePriority priority, out TargetedChargeRequest request, out string? error)
     {
         // The basis the form is actually offering: asking in state of charge needs both a configured
         // pack and a reading to measure the gap from, and without them the selector is not shown at all.
@@ -474,7 +600,7 @@ else
             departBy: Compose(_departure),
             energyWh: socBasis ? null : _energyKWh * 1000,
             targetSocPercent: socBasis ? _targetSocPercent : null,
-            priority: _priority,
+            priority: priority,
             restSocPercent: _restSocPercent,
             vehicleSoc: SocBasisAt(now),
             limits: Limits,
@@ -536,6 +662,48 @@ else
             + $"The last {(tailWh ?? 0) / 1000:F1} kWh — about {_restSocPercent:F0}% to {endSoc:F0}% — is scheduled "
             + "to land just before you leave.";
     }
+
+    /// <summary>The request as the dialog's title: what, by when -- "80% by Thu 17:00".</summary>
+    private string Title(TargetedChargeRequest request)
+    {
+        var by = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).ToString("ddd HH:mm");
+
+        return request.TargetSocPercent is { } target
+            ? $"{target:F0}% by {by}"
+            : $"{request.RequiredEnergyWh / 1000:F1} kWh by {by}";
+    }
+
+    /// <summary>
+    /// How much more grid Just in time buys than Cheapest, for whichever of the two plans is not the
+    /// chosen one. Null when there is no comparison to make, or nothing in it.
+    /// </summary>
+    private double? JustInTimeExtraWh()
+    {
+        var (held, cheap) = _priority == TargetedChargePriority.JustInTime
+            ? (_preview, _cheapestPreview)
+            : (_justInTimePreview, _preview);
+
+        if (held is null || cheap is null)
+        {
+            return null;
+        }
+
+        var extraWh = held.GridEnergyWh - cheap.GridEnergyWh;
+
+        return extraWh > 100 ? extraWh : null;
+    }
+
+    // A width for the split bar, as a share of everything the plan sends to the car.
+    private static string Share(double wattHours, TargetedChargePlan plan)
+    {
+        var total = plan.SolarEnergyWh + plan.GridEnergyWh;
+
+        return total <= 0
+            ? "0%"
+            : $"{(wattHours / total * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%";
+    }
+
+    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
 
     /// <summary>
     /// What choosing the hold costs, against the same energy by the same time charged as cheaply as

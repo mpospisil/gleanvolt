@@ -1948,3 +1948,93 @@ a.seg-opt {
 .glossary {
     margin-top: var(--space-6);
 }
+
+/*
+    Segmented controls inside a .control (#255): the group's name sits where a label would, and the
+    options are labels too -- which .control label would otherwise turn into bold blocks.
+*/
+.control .control-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+}
+
+.control .seg-opt {
+    display: inline-flex;
+    font-weight: 400;
+    margin: 0;
+}
+
+/*
+    The Targeted preview (#255, direction 1d): a modal titled with the request, the plan in words, the
+    sun/grid bar, the pacing priced, and Back or Start along the bottom.
+*/
+.targeted-dialog {
+    width: min(34rem, calc(100vw - 2 * var(--space-4)));
+    max-height: calc(100vh - 2 * var(--space-5));
+    overflow-y: auto;
+}
+
+.targeted-dialog h2 {
+    font-size: 1.6rem;
+    margin: 0;
+}
+
+.dialog-asking {
+    margin: var(--space-1) 0 var(--space-4);
+    font-size: 0.9rem;
+}
+
+.targeted-dialog .split {
+    margin: var(--space-4) 0;
+}
+
+.dialog-pacing {
+    margin: var(--space-4) 0 var(--space-3);
+}
+
+.dialog-pacing .control-label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: var(--space-2);
+}
+
+.dialog-figures {
+    margin: var(--space-4) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+}
+
+.dialog-figures summary {
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.dialog-figures .stat-grid {
+    margin-top: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+}
+
+@media (max-width: 40rem) {
+    .targeted-dialog {
+        padding: var(--space-4);
+    }
+
+    .dialog-actions .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
