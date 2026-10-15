@@ -23,15 +23,21 @@ if (args is ["hash-password", var plainPassword])
 // The default content root is the process's current directory, not the exe's own -- fine for
 // `dotnet run` (already the project directory) and for the systemd unit and the container image
 // (each pins or coincides with the right directory another way), but not for a single-file publish
-// run through WinGet's PortableCommandAlias: that launches Links\gleanvolt.exe, a symlink whose
-// directory has none of appsettings.json, wwwroot or data/, only the real install directory does.
+// run through WinGet's PortableCommandAlias: that launches Links\gleanvolt.exe, a reparse-point
+// symlink whose directory has none of appsettings.json, wwwroot or data/, only the real install
+// directory does. AppContext.BaseDirectory and Environment.ProcessPath both return the symlink's own
+// path, not the real one -- verified directly: neither is "resolved" by the OS or the runtime before
+// the process sees it. FileInfo.ResolveLinkTarget is, so that is what has to run.
 // Assembly.GetEntryAssembly().Location is empty only for a single-file publish, so this changes
 // nothing for every other way the worker runs.
 #pragma warning disable IL3000 // Read only for emptiness, as the single-file marker it always is -- never used as a path.
 if (string.IsNullOrEmpty(System.Reflection.Assembly.GetEntryAssembly()?.Location))
 #pragma warning restore IL3000
 {
-    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+    var exePath = Environment.ProcessPath is { } processPath
+        ? new FileInfo(processPath).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? processPath
+        : AppContext.BaseDirectory;
+    Directory.SetCurrentDirectory(Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory);
 }
 
 // Load secrets (e.g. Solcast__ApiKey) from an untracked .env file into the process environment
