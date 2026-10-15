@@ -1677,3 +1677,261 @@ button.link:hover {
 .dialog h2:first-child {
     margin-top: 0;
 }
+
+/*
+    The overview (#255, direction 1a). Wider than the reading pages: a main column and a side column
+    of cards on a desktop, one column on a phone with the cards after the mode. :has() rather than a
+    class on <main>, because the layout does not know which page it wraps.
+*/
+.content:has(.overview) {
+    max-width: 76rem;
+}
+
+.overview-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.overview-head h1 {
+    margin: 0;
+}
+
+.overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5) var(--space-6);
+}
+
+@media (min-width: 64rem) {
+    .overview {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        align-items: start;
+    }
+}
+
+/* What is happening and why, in words: the display face at reading size, the first thing on the page
+   after its name. */
+.headline {
+    font-family: var(--font-display);
+    font-size: 1.65rem;
+    line-height: 1.35;
+    margin: 0 0 var(--space-5);
+    max-width: 46ch;
+}
+
+@media (max-width: 40rem) {
+    .headline {
+        font-size: 1.4rem;
+    }
+}
+
+/*
+    Five figures in a row, each topped by a rule in its series colour -- the same colour the charts
+    draw it in, so the strip and the Energy page read as one vocabulary. Hairlines between them rather
+    than boxes. On a phone they wrap two and three to a row.
+*/
+.figures {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    border-bottom: 1px solid var(--line);
+}
+
+.figure {
+    padding: var(--space-3) var(--space-3) var(--space-3) 0;
+    border-top: 2px solid var(--rule);
+    min-width: 0;
+}
+
+.figure + .figure {
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--line);
+}
+
+.figure.solar { border-top-color: var(--solar); }
+.figure.house { border-top-color: var(--house); }
+.figure.battery { border-top-color: var(--battery); }
+.figure.ev { border-top-color: var(--ev); }
+.figure.grid-flow { border-top-color: var(--grid-flow); }
+
+.figure-label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.figure-now {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1.2;
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+}
+
+.figure-sub,
+.figure-today {
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+.figure-today {
+    margin-top: var(--space-1);
+    color: var(--ink);
+}
+
+.figures-note {
+    font-size: 0.85rem;
+}
+
+@media (max-width: 40rem) {
+    .figures {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        border-bottom: none;
+    }
+
+    .figure,
+    .figure + .figure {
+        padding: var(--space-3) var(--space-3) var(--space-3) 0;
+        border-left: none;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .figure:nth-child(even) {
+        padding-left: var(--space-3);
+        border-left: 1px solid var(--line);
+    }
+}
+
+.mode h2 {
+    margin-top: var(--space-6);
+}
+
+/* The mode strip is links, so the segments are anchors; the current one is marked the way a checked
+   radio is in a .seg. */
+a.seg-opt {
+    text-decoration: none;
+}
+
+.seg-opt[aria-current="true"] {
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    background: var(--accent-wash);
+}
+
+/* On a phone six segments cannot share a row, and a wrapped segmented box is ragged; they become
+   separate outlined chips instead. */
+@media (max-width: 40rem) {
+    .mode-seg {
+        border: none;
+        gap: var(--space-2);
+    }
+
+    .mode-seg .seg-opt,
+    .mode-seg .seg-opt + .seg-opt {
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-sm);
+    }
+}
+
+.mode-summary {
+    margin: var(--space-3) 0 0;
+    max-width: 62ch;
+}
+
+.hold {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-4) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+}
+
+.hold-label {
+    margin-right: var(--space-1);
+}
+
+.overview-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+}
+
+.overview-side .card h2 {
+    font-size: 1.5rem;
+    margin: 0 0 var(--space-3);
+}
+
+/* Height from its content, so the legend sits inside the card rather than over the table under it. */
+.plan-card .chart {
+    height: auto;
+    border: none;
+    padding: 0;
+    margin: 0 0 var(--space-3);
+}
+
+/* Four rows of label and figure: hairlines between them and none under the last, the card's own
+   border closing it. */
+.plan-table {
+    border-bottom: none;
+}
+
+.plan-table tr:last-child th {
+    border-bottom: none;
+}
+
+.plan-table th {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.9rem;
+}
+
+.plan-table td.num {
+    text-align: right;
+}
+
+.card-link {
+    margin: var(--space-3) 0 0;
+    font-size: 0.9rem;
+}
+
+.session-energy {
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    line-height: 1.1;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+.session-energy-note {
+    margin: var(--space-1) 0 var(--space-4);
+    font-size: 0.9rem;
+}
+
+.session-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-1) var(--space-4);
+    margin: 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+}
+
+.session-facts dt {
+    color: var(--muted);
+}
+
+.session-facts dd {
+    margin: 0;
+    text-align: right;
+}
+
+.glossary {
+    margin-top: var(--space-6);
+}

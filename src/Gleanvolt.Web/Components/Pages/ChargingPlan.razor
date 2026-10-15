@@ -125,23 +125,15 @@
 </section>
 
 @code {
-    private const string SolarSlug = "solar";
-    private const string ForecastedSlug = "forecasted";
-    private const string SolarGridSlug = "solar-grid";
-    private const string FastSlug = "fast";
-    private const string TargetedSlug = "targeted";
+    private const string SolarSlug = ChargeModeTabs.SolarSlug;
+    private const string ForecastedSlug = ChargeModeTabs.ForecastedSlug;
+    private const string SolarGridSlug = ChargeModeTabs.SolarGridSlug;
+    private const string FastSlug = ChargeModeTabs.FastSlug;
+    private const string TargetedSlug = ChargeModeTabs.TargetedSlug;
 
-    // The order is the order they are worth reaching for: the two everyday solar modes first, then
-    // the one that follows the sun but lets the grid help, then the two that buy from the grid when
-    // they have to.
+    // Shared with the overview's mode strip (#255), which links into these tabs.
     private static readonly (string Slug, string Label, ChargeControlMode Mode)[] Tabs =
-    [
-        (SolarSlug, "Solar", ChargeControlMode.Solar),
-        (ForecastedSlug, "Forecasted", ChargeControlMode.Forecasted),
-        (SolarGridSlug, "Solar + grid", ChargeControlMode.SolarGrid),
-        (FastSlug, "Fast (no battery)", ChargeControlMode.FastNoBattery),
-        (TargetedSlug, "Targeted", ChargeControlMode.Targeted),
-    ];
+        [.. ChargeModeTabs.All.Select(entry => (entry.Slug, entry.Label, entry.Mode))];
 
     /// <summary>Which mode's tab to show, from the route. Null opens on whatever is driving.</summary>
     [Parameter] public string? Tab { get; set; }

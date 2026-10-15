@@ -99,7 +99,7 @@ else
 {
     <h2>The plan</h2>
 
-    <p><strong>@Headline(plan)</strong></p>
+    <p><strong>@SolarDayPlanNarrative.Headline(plan, Time.LocalTimeZone)</strong></p>
 
     <p class="muted">
         Updated @TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
@@ -243,31 +243,6 @@ else
     {
         _minBatterySocPercent = ForecastSettings.MinBatterySocFloorPercent;
         _resumeMarginPercent = ForecastSettings.FloorResumeMarginPercent;
-    }
-
-    // What the mode is entitled to say, in the one sentence it is worth: a forecast of what today
-    // gives the car and when, never a verdict on whether that is enough. The tiles below carry the
-    // same two figures apart -- budget here, window there -- and nobody reads two tiles to answer
-    // "is it worth plugging in this morning?".
-    private string Headline(SolarDayPlan plan)
-    {
-        if (!plan.IsUsable)
-        {
-            return "No usable forecast, so no plan for today; the mode is charging on live surplus instead.";
-        }
-
-        if (plan.NextFeasibleWindow is not { } window || plan.FeasibleEvEnergyWh <= 0)
-        {
-            return "Today has no chargeable window: the sun never clears the charger's floor for long enough, "
-                + "or the home battery needs all of it. The car waits.";
-        }
-
-        // "from 10:20 to 15:40" rather than the tile's "10:20–15:40": this is a sentence, and a dash
-        // reads as a range inside one.
-        var start = TimeZoneInfo.ConvertTime(window.Start, Time.LocalTimeZone);
-        var end = TimeZoneInfo.ConvertTime(window.End, Time.LocalTimeZone);
-
-        return $"Today gives the car about {Kwh(plan.FeasibleEvEnergyWh)}, in a window from {start:HH:mm} to {end:HH:mm}.";
     }
 
     private string SessionProgress() =>

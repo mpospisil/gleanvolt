@@ -1,7 +1,7 @@
 @page "/"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@implements IDisposable
+@implements IAsyncDisposable
 @inject ChargeControlStatusHolder StatusHolder
 @inject IVehicleTelemetry Vehicle
 @inject VehicleDisplayOptions VehicleDisplay
@@ -10,30 +10,22 @@
 @inject ConfiguredVehicleFeed VehicleFeed
 @inject ISolarForecastService Forecasts
 @inject TimeProvider Time
+@inject IJSRuntime JS
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider Services
 
 @*
     The dashboard reports; it no longer decides (#98). Every control that used to sit under these
-    numbers now lives on the Charging plan page, next to the mode it belongs to -- so this page can
-    be read in the order the questions are actually asked, rather than as one undifferentiated grid
-    of fourteen figures followed by a column of inputs.
+    numbers lives on the Charging plan page, next to the mode it belongs to. Since #255 it is laid out
+    as the overview (see the comment under the title); the car and the forecast table below it are the
+    two sections that kept their shape:
 
-    Four sections, in that order:
-
-      Energy          -- the house: what the roof is making, what the battery and the grid are doing.
-                         True whatever is or isn't plugged in, which is why it comes first.
-      Solar forecast  -- today and tomorrow as a table, with what each column means written beneath it
-                         rather than in hover hints: these figures are read against each other --
-                         tomorrow against today, the cautious band against the median -- not one at a time.
       Vehicle         -- the car: the charger's own view of whether one is connected, plus whatever
                          the car's one feed last said about itself (#73, #140, #212). Read-only,
                          and nothing in the control logic consumes the cloud half yet.
-      Charging session-- what is happening at the charger right now, shown only while something is
-                         happening: a mode is driving, or the car is drawing power under nobody's
-                         control. Off with an idle charger gets one line and a way to start, not a
-                         grid of dashes.
-
-    Each figure keeps its meaning inline, since MQTT discovery has nowhere to put one and README's
-    "what each entity means" table is what the hints are drawn from.
+      Solar forecast  -- today and tomorrow as a table, with what each column means written beneath it
+                         rather than in hover hints: these figures are read against each other --
+                         tomorrow against today, the cautious band against the median -- not one at a time.
 
     Follows StatusHolder.Updated exactly like the health page: seeded from Current before
     subscribing, so a browser that arrives between two polls sees the last one rather than nothing,
@@ -42,7 +34,34 @@
 
 <SiteTitle Page="Dashboard" />
 
-<h1>Dashboard</h1>
+@*
+    The overview (#255, direction 1a with 1b's prose status). One question per block, in the order
+    they are asked:
+
+      the headline    -- what the controller is doing and why, in words (OverviewNarrative).
+      the figures     -- Solar, House, Battery, Car, Grid: each one's power now and its energy so far
+                         today. "So far today" comes from the energy monitor's store when it is on, and
+                         is simply left off when it is not.
+      the mode        -- which mode is driving, as a strip of links into the Charging plan tabs. Still
+                         read-only: this page reports and the plan page decides (#98), so the strip is a
+                         way to the controls rather than a second copy of them.
+      the side cards  -- Today's plan, when a mode has published one, and This session.
+
+    Then the car and the day's forecast, as before. Every figure's meaning is still on the page, under
+    "What the figures mean" at the bottom rather than under each figure: the strip is meant to be read
+    at a glance, and README's entity table is what those sentences are drawn from.
+*@
+
+<header class="overview-head">
+    <h1>Dashboard</h1>
+    @if (_status is not null)
+    {
+        <span class="tag accent">Live</span>
+        <span class="muted">
+            Updated @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+        </span>
+    }
+</header>
 
 @if (_status is null)
 {
@@ -50,71 +69,159 @@
 }
 else
 {
-    <p class="muted">
-        Updated @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
-    </p>
+    var house = HouseWatts(_status);
 
-    <h2>Energy</h2>
+    <div class="overview">
+        <div class="overview-main">
+            <p class="headline" id="overview-headline">
+                @string.Join(" ", OverviewNarrative.Describe(_status, Time.LocalTimeZone))
+            </p>
 
-    <section class="stat-grid">
-        <Stat Label="Solar power" Value="@Watts(_status.SolarPowerWatts)"
-              Hint="PV production measured at the inverter, before the house, the battery or the car take any of it." />
-        <Stat Label="Forecast solar power" Value="@Watts(_status.ForecastSolarPowerWatts)"
-              Hint="What the forecast expected the roof to be making right now, to read against the measured figure beside it. 0 when no forecast covers this moment." />
-        <Stat Label="Solar surplus" Value="@Watts(_status.SurplusWatts)"
-              Hint="PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Blank when the selected mode doesn't decide on surplus." />
-        <Stat Label="Battery SOC" Value="@Percent(_status.BatterySocPercent)"
-              Hint="Home battery state of charge as the inverter reports it." />
-        <Stat Label="Battery power" Value="@Watts(_status.BatteryPowerWatts)"
-              Hint="Positive while the battery charges, negative while it discharges." />
-        <Stat Label="Grid power" Value="@Watts(_status.GridPowerWatts)"
-              Hint="Positive while importing from the grid, negative while exporting." />
-    </section>
+            <section class="figures" aria-label="Power now and energy today">
+                <div class="figure solar">
+                    <div class="figure-label">Solar</div>
+                    <div class="figure-now">@Watts(_status.SolarPowerWatts)</div>
+                    <div class="figure-sub">forecast @Watts(_status.ForecastSolarPowerWatts)</div>
+                    @if (_status.SurplusWatts is { } surplus)
+                    {
+                        <div class="figure-sub">surplus @Watts(surplus)</div>
+                    }
+                    <div class="figure-today">@Today(t => t.SolarKwh)</div>
+                </div>
+                <div class="figure house">
+                    <div class="figure-label">House</div>
+                    <div class="figure-now">@Watts(house)</div>
+                    <div class="figure-sub">without the car</div>
+                    <div class="figure-today">@Today(t => t.HouseKwh)</div>
+                </div>
+                <div class="figure battery">
+                    <div class="figure-label">Battery</div>
+                    <div class="figure-now">@Watts(_status.BatteryPowerWatts)</div>
+                    <div class="figure-sub">@Percent(_status.BatterySocPercent) charged</div>
+                    <div class="figure-today">@TodayInOut(t => t.BatteryInKwh, t => t.BatteryOutKwh, "in", "out")</div>
+                </div>
+                <div class="figure ev">
+                    <div class="figure-label">Car</div>
+                    <div class="figure-now">@Watts(_status.EvChargerPowerWatts)</div>
+                    <div class="figure-sub">@(_status.CarConnected ? "plugged in" : "not plugged in")</div>
+                    <div class="figure-today">@Today(t => t.EvKwh)</div>
+                </div>
+                <div class="figure grid-flow">
+                    <div class="figure-label">Grid</div>
+                    <div class="figure-now">@Watts(_status.GridPowerWatts)</div>
+                    <div class="figure-sub">@(_status.GridPowerWatts switch { > 0 => "importing", < 0 => "exporting", _ => "balanced" })</div>
+                    <div class="figure-today">@TodayInOut(t => t.ImportKwh, t => t.ExportKwh, "in", "out")</div>
+                </div>
+            </section>
 
-    <h2>Solar forecast</h2>
-
-    @* Units in the note, not in the cells or the headers, and the date under the day's name rather than
-       beside it: five columns have to fit a phone, and either would push the table sideways. *@
-    <table class="sessions energy forecast-days" id="solar-forecast">
-        <thead>
-            <tr>
-                <th>Day</th>
-                <th class="num">Expected</th>
-                <th class="num">Low (p10)</th>
-                <th class="num">High (p90)</th>
-                <th class="num">Peak</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var (label, date, day) in _forecastDays)
+            @if (_today is null)
             {
-                <tr>
-                    <td>@label <span class="muted forecast-date">@date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span></td>
-                    <td class="num">@Figure(day?.ExpectedWh)</td>
-                    <td class="num">@Figure(day?.LowWh)</td>
-                    <td class="num">@Figure(day?.HighWh)</td>
-                    <td class="num">@Figure(day?.PeakWatts)</td>
-                </tr>
+                <p class="muted figures-note">
+                    Today's energy needs the energy monitor, which is off on this installation; the figures
+                    above are power now only.
+                </p>
             }
-        </tbody>
-    </table>
 
-    <p class="muted table-note">
-        Energy in kWh, peak power in kW. Each row is a whole day, midnight to midnight in
-        @Time.LocalTimeZone.Id time. Today's includes the hours already gone, as last forecast before they
-        happened, so it is what the day was expected to bring rather than what is still to come.
-        <strong>Expected</strong> is Solcast's median: as likely to be beaten as missed.
-        <strong>Low (p10)</strong> is the cautious figure, one the day should beat about nine times in ten —
-        the Forecasted mode plans on this band by default.
-        <strong>High (p90)</strong> is the hopeful one, beaten only about one time in ten; the wider the gap
-        between the two, the less sure the sky.
-        <strong>Peak</strong> is the strongest half hour the median expects, before the house takes its
-        share — a quick check on whether the roof will make enough to charge the car at all.
-        Solcast is asked again every few hours in daylight, so tomorrow's figures keep moving until the
-        day arrives. A dash means no forecast is held for that day yet.
-        <a href="/forecast">Forecast</a> has the same two days period by period — a day total and a
-        day's shape are different things, and this is the total.
-    </p>
+            <section class="mode" aria-labelledby="mode-heading">
+                <h2 id="mode-heading">Charge mode</h2>
+                @* Links, not radios: each goes to that mode's tab, where it is started and where its
+                   settings are. The current one is marked, Off included, which has no tab of its own. *@
+                <nav class="seg mode-seg" aria-label="Charge modes">
+                    @if (_status.Mode == ChargeControlMode.Off)
+                    {
+                        <span class="seg-opt" aria-current="true">Off</span>
+                    }
+                    else
+                    {
+                        <span class="seg-opt">Off</span>
+                    }
+                    @foreach (var entry in ChargeModeTabs.All)
+                    {
+                        <a class="seg-opt" href="@($"/charging-plan/{entry.Slug}")"
+                           aria-current="@(entry.Mode == _status.Mode ? "true" : null)">@entry.Label</a>
+                    }
+                </nav>
+                <p class="mode-summary">
+                    @(ChargeModeTabs.For(_status.Mode)?.Summary ?? "No mode is driving the charger.")
+                    Started, stopped and set up on the <a href="/charging-plan">Charging plan</a> page.
+                </p>
+
+                @if (_status.BatteryHoldEnabled)
+                {
+                    <p class="hold" id="battery-hold">
+                        <span class="hold-label">Battery discharge hold</span>
+                        <span class="tag @(_status.BatteryHoldActive ? "accent" : null)">@(_status.BatteryHoldActive ? "On" : "Off")</span>
+                        <span class="muted">@HoldDetail(_status)</span>
+                    </p>
+                }
+            </section>
+        </div>
+
+        <aside class="overview-side">
+            @if (_status.Mode == ChargeControlMode.Forecasted && _status.Plan is { } plan)
+            {
+                <section class="card plan-card" id="todays-plan">
+                    <h2>Today's plan</h2>
+                    @* The plan's sentence is the headline's second one already; the card is the picture
+                       and the four figures behind it. *@
+                    @if (plan.Timeline.Count > 0)
+                    {
+                        <div id="overview-plan-chart" class="chart"></div>
+                    }
+                    <table class="sessions plan-table">
+                        <tbody>
+                            <tr><th scope="row">Window</th><td class="num">@Window(plan.NextFeasibleWindow)</td></tr>
+                            <tr><th scope="row">Car energy</th><td class="num">@Kwh(plan.FeasibleEvEnergyWh)</td></tr>
+                            <tr><th scope="row">Battery floor</th><td class="num">@Percent(plan.RequiredSocFloorPercent)</td></tr>
+                            <tr><th scope="row">Shortfall</th><td class="num">@Kwh(plan.ShortfallWh)</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="card-link"><a href="/charging-plan/forecasted">The whole plan</a></p>
+                </section>
+            }
+            else if (_status.Mode == ChargeControlMode.Targeted && _status.TargetedPlan is { } targeted)
+            {
+                <section class="card plan-card" id="todays-plan">
+                    <h2>The plan</h2>
+                    @foreach (var paragraph in TargetedPlanNarrative.Describe(targeted, Time.LocalTimeZone))
+                    {
+                        <p>@paragraph</p>
+                    }
+                    <p class="card-link"><a href="/charging-plan/targeted">The whole plan</a></p>
+                </section>
+            }
+
+            <section class="card session-card" id="this-session">
+                <h2>This session</h2>
+                @if (!IsCharging(_status))
+                {
+                    <p class="muted">
+                        Nothing is charging. Charge mode is <strong>@_status.Mode</strong> and the charger reports
+                        <strong>@_status.ChargerStatus</strong> — start a mode on the
+                        <a href="/charging-plan">Charging plan</a> page.
+                    </p>
+                }
+                else
+                {
+                    <div class="session-energy">@Kwh(_status.SessionEnergyWh)</div>
+                    <p class="muted session-energy-note">
+                        into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {carSoc:F0}%" : "")
+                    </p>
+                    <dl class="session-facts">
+                        <dt>Charge mode</dt><dd>@_status.Mode</dd>
+                        <dt>Control state</dt><dd>@_status.State</dd>
+                        <dt>Charger status</dt><dd>@_status.ChargerStatus</dd>
+                        <dt>Session energy</dt><dd>@Kwh(_status.SessionEnergyWh)</dd>
+                        <dt>EV charging power</dt><dd>@Watts(_status.EvChargerPowerWatts)</dd>
+                        <dt>EV charging current</dt><dd>@Amps(_status.EvChargingCurrentAmps)</dd>
+                        <dt>Target current</dt><dd>@Amps(_status.TargetCurrentAmps)</dd>
+                        <dt>Active current</dt><dd>@Amps(_status.ActiveCurrentAmps)</dd>
+                        <dt>Battery loan power</dt><dd>@Watts(_status.LoanPowerWatts)</dd>
+                    </dl>
+                }
+            </section>
+        </aside>
+    </div>
 
     <h2>Vehicle</h2>
 
@@ -226,41 +333,90 @@ else
         }
     </section>
 
-    <h2>Charging session</h2>
+    <h2>Solar forecast</h2>
 
-    @if (!IsCharging(_status))
-    {
-        <p class="muted">
-            Nothing is charging. Charge mode is <strong>@_status.Mode</strong> and the charger reports
-            <strong>@_status.ChargerStatus</strong> — start a mode on the
-            <a href="/charging-plan">Charging plan</a> page.
-        </p>
-    }
-    else
-    {
-        <section class="stat-grid">
-            <Stat Label="Charge mode" Value="@_status.Mode.ToString()"
-                  Hint="Which strategy is driving the charger, as of the last poll. Always starts at Off after a restart, and is changed from the Charging plan page." />
-            <Stat Label="Control state" Value="@_status.State.ToString()"
-                  Hint="What charge control is doing right now: Disabled (nothing running), Idle (running but not acting, usually because the charger is no longer in Fast), Charging, or Paused." />
-            <Stat Label="Charger status" Value="@_status.ChargerStatus.ToString()"
-                  Hint="The charger's own reported state, straight from its register." />
-            <Stat Label="Session energy" Value="@Kwh(_status.SessionEnergyWh)"
-                  Hint="Energy delivered to the car since it was plugged in. Starts afresh when it's unplugged." />
+    @* Units in the note, not in the cells or the headers, and the date under the day's name rather than
+       beside it: five columns have to fit a phone, and either would push the table sideways. *@
+    <table class="sessions energy forecast-days" id="solar-forecast">
+        <thead>
+            <tr>
+                <th>Day</th>
+                <th class="num">Expected</th>
+                <th class="num">Low (p10)</th>
+                <th class="num">High (p90)</th>
+                <th class="num">Peak</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (label, date, day) in _forecastDays)
+            {
+                <tr>
+                    <td>@label <span class="muted forecast-date">@date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span></td>
+                    <td class="num">@Figure(day?.ExpectedWh)</td>
+                    <td class="num">@Figure(day?.LowWh)</td>
+                    <td class="num">@Figure(day?.HighWh)</td>
+                    <td class="num">@Figure(day?.PeakWatts)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
 
-            <Stat Label="EV charging power" Value="@Watts(_status.EvChargerPowerWatts)"
-                  Hint="What the charger reports the car actually drawing right now -- not a setpoint." />
-            <Stat Label="EV charging current" Value="@Amps(_status.EvChargingCurrentAmps)"
-                  Hint="Charging current derived from the charger's measured power: what the car really takes." />
-            <Stat Label="Target current" Value="@Amps(_status.TargetCurrentAmps)"
-                  Hint="The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging." />
-            <Stat Label="Active current" Value="@Amps(_status.ActiveCurrentAmps)"
-                  Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
+    <p class="muted table-note">
+        Energy in kWh, peak power in kW. Each row is a whole day, midnight to midnight in
+        @Time.LocalTimeZone.Id time. Today's includes the hours already gone, as last forecast before they
+        happened, so it is what the day was expected to bring rather than what is still to come.
+        <strong>Expected</strong> is Solcast's median: as likely to be beaten as missed.
+        <strong>Low (p10)</strong> is the cautious figure, one the day should beat about nine times in ten —
+        the Forecasted mode plans on this band by default.
+        <strong>High (p90)</strong> is the hopeful one, beaten only about one time in ten; the wider the gap
+        between the two, the less sure the sky.
+        <strong>Peak</strong> is the strongest half hour the median expects, before the house takes its
+        share — a quick check on whether the roof will make enough to charge the car at all.
+        Solcast is asked again every few hours in daylight, so tomorrow's figures keep moving until the
+        day arrives. A dash means no forecast is held for that day yet.
+        <a href="/forecast">Forecast</a> has the same two days period by period — a day total and a
+        day's shape are different things, and this is the total.
+    </p>
 
-            <Stat Label="Battery loan power" Value="@Watts(_status.LoanPowerWatts)"
-                  Hint="How much of what the car is drawing right now is covered by the home battery rather than by live sun. Zero outside the Forecasted mode." />
-        </section>
-    }
+    @* What each figure means, kept on the page (#255): the strip above has no room for a sentence under
+       every number, and these are the sentences README's entity table is drawn from. *@
+    <details class="diagnostics glossary">
+        <summary>What the figures mean</summary>
+        <dl class="fields">
+            <dt>Solar power</dt>
+            <dd>PV production measured at the inverter, before the house, the battery or the car take any of it.</dd>
+            <dt>Forecast solar power</dt>
+            <dd>What the forecast expected the roof to be making right now, to read against the measured figure beside it. 0 when no forecast covers this moment.</dd>
+            <dt>Solar surplus</dt>
+            <dd>PV left after household consumption -- the smoothed 3-minute average the solar modes decide on. Shown only while the selected mode decides on surplus.</dd>
+            <dt>House</dt>
+            <dd>What the house is drawing apart from the car: solar plus grid import, less what the battery takes and the car draws. The same residual the Energy page calls House.</dd>
+            <dt>Battery SOC</dt>
+            <dd>Home battery state of charge as the inverter reports it.</dd>
+            <dt>Battery power</dt>
+            <dd>Positive while the battery charges, negative while it discharges.</dd>
+            <dt>Car</dt>
+            <dd>What the charger reports the car actually drawing right now -- not a setpoint. Plugged in is the charger's own view of whether a vehicle is connected.</dd>
+            <dt>Grid power</dt>
+            <dd>Positive while importing from the grid, negative while exporting.</dd>
+            <dt>Today</dt>
+            <dd>Energy since local midnight, as the energy monitor recorded it in quarter hours: a stretch the service was not running is missing from it, not estimated.</dd>
+            <dt>Control state</dt>
+            <dd>What charge control is doing right now: Disabled (nothing running), Idle (running but not acting, usually because the charger is no longer in Fast), Charging, or Paused.</dd>
+            <dt>Charger status</dt>
+            <dd>The charger's own reported state, straight from its register.</dd>
+            <dt>Session energy</dt>
+            <dd>Energy delivered to the car since it was plugged in. Starts afresh when it's unplugged.</dd>
+            <dt>EV charging current</dt>
+            <dd>Charging current derived from the charger's measured power: what the car really takes.</dd>
+            <dt>Target current</dt>
+            <dd>The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging.</dd>
+            <dt>Active current</dt>
+            <dd>The charger's setpoint read back from the hardware: what it was actually left at.</dd>
+            <dt>Battery loan power</dt>
+            <dd>How much of what the car is drawing right now is covered by the home battery rather than by live sun. Zero outside the Forecasted mode.</dd>
+        </dl>
+    </details>
 }
 
 @code {
@@ -290,16 +446,29 @@ else
     // Today and tomorrow, in that order; a summary is null while no forecast is held for its day.
     private IReadOnlyList<(string Label, DateOnly Date, SolarDayForecastSummary? Summary)> _forecastDays = [];
 
-    protected override void OnInitialized()
+    // The energy monitor's store, when it is on: it can be switched off on its own, and then the
+    // figures are power now only. Asked for rather than injected for exactly that reason.
+    private IEnergyIntervalStore? _energy;
+
+    // Energy since local midnight, or null while there is no store to read it from.
+    private TodayTotals? _today;
+    private DateTimeOffset _todayReadAt = DateTimeOffset.MinValue;
+
+    private bool _chartRendered;
+    private bool _chartCreated;
+
+    protected override async Task OnInitializedAsync()
     {
         _status = StatusHolder.Current;
         StatusHolder.Updated += OnStatusUpdated;
 
         // The installation's one feed, settled by the composition root (#212) -- not chosen here.
         _service = VehicleFeed.Service;
+        _energy = Services.GetService<IEnergyIntervalStore>();
 
         RefreshVehicle();
         ReadDayForecasts();
+        await ReadTodayAsync();
     }
 
     private void OnStatusUpdated(ChargeControlStatus status)
@@ -312,8 +481,116 @@ else
         RefreshVehicle();
         ReadDayForecasts();
 
-        InvokeAsync(StateHasChanged);
+        // The plan is recomputed every poll, so its chart is redrawn every poll too -- the same choice
+        // the Forecasted tab makes.
+        _chartRendered = false;
+
+        InvokeAsync(async () =>
+        {
+            await ReadTodayAsync();
+            StateHasChanged();
+        });
     }
+
+    /// <summary>
+    /// Today's totals from the energy store. A query rather than a lookup, so at most once a minute:
+    /// the store only gains a row every quarter hour, and a poll every few seconds asking for the
+    /// same day again would be load for nothing.
+    /// </summary>
+    private async Task ReadTodayAsync()
+    {
+        if (_energy is null)
+        {
+            return;
+        }
+
+        var now = Time.GetUtcNow();
+        if (now - _todayReadAt < TimeSpan.FromMinutes(1))
+        {
+            return;
+        }
+
+        _todayReadAt = now;
+
+        var zone = Time.LocalTimeZone;
+        var midnight = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime).ToDateTime(TimeOnly.MinValue);
+        var from = new DateTimeOffset(midnight, zone.GetUtcOffset(midnight));
+
+        try
+        {
+            var intervals = await _energy.GetIntervalsAsync(from, now.AddMinutes(15), CancellationToken.None);
+            _today = TodayTotals.From(intervals);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A store that cannot be read leaves the last totals on screen rather than breaking the
+            // page: the live figures beside them do not depend on it.
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartRendered
+            || _status is not { Mode: ChargeControlMode.Forecasted, Plan: { Timeline.Count: > 0 } plan })
+        {
+            return;
+        }
+
+        _chartRendered = true;
+        _chartCreated = true;
+
+        await JS.InvokeVoidAsync(
+            "solaxCharts.renderTimelineChart",
+            "overview-plan-chart",
+            plan.Timeline.Select(p => p.Start.ToUnixTimeSeconds()).ToArray(),
+            plan.Timeline.Select(p => p.SurplusWatts).ToArray(),
+            plan.Timeline.Select(p => p.RequiredSocFloorPercent).ToArray(),
+            plan.NextFeasibleWindow?.Start.ToUnixTimeSeconds(),
+            plan.NextFeasibleWindow?.End.ToUnixTimeSeconds(),
+            _status.Timestamp.ToUnixTimeSeconds());
+    }
+
+    /// <summary>The day so far, summed from the energy monitor's quarter hours.</summary>
+    private sealed record TodayTotals(
+        double SolarKwh, double HouseKwh, double BatteryInKwh, double BatteryOutKwh,
+        double EvKwh, double ImportKwh, double ExportKwh)
+    {
+        public static TodayTotals From(IReadOnlyList<EnergyInterval> intervals) => new(
+            intervals.Sum(i => i.SolarKwh),
+            intervals.Sum(i => i.OtherLoadsKwh),
+            intervals.Sum(i => i.BatteryChargeKwh),
+            intervals.Sum(i => i.BatteryDischargeKwh),
+            intervals.Sum(i => i.EvKwh),
+            intervals.Sum(i => i.GridImportKwh),
+            intervals.Sum(i => i.GridExportKwh));
+    }
+
+    private string Today(Func<TodayTotals, double> pick) =>
+        _today is null ? "" : $"{pick(_today):F1} kWh today";
+
+    private string TodayInOut(Func<TodayTotals, double> into, Func<TodayTotals, double> outOf, string inWord, string outWord) =>
+        _today is null ? "" : $"{into(_today):F1} {inWord} · {outOf(_today):F1} {outWord} kWh today";
+
+    // The house apart from the car, from the same live readings the figures beside it show: what the
+    // roof makes and the grid brings in, less what the battery takes and the car draws. The Energy
+    // page's "other loads" residual, live.
+    private static double HouseWatts(ChargeControlStatus status) =>
+        status.SolarPowerWatts + status.GridPowerWatts - status.BatteryPowerWatts - status.EvChargerPowerWatts;
+
+    // What the hold is doing, beside the On/Off: armed is what was last written to the inverter,
+    // requested is the owner's intent -- they differ while a mode is waiting to arm it.
+    private static string HoldDetail(ChargeControlStatus status) => status switch
+    {
+        { BatteryHoldActive: true, BatteryHoldTargetWatts: { } target } => $"armed on the inverter, holding at {target:F0} W",
+        { BatteryHoldActive: true } => "armed on the inverter",
+        { BatteryHoldRequested: true } => "requested, not yet armed",
+        _ => "the battery serves the house as usual",
+    };
+
+    private string Window((DateTimeOffset Start, DateTimeOffset End)? window) =>
+        window is { } w
+            ? $"{TimeZoneInfo.ConvertTime(w.Start, Time.LocalTimeZone):HH:mm}–{TimeZoneInfo.ConvertTime(w.End, Time.LocalTimeZone):HH:mm}"
+            : "none";
 
     // A lookup, not a sum: the forecast source works the day totals out when a forecast lands, so this
     // is cheap enough for every poll. Reading it on the poll's cadence is also what picks up a refresh
@@ -329,7 +606,24 @@ else
         ];
     }
 
-    public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
+    public async ValueTask DisposeAsync()
+    {
+        StatusHolder.Updated -= OnStatusUpdated;
+
+        if (!_chartCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("solaxCharts.dispose", "overview-plan-chart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is already gone (e.g. the browser tab closed) -- nothing left to clean up.
+        }
+    }
 
     // "Is there a session to report on?" -- deliberately not "is the mode Off". A car drawing power
     // under no mode at all is exactly the case this section should not hide: somebody plugged in and
