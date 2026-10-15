@@ -246,10 +246,28 @@ input,
 }
 
 :where(input:not([type="checkbox"], [type="radio"]), select, textarea) {
-    background: var(--field);
+    background-color: var(--field);
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-sm);
     color: var(--ink);
+}
+
+/* A select drops the browser's own arrow for a thin chevron drawn in the muted ink -- a stroke, like
+   every other mark on the page. currentColor does not reach into a background image, so the chevron
+   carries its colour and the dark theme gives it its own. */
+:where(select) {
+    appearance: none;
+    padding-right: 2rem !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f5b56' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.55rem center;
+    background-size: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    :where(select) {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8a39b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
 }
 
 /* uPlot's legend is HTML, so it takes the page's face here; the axes are canvas and take it from
@@ -728,7 +746,7 @@ h1 {
     padding: var(--space-2);
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-sm);
-    background: var(--field);
+    background-color: var(--field);
     color: var(--ink);
     font-size: 1rem;
 }
@@ -891,7 +909,7 @@ h1 {
     padding: var(--space-1) var(--space-2);
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-sm);
-    background: var(--field);
+    background-color: var(--field);
     color: var(--ink);
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
@@ -973,9 +991,13 @@ h1 {
     border-radius: var(--radius-sm);
     color: var(--ink);
     padding: var(--space-1) var(--space-4);
-    margin-left: 0.5rem;
     font-size: 1rem;
     cursor: pointer;
+}
+
+/* Beside the button it pairs with (Activate and Cancel), not when it stands on its own line. */
+.control button + button.secondary {
+    margin-left: var(--space-2);
 }
 
 /* The .secondary margin above exists for the Activate/Cancel pairing; inside a gapped flex row it
@@ -1012,6 +1034,8 @@ h1 {
 .range-control label {
     color: var(--muted);
     font-size: 0.9rem;
+    font-weight: 400;
+    margin: 0;
 }
 
 /* Classical's table: no box, a firmer rule under the head and a hairline between rows, closed by
@@ -1037,9 +1061,18 @@ h1 {
 .sessions th {
     color: var(--muted);
     font-weight: 400;
+}
+
+/* Column heads only are set as small capitals; a heading row inside the body -- the forecast's day
+   rows -- or a row header stays in sentence case. */
+.sessions thead th {
     font-size: 0.75rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+}
+
+.sessions tbody th {
+    color: var(--ink);
 }
 
 .sessions tbody tr:last-child td {
@@ -1260,9 +1293,18 @@ h1 {
     }
 }
 
+/* The day stepper's arrows, at the height of the date field between them. */
 .day-step {
-    padding: 0.15rem 0.55rem;
+    min-width: 2.2rem;
+    padding: var(--space-1) var(--space-2);
     line-height: 1.4;
+    font-size: 1.05rem;
+}
+
+.range-control input[type="date"],
+.range-control select {
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.95rem;
 }
 
 .table-note,
@@ -1450,7 +1492,7 @@ button.link:hover {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-sm);
-    background: var(--field);
+    background-color: var(--field);
     color: var(--ink);
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
@@ -1461,7 +1503,7 @@ button.link:hover {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-sm);
-    background: var(--field);
+    background-color: var(--field);
     color: var(--ink);
     font-size: 1rem;
 }
