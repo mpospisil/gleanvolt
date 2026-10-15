@@ -8,6 +8,7 @@
 @using Microsoft.AspNetCore.Http
 @inject Gleanvolt.Web.Auth.WebPasswordState Password
 @inject NavigationManager Navigation
+@inject PvSystemInfo Site
 
 @*
     The one page in this assembly that must run as static server-side rendering rather than an
@@ -21,24 +22,49 @@
    sign-in prompt is the one place naming the installation buys nothing. *@
 <PageTitle>Sign in — Gleanvolt</PageTitle>
 
-<div class="login-card">
-    <h1>Sign in</h1>
+@*
+    The card is the page (#255, direction 2a): the sun mark, the product and the installation's name,
+    then the one field. The name sits on the card as well as in the header because this is the screen
+    where knowing which roof you are about to sign in to matters -- and on a phone the header's copy of
+    it is the first thing to be cut short.
 
-    @if (_failed)
+    The wrong-password state (2c) marks the field itself and says so under it, tied to it with
+    aria-describedby so a screen reader reads the error with the field rather than somewhere above it.
+*@
+<div class="login-card sign-in">
+    <div class="sign-in-mark"><SunMark /></div>
+    <h1>Gleanvolt</h1>
+    @if (!string.IsNullOrWhiteSpace(Site.Name))
     {
-        <p class="error">Wrong password.</p>
+        <p class="sign-in-site">@Site.Name</p>
     }
 
-    <EditForm Model="Input" method="post" FormName="login" OnValidSubmit="SignInAsync">
+    <EditForm EditContext="_form" method="post" FormName="login" OnValidSubmit="SignInAsync">
         <DataAnnotationsValidator />
 
-        <label>
-            Password
-            <InputText type="password" @bind-Value="Input!.Password" autofocus />
-        </label>
+        <label for="password">Password</label>
+        @* InputText sets aria-invalid and the "invalid" class itself, from the message SignInAsync
+           records against the field; only the link to the words is this page's to add. *@
+        <InputText id="password" type="password" @bind-Value="Input!.Password" autofocus
+                   autocomplete="current-password"
+                   aria-describedby="@(_failed ? "password-error" : null)" />
 
-        <button type="submit">Sign in</button>
+        @if (_failed)
+        {
+            <p class="error field-error" id="password-error">Wrong password.</p>
+        }
+
+        <button type="submit" class="btn btn-primary">Sign in</button>
     </EditForm>
+
+    @* Where the password comes from, both ways it can -- the Setup page (which writes it to the
+       overrides file) or Web__PasswordHash set by hand. No file is named: which one holds it depends on
+       which way it was set. There is no reset link because there is nothing behind one. *@
+    <p class="sign-in-hint">
+        One password for this installation, chosen on its Setup page the first time it ran or set as
+        <code>Web__PasswordHash</code>. There is no reset from here: a forgotten one is replaced in the
+        settings on the machine itself.
+    </p>
 </div>
 
 @code {
@@ -52,9 +78,20 @@
 
     private bool _failed;
 
+    private EditContext _form = default!;
+
+    private ValidationMessageStore _messages = default!;
+
     // [SupplyParameterFromForm] only populates Input on a matching POST; the initial GET (and any
-    // other render) needs a model of its own for EditForm to bind against.
-    protected override void OnInitialized() => Input ??= new();
+    // other render) needs a model of its own for EditForm to bind against. The context is explicit so
+    // a wrong password can be recorded as the field's own validation message: that is what makes
+    // InputText mark the field invalid, for the eye and for a screen reader alike.
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+        _form = new EditContext(Input);
+        _messages = new ValidationMessageStore(_form);
+    }
 
     private async Task SignInAsync()
     {
@@ -63,6 +100,8 @@
         if (!WebPasswordHasher.Verify(Password.Hash, Input?.Password ?? ""))
         {
             _failed = true;
+            _messages.Add(() => Input!.Password, "Wrong password.");
+            _form.NotifyValidationStateChanged();
             return;
         }
 

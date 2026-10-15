@@ -44,7 +44,7 @@ The two fonts are vendored the same way, unmodified, under `src/Gleanvolt.Web/ww
 each folder with its SIL Open Font License; `VENDORED.md` there records the source. They are bundled
 with the software, not sold on their own, as the OFL requires.
 
-Lucide's `sun` icon is copied inline as SVG markup into `Components/Layout/MainLayout.razor`. Lucide's
+Lucide's `sun` icon is copied inline as SVG markup into `src/Gleanvolt.Web/Components/SunMark.razor`. Lucide's
 ISC licence:
 
 > Permission to use, copy, modify, and/or distribute this software for any purpose with or without
