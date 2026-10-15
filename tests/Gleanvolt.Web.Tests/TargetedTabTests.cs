@@ -326,7 +326,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42);
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
         page.Find("#target-departure").Change("2026-08-11T07:00:00");
         Activate(page);
@@ -350,7 +350,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42);
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
 
         Assert.Contains("From 42% now, that is about 32.5 kWh", page.Markup);
@@ -372,7 +372,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
         Activate(page);
 
@@ -393,7 +393,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42, age: TimeSpan.FromHours(13));
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
 
         Assert.DoesNotContain("that is about", page.Markup);
@@ -428,7 +428,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42, age: TimeSpan.FromHours(5));
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
         page.Find("#target-departure").Change("2026-08-11T07:00:00");
         Activate(page);
@@ -444,7 +444,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 85);
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("80");
         Activate(page);
 
@@ -678,7 +678,7 @@ public class TargetedTabTests : PageTest
 
         // And the rest field only under the priority that uses it.
         Assert.Empty(page.FindAll("#rest-soc"));
-        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        page.Find("#charge-priority-justintime").Change(true);
         Assert.NotEmpty(page.FindAll("#rest-soc"));
     }
 
@@ -689,9 +689,9 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42);
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("100");
-        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        page.Find("#charge-priority-justintime").Change(true);
         page.Find("#rest-soc").Change("80");
         page.Find("#target-departure").Change("2026-08-11T07:00:00");
         Activate(page);
@@ -730,7 +730,7 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 85);
 
         var page = RenderTab();
-        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        page.Find("#charge-priority-justintime").Change(true);
 
         Assert.Contains("already at 85%", page.Find("#rest-soc").ParentElement!.TextContent);
         Assert.Contains("the whole charge is the held stretch", page.Find("#rest-soc").ParentElement!.TextContent);
@@ -743,9 +743,9 @@ public class TargetedTabTests : PageTest
         CarReports(socPercent: 42);
 
         var page = RenderTab();
-        page.Find("#target-basis").Change("Soc");
+        page.Find("#target-basis-soc").Change(true);
         page.Find("#target-soc").Change("70");
-        page.Find("#charge-priority").Change(nameof(TargetedChargePriority.JustInTime));
+        page.Find("#charge-priority-justintime").Change(true);
 
         Assert.Contains("nothing above it to hold", page.Find("#rest-soc").ParentElement!.TextContent);
     }
@@ -807,6 +807,99 @@ public class TargetedTabTests : PageTest
         if (start.Count > 0)
         {
             start[0].Click();
+        }
+    }
+
+    // ---- The preview as the 1d dialog (#255) ----
+
+    [Fact]
+    public void Opens_the_preview_as_a_modal_titled_with_the_request()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#target-basis-soc").Change(true);
+        page.Find("#target-soc").Change("80");
+        page.Find("#target-departure").Change("2026-08-11T17:00:00");
+        page.Find("#preview-target").Click();
+
+        Assert.Equal("dialog", page.Find("#target-preview").TagName.ToLowerInvariant());
+        Assert.Equal("80% by Tue 17:00", page.Find("#target-preview-title").TextContent);
+
+        // Only the browser can make a <dialog> modal, so the tab asks it to -- once per opening.
+        var shown = Assert.Single(JSInterop.Invocations, i => i.Identifier == "gleanvoltDialog.show");
+        Assert.Equal("target-preview", shown.Arguments[0]);
+    }
+
+    [Fact]
+    public void Shows_where_the_energy_comes_from_as_a_sun_and_grid_bar()
+    {
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+
+        // TestTargetedPlans.SolarPlusGrid: 14.6 kWh of sun and 7.4 from the grid.
+        var split = page.Find("#target-split").TextContent;
+        Assert.Contains("Sun 14.6 kWh", split);
+        Assert.Contains("Grid 7.4 kWh", split);
+        Assert.Contains("width:66.36%", page.Find("#target-split .split-bar .solar").GetAttribute("style"));
+    }
+
+    [Fact]
+    public void Back_closes_the_dialog_and_lets_it_open_again()
+    {
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+        page.Find("#discard-preview").Click();
+
+        Assert.Empty(page.FindAll("#target-preview"));
+
+        page.Find("#preview-target").Click();
+
+        Assert.Equal(2, JSInterop.Invocations.Count(i => i.Identifier == "gleanvoltDialog.show"));
+    }
+
+    [Fact]
+    public void Prices_just_in_time_on_the_pacing_choice_and_switches_in_place()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+        var priced = new PricedPreview(Now);
+        Services.AddSingleton<Core.Interfaces.ITargetedChargePreview>(priced);
+
+        var page = RenderTab();
+        page.Find("#target-basis-soc").Change(true);
+        page.Find("#target-soc").Change("100");
+        page.Find("#target-departure").Change("2026-08-11T07:00:00");
+        page.Find("#preview-target").Click();
+
+        // Cheapest chosen: the other option carries what it would cost.
+        Assert.Contains("Just in time · +1.2 kWh grid", page.Find("#dialog-pacing").TextContent);
+
+        page.Find("#dialog-pacing-justintime").Change(true);
+
+        // Rebuilt in place: still open, still the one dialog, now the held plan.
+        Assert.Single(page.FindAll("#target-preview"));
+        Assert.Single(JSInterop.Invocations, i => i.Identifier == "gleanvoltDialog.show");
+        Assert.Contains("Grid 8.6 kWh", page.Find("#target-split").TextContent);
+
+        // And the price stays on the option, now measured against the Cheapest plan it replaced.
+        Assert.Contains("Just in time · +1.2 kWh grid", page.Find("#dialog-pacing").TextContent);
+    }
+
+    /// <summary>A preview that answers Just in time with 1.2 kWh more grid than Cheapest.</summary>
+    private sealed class PricedPreview(DateTimeOffset now) : Core.Interfaces.ITargetedChargePreview
+    {
+        public List<TargetedChargeRequest> Requests { get; } = [];
+
+        public TargetedChargePlan? Preview(TargetedChargeRequest request)
+        {
+            Requests.Add(request);
+            var plan = TestTargetedPlans.SolarPlusGrid(now);
+
+            return request.Priority == TargetedChargePriority.JustInTime
+                ? plan with { GridEnergyWh = plan.GridEnergyWh + 1_200 }
+                : plan;
         }
     }
 }
