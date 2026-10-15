@@ -1,0 +1,88 @@
+# escape=`
+#
+# Not a production image, and not Dockerfile.winget-smoketest either. That one builds the win-x64
+# artifact from source and runs the exe from its own directory -- which would not have caught the
+# bug reported at https://github.com/microsoft/winget-pkgs/pull/428803#issuecomment-5942334799,
+# because that bug was specifically about how WinGet's PortableCommandAlias *reaches* the exe, not
+# about the exe itself.
+#
+# WinGet's "Portable" installer type puts the real files under
+#   %LOCALAPPDATA%\Microsoft\WinGet\Packages\<PackageId>__DefaultSource\win-x64\Gleanvolt.Worker.exe
+# and points a command-line alias at them with a reparse-point symlink:
+#   %LOCALAPPDATA%\Microsoft\WinGet\Links\gleanvolt.exe -> ...\Packages\...\win-x64\Gleanvolt.Worker.exe
+# A user then runs `gleanvolt` from whatever directory their shell happens to be in. This Dockerfile
+# downloads the actual published release asset -- the same bytes winget-pkgs' manifest points at --
+# and reproduces exactly that layout and that indirection, rather than approximating it.
+#
+#   docker build -f Dockerfile.winget-install-smoketest -t gleanvolt-winget-install-smoketest .
+#   docker run --rm -p 8090:8090 gleanvolt-winget-install-smoketest
+#
+# Requires Docker Desktop switched to Windows containers (right-click the tray icon -> "Switch to
+# Windows containers..."). Bare Nano Server, deliberately: curl.exe, tar.exe and mklink all ship in
+# it already, so there is no reason to pull in a heavier base just to fetch and unpack a zip. Nano
+# Server does NOT ship certutil (or PowerShell), so unlike a CI pipeline this can't verify the
+# download's hash for itself -- GLEANVOLT_SHA256 below is pinned from the release's own SHA256SUMS,
+# cross-checked by running sha256sum on the downloaded zip outside the container, but is a comment
+# here, not an enforced check. Confirm it again by hand if retargeting GLEANVOLT_VERSION.
+#
+# All data stays in the container's own writable layer -- no volume is declared, so `docker rm` is a
+# clean slate.
+
+ARG WINDOWS_VERSION=ltsc2022
+ARG GLEANVOLT_VERSION=1.0.12
+# GLEANVOLT_SHA256=BAF9712E58B510C27B40BB609E4800019F9B8C1B049077414B3EDD8A8E0EAF25
+
+FROM mcr.microsoft.com/windows/nanoserver:${WINDOWS_VERSION}
+
+ARG GLEANVOLT_VERSION
+
+# The real per-user WinGet paths, so this reproduces the reported bug's exact shape rather than a
+# simplified stand-in.
+ENV PACKAGE_DIR="C:\Users\ContainerUser\AppData\Local\Microsoft\WinGet\Packages\MartinPospisil.Gleanvolt__DefaultSource"
+ENV LINKS_DIR="C:\Users\ContainerUser\AppData\Local\Microsoft\WinGet\Links"
+
+# Windows mkdir takes one path per invocation, unlike POSIX mkdir -- three separate calls, not one.
+RUN mkdir "%PACKAGE_DIR%" `
+    && mkdir "%LINKS_DIR%" `
+    && mkdir C:\fetch
+
+WORKDIR C:\fetch
+
+RUN curl.exe -fsSL -o gleanvolt.zip `
+        "https://github.com/mpospisil/gleanvolt/releases/download/v%GLEANVOLT_VERSION%/gleanvolt-%GLEANVOLT_VERSION%-win-x64.zip" `
+    && tar.exe -xf gleanvolt.zip -C "%PACKAGE_DIR%" `
+    && del gleanvolt.zip
+
+# The alias WinGet's PortableCommandAlias creates: a reparse-point symlink, not a copy. Requires
+# SeCreateSymbolicLinkPrivilege, which ContainerUser (the default user, including at build time on
+# Nano Server) does not have -- matching a real Windows install, where creating the alias needs the
+# installer's elevated-enough context but running it afterward does not.
+USER ContainerAdministrator
+RUN mklink "%LINKS_DIR%\gleanvolt.exe" "%PACKAGE_DIR%\win-x64\Gleanvolt.Worker.exe"
+
+# The regression this exists to catch: a win-x64 build that is self-contained but not single-file
+# ships a companion Gleanvolt.Worker.dll, which the alias symlink cannot find (the apphost resolves
+# it next to the path it was invoked as, not the symlink's target) -- see the PR comment linked above.
+# Fail the build itself if that ever comes back, rather than waiting to notice it at `docker run`.
+RUN if exist "%PACKAGE_DIR%\win-x64\Gleanvolt.Worker.dll" (echo Regression: win-x64 build is not single-file again & exit 1)
+
+# ${PACKAGE_DIR}, not %PACKAGE_DIR%: COPY's variables are substituted by the Docker builder itself,
+# which always uses Docker's own $VAR syntax regardless of target OS -- cmd's %VAR% is only expanded
+# inside a RUN once cmd.exe actually runs it. Unquoted and backslash-terminated, deliberately: a
+# trailing \ right before a closing " is read as an escaped quote, not a literal backslash, and
+# PACKAGE_DIR has no spaces to quote for anyway.
+COPY LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md ${PACKAGE_DIR}\win-x64\
+
+ENV DOTNET_EnableDiagnostics=0
+
+# Neither C:\...\Packages\...\win-x64\ nor C:\...\Links\: an unrelated directory, the same way the
+# reviewer's own manual test ran it from Desktop. Content-root resolution that only worked by
+# accident -- because dev runs happen to start in the exe's own directory -- fails here exactly like
+# it failed there.
+WORKDIR C:\Users\ContainerUser
+
+USER ContainerUser
+
+EXPOSE 8090
+
+ENTRYPOINT ["C:\\Users\\ContainerUser\\AppData\\Local\\Microsoft\\WinGet\\Links\\gleanvolt.exe"]
