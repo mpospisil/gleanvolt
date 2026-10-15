@@ -8,9 +8,8 @@
 *@
 
 <header class="topbar">
-    @* The sun mark is Lucide's "sun" (ISC, see THIRD-PARTY-NOTICES.md), inline so nothing is fetched. *@
     <span class="brand">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>
+        <SunMark />
         Gleanvolt
     </span>
     @*
@@ -29,33 +28,42 @@
         reason the sign-out control is a form: this layout also wraps the static sign-in page, and a
         checkbox opens the menu whether or not a circuit is live. menu.js closes it again after a link
         is followed, since enhanced navigation keeps the header -- and the box's checked state.
+
+        The links, and the button that folds them, only for the audience they are for: on the default
+        policy, like the feed alert below, so with sign-in required the sign-in page shows the name
+        and nothing else -- every link would only have bounced back to it -- and with sign-in off
+        nothing changes.
     *@
-    <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="Menu" />
-    <label for="menu-toggle" class="menu-button" aria-hidden="true">
-        <span class="menu-icon"></span>Menu
-    </label>
-    <div class="menu">
-        <nav>
-            <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
-            <NavLink href="/charging-plan">Charging plan</NavLink>
-            <NavLink href="/sessions">Sessions</NavLink>
-            <NavLink href="/energy">Energy</NavLink>
-            <NavLink href="/forecast">Forecast</NavLink>
-            <NavLink href="/pv-system">PV system</NavLink>
-            <NavLink href="/car">Car</NavLink>
-            <NavLink href="/health">Health</NavLink>
-        </nav>
-        @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
-           stay true regardless of Web:RequireAuthentication, or this control would show for an
-           anonymous visitor once RequireAuthentication is off and DefaultPolicy allows everyone. *@
-        <AuthorizeView Policy="Authenticated">
-            <Authorized>
-                <form method="post" action="/logout" class="signout">
-                    <button type="submit">Sign out</button>
-                </form>
-            </Authorized>
-        </AuthorizeView>
-    </div>
+    <AuthorizeView Context="viewer">
+        <Authorized>
+            <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="Menu" />
+            <label for="menu-toggle" class="menu-button" aria-hidden="true">
+                <span class="menu-icon"></span>Menu
+            </label>
+            <div class="menu">
+                <nav>
+                    <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
+                    <NavLink href="/charging-plan">Charging plan</NavLink>
+                    <NavLink href="/sessions">Sessions</NavLink>
+                    <NavLink href="/energy">Energy</NavLink>
+                    <NavLink href="/forecast">Forecast</NavLink>
+                    <NavLink href="/pv-system">PV system</NavLink>
+                    <NavLink href="/car">Car</NavLink>
+                    <NavLink href="/health">Health</NavLink>
+                </nav>
+                @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
+                   stay true regardless of Web:RequireAuthentication, or this control would show for an
+                   anonymous visitor once RequireAuthentication is off and DefaultPolicy allows everyone. *@
+                <AuthorizeView Policy="Authenticated">
+                    <Authorized>
+                        <form method="post" action="/logout" class="signout">
+                            <button type="submit">Sign out</button>
+                        </form>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </Authorized>
+    </AuthorizeView>
 </header>
 
 <main class="content">

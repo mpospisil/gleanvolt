@@ -238,6 +238,47 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task The_sign_in_card_names_the_installation_and_offers_no_links_past_it()
+    {
+        // The sign-in card (#255) is where knowing which roof you are signing in to matters, so it
+        // carries the name itself. The header's links are left off: with sign-in required every one of
+        // them would only have bounced back here.
+        var client = await StartAsync(Protected());
+
+        var html = await (await client.GetAsync("/login")).Content.ReadAsStringAsync();
+
+        Assert.Contains("<p class=\"sign-in-site\">Home Roof</p>", html);
+        Assert.DoesNotContain("href=\"/charging-plan\"", html);
+        Assert.DoesNotContain("id=\"menu-toggle\"", html);
+    }
+
+    [Fact]
+    public async Task Keeps_the_links_when_sign_in_is_off()
+    {
+        // The other half of the rule above: with nobody to sign in, the links are the audience's.
+        var client = await StartAsync(new WebOptions { Enabled = true, RequireAuthentication = false });
+
+        var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
+
+        Assert.Contains("href=\"/charging-plan\"", html);
+        Assert.Contains("id=\"menu-toggle\"", html);
+    }
+
+    [Fact]
+    public async Task Ties_the_wrong_password_message_to_the_field()
+    {
+        // A screen reader reads the error with the field it is about, not somewhere above the form.
+        var client = await StartAsync(Protected());
+        var (cookie, token) = await GetLoginFormAsync(client);
+
+        var body = await (await PostLoginAsync(client, cookie, token, "not the password")).Content.ReadAsStringAsync();
+
+        Assert.Matches("<input[^>]*aria-describedby=\"password-error\"", body);
+        Assert.Matches("<input[^>]*aria-invalid=\"true\"", body);
+        Assert.Contains("id=\"password-error\">Wrong password.</p>", body);
+    }
+
+    [Fact]
     public async Task Serves_no_dashboard_at_all_with_no_authentication_configured()
     {
         // The out-of-the-box deployment, through the real pipeline: no password, no
