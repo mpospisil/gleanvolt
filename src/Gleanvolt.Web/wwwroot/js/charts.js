@@ -24,7 +24,7 @@ window.solaxCharts = (function () {
     // on its own can't communicate. Recreated (not patched via setData) on every poll like the rest of
     // the plan page's live figures; a plan updates every few seconds, so a brief redraw is the honest
     // cost of staying current rather than a defect to work around.
-    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec) {
+    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec, nowSec) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -88,6 +88,27 @@ window.solaxCharts = (function () {
                         ctx.save();
                         ctx.fillStyle = accent + "1a";
                         ctx.fillRect(x0, u.bbox.top, x1 - x0, u.bbox.height);
+                        ctx.restore();
+                    },
+                    // "Now" (#255, the overview's Today's plan card): a hairline in ink, so the window
+                    // reads as ahead, under way or gone without working it out from the clock. Optional;
+                    // the Forecasted tab passes none.
+                    (u) => {
+                        if (nowSec == null) {
+                            return;
+                        }
+
+                        const x = Math.round(u.valToPos(nowSec, "x", true)) + 0.5;
+                        const ctx = u.ctx;
+
+                        ctx.save();
+                        ctx.strokeStyle = ink;
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([2, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(x, u.bbox.top);
+                        ctx.lineTo(x, u.bbox.top + u.bbox.height);
+                        ctx.stroke();
                         ctx.restore();
                     },
                 ],
