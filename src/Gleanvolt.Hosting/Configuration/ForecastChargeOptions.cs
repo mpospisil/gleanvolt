@@ -63,10 +63,8 @@ public sealed class ForecastChargeOptions
     ///
     /// <para>Without it the gate turns on a single percent of SOC — the inverter reports whole
     /// percent — so a morning that starts just above the floor stops and restarts the car every few
-    /// minutes. Keep it above <see cref="HoldReleaseMarginPercent"/>: the battery hold must have let
-    /// go before the car comes back to compete for the surplus, or SOC simply pins to the floor with
-    /// the grid covering every dip. On a 9 kWh pack 5% is ~450 Wh, roughly nine minutes of a 3 kW
-    /// surplus going into the battery.</para>
+    /// minutes. On a 9 kWh pack 5% is ~450 Wh, roughly nine minutes of a 3 kW surplus going into the
+    /// battery.</para>
     /// </summary>
     public double FloorResumeMarginPercent { get; init; } = 5;
 
@@ -144,16 +142,6 @@ public sealed class ForecastChargeOptions
     /// live-solar behaviour. Never assume optimistic headroom from a stale forecast.
     /// </summary>
     public TimeSpan StaleForecastAfter { get; init; } = TimeSpan.FromHours(4);
-
-    /// <summary>
-    /// Whether the battery discharge hold (issue #20) is armed automatically at the trajectory floor,
-    /// so an estimate error physically cannot dig below it. Requires <c>BatteryHold:Enabled</c>; a
-    /// manual hold from Home Assistant always wins.
-    /// </summary>
-    public bool AutoArmBatteryHoldAtFloor { get; init; } = true;
-
-    /// <summary>How far SOC must recover above the floor before an auto-armed hold is released again.</summary>
-    public double HoldReleaseMarginPercent { get; init; } = 2;
 
     /// <summary>Closed daylight forecast periods required before the realised bias is trusted.</summary>
     public int BiasMinPeriods { get; init; } = 4;

@@ -235,7 +235,7 @@ public sealed class PollingService : BackgroundService
                 // Charging as it stands after the block above, so a mode that has just ended itself lets
                 // go of a bridge hold in this cycle instead of holding it through the release dwell.
                 var hold = await ApplyBatteryHoldAsync(
-                    state, mode, plan, targetedPlan, fastCharge,
+                    state, mode, targetedPlan, fastCharge,
                     charging: result.State == ChargeControlState.Charging,
                     gridBridging: result.GridBridgeWatts > 0,
                     stoppingToken);
@@ -457,7 +457,6 @@ public sealed class PollingService : BackgroundService
     private async Task<BatteryHoldState> ApplyBatteryHoldAsync(
         EnergyState state,
         ChargeControlMode mode,
-        SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
         FastChargeProgress? fastCharge,
         bool charging,
@@ -473,7 +472,7 @@ public sealed class PollingService : BackgroundService
         // switch is on, and the fast mode's release runs *inside* AutoHold -- through the switch. A
         // mode ending while its own hold was armed would then never release it, which is the one
         // outcome this whole arrangement exists to prevent.
-        var auto = AutoHold(state, mode, plan, targetedPlan, fastCharge, charging, gridBridging);
+        var auto = AutoHold(state, mode, targetedPlan, fastCharge, charging, gridBridging);
         var hold = _batteryHold.Hold || auto;
         var expectedPvWatts = _solarForecast.GetForecastForToday()?.ExpectedPowerWattsAt(state.Timestamp);
         var target = BatteryDischargeHoldStrategy.Target(
@@ -619,10 +618,9 @@ public sealed class PollingService : BackgroundService
     /// <see cref="ReleaseFastHoldIfEnded"/> when the mode stops driving, so for as long as it runs the
     /// owner's switch is the only input — off means off.</para>
     ///
-    /// <para><see cref="ChargeControlMode.Forecasted"/> wants it once SOC has reached the floor the plan
-    /// requires for a 100% battery by the deadline, so an estimate error cannot dig below it — the grid
-    /// covers the gap instead of the pack. Released again only after SOC has recovered a margin above the
-    /// floor, so the hold doesn't chatter around the line.</para>
+    /// <para><see cref="ChargeControlMode.Forecasted"/> never wants it. The mode's job is to store as much
+    /// of the sun as it can and import as little as it can; it pauses the car at the plan's floor by
+    /// itself, so a hold could only put the house or the car on the grid in place of the pack.</para>
     ///
     /// <para><see cref="ChargeControlMode.SolarGrid"/> and <see cref="ChargeControlMode.Targeted"/> want it
     /// while the car draws more than the sun gives — see <see cref="BridgeHold"/>.</para>
@@ -630,7 +628,6 @@ public sealed class PollingService : BackgroundService
     private bool AutoHold(
         EnergyState state,
         ChargeControlMode mode,
-        SolarDayPlan plan,
         TargetedChargePlan? targetedPlan,
         FastChargeProgress? fastCharge,
         bool charging,
@@ -715,32 +712,17 @@ public sealed class PollingService : BackgroundService
             return bridge.Armed;
         }
 
-        if (mode != ChargeControlMode.Forecasted || !_forecastOptions.AutoArmBatteryHoldAtFloor || !plan.IsUsable)
+        // Everything else, Forecasted included, never holds the pack. Forecasted is there to put the sun
+        // into the batteries and keep the grid out; it already stops the car at its own floor, so a hold
+        // there could only ever swap pack for grid. On 2026-10-17 it kept the pack out of the house all
+        // day: paused car, pack at 84%, an oven on, and 2 kW from the grid.
+        if (_autoHold)
         {
-            if (_autoHold)
-            {
-                _logger.LogInformation("Battery discharge hold released automatically: mode is now {Mode}.", mode);
-            }
-
-            _autoHold = false;
-            return false;
+            _logger.LogInformation("Battery discharge hold released automatically: mode is now {Mode}.", mode);
         }
 
-        var soc = state.BatterySocPercent;
-        var release = plan.RequiredSocFloorPercent + _forecastOptions.HoldReleaseMarginPercent;
-        var armed = _autoHold ? soc < release : soc <= plan.RequiredSocFloorPercent;
-
-        if (armed != _autoHold)
-        {
-            _logger.LogInformation(
-                "Battery discharge hold {Action} automatically: SOC {Soc:F0}% against the plan's {Floor:F0}% floor.",
-                armed ? "armed" : "released",
-                soc,
-                plan.RequiredSocFloorPercent);
-        }
-
-        _autoHold = armed;
-        return armed;
+        _autoHold = false;
+        return false;
     }
 
     /// <summary>

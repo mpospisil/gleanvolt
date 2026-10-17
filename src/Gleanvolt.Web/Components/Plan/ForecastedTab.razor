@@ -119,7 +119,7 @@ else
         <Stat Label="Loan headroom" Value="@Kwh(plan.LoanHeadroomWh)"
               Hint="How much the pack may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, or when every remaining watt has a home in the pack." />
         <Stat Label="Required SOC floor" Value="@Percent(plan.RequiredSocFloorPercent)"
-              Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what arms the discharge hold automatically." />
+              Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what pauses the car." />
         <Stat Label="Forecast remaining today" Value="@Kwh(plan.RemainingPvWh)"
               Hint="Forecast PV still to come today, at the configured confidence band and already scaled by forecast accuracy." />
         <Stat Label="Tomorrow forecast" Value="@(Status.TomorrowForecastWh is { } tomorrow ? Kwh(tomorrow) : "—")"

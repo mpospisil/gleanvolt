@@ -810,9 +810,7 @@ each time. Two things prevent that:
 
 - **A resume margin.** Charging continues down to `SocFloor` itself, but a paused session only comes
   back at `SocFloor + FloorResumeMarginPercent` (default 5 %) — the SOC counterpart of
-  `ResumeHysteresisWatts`. It is held at or above `HoldReleaseMarginPercent`, because a car allowed
-  back before the auto-armed [battery hold](#battery-discharge-hold-writes-to-the-inverter) releases
-  would simply pin SOC to the floor with the grid covering every dip.
+  `ResumeHysteresisWatts`.
 - **The clamp and the trajectory are different events.** Falling through `TrajectoryFloor` puts the
   evening 100 % at risk and stops the session at once. Falling through the `MinBatterySocFloorPercent`
   clamp while the trajectory sits far below — the normal case on a sunny morning, when the sun could
@@ -820,8 +818,8 @@ each time. Two things prevent that:
   the `MinRunTime` dwell timer like any other soft reason and the session is held at 6 A rather than
   cut short. Both floors are published, as `soc_floor` and `soc_floor_traj`.
 - **A guard band, so the pack recovers instead of hovering.** Not flapping is not the same as getting
-  better: a car that takes every watt the sun makes holds SOC *exactly* on the floor all morning, with
-  the auto-armed hold sending every dip to the grid. So while SOC is inside the resume margin,
+  better: a car that takes every watt the sun makes holds SOC *exactly* on the floor all morning, and
+  the pack never gets the charge the evening needs. So while SOC is inside the resume margin,
   `FloorGuardReserveWatts` (default 750) of surplus is withheld from the car and the battery lends
   nothing — a loan and a reserve at the same SOC would only cancel out. On the 9 kWh default that
   clears a 5 % band in about forty minutes and costs a three-phase session roughly one amp. Where the
@@ -839,7 +837,7 @@ because that is what the floor means, so the bounds are about wear and about whe
 buys anything:
 
 - **never below the plan's SOC floor**, nor below `MinBatterySocFloorPercent` (default 50 %), with
-  `LoanSocMarginPercent` of clearance above it before lending starts at all. The floor rises as the day runs out, the discharge hold arms at it,
+  `LoanSocMarginPercent` of clearance above it before lending starts at all. The floor rises as the day runs out, the car pauses at it,
   and the repayment needs no scheduling: lending drops SOC, which books more of the late production for
   the pack, which raises the floor, which squeezes the car out earlier.
 - **`MaxLoanPowerWatts`** (default 3800) caps the bridge and the discharge rate. It has to be able to
@@ -863,9 +861,10 @@ The same two floors decide what the plan calls a **charge window**, so a window 
 tab is one the controller will enter — the two used to be computed separately and disagreed by the
 width of a whole band of weather.
 
-With `BatteryHold:Enabled` on, the [battery discharge hold](#battery-discharge-hold-writes-to-the-inverter)
-is armed automatically once SOC reaches the floor, so an estimate error can't dig below it — the grid
-covers the gap instead of the pack. A manual hold from HA always wins.
+`Forecasted` never arms the [battery discharge hold](#battery-discharge-hold-writes-to-the-inverter) by
+itself. Its job is to store as much of the sun as it can and import as little as it can, and it already
+pauses the car at the floor; a hold on top of that could only send the house, or the car, to the grid in
+place of the pack. A manual hold from HA still applies.
 
 #### When the sun can't cover everything
 
@@ -960,8 +959,6 @@ deadline.
                                      //   Forecasted and Targeted share it)
     "FinalGuardBefore": "01:00:00",  // pause the car this long before the deadline if SOC < 100%
     "StaleForecastAfter": "04:00:00",// older than this → fall back to Solar behaviour
-    "AutoArmBatteryHoldAtFloor": true,
-    "HoldReleaseMarginPercent": 2,
     "BiasMinPeriods": 4,             // closed daylight periods before the bias is trusted
     "BiasClampMin": 0.5,
     "BiasClampMax": 1.2,
@@ -1612,7 +1609,7 @@ description or tooltip field. The meanings live here instead.
 | **Charge off** | button | Writes the charger's use-mode `Stop` and returns the mode to `Off`, releasing any hold a mode had armed. Always writes, even when the controller was already `Off` and never took control: the button says stop charging, so it stops charging. The current setpoint is left wherever the last cycle put it. This stops *the car*, not the controller — that is **Stop service**. |
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` and `SolarGrid` are different: they arm their own hold only while the car draws more than the sun gives — `Targeted`'s grid block, the grid bridge, or a cloud the 3-minute average has not caught up with — keep it for `BatteryHold:BridgeReleaseDwell` after the last of those while charging, and never touch this switch. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
-| **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Never applied below the hold's release margin. Doesn't persist across restarts. |
+| **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts. |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
 | **Fast energy** | kWh | How much to deliver before the fast charge stops itself, measured at the charger and metered from the press. Read only under the `Energy` basis. Doesn't persist across restarts. |
 | **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Ev:Vehicles:0:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. A reading older than `Vehicle:MaxAge` is **refused**, not converted: the press logs why and starts nothing, since a button has nowhere to show a message (#179). Ask in **Fast energy**, or press `Full`. Doesn't persist across restarts. |
@@ -1651,7 +1648,7 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **Projected shortfall** | kWh | How far today's forecast falls short of the house plus a full home battery. Above zero means the evening 100% is at risk. The car is **not** in this sum — it only ever gets what is left once both are served, so it can neither cause this shortfall nor be measured against it. |
 | **Surplus spill** | kWh | Remaining surplus the home battery has no room for: what is still coming, less what it can absorb by the evening deadline. At 100% it is all of it, and every watt of it leaves the house unless the car takes it. Above zero it is what lets the pack lend against a much thinner surplus than usual, because the energy lent is not energy it would have kept. |
 | **Loan headroom** | kWh | How much the pack may lend right now for free: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, and zero when every remaining watt has a home in the pack — which is the answer to "why is nothing being lent while the sun is out?". |
-| **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what arms the discharge hold automatically. |
+| **Required SOC floor** | % | The SOC the battery must not fall below right now if the sun still to come is to return it to 100% by the evening deadline. It climbs towards 100% as the day runs out, which is what squeezes the car out of the late afternoon without any scheduling. Battery SOC dropping to this line is what pauses the car. |
 | **Trajectory SOC floor** | % | The same figure before the **Minimum battery SOC** clamp is applied: what the forecast on its own says the battery could be drawn down to. Well below the floor in force on a sunny morning, equal to it once the day is short. The pair is the first thing to read when a session pauses — it says whether the car is being held back by the forecast or merely by your configured minimum, and the controller stops the session harder in the first case. |
 | **Forecast remaining today** | kWh | Forecast PV still to come today, at the configured confidence band and already scaled by **Forecast accuracy**. |
 | **Tomorrow forecast** | kWh | Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out. |

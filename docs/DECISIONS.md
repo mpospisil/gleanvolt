@@ -4,6 +4,34 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-17 — `Forecasted` never arms the battery hold
+
+**Context.** On 2026-10-17 the charger started the car at plug-in and took the pack to 11% before a mode
+was picked. `Forecasted`, selected at 08:48, paused the car and armed the hold at once: 11% against an
+88% floor. The car stayed paused all day, because the floor rose with the day ahead of SOC, and so did
+the hold. By 12:20 the pack was at 84% when a ~4 kW load came on (the oven). The hold kept the pack
+out of it, and the house took 1–2.6 kW from the grid while the pack sat still.
+
+The first fix released the hold whenever the car was paused, as `SolarGrid` and `Targeted` do
+([2026-09-15](#2026-09-15--the-bridge-hold-arms-on-the-cars-live-shortfall-and-lets-go-after-a-dwell)).
+That still left it armed in the one place it could act: a car charging on the floor, where it sends the
+car's dips to the grid instead of the pack.
+
+**Decision — no automatic hold in `Forecasted` at all.** The mode is there to store as much of the sun
+as it can and import as little as it can. Some days that is not possible, and then it imports; it should
+never import to protect a battery that is there to be used. It already pauses the car at the plan's
+floor, which is what protects the evening. A hold on top of that only ever swaps pack for grid. A
+manual hold still applies.
+
+`AutoArmBatteryHoldAtFloor` and `HoldReleaseMarginPercent` are removed, along with the floor they put
+under `FloorResumeMarginPercent`: the resume margin was kept above the hold's release margin so the car
+never came back while the pack was still held, and there is no hold left to wait for.
+
+**Cost.** A car charging on the floor through a cloud, or inside the minimum run time below the owner's
+clamp, now draws on the pack for those minutes. It is stored sun, and the floor's pause ends it.
+
+---
+
 ## 2026-10-13 — `Forecasted` drops the session energy target too; the car's own limit is the ceiling
 
 **Context.** Issue #249. #217 took the daily EV target out of `Forecasted` and kept the **session

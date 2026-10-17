@@ -13,9 +13,7 @@ namespace Gleanvolt.Core.Models;
 /// The SOC counterpart of <paramref name="ResumeHysteresisWatts"/>: how far above the plan's floor the
 /// battery must have recovered before a paused session may restart. Charging continues down to the
 /// floor itself, but coming back requires the margin — without it the gate flips on a single percent
-/// of SOC (the inverter reports whole percent) and the car cycles on and off all morning. Set it
-/// larger than the battery hold's release margin, so the pack is discharging freely again before the
-/// car returns to compete for the surplus.
+/// of SOC (the inverter reports whole percent) and the car cycles on and off all morning.
 /// </param>
 /// <param name="FloorGuardReserveWatts">
 /// Surplus withheld from the car while the SOC is inside the guard band — the same
