@@ -1,5 +1,6 @@
 using Gleanvolt.Api;
 using Gleanvolt.Web;
+using Gleanvolt.Web.Auth;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
@@ -210,6 +211,18 @@ public class ApiSurfaceRegistrationTests
             ("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"), ("Web:PasswordHash", "a-hash"));
 
         Assert.Equal("a-key", Assert.Single(provider.GetRequiredService<ApiDisplayOptions>().Keys).Secret);
+    }
+
+    [Fact]
+    public async Task APasswordSetAfterStartupHandsTheKeyOverWithoutARestart()
+    {
+        // Issue #254: /setup records the hash in WebPasswordState, not in the startup configuration.
+        await using var provider = Build(("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"));
+        provider.GetRequiredService<WebPasswordState>().Set("a-hash");
+
+        using var scope = provider.CreateScope();
+
+        Assert.Equal("a-key", Assert.Single(scope.ServiceProvider.GetRequiredService<ApiDisplayOptions>().Keys).Secret);
     }
 
     [Fact]

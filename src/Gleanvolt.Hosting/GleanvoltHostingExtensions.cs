@@ -26,6 +26,7 @@ using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Api;
 using Gleanvolt.Web;
+using Gleanvolt.Web.Auth;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
@@ -969,18 +970,25 @@ public static class GleanvoltHostingExtensions
             //
             // The paths are GleanvoltApi's own constants rather than literals, so a route that moves
             // cannot leave the page pointing at where it used to be.
-            services.AddSingleton(new ApiDisplayOptions(
-                api.Enabled,
-                GleanvoltApi.BasePath,
-                GleanvoltApi.DocumentPath,
-                web.Port,
-                [.. api.Keys
-                    .Where(key => !string.IsNullOrWhiteSpace(key.Value))
-                    // By name, so the table does not reorder itself between restarts on an installation
-                    // with several clients.
-                    .OrderBy(key => key.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(key => new ApiKeyDisplay(
-                        key.Key, web.AuthenticationRequired ? key.Value : null))]));
+            //
+            // Scoped, not a singleton, and gated on the password in force rather than the startup one
+            // (issue #254): a password set on /setup has to unlock the keys on the next page load, not
+            // the next restart. Setup ends with a full reload, so that next load is a new scope.
+            services.AddScoped(provider =>
+            {
+                var loginEnforced = web.LoginEnforced(provider.GetRequiredService<WebPasswordState>());
+                return new ApiDisplayOptions(
+                    api.Enabled,
+                    GleanvoltApi.BasePath,
+                    GleanvoltApi.DocumentPath,
+                    web.Port,
+                    [.. api.Keys
+                        .Where(key => !string.IsNullOrWhiteSpace(key.Value))
+                        // By name, so the table does not reorder itself between restarts on an installation
+                        // with several clients.
+                        .OrderBy(key => key.Key, StringComparer.OrdinalIgnoreCase)
+                        .Select(key => new ApiKeyDisplay(key.Key, loginEnforced ? key.Value : null))]);
+            });
 
             // What the two MQTT links are configured to do (issue #143). Registered whenever the UI is
             // enabled rather than inside a check on either link, because "MQTT is off" is the thing the
@@ -991,9 +999,11 @@ public static class GleanvoltHostingExtensions
             // that publishes to the .../set topics -- so handing it out would be handing out the stop
             // button on the wallbox by another route. The record is therefore built with a null password
             // unless a login is actually enforced, which is a structural guarantee in the spirit of
-            // ReadOnlyModbusClient: the page cannot disclose what it was never given.
-            services.AddSingleton(provider =>
+            // ReadOnlyModbusClient: the page cannot disclose what it was never given. Scoped and read from
+            // the password in force, like the API keys above (issue #254).
+            services.AddScoped(provider =>
             {
+                var loginEnforced = web.LoginEnforced(provider.GetRequiredService<WebPasswordState>());
                 var ha = provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value;
                 var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
                 var discovery = provider.GetRequiredService<HaDiscovery>();
@@ -1031,7 +1041,7 @@ public static class GleanvoltHostingExtensions
                         host,
                         port,
                         username ?? string.Empty,
-                        web.AuthenticationRequired && !string.IsNullOrEmpty(password) ? password : null,
+                        loginEnforced && !string.IsNullOrEmpty(password) ? password : null,
                         !string.IsNullOrEmpty(password),
                         clientId);
             });

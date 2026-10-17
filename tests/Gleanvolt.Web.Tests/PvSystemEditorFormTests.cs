@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Auth;
 using Gleanvolt.Web.Components;
 
 namespace Gleanvolt.Web.Tests;
@@ -25,6 +26,7 @@ public class PvSystemEditorFormTests : BunitContext
 
         // A login, which is what makes the form editable at all.
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
+        Services.AddSingleton(new WebPasswordState("hash"));
 
         // The restart asks the browser to watch for the controller coming back; the script is not here.
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -180,6 +182,45 @@ public class PvSystemEditorFormTests : BunitContext
 
         Assert.Contains("does not read", form.Find("#pv-unavailable").TextContent);
         Assert.All(form.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
+        Assert.Empty(form.FindAll("#pv-save"));
+    }
+
+    [Fact]
+    public void Without_a_login_the_form_is_read_only()
+    {
+        Services.AddSingleton(Options.Create(new WebOptions()));
+        Services.AddSingleton(new WebPasswordState(null));
+
+        var form = Render<PvSystemEditorForm>();
+
+        Assert.Contains("no login", form.Find("#pv-readonly").TextContent);
+        Assert.All(form.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
+        Assert.Empty(form.FindAll("#pv-save"));
+    }
+
+    [Fact]
+    public void A_password_set_after_startup_makes_the_form_editable_without_a_restart()
+    {
+        // Issue #254: /setup records the hash in WebPasswordState, never in the startup WebOptions.
+        Services.AddSingleton(Options.Create(new WebOptions()));
+        var password = new WebPasswordState(null);
+        Services.AddSingleton(password);
+        password.Set("hash");
+
+        var form = Render<PvSystemEditorForm>();
+
+        Assert.Empty(form.FindAll("#pv-readonly"));
+        Assert.NotNull(form.Find("#pv-save"));
+    }
+
+    [Fact]
+    public void Authentication_switched_off_keeps_the_form_read_only_even_with_a_password()
+    {
+        Services.AddSingleton(Options.Create(new WebOptions { RequireAuthentication = false, PasswordHash = "hash" }));
+
+        var form = Render<PvSystemEditorForm>();
+
+        Assert.NotNull(form.Find("#pv-readonly"));
         Assert.Empty(form.FindAll("#pv-save"));
     }
 }

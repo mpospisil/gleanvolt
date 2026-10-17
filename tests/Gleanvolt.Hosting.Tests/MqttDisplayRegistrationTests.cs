@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Web;
+using Gleanvolt.Web.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -147,6 +148,20 @@ public class MqttDisplayRegistrationTests
         Assert.Equal("broker-secret", mqtt.HomeAssistant.Connection.Password);
         Assert.Equal("car-secret", mqtt.Vehicle.Connection.Password);
         Assert.False(mqtt.HomeAssistant.Connection.PasswordWithheld);
+    }
+
+    [Fact]
+    public async Task APasswordSetAfterStartupHandsTheBrokerPasswordOverWithoutARestart()
+    {
+        // Issue #254: /setup records the hash in WebPasswordState, not in the startup configuration.
+        await using var provider = Build(HomeAssistantOn);
+        provider.GetRequiredService<WebPasswordState>().Set("a-hash");
+
+        using var scope = provider.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<MqttDisplayOptions>().HomeAssistant.Connection;
+
+        Assert.Equal("broker-secret", connection.Password);
+        Assert.False(connection.PasswordWithheld);
     }
 
     [Fact]

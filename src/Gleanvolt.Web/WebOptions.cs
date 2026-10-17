@@ -1,3 +1,5 @@
+using Gleanvolt.Web.Auth;
+
 namespace Gleanvolt.Web;
 
 /// <summary>
@@ -65,4 +67,14 @@ public sealed class WebOptions
     /// </summary>
     public bool AuthenticationRequired =>
         RequireAuthentication ?? !string.IsNullOrWhiteSpace(PasswordHash);
+
+    /// <summary>
+    /// The same answer as <see cref="AuthenticationRequired"/>, but for the password in force now
+    /// rather than the one configuration held at startup (issue #254). A password chosen on the setup
+    /// page lands in <paramref name="password"/> and not in these options, so anything that decides
+    /// per request or render -- whether an editor is editable, whether a secret is shown -- asks this,
+    /// or it keeps behaving as if there were no login until the next restart.
+    /// </summary>
+    public bool LoginEnforced(WebPasswordState password) =>
+        RequireAuthentication ?? password.IsSet;
 }
