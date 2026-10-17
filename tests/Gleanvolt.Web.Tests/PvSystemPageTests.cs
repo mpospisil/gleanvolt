@@ -135,6 +135,7 @@ public class PvSystemPageTests : BunitContext
         // The edit form's dependencies, in the UI's default state: no login, so the form is read-only.
         context.Services.AddSingleton<IPvSystemEditor>(new FakePvSystemEditor());
         context.Services.AddSingleton(Options.Create(new WebOptions()));
+        context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
 
         return context.Render<PvSystem>();

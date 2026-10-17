@@ -1,5 +1,6 @@
 @inject IEvEditor Editor
 @inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
 
 @*
     The car, editable (issue #214). Everything below this form on /car is what the process is running
@@ -252,7 +253,8 @@
 
     // These fields are a manufacturer account, so the rule #204 set for the device addresses applies
     // at least as strongly: an open UI shows the form without letting anyone use it.
-    private bool ReadOnly => !Web.Value.AuthenticationRequired;
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
     private bool Editable => !ReadOnly && _settings.Unavailable is null;
 

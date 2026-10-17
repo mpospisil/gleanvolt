@@ -111,6 +111,7 @@ public class CarPageTests : PageTest
 
         Services.AddSingleton(resolved);
         Services.AddSingleton(Options.Create(_web));
+        Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(_web.PasswordHash));
         Services.AddSingleton(ChargingLimits.Intersect(minAmps, maxAmps, 3, resolved));
         Services.AddSingleton(_account);
         Services.AddSingleton(_portal);

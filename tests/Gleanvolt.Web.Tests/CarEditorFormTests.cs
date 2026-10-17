@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Auth;
 using Gleanvolt.Web.Components;
 
 namespace Gleanvolt.Web.Tests;
@@ -25,6 +26,7 @@ public class CarEditorFormTests : BunitContext
 
         // A login, which is what makes the form editable at all.
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
+        Services.AddSingleton(new WebPasswordState("hash"));
 
         // The restart asks the browser to watch for the controller coming back; the script is not here.
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -335,11 +337,27 @@ public class CarEditorFormTests : BunitContext
         // These fields are a manufacturer account: without a login anyone on the LAN could read the
         // car, or point it at their own.
         Services.AddSingleton(Options.Create(new WebOptions()));
+        Services.AddSingleton(new WebPasswordState(null));
         var form = Render<CarEditorForm>();
 
         Assert.Contains("no login", form.Find("#car-readonly").TextContent);
         Assert.All(form.FindAll("input, select"), control => Assert.True(control.HasAttribute("disabled")));
         Assert.Empty(form.FindAll("#car-save"));
+    }
+
+    [Fact]
+    public void A_password_set_after_startup_makes_the_form_editable_without_a_restart()
+    {
+        // Issue #254: /setup records the hash in WebPasswordState, never in the startup WebOptions.
+        Services.AddSingleton(Options.Create(new WebOptions()));
+        var password = new WebPasswordState(null);
+        Services.AddSingleton(password);
+        password.Set("hash");
+
+        var form = Form();
+
+        Assert.Empty(form.FindAll("#car-readonly"));
+        Assert.NotNull(form.Find("#car-save"));
     }
 
     [Fact]

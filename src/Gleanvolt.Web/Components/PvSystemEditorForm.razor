@@ -1,5 +1,6 @@
 @inject IPvSystemEditor Editor
 @inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
 
 @*
     The installation, editable (issue #204). Everything below this form on /pv-system is what the process
@@ -218,7 +219,8 @@
 
     // Editing device addresses redirects Modbus writes, so an open UI shows the form without letting
     // anyone use it. Restart is not held to this: it follows Stop, which an open UI already offers.
-    private bool ReadOnly => !Web.Value.AuthenticationRequired;
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
     private bool Editable => !ReadOnly && _settings.Unavailable is null;
 
