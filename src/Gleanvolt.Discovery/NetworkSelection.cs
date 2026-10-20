@@ -67,8 +67,8 @@ public sealed record NetworkSelection(IReadOnlyList<Ipv4Subnet> Subnets, IReadOn
                 warnings.Add(
                     $"This looks like a container, so {subnet} on {entry.Name} is most likely the container's own "
                     + "network rather than your LAN, and the devices will not be on it. Pass --subnet with your "
-                    + "LAN's range (e.g. --subnet 192.168.1.0/24), and run the container with --network host if "
-                    + "it cannot reach the LAN at all.");
+                    + "LAN's range (e.g. --subnet 192.168.1.0/24), or run the container with --network host so "
+                    + "the LAN's own interface is visible and found.");
             }
 
             if (!subnets.Contains(subnet))
