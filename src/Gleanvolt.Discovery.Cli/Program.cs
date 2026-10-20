@@ -48,7 +48,7 @@ Console.Error.WriteLine(
 
 var report = await new DeviceScanner(arguments.Options).ScanAsync(
     plan,
-    device => Console.Error.WriteLine($"  found {device.Host}:{device.Port} {device.Finding}"),
+    device => Console.Error.WriteLine(ReportWriter.FoundLine(device)),
     stop.Token);
 
 if (arguments.Json)

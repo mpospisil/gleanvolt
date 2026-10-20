@@ -14,6 +14,22 @@ internal static class ReportWriter
 
     public static string ToJson(DiscoveryReport report) => JsonSerializer.Serialize(report, Json);
 
+    /// <summary>
+    /// The progress line printed the moment a device answers, so a scan that is stopped early (or a
+    /// long one still running) has already said what each device is, not only that something is there.
+    /// </summary>
+    public static string FoundLine(DiscoveredDevice device)
+    {
+        var details = new[]
+        {
+            device.Role?.ToString().ToLowerInvariant(),
+            device.Model,
+            device.SerialNumber is null ? null : $"serial {device.SerialNumber}",
+        }.OfType<string>().ToList();
+
+        return $"  found {device.Host}:{device.Port} {(details.Count > 0 ? string.Join(", ", details) : Tier(device))}";
+    }
+
     public static void WriteTable(DiscoveryReport report, TextWriter output)
     {
         foreach (var warning in report.Warnings)

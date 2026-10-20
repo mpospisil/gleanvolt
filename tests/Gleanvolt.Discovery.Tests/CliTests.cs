@@ -43,6 +43,23 @@ public class CliTests
     }
 
     [Fact]
+    public void The_progress_line_names_the_role_model_and_serial()
+    {
+        Assert.Equal(
+            "  found 192.168.2.6:502 charger, X3-HAC 11 kW, serial SERIAL00000000",
+            ReportWriter.FoundLine(Device(PvDeviceRole.Charger, "192.168.2.6", "X3-HAC 11 kW", SupportTier.Verified)));
+    }
+
+    [Fact]
+    public void A_progress_line_with_nothing_identified_says_what_answered()
+    {
+        Assert.Equal(
+            "  found 192.168.2.30:8899 Open, no Modbus reply",
+            ReportWriter.FoundLine(new DiscoveredDevice("192.168.2.30", 8899, null, DiscoveryFinding.NoModbusReply,
+                null, null, null, null, null, null, "note")));
+    }
+
+    [Fact]
     public void The_configuration_to_paste_uses_the_environment_variable_names()
     {
         var lines = DiscoveryConfiguration.EnvironmentLines(
