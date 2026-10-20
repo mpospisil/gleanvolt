@@ -24,10 +24,13 @@ public sealed class ModbusTcpClient : IModbusClient
 {
     // TcpClient.ConnectAsync has no built-in timeout: an unreachable or non-responding
     // device (wrong IP, firewalled, powered off) otherwise blocks the caller indefinitely.
-    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan IoTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultIoTimeout = TimeSpan.FromSeconds(5);
 
     private readonly DeviceConfig _device;
+    private readonly TimeSpan _connectTimeout;
+    private readonly TimeSpan _ioTimeout;
+    private readonly int? _retries;
     private readonly TimeSpan _minRequestInterval;
     private readonly TimeProvider _timeProvider;
 
@@ -40,11 +43,28 @@ public sealed class ModbusTcpClient : IModbusClient
     private IModbusMaster? _master;
     private long _lastRequestTicks;
 
-    public ModbusTcpClient(DeviceConfig device, TimeProvider? timeProvider = null)
+    /// <param name="device">Where the device is, and how long to wait between requests to it.</param>
+    /// <param name="timeProvider">The clock the request spacing is measured on.</param>
+    /// <param name="connectTimeout">How long a connect may take; 5 s by default.</param>
+    /// <param name="ioTimeout">How long one request may wait for its reply; 5 s by default.</param>
+    /// <param name="retries">
+    /// How many times NModbus repeats a request that timed out, or null for its own default. The
+    /// appliance leaves it alone; a LAN scan (issue #267) sets 0, because a probe that may not get a
+    /// reply would otherwise pay for one timeout several times over before it learnt anything.
+    /// </param>
+    public ModbusTcpClient(
+        DeviceConfig device,
+        TimeProvider? timeProvider = null,
+        TimeSpan? connectTimeout = null,
+        TimeSpan? ioTimeout = null,
+        int? retries = null)
     {
         _device = device;
         _minRequestInterval = device.MinRequestInterval;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _connectTimeout = connectTimeout ?? DefaultConnectTimeout;
+        _ioTimeout = ioTimeout ?? DefaultIoTimeout;
+        _retries = retries;
     }
 
     public bool IsConnected => _tcpClient?.Connected ?? false;
@@ -144,7 +164,7 @@ public sealed class ModbusTcpClient : IModbusClient
 
     private async Task ConnectCoreAsync(CancellationToken cancellationToken)
     {
-        using var timeoutCts = new CancellationTokenSource(ConnectTimeout);
+        using var timeoutCts = new CancellationTokenSource(_connectTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         var tcpClient = new TcpClient();
@@ -156,7 +176,7 @@ public sealed class ModbusTcpClient : IModbusClient
         {
             tcpClient.Dispose();
             throw new TimeoutException(
-                $"Timed out connecting to Modbus device at {_device.Host}:{_device.Port} after {ConnectTimeout}.");
+                $"Timed out connecting to Modbus device at {_device.Host}:{_device.Port} after {_connectTimeout}.");
         }
         catch
         {
@@ -165,12 +185,17 @@ public sealed class ModbusTcpClient : IModbusClient
         }
 
         // Guards the NModbus read/write calls below, which don't accept a CancellationToken.
-        tcpClient.ReceiveTimeout = (int)IoTimeout.TotalMilliseconds;
-        tcpClient.SendTimeout = (int)IoTimeout.TotalMilliseconds;
+        tcpClient.ReceiveTimeout = (int)_ioTimeout.TotalMilliseconds;
+        tcpClient.SendTimeout = (int)_ioTimeout.TotalMilliseconds;
 
         Invalidate();
         _tcpClient = tcpClient;
         _master = new ModbusFactory().CreateMaster(tcpClient);
+
+        if (_retries is { } retries)
+        {
+            _master.Transport.Retries = retries;
+        }
     }
 
     /// <summary>

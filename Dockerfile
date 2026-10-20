@@ -48,6 +48,8 @@ COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj                       src/Gleanvolt.Web/
 COPY src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj               src/Gleanvolt.Hosting/
 COPY src/Gleanvolt.Worker/Gleanvolt.Worker.csproj                 src/Gleanvolt.Worker/
+COPY src/Gleanvolt.Discovery/Gleanvolt.Discovery.csproj           src/Gleanvolt.Discovery/
+COPY src/Gleanvolt.Discovery.Cli/Gleanvolt.Discovery.Cli.csproj   src/Gleanvolt.Discovery.Cli/
 RUN dotnet restore src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -a "$TARGETARCH"
 
 COPY src/ src/

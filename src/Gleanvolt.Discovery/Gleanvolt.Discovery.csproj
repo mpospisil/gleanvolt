@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    Infrastructure for the Modbus client, ReadOnlyModbusClient and the register maps, and nothing
+    above it (issue #267): the scan has to run on a laptop with no Gleanvolt installed, so it must not
+    pull in the composition root, the configuration or the web UI. Not packable yet — the console is
+    the only thing that uses it until /pv-system does.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Discovery.Tests" />
+  </ItemGroup>
+
+</Project>

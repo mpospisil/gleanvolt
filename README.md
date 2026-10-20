@@ -121,6 +121,9 @@ Gleanvolt.slnx
 │   │   ├── Sessions/               # Charging-session recording worker
 │   │   └── Vehicles/               # EV telemetry MQTT subscriber
 │   │
+│   ├── Gleanvolt.Discovery/            # The LAN scan: finds the SolaX devices and their Modbus address
+│   ├── Gleanvolt.Discovery.Cli/        # gleanvolt-discover, the console around it
+│   │
 │   └── Gleanvolt.Worker/               # The executable host, and nothing else
 │       ├── Program.cs              # .env, Serilog, AddGleanvolt(), the exit code
 │       ├── DotEnv.cs               # Secrets from an untracked .env, before configuration is built
@@ -130,7 +133,8 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Infrastructure.Tests/ # Register encoding and write-path tests
 │   ├── Gleanvolt.Api.Tests/            # The endpoints over TestServer, and the OpenAPI contract snapshot
 │   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
-│   └── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
+│   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
+│   └── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
@@ -151,6 +155,9 @@ Gleanvolt.slnx
   other two do, and it owns no decision logic. Composing a targeted request is decision logic, which
   is why that moved into `Gleanvolt.Core` when this surface arrived rather than being written twice.
 - **`Gleanvolt.Web` references `Gleanvolt.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Gleanvolt.Hosting` hosts it; the dependency never runs the other way.
+- **`Gleanvolt.Discovery` references `Gleanvolt.Infrastructure` and nothing above it**, so the scan
+  runs with no Gleanvolt installed: the Modbus client and the register maps, never the composition root
+  or the configuration. `Gleanvolt.Discovery.Cli` is its console and nothing else.
 - **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
 ### The libraries as packages
@@ -193,6 +200,45 @@ Set your device addresses first (see [Configuration](#configuration)). On a firs
 written to either device: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
+
+### Finding your devices
+
+Don't know the inverter's or the charger's address, or which port and unit id they speak Modbus on?
+`gleanvolt-discover` scans your LAN and tells you
+([issue #267](https://github.com/mpospisil/gleanvolt/issues/267)). It runs on its own, on any laptop or
+Pi on the same network, with no Gleanvolt installed, and it only ever reads: every connection goes
+through `ReadOnlyModbusClient`.
+
+**Stop Gleanvolt first** (and Home Assistant's SolaX integration, if you run it). A SolaX device accepts
+very few Modbus TCP connections, so while something else holds one the scan finds the port open and gets
+no reply, and says so: *port open, no Modbus reply. Is Gleanvolt or Home Assistant connected to it right
+now?*
+
+```bash
+# Build it once, self-contained: the result needs no .NET on the machine that runs it.
+# linux-arm64 for a Pi, win-x64 for Windows.
+dotnet publish src/Gleanvolt.Discovery.Cli -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o discover
+
+./discover/gleanvolt-discover                           # every private interface's subnet, each capped at a /22
+./discover/gleanvolt-discover --subnet 192.168.1.0/24   # or say which
+./discover/gleanvolt-discover --host 192.168.1.50 --all-unit-ids
+```
+
+It tries ports 502 (Modbus TCP), 8899 (the usual RS485 bridge) and 80 (where it recognises a SolaX
+dongle's web page, which is not Modbus), unit ids `1,0,2,3,4,5,247`, and names each box from its serial
+number, with the support tier from [SUPPORTED_PV_SYSTEMS.md](docs/SUPPORTED_PV_SYSTEMS.md). Under the
+table it prints the configuration that would use what it found, ready to paste into `.env` or to enter on
+`/pv-system`:
+
+```
+Pv__Inverter__Host=192.168.2.10
+Pv__Inverter__Port=502
+Pv__Inverter__UnitId=1
+```
+
+`--json` prints the same results as JSON, `--help` lists the rest (ports, unit ids, timeouts), and Ctrl+C
+stops the scan and prints what it had found. Inside a container the default subnet is the container's
+own, not your LAN: the tool says so, and `--subnet` is the fix.
 
 ## Install on Linux
 
