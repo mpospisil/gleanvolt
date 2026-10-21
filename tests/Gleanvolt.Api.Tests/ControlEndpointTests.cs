@@ -16,9 +16,9 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _host.DisposeAsync();
 
-    private static object Target(double kWh = 22) => new
+    private static object Target(double wh = 22_000) => new
     {
-        energyKWh = kWh,
+        energyWh = wh,
         departBy = Fixtures.Now.AddHours(17).ToString("o"),
     };
 
@@ -175,7 +175,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
         var body = await (await client.PostAsJsonAsync(
             "/api/v1/charging/start",
-            new { mode = "fastNoBattery", fast = new { basis = "energy", energyKWh = 20 } })).ReadAsync();
+            new { mode = "fastNoBattery", fast = new { basis = "energy", energyWh = 20_000 } })).ReadAsync();
 
         Assert.True(body.GetProperty("succeeded").GetBoolean());
         Assert.Equal(20_000, _host.Fast.Limit!.RequiredEnergyWh);
@@ -279,7 +279,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/charging/start",
-            new { mode = "solar", fast = new { basis = "energy", energyKWh = 20 } });
+            new { mode = "solar", fast = new { basis = "energy", energyWh = 20_000 } });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("fastNoBattery", (await response.ReadAsync()).Text("detail"));
@@ -295,7 +295,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
         var body = await (await client.PostAsJsonAsync(
             "/api/v1/charging/start",
-            new { mode = "fastNoBattery", fast = new { basis = "energy", energyKWh = 20 } })).ReadAsync();
+            new { mode = "fastNoBattery", fast = new { basis = "energy", energyWh = 20_000 } })).ReadAsync();
 
         Assert.False(body.GetProperty("succeeded").GetBoolean());
         Assert.Null(_host.Fast.Limit);
@@ -338,7 +338,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             new
             {
                 mode = "fastNoBattery",
-                fast = new { basis = "energy", energyKWh = 30, departBy = departure.ToString("o") },
+                fast = new { basis = "energy", energyWh = 30_000, departBy = departure.ToString("o") },
             })).ReadAsync();
 
         Assert.True(body.GetProperty("succeeded").GetBoolean());
@@ -370,7 +370,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             new
             {
                 mode = "fastNoBattery",
-                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(-1).ToString("o") },
+                fast = new { basis = "energy", energyWh = 30_000, departBy = Fixtures.Now.AddHours(-1).ToString("o") },
             });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -388,7 +388,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             new
             {
                 mode = "fastNoBattery",
-                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(40).ToString("o") },
+                fast = new { basis = "energy", energyWh = 30_000, departBy = Fixtures.Now.AddHours(40).ToString("o") },
             });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -408,7 +408,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             new
             {
                 mode = "fastNoBattery",
-                fast = new { basis = "energy", energyKWh = 30, departBy = Fixtures.Now.AddHours(9).ToString("o") },
+                fast = new { basis = "energy", energyWh = 30_000, departBy = Fixtures.Now.AddHours(9).ToString("o") },
             })).ReadAsync();
 
         Assert.NotEqual(JsonValueKind.Null, body.GetProperty("fast").GetProperty("departBy").ValueKind);
@@ -445,7 +445,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             "/api/v1/charging/start/targeted",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(9).ToString("o"),
                 editable = new
                 {
@@ -478,7 +478,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             "/api/v1/charging/start/targeted",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(9).ToString("o"),
                 editable = new { notAfter = Fixtures.Now.AddMinutes(1).ToString("o") },
             });
@@ -501,7 +501,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
             "/api/v1/charging/start/targeted",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(9).ToString("o"),
                 editable = new { maxGridEnergyWh = 0 },
             })).ReadAsync();
@@ -517,7 +517,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/charging/start/targeted",
-            new { energyKWh = 22, departBy = Fixtures.Now.AddHours(-1).ToString("o") });
+            new { energyWh = 22_000, departBy = Fixtures.Now.AddHours(-1).ToString("o") });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("in the past", (await response.ReadAsync()).Text("detail"));
@@ -548,7 +548,7 @@ public sealed class ControlEndpointTests : IAsyncDisposable
 
     private static object Target() => new
     {
-        energyKWh = 22,
+        energyWh = 22_000,
         departBy = Fixtures.Now.AddHours(9).ToString("o"),
     };
 }

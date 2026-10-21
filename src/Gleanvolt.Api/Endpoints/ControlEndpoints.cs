@@ -52,11 +52,11 @@ internal static class ControlEndpoints
             if (body.Mode == ChargeControlMode.FastNoBattery)
             {
                 // The same factory the web tab and the Home Assistant button go through: the SOC to
-                // kilowatt-hours conversion and every refusal live there, so all three doors reject the
+                // energy conversion and every refusal live there, so all three doors reject the
                 // same things for the same reasons.
                 var composed = FastChargeLimitFactory.Create(
                     basis: body.Fast?.Basis ?? FastChargeBasis.Full,
-                    energyWh: body.Fast?.EnergyKWh * 1000,
+                    energyWh: body.Fast?.EnergyWh,
                     targetSocPercent: body.Fast?.TargetSocPercent,
                     vehicleSoc: VehicleSocBasis.From(
                         vehicle.GetCurrentState(), host.VehicleMaxAge, time.GetUtcNow()),

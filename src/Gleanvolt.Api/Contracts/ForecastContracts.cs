@@ -142,7 +142,7 @@ public sealed record ForecastPeriodResponse(
 /// <summary>Conditions at the site, from the configured weather provider.</summary>
 /// <param name="ObservedAt">When the provider made the observation.</param>
 /// <param name="TemperatureCelsius">Air temperature.</param>
-/// <param name="PressureHpa">Barometric pressure.</param>
+/// <param name="PressurePascals">Barometric pressure at station level, in Pa.</param>
 /// <param name="HumidityPercent">Relative humidity.</param>
 /// <param name="CloudsPercent">Cloud cover — the figure that matters to the roof.</param>
 /// <param name="VisibilityMetres">Visibility, or null when the provider omitted it.</param>
@@ -151,7 +151,7 @@ public sealed record ForecastPeriodResponse(
 public sealed record WeatherResponse(
     DateTimeOffset ObservedAt,
     double TemperatureCelsius,
-    double PressureHpa,
+    double PressurePascals,
     double HumidityPercent,
     double CloudsPercent,
     double? VisibilityMetres,
@@ -161,7 +161,7 @@ public sealed record WeatherResponse(
     internal static WeatherResponse From(WeatherObservation observation) => new(
         observation.ObservedAt,
         observation.TemperatureCelsius,
-        observation.PressurePascals / 100,
+        observation.PressurePascals,
         observation.HumidityPercent,
         observation.CloudsPercent,
         observation.VisibilityMetres,
@@ -182,8 +182,8 @@ public sealed record WeatherResponse(
 /// <param name="AgeSeconds">How old the reading is now. Negative is clamped to zero.</param>
 /// <param name="Stale">Whether it is older than the configured maximum age — a dead feed, rather than merely an old number.</param>
 /// <param name="SocPercent">The drive battery's state of charge, or null when the car does not report one.</param>
-/// <param name="RangeKm">Electric range, or null when not reported. Display only — nothing plans on it.</param>
-/// <param name="ChargeTimeRemainingMinutes">What the car says is left of its own charge, or null when not reported.</param>
+/// <param name="RangeMetres">Electric range in metres, or null when not reported. Display only — nothing plans on it.</param>
+/// <param name="ChargeTimeRemainingSeconds">What the car says is left of its own charge, in seconds, or null when not reported.</param>
 /// <param name="ChargeState">What the car says it is doing.</param>
 /// <param name="PlugState">Whether the car says a cable is connected. The charger's own view is <c>carConnected</c> on the status.</param>
 /// <param name="SourceId">Which feed this came from, for diagnostics.</param>
@@ -193,7 +193,7 @@ public sealed record WeatherResponse(
 /// </param>
 /// <param name="CanTargetSoc">
 /// Whether a targeted charge may be asked for as a state of charge: a reported SOC and a configured
-/// pack size (<c>Vehicle:BatteryCapacityKWh</c>). False means ask in kilowatt-hours.
+/// pack size (<c>Ev:Vehicles:0:BatteryCapacityKWh</c>). False means ask in energy (Wh).
 /// </param>
 public sealed record VehicleResponse(
     bool Available,
@@ -201,8 +201,8 @@ public sealed record VehicleResponse(
     double? AgeSeconds,
     bool Stale,
     double? SocPercent,
-    double? RangeKm,
-    double? ChargeTimeRemainingMinutes,
+    double? RangeMetres,
+    double? ChargeTimeRemainingSeconds,
     VehicleChargeState ChargeState,
     VehiclePlugState PlugState,
     string? SourceId,
@@ -225,8 +225,8 @@ public sealed record VehicleResponse(
             age < TimeSpan.Zero ? 0 : age.TotalSeconds,
             state.IsStaleAt(now, maxAge),
             state.SocPercent,
-            state.RangeMetres / 1000,
-            state.ChargeTimeRemaining?.TotalMinutes,
+            state.RangeMetres,
+            state.ChargeTimeRemaining?.TotalSeconds,
             state.ChargeState,
             state.PlugState,
             state.SourceId,
@@ -243,7 +243,7 @@ public sealed record VehicleResponse(
 /// <param name="Name">What a human calls it.</param>
 /// <param name="Make">The manufacturer. Reported, never acted on.</param>
 /// <param name="Model">The model. Reported, never acted on.</param>
-/// <param name="BatteryCapacityKWh">Usable capacity — the figure its SOC is a percentage of. Zero when unconfigured.</param>
+/// <param name="BatteryCapacityWh">Usable capacity in Wh — the figure its SOC is a percentage of. Zero when unconfigured.</param>
 /// <param name="ChargeEfficiency">Charger-meter → cells efficiency, applied to SOC-based targets.</param>
 /// <param name="Phases">
 /// Phases the <b>car</b> can charge on, or null when unstated. Where this differs from the charger's,
@@ -256,7 +256,7 @@ public sealed record EvResponse(
     string Name,
     string Make,
     string Model,
-    double BatteryCapacityKWh,
+    double BatteryCapacityWh,
     double ChargeEfficiency,
     int? Phases,
     int? MinChargingCurrentAmps,
@@ -267,7 +267,7 @@ public sealed record EvResponse(
         ev.Name,
         ev.Make,
         ev.Model,
-        ev.BatteryCapacityWh / 1000,
+        ev.BatteryCapacityWh,
         ev.ChargeEfficiency,
         ev.Phases,
         ev.MinChargingCurrentAmps,

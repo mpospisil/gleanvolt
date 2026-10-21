@@ -168,10 +168,10 @@ public sealed record ApiOperationResponse(string Method, string Path, string? Su
 /// </summary>
 /// <param name="Basis">
 /// What is being aimed at. <c>full</c> needs neither figure below; <c>energy</c> reads
-/// <paramref name="EnergyKWh"/>; <c>soc</c> reads <paramref name="TargetSocPercent"/> and needs both a
+/// <paramref name="EnergyWh"/>; <c>soc</c> reads <paramref name="TargetSocPercent"/> and needs both a
 /// configured pack capacity and a reported reading from the car.
 /// </param>
-/// <param name="EnergyKWh">The energy to deliver, measured at the charger.</param>
+/// <param name="EnergyWh">The energy to deliver in Wh, measured at the charger.</param>
 /// <param name="TargetSocPercent">
 /// The state of charge to stop at. Converted to energy <b>once</b>, when the mode is started, and never
 /// re-derived from a later reading — a parked car's cloud SOC arrives when it feels like it, and a
@@ -190,7 +190,7 @@ public sealed record ApiOperationResponse(string Method, string Path, string? Su
 /// </param>
 public sealed record FastChargeLimitBody(
     FastChargeBasis Basis = FastChargeBasis.Full,
-    double? EnergyKWh = null,
+    double? EnergyWh = null,
     double? TargetSocPercent = null,
     DateTimeOffset? DepartBy = null);
 

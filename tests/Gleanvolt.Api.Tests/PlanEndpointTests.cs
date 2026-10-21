@@ -15,9 +15,9 @@ public sealed class PlanEndpointTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _host.DisposeAsync();
 
-    private static object EnergyAsk(double kWh = 22, int hoursAhead = 17) => new
+    private static object EnergyAsk(double wh = 22_000, int hoursAhead = 17) => new
     {
-        energyKWh = kWh,
+        energyWh = wh,
         departBy = Fixtures.Now.AddHours(hoursAhead).ToString("o"),
     };
 
@@ -112,7 +112,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
 
         var response = await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", new
         {
-            energyKWh = 22,
+            energyWh = 22_000,
             targetSocPercent = 80,
             departBy = Fixtures.Now.AddHours(17).ToString("o"),
         });
@@ -218,7 +218,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
             "/api/v1/plans/targeted/preview",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(17).ToString("o"),
                 editable = JsonSerializer.Deserialize<JsonElement>(first.GetProperty("editable").GetRawText()),
             })).ReadAsync();
@@ -241,7 +241,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
             "/api/v1/plans/targeted/preview",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(17).ToString("o"),
                 editable = new { notBefore = notBefore.ToString("o"), maxGridEnergyWh = 5000 },
             });
@@ -263,7 +263,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
             "/api/v1/plans/targeted/preview",
             new
             {
-                energyKWh = 22,
+                energyWh = 22_000,
                 departBy = Fixtures.Now.AddHours(17).ToString("o"),
                 editable = new { notBefore = notBefore.ToString("o") },
             })).ReadAsync();
@@ -273,7 +273,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
 
     private static object Target() => new
     {
-        energyKWh = 22,
+        energyWh = 22_000,
         departBy = Fixtures.Now.AddHours(17).ToString("o"),
     };
 
@@ -317,7 +317,7 @@ public sealed class PlanEndpointTests : IAsyncDisposable
 
         var body = await (await client.PostAsJsonAsync("/api/v1/plans/targeted/preview", new
         {
-            energyKWh = 22,
+            energyWh = 22_000,
             departBy = Fixtures.Now.AddHours(17).ToString("o"),
         })).ReadAsync();
 
