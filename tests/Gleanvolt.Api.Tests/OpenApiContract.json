@@ -169,6 +169,45 @@
         ]
       }
     },
+    "/api/v1/tariff": {
+      "get": {
+        "operationId": "getTariff",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $TariffResponse"
+        ]
+      }
+    },
+    "/api/v1/tariff/providers": {
+      "get": {
+        "operationId": "listTariffProviders",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json array\u003C$TariffProviderResponse\u003E"
+        ]
+      }
+    },
+    "/api/v1/tariff/settings": {
+      "get": {
+        "operationId": "getTariffSettings",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $TariffSettingsResponse"
+        ]
+      },
+      "put": {
+        "operationId": "putTariffSettings",
+        "parameters": [],
+        "requestBody": "application/json $TariffSettingsRequest",
+        "responses": [
+          "200 application/json $TariffSettingsResponse",
+          "400 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
     "/api/v1/vehicle": {
       "get": {
         "operationId": "getVehicle",
@@ -571,6 +610,52 @@
       "tailEnergyWh": "number|string(double) (required)",
       "targetSocPercent": "number|string(double)? (required)",
       "vehicleSocPercentAtRequest": "number|string(double)? (required)"
+    },
+    "TariffNowResponse": {
+      "pricePerKwh": "number|string(double)? (required)",
+      "rate": "$TariffRate (required)",
+      "until": "string(date-time)? (required)"
+    },
+    "TariffProblemResponse": {
+      "field": "string (required)",
+      "isWarning": "boolean (required)",
+      "message": "string (required)",
+      "row": "integer|string(int32)? (required)"
+    },
+    "TariffProviderResponse": {
+      "id": "string (required)",
+      "name": "string (required)",
+      "selected": "boolean (required)"
+    },
+    "TariffRate": "enum[low|high]",
+    "TariffResponse": {
+      "currency": "string (required)",
+      "highPricePerKwh": "number|string(double)? (required)",
+      "lowPricePerKwh": "number|string(double)? (required)",
+      "now": "any (required)",
+      "provider": "string (required)",
+      "providerName": "string? (required)",
+      "unavailable": "string? (required)",
+      "windows": "array\u003C$TariffWindowResponse\u003E (required)"
+    },
+    "TariffSettingsRequest": {
+      "highPricePerKwh": "number|string(double)? (required)",
+      "lowPricePerKwh": "number|string(double)? (required)",
+      "provider": "string (required)",
+      "settings": "object? (required)"
+    },
+    "TariffSettingsResponse": {
+      "highPricePerKwh": "number|string(double)? (required)",
+      "lowPricePerKwh": "number|string(double)? (required)",
+      "provider": "string (required)",
+      "settings": "object (required)",
+      "warnings": "array\u003C$TariffProblemResponse\u003E (required)"
+    },
+    "TariffWindowResponse": {
+      "end": "string(date-time) (required)",
+      "pricePerKwh": "number|string(double)? (required)",
+      "rate": "$TariffRate (required)",
+      "start": "string(date-time) (required)"
     },
     "TimeWindowBody": {
       "end": "string(date-time) (required)",
