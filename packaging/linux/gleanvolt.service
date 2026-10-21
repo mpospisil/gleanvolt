@@ -45,6 +45,8 @@ Environment=Secrets__Directory=/var/lib/gleanvolt
 # The PV system as edited on the web UI's /pv-system page (issue #204). It overrides gleanvolt.env
 # key by key, and "Revert" on that page -- or deleting this file -- goes back to it.
 Environment=Pv__OverridesPath=/var/lib/gleanvolt/pv-system.json
+# The owner's low-tariff table, edited on the Settings page (issue #265) and applied on save.
+Environment=Tariff__Path=/var/lib/gleanvolt/tariff.json
 # Serilog's rolling file sink, which keeps its own 14 days. Kept beside the journal rather than
 # replaced by it: on a Raspberry Pi the journal is in RAM by default and is gone after a reboot, and
 # the log of the run that ended badly is the one worth having.

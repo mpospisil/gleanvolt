@@ -13,6 +13,7 @@ using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
+using Gleanvolt.Hosting.Tariff;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -87,6 +88,28 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>()));
+
+        // What grid energy costs when (issue #265): the owner's low-tariff table, edited on Settings and
+        // applied on save. Read once here and held in memory, so the poll loop never touches the file.
+        services.Configure<TariffOptions>(configuration.GetSection(TariffOptions.SectionName));
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+
+            // Resolved against the content root so a relative path means the same thing however the
+            // service was started -- `dotnet run`, the debugger, or the container's working directory.
+            var path = Path.IsPathRooted(options.Path)
+                ? options.Path
+                : Path.Combine(environment.ContentRootPath, options.Path);
+
+            return new TariffTableFile(
+                Path.GetFullPath(path),
+                string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant(),
+                provider.GetRequiredService<ILogger<TariffTableFile>>());
+        });
+        services.AddSingleton<ITariffEditor>(provider => provider.GetRequiredService<TariffTableFile>());
+        services.AddSingleton<ITariffSchedule, TariffSchedule>();
 
         // Where the bearer-equivalent secrets live, and what protects them (issue #215). One store for
         // all of them: the volkswagen.de session, the MyŠkoda key and -- once #214 lands -- the vehicle
