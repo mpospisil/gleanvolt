@@ -138,6 +138,11 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
 
+        // The tariff form's, with no tariff set up.
+        context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
+        context.Services.AddSingleton<TimeProvider>(
+            new FixedTimeProvider(new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
+
         return context.Render<PvSystem>();
     }
 

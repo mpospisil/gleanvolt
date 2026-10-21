@@ -1582,6 +1582,101 @@ button.link:hover {
     padding-bottom: 0;
 }
 
+/* The tariff (#265): low-tariff periods as rows of two time boxes, and a preview of today and
+   tomorrow as 24-hour bars with low tariff shaded, so a 16:00 typed for 06:00 looks wrong at once. */
+.tariff-periods {
+    width: auto;
+    margin-bottom: 0.5rem;
+}
+
+.tariff-periods td {
+    padding-right: var(--space-3);
+}
+
+.tariff-time {
+    width: 7rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-sm);
+    background-color: var(--field);
+    color: var(--ink);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.tariff-periods tr.invalid .tariff-time {
+    border-color: var(--danger);
+}
+
+.tariff-periods .tariff-problem td {
+    padding-top: 0;
+    font-size: 0.85rem;
+    border-top: none;
+}
+
+.warning,
+.pv-field .hint.warning {
+    color: var(--amber);
+}
+
+.pv-field .hint.error {
+    color: var(--danger);
+}
+
+.tariff-preview {
+    max-width: 40rem;
+}
+
+.tariff-day {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.tariff-day-name {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.tariff-bar {
+    position: relative;
+    height: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--panel);
+    overflow: hidden;
+}
+
+.tariff-low {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tariff-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-left: calc(8rem + var(--space-3));
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 40rem) {
+    .tariff-day {
+        grid-template-columns: 1fr;
+        gap: var(--space-1);
+    }
+
+    .tariff-axis {
+        margin-left: 0;
+    }
+}
+
 .probes {
     margin: 0.75rem 0 0.25rem;
     padding-left: 1.25rem;

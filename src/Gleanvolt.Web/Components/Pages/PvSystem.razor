@@ -17,7 +17,8 @@
 
     The form at the top (issue #204) edits something else: the configuration the *next* start reads.
     A save goes to the web UI's overrides file, a restart applies it, and until then the form says what
-    is saved and not yet running. See PvSystemEditorForm.
+    is saved and not yet running. See PvSystemEditorForm. The tariff below it (issue #265) is the
+    exception: it is the owner's data rather than configuration, and a save applies at once.
 
     What the rest is for: answering "which system is this, and what is it talking to?" from a browser,
     the question the startup log answers once and then buries.
@@ -35,6 +36,8 @@
 </p>
 
 <PvSystemEditorForm />
+
+<TariffEditorForm />
 
 <h2>Identity</h2>
 

@@ -1104,3 +1104,32 @@ internal static class TestForecasts
         new(retrievedAt, [.. watts.Select((w, i) =>
             At(firstPeriodEnd.AddMinutes(30 * i), w, w * 0.8, w * 1.2))]);
 }
+
+internal sealed class FakeTariffEditor : ITariffEditor
+{
+    public TariffTable Stored { get; set; } = TariffTable.None;
+
+    public List<TariffTable> Saves { get; } = [];
+
+    public string Currency { get; set; } = "CZK";
+
+    public event Action? Saved;
+
+    public TariffTable Read() => Stored;
+
+    // The real service's rules, so a test cannot pass a table the controller would refuse.
+    public TariffSaveResult Save(TariffTable table)
+    {
+        var problems = Gleanvolt.Core.Configuration.TariffRules.Check(table);
+
+        if (problems.Any(problem => !problem.IsWarning))
+        {
+            return new TariffSaveResult(false, problems);
+        }
+
+        Saves.Add(table);
+        Stored = Gleanvolt.Core.Configuration.TariffRules.Normalize(table);
+        Saved?.Invoke();
+        return new TariffSaveResult(true, problems);
+    }
+}
