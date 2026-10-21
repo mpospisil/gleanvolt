@@ -65,6 +65,10 @@ public static class WebUiHost
         // not gets whatever update service is registered, or none.
         services.TryAddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
 
+        // The Settings panel of each tariff strategy that has settings (#265). A new strategy registers
+        // its panel the same way, beside its ITariffProvider; one without a panel has nothing to set.
+        services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
+
         // The scheme is registered whenever the UI is enabled, whether or not RequireAuthentication
         // is on: the login and logout endpoints need it to exist either way, and it is DefaultPolicy
         // below -- not this registration -- that decides whether [Authorize] actually turns anyone

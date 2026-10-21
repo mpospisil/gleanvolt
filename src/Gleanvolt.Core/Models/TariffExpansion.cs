@@ -4,7 +4,8 @@ namespace Gleanvolt.Core.Models;
 
 /// <summary>
 /// Turns a <see cref="TariffTable"/>'s wall-clock periods into a <see cref="TariffTimeline"/> of
-/// instants (issue #265).
+/// instants (issue #265): the <see cref="TariffProviderIds.Table"/> strategy's arithmetic, and the
+/// preview's on Settings.
 ///
 /// <para><b>Through the zone's rules, never by adding hours.</b> Each edge is a local date and time
 /// converted on its own, so a day is 23 or 25 hours long when the clocks say so. On the spring-forward
@@ -18,21 +19,13 @@ namespace Gleanvolt.Core.Models;
 /// </summary>
 public static class TariffExpansion
 {
-    /// <summary>
-    /// The timeline from the start of <paramref name="today"/> to the end of the day after it, or null
-    /// when the table's provider is <see cref="TariffProvider.None"/>.
-    /// </summary>
-    /// <param name="table">The owner's table; assumed to have passed <see cref="TariffRules.Check"/>.</param>
+    /// <summary>The timeline from the start of <paramref name="today"/> to the end of the day after it.</summary>
+    /// <param name="table">The owner's table; rows that do not parse are skipped.</param>
     /// <param name="zone">The zone the table's times are in.</param>
     /// <param name="today">The local date the timeline starts on.</param>
-    /// <param name="currency">What the prices are in.</param>
-    public static TariffTimeline? Expand(TariffTable table, TimeZoneInfo zone, DateOnly today, string currency)
+    /// <param name="prices">The shared prices, or null.</param>
+    public static TariffTimeline Expand(TariffTable table, TimeZoneInfo zone, DateOnly today, TariffPrices? prices)
     {
-        if (table.Provider == TariffProvider.None)
-        {
-            return null;
-        }
-
         var start = ToInstant(today, 0, zone);
         var end = ToInstant(today.AddDays(2), 0, zone);
 
@@ -91,7 +84,7 @@ public static class TariffExpansion
             windows.Add(new TariffWindow(new TimeWindow(cursor, end), TariffRate.High));
         }
 
-        return new TariffTimeline(windows, table.PricesIn(currency));
+        return new TariffTimeline(windows, prices, TariffProviderIds.Table);
     }
 
     /// <summary>

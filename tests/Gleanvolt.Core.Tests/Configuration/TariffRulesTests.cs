@@ -4,22 +4,18 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Core.Tests.Configuration;
 
 /// <summary>
-/// Every rule a tariff table is held to before it is saved (issue #265), one test each, with the
-/// message the form shows on the row.
+/// Every rule tariff settings are held to before they are saved (issue #265), one test each, with the
+/// message the form shows in place: the shared price rules, and the Table strategy's own.
 /// </summary>
 public class TariffRulesTests
 {
-    private static TariffTable Table(
-        TariffPeriod[]? weekday = null,
-        TariffPeriod[]? weekend = null,
-        decimal? low = 2.10m,
-        decimal? high = 4.80m) =>
-        new(TariffProvider.Table, weekday ?? [new("00:00", "06:00")], weekend ?? [], low, high);
+    private static TariffTable Table(TariffPeriod[]? weekday = null, TariffPeriod[]? weekend = null) =>
+        new(weekday ?? [new("00:00", "06:00")], weekend ?? []);
 
     [Fact]
     public void AGoodTableHasNoProblems()
     {
-        Assert.Empty(TariffRules.Check(Table([new("00:00", "06:00"), new("22:00", "24:00")])));
+        Assert.Empty(TariffRules.CheckTable(Table([new("00:00", "06:00"), new("22:00", "24:00")])));
     }
 
     [Theory]
@@ -33,7 +29,7 @@ public class TariffRulesTests
     [InlineData("-1:00", "08:00", false)]
     public void TimesAreHhMmWith2400AllowedOnlyAsAnEnd(string start, string end, bool valid)
     {
-        var problems = TariffRules.Check(Table([new(start, end)]));
+        var problems = TariffRules.CheckTable(Table([new(start, end)]));
 
         if (valid)
         {
@@ -41,8 +37,7 @@ public class TariffRulesTests
         }
         else
         {
-            var problem = Assert.Single(problems);
-            Assert.Equal(new TariffProblem(TariffField.Weekday, 0, "Not a time."), problem);
+            Assert.Equal(new TariffProblem(TariffFields.TableWeekday, 0, "Not a time."), Assert.Single(problems));
         }
     }
 
@@ -51,9 +46,9 @@ public class TariffRulesTests
     [InlineData("08:00", "08:00")]
     public void APeriodMustStartBeforeItEnds(string start, string end)
     {
-        var problem = Assert.Single(TariffRules.Check(Table(weekend: [new(start, end)], weekday: [])));
+        var problem = Assert.Single(TariffRules.CheckTable(Table(weekday: [], weekend: [new(start, end)])));
 
-        Assert.Equal(TariffField.Weekend, problem.Field);
+        Assert.Equal(TariffFields.TableWeekend, problem.Field);
         Assert.Equal(0, problem.Row);
         Assert.Equal("Ends before it starts. Split a period over midnight into two rows.", problem.Message);
         Assert.False(problem.IsWarning);
@@ -62,12 +57,12 @@ public class TariffRulesTests
     [Fact]
     public void AnOverlapIsReportedOnBothRows()
     {
-        var problems = TariffRules.Check(Table([new("05:00", "07:00"), new("13:00", "15:00"), new("06:00", "08:00")]));
+        var problems = TariffRules.CheckTable(Table([new("05:00", "07:00"), new("13:00", "15:00"), new("06:00", "08:00")]));
 
         Assert.Equal(
             [
-                new TariffProblem(TariffField.Weekday, 0, "Overlaps 06:00–08:00."),
-                new TariffProblem(TariffField.Weekday, 2, "Overlaps 05:00–07:00."),
+                new TariffProblem(TariffFields.TableWeekday, 0, "Overlaps 06:00–08:00."),
+                new TariffProblem(TariffFields.TableWeekday, 2, "Overlaps 05:00–07:00."),
             ],
             problems);
     }
@@ -75,34 +70,42 @@ public class TariffRulesTests
     [Fact]
     public void PeriodsThatOnlyMeetDoNotOverlap()
     {
-        Assert.Empty(TariffRules.Check(Table([new("06:00", "08:00"), new("08:00", "10:00")])));
+        Assert.Empty(TariffRules.CheckTable(Table([new("06:00", "08:00"), new("08:00", "10:00")])));
     }
 
     [Fact]
     public void TheTwoListsAreCheckedApart()
     {
-        Assert.Empty(TariffRules.Check(Table(weekday: [new("00:00", "06:00")], weekend: [new("00:00", "08:00")])));
+        Assert.Empty(TariffRules.CheckTable(Table(weekday: [new("00:00", "06:00")], weekend: [new("00:00", "08:00")])));
+    }
+
+    [Fact]
+    public void NoPeriodsAtAllIsAWarning()
+    {
+        var problem = Assert.Single(TariffRules.CheckTable(TariffTable.Empty));
+
+        Assert.Equal(TariffFields.Table, problem.Field);
+        Assert.Equal("No low-tariff periods: everything would be high tariff.", problem.Message);
+        Assert.True(problem.IsWarning);
     }
 
     [Fact]
     public void APriceCannotBeNegative()
     {
-        var problems = TariffRules.Check(Table(low: -1m, high: -0.5m));
-
         Assert.Equal(
             [
-                new TariffProblem(TariffField.LowPrice, null, "A price can't be negative."),
-                new TariffProblem(TariffField.HighPrice, null, "A price can't be negative."),
+                new TariffProblem(TariffFields.LowPrice, null, "A price can't be negative."),
+                new TariffProblem(TariffFields.HighPrice, null, "A price can't be negative."),
             ],
-            problems);
+            TariffRules.CheckPrices(-1m, -0.5m));
     }
 
     [Fact]
     public void ALowPriceAboveTheHighOneIsAWarning()
     {
-        var problem = Assert.Single(TariffRules.Check(Table(low: 5m, high: 4m)));
+        var problem = Assert.Single(TariffRules.CheckPrices(5m, 4m));
 
-        Assert.Equal(TariffField.LowPrice, problem.Field);
+        Assert.Equal(TariffFields.LowPrice, problem.Field);
         Assert.Equal("Low tariff costs more than high.", problem.Message);
         Assert.True(problem.IsWarning);
     }
@@ -110,25 +113,8 @@ public class TariffRulesTests
     [Fact]
     public void PricesAreOptional()
     {
-        Assert.Empty(TariffRules.Check(Table(low: null, high: null)));
-    }
-
-    [Fact]
-    public void NoPeriodsAtAllIsAWarning()
-    {
-        var problem = Assert.Single(TariffRules.Check(Table(weekday: [], weekend: [])));
-
-        Assert.Equal(TariffField.Table, problem.Field);
-        Assert.Equal("No low-tariff periods: everything would be high tariff.", problem.Message);
-        Assert.True(problem.IsWarning);
-    }
-
-    [Fact]
-    public void ProviderNoneIsNeverRefused()
-    {
-        var table = Table([new("nonsense", "22:00")], low: -1m) with { Provider = TariffProvider.None };
-
-        Assert.Empty(TariffRules.Check(table));
+        Assert.Empty(TariffRules.CheckPrices(null, null));
+        Assert.Empty(TariffRules.CheckPrices(2.10m, null));
     }
 
     [Fact]

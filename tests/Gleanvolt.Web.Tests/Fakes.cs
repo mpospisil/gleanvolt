@@ -1107,29 +1107,65 @@ internal static class TestForecasts
 
 internal sealed class FakeTariffEditor : ITariffEditor
 {
-    public TariffTable Stored { get; set; } = TariffTable.None;
+    public FakeTariffEditor(params ITariffProvider[] extra) =>
+        Providers = [new Gleanvolt.Core.Strategies.NoTariffProvider(), new Gleanvolt.Core.Strategies.TableTariffProvider(), .. extra];
 
-    public List<TariffTable> Saves { get; } = [];
+    public TariffSettings Stored { get; set; } = TariffSettings.None;
+
+    public List<TariffSettings> Saves { get; } = [];
+
+    public IReadOnlyList<ITariffProvider> Providers { get; }
 
     public string Currency { get; set; } = "CZK";
 
     public event Action? Saved;
 
-    public TariffTable Read() => Stored;
+    public TariffSettings Read() => Stored;
 
-    // The real service's rules, so a test cannot pass a table the controller would refuse.
-    public TariffSaveResult Save(TariffTable table)
+    // The real service's rules, so a test cannot pass settings the controller would refuse.
+    public IReadOnlyList<TariffProblem> Check(TariffSettings settings)
     {
-        var problems = Gleanvolt.Core.Configuration.TariffRules.Check(table);
+        if (settings.Selects(TariffProviderIds.None))
+        {
+            return [];
+        }
+
+        if (Providers.FirstOrDefault(provider => settings.Selects(provider.Id)) is not { } selected)
+        {
+            return [new TariffProblem(TariffFields.Provider, null, $"There is no tariff provider called {settings.Provider} in this build.")];
+        }
+
+        return
+        [
+            .. Gleanvolt.Core.Configuration.TariffRules.CheckPrices(settings.LowPricePerKwh, settings.HighPricePerKwh),
+            .. selected.Check(settings.SectionFor(selected.Id)),
+        ];
+    }
+
+    public TariffSaveResult Save(TariffSettings settings)
+    {
+        var problems = Check(settings);
 
         if (problems.Any(problem => !problem.IsWarning))
         {
             return new TariffSaveResult(false, problems);
         }
 
-        Saves.Add(table);
-        Stored = Gleanvolt.Core.Configuration.TariffRules.Normalize(table);
+        var selected = Providers.First(provider => settings.Selects(provider.Id));
+        Saves.Add(settings);
+        Stored = settings.WithSection(selected.Id, selected.Normalize(settings.SectionFor(selected.Id))) with { Provider = selected.Id };
         Saved?.Invoke();
         return new TariffSaveResult(true, problems);
     }
+}
+
+/// <summary>Tariff settings with the Table strategy selected and <paramref name="table"/> as its section.</summary>
+internal static class TestTariffs
+{
+    public static TariffSettings Table(TariffTable table, decimal? low = 2.10m, decimal? high = 4.80m) =>
+        (TariffSettings.None with { Provider = TariffProviderIds.Table, LowPricePerKwh = low, HighPricePerKwh = high })
+            .WithSection(TariffProviderIds.Table, Gleanvolt.Core.Strategies.TableTariffProvider.Write(table));
+
+    public static TariffTable TableOf(TariffSettings settings) =>
+        Gleanvolt.Core.Strategies.TableTariffProvider.Read(settings.SectionFor(TariffProviderIds.Table))!;
 }

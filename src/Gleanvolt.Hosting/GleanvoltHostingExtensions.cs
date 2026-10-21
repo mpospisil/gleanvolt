@@ -89,9 +89,13 @@ public static class GleanvoltHostingExtensions
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>()));
 
-        // What grid energy costs when (issue #265): the owner's low-tariff table, edited on Settings and
-        // applied on save. Read once here and held in memory, so the poll loop never touches the file.
+        // What grid energy costs when (issue #265). Each way of knowing is a strategy registered here as
+        // an ITariffProvider, in the order Settings offers them; the saved settings select one at runtime,
+        // and a new strategy is one more line here (and its panel in the web UI), nothing else. The
+        // settings are read once and held in memory, so the poll loop never touches the file.
         services.Configure<TariffOptions>(configuration.GetSection(TariffOptions.SectionName));
+        services.AddSingleton<ITariffProvider, NoTariffProvider>();
+        services.AddSingleton<ITariffProvider, TableTariffProvider>();
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
@@ -103,13 +107,16 @@ public static class GleanvoltHostingExtensions
                 ? options.Path
                 : Path.Combine(environment.ContentRootPath, options.Path);
 
-            return new TariffTableFile(
+            return new TariffSettingsFile(
                 Path.GetFullPath(path),
                 string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant(),
-                provider.GetRequiredService<ILogger<TariffTableFile>>());
+                provider.GetServices<ITariffProvider>(),
+                provider.GetRequiredService<ILogger<TariffSettingsFile>>());
         });
-        services.AddSingleton<ITariffEditor>(provider => provider.GetRequiredService<TariffTableFile>());
-        services.AddSingleton<ITariffSchedule, TariffSchedule>();
+        services.AddSingleton<ITariffEditor>(provider => provider.GetRequiredService<TariffSettingsFile>());
+        services.AddSingleton<TariffSchedule>();
+        services.AddSingleton<ITariffSchedule>(provider => provider.GetRequiredService<TariffSchedule>());
+        services.AddHostedService<TariffRefreshWorker>();
 
         // Where the bearer-equivalent secrets live, and what protects them (issue #215). One store for
         // all of them: the volkswagen.de session, the MyŠkoda key and -- once #214 lands -- the vehicle

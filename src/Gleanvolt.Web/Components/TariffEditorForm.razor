@@ -1,19 +1,19 @@
 @using System.Globalization
-@using Gleanvolt.Core.Configuration
+@using System.Text.Json
 @inject ITariffEditor Editor
-@inject TimeProvider Time
+@inject IEnumerable<TariffPanelRegistration> Panels
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
 
 @*
-    The tariff (issue #265): when grid energy is cheap, as the owner's distributor switches it. Unlike
-    the installation form above it, a save here applies at once -- the schedule is read afresh after
-    every save -- so there is no "saved, not applied" to show and no restart to offer.
+    The tariff (issue #265): when grid energy is cheap. Unlike the installation form above it, a save
+    here applies at once -- the schedule asks the selected strategy afresh after every save -- so there
+    is no "saved, not applied" to show and no restart to offer.
 
-    Only the low-tariff periods are entered; everything else is high tariff. A period belongs to one
-    day, so a night tariff is two rows, and the preview draws them joined, which is how the owner sees
-    that it came out right. The rules are TariffRules, the same ones the service runs on save, checked
-    here on every keystroke so that Save is never the first place a mistake shows.
+    The choice is between the strategies this build registers, and each brings its own panel for its
+    own settings (TariffPanelRegistration), so a new strategy needs no change here. This form owns what
+    they share: the selection, the prices, the check on every keystroke and the save. Switching to
+    another strategy and back keeps the first one's settings, here and in the file.
 
     Read-only without a login, like the installation form: the tariff is what Fast and SolarGrid will
     wait for (#274), so an open UI must not let anyone on the LAN move it.
@@ -23,9 +23,8 @@
     <h2>Tariff</h2>
 
     <p class="muted">
-        When the grid is cheap. Enter the low-tariff periods your distributor switches, as its HDO page
-        lists them; every other minute is high tariff. A period over midnight is two rows, 22:00–24:00
-        and 00:00–06:00. A save applies at once.
+        When the grid is cheap, so charging can wait for it. Choose where the low-tariff times come
+        from; every other minute is high tariff. A save applies at once.
     </p>
 
     @if (ReadOnly)
@@ -39,77 +38,39 @@
     <div class="control">
         <span class="control-label" id="tariff-provider-label">Provider</span>
         <div class="seg" role="radiogroup" id="tariff-provider" aria-labelledby="tariff-provider-label">
-            <label class="seg-opt">
-                <input type="radio" name="tariff-provider" id="tariff-provider-none"
-                       disabled="@ReadOnly" checked="@(_provider == TariffProvider.None)" @onchange="() => SetProvider(TariffProvider.None)" />
-                None
-            </label>
-            <label class="seg-opt">
-                <input type="radio" name="tariff-provider" id="tariff-provider-table"
-                       disabled="@ReadOnly" checked="@(_provider == TariffProvider.Table)" @onchange="() => SetProvider(TariffProvider.Table)" />
-                Table
-            </label>
+            @foreach (var provider in Editor.Providers)
+            {
+                var id = provider.Id;
+
+                <label class="seg-opt">
+                    <input type="radio" name="tariff-provider" id="tariff-provider-@Slug(id)" disabled="@ReadOnly"
+                           checked="@(_settings.Selects(id))" @onchange="() => Select(id)" />
+                    @provider.Name
+                </label>
+            }
         </div>
-        @if (_provider == TariffProvider.None)
+        @if (Selected is null)
+        {
+            <span class="hint error" id="tariff-provider-unknown">
+                The saved provider, @_settings.Provider, is not in this build. Choose another one.
+            </span>
+        }
+        else if (IsNone)
         {
             <span class="hint">No tariff: the grid costs the same at every hour.</span>
         }
     </div>
 
-    @if (_provider == TariffProvider.Table)
+    @if (Selected is { } selected && !IsNone)
     {
-        @foreach (var days in AllDays)
+        @if (Panels.FirstOrDefault(panel => string.Equals(panel.ProviderId, selected.Id, StringComparison.OrdinalIgnoreCase)) is { } panel)
         {
-            var rows = Rows(days);
-            var key = days.ToString().ToLowerInvariant();
-
-            <h3>@(days == TariffDays.Weekday ? "Weekdays" : "Weekend") <span class="muted">@(days == TariffDays.Weekday ? "Mon–Fri" : "Sat–Sun")</span></h3>
-
-            <table class="sessions tariff-periods" id="tariff-@key">
-                @if (rows.Count > 0)
-                {
-                    <thead>
-                        <tr><th>Low tariff from</th><th>until</th><th></th></tr>
-                    </thead>
-                }
-                <tbody>
-                    @for (var i = 0; i < rows.Count; i++)
-                    {
-                        var row = rows[i];
-                        var index = i;
-                        var problem = RowProblem(days, index);
-
-                        <tr class="@(problem is null ? null : "invalid")">
-                            <td>
-                                <input class="tariff-time" id="tariff-@key-@index-start" type="text" inputmode="numeric"
-                                       spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="Start" disabled="@ReadOnly"
-                                       value="@row.Start" @oninput="e => Edit(() => row.Start = Text(e))" />
-                            </td>
-                            <td>
-                                <input class="tariff-time" id="tariff-@key-@index-end" type="text" inputmode="numeric"
-                                       spellcheck="false" autocomplete="off" placeholder="HH:mm or 24:00" aria-label="End" disabled="@ReadOnly"
-                                       value="@row.End" @oninput="e => Edit(() => row.End = Text(e))" />
-                            </td>
-                            <td>
-                                @if (!ReadOnly)
-                                {
-                                    <button type="button" class="link" id="tariff-@key-@index-remove"
-                                            @onclick="() => Edit(() => rows.RemoveAt(index))">Remove</button>
-                                }
-                            </td>
-                        </tr>
-                        @if (problem is not null)
-                        {
-                            <tr class="tariff-problem"><td colspan="3" class="error">@problem</td></tr>
-                        }
-                    }
-                </tbody>
-            </table>
-
-            @if (!ReadOnly)
-            {
-                <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">Add period</button>
-            }
+            @* Keyed by provider and by reload, so switching strategy or Cancel starts the panel afresh from the settings. *@
+            <DynamicComponent @key="@($"{selected.Id}/{_generation}")" Type="panel.Component" Parameters="PanelParameters(selected)" />
+        }
+        else
+        {
+            <p class="muted" id="tariff-no-panel">@selected.Name has nothing to set here.</p>
         }
 
         <h3>Prices</h3>
@@ -119,7 +80,7 @@
                 <label for="tariff-low-price">Low tariff price, @Units.PriceUnit(Editor.Currency)</label>
                 <input id="tariff-low-price" type="text" inputmode="decimal" autocomplete="off" disabled="@ReadOnly"
                        value="@_lowPrice" @oninput="e => Edit(() => _lowPrice = Text(e))" />
-                @if (FieldProblem(TariffField.LowPrice) is { } low)
+                @if (FieldProblem(TariffFields.LowPrice) is { } low)
                 {
                     <span class="hint @(low.IsWarning ? "warning" : "error")">@low.Message</span>
                 }
@@ -128,38 +89,11 @@
                 <label for="tariff-high-price">High tariff price, @Units.PriceUnit(Editor.Currency)</label>
                 <input id="tariff-high-price" type="text" inputmode="decimal" autocomplete="off" disabled="@ReadOnly"
                        value="@_highPrice" @oninput="e => Edit(() => _highPrice = Text(e))" />
-                @if (FieldProblem(TariffField.HighPrice) is { } high)
+                @if (FieldProblem(TariffFields.HighPrice) is { } high)
                 {
                     <span class="hint @(high.IsWarning ? "warning" : "error")">@high.Message</span>
                 }
             </div>
-        </div>
-
-        @if (FieldProblem(TariffField.Table) is { } table)
-        {
-            <p class="warning" id="tariff-table-warning">@table.Message</p>
-        }
-
-        <h3>Today and tomorrow</h3>
-
-        @* Drawn from what the form holds, not what is saved, so a typo shows as a wrong-looking day before Save. *@
-        <div class="tariff-preview" id="tariff-preview">
-            @foreach (var day in PreviewDays())
-            {
-                <div class="tariff-day">
-                    <span class="tariff-day-name">@day.Name</span>
-                    <div class="tariff-bar" role="img" aria-label="@day.Label">
-                        @foreach (var (left, width) in day.Low)
-                        {
-                            <span class="tariff-low" style="left: @Css(left)%; width: @Css(width)%"></span>
-                        }
-                    </div>
-                </div>
-            }
-            <div class="tariff-axis" aria-hidden="true">
-                <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
-            </div>
-            <p class="table-note muted">Shaded is low tariff.</p>
         </div>
     }
 
@@ -188,56 +122,50 @@
 </section>
 
 @code {
-    private static readonly TariffDays[] AllDays = [TariffDays.Weekday, TariffDays.Weekend];
-
-    // A row as the form holds it: whatever was typed, valid or not.
-    private sealed class Row
-    {
-        public string Start { get; set; } = string.Empty;
-
-        public string End { get; set; } = string.Empty;
-    }
-
-    private sealed record PreviewDay(string Name, string Label, IReadOnlyList<(double Left, double Width)> Low);
-
-    private TariffProvider _provider;
-    private List<Row> _weekday = [];
-    private List<Row> _weekend = [];
+    private TariffSettings _settings = TariffSettings.None;
     private string _lowPrice = string.Empty;
     private string _highPrice = string.Empty;
     private IReadOnlyList<TariffProblem> _problems = [];
     private List<string> _saveErrors = [];
     private string? _message;
     private bool _dirty;
+    private int _generation;
 
     // The password in force, not the startup one, so a password set on /setup unlocks this at once.
     private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
     private bool HasErrors => _problems.Any(problem => !problem.IsWarning);
 
+    private ITariffProvider? Selected => Editor.Providers.FirstOrDefault(provider => _settings.Selects(provider.Id));
+
+    private bool IsNone => _settings.Selects(TariffProviderIds.None);
+
     protected override void OnInitialized() => Reload();
 
     private void Reload()
     {
-        var saved = Editor.Read();
-
-        _provider = saved.Provider;
-        _weekday = [.. saved.Weekday.Select(period => new Row { Start = period.Start, End = period.End })];
-        _weekend = [.. saved.Weekend.Select(period => new Row { Start = period.Start, End = period.End })];
-        _lowPrice = Price(saved.LowPricePerKwh);
-        _highPrice = Price(saved.HighPricePerKwh);
+        _settings = Editor.Read();
+        _lowPrice = Price(_settings.LowPricePerKwh);
+        _highPrice = Price(_settings.HighPricePerKwh);
         _saveErrors = [];
         _dirty = false;
+        _generation++;
         Check();
     }
 
-    private List<Row> Rows(TariffDays days) => days == TariffDays.Weekday ? _weekday : _weekend;
+    private void Select(string id) => Edit(() => _settings = _settings with { Provider = id });
 
-    private void SetProvider(TariffProvider provider) => Edit(() => _provider = provider);
+    // The section the panel handed back replaces the selected strategy's own; every other one is kept.
+    private void SectionChanged(string id, JsonElement section) => Edit(() => _settings = _settings.WithSection(id, section));
 
-    // A new row starts where the last one ended, which is where the next period of a day usually does.
-    private void Add(List<Row> rows) => Edit(() =>
-        rows.Add(new Row { Start = rows.Count > 0 && rows[^1].End.Trim() != "24:00" ? rows[^1].End : string.Empty }));
+    private Dictionary<string, object?> PanelParameters(ITariffProvider provider) => new()
+    {
+        [nameof(TariffProviderPanel.Settings)] = _settings.SectionFor(provider.Id),
+        [nameof(TariffProviderPanel.SettingsChanged)] =
+            EventCallback.Factory.Create<JsonElement>(this, section => SectionChanged(provider.Id, section)),
+        [nameof(TariffProviderPanel.Problems)] = _problems,
+        [nameof(TariffProviderPanel.ReadOnly)] = ReadOnly,
+    };
 
     private void Edit(Action change)
     {
@@ -248,7 +176,7 @@
         Check();
     }
 
-    private void Check() => _problems = [.. TariffRules.Check(Draft()), .. PriceProblems()];
+    private void Check() => _problems = [.. Editor.Check(Draft()), .. PriceProblems()];
 
     private void Save()
     {
@@ -262,104 +190,45 @@
         if (!result.Saved)
         {
             _problems = result.Problems;
-            _saveErrors = [.. result.Errors.Where(error => error.Row is null && error.Field == TariffField.Table).Select(error => error.Message)];
+            _saveErrors = [.. result.Errors.Where(error => error.Field == TariffFields.Provider).Select(error => error.Message)];
             return;
         }
 
         Reload();
-        _message = _provider == TariffProvider.None
-            ? "Saved. There is no tariff now."
-            : "Saved. The new tariff applies now.";
+        _message = IsNone ? "Saved. There is no tariff now." : "Saved. The new tariff applies now.";
     }
 
-    // What the form holds as a table, for the rules, the preview and Save alike. A price that does not
-    // parse is left out here and reported by PriceProblems instead.
-    private TariffTable Draft() => new(
-        _provider,
-        [.. _weekday.Select(row => new TariffPeriod(row.Start, row.End))],
-        [.. _weekend.Select(row => new TariffPeriod(row.Start, row.End))],
-        ParsePrice(_lowPrice),
-        ParsePrice(_highPrice));
+    // What the form holds, for the check and Save alike. A price that does not parse is left out here
+    // and reported by PriceProblems instead.
+    private TariffSettings Draft() => _settings with
+    {
+        LowPricePerKwh = ParsePrice(_lowPrice),
+        HighPricePerKwh = ParsePrice(_highPrice),
+    };
 
     private IEnumerable<TariffProblem> PriceProblems()
     {
-        if (_provider == TariffProvider.None)
+        if (IsNone)
         {
             yield break;
         }
 
         if (_lowPrice.Trim().Length > 0 && ParsePrice(_lowPrice) is null)
         {
-            yield return new TariffProblem(TariffField.LowPrice, null, "Not a price.");
+            yield return new TariffProblem(TariffFields.LowPrice, null, "Not a price.");
         }
 
         if (_highPrice.Trim().Length > 0 && ParsePrice(_highPrice) is null)
         {
-            yield return new TariffProblem(TariffField.HighPrice, null, "Not a price.");
+            yield return new TariffProblem(TariffFields.HighPrice, null, "Not a price.");
         }
-    }
-
-    private string? RowProblem(TariffDays days, int row)
-    {
-        var field = days == TariffDays.Weekday ? TariffField.Weekday : TariffField.Weekend;
-        return _problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row)?.Message;
     }
 
     // An error before a warning, when a field has both.
-    private TariffProblem? FieldProblem(TariffField field) =>
+    private TariffProblem? FieldProblem(string field) =>
         _problems.Where(problem => problem.Field == field).OrderBy(problem => problem.IsWarning).FirstOrDefault();
 
-    // Each local day as the share of its own length that is low tariff, so a 23-hour spring day is drawn
-    // as the whole bar rather than as a bar that stops short.
-    private List<PreviewDay> PreviewDays()
-    {
-        var zone = Time.LocalTimeZone;
-        var today = DateOnly.FromDateTime(Time.GetLocalNow().DateTime);
-        var timeline = TariffExpansion.Expand(Draft(), zone, today, Editor.Currency);
-        var days = new List<PreviewDay>();
-
-        for (var offset = 0; offset < 2; offset++)
-        {
-            var date = today.AddDays(offset);
-            var start = TariffExpansion.ToInstant(date, 0, zone);
-            var end = TariffExpansion.ToInstant(date.AddDays(1), 0, zone);
-            var length = (end - start).TotalMinutes;
-            var low = new List<(double, double)>();
-            var spoken = new List<string>();
-
-            foreach (var window in timeline?.LowWindows ?? [])
-            {
-                var from = window.Start > start ? window.Start : start;
-                var to = window.End < end ? window.End : end;
-
-                if (to <= from)
-                {
-                    continue;
-                }
-
-                low.Add(((from - start).TotalMinutes / length * 100, (to - from).TotalMinutes / length * 100));
-                spoken.Add($"{Clock(from, zone, start)}–{Clock(to, zone, start)}");
-            }
-
-            var name = offset == 0 ? "Today" : "Tomorrow";
-            var label = spoken.Count == 0
-                ? $"{name}: high tariff all day"
-                : $"{name}: low tariff {string.Join(", ", spoken)}";
-
-            days.Add(new PreviewDay($"{name} ({date.DayOfWeek.ToString()[..3]})", label, low));
-        }
-
-        return days;
-    }
-
-    // A preview edge as the owner typed it: the next midnight reads 24:00, not 00:00.
-    private static string Clock(DateTimeOffset instant, TimeZoneInfo zone, DateTimeOffset dayStart)
-    {
-        var local = TimeZoneInfo.ConvertTime(instant, zone);
-        return local.Date > TimeZoneInfo.ConvertTime(dayStart, zone).Date ? "24:00" : local.ToString("HH:mm", CultureInfo.InvariantCulture);
-    }
-
-    private static string Css(double percent) => percent.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Slug(string id) => id.ToLowerInvariant();
 
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? string.Empty;
 

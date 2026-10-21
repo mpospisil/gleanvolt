@@ -21,11 +21,36 @@ public sealed record TariffPrices(decimal LowPerKwh, decimal HighPerKwh, string 
 }
 
 /// <summary>One stretch of a single rate, half-open like every <see cref="TimeWindow"/>.</summary>
-public sealed record TariffWindow(TimeWindow Window, TariffRate Rate);
+/// <param name="Window">When.</param>
+/// <param name="Rate">Which rate: what Fast and SolarGrid act on.</param>
+/// <param name="PricePerKwh">
+/// This window's own price, for a strategy that knows one (a spot price per slot), or null for the
+/// shared price of <paramref name="Rate"/>. It is how a price that changes every quarter hour fits a
+/// two-rate model: the strategy decides which slots are <see cref="TariffRate.Low"/>, and the real
+/// price travels with each one.
+/// </param>
+public sealed record TariffWindow(TimeWindow Window, TariffRate Rate, decimal? PricePerKwh = null);
+
+/// <summary>
+/// Everything a strategy may need to expand its settings, as one record, so a new input later is a new
+/// property rather than a changed signature on every <see cref="Interfaces.ITariffProvider"/>.
+/// </summary>
+/// <param name="Now">When the expansion is made.</param>
+/// <param name="Today">The local date the timeline starts on.</param>
+/// <param name="Zone">The zone local times are in.</param>
+/// <param name="Prices">The shared prices, or null when the owner has not entered both.</param>
+/// <param name="Settings">The strategy's own section of <c>tariff.json</c>; undefined when none is saved.</param>
+public sealed record TariffContext(
+    DateTimeOffset Now,
+    DateOnly Today,
+    TimeZoneInfo Zone,
+    TariffPrices? Prices,
+    System.Text.Json.JsonElement Settings);
 
 /// <summary>
 /// The tariff as concrete instants: alternating low and high stretches that tile the timeline without
-/// a gap, from the start of today to at least the end of tomorrow, local time.
+/// a gap, as far ahead as the strategy knows — for the Table strategy, from the start of today to the
+/// end of tomorrow, local time.
 ///
 /// <para><b>Two neighbours never share a rate.</b> A night tariff is entered as 22:00–24:00 and
 /// 00:00–06:00, one period per day, and the expansion joins them into one window. So
@@ -34,7 +59,8 @@ public sealed record TariffWindow(TimeWindow Window, TariffRate Rate);
 /// </summary>
 /// <param name="Windows">In time order, each starting where the one before ends.</param>
 /// <param name="Prices">What each rate costs, or null when the owner has not entered prices.</param>
-public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffPrices? Prices)
+/// <param name="ProviderId">The strategy that produced it, for a surface that names it.</param>
+public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffPrices? Prices, string ProviderId = "")
 {
     /// <summary>The window covering <paramref name="instant"/>, or null outside the timeline.</summary>
     public TariffWindow? WindowAt(DateTimeOffset instant) =>
@@ -43,9 +69,12 @@ public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffP
     /// <summary>The rate at <paramref name="instant"/>, or null outside the timeline.</summary>
     public TariffRate? RateAt(DateTimeOffset instant) => WindowAt(instant)?.Rate;
 
-    /// <summary>What a grid kWh costs at <paramref name="instant"/>, or null without prices or outside the timeline.</summary>
+    /// <summary>
+    /// What a grid kWh costs at <paramref name="instant"/>: the window's own price when it has one, else
+    /// the shared price of its rate; null without either, or outside the timeline.
+    /// </summary>
     public decimal? PriceAt(DateTimeOffset instant) =>
-        Prices is { } prices && RateAt(instant) is { } rate ? prices.For(rate) : null;
+        WindowAt(instant) is not { } window ? null : window.PricePerKwh ?? Prices?.For(window.Rate);
 
     /// <summary>
     /// When the rate next changes after <paramref name="instant"/>, or null when it does not change

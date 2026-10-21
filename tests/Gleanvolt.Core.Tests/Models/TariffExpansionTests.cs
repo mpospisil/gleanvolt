@@ -13,11 +13,13 @@ public class TariffExpansionTests
 
     private static readonly TariffPeriod[] Night = [new("00:00", "06:00"), new("22:00", "24:00")];
 
-    private static TariffTable Table(TariffPeriod[] weekday, TariffPeriod[]? weekend = null) =>
-        new(TariffProvider.Table, weekday, weekend ?? weekday, 2.10m, 4.80m);
+    private static readonly TariffPrices Prices = new(2.10m, 4.80m, "CZK");
 
-    private static TariffTimeline Expand(TariffTable table, DateOnly today) =>
-        TariffExpansion.Expand(table, Prague, today, "CZK")!;
+    private static TariffTable Table(TariffPeriod[] weekday, TariffPeriod[]? weekend = null) =>
+        new(weekday, weekend ?? weekday);
+
+    private static TariffTimeline Expand(TariffTable table, DateOnly today, TariffPrices? prices = null) =>
+        TariffExpansion.Expand(table, Prague, today, prices ?? Prices);
 
     // A wall-clock time in Prague on `date`, as an instant, for dates where it is unambiguous.
     private static DateTimeOffset At(DateOnly date, int hour, int minute = 0)
@@ -27,12 +29,6 @@ public class TariffExpansionTests
     }
 
     private static readonly DateOnly Wednesday = new(2026, 10, 21);
-
-    [Fact]
-    public void NoProviderIsNoTimeline()
-    {
-        Assert.Null(TariffExpansion.Expand(TariffTable.None with { Weekday = Night }, Prague, Wednesday, "CZK"));
-    }
 
     [Fact]
     public void TheTimelineTilesTodayAndTomorrowWithoutAGapAndAlternatesRates()
@@ -185,9 +181,26 @@ public class TariffExpansionTests
     [Fact]
     public void PricesNeedBothRates()
     {
-        var timeline = Expand(Table(Night) with { HighPricePerKwh = null }, Wednesday);
+        var settings = TariffSettings.None with { LowPricePerKwh = 2.10m };
+        var timeline = TariffExpansion.Expand(Table(Night), Prague, Wednesday, settings.PricesIn("CZK"));
 
         Assert.Null(timeline.Prices);
         Assert.Null(timeline.PriceAt(At(Wednesday, 1)));
+    }
+
+    [Fact]
+    public void AWindowsOwnPriceWinsOverItsRates()
+    {
+        var start = At(Wednesday, 0);
+        var timeline = new TariffTimeline(
+            [
+                new TariffWindow(new TimeWindow(start, start.AddHours(1)), TariffRate.Low, PricePerKwh: 0.85m),
+                new TariffWindow(new TimeWindow(start.AddHours(1), start.AddHours(2)), TariffRate.High),
+            ],
+            Prices);
+
+        Assert.Equal(0.85m, timeline.PriceAt(start));
+        Assert.Equal(4.80m, timeline.PriceAt(start.AddHours(1)));
+        Assert.Null(timeline.PriceAt(start.AddHours(2)));
     }
 }

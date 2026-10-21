@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -9,19 +10,25 @@ using Gleanvolt.Web.Components;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// The tariff on Settings (issue #265). What it has to get right: each rule shows on the row as the
-/// owner types, Save stays disabled while anything is an error, warnings are saved through, nothing is
-/// written before Save, and the preview draws what the form holds.
+/// The tariff on Settings (issue #265). What it has to get right: the choice lists the strategies this
+/// build registers and each brings its own panel; every rule shows in place as the owner types; Save
+/// stays disabled while anything is an error and warnings save through; nothing is written before Save;
+/// switching strategy and back keeps the first one's settings; and the preview draws what the form holds.
 /// </summary>
 public class TariffEditorFormTests : BunitContext
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
-    private readonly FakeTariffEditor _editor = new();
+    private static readonly TariffTable NightTable = new(
+        [new("00:00", "06:00"), new("22:00", "24:00")],
+        [new("00:00", "08:00")]);
+
+    private FakeTariffEditor _editor = new();
 
     public TariffEditorFormTests()
     {
-        Services.AddSingleton<ITariffEditor>(_editor);
+        Services.AddSingleton<ITariffEditor>(_ => _editor);
+        Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
 
         // A login, which is what makes the form editable at all.
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
@@ -32,16 +39,9 @@ public class TariffEditorFormTests : BunitContext
             new FixedTimeProvider(new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), Prague));
     }
 
-    private static readonly TariffTable Night = new(
-        TariffProvider.Table,
-        [new("00:00", "06:00"), new("22:00", "24:00")],
-        [new("00:00", "08:00")],
-        2.10m,
-        4.80m);
-
-    private IRenderedComponent<TariffEditorForm> RenderTable()
+    private IRenderedComponent<TariffEditorForm> RenderTable(TariffTable? table = null)
     {
-        _editor.Stored = Night;
+        _editor.Stored = TestTariffs.Table(table ?? NightTable);
         return Render<TariffEditorForm>();
     }
 
@@ -52,7 +52,8 @@ public class TariffEditorFormTests : BunitContext
     public void WithoutALoginItCanBeReadButNotChanged()
     {
         using var open = new BunitContext();
-        open.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor { Stored = Night });
+        open.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor { Stored = TestTariffs.Table(NightTable) });
+        open.Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
         open.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(DateTimeOffset.UnixEpoch, Prague));
         open.Services.AddSingleton(Options.Create(new WebOptions()));
         open.Services.AddSingleton(new WebPasswordState(null));
@@ -74,6 +75,46 @@ public class TariffEditorFormTests : BunitContext
         Assert.Empty(form.FindAll("#tariff-weekday"));
         Assert.Empty(form.FindAll("#tariff-low-price"));
         Assert.True(SaveDisabled(form));
+    }
+
+    [Fact]
+    public void TheChoiceListsEveryRegisteredStrategy()
+    {
+        _editor = new FakeTariffEditor(new PanelLessProvider());
+
+        var form = Render<TariffEditorForm>();
+
+        Assert.Equal(["None", "Table", "Test feed"], form.FindAll("#tariff-provider label").Select(label => label.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void AStrategyWithoutAPanelHasNothingToSetButStillHasPrices()
+    {
+        _editor = new FakeTariffEditor(new PanelLessProvider());
+        var form = Render<TariffEditorForm>();
+
+        form.Find("#tariff-provider-testfeed").Change(true);
+
+        Assert.Contains("Test feed has nothing to set here.", form.Find("#tariff-no-panel").TextContent);
+        Assert.NotNull(form.Find("#tariff-low-price"));
+
+        form.Find("#tariff-save").Click();
+
+        Assert.Equal("TestFeed", Assert.Single(_editor.Saves).Provider);
+    }
+
+    [Fact]
+    public void ASavedStrategyThisBuildLacksIsSaidAndBlocksSaveUntilAnotherIsChosen()
+    {
+        _editor.Stored = TestTariffs.Table(NightTable) with { Provider = "Egd" };
+        var form = Render<TariffEditorForm>();
+
+        Assert.Contains("Egd, is not in this build", form.Find("#tariff-provider-unknown").TextContent);
+
+        form.Find("#tariff-provider-table").Change(true);
+
+        Assert.Equal("22:00", form.Find("#tariff-weekday-1-start").GetAttribute("value"));
+        Assert.False(SaveDisabled(form));
     }
 
     [Fact]
@@ -163,7 +204,7 @@ public class TariffEditorFormTests : BunitContext
         form.Find("#tariff-weekday-1-remove").Click();
         form.Find("#tariff-weekday-0-remove").Click();
 
-        Assert.Contains("everything would be high tariff", form.Find("#tariff-table-warning").TextContent);
+        Assert.Contains("everything would be high tariff", form.Find("#tariff-table-problem").TextContent);
 
         form.Find("#tariff-save").Click();
 
@@ -199,8 +240,7 @@ public class TariffEditorFormTests : BunitContext
     [Fact]
     public void SaveStoresTheRowsSortedAndSaysItApplies()
     {
-        _editor.Stored = Night with { Weekday = [], Weekend = [] };
-        var form = Render<TariffEditorForm>();
+        var form = RenderTable(TariffTable.Empty);
 
         form.Find("#tariff-weekday-add").Click();
         form.Find("#tariff-weekday-0-start").Input("13:00");
@@ -211,20 +251,38 @@ public class TariffEditorFormTests : BunitContext
         form.Find("#tariff-save").Click();
 
         Assert.Single(_editor.Saves);
-        Assert.Equal([new TariffPeriod("00:00", "06:00"), new TariffPeriod("13:00", "15:00")], _editor.Stored.Weekday);
+        Assert.Equal(
+            [new TariffPeriod("00:00", "06:00"), new TariffPeriod("13:00", "15:00")],
+            TestTariffs.TableOf(_editor.Stored).Weekday);
         Assert.Equal("00:00", form.Find("#tariff-weekday-0-start").GetAttribute("value"));
         Assert.Contains("applies now", form.Find("#tariff-message").TextContent);
     }
 
     [Fact]
-    public void SwitchingToNoneSavesWithoutTheTable()
+    public void SwitchingToNoneAndBackKeepsWhatWasTyped()
+    {
+        var form = RenderTable();
+
+        form.Find("#tariff-weekday-0-end").Input("07:00");
+        form.Find("#tariff-provider-none").Change(true);
+
+        Assert.Empty(form.FindAll("#tariff-weekday"));
+
+        form.Find("#tariff-provider-table").Change(true);
+
+        Assert.Equal("07:00", form.Find("#tariff-weekday-0-end").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void SwitchingToNoneSavesTheSelectionAndKeepsTheTable()
     {
         var form = RenderTable();
 
         form.Find("#tariff-provider-none").Change(true);
         form.Find("#tariff-save").Click();
 
-        Assert.Equal(TariffProvider.None, Assert.Single(_editor.Saves).Provider);
+        Assert.True(Assert.Single(_editor.Saves).Selects(TariffProviderIds.None));
+        Assert.Equal(2, TestTariffs.TableOf(_editor.Stored).Weekday.Count);
     }
 
     [Fact]
@@ -243,5 +301,17 @@ public class TariffEditorFormTests : BunitContext
         Assert.Equal(
             "Today: low tariff 00:00–16:00, 22:00–24:00",
             form.FindAll(".tariff-bar")[0].GetAttribute("aria-label"));
+    }
+
+    // A strategy registered only here, with no panel: proof that the form needs no change for a new one.
+    private sealed class PanelLessProvider : ITariffProvider
+    {
+        public string Id => "TestFeed";
+
+        public string Name => "Test feed";
+
+        public IReadOnlyList<TariffProblem> Check(JsonElement settings) => [];
+
+        public TariffTimeline? Expand(TariffContext context) => null;
     }
 }

@@ -4,9 +4,10 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Core.Configuration;
 
 /// <summary>
-/// What makes a <see cref="TariffTable"/> savable (issue #265), stated once for the two places that
-/// check it: the Settings form, as the owner types, and the service that writes the file, which the API
-/// and a second browser tab reach without going through the form.
+/// What makes tariff settings savable (issue #265), stated once for the places that check them: the
+/// Settings form, as the owner types, and the service that writes the file, which the API and a second
+/// browser tab reach without going through the form. The price rules apply whichever strategy is
+/// selected; the table rules are the <see cref="TariffProviderIds.Table"/> strategy's.
 /// </summary>
 public static class TariffRules
 {
@@ -40,42 +41,43 @@ public static class TariffRules
     public static string FormatMinutes(int minutes) =>
         string.Create(CultureInfo.InvariantCulture, $"{minutes / 60:00}:{minutes % 60:00}");
 
-    /// <summary>Every problem with <paramref name="table"/>, errors and warnings together; empty when there are none.</summary>
-    public static IReadOnlyList<TariffProblem> Check(TariffTable table)
+    /// <summary>The shared prices' problems, which apply whichever strategy is selected; empty when there are none.</summary>
+    public static IReadOnlyList<TariffProblem> CheckPrices(decimal? low, decimal? high)
     {
         var problems = new List<TariffProblem>();
 
-        // A provider of None ignores everything else, and a half-filled table left behind by switching
-        // to None must not stop that switch being saved.
-        if (table.Provider == TariffProvider.None)
+        if (low < 0)
         {
-            return problems;
+            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "A price can't be negative."));
         }
 
-        CheckPeriods(table.Weekday, TariffField.Weekday, problems);
-        CheckPeriods(table.Weekend, TariffField.Weekend, problems);
-
-        if (table.LowPricePerKwh < 0)
+        if (high < 0)
         {
-            problems.Add(new TariffProblem(TariffField.LowPrice, null, "A price can't be negative."));
-        }
-
-        if (table.HighPricePerKwh < 0)
-        {
-            problems.Add(new TariffProblem(TariffField.HighPrice, null, "A price can't be negative."));
+            problems.Add(new TariffProblem(TariffFields.HighPrice, null, "A price can't be negative."));
         }
 
         // A warning, not a block: nothing in the controller acts on the prices yet, the times are what
         // matter, and a tariff this odd could exist. Wrong prices cost a wrong-looking figure.
-        if (table.LowPricePerKwh is { } low && table.HighPricePerKwh is { } high && low >= 0 && low > high)
+        if (low is { } l && high is { } h && l >= 0 && l > h)
         {
-            problems.Add(new TariffProblem(TariffField.LowPrice, null, "Low tariff costs more than high.", IsWarning: true));
+            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "Low tariff costs more than high.", IsWarning: true));
         }
+
+        return problems;
+    }
+
+    /// <summary>Every problem with <paramref name="table"/>, errors and warnings together; empty when there are none.</summary>
+    public static IReadOnlyList<TariffProblem> CheckTable(TariffTable table)
+    {
+        var problems = new List<TariffProblem>();
+
+        CheckPeriods(table.Weekday, TariffFields.TableWeekday, problems);
+        CheckPeriods(table.Weekend, TariffFields.TableWeekend, problems);
 
         if (table.Weekday.Count == 0 && table.Weekend.Count == 0)
         {
             problems.Add(new TariffProblem(
-                TariffField.Table, null, "No low-tariff periods: everything would be high tariff.", IsWarning: true));
+                TariffFields.Table, null, "No low-tariff periods: everything would be high tariff.", IsWarning: true));
         }
 
         return problems;
@@ -83,17 +85,13 @@ public static class TariffRules
 
     /// <summary>
     /// <paramref name="table"/> as it is stored: each time as <c>HH:mm</c> and each list sorted by start,
-    /// whatever order the rows were added in. Only meaningful for a table <see cref="Check"/> passed.
+    /// whatever order the rows were added in. Only meaningful for a table <see cref="CheckTable"/> passed.
     /// </summary>
-    public static TariffTable Normalize(TariffTable table) => table with
-    {
-        Weekday = Normalize(table.Weekday),
-        Weekend = Normalize(table.Weekend),
-    };
+    public static TariffTable Normalize(TariffTable table) => new(Normalize(table.Weekday), Normalize(table.Weekend));
 
     /// <summary>
-    /// The parsed periods of a list <see cref="Check"/> passed, as minute ranges sorted by start. Rows
-    /// that do not parse are skipped, so a caller drawing a half-typed table draws what it can.
+    /// The parsed periods of a list as minute ranges sorted by start. Rows that do not parse are
+    /// skipped, so a caller drawing a half-typed table draws what it can.
     /// </summary>
     public static IReadOnlyList<(int Start, int End)> Minutes(IReadOnlyList<TariffPeriod> periods) =>
     [
@@ -107,7 +105,7 @@ public static class TariffRules
     private static List<TariffPeriod> Normalize(IReadOnlyList<TariffPeriod> periods) =>
         [.. Minutes(periods).Select(period => new TariffPeriod(FormatMinutes(period.Start), FormatMinutes(period.End)))];
 
-    private static void CheckPeriods(IReadOnlyList<TariffPeriod> periods, TariffField field, List<TariffProblem> problems)
+    private static void CheckPeriods(IReadOnlyList<TariffPeriod> periods, string field, List<TariffProblem> problems)
     {
         var parsed = new (int Start, int End)?[periods.Count];
 
