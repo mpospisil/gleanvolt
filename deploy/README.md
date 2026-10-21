@@ -800,6 +800,7 @@ Everything that is state, because none of it lives inside a container:
 | `/opt/gleanvolt/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
 | `data/sessions.db` | charging-session history, with its SQLite WAL |
 | `data/energy.db` | the site's 15-minute energy history, with its SQLite WAL |
+| `data/pv-system.json`, `data/tariff.json` | what was saved on **Settings**: the installation's edits, and the [grid tariff](../README.md#grid-tariff-the-tariff-section) |
 | `data/vw-website-session.json`, `data/skoda-api-key.json` | **the car's sign-in.** Bearer-equivalent, mode `0600` — see below |
 | `logs/` | the controller's own log files |
 | `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
@@ -1176,7 +1177,7 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | Host path | In the container | What it is | Back up? |
 |---|---|---|---|
 | `/opt/gleanvolt/.env` | (environment) | secrets, `chmod 600` | yes |
-| `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — charging-session history; `energy.db` — the site's 15-minute energy history | **critical** |
+| `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — charging-session history; `energy.db` — the site's 15-minute energy history; `pv-system.json` and `tariff.json` — what was saved on Settings | **critical** |
 | `/opt/gleanvolt/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
 | `/opt/gleanvolt/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
 | `/opt/gleanvolt/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |

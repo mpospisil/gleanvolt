@@ -93,7 +93,7 @@ it. Upgrades never overwrite it.
 |---|---|
 | `/opt/gleanvolt/` | the program: replaced on every upgrade, never edit it |
 | `/etc/gleanvolt/gleanvolt.env` | your settings |
-| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, vehicle sign-in files. Back this up — **carefully**, see below |
+| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, what was saved on Settings (`pv-system.json`, `tariff.json`), vehicle sign-in files. Back this up — **carefully**, see below |
 | `/var/log/gleanvolt/` | the log files, one per day, kept 14 days |
 | `journalctl -u gleanvolt` | the same log in the system journal. On a Raspberry Pi the journal is lost at reboot; the files above are not |
 
