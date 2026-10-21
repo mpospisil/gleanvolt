@@ -15,7 +15,7 @@ public class TargetedChargeRequestFactoryTests
 
     private static readonly TargetedChargeRequestLimits Limits = new(
         MaxHorizon: TimeSpan.FromHours(36),
-        BatteryCapacityKWh: 77,
+        BatteryCapacityWh: 77_000,
         ChargeEfficiency: 0.9,
         DefaultRestSocPercent: 80);
 
@@ -89,7 +89,7 @@ public class TargetedChargeRequestFactoryTests
     [Fact]
     public void Refuses_a_state_of_charge_target_on_an_installation_that_cannot_convert_one()
     {
-        var result = Create(targetSoc: 80, vehicleSoc: 42, limits: Limits with { BatteryCapacityKWh = 0 });
+        var result = Create(targetSoc: 80, vehicleSoc: 42, limits: Limits with { BatteryCapacityWh = 0 });
 
         Assert.Null(result.Request);
         Assert.Contains("usable capacity", result.Error);

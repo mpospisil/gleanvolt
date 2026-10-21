@@ -140,7 +140,7 @@ public sealed class OpenWeatherMapService : IWeatherService
         var observation = new WeatherObservation(
             ObservedAt: DateTimeOffset.FromUnixTimeSeconds(response.Timestamp),
             TemperatureCelsius: main.Temperature,
-            PressureHpa: main.Pressure,
+            PressurePascals: main.Pressure * 100, // OpenWeather reports hPa
             HumidityPercent: main.Humidity,
             CloudsPercent: response.Clouds?.All ?? 0,
             VisibilityMetres: response.Visibility,

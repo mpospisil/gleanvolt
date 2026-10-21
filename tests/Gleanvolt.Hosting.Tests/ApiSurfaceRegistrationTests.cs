@@ -96,7 +96,7 @@ public class ApiSurfaceRegistrationTests
 
         var limits = provider.GetRequiredService<TargetedChargeRequestLimits>();
 
-        Assert.Equal(77, limits.BatteryCapacityKWh);
+        Assert.Equal(77_000, limits.BatteryCapacityWh);
         Assert.True(limits.CanTargetSoc);
         Assert.Equal(TimeSpan.FromHours(20), limits.MaxHorizon);
     }

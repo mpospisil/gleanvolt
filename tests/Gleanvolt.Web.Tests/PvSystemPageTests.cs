@@ -25,8 +25,8 @@ public class PvSystemPageTests : BunitContext
         double? longitude = 14.4378,
         double? azimuth = 172,
         double? tilt = 35,
-        double? capacityKwp = 9.2,
-        double? inverterCapacityKw = 8,
+        double? peakPowerWatts = 9_200,
+        double? inverterCapacityWatts = 8_000,
         double? lossFactor = 0.9,
         DateOnly? installDate = null,
         IReadOnlyList<PvDeviceInfo>? chargers = null) =>
@@ -38,8 +38,8 @@ public class PvSystemPageTests : BunitContext
             longitude,
             azimuth,
             tilt,
-            capacityKwp,
-            inverterCapacityKw,
+            peakPowerWatts,
+            inverterCapacityWatts,
             lossFactor,
             installDate ?? new DateOnly(2024, 5, 1),
             Device("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", "192.168.2.10"),
@@ -47,7 +47,7 @@ public class PvSystemPageTests : BunitContext
 
     /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
     private static EvInfo Car(int? phases = 3, int? minAmps = 6, int? maxAmps = 16) => new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, phases, minAmps, maxAmps, "gleanvolt/vehicle/id4/state");
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, phases, minAmps, maxAmps, "gleanvolt/vehicle/id4/state");
 
     /// <summary>
     /// A configured MQTT link, as the host composes one. <paramref name="password"/> is what the host
@@ -219,8 +219,8 @@ public class PvSystemPageTests : BunitContext
             longitude: null,
             azimuth: null,
             tilt: null,
-            capacityKwp: null,
-            inverterCapacityKw: null,
+            peakPowerWatts: null,
+            inverterCapacityWatts: null,
             lossFactor: null));
 
         Assert.DoesNotContain("0.0000", page.Markup);

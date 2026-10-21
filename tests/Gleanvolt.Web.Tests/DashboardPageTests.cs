@@ -47,7 +47,7 @@ public class DashboardPageTests : PageTest
     }
 
     private static EvInfo Id4() => new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
 
     /// <summary>
     /// A manufacturer feed that only ever answers "here is how I am". Fetching throws on purpose: the
@@ -122,7 +122,7 @@ public class DashboardPageTests : PageTest
     {
         // Everything in the Ev section except the pack is optional (#124), and a car with no name and
         // no model must not render as a leading comma.
-        _car = EvInfo.Unknown with { BatteryCapacityKWh = 77 };
+        _car = EvInfo.Unknown with { BatteryCapacityWh = 77_000 };
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();

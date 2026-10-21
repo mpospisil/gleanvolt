@@ -362,7 +362,7 @@ public static class GleanvoltHostingExtensions
                     MaxLoanPowerWatts: forecast.MaxLoanPowerWatts,
                     MinBridgeSurplusWatts: forecast.MinBridgeSurplusWatts,
                     SpillBridgeSurplusWatts: forecast.SpillBridgeSurplusWatts,
-                    MaxDailyLoanWh: forecast.MaxDailyLoanKWh * 1000,
+                    MaxDailyLoanWh: forecast.MaxDailyLoanWh,
                     LoanSocMarginPercent: forecast.LoanSocMarginPercent,
                     MinRunTime: forecast.MinRunTime,
                     MinPauseTime: forecast.MinPauseTime,
@@ -762,7 +762,7 @@ public static class GleanvoltHostingExtensions
             // MaxAge is the feed's; the pack is the car's. Two sections, and the split is the point of
             // issue #124.
             return new VehicleDisplayOptions(
-                vehicle.MaxAge, ev.BatteryCapacityKWh, ev.ChargeEfficiency, vehicle.OnDemandOnly);
+                vehicle.MaxAge, ev.BatteryCapacityWh, ev.ChargeEfficiency, vehicle.OnDemandOnly);
         });
 
         // Same arrangement for the targeted page: it has to reject a departure beyond the horizon
@@ -784,7 +784,7 @@ public static class GleanvoltHostingExtensions
 
             return new TargetedChargeRequestLimits(
                 targeted.MaxHorizon,
-                ev.BatteryCapacityKWh,
+                ev.BatteryCapacityWh,
                 ev.ChargeEfficiency,
                 targeted.JustInTime.RestSocPercent);
         });

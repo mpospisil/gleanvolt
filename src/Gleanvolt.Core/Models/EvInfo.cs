@@ -16,7 +16,7 @@ namespace Gleanvolt.Core.Models;
 /// <param name="Name">The display name; falls back to <paramref name="Id"/>, then to the model.</param>
 /// <param name="Make">The manufacturer. Reported, never acted on.</param>
 /// <param name="Model">The model. Reported, never acted on.</param>
-/// <param name="BatteryCapacityKWh">Usable capacity, or 0 when it has not been configured.</param>
+/// <param name="BatteryCapacityWh">Usable capacity in Wh, or 0 when it has not been configured.</param>
 /// <param name="ChargeEfficiency">Charger-meter → cells efficiency, (0..1].</param>
 /// <param name="Phases">
 /// Phases the <b>car</b> can charge on, or null when unstated. Null narrows nothing; a stated value
@@ -30,7 +30,7 @@ public sealed record EvInfo(
     string Name,
     string Make,
     string Model,
-    double BatteryCapacityKWh,
+    double BatteryCapacityWh,
     double ChargeEfficiency,
     int? Phases,
     int? MinChargingCurrentAmps,
@@ -46,7 +46,7 @@ public sealed record EvInfo(
         Name: string.Empty,
         Make: string.Empty,
         Model: string.Empty,
-        BatteryCapacityKWh: 0,
+        BatteryCapacityWh: 0,
         ChargeEfficiency: 0.9,
         Phases: null,
         MinChargingCurrentAmps: null,
@@ -70,19 +70,16 @@ public sealed record EvInfo(
         || !string.IsNullOrWhiteSpace(Name)
         || !string.IsNullOrWhiteSpace(Make)
         || !string.IsNullOrWhiteSpace(Model)
-        || BatteryCapacityKWh > 0
+        || BatteryCapacityWh > 0
         || Phases is not null
         || MinChargingCurrentAmps is not null
         || MaxChargingCurrentAmps is not null;
 
     /// <summary>Whether a target may be asked for as a state of charge — i.e. whether a capacity is known.</summary>
-    public bool CanTargetSoc => BatteryCapacityKWh > 0;
-
-    /// <summary>The pack's usable capacity in watt-hours, which is what the conversions are stated in.</summary>
-    public double BatteryCapacityWh => BatteryCapacityKWh * 1000;
+    public bool CanTargetSoc => BatteryCapacityWh > 0;
 
     /// <summary>The pack figures in the shape the charge factories take.</summary>
-    public VehiclePackLimits Pack => new(BatteryCapacityKWh, ChargeEfficiency);
+    public VehiclePackLimits Pack => new(BatteryCapacityWh, ChargeEfficiency);
 
     /// <summary>
     /// One line for the log at startup, so a <c>docker logs</c> dump answers "and what car did it think
@@ -99,7 +96,7 @@ public sealed record EvInfo(
         var what = string.Join(" ", new[] { Make, Model }.Where(part => !string.IsNullOrWhiteSpace(part)));
         var name = string.IsNullOrWhiteSpace(Name) ? (string.IsNullOrWhiteSpace(Id) ? "unnamed" : Id) : Name;
 
-        var pack = CanTargetSoc ? $"{BatteryCapacityKWh:0.#}kWh usable" : "capacity not configured";
+        var pack = CanTargetSoc ? $"{BatteryCapacityWh / 1000:0.#}kWh usable" : "capacity not configured";
 
         var accepts = (MinChargingCurrentAmps, MaxChargingCurrentAmps, Phases) switch
         {

@@ -54,7 +54,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
     internal TimeZoneInfo Zone { get; } = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
     /// <summary>Starts the host and returns a client that already presents a valid key.</summary>
-    internal async Task<HttpClient> StartAsync(ApiOptions? options = null, double batteryCapacityKWh = 77)
+    internal async Task<HttpClient> StartAsync(ApiOptions? options = null, double batteryCapacityWh = 77_000)
     {
         var api = options ?? new ApiOptions
         {
@@ -87,7 +87,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton(Car);
         builder.Services.AddSingleton(new TargetedChargeRequestLimits(
             MaxHorizon: TimeSpan.FromHours(36),
-            BatteryCapacityKWh: batteryCapacityKWh,
+            BatteryCapacityWh: batteryCapacityWh,
             ChargeEfficiency: 0.9,
             DefaultRestSocPercent: 80));
         builder.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(Fixtures.Now, Zone));

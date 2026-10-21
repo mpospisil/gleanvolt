@@ -42,7 +42,7 @@ public class VwGroupVehicleStateMapperTests
 
         Assert.NotNull(state);
         Assert.Equal(37, state.SocPercent);
-        Assert.Equal(41, state.RangeKm);
+        Assert.Equal(41_000, state.RangeMetres);
         Assert.Equal(VehicleChargeState.Idle, state.ChargeState);
         Assert.Equal(VehiclePlugState.Disconnected, state.PlugState);
     }
@@ -52,7 +52,7 @@ public class VwGroupVehicleStateMapperTests
     {
         // The portal states the unit in the field name, which is the only reason this can be
         // converted rather than guessed at from magnitude.
-        Assert.Equal(348, VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).State!.RangeKm);
+        Assert.Equal(348_000, VwGroupVehicleStateMapper.Map(Snapshots("meb-dotted.json")).State!.RangeMetres);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class VwGroupVehicleStateMapperTests
         // news -- and the last one in this bundle is a sentinel anyway.
         var result = VwGroupVehicleStateMapper.Map(Snapshots("sentinels-and-partials.json"));
 
-        Assert.Equal(18240, result.OdometerKm);
+        Assert.Equal(18240_000, result.OdometerMetres);
     }
 
     [Fact]

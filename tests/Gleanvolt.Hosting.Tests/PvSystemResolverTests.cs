@@ -51,7 +51,7 @@ public class PvSystemResolverTests
         Assert.Equal(50.0755, site.Latitude);
         Assert.Equal(14.4378, site.Longitude);
         Assert.Equal(35, site.TiltDegrees);
-        Assert.Equal(9.2, site.CapacityKwp);
+        Assert.Equal(9_200, site.PeakPowerWatts);
         Assert.Equal(0.9, site.LossFactor);
         Assert.Equal(new DateOnly(2024, 5, 1), site.InstallDate);
         Assert.True(site.HasLocation);
@@ -103,7 +103,7 @@ public class PvSystemResolverTests
         Assert.False(site.HasLocation);
         Assert.Null(site.AzimuthDegrees);
         Assert.Null(site.TiltDegrees);
-        Assert.Null(site.CapacityKwp);
+        Assert.Null(site.PeakPowerWatts);
         Assert.Null(site.LossFactor);
         Assert.Null(site.InstallDate);
     }

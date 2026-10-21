@@ -24,7 +24,7 @@ public class VwWebsiteChargingStatusTests
         Assert.Null(error);
         Assert.NotNull(state);
         Assert.Equal(55, state!.SocPercent);
-        Assert.Equal(220, state.RangeKm);
+        Assert.Equal(220_000, state.RangeMetres);
         Assert.Equal("vw-website", state.SourceId);
     }
 

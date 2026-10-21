@@ -17,7 +17,7 @@ namespace Gleanvolt.Core.Models;
 /// be told apart from a live one, and these are typically a few minutes old.
 /// </param>
 /// <param name="TemperatureCelsius">Air temperature, °C.</param>
-/// <param name="PressureHpa">Atmospheric pressure at station level, hPa.</param>
+/// <param name="PressurePascals">Atmospheric pressure at station level, Pa.</param>
 /// <param name="HumidityPercent">Relative humidity, %.</param>
 /// <param name="CloudsPercent">
 /// Cloud cover, %. The single most useful figure here: against the day's forecast curve it separates
@@ -32,7 +32,7 @@ namespace Gleanvolt.Core.Models;
 public sealed record WeatherObservation(
     DateTimeOffset ObservedAt,
     double TemperatureCelsius,
-    double PressureHpa,
+    double PressurePascals,
     double HumidityPercent,
     double CloudsPercent,
     double? VisibilityMetres,

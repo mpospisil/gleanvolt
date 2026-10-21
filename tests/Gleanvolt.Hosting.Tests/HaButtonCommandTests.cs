@@ -197,7 +197,7 @@ public class HaButtonCommandTests
     public async Task ChargeFastConvertsTheSocBoxUnderTheSocBasis()
     {
         _vehicle.State = new VehicleState(Now, SocPercent: 42);
-        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+        var worker = Worker(EvInfo.Unknown with { BatteryCapacityWh = 77_000, ChargeEfficiency = 0.9 });
 
         await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Soc");
         await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastTargetSocNumber), "60");
@@ -219,7 +219,7 @@ public class HaButtonCommandTests
     {
         // 13 h against VehicleOptions.MaxAge's 12 h default.
         _vehicle.State = new VehicleState(Now.AddHours(-13), SocPercent: 42);
-        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+        var worker = Worker(EvInfo.Unknown with { BatteryCapacityWh = 77_000, ChargeEfficiency = 0.9 });
 
         await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Soc");
         await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastTargetSocNumber), "60");
@@ -238,7 +238,7 @@ public class HaButtonCommandTests
     public async Task ChargeFastStillTakesAnEnergyAmountWhenTheReadingIsStale()
     {
         _vehicle.State = new VehicleState(Now.AddHours(-13), SocPercent: 42);
-        var worker = Worker(new VehicleOptions { BatteryCapacityKWh = 77, ChargeEfficiency = 0.9 });
+        var worker = Worker(EvInfo.Unknown with { BatteryCapacityWh = 77_000, ChargeEfficiency = 0.9 });
 
         await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.FastBasisSelect), "Energy");
         await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.FastEnergyNumber), "20");
@@ -359,7 +359,7 @@ public class HaButtonCommandTests
         Assert.False(_fast.Limit!.IsDeferred);
     }
 
-    private HomeAssistantMqttWorker Worker(VehicleOptions? vehicleOptions = null) =>
+    private HomeAssistantMqttWorker Worker(EvInfo? ev = null) =>
         new(
             Options.Create(HaOptions),
             Options.Create(new BatteryHoldOptions()),
@@ -373,7 +373,8 @@ public class HaButtonCommandTests
             new ChargeControlStatusHolder(),
             NullLogger<HomeAssistantMqttWorker>.Instance,
             Options.Create(new TargetedChargeOptions()),
-            Options.Create(vehicleOptions ?? new VehicleOptions()),
+            Options.Create(new VehicleOptions()),
+            ev ?? EvInfo.Unknown,
             Discovery,
             _vehicle,
             // No manufacturer update service (#140): this suite is about the buttons, and the Car feed

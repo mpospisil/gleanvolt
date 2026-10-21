@@ -24,8 +24,8 @@ namespace Gleanvolt.Core.Models;
 /// offset so a source reporting local time is not silently reinterpreted as UTC.
 /// </param>
 /// <param name="SocPercent">The drive battery's state of charge, 0-100, or null if not reported.</param>
-/// <param name="RangeKm">
-/// The range the <b>car</b> reckons is left in it, in kilometres, or null if not reported. Its own
+/// <param name="RangeMetres">
+/// The range the <b>car</b> reckons is left in it, in metres, or null if not reported. Its own
 /// estimate off its own recent consumption, which is the only reason it is worth showing: nothing here
 /// could compute it, and it is the figure that actually answers "is 80% enough for the trip?".
 ///
@@ -47,7 +47,7 @@ namespace Gleanvolt.Core.Models;
 public sealed record VehicleState(
     DateTimeOffset CapturedAt,
     double? SocPercent = null,
-    double? RangeKm = null,
+    double? RangeMetres = null,
     TimeSpan? ChargeTimeRemaining = null,
     VehicleChargeState ChargeState = VehicleChargeState.Unknown,
     VehiclePlugState PlugState = VehiclePlugState.Unknown,

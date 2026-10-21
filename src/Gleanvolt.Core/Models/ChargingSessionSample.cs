@@ -36,11 +36,11 @@ namespace Gleanvolt.Core.Models;
 /// hours — a SOC without its capture time cannot be told apart from a live one, and would silently
 /// flatten a chart. Null whenever <paramref name="VehicleSocPercent"/> is.
 /// </param>
-/// <param name="VehicleChargeTimeRemainingMinutes">
+/// <param name="VehicleChargeTimeRemaining">
 /// How much longer the <b>car itself</b> reckons it needs. Its own estimate, not one of ours — it
 /// knows its charge curve, its taper and its target, and we know none of those.
 ///
-/// <para><b>0 when the car did not report it</b>, which is not an error: plenty of feeds publish SOC
+/// <para><b>Zero when the car did not report it</b>, which is not an error: plenty of feeds publish SOC
 /// and nothing else. Because 0 is also a legitimate reading ("done"), the two are told apart by
 /// <paramref name="VehicleChargeTimeRemainingReported"/> — never read the number without it.</para>
 /// </param>
@@ -101,7 +101,7 @@ public sealed record ChargingSessionSample(
     double GridImportWh,
     double? VehicleSocPercent,
     DateTimeOffset? VehicleSocCapturedAt,
-    double VehicleChargeTimeRemainingMinutes,
+    TimeSpan VehicleChargeTimeRemaining,
     bool VehicleChargeTimeRemainingReported,
     double? SurplusWatts,
     double LoanPowerWatts,

@@ -13,7 +13,7 @@ public class EnergyStateReaderUnmeteredPhaseTests
 {
     private static PvSystemInfo Site(GridPhase? unmetered) => new(
         Id: "", Name: "", Address: "", Latitude: null, Longitude: null, AzimuthDegrees: null, TiltDegrees: null,
-        CapacityKwp: null, InverterCapacityKw: null, LossFactor: null, InstallDate: null,
+        PeakPowerWatts: null, InverterCapacityWatts: null, LossFactor: null, InstallDate: null,
         Inverter: new PvDeviceInfo("Inverter", "", "", new DeviceConfig { Host = "inverter" }),
         Chargers: [])
     {

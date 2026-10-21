@@ -69,8 +69,9 @@ public static partial class PvSystemRules
             Longitude: longitude,
             AzimuthDegrees: Normalise(Range(pv.AzimuthDegrees, -360, 360, "Pv:AzimuthDegrees", problems)),
             TiltDegrees: Range(pv.TiltDegrees, 0, 90, "Pv:TiltDegrees", problems),
-            CapacityKwp: Positive(pv.CapacityKwp, "Pv:CapacityKwp", problems),
-            InverterCapacityKw: Positive(pv.InverterCapacityKw, "Pv:InverterCapacityKw", problems),
+            // The keys are in kWp and kW, as installers state them; the model holds watts (#263).
+            PeakPowerWatts: Positive(pv.CapacityKwp, "Pv:CapacityKwp", problems) * 1000,
+            InverterCapacityWatts: Positive(pv.InverterCapacityKw, "Pv:InverterCapacityKw", problems) * 1000,
             LossFactor: Fraction(pv.LossFactor, "Pv:LossFactor", problems),
             InstallDate: ParseInstallDate(pv.InstallDate, problems),
             Inverter: ResolveInverter(pv, inverterDeviceId, problems),

@@ -33,6 +33,21 @@ since renaming them breaks installs and docs; they are converted at the options 
 keeps publishing kWh: it is another display edge, and changing a sensor's `unit_of_measurement` makes HA
 flag its long-term statistics for repair by hand.
 
+Below the API, the complete list of what is not in its base unit, and why:
+
+| Where | Unit | Why |
+|---|---|---|
+| `EnergyInterval.*Kwh`, `energy_intervals.*_kwh` | kWh | The analytics surface, above. |
+| Options bound from settings keys: `Ev:Vehicles:0:BatteryCapacityKWh`, `Forecast:BatteryCapacityKWh`, `Forecast:MaxDailyLoanKWh`, `Pv:CapacityKwp`, `Pv:InverterCapacityKw`, `*PollIntervalSeconds`, `*RetentionDays`, `Forecast:HouseLoadHistoryDays` | as named | The keys are what installs and docs hold. The resolved models (`EvInfo`, `PvSystemInfo`) and the options' `…Wh` properties are what code reads. |
+| SQLite columns `charging_session_samples` remaining time (minutes) and weather pressure (hPa) | min, hPa | Existing data; the store converts on the way in and out. |
+| Wire DTOs of the car feeds (km, minutes), Solcast (kW), OpenWeather (hPa) | theirs | Someone else's format; each mapper converts to base. |
+| HA numbers and sensors, log messages | kWh, kW | Display edges. |
+
+**Step 2 found a bug at one of those edges.** The Home Assistant worker read the car's pack from
+`VehicleOptions`, the feed's section, which has refused `Vehicle:BatteryCapacityKWh` since #124. So the capacity
+was always 0 there. A fast charge to a battery % from HA was refused, and a just-in-time Targeted hold from HA
+charged without the hold. It now reads `EvInfo`, as the web UI and the API do.
+
 **Decision — the HTTP API carries base units only.** It is not a UI. Fields become `…Wh`, `…Watts`,
 `…Metres` and `…Seconds` (`peakPowerWatts`, `inverterCapacityWatts`, `chargeTimeRemainingSeconds`), and a
 kWh value still in the domain is converted at the edge, never the other way round. The routes stay

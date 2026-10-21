@@ -66,14 +66,14 @@ public class VwGroupLiveCaptureTests
     [Fact]
     public void The_odometer_comes_from_mileage_value()
     {
-        Assert.Equal(53029, Map().OdometerKm);
+        Assert.Equal(53029_000, Map().OdometerMetres);
     }
 
     /// <summary>Absent is absent. This bundle carries no range, and inventing zero would be a lie.</summary>
     [Fact]
     public void A_field_the_car_does_not_send_stays_null()
     {
-        Assert.Null(Map().State!.RangeKm);
+        Assert.Null(Map().State!.RangeMetres);
     }
 
     [Fact]

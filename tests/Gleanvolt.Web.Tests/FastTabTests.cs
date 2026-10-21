@@ -52,7 +52,7 @@ public class FastTabTests : PageTest
     }
 
     private void WithAKnownPack() =>
-        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityKWh: 77, ChargeEfficiency: 0.9));
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityWh: 77_000, ChargeEfficiency: 0.9));
 
     private void CarReports(double? socPercent = 42, TimeSpan? age = null) =>
         _vehicle.Set(new VehicleState(

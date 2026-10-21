@@ -16,12 +16,6 @@ namespace Gleanvolt.Web.Components;
 internal static class VehicleFormatting
 {
     /// <summary>
-    /// The range the car reckons is left in it. Whole kilometres: it is the car's own estimate off
-    /// its own recent consumption, and a decimal on it would be borrowed confidence.
-    /// </summary>
-    public static string Km(double? km) => Units.Distance(Units.MetresFromKm(km));
-
-    /// <summary>
     /// The car's own estimate of how much longer it needs. Null and zero are different facts (#73):
     /// zero means the car says it is done, a dash means this source does not carry the field at all.
     /// </summary>

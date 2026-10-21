@@ -17,8 +17,8 @@ namespace Gleanvolt.Core.Models;
 /// <param name="Longitude">Site longitude in decimal degrees, or null — always null together with latitude.</param>
 /// <param name="AzimuthDegrees">Compass bearing the array faces, normalised into [0, 360). See <see cref="PvSystemOptions.AzimuthDegrees"/>.</param>
 /// <param name="TiltDegrees">Tilt from horizontal in degrees.</param>
-/// <param name="CapacityKwp">Peak DC capacity in kWp.</param>
-/// <param name="InverterCapacityKw">AC-side capacity in kW, where it clips the array.</param>
+/// <param name="PeakPowerWatts">Peak DC power of the array (its kWp rating), in W.</param>
+/// <param name="InverterCapacityWatts">AC-side capacity in W, where it clips the array.</param>
 /// <param name="LossFactor">System loss factor in (0, 1].</param>
 /// <param name="InstallDate">Commissioning date.</param>
 /// <param name="Inverter">The inverter — always present; a controller with no inverter does not start.</param>
@@ -31,8 +31,8 @@ public sealed record PvSystemInfo(
     double? Longitude,
     double? AzimuthDegrees,
     double? TiltDegrees,
-    double? CapacityKwp,
-    double? InverterCapacityKw,
+    double? PeakPowerWatts,
+    double? InverterCapacityWatts,
     double? LossFactor,
     DateOnly? InstallDate,
     PvDeviceInfo Inverter,

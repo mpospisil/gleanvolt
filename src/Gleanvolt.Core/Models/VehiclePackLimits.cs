@@ -15,8 +15,8 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="TargetedChargeRequestLimits.Pack"/> projects one onto the other, so the two factories
 /// cannot drift apart on what a capacity means.</para>
 /// </summary>
-/// <param name="BatteryCapacityKWh">
-/// The car's usable capacity, or 0 when it has not been configured. Zero withdraws the SOC basis
+/// <param name="BatteryCapacityWh">
+/// The car's usable capacity in Wh, or 0 when it has not been configured. Zero withdraws the SOC basis
 /// entirely rather than guessing at a pack size.
 /// </param>
 /// <param name="ChargeEfficiency">
@@ -24,11 +24,8 @@ namespace Gleanvolt.Core.Models;
 /// rectifier and the cells rather than reaching the state of charge; ask for the difference in the
 /// pack and the car arrives short.
 /// </param>
-public sealed record VehiclePackLimits(double BatteryCapacityKWh = 0, double ChargeEfficiency = 0.9)
+public sealed record VehiclePackLimits(double BatteryCapacityWh = 0, double ChargeEfficiency = 0.9)
 {
     /// <summary>Whether a target may be asked for as a state of charge — i.e. whether a capacity is known.</summary>
-    public bool CanTargetSoc => BatteryCapacityKWh > 0;
-
-    /// <summary>The pack's usable capacity in watt-hours, which is what the conversions are stated in.</summary>
-    public double BatteryCapacityWh => BatteryCapacityKWh * 1000;
+    public bool CanTargetSoc => BatteryCapacityWh > 0;
 }

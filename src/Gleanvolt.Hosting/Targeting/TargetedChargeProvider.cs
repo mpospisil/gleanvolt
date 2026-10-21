@@ -172,7 +172,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         departBy > now ? _forecast.GetForecast(now, departBy) : null;
 
     private TargetedChargePlannerOptions PlannerOptions() => new(
-        BatteryCapacityWh: _forecastOptions.BatteryCapacityKWh * 1000,
+        BatteryCapacityWh: _forecastOptions.BatteryCapacityWh,
         ChargeEfficiency: _forecastOptions.ChargeEfficiency,
         MinChargePowerWatts: _power.AmpsToWatts(_chargeControl.MinChargingCurrentAmps),
         MaxChargePowerWatts: _power.AmpsToWatts(_chargeControl.MaxChargingCurrentAmps),

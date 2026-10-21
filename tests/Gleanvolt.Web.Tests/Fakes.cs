@@ -345,7 +345,7 @@ internal static class TestSessions
             GridImportWh: 0,
             VehicleSocPercent: vehicleSocPercent,
             VehicleSocCapturedAt: vehicleSocCapturedAt,
-            VehicleChargeTimeRemainingMinutes: 0,
+            VehicleChargeTimeRemaining: TimeSpan.Zero,
             VehicleChargeTimeRemainingReported: false,
             SurplusWatts: surplusWatts,
             LoanPowerWatts: loanPowerWatts,

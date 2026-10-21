@@ -20,7 +20,7 @@ namespace Gleanvolt.Core.Models;
 /// <param name="OldestSnapshot">The earliest capture time in the bundle, for judging its spread.</param>
 /// <param name="NewestSnapshot">The latest capture time, which is what <see cref="State"/> is quoted at.</param>
 /// <param name="TargetSocPercent">The car's own charge limit, when the portal carried one. Nothing reads it yet.</param>
-/// <param name="OdometerKm">The odometer, when carried. Nothing reads it yet.</param>
+/// <param name="OdometerMetres">The odometer in metres, when carried. Nothing reads it yet.</param>
 /// <param name="UnmappedFields">Field names in the bundle that nothing here recognises.</param>
 /// <param name="MatchedFields">
 /// The fields that <b>were</b> recognised, with the raw value read out of each. The other half of
@@ -49,7 +49,7 @@ public sealed record VehiclePortalReading(
     DateTimeOffset? OldestSnapshot = null,
     DateTimeOffset? NewestSnapshot = null,
     double? TargetSocPercent = null,
-    double? OdometerKm = null,
+    double? OdometerMetres = null,
     IReadOnlyList<string>? UnmappedFields = null,
     string? FailureKind = null,
     string? Message = null,

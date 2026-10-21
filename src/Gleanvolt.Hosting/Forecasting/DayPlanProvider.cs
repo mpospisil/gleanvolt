@@ -178,7 +178,7 @@ public sealed class DayPlanProvider
         }
 
         var plannerOptions = new SolarDayPlannerOptions(
-            BatteryCapacityWh: _options.BatteryCapacityKWh * 1000,
+            BatteryCapacityWh: _options.BatteryCapacityWh,
             ChargeEfficiency: _options.ChargeEfficiency,
             MinChargePowerWatts: _power.AmpsToWatts(_minChargingCurrentAmps),
             MaxLoanPowerWatts: _options.EnableBatteryLoan ? _options.MaxLoanPowerWatts : 0,
