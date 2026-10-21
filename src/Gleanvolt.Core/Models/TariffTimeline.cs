@@ -20,6 +20,23 @@ public sealed record TariffPrices(decimal LowPerKwh, decimal HighPerKwh, string 
     public decimal For(TariffRate rate) => rate == TariffRate.Low ? LowPerKwh : HighPerKwh;
 }
 
+/// <summary>
+/// The tariff as a mode set to <b>low tariff only</b> sees it (issue #274): the rate now and when it
+/// next changes. Handed to a controller only when the option is on for the mode driving <i>and</i> a
+/// tariff is known; null otherwise, which every controller reads as no restriction.
+/// </summary>
+/// <param name="Rate">The rate now.</param>
+/// <param name="NextChange">When it next changes, or null when that is beyond what the tariff knows.</param>
+public sealed record TariffGate(TariffRate Rate, DateTimeOffset? NextChange)
+{
+    /// <summary>Whether a low-tariff-only mode has to wait now.</summary>
+    public bool IsHigh => Rate == TariffRate.High;
+
+    /// <summary>The gate for <paramref name="instant"/> on <paramref name="timeline"/>, or null when the timeline does not cover it.</summary>
+    public static TariffGate? At(TariffTimeline? timeline, DateTimeOffset instant) =>
+        timeline?.WindowAt(instant) is { } window ? new TariffGate(window.Rate, timeline.NextChangeAfter(instant)) : null;
+}
+
 /// <summary>One stretch of a single rate, half-open like every <see cref="TimeWindow"/>.</summary>
 /// <param name="Window">When.</param>
 /// <param name="Rate">Which rate: what Fast and SolarGrid act on.</param>

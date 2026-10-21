@@ -30,6 +30,11 @@ namespace Gleanvolt.Core.Strategies;
 /// The reason to want it is the pack: a car asked to go above 80% and charged at 22:00 sits there all
 /// night, and it is the sitting rather than the charging that ages the cells.</para>
 ///
+/// <para>And one thing can hold it back (#274): with <b>low tariff only</b> set, it waits through high
+/// tariff and charges flat out in low, through <see cref="TariffWait"/>. The car's own limit still
+/// ends it, judged only while the mode is asking it to charge, so a wait for low tariff is never
+/// mistaken for a full car.</para>
+///
 /// Like the other controllers it only acts while the charger's own use-mode is
 /// <see cref="EvChargerMode.Fast"/> — which starting the mode wrote, and which nothing here
 /// re-asserts — and it only ever decides the current setpoint.
@@ -123,6 +128,15 @@ public sealed class FastChargingController : IChargingController
                     + $"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs "
                     + $"{Describe(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}.");
             }
+        }
+
+        // Low tariff only (#274): after the target and the departure, so a charge that has met its
+        // amount or run out of time still ends, and before the idle check below, which a wait must
+        // never reach. Through a high tariff the car is not charging because we said so, and the
+        // guard below only judges a finished car while we are asking it to charge.
+        if (TariffWait.For(input, "Fast") is { } wait)
+        {
+            return wait;
         }
 
         // "Has finished" is only meaningful once the car has actually started *and* while we are still
