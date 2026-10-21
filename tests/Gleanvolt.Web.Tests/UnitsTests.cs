@@ -138,7 +138,5 @@ public class UnitsTests
         Assert.Equal(20_000, Units.WattHoursFromKwh(20));
         Assert.Equal(20, Units.KwhFromWattHours(20_000));
         Assert.Null(Units.WattHoursFromKwh((double?)null));
-        Assert.Equal(8_400, Units.WattsFromKw(8.4)!.Value, 6);
-        Assert.Equal(312_000, Units.MetresFromKm(312));
     }
 }

@@ -125,7 +125,7 @@ public sealed class VwGroupPortalReader(
                     OldestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[0].CapturedAt : null,
                     NewestSnapshot = read.Snapshots.Count > 0 ? read.Snapshots[^1].CapturedAt : null,
                     TargetSocPercent = mapped.TargetSocPercent,
-                    OdometerKm = mapped.OdometerKm,
+                    OdometerMetres = mapped.OdometerMetres,
                 };
             }
 
@@ -143,7 +143,7 @@ public sealed class VwGroupPortalReader(
                 OldestSnapshot: read.Snapshots[0].CapturedAt,
                 NewestSnapshot: read.Snapshots[^1].CapturedAt,
                 TargetSocPercent: mapped.TargetSocPercent,
-                OdometerKm: mapped.OdometerKm,
+                OdometerMetres: mapped.OdometerMetres,
                 UnmappedFields: mapped.UnmappedFields,
                 MatchedFields: mapped.MatchedFields,
                 Diagnostics: notes,
@@ -177,7 +177,7 @@ public sealed class VwGroupPortalReader(
         var missing = new List<string>();
 
         if (state.SocPercent is null) missing.Add("state of charge");
-        if (state.RangeKm is null) missing.Add("range");
+        if (state.RangeMetres is null) missing.Add("range");
         if (state.ChargeTimeRemaining is null) missing.Add("remaining time");
         if (state.ChargeState == VehicleChargeState.Unknown) missing.Add("charging state");
         if (state.PlugState == VehiclePlugState.Unknown) missing.Add("plug state");

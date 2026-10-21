@@ -62,7 +62,7 @@ public class CarPageTests : PageTest
 
     /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
     private static EvInfo Id4 { get; } = new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77, 0.9, 3, 6, 16, string.Empty);
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, string.Empty);
 
     private sealed class StubFeed : IVehicleUpdateService
     {
@@ -482,7 +482,7 @@ public class CarPageTests : PageTest
     public void A_live_feed_is_asked_with_the_same_call_the_worker_makes()
     {
         var refresh = new FakeVehicleStateRefresh(new VehicleState(
-            Reported, SocPercent: 64, RangeKm: 312, SourceId: "vw-website"));
+            Reported, SocPercent: 64, RangeMetres: 312_000, SourceId: "vw-website"));
         _refresh = refresh;
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed());
 
@@ -623,7 +623,7 @@ public class CarPageTests : PageTest
             State: new VehicleState(
                 new DateTimeOffset(2026, 9, 1, 5, 27, 11, TimeSpan.Zero),
                 SocPercent: 64,
-                RangeKm: 312,
+                RangeMetres: 312_000,
                 ChargeState: VehicleChargeState.Idle,
                 PlugState: VehiclePlugState.Disconnected),
             Vehicle: "…1234",
@@ -763,7 +763,7 @@ public class CarPageTests : PageTest
             SnapshotCount: 3,
             OldestSnapshot: new DateTimeOffset(2026, 9, 2, 9, 59, 0, TimeSpan.Zero),
             NewestSnapshot: new DateTimeOffset(2026, 9, 2, 10, 29, 0, TimeSpan.Zero),
-            OdometerKm: 53065,
+            OdometerMetres: 53065_000,
             TargetSocPercent: 80,
             FailureKind: "UnusableData",
             Message: "none of its 47 field(s) are ones this build recognises"));
@@ -829,14 +829,14 @@ public class CarPageTests : PageTest
             State: new VehicleState(
                 Reported,
                 SocPercent: soc,
-                RangeKm: 312,
+                RangeMetres: 312_000,
                 ChargeTimeRemaining: timeLeft,
                 ChargeState: VehicleChargeState.Charging,
                 PlugState: VehiclePlugState.Connected),
             Vehicle: "…1234",
             SnapshotCount: 6,
             TargetSocPercent: targetSoc,
-            OdometerKm: 53065);
+            OdometerMetres: 53065_000);
 
     /// <summary>
     /// The point of #178. The battery percentage used to be the fourth thing on the page, behind

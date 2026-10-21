@@ -60,7 +60,8 @@ public static partial class EvRules
             Name: string.IsNullOrWhiteSpace(vehicle.Name) ? id : vehicle.Name.Trim(),
             Make: vehicle.Make.Trim(),
             Model: vehicle.Model.Trim(),
-            BatteryCapacityKWh: Positive(vehicle.BatteryCapacityKWh, "Ev:Vehicles:0:BatteryCapacityKWh", problems),
+            // The key is in kWh, as a pack is stated; the model holds Wh (#263).
+            BatteryCapacityWh: Positive(vehicle.BatteryCapacityKWh, "Ev:Vehicles:0:BatteryCapacityKWh", problems) * 1000,
             ChargeEfficiency: Efficiency(vehicle.ChargeEfficiency, problems),
             Phases: Phases(vehicle.Phases, problems),
             MinChargingCurrentAmps: Amps(vehicle.MinChargingCurrentAmps, "Ev:Vehicles:0:MinChargingCurrentAmps", problems),

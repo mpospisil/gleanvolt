@@ -152,7 +152,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         Assert.Equal(25, sample.GridImportWh, 0);
         Assert.Equal(42, sample.VehicleSocPercent);
         Assert.Equal(capturedAt, sample.VehicleSocCapturedAt);
-        Assert.Equal(95, sample.VehicleChargeTimeRemainingMinutes, 1);
+        Assert.Equal(95, sample.VehicleChargeTimeRemaining.TotalMinutes, 1);
         Assert.True(sample.VehicleChargeTimeRemainingReported);
     }
 
@@ -175,7 +175,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
 
         // Zero, and flagged as never answered -- the store must not let a missing estimate read as a
         // car that says it is finished.
-        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.Equal(TimeSpan.Zero, sample.VehicleChargeTimeRemaining);
         Assert.False(sample.VehicleChargeTimeRemainingReported);
     }
 
@@ -208,7 +208,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         Assert.Equal(0, sample.GridImportWh);
         Assert.Null(sample.ForecastSolarWh);
         Assert.Null(sample.VehicleSocPercent);
-        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.Equal(TimeSpan.Zero, sample.VehicleChargeTimeRemaining);
         Assert.False(sample.VehicleChargeTimeRemainingReported);
 
         // The columns v1 did write are untouched by the migration.
@@ -331,7 +331,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         Assert.Equal(5, stored.WeatherAtStart.CloudsPercent, 2);
         Assert.Equal("Clear", stored.WeatherAtStart.Condition);
         Assert.Equal("clear sky", stored.WeatherAtStart.ConditionDescription);
-        Assert.Equal(1017, stored.WeatherAtStart.PressureHpa, 2);
+        Assert.Equal(101_700, stored.WeatherAtStart.PressurePascals, 2);
         Assert.Equal(51, stored.WeatherAtStart.HumidityPercent, 2);
         Assert.Equal(10_000, stored.WeatherAtStart.VisibilityMetres);
         Assert.Equal(Noon, stored.WeatherAtStart.ObservedAt);
@@ -388,7 +388,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         double clouds,
         string condition,
         string description) =>
-        new(observedAt, temperature, PressureHpa: 1017, HumidityPercent: 51, CloudsPercent: clouds,
+        new(observedAt, temperature, PressurePascals: 101_700, HumidityPercent: 51, CloudsPercent: clouds,
             VisibilityMetres: 10_000, Condition: condition, ConditionDescription: description);
 
     private static SolarForecast DayCurve() => new(
@@ -677,7 +677,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         GridImportWh: 25,
         VehicleSocPercent: vehicleSoc,
         VehicleSocCapturedAt: vehicleSocAt,
-        VehicleChargeTimeRemainingMinutes: vehicleRemainingMinutes ?? 0,
+        VehicleChargeTimeRemaining: TimeSpan.FromMinutes(vehicleRemainingMinutes ?? 0),
         VehicleChargeTimeRemainingReported: vehicleRemainingMinutes is not null,
         SurplusWatts: 4200,
         LoanPowerWatts: 0,

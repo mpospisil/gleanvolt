@@ -28,6 +28,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IVehicleTelemetry? _vehicle;
     private readonly VehicleOptions _vehicleOptions;
 
+    // The car's pack, from the Ev section. Not VehicleOptions: the capacity and efficiency left the
+    // feed's section in #124, and a Vehicle:BatteryCapacityKWh that is still set stops the host.
+    private readonly VehiclePackLimits _pack;
+
     // The manufacturer feed whose health the Car feed entity carries (issue #140), or null when none
     // is configured -- in which case the entity is not published and this is never read.
     private readonly IVehicleUpdateService? _vehicleFeed;
@@ -43,7 +47,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     // The half-made request: what the number and the text entities hold until the button applies them.
     // It lives here rather than in the selector because an amount typed and not yet activated is not a
     // request -- the selector only ever holds something the controller is actually working to.
-    private double _pendingEnergyKWh;
+    private double _pendingEnergyWh;
     private DateTimeOffset? _pendingDeparture;
     private string _pendingDepartureText = string.Empty;
     private TargetedChargePriority _pendingPriority = TargetedChargePriority.Cheapest;
@@ -52,7 +56,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     // The same arrangement for the fast charge's amount (#119). Full is the default, so a dashboard
     // nobody has touched presses the button and gets what the button has always done.
     private FastChargeBasis _pendingFastBasis = FastChargeBasis.Full;
-    private double _pendingFastEnergyKWh;
+    private double _pendingFastEnergyWh;
     private double _pendingFastSocPercent = 80;
     private DateTimeOffset? _pendingFastDeparture;
     private string _pendingFastDepartureText = string.Empty;
@@ -75,6 +79,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         ILogger<HomeAssistantMqttWorker> logger,
         IOptions<TargetedChargeOptions> targetedOptions,
         IOptions<VehicleOptions> vehicleOptions,
+        EvInfo ev,
         HaDiscovery discovery,
         IVehicleTelemetry? vehicle = null,
         ConfiguredVehicleFeed? vehicleFeed = null,
@@ -93,6 +98,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         _vehicle = vehicle;
         _vehicleFeed = vehicleFeed?.Service;
         _vehicleOptions = vehicleOptions.Value;
+        _pack = ev.Pack;
         _targetedOptions = targetedOptions.Value;
         _pendingRestSocPercent = _targetedOptions.JustInTime.RestSocPercent;
         _shutdown = shutdown;
@@ -277,12 +283,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         // The active request outranks whatever was last typed: a target set from the web UI has to
         // show up here too, or the two surfaces would disagree about what the car is being charged to.
-        yield return (HaDiscovery.TargetEnergyNumber, (_target.Request?.RequiredEnergyWh / 1000) ?? _pendingEnergyKWh);
+        yield return (HaDiscovery.TargetEnergyNumber, (_target.Request?.RequiredEnergyWh ?? _pendingEnergyWh) / 1000);
         yield return (HaDiscovery.TargetRestSocNumber, _target.Request?.RestSocPercent ?? _pendingRestSocPercent);
 
         // ...and the same rule for the fast charge's boxes: a running limit outranks whatever was last
         // typed, so a fast charge started from the web UI shows up here too.
-        yield return (HaDiscovery.FastEnergyNumber, (_fast.Limit?.RequiredEnergyWh / 1000) ?? _pendingFastEnergyKWh);
+        yield return (HaDiscovery.FastEnergyNumber, (_fast.Limit?.RequiredEnergyWh ?? _pendingFastEnergyWh) / 1000);
         yield return (HaDiscovery.FastTargetSocNumber, _fast.Limit?.TargetSocPercent ?? _pendingFastSocPercent);
 
         if (_solarGrid is not null)
@@ -436,11 +442,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     {
         var composed = FastChargeLimitFactory.Create(
             basis: _pendingFastBasis,
-            energyWh: _pendingFastEnergyKWh * 1000,
+            energyWh: _pendingFastEnergyWh,
             targetSocPercent: _pendingFastSocPercent,
             vehicleSoc: VehicleSocBasis.From(
                 _vehicle?.GetCurrentState(), _vehicleOptions.MaxAge, _timeProvider.GetUtcNow()),
-            pack: new VehiclePackLimits(_vehicleOptions.BatteryCapacityKWh, _vehicleOptions.ChargeEfficiency),
+            pack: _pack,
             now: _timeProvider.GetUtcNow(),
             departBy: _pendingFastDeparture,
             maxHorizon: _targetedOptions.MaxHorizon);
@@ -540,7 +546,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 break;
             case HaDiscovery.TargetEnergyNumber:
                 // Held, not applied: the button is what turns an amount into a promise.
-                _pendingEnergyKWh = Math.Max(0, value);
+                _pendingEnergyWh = Math.Max(0, value) * 1000; // the HA number is in kWh
                 break;
             case HaDiscovery.TargetRestSocNumber:
                 _pendingRestSocPercent = Math.Clamp(value, 0, 100);
@@ -548,7 +554,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             case HaDiscovery.FastEnergyNumber:
                 // Held like the targeted energy above: an amount typed is not a limit until the button
                 // is pressed.
-                _pendingFastEnergyKWh = Math.Max(0, value);
+                _pendingFastEnergyWh = Math.Max(0, value) * 1000; // the HA number is in kWh
                 break;
             case HaDiscovery.FastTargetSocNumber:
                 _pendingFastSocPercent = Math.Clamp(value, 0, 100);
@@ -699,7 +705,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
-        if (_pendingEnergyKWh <= 0 || _pendingDeparture is not { } departure)
+        if (_pendingEnergyWh <= 0 || _pendingDeparture is not { } departure)
         {
             _logger.LogWarning(
                 "Activate target pressed with nothing to activate: set both Target energy and Departure time first.");
@@ -715,7 +721,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
-        var energyWh = _pendingEnergyKWh * 1000;
+        var energyWh = _pendingEnergyWh;
         var request = new TargetedChargeRequest(energyWh, departure, now) with { Priority = _pendingPriority };
 
         // The same split the web tab makes, made in the same place in the sequence and by the same
@@ -726,19 +732,19 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (_pendingPriority == TargetedChargePriority.JustInTime)
         {
             var socNow = _vehicle?.GetCurrentState()?.SocPercent;
-            var capacityWh = _vehicleOptions.BatteryCapacityKWh * 1000;
+            var capacityWh = _pack.BatteryCapacityWh;
             var endSoc = VehicleTargetEnergy.ResultingSocPercent(
-                socNow, energyWh, capacityWh, _vehicleOptions.ChargeEfficiency);
+                socNow, energyWh, capacityWh, _pack.ChargeEfficiency);
 
             var tailWh = endSoc is { } end
                 ? VehicleTargetEnergy.TailAboveRestWh(
-                    socNow, end, _pendingRestSocPercent, capacityWh, _vehicleOptions.ChargeEfficiency)
+                    socNow, end, _pendingRestSocPercent, capacityWh, _pack.ChargeEfficiency)
                 : null;
 
             if (tailWh is null)
             {
                 _logger.LogWarning(
-                    "Just-in-time asked for, but there is no car SOC and/or no Vehicle:BatteryCapacityKWh to "
+                    "Just-in-time asked for, but there is no car SOC and/or no Ev:Vehicles:0:BatteryCapacityKWh to "
                     + "measure a {Rest:F0}% rest point from; charging without a hold.",
                     _pendingRestSocPercent);
             }

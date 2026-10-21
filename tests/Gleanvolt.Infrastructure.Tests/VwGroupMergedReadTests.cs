@@ -129,10 +129,10 @@ public class VwGroupMergedReadTests
         var read = await Client(portal, Options()).ReadAsync();
 
         Assert.Equal(57, read.Mapping.State!.SocPercent);
-        Assert.Equal(310, read.Mapping.State.RangeKm);
+        Assert.Equal(310_000, read.Mapping.State.RangeMetres);
 
         // The odometer from the newest, the battery from the one before: one car out of two deliveries.
-        Assert.Equal(53065, read.Mapping.OdometerKm);
+        Assert.Equal(53065_000, read.Mapping.OdometerMetres);
         Assert.Equal(2, read.DatasetsRead);
     }
 
@@ -191,7 +191,7 @@ public class VwGroupMergedReadTests
         var state = (await Client(portal, Options()).ReadAsync()).Mapping.State!;
 
         Assert.Equal(69, state.SocPercent);
-        Assert.Equal(310, state.RangeKm);
+        Assert.Equal(310_000, state.RangeMetres);
         Assert.Equal(TimeSpan.FromMinutes(165), state.ChargeTimeRemaining);
         Assert.Equal(VehicleChargeState.Idle, state.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, state.PlugState);
@@ -354,7 +354,7 @@ public class VwGroupMergedReadTests
         // Charging and time left arrived; range and plug did not, and neither delivery carries them.
         Assert.Equal(70, read.Mapping.State!.SocPercent);
         Assert.Equal(VehicleChargeState.Charging, read.Mapping.State.ChargeState);
-        Assert.Null(read.Mapping.State.RangeKm);
+        Assert.Null(read.Mapping.State.RangeMetres);
         Assert.Equal(VehiclePlugState.Unknown, read.Mapping.State.PlugState);
     }
 

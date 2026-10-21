@@ -12,8 +12,8 @@ namespace Gleanvolt.Core.Models;
 /// How far ahead a departure may be set. Beyond it neither the forecast nor a request that does not
 /// survive a restart can honestly promise anything.
 /// </param>
-/// <param name="BatteryCapacityKWh">
-/// The car's usable capacity, or 0 when it has not been configured. Zero withdraws the SOC-based
+/// <param name="BatteryCapacityWh">
+/// The car's usable capacity in Wh, or 0 when it has not been configured. Zero withdraws the SOC-based
 /// target entirely: see <see cref="Strategies.VehicleTargetEnergy"/>.
 /// </param>
 /// <param name="ChargeEfficiency">Charger-meter → cells efficiency, applied to a SOC-based target.</param>
@@ -23,7 +23,7 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 public sealed record TargetedChargeRequestLimits(
     TimeSpan MaxHorizon,
-    double BatteryCapacityKWh = 0,
+    double BatteryCapacityWh = 0,
     double ChargeEfficiency = 0.9,
     double DefaultRestSocPercent = 80)
 {
@@ -33,11 +33,8 @@ public sealed record TargetedChargeRequestLimits(
     /// rather than two parallel records, so the two factories cannot disagree about what a capacity
     /// means.
     /// </summary>
-    public VehiclePackLimits Pack => new(BatteryCapacityKWh, ChargeEfficiency);
+    public VehiclePackLimits Pack => new(BatteryCapacityWh, ChargeEfficiency);
 
     /// <summary>Whether a target may be asked for as a state of charge — i.e. whether a capacity is known.</summary>
     public bool CanTargetSoc => Pack.CanTargetSoc;
-
-    /// <summary>The pack's usable capacity in watt-hours, which is what the conversions are stated in.</summary>
-    public double BatteryCapacityWh => Pack.BatteryCapacityWh;
 }

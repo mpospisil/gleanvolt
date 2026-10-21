@@ -54,8 +54,8 @@ public class SessionDetailPageTests : PageTest
         var started = new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
         var session = TestSessions.Sample(startedAt: started, endedAt: started.AddHours(4)) with
         {
-            WeatherAtStart = new WeatherObservation(started, 19.6, 1017, 51, 5, 10_000, "Clear", "clear sky"),
-            WeatherAtEnd = new WeatherObservation(started.AddHours(4), 14.1, 1009, 76, 88, 4_000, "Rain", "light rain"),
+            WeatherAtStart = new WeatherObservation(started, 19.6, 101_700, 51, 5, 10_000, "Clear", "clear sky"),
+            WeatherAtEnd = new WeatherObservation(started.AddHours(4), 14.1, 100_900, 76, 88, 4_000, "Rain", "light rain"),
             Sunrise = started.AddHours(-3),
             Sunset = started.AddHours(9),
         };

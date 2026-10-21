@@ -81,7 +81,7 @@ public static class VwWebsiteChargingStatus
         return new VehicleState(
             capturedAt.Value,
             SocPercent: Number(battery, "currentSOC_pct"),
-            RangeKm: Number(battery, "cruisingRangeElectric_km"),
+            RangeMetres: Number(battery, "cruisingRangeElectric_km") * 1000,
             ChargeTimeRemaining: Minutes(charging, "remainingChargingTimeToComplete_min"),
             ChargeState: ChargeState(Text(charging, "chargingState")),
             PlugState: PlugState(Text(plug, "plugConnectionState")),

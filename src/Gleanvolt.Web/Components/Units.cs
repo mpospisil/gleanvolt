@@ -184,12 +184,6 @@ internal static class Units
     /// <summary>A base-unit energy as a form shows it for editing, in kilowatt-hours.</summary>
     public static double KwhFromWattHours(double wattHours) => wattHours / Kilo;
 
-    /// <summary>Kilowatts, as a setting holds them, in the base unit.</summary>
-    public static double? WattsFromKw(double? kw) => kw * Kilo;
-
-    /// <summary>Kilometres, as a car's feed reports them, in the base unit.</summary>
-    public static double? MetresFromKm(double? km) => km * Kilo;
-
     // ---- The formatting itself ----
 
     private static string Scaled(double value, string unit, string kiloUnit, bool signed)

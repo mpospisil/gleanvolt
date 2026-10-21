@@ -387,7 +387,7 @@ public sealed class ChargingSessionTracker
             // Stored as a plain number with a companion flag rather than as a nullable: a chart wants
             // a series it can draw, and "the car didn't say" is carried by the flag next to it. Zero
             // on its own is ambiguous -- it is also what a car that has finished reports.
-            VehicleChargeTimeRemainingMinutes: _vehicle?.ChargeTimeRemaining?.TotalMinutes ?? 0,
+            VehicleChargeTimeRemaining: _vehicle?.ChargeTimeRemaining ?? TimeSpan.Zero,
             VehicleChargeTimeRemainingReported: _vehicle?.ChargeTimeRemaining is not null,
             SurplusWatts: status.SurplusWatts,
             LoanPowerWatts: status.LoanPowerWatts,

@@ -207,7 +207,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
             energyWh: Units.WattHoursFromKwh(_energyKWh),
             targetSocPercent: _targetSocPercent,
             vehicleSoc: SocBasis,
-            pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityKWh, VehicleDisplay.ChargeEfficiency),
+            pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency),
             now: Time.GetUtcNow(),
             // Only when the basis can carry one -- the box is hidden under Full, so a stale value left
             // in it must not travel with a press that no longer means to use it.
@@ -292,14 +292,14 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            basis.ConvertibleSocPercent, _targetSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
             <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
             _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
-                + $"charger: {Units.Capacity(Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh))} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
+                + $"charger: {Units.Capacity(VehicleDisplay.BatteryCapacityWh)} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
                 + "of what the charger meters reaching the cells.",
         };
     }

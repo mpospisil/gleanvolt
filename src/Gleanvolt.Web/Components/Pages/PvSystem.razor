@@ -92,10 +92,10 @@
 
 <dl class="facts">
     <dt>Peak DC capacity</dt>
-    <dd>@Units.PeakPower(Units.WattsFromKw(Site.CapacityKwp))</dd>
+    <dd>@Units.PeakPower(Site.PeakPowerWatts)</dd>
 
     <dt>Inverter capacity</dt>
-    <dd>@Units.Rating(Units.WattsFromKw(Site.InverterCapacityKw))</dd>
+    <dd>@Units.Rating(Site.InverterCapacityWatts)</dd>
 
     <dt>Loss factor</dt>
     <dd>@Number(Site.LossFactor, format: "0.00")</dd>
@@ -166,7 +166,7 @@ else
         <dd>@Text(string.Join(" ", new[] { Car.Make, Car.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
 
         <dt>Usable battery</dt>
-        <dd>@(Car.CanTargetSoc ? Units.Capacity(Units.WattHoursFromKwh(Car.BatteryCapacityKWh)) : Missing)</dd>
+        <dd>@(Car.CanTargetSoc ? Units.Capacity(Car.BatteryCapacityWh) : Missing)</dd>
 
         <dt>Charge efficiency</dt>
         <dd>@Units.Fraction(Car.ChargeEfficiency)</dd>

@@ -34,6 +34,12 @@ public sealed class ForecastChargeOptions
     /// </summary>
     public double BatteryCapacityKWh { get; init; } = 9.0;
 
+    /// <summary>
+    /// <see cref="BatteryCapacityKWh"/> in the base unit (#263). The key stays in kWh, as a battery
+    /// is stated; everything that plans reads this.
+    /// </summary>
+    public double BatteryCapacityWh => BatteryCapacityKWh * 1000;
+
     /// <summary>PV → battery charge efficiency (0..1], used to size what the sun must actually deliver.</summary>
     public double ChargeEfficiency { get; init; } = 0.95;
 
@@ -118,6 +124,9 @@ public sealed class ForecastChargeOptions
     /// pack is still down is the wear, and a pack refilled to 100% by lunchtime is where it started.
     /// </summary>
     public double MaxDailyLoanKWh { get; init; } = 4;
+
+    /// <summary><see cref="MaxDailyLoanKWh"/> in the base unit (#263).</summary>
+    public double MaxDailyLoanWh => MaxDailyLoanKWh * 1000;
 
     /// <summary>How far above the required floor the SOC must sit before the battery will lend at all.</summary>
     public double LoanSocMarginPercent { get; init; } = 2;

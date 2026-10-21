@@ -108,7 +108,7 @@ public static class VehicleTelemetryPayload
             state = new VehicleState(
                 capturedAt,
                 soc,
-                rangeKm,
+                rangeKm * 1000, // range_km on the wire; the reading holds metres (#263)
                 remaining,
                 ReadEnum(root, ChargeStateProperty, VehicleChargeState.Unknown),
                 ReadEnum(root, PlugStateProperty, VehiclePlugState.Unknown),

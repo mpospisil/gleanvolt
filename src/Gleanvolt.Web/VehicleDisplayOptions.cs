@@ -11,19 +11,19 @@ namespace Gleanvolt.Web;
 /// object.</para>
 /// </summary>
 /// <param name="MaxAge">How old a reading may be before it is shown as stale.</param>
-/// <param name="BatteryCapacityKWh">
-/// The car's usable capacity, or 0 when it has not been configured. Zero withdraws the SOC-based
+/// <param name="BatteryCapacityWh">
+/// The car's usable capacity in Wh, or 0 when it has not been configured. Zero withdraws the SOC-based
 /// target: see <see cref="Core.Strategies.VehicleTargetEnergy"/>.
 /// </param>
 /// <param name="ChargeEfficiency">Charger-meter → cells efficiency, applied to a SOC-based target.</param>
 public sealed record VehicleDisplayOptions(
     TimeSpan MaxAge,
-    double BatteryCapacityKWh = 0,
+    double BatteryCapacityWh = 0,
     double ChargeEfficiency = 0.9,
     bool OnDemandOnly = false)
 {
     /// <summary>Whether a target may be asked for as a state of charge — i.e. whether a capacity is known.</summary>
-    public bool CanTargetSoc => BatteryCapacityKWh > 0;
+    public bool CanTargetSoc => BatteryCapacityWh > 0;
 
     /// <summary>
     /// Whether a reading may be shown without somebody having just asked for it (issue #168).

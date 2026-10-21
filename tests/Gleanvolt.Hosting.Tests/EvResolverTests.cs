@@ -80,7 +80,7 @@ public class EvResolverTests
         Assert.True(ev.IsConfigured);
         Assert.Equal("id4", ev.Id);
         Assert.Equal("The ID.4", ev.Name);
-        Assert.Equal(77, ev.BatteryCapacityKWh);
+        Assert.Equal(77_000, ev.BatteryCapacityWh);
         Assert.Equal(77_000, ev.BatteryCapacityWh);
         Assert.True(ev.CanTargetSoc);
         Assert.Equal(3, ev.Phases);

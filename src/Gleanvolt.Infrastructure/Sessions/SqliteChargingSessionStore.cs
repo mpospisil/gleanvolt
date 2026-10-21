@@ -231,7 +231,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     p["$grid_import_wh"].Value = sample.GridImportWh;
                     p["$vehicle_soc"].Value = (object?)sample.VehicleSocPercent ?? DBNull.Value;
                     p["$vehicle_soc_at"].Value = sample.VehicleSocCapturedAt is { } capturedAt ? Utc(capturedAt) : DBNull.Value;
-                    p["$vehicle_remaining_min"].Value = sample.VehicleChargeTimeRemainingMinutes;
+                    p["$vehicle_remaining_min"].Value = sample.VehicleChargeTimeRemaining.TotalMinutes; // the column is in minutes
                     p["$vehicle_remaining_reported"].Value = sample.VehicleChargeTimeRemainingReported ? 1 : 0;
                     p["$surplus"].Value = (object?)sample.SurplusWatts ?? DBNull.Value;
                     p["$loan_power"].Value = sample.LoanPowerWatts;
@@ -627,7 +627,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 GridImportWh: reader.GetDouble(29),
                 VehicleSocPercent: NullableDouble(reader, 30),
                 VehicleSocCapturedAt: reader.IsDBNull(31) ? null : Instant(reader.GetString(31)),
-                VehicleChargeTimeRemainingMinutes: reader.GetDouble(32),
+                VehicleChargeTimeRemaining: TimeSpan.FromMinutes(reader.GetDouble(32)),
                 VehicleChargeTimeRemainingReported: reader.GetInt64(33) != 0));
         }
 
@@ -707,7 +707,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             : new WeatherObservation(
                 ObservedAt: Instant(reader.GetString(firstOrdinal)),
                 TemperatureCelsius: reader.GetDouble(firstOrdinal + 1),
-                PressureHpa: reader.GetDouble(firstOrdinal + 2),
+                PressurePascals: reader.GetDouble(firstOrdinal + 2) * 100, // the column is in hPa
                 HumidityPercent: reader.GetDouble(firstOrdinal + 3),
                 CloudsPercent: reader.GetDouble(firstOrdinal + 4),
                 VisibilityMetres: NullableDouble(reader, firstOrdinal + 5),
@@ -725,7 +725,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
     {
         command.Parameters.AddWithValue($"${prefix}_observed_at", (object?)(weather is null ? null : Utc(weather.ObservedAt)) ?? DBNull.Value);
         command.Parameters.AddWithValue($"${prefix}_temp", (object?)weather?.TemperatureCelsius ?? DBNull.Value);
-        command.Parameters.AddWithValue($"${prefix}_pressure", (object?)weather?.PressureHpa ?? DBNull.Value);
+        command.Parameters.AddWithValue($"${prefix}_pressure", (object?)(weather?.PressurePascals / 100) ?? DBNull.Value);
         command.Parameters.AddWithValue($"${prefix}_humidity", (object?)weather?.HumidityPercent ?? DBNull.Value);
         command.Parameters.AddWithValue($"${prefix}_clouds", (object?)weather?.CloudsPercent ?? DBNull.Value);
         command.Parameters.AddWithValue($"${prefix}_visibility", (object?)weather?.VisibilityMetres ?? DBNull.Value);

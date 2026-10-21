@@ -350,7 +350,7 @@ else
         {
             <Stat Label="Car battery" Value="@Units.Percent(shown.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
-            <Stat Label="Car range" Value="@Km(shown.RangeKm)"
+            <Stat Label="Car range" Value="@Units.Distance(shown.RangeMetres)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
             <Stat Label="Car reading age" Value="@VehicleAge(shown)"
                   Hint="How long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died." />
@@ -697,15 +697,10 @@ else
             described = "The car";
         }
 
-        return Car.BatteryCapacityKWh > 0
-            ? $"{described}, {Units.Capacity(Units.WattHoursFromKwh(Car.BatteryCapacityKWh))} usable"
+        return Car.BatteryCapacityWh > 0
+            ? $"{described}, {Units.Capacity(Car.BatteryCapacityWh)} usable"
             : described;
     }
-
-    // The car's figures are formatted in VehicleFormatting rather than here (#178): /car
-    // shows the same ones, and it exists to be compared against this card. Two roundings would let
-    // the two pages disagree over a reading they agree on.
-    private static string Km(double? km) => VehicleFormatting.Km(km);
 
     /// <summary>
     /// Whether this reading came from the configured feed. Matched on the name the feed puts on its

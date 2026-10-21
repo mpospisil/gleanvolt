@@ -71,11 +71,11 @@ public static class SkodaVehicleResponse
             return null;
         }
 
-        var rangeKm = Number(battery, "remainingCruisingRangeInMeters") / 1000;
+        var rangeMetres = Number(battery, "remainingCruisingRangeInMeters");
 
-        if (rangeKm is < 0 or > MaxRangeKm)
+        if (rangeMetres is < 0 or > MaxRangeKm * 1000)
         {
-            error = $"remainingCruisingRangeInMeters was {rangeKm * 1000}, outside 0-{MaxRangeKm} km";
+            error = $"remainingCruisingRangeInMeters was {rangeMetres}, outside 0-{MaxRangeKm} km";
             return null;
         }
 
@@ -84,7 +84,7 @@ public static class SkodaVehicleResponse
         return new VehicleState(
             capturedAt,
             SocPercent: soc,
-            RangeKm: rangeKm,
+            RangeMetres: rangeMetres,
             ChargeTimeRemaining: Minutes(status, "remainingTimeToFullyChargedInMinutes"),
             ChargeState: ChargeState(state),
             PlugState: PlugState(state),

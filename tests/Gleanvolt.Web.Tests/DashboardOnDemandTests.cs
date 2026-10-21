@@ -22,7 +22,7 @@ public class DashboardOnDemandTests : PageTest
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 8, 0, 0, TimeSpan.Zero);
 
     private static VehicleState Car(double soc = 64, double range = 312) =>
-        new(Now.AddMinutes(-20), SocPercent: soc, RangeKm: range,
+        new(Now.AddMinutes(-20), SocPercent: soc, RangeMetres: range * 1000,
             ChargeState: VehicleChargeState.Idle, PlugState: VehiclePlugState.Disconnected,
             SourceId: "vw-group");
 
@@ -44,7 +44,7 @@ public class DashboardOnDemandTests : PageTest
         Services.AddSingleton(holder);
         Services.AddSingleton<IVehicleTelemetry>(holder);
         Services.AddSingleton<IVehicleStateRefresh>(refresh);
-        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), 77, 0.9, onDemand));
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), 77_000, 0.9, onDemand));
         Services.AddSingleton(EvInfo.Unknown);
         Services.AddSingleton<ISolarForecastService>(new FakeSolarForecastService());
         return refresh;

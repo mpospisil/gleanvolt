@@ -329,7 +329,7 @@ public sealed class VwGroupPortalClient
     /// decides when to stop regardless.</para>
     /// </summary>
     private static bool IsWholeCar(VehicleState? state) =>
-        state is { SocPercent: not null, RangeKm: not null, ChargeTimeRemaining: not null }
+        state is { SocPercent: not null, RangeMetres: not null, ChargeTimeRemaining: not null }
             and { ChargeState: not VehicleChargeState.Unknown, PlugState: not VehiclePlugState.Unknown };
 
     /// <summary>What a reading is still short of, for the log line that says whether to reach further.</summary>
@@ -343,7 +343,7 @@ public sealed class VwGroupPortalClient
         var missing = new List<string>();
 
         if (state.SocPercent is null) missing.Add("state of charge");
-        if (state.RangeKm is null) missing.Add("range");
+        if (state.RangeMetres is null) missing.Add("range");
         if (state.ChargeTimeRemaining is null) missing.Add("remaining time");
         if (state.ChargeState == VehicleChargeState.Unknown) missing.Add("charging state");
         if (state.PlugState == VehiclePlugState.Unknown) missing.Add("plug state");

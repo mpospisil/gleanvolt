@@ -19,7 +19,7 @@ public class VehicleTelemetryPayloadTests
 
         Assert.Equal(DateTimeOffset.Parse("2026-08-17T10:44:23+00:00"), state!.CapturedAt);
         Assert.Equal(28, state.SocPercent);
-        Assert.Equal(176, state.RangeKm);
+        Assert.Equal(176_000, state.RangeMetres);
         Assert.Equal(TimeSpan.FromMinutes(95), state.ChargeTimeRemaining);
         Assert.Equal(VehicleChargeState.Charging, state.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, state.PlugState);
@@ -118,7 +118,7 @@ public class VehicleTelemetryPayloadTests
         Assert.True(VehicleTelemetryPayload.TryParse(
             """{"captured_at":"2026-08-17T10:44:23+00:00","soc_percent":41}""", out var state, out _));
 
-        Assert.Null(state!.RangeKm);
+        Assert.Null(state!.RangeMetres);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class VehicleTelemetryPayloadTests
         Assert.True(VehicleTelemetryPayload.TryParse(
             """{"captured_at":"2026-08-17T10:44:23+00:00","range_km":0}""", out var state, out _));
 
-        Assert.Equal(0, state!.RangeKm);
+        Assert.Equal(0, state!.RangeMetres);
     }
 
     [Theory]

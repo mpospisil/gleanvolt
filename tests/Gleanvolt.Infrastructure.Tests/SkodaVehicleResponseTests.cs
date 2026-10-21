@@ -18,7 +18,7 @@ public class SkodaVehicleResponseTests
         Assert.Null(error);
         Assert.NotNull(state);
         Assert.Equal(71, state!.SocPercent);
-        Assert.Equal(249, state.RangeKm);
+        Assert.Equal(249_000, state.RangeMetres);
         Assert.Equal(TimeSpan.FromMinutes(95), state.ChargeTimeRemaining);
         Assert.Equal(VehicleChargeState.Charging, state.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, state.PlugState);

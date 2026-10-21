@@ -43,7 +43,7 @@ public sealed class OpenWeatherMapServiceTests
         Assert.NotNull(reading);
         var observation = reading!.Observation;
         Assert.Equal(19.62, observation.TemperatureCelsius, 2);
-        Assert.Equal(1017, observation.PressureHpa, 2);
+        Assert.Equal(101_700, observation.PressurePascals, 2);
         Assert.Equal(51, observation.HumidityPercent, 2);
         Assert.Equal(5, observation.CloudsPercent, 2);
         Assert.Equal(10_000, observation.VisibilityMetres);
@@ -154,8 +154,8 @@ public sealed class OpenWeatherMapServiceTests
         Longitude: longitude,
         AzimuthDegrees: null,
         TiltDegrees: null,
-        CapacityKwp: null,
-        InverterCapacityKw: null,
+        PeakPowerWatts: null,
+        InverterCapacityWatts: null,
         LossFactor: null,
         InstallDate: null,
         Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),

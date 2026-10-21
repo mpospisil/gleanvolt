@@ -13,7 +13,7 @@ public class FastChargeLimitFactoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 1, 15, 22, 0, 0, TimeSpan.FromHours(1));
 
-    private static readonly VehiclePackLimits Pack = new(BatteryCapacityKWh: 77, ChargeEfficiency: 0.9);
+    private static readonly VehiclePackLimits Pack = new(BatteryCapacityWh: 77_000, ChargeEfficiency: 0.9);
 
     private static FastChargeLimitFactory.Result Create(
         FastChargeBasis basis,
@@ -90,7 +90,7 @@ public class FastChargeLimitFactoryTests
             TargetedChargePriority.Cheapest,
             restSocPercent: null,
             vehicleSoc: Fresh(42),
-            new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77, 0.9),
+            new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77_000, 0.9),
             Now).Request;
 
         Assert.NotNull(fast);
@@ -309,7 +309,7 @@ public class FastChargeLimitFactoryTests
             TargetedChargePriority.Cheapest,
             restSocPercent: null,
             vehicleSoc: stale,
-            new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77, 0.9),
+            new TargetedChargeRequestLimits(TimeSpan.FromHours(36), 77_000, 0.9),
             Now).Error;
 
         Assert.Equal(targeted, fast);

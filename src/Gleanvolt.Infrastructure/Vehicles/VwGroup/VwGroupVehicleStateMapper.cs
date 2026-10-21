@@ -14,7 +14,7 @@ namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 /// <see cref="VehicleState"/>: #101's impossible-target gate stays deferred, and this exists so that
 /// "does it actually arrive for this car?" is answerable without a code change.
 /// </param>
-/// <param name="OdometerKm">The odometer, for the same reason — and it is the monotonic tie-break's witness.</param>
+/// <param name="OdometerMetres">The odometer in metres, for the same reason — and it is the monotonic tie-break's witness.</param>
 /// <param name="UnmappedFields">
 /// Field names the bundle carried that nothing here recognised.
 ///
@@ -27,7 +27,7 @@ public sealed record VwGroupMappingResult(
     VehicleState? State,
     string? Error = null,
     double? TargetSocPercent = null,
-    double? OdometerKm = null,
+    double? OdometerMetres = null,
     IReadOnlyList<string>? UnmappedFields = null,
     IReadOnlyDictionary<string, VehicleFieldReading>? MatchedFields = null)
 {
@@ -158,7 +158,7 @@ public static class VwGroupVehicleStateMapper
         var state = new VehicleState(
             contributedAt ?? capturedAt,
             soc,
-            range,
+            range * 1000, // the portal reports km; the reading holds metres (#263)
             minutes is { } value ? TimeSpan.FromMinutes(value) : null,
             MapEnum(ordered, VwGroupFieldNames.ChargeState, VwGroupFieldNames.ChargeStates, VehicleChargeState.Unknown),
             MapEnum(ordered, VwGroupFieldNames.PlugState, VwGroupFieldNames.PlugStates, VehiclePlugState.Unknown),
@@ -179,7 +179,7 @@ public static class VwGroupVehicleStateMapper
         //
         // Reported with the count rather than silently, because the field names are the fix and they
         // are already in hand: both surfaces list them.
-        if (state is { SocPercent: null, RangeKm: null, ChargeTimeRemaining: null }
+        if (state is { SocPercent: null, RangeMetres: null, ChargeTimeRemaining: null }
             and { ChargeState: VehicleChargeState.Unknown, PlugState: VehiclePlugState.Unknown })
         {
             return new VwGroupMappingResult(
@@ -189,12 +189,12 @@ public static class VwGroupVehicleStateMapper
                 + "time are all missing rather than absent. The unrecognised names are listed below, "
                 + "and adding them to VwGroupFieldNames is the fix",
                 targetSoc,
-                odometer,
+                odometer * 1000,
                 unmapped,
                 matched);
         }
 
-        return new VwGroupMappingResult(state, null, targetSoc, odometer, unmapped, matched);
+        return new VwGroupMappingResult(state, null, targetSoc, odometer * 1000, unmapped, matched);
     }
 
     /// <summary>

@@ -65,13 +65,13 @@ public class TargetedTabTests : PageTest
 
     /// <summary>An ID.4 Pro's usable pack, and the AC losses between the charger's meter and it.</summary>
     private void WithAKnownPack() =>
-        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityKWh: 77, ChargeEfficiency: 0.9));
+        Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12), BatteryCapacityWh: 77_000, ChargeEfficiency: 0.9));
 
     private void CarReports(double? socPercent = 42, double? rangeKm = 176, TimeSpan? age = null) =>
         _vehicle.Set(new VehicleState(
             Now - (age ?? TimeSpan.FromMinutes(20)),
             SocPercent: socPercent,
-            RangeKm: rangeKm,
+            RangeMetres: rangeKm * 1000,
             PlugState: VehiclePlugState.Connected,
             ChargeState: VehicleChargeState.Idle,
             SourceId: "id4"));

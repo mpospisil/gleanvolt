@@ -82,7 +82,7 @@ public class VehicleSocBasisTests
     public void A_reading_carrying_no_state_of_charge_is_not_stale_whatever_its_age()
     {
         var basis = VehicleSocBasis.From(
-            new VehicleState(Now - TimeSpan.FromDays(3), RangeKm: 312, PlugState: VehiclePlugState.Connected),
+            new VehicleState(Now - TimeSpan.FromDays(3), RangeMetres: 312_000, PlugState: VehiclePlugState.Connected),
             MaxAge,
             Now);
 

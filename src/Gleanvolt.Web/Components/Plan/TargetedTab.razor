@@ -62,7 +62,7 @@
         <section class="stat-grid">
             <Stat Label="Car battery" Value="@Units.Percent(_vehicle.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
-            <Stat Label="Range" Value="@VehicleFormatting.Km(_vehicle.RangeKm)"
+            <Stat Label="Range" Value="@Units.Distance(_vehicle.RangeMetres)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip." />
             <Stat Label="Plugged in" Value="@PluggedIn()"
                   Hint="What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours." />
@@ -615,7 +615,7 @@ else
     /// <summary>The installation figures the factory cannot compose a request without.</summary>
     private TargetedChargeRequestLimits Limits => new(
         Display.MaxHorizon,
-        VehicleDisplay.BatteryCapacityKWh,
+        VehicleDisplay.BatteryCapacityWh,
         VehicleDisplay.ChargeEfficiency,
         Display.DefaultRestSocPercent);
 
@@ -647,7 +647,7 @@ else
         var endSoc = _basis == TargetBasis.Soc && CanTargetSoc
             ? _targetSocPercent
             : VehicleTargetEnergy.ResultingSocPercent(
-                socNow, Units.WattHoursFromKwh(_energyKWh), Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency) ?? 0;
+                socNow, Units.WattHoursFromKwh(_energyKWh), VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency) ?? 0;
 
         if (endSoc <= _restSocPercent)
         {
@@ -656,7 +656,7 @@ else
         }
 
         var tailWh = VehicleTargetEnergy.TailAboveRestWh(
-            socNow, endSoc, _restSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
+            socNow, endSoc, _restSocPercent, VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency);
 
         return $"The car charges on the sun up to {Units.Percent(_restSocPercent)} whenever the sun is there, then waits. "
             + $"The last {Units.Energy(tailWh ?? 0)} — about {Units.Percent(_restSocPercent)} to {Units.Percent(endSoc)} — is scheduled "
@@ -747,14 +747,14 @@ else
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            basis.ConvertibleSocPercent, _targetSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
             <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
             _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
-                + $"charger: {Units.Capacity(Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh))} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
+                + $"charger: {Units.Capacity(VehicleDisplay.BatteryCapacityWh)} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
                 + "of what the charger meters reaching the cells.",
         };
     }

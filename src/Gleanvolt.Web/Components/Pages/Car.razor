@@ -272,7 +272,7 @@ else
         <dd>@Text(string.Join(" ", new[] { Vehicle.Make, Vehicle.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
 
         <dt>Usable battery</dt>
-        <dd>@(Vehicle.CanTargetSoc ? Units.Capacity(Units.WattHoursFromKwh(Vehicle.BatteryCapacityKWh)) : Missing)</dd>
+        <dd>@(Vehicle.CanTargetSoc ? Units.Capacity(Vehicle.BatteryCapacityWh) : Missing)</dd>
 
         <dt>Charge efficiency</dt>
         <dd>@Units.Fraction(Vehicle.ChargeEfficiency)</dd>
@@ -401,7 +401,7 @@ else
         <section class="stat-grid" id="car">
             <Stat Label="Car battery" Value="@Units.Percent(state.SocPercent)"
                   Hint="The car's own state of charge, as the source answered this press. Not the home battery." />
-            <Stat Label="Car range" Value="@VehicleFormatting.Km(state.RangeKm)"
+            <Stat Label="Car range" Value="@Units.Distance(state.RangeMetres)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
             <Stat Label="Car reading age" Value="@Age(state)"
                   Hint="How long ago the car itself produced this reading — not how long ago you pressed the button. Hours old is normal for a parked car." />

@@ -230,7 +230,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         _host.Vehicle.Set(new VehicleState(
             CapturedAt: Fixtures.Now.AddHours(-13),
             SocPercent: 42,
-            RangeKm: 176,
+            RangeMetres: 176_000,
             PlugState: VehiclePlugState.Connected));
 
         var body = await (await client.GetAsync("/api/v1/vehicle")).ReadAsync();
@@ -261,7 +261,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
     [Fact]
     public async Task Vehicle_cannot_target_soc_without_a_configured_pack()
     {
-        var client = await _host.StartAsync(batteryCapacityKWh: 0);
+        var client = await _host.StartAsync(batteryCapacityWh: 0);
         _host.Vehicle.Set(new VehicleState(Fixtures.Now, SocPercent: 42));
 
         var body = await (await client.GetAsync("/api/v1/vehicle")).ReadAsync();
@@ -287,7 +287,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         var client = await _host.StartAsync();
         _host.Weather.IsConfigured = true;
         _host.Weather.Reading = new WeatherReading(
-            new WeatherObservation(Fixtures.Now, 3.5, 1013, 80, 40, 10000, "Clouds", "scattered clouds"),
+            new WeatherObservation(Fixtures.Now, 3.5, 101_300, 80, 40, 10000, "Clouds", "scattered clouds"),
             null,
             null);
 
@@ -326,7 +326,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
             Name = "The ID.4",
             Make = "Volkswagen",
             Model = "ID.4 Pro",
-            BatteryCapacityKWh = 77,
+            BatteryCapacityWh = 77_000,
             Phases = 3,
             MinChargingCurrentAmps = 6,
             MaxChargingCurrentAmps = 16,

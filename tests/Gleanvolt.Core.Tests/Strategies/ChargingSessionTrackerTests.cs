@@ -512,7 +512,7 @@ public class ChargingSessionTrackerTests
             Status(Noon),
             vehicle: new VehicleState(Noon, SocPercent: 42, ChargeTimeRemaining: TimeSpan.FromMinutes(95))).Sample!;
 
-        Assert.Equal(95, sample.VehicleChargeTimeRemainingMinutes, 1);
+        Assert.Equal(95, sample.VehicleChargeTimeRemaining.TotalMinutes, 1);
         Assert.True(sample.VehicleChargeTimeRemainingReported);
     }
 
@@ -525,7 +525,7 @@ public class ChargingSessionTrackerTests
 
         var sample = tracker.Observe(Status(Noon), vehicle: new VehicleState(Noon, SocPercent: 42)).Sample!;
 
-        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.Equal(TimeSpan.Zero, sample.VehicleChargeTimeRemaining);
         Assert.False(sample.VehicleChargeTimeRemainingReported);
     }
 
@@ -538,7 +538,7 @@ public class ChargingSessionTrackerTests
             Status(Noon),
             vehicle: new VehicleState(Noon, ChargeTimeRemaining: TimeSpan.Zero)).Sample!;
 
-        Assert.Equal(0, done.VehicleChargeTimeRemainingMinutes);
+        Assert.Equal(TimeSpan.Zero, done.VehicleChargeTimeRemaining);
         Assert.True(done.VehicleChargeTimeRemainingReported);
     }
 
@@ -549,7 +549,7 @@ public class ChargingSessionTrackerTests
 
         var sample = tracker.Observe(Status(Noon)).Sample!;
 
-        Assert.Equal(0, sample.VehicleChargeTimeRemainingMinutes);
+        Assert.Equal(TimeSpan.Zero, sample.VehicleChargeTimeRemaining);
         Assert.False(sample.VehicleChargeTimeRemainingReported);
     }
 
