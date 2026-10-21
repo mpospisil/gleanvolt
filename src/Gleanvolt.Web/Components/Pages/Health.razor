@@ -49,7 +49,7 @@
     }
 
     <dt>Charge mode</dt>
-    <dd>@(_status is null ? "—" : _status.Mode.ToString())</dd>
+    <dd>@(_status?.Mode.ToString() ?? Units.Missing)</dd>
 
     @*
         What protects the volkswagen.de session and the MyŠkoda key on disk (#215). Here rather than
@@ -101,7 +101,7 @@
 
         <dt>Portal session</dt>
         <dd>
-            @(diagnostics.SessionAge is { } age ? Duration(age) : "none")
+            @(diagnostics.SessionAge is { } age ? Units.Duration(age) : "none")
             <span class="muted">
                 (@diagnostics.Sessions sign-in@(diagnostics.Sessions == 1 ? "" : "s") since start@(diagnostics.Sessions > 1 ? " — sessions are expiring" : ""))
             </span>
@@ -234,43 +234,15 @@
     // kept alive by its own event handler for as long as the process runs.
     public void Dispose() => StatusHolder.Updated -= OnStatusUpdated;
 
-    // Clamped at zero: a clock stepped backwards by NTP must not read as a poll from the future.
-    private string Age(DateTimeOffset timestamp)
-    {
-        var age = Time.GetUtcNow() - timestamp;
-        if (age < TimeSpan.Zero)
-        {
-            age = TimeSpan.Zero;
-        }
-
-        return age.TotalSeconds < 90
-            ? $"{age.TotalSeconds:F0} s"
-            : $"{age.TotalMinutes:F0} min";
-    }
-
-    /// <summary>
-    /// A span in the coarsest unit that still says something. A portal session is the thing this is
-    /// for, and "1.4 h" answers "is it holding one?" better than 84 minutes does.
-    /// </summary>
-    private static string Duration(TimeSpan span)
-    {
-        if (span < TimeSpan.Zero)
-        {
-            span = TimeSpan.Zero;
-        }
-
-        return span.TotalMinutes < 90
-            ? $"{span.TotalMinutes:F0} min"
-            : span.TotalHours < 48
-                ? $"{span.TotalHours:F1} h"
-                : $"{span.TotalDays:F1} days";
-    }
+    // Clamped at zero (Units.Duration reads a negative span as none): a clock stepped backwards by
+    // NTP must not read as a poll from the future.
+    private string Age(DateTimeOffset timestamp) => Units.Duration(Time.GetUtcNow() - timestamp);
 
     /// <summary>How long until a moment, or "due" once it has passed and the fetch has not landed.</summary>
     private string Until(DateTimeOffset moment)
     {
         var remaining = moment - Time.GetUtcNow();
 
-        return remaining <= TimeSpan.Zero ? "due" : $"in {Duration(remaining)}";
+        return remaining <= TimeSpan.Zero ? "due" : $"in {Units.Duration(remaining)}";
     }
 }

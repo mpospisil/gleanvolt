@@ -80,11 +80,11 @@ else
             <section class="figures" aria-label="Power now and energy today">
                 <div class="figure solar">
                     <div class="figure-label">Solar</div>
-                    <div class="figure-now">@Kw(_status.SolarPowerWatts)</div>
-                    <div class="figure-sub">forecast @Kw(_status.ForecastSolarPowerWatts)</div>
+                    <div class="figure-now">@Flow(_status.SolarPowerWatts)</div>
+                    <div class="figure-sub">forecast @Flow(_status.ForecastSolarPowerWatts)</div>
                     @if (_status.SurplusWatts is { } surplus)
                     {
-                        <div class="figure-sub">surplus @Kw(surplus)</div>
+                        <div class="figure-sub">surplus @Flow(surplus)</div>
                     }
                     <div class="figure-today">@Today(t => t.SolarKwh)</div>
                 </div>
@@ -94,31 +94,31 @@ else
                        car draws, part of its load is missing from the sum. A dash, not a wrong number. *@
                     @if (house >= 0)
                     {
-                        <div class="figure-now">@Kw(house)</div>
+                        <div class="figure-now">@Flow(house)</div>
                         <div class="figure-sub">without the car</div>
                     }
                     else
                     {
-                        <div class="figure-now">—</div>
+                        <div class="figure-now">@Units.Missing</div>
                         <div class="figure-sub">not measurable</div>
                     }
                     <div class="figure-today">@Today(t => t.HouseKwh)</div>
                 </div>
                 <div class="figure battery">
                     <div class="figure-label">Battery</div>
-                    <div class="figure-now">@Kw(_status.BatteryPowerWatts)</div>
-                    <div class="figure-sub">@(_status.BatteryPowerWatts switch { > 0 => "charging", < 0 => "supplying", _ => "idle" }) · @Percent(_status.BatterySocPercent)</div>
+                    <div class="figure-now">@Flow(_status.BatteryPowerWatts)</div>
+                    <div class="figure-sub">@(_status.BatteryPowerWatts switch { > 0 => "charging", < 0 => "supplying", _ => "idle" }) · @Units.Percent(_status.BatterySocPercent)</div>
                     <div class="figure-today">@TodayInOut(t => t.BatteryInKwh, t => t.BatteryOutKwh, "in", "out")</div>
                 </div>
                 <div class="figure ev">
                     <div class="figure-label">Car</div>
-                    <div class="figure-now">@Kw(_status.EvChargerPowerWatts)</div>
+                    <div class="figure-now">@Flow(_status.EvChargerPowerWatts)</div>
                     <div class="figure-sub">@(_status.CarConnected ? "plugged in" : "not plugged in")</div>
                     <div class="figure-today">@Today(t => t.EvKwh)</div>
                 </div>
                 <div class="figure grid-flow">
                     <div class="figure-label">Grid</div>
-                    <div class="figure-now">@Kw(_status.GridPowerWatts)</div>
+                    <div class="figure-now">@Flow(_status.GridPowerWatts)</div>
                     <div class="figure-sub">@(_status.GridPowerWatts switch { > 0 => "importing", < 0 => "exporting", _ => "balanced" })</div>
                     <div class="figure-today">@TodayInOut(t => t.ImportKwh, t => t.ExportKwh, "in", "out")</div>
                 </div>
@@ -126,7 +126,7 @@ else
 
             @if (_today is { Count: > 0 })
             {
-                <p class="muted figures-note">Power now; under it, kWh since midnight.</p>
+                <p class="muted figures-note">Power now; under it, energy since midnight.</p>
             }
             else if (_today is null)
             {
@@ -185,9 +185,9 @@ else
                     <table class="sessions plan-table">
                         <tbody>
                             <tr><th scope="row">Window</th><td class="num">@Window(plan.NextFeasibleWindow)</td></tr>
-                            <tr><th scope="row">Car energy</th><td class="num">@Kwh(plan.FeasibleEvEnergyWh)</td></tr>
-                            <tr><th scope="row">Battery floor</th><td class="num">@Percent(plan.RequiredSocFloorPercent)</td></tr>
-                            <tr><th scope="row">Shortfall</th><td class="num">@Kwh(plan.ShortfallWh)</td></tr>
+                            <tr><th scope="row">Car energy</th><td class="num">@Units.Energy(plan.FeasibleEvEnergyWh)</td></tr>
+                            <tr><th scope="row">Battery floor</th><td class="num">@Units.Percent(plan.RequiredSocFloorPercent)</td></tr>
+                            <tr><th scope="row">Shortfall</th><td class="num">@Units.Energy(plan.ShortfallWh)</td></tr>
                         </tbody>
                     </table>
                     <p class="card-link"><a href="/charging-plan/forecasted">The whole plan</a></p>
@@ -221,26 +221,26 @@ else
                        first poll of a session) puts the power first: a large 0.0 kWh reads as broken. *@
                     @if (_status.SessionEnergyWh <= 0 && _status.EvChargerPowerWatts > 0)
                     {
-                        <div class="session-energy">@Kw(_status.EvChargerPowerWatts)</div>
+                        <div class="session-energy">@Flow(_status.EvChargerPowerWatts)</div>
                         <p class="muted session-energy-note">drawing now; no session energy counted yet</p>
                     }
                     else
                     {
-                        <div class="session-energy">@Kwh(_status.SessionEnergyWh)</div>
+                        <div class="session-energy">@Units.Energy(_status.SessionEnergyWh)</div>
                         <p class="muted session-energy-note">
-                            into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {carSoc:F0}%" : "")
+                            into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {Units.Percent(carSoc)}" : "")
                         </p>
                     }
                     <dl class="session-facts">
                         <dt>Charge mode</dt><dd>@_status.Mode</dd>
                         <dt>Control state</dt><dd>@_status.State</dd>
                         <dt>Charger status</dt><dd>@_status.ChargerStatus</dd>
-                        <dt>Session energy</dt><dd>@Kwh(_status.SessionEnergyWh)</dd>
-                        <dt>EV charging power</dt><dd>@Watts(_status.EvChargerPowerWatts)</dd>
-                        <dt>EV charging current</dt><dd>@Amps(_status.EvChargingCurrentAmps)</dd>
-                        <dt>Target current</dt><dd>@Amps(_status.TargetCurrentAmps)</dd>
-                        <dt>Active current</dt><dd>@Amps(_status.ActiveCurrentAmps)</dd>
-                        <dt>Battery loan power</dt><dd>@Watts(_status.LoanPowerWatts)</dd>
+                        <dt>Session energy</dt><dd>@Units.Energy(_status.SessionEnergyWh)</dd>
+                        <dt>EV charging power</dt><dd>@Units.Watts(_status.EvChargerPowerWatts)</dd>
+                        <dt>EV charging current</dt><dd>@Units.Current(_status.EvChargingCurrentAmps)</dd>
+                        <dt>Target current</dt><dd>@Units.Current(_status.TargetCurrentAmps)</dd>
+                        <dt>Active current</dt><dd>@Units.Current(_status.ActiveCurrentAmps)</dd>
+                        <dt>Battery loan power</dt><dd>@Units.Watts(_status.LoanPowerWatts)</dd>
                     </dl>
                 }
             </section>
@@ -337,7 +337,7 @@ else
             Reported by the car @VehicleAge(Showing) ago@(Via(Showing) is { } via ? $" via {via}" : "")
             @if (IsStale(Showing))
             {
-                <strong> — stale, older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h</strong>
+                <strong> — stale, older than @Units.Hours(VehicleDisplay.MaxAge)</strong>
             }
         </p>
     }
@@ -348,7 +348,7 @@ else
 
         @if (Showing is { } shown)
         {
-            <Stat Label="Car battery" Value="@Percent(shown.SocPercent)"
+            <Stat Label="Car battery" Value="@Units.Percent(shown.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
             <Stat Label="Car range" Value="@Km(shown.RangeKm)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
@@ -380,10 +380,10 @@ else
             {
                 <tr>
                     <td>@label <span class="muted forecast-date">@date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span></td>
-                    <td class="num">@Figure(day?.ExpectedWh)</td>
-                    <td class="num">@Figure(day?.LowWh)</td>
-                    <td class="num">@Figure(day?.HighWh)</td>
-                    <td class="num">@Figure(day?.PeakWatts)</td>
+                    <td class="num">@Units.Kwh(day?.ExpectedWh, unit: false)</td>
+                    <td class="num">@Units.Kwh(day?.LowWh, unit: false)</td>
+                    <td class="num">@Units.Kwh(day?.HighWh, unit: false)</td>
+                    <td class="num">@Units.Kw(day?.PeakWatts, unit: false)</td>
                 </tr>
             }
         </tbody>
@@ -600,10 +600,12 @@ else
     // Nothing recorded yet today (a fresh install, or the first quarter hour after midnight) leaves
     // the line off rather than printing a row of zeros that reads as a dark day.
     private string Today(Func<TodayTotals, double> pick) =>
-        _today is not { Count: > 0 } ? "" : $"{pick(_today):F1} kWh";
+        _today is not { Count: > 0 } ? "" : Units.Energy(Units.WattHoursFromKwh(pick(_today)));
 
     private string TodayInOut(Func<TodayTotals, double> into, Func<TodayTotals, double> outOf, string inWord, string outWord) =>
-        _today is not { Count: > 0 } ? "" : $"{into(_today):F1} {inWord} · {outOf(_today):F1} {outWord}";
+        _today is not { Count: > 0 }
+            ? ""
+            : $"{Units.Energy(Units.WattHoursFromKwh(into(_today)))} {inWord} · {Units.Energy(Units.WattHoursFromKwh(outOf(_today)))} {outWord}";
 
     // The house apart from the car, from the same live readings the figures beside it show: what the
     // roof makes and the grid brings in, less what the battery takes and the car draws. The Energy
@@ -615,7 +617,7 @@ else
     // requested is the owner's intent -- they differ while a mode is waiting to arm it.
     private static string HoldDetail(ChargeControlStatus status) => status switch
     {
-        { BatteryHoldActive: true, BatteryHoldTargetWatts: { } target } => $"armed on the inverter, holding at {target:F0} W",
+        { BatteryHoldActive: true, BatteryHoldTargetWatts: { } target } => $"armed on the inverter, holding at {Units.Power(target)}",
         { BatteryHoldActive: true } => "armed on the inverter",
         { BatteryHoldRequested: true } => "requested, not yet armed",
         _ => "the battery serves the house as usual",
@@ -696,7 +698,7 @@ else
         }
 
         return Car.BatteryCapacityKWh > 0
-            ? $"{described}, {Car.BatteryCapacityKWh:0.#} kWh usable"
+            ? $"{described}, {Units.Capacity(Units.WattHoursFromKwh(Car.BatteryCapacityKWh))} usable"
             : described;
     }
 
@@ -756,25 +758,6 @@ else
     private string VehicleAge(VehicleState vehicle) =>
         VehicleFormatting.Age(vehicle, Time.GetUtcNow());
 
-    private static string Watts(double watts) => $"{watts:F0} W";
-
-    // The strip's figures: kilowatts without a sign, since the word under each says which way it flows.
-    private static string Kw(double watts) => $"{Math.Abs(watts) / 1000:0.0} kW";
-
-    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
-
-    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
-
-    private static string Kwh(double? wattHours) => wattHours is null ? "—" : Kwh(wattHours.Value);
-
-    // A forecast-table cell: Wh as kWh, or W as kW, with the unit left to the column header.
-    private static string Figure(double? value) => value is null ? "—" : $"{value.Value / 1000:F1}";
-
-    private static string Percent(double percent) => $"{percent:F0}%";
-
-    private static string Percent(double? percent) => VehicleFormatting.Percent(percent);
-
-    private static string Amps(int amps) => $"{amps} A";
-
-    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+    // The strip's figures: without a sign, since the word under each says which way it flows.
+    private static string Flow(double watts) => Units.Power(Math.Abs(watts));
 }

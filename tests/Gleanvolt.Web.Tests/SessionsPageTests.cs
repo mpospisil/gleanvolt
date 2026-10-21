@@ -47,7 +47,7 @@ public class SessionsPageTests : PageTest
             Assert.Contains("Forecasted", page.Markup);
             Assert.Contains("6.00 kWh", page.Markup);
             Assert.Contains("75%", page.Markup); // 4500 / 6000 solar share
-            Assert.Contains("1h 0m", page.Markup);
+            Assert.Contains("1 h", page.Markup);
         });
     }
 

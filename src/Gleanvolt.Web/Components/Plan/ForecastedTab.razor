@@ -110,23 +110,23 @@ else
               Hint="Why the plan decided what it decided -- the same line the log carries." />
         <Stat Label="Charge window" Value="@FormatWindow(plan.NextFeasibleWindow)"
               Hint="The next stretch of today forecast to clear the charger's minimum power for long enough to be worth starting. 'none' when today offers no such window." />
-        <Stat Label="EV energy budget" Value="@Kwh(plan.FeasibleEvEnergyWh)"
+        <Stat Label="EV energy budget" Value="@Units.Energy(plan.FeasibleEvEnergyWh)"
               Hint="How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power." />
-        <Stat Label="Projected shortfall" Value="@Kwh(plan.ShortfallWh)"
+        <Stat Label="Projected shortfall" Value="@Units.Energy(plan.ShortfallWh)"
               Hint="How far today's forecast falls short of the house plus a full home battery. Above zero, the evening 100% is at risk. The car is not in this sum — it only ever gets what is left over." />
-        <Stat Label="Surplus spill" Value="@Kwh(plan.SpillWh)"
+        <Stat Label="Surplus spill" Value="@Units.Energy(plan.SpillWh)"
               Hint="Remaining surplus the home battery has no room for — what is still coming less what it can absorb. At 100% it is all of it, and every watt leaves the house unless the car takes it, which is what lets the battery lend against a much thinner surplus." />
-        <Stat Label="Loan headroom" Value="@Kwh(plan.LoanHeadroomWh)"
+        <Stat Label="Loan headroom" Value="@Units.Energy(plan.LoanHeadroomWh)"
               Hint="How much the pack may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, or when every remaining watt has a home in the pack." />
-        <Stat Label="Required SOC floor" Value="@Percent(plan.RequiredSocFloorPercent)"
+        <Stat Label="Required SOC floor" Value="@Units.Percent(plan.RequiredSocFloorPercent)"
               Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what pauses the car." />
-        <Stat Label="Forecast remaining today" Value="@Kwh(plan.RemainingPvWh)"
+        <Stat Label="Forecast remaining today" Value="@Units.Energy(plan.RemainingPvWh)"
               Hint="Forecast PV still to come today, at the configured confidence band and already scaled by forecast accuracy." />
-        <Stat Label="Tomorrow forecast" Value="@(Status.TomorrowForecastWh is { } tomorrow ? Kwh(tomorrow) : "—")"
+        <Stat Label="Tomorrow forecast" Value="@Units.Energy(Status.TomorrowForecastWh)"
               Hint="Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out." />
-        <Stat Label="Forecast accuracy" Value="@Percent(plan.BiasFactor * 100)"
+        <Stat Label="Forecast accuracy" Value="@Units.Fraction(plan.BiasFactor)"
               Hint="Actual production against forecast so far today. 100% is on the nose; the rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted." />
-        <Stat Label="Battery loaned today" Value="@Kwh(Status.LoanedTodayWh)"
+        <Stat Label="Battery loaned today" Value="@Units.Energy(Status.LoanedTodayWh)"
               Hint="Energy the home battery has lent the car today so a surplus below the charger's floor could still reach it. Resets at local midnight." />
     </section>
 
@@ -248,14 +248,10 @@ else
     private string SessionProgress() =>
         Status is null
             ? "No poll has completed yet."
-            : $"{Kwh(Status.SessionEnergyWh)} into the car since it was plugged in.";
+            : $"{Units.Energy(Status.SessionEnergyWh)} into the car since it was plugged in.";
 
     private string FormatWindow((DateTimeOffset Start, DateTimeOffset End)? window) =>
         window is { } w
             ? $"{TimeZoneInfo.ConvertTime(w.Start, Time.LocalTimeZone):HH:mm}–{TimeZoneInfo.ConvertTime(w.End, Time.LocalTimeZone):HH:mm}"
             : "none";
-
-    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
-
-    private static string Percent(double percent) => $"{percent:F0}%";
 }

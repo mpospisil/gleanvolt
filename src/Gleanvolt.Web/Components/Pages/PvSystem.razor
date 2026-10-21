@@ -69,7 +69,7 @@
         }
         else
         {
-            <span class="muted">—</span>
+            <span class="muted">@Missing</span>
         }
     </dd>
 
@@ -77,7 +77,7 @@
     <dd>@Azimuth()</dd>
 
     <dt>Tilt</dt>
-    <dd>@Degrees(Site.TiltDegrees)</dd>
+    <dd>@Units.Angle(Site.TiltDegrees)</dd>
 </dl>
 
 @if (!Site.HasLocation)
@@ -92,10 +92,10 @@
 
 <dl class="facts">
     <dt>Peak DC capacity</dt>
-    <dd>@Number(Site.CapacityKwp, "kWp")</dd>
+    <dd>@Units.PeakPower(Units.WattsFromKw(Site.CapacityKwp))</dd>
 
     <dt>Inverter capacity</dt>
-    <dd>@Number(Site.InverterCapacityKw, "kW")</dd>
+    <dd>@Units.Rating(Units.WattsFromKw(Site.InverterCapacityKw))</dd>
 
     <dt>Loss factor</dt>
     <dd>@Number(Site.LossFactor, format: "0.00")</dd>
@@ -166,10 +166,10 @@ else
         <dd>@Text(string.Join(" ", new[] { Car.Make, Car.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
 
         <dt>Usable battery</dt>
-        <dd>@(Car.CanTargetSoc ? $"{Car.BatteryCapacityKWh.ToString("0.#", Invariant)} kWh" : Missing)</dd>
+        <dd>@(Car.CanTargetSoc ? Units.Capacity(Units.WattHoursFromKwh(Car.BatteryCapacityKWh)) : Missing)</dd>
 
         <dt>Charge efficiency</dt>
-        <dd>@Car.ChargeEfficiency.ToString("P0", Invariant)</dd>
+        <dd>@Units.Fraction(Car.ChargeEfficiency)</dd>
     </dl>
 
     <h3>What it will accept</h3>
@@ -186,15 +186,15 @@ else
         <tbody>
             <tr>
                 <td>Minimum current</td>
-                <td>@Amps(Car.MinChargingCurrentAmps)</td>
-                <td>@Amps(Limits.MinAmps == Car.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
-                <td>@Amps(Limits.MinAmps)</td>
+                <td>@Units.Current(Car.MinChargingCurrentAmps)</td>
+                <td>@Units.Current(Limits.MinAmps == Car.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
+                <td>@Units.Current(Limits.MinAmps)</td>
             </tr>
             <tr>
                 <td>Maximum current</td>
-                <td>@Amps(Car.MaxChargingCurrentAmps)</td>
-                <td>@Amps(Limits.MaxAmps == Car.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
-                <td>@Amps(Limits.MaxAmps)</td>
+                <td>@Units.Current(Car.MaxChargingCurrentAmps)</td>
+                <td>@Units.Current(Limits.MaxAmps == Car.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
+                <td>@Units.Current(Limits.MaxAmps)</td>
             </tr>
             <tr>
                 <td>Phases</td>
@@ -510,7 +510,7 @@ else
 }
 
 @code {
-    private const string Missing = "—";
+    private const string Missing = Units.Missing;
 
     // The example call the section exists to serve, split around the key so the secret can be masked
     // inside it while Copy still hands over the whole command.
@@ -534,50 +534,17 @@ else
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
 
-    private static string Amps(int? value) => value is { } amps ? $"{amps} A" : Missing;
-
     private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
 
     private static string Address(PvDeviceInfo device) => $"{device.Connection.Host}:{device.Connection.Port}";
 
-    // Intervals here run from fifteen seconds to twelve hours, so a single format would print either
-    // "0h 0m" for the status interval or "12h 0m" for the staleness guard. Each is shown in the unit
-    // it was configured in.
-    private static string Interval(TimeSpan value)
-    {
-        if (value <= TimeSpan.Zero)
-        {
-            return Missing;
-        }
+    // Intervals here run from fifteen seconds to twelve hours, and each reads in the units it
+    // was configured in: Units.Duration keeps seconds below ten minutes and minutes below two days.
+    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Missing : Units.Duration(value);
 
-        if (value < TimeSpan.FromMinutes(1))
-        {
-            return $"{value.TotalSeconds.ToString("0.#", Invariant)} s";
-        }
-
-        if (value < TimeSpan.FromHours(1))
-        {
-            return $"{value.TotalMinutes.ToString("0.#", Invariant)} min";
-        }
-
-        return value.Minutes == 0
-            ? $"{(int)value.TotalHours} h"
-            : $"{(int)value.TotalHours} h {value.Minutes} min";
-    }
-
-    private static string Degrees(double? value) =>
-        value is { } number ? $"{number.ToString("0.#", Invariant)}°" : Missing;
-
-    private static string Number(double? value, string? unit = null, string format = "0.##")
-    {
-        if (value is not { } number)
-        {
-            return Missing;
-        }
-
-        var text = number.ToString(format, Invariant);
-        return unit is null ? text : $"{text} {unit}";
-    }
+    // A plain figure with no unit, such as the loss factor.
+    private static string Number(double? value, string format) =>
+        value is { } number ? number.ToString(format, Invariant) : Missing;
 
     // The bearing with the direction it means spelled out, because "172°" is only checkable by
     // someone who already knows which way their roof faces in degrees.
@@ -589,6 +556,6 @@ else
         }
 
         var point = Compass[(int)Math.Round(bearing / 45) % Compass.Length];
-        return $"{Degrees(bearing)} ({point})";
+        return $"{Units.Angle(bearing)} ({point})";
     }
 }

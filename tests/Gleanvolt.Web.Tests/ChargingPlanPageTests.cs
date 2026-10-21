@@ -291,7 +291,7 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab("solar");
 
         Assert.Contains("Solar surplus", page.Markup);
-        Assert.Contains("1800 W", page.Markup);
+        Assert.Contains("1.8 kW", page.Markup);
         Assert.Contains("100%", page.Markup);
     }
 
@@ -307,8 +307,8 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab("fast");
 
         Assert.Contains("Grid power", page.Markup);
-        Assert.Contains("7400 W", page.Markup);
-        Assert.Contains("11000 W", page.Markup);
+        Assert.Contains("7.4 kW", page.Markup);
+        Assert.Contains("11.0 kW", page.Markup);
     }
 
     [Fact]

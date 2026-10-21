@@ -772,7 +772,7 @@ public class CarPageTests : PageTest
 
         Assert.Contains("The delivery", page.Markup);
         Assert.Contains("…1234", page.Markup);
-        Assert.Contains("53065", page.Markup);
+        Assert.Contains("53,065 km", page.Markup);
         Assert.Contains("80%", page.Markup);
     }
 
@@ -877,7 +877,7 @@ public class CarPageTests : PageTest
         Assert.Contains("Target SOC", card);
         Assert.Contains("80%", card);
         Assert.Contains("Time left", card);
-        Assert.Contains("95 min", card);
+        Assert.Contains("1 h 35 min", card);
     }
 
     /// <summary>
@@ -917,7 +917,7 @@ public class CarPageTests : PageTest
 
         // Still there, and still complete -- collapsed is not dropped.
         Assert.Contains("settings.auto_unlock_ac", diagnostics.TextContent);
-        Assert.Contains("53065", diagnostics.TextContent);
+        Assert.Contains("53,065 km", diagnostics.TextContent);
     }
 
     /// <summary>

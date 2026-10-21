@@ -85,7 +85,7 @@ else
                     <td class="num">@Kwh(interval.SolarKwh)</td>
                     @* An em dash, not 0.00: no forecast covered this window, which is a different
                        fact from a forecast of nothing. *@
-                    <td class="num">@(interval.ForecastSolarKwh is { } forecast ? Kwh(forecast) : "—")</td>
+                    <td class="num">@Kwh(interval.ForecastSolarKwh)</td>
                     <td class="num">@Kwh(interval.GridImportKwh)</td>
                     <td class="num">@Kwh(interval.GridExportKwh)</td>
                     <td class="num">@Kwh(interval.EvKwh)</td>
@@ -95,7 +95,7 @@ else
                     <td class="num">@Soc(interval)</td>
                     @* Only spelled out when it is short. A column reading "100%" ninety-six times
                        would bury the handful of rows the reader actually has to be careful with. *@
-                    <td class="num">@(IsPartial(interval) ? $"{interval.Coverage * 100:F0}%" : "—")</td>
+                    <td class="num">@(IsPartial(interval) ? Units.Fraction(interval.Coverage) : Units.Missing)</td>
                 </tr>
             }
         </tbody>
@@ -105,14 +105,14 @@ else
                 <td class="num">@Kwh(_intervals.Sum(i => i.SolarKwh))</td>
                 <td class="num">@(_intervals.Any(i => i.ForecastSolarKwh is not null)
                                     ? Kwh(_intervals.Sum(i => i.ForecastSolarKwh ?? 0))
-                                    : "—")</td>
+                                    : Units.Missing)</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.GridImportKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.GridExportKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.EvKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.BatteryChargeKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.BatteryDischargeKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.HouseLoadKwh))</td>
-                <td class="num">@($"{_intervals[0].SocStartPercent:F0} → {_intervals[^1].SocEndPercent:F0}%")</td>
+                <td class="num">@($"{Units.Percent(_intervals[0].SocStartPercent)} → {Units.Percent(_intervals[^1].SocEndPercent)}")</td>
                 <td class="num">@_intervals.Count rows</td>
             </tr>
         </tfoot>
@@ -250,8 +250,10 @@ else
     private string Local(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("HH:mm");
 
-    private static string Kwh(double value) => value.ToString("F2");
+    // Energy intervals are the one surface below the UI kept in kWh (an analytics table, see
+    // EnergyInterval), so the figure is taken back to the base unit before it is formatted.
+    private static string Kwh(double? kwh) => Units.Kwh(Units.WattHoursFromKwh(kwh), 2, unit: false);
 
     private static string Soc(EnergyInterval interval) =>
-        $"{interval.SocStartPercent:F0} → {interval.SocEndPercent:F0}%";
+        $"{Units.Percent(interval.SocStartPercent)} → {Units.Percent(interval.SocEndPercent)}";
 }

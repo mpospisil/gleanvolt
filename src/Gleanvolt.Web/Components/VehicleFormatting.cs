@@ -15,48 +15,23 @@ namespace Gleanvolt.Web.Components;
 /// </summary>
 internal static class VehicleFormatting
 {
-    /// <summary>A state of charge, or a dash when the source did not carry one.</summary>
-    public static string Percent(double? percent) => percent is null ? "—" : $"{percent.Value:F0}%";
-
     /// <summary>
     /// The range the car reckons is left in it. Whole kilometres: it is the car's own estimate off
     /// its own recent consumption, and a decimal on it would be borrowed confidence.
     /// </summary>
-    public static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
+    public static string Km(double? km) => Units.Distance(Units.MetresFromKm(km));
 
     /// <summary>
     /// The car's own estimate of how much longer it needs. Null and zero are different facts (#73):
     /// zero means the car says it is done, a dash means this source does not carry the field at all.
     /// </summary>
     public static string ChargeTime(VehicleState reading) =>
-        reading.ChargeTimeRemaining is { } left ? $"{left.TotalMinutes:F0} min" : "—";
+        Units.Duration(reading.ChargeTimeRemaining);
 
     /// <summary>
     /// How long ago the <b>car</b> produced this reading, as of <paramref name="now"/> — not how long
     /// ago we received it. A negative age (the car's clock running ahead of ours) reads as "just now"
     /// rather than as a negative duration.
     /// </summary>
-    public static string Age(VehicleState vehicle, DateTimeOffset now)
-    {
-        var age = vehicle.AgeAt(now);
-
-        if (age < TimeSpan.Zero)
-        {
-            return "just now";
-        }
-
-        if (age < TimeSpan.FromMinutes(1))
-        {
-            return "under a minute";
-        }
-
-        if (age < TimeSpan.FromHours(1))
-        {
-            return $"{age.TotalMinutes:F0} min";
-        }
-
-        return age < TimeSpan.FromDays(1)
-            ? $"{age.TotalHours:F1} h"
-            : $"{age.TotalDays:F1} days";
-    }
+    public static string Age(VehicleState vehicle, DateTimeOffset now) => Units.Age(vehicle.AgeAt(now));
 }

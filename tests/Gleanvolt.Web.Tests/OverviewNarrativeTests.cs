@@ -42,7 +42,7 @@ public class OverviewNarrativeTests
             LoanPowerWatts = 700,
         });
 
-        Assert.StartsWith("Charging the car at 4.1 kW in Forecasted mode, 0.7 kW of it lent by the home battery.", text);
+        Assert.StartsWith("Charging the car at 4.1 kW in Forecasted mode, 700 W of it lent by the home battery.", text);
     }
 
     [Fact]

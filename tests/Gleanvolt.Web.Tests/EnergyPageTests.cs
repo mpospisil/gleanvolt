@@ -116,7 +116,7 @@ public class EnergyPageTests : PageTest
         {
             var footer = page.Find("tfoot").TextContent;
             Assert.Contains("4.00", footer);        // 1.25 + 2.75
-            Assert.Contains("40 → 70%", footer);    // first row's start to the last row's end
+            Assert.Contains("40% → 70%", footer);    // first row's start to the last row's end
             Assert.Contains("2 rows", footer);
         });
     }

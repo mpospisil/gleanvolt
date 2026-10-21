@@ -55,15 +55,15 @@ public static class OverviewNarrative
             {
                 // The charger starts a car in Fast the moment it is plugged in, before any mode is
                 // picked; this is that, and it must not read as a mode the owner chose.
-                return $"The car is drawing {Kw(status.EvChargerPowerWatts)} with no mode driving the charger — "
+                return $"The car is drawing {Units.Power(status.EvChargerPowerWatts)} with no mode driving the charger — "
                     + "the charger started it on its own.";
             }
 
             var loan = status.LoanPowerWatts > 0
-                ? $", {Kw(status.LoanPowerWatts)} of it lent by the home battery"
+                ? $", {Units.Power(status.LoanPowerWatts)} of it lent by the home battery"
                 : "";
 
-            return $"Charging the car at {Kw(status.EvChargerPowerWatts)} in {mode} mode{loan}.";
+            return $"Charging the car at {Units.Power(status.EvChargerPowerWatts)} in {mode} mode{loan}.";
         }
 
         if (status.Mode == ChargeControlMode.Off)
@@ -102,6 +102,4 @@ public static class OverviewNarrative
 
         return null;
     }
-
-    private static string Kw(double watts) => $"{watts / 1000:0.0} kW";
 }

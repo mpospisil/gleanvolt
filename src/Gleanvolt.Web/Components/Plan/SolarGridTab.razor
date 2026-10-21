@@ -45,13 +45,13 @@
 @if (Status is { } status)
 {
     <section class="stat-grid">
-        <Stat Label="Solar surplus" Value="@Watts(status.SurplusWatts)"
+        <Stat Label="Solar surplus" Value="@Units.Power(status.SurplusWatts)"
               Hint="PV left after household consumption — the smoothed 3-minute average this mode decides on. Blank while a mode that doesn't decide on surplus is driving." />
         <Stat Label="Sun until" Value="@SunUntil(status)"
               Hint="When the forecast says the surplus stops clearing your minimum today — when this mode will switch itself off if the live surplus agrees. Only shown while this mode is driving." />
-        <Stat Label="Target current" Value="@Amps(status.TargetCurrentAmps)"
+        <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)"
               Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
-        <Stat Label="Grid power" Value="@Watts(status.GridPowerWatts)"
+        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)"
               Hint="Positive while importing. While the grid is topping up a small surplus, this is roughly that top-up." />
     </section>
 
@@ -93,15 +93,9 @@
 
     private string SunUntil(ChargeControlStatus status) => status.SolarGrid switch
     {
-        null => "—",
+        null => Units.Missing,
         { ForecastUsable: false } => "no forecast",
         { SunUntil: { } until } => TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone).ToString("HH:mm"),
         _ => "none left today",
     };
-
-    private static string Watts(double watts) => $"{watts:F0} W";
-
-    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
-
-    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
 }

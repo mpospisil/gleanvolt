@@ -50,7 +50,7 @@ else
         <dd>@(session.EndedAt is { } ended ? Local(ended) : "in progress")</dd>
 
         <dt>Duration</dt>
-        <dd>@SessionFormatting.FormatDuration(session.Duration(Time.GetUtcNow()))</dd>
+        <dd>@Units.Duration(session.Duration(Time.GetUtcNow()))</dd>
 
         <dt>Strategy</dt>
         <dd>@session.FormatStrategy()</dd>
@@ -62,10 +62,10 @@ else
         }
 
         <dt>Battery SOC</dt>
-        <dd>@(session.StartBatterySocPercent.ToString("F0"))% → @(session.EndBatterySocPercent is { } endSoc ? $"{endSoc:F0}%" : "—")</dd>
+        <dd>@Units.Percent(session.StartBatterySocPercent) → @Units.Percent(session.EndBatterySocPercent)</dd>
 
         <dt>Peak charging power</dt>
-        <dd>@(session.PeakChargingPowerWatts.ToString("F0")) W</dd>
+        <dd>@Units.Power(session.PeakChargingPowerWatts)</dd>
 
         @if (session.DayForecast is { Periods.Count: > 0 } dayForecast)
         {
@@ -97,7 +97,7 @@ else
                 @Local(sunrise, "HH:mm") – @Local(sunset, "HH:mm")
                 @if (session.DaylightLength is { } daylight)
                 {
-                    @: (@SessionFormatting.FormatDuration(daylight))
+                    @: (@Units.Duration(daylight))
                 }
             </dd>
         }
@@ -106,10 +106,10 @@ else
     <section class="split">
         <h2>Energy source split</h2>
         <p class="muted">
-            @((session.EnergyDeliveredWh / 1000).ToString("F2")) kWh delivered
+            @Units.Kwh(session.EnergyDeliveredWh, 2) delivered
             @if (session.LoanedWh > 0)
             {
-                @: — of which @((session.LoanedWh / 1000).ToString("F2")) kWh was loaned from the battery
+                @: — of which @Units.Kwh(session.LoanedWh, 2) was loaned from the battery
             }
         </p>
 
@@ -121,9 +121,9 @@ else
                 <span class="battery" style="width:@Share(session.FromBatteryWh, session.EnergyDeliveredWh)"></span>
             </div>
             <ul class="split-legend">
-                <li><span class="swatch solar"></span>Solar: @((session.FromSolarWh / 1000).ToString("F2")) kWh</li>
-                <li><span class="swatch grid"></span>Grid: @((session.FromGridWh / 1000).ToString("F2")) kWh</li>
-                <li><span class="swatch battery"></span>Battery: @((session.FromBatteryWh / 1000).ToString("F2")) kWh</li>
+                <li><span class="swatch solar"></span>Solar: @Units.Kwh(session.FromSolarWh, 2)</li>
+                <li><span class="swatch grid"></span>Grid: @Units.Kwh(session.FromGridWh, 2)</li>
+                <li><span class="swatch battery"></span>Battery: @Units.Kwh(session.FromBatteryWh, 2)</li>
             </ul>
         }
         else
@@ -259,5 +259,5 @@ else
         TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString(format);
 
     private static string Share(double value, double total) =>
-        $"{(total > 0 ? value / total * 100 : 0):F1}%";
+        Units.Percent(total > 0 ? value / total * 100 : 0, 1);
 }

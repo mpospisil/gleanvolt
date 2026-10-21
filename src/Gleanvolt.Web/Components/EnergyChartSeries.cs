@@ -159,7 +159,7 @@ internal sealed record EnergyChartSeries(
     /// quarter hour instead would draw every restart as a dip the sun never took.
     /// </summary>
     private static double? Watts(double kwh, EnergyInterval interval) =>
-        interval.Coverage < MinimumCoverage ? null : kwh / interval.Covered.TotalHours * 1000;
+        interval.Coverage < MinimumCoverage ? null : Units.WattHoursFromKwh(kwh) / interval.Covered.TotalHours;
 
     /// <summary>
     /// The stretches of the day that were only partly observed, contiguous windows merged into one
