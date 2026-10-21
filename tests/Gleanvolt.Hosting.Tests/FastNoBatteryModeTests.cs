@@ -37,6 +37,95 @@ public class FastNoBatteryModeTests
 
     private int? LastTarget => _writes.Count == 0 ? null : _writes[^1].Target;
 
+    // -- Low tariff only (#274)
+
+    // High tariff until half an hour from now, low for five hours after that.
+    private static FixedTariffSchedule LowFromHalfPast() => new(new TariffTimeline(
+        [
+            new TariffWindow(new TimeWindow(Now.AddHours(-1), Now.AddMinutes(30)), TariffRate.High),
+            new TariffWindow(new TimeWindow(Now.AddMinutes(30), Now.AddHours(5)), TariffRate.Low),
+        ],
+        Prices: null));
+
+    [Fact]
+    public async Task AHighTariffPauseThenTheLowEdgeThenTheCarDrawing_IsStillFast()
+    {
+        // The issue's own test, and the thing to get right: the car is held back through high tariff,
+        // drawing nothing for far longer than the two-minute dwell, and that is our doing -- not a car
+        // at its limit. Then low tariff starts, the car takes a minute to spin up, and draws.
+        await RunAsync(
+            [
+                Charging(Now),                       // the charger started it at plug-in; high tariff stops it
+                Idle(Now.AddMinutes(5)),
+                Idle(Now.AddMinutes(25)),            // twenty minutes idle, all of it waiting for low tariff
+                Idle(Now.AddMinutes(31)),            // low tariff: armed again, not yet drawing
+                Idle(Now.AddMinutes(32)),            // a minute in, still inside the fresh dwell
+                Charging(Now.AddMinutes(33)),
+                Charging(Now.AddMinutes(34)),
+            ],
+            tariff: LowFromHalfPast(),
+            lowTariffOnly: true);
+
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+        Assert.Equal([EvChargerMode.Stop, EvChargerMode.Fast], _charger.ModeWrites.Select(write => write.Mode));
+        Assert.Contains("waiting for low tariff (Fast, low tariff only)", _charger.ModeWrites[0].Reason);
+        Assert.Equal(16, LastTarget);
+    }
+
+    [Fact]
+    public async Task ACarThatStopsAtItsOwnLimitInLowTariffStillEndsTheMode()
+    {
+        await RunAsync(
+            [Charging(Now.AddMinutes(40)), Idle(Now.AddMinutes(41)), Idle(Now.AddMinutes(44))],
+            tariff: LowFromHalfPast(),
+            lowTariffOnly: true);
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+    }
+
+    [Fact]
+    public async Task TheHoldIsReleasedThroughTheWaitAndArmedAgainAtTheLowEdge()
+    {
+        // Not the issue's guess ("keep it armed, nothing is drawing"): the hold keeps the pack out of the
+        // house as well as the car, so armed through a high tariff it would put the house on the grid
+        // at the expensive rate for as long as the wait lasts.
+        await RunAsync(
+            [Idle(Now.AddMinutes(5)), Idle(Now.AddMinutes(20)), Charging(Now.AddMinutes(31)), Charging(Now.AddMinutes(32))],
+            tariff: LowFromHalfPast(),
+            lowTariffOnly: true);
+
+        Assert.False(_inverter.Applied[0]);
+        Assert.True(_inverter.Applied[^1]);
+    }
+
+    [Fact]
+    public async Task WithTheOptionOffTheTariffChangesNothing()
+    {
+        await RunAsync([Charging(Now), Charging(Now.AddMinutes(1))], tariff: LowFromHalfPast(), lowTariffOnly: false);
+
+        Assert.Empty(_charger.ModeWrites);
+        Assert.All(_writes, write => Assert.Equal(16, write.Target));
+        Assert.Null(_status.Current!.LowTariff);
+    }
+
+    [Fact]
+    public async Task WithNoTariffTheOptionIsIgnoredAndTheStatusSaysSo()
+    {
+        await RunAsync([Charging(Now), Charging(Now.AddMinutes(1))], tariff: new FixedTariffSchedule(null), lowTariffOnly: true);
+
+        Assert.Empty(_charger.ModeWrites);
+        Assert.All(_writes, write => Assert.Equal(16, write.Target));
+        Assert.Equal(new LowTariffStatus(Waiting: false, Until: null, Ignored: true), _status.Current!.LowTariff);
+    }
+
+    [Fact]
+    public async Task WhileWaitingTheStatusSaysUntilWhen()
+    {
+        await RunAsync([Idle(Now.AddMinutes(5))], tariff: LowFromHalfPast(), lowTariffOnly: true);
+
+        Assert.Equal(new LowTariffStatus(Waiting: true, Until: Now.AddMinutes(30), Ignored: false), _status.Current!.LowTariff);
+    }
+
     [Fact]
     public async Task TheHoldIsArmedForAsLongAsTheModeIsSelected()
     {
@@ -487,7 +576,12 @@ public class FastNoBatteryModeTests
     // Drives the real poll loop over a scripted telemetry sequence, then stops it. The service parks on
     // the reader once the script runs out, so exactly these polls happen -- no timing assumptions.
     private async Task RunAsync(
-        EnergyState[] states, bool batteryHoldEnabled = true, FastChargeLimit? limit = null, ISolarForecastService? forecast = null)
+        EnergyState[] states,
+        bool batteryHoldEnabled = true,
+        FastChargeLimit? limit = null,
+        ISolarForecastService? forecast = null,
+        ITariffSchedule? tariff = null,
+        bool lowTariffOnly = false)
     {
         if (limit is not null)
         {
@@ -550,7 +644,12 @@ public class FastNoBatteryModeTests
             Options.Create(chargeControl),
             Options.Create(new BatteryHoldOptions { Enabled = batteryHoldEnabled, DryRun = true }),
             forecastOptions,
-            NullLogger<PollingService>.Instance);
+            NullLogger<PollingService>.Instance,
+            tariff: tariff,
+            lowTariff: new Gleanvolt.Hosting.Tariff.LowTariffSettings(
+                Options.Create(new FastChargeOptions { LowTariffOnly = lowTariffOnly }),
+                Options.Create(new SolarGridChargeOptions()),
+                NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance));
 
         await service.StartAsync(CancellationToken.None);
         await reader.Exhausted.WaitAsync(TimeSpan.FromSeconds(10));
