@@ -53,16 +53,16 @@
             @if (_vehicleStale)
             {
                 <strong>
-                    Stale — older than @(VehicleDisplay.MaxAge.TotalHours.ToString("F0")) h, so the feed may
+                    Stale — older than @Units.Hours(VehicleDisplay.MaxAge), so the feed may
                     have died. Check the figures against the car before planning from them.
                 </strong>
             }
         </p>
 
         <section class="stat-grid">
-            <Stat Label="Car battery" Value="@Percent(_vehicle.SocPercent)"
+            <Stat Label="Car battery" Value="@Units.Percent(_vehicle.SocPercent)"
                   Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
-            <Stat Label="Range" Value="@Km(_vehicle.RangeKm)"
+            <Stat Label="Range" Value="@VehicleFormatting.Km(_vehicle.RangeKm)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip." />
             <Stat Label="Plugged in" Value="@PluggedIn()"
                   Hint="What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours." />
@@ -170,7 +170,7 @@ else
            @bind="_departure" @bind:event="onchange" @bind:after="OnFormEdited" />
     <span class="hint">
         Charging finishes a few minutes before this, so the car is ready rather than still drawing.
-        At most @(Display.MaxHorizon.TotalHours.ToString("F0")) hours ahead.
+        At most @Units.Hours(Display.MaxHorizon) ahead.
     </span>
 </div>
 
@@ -234,8 +234,8 @@ else
                         <span class="grid" style="width:@Share(preview.GridEnergyWh, preview)"></span>
                     </div>
                     <ul class="split-legend">
-                        <li><span class="swatch solar"></span>Sun @Kwh(preview.SolarEnergyWh)</li>
-                        <li><span class="swatch grid"></span>Grid @Kwh(preview.GridEnergyWh)</li>
+                        <li><span class="swatch solar"></span>Sun @Units.Energy(preview.SolarEnergyWh)</li>
+                        <li><span class="swatch grid"></span>Grid @Units.Energy(preview.GridEnergyWh)</li>
                     </ul>
                 </div>
             }
@@ -260,7 +260,7 @@ else
                             <input type="radio" name="dialog-pacing" id="dialog-pacing-justintime"
                                    checked="@(_priority == TargetedChargePriority.JustInTime)"
                                    @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
-                            Just in time@(JustInTimeExtraWh() is { } extra ? $" · +{extra / 1000:F1} kWh grid" : "")
+                            Just in time@(JustInTimeExtraWh() is { } extra ? $" · {Units.Energy(extra, signed: true)} grid" : "")
                         </label>
                     </div>
                 </div>
@@ -421,7 +421,7 @@ else
     {
         if (request is not null)
         {
-            _energyKWh = Math.Round(request.RequiredEnergyWh / 1000, 1);
+            _energyKWh = Math.Round(Units.KwhFromWattHours(request.RequiredEnergyWh), 1);
             _departure = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).DateTime;
 
             if (request.TargetSocPercent is { } soc)
@@ -598,7 +598,7 @@ else
 
         var result = TargetedChargeRequestFactory.Create(
             departBy: Compose(_departure),
-            energyWh: socBasis ? null : _energyKWh * 1000,
+            energyWh: socBasis ? null : Units.WattHoursFromKwh(_energyKWh),
             targetSocPercent: socBasis ? _targetSocPercent : null,
             priority: priority,
             restSocPercent: _restSocPercent,
@@ -622,9 +622,9 @@ else
     /// <summary>The request in the terms it was asked in, which for a SOC target is not kilowatt-hours.</summary>
     private static string Asking(TargetedChargeRequest request) =>
         request.TargetSocPercent is { } target
-            ? $"Charging to {target:F0}%, from the {request.VehicleSocPercentAtRequest:F0}% the car last "
-                + $"reported: {request.RequiredEnergyWh / 1000:F1} kWh at the charger, charge losses included."
-            : $"{request.RequiredEnergyWh / 1000:F1} kWh at the charger.";
+            ? $"Charging to {Units.Percent(target)}, from the {Units.Percent(request.VehicleSocPercentAtRequest)} the car last "
+                + $"reported: {Units.Energy(request.RequiredEnergyWh)} at the charger, charge losses included."
+            : $"{Units.Energy(request.RequiredEnergyWh)} at the charger.";
 
     /// <summary>
     /// What the hold will actually amount to, in the terms the owner set it in. The interesting case is
@@ -640,26 +640,26 @@ else
 
         if (socNow >= _restSocPercent)
         {
-            return $"The car is already at {Percent(socNow)}, at or above the {_restSocPercent:F0}% rest level, so "
+            return $"The car is already at {Units.Percent(socNow)}, at or above the {Units.Percent(_restSocPercent)} rest level, so "
                 + "the whole charge is the held stretch and none of it will start until the release time.";
         }
 
         var endSoc = _basis == TargetBasis.Soc && CanTargetSoc
             ? _targetSocPercent
             : VehicleTargetEnergy.ResultingSocPercent(
-                socNow, _energyKWh * 1000, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency) ?? 0;
+                socNow, Units.WattHoursFromKwh(_energyKWh), Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency) ?? 0;
 
         if (endSoc <= _restSocPercent)
         {
-            return $"This target finishes at about {endSoc:F0}%, at or below the {_restSocPercent:F0}% rest level, so "
+            return $"This target finishes at about {Units.Percent(endSoc)}, at or below the {Units.Percent(_restSocPercent)} rest level, so "
                 + "there is nothing above it to hold and the charge runs as it would under Cheapest.";
         }
 
         var tailWh = VehicleTargetEnergy.TailAboveRestWh(
-            socNow, endSoc, _restSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+            socNow, endSoc, _restSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
 
-        return $"The car charges on the sun up to {_restSocPercent:F0}% whenever the sun is there, then waits. "
-            + $"The last {(tailWh ?? 0) / 1000:F1} kWh — about {_restSocPercent:F0}% to {endSoc:F0}% — is scheduled "
+        return $"The car charges on the sun up to {Units.Percent(_restSocPercent)} whenever the sun is there, then waits. "
+            + $"The last {Units.Energy(tailWh ?? 0)} — about {Units.Percent(_restSocPercent)} to {Units.Percent(endSoc)} — is scheduled "
             + "to land just before you leave.";
     }
 
@@ -669,8 +669,8 @@ else
         var by = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).ToString("ddd HH:mm");
 
         return request.TargetSocPercent is { } target
-            ? $"{target:F0}% by {by}"
-            : $"{request.RequiredEnergyWh / 1000:F1} kWh by {by}";
+            ? $"{Units.Percent(target)} by {by}"
+            : $"{Units.Energy(request.RequiredEnergyWh)} by {by}";
     }
 
     /// <summary>
@@ -703,8 +703,6 @@ else
             : $"{(wattHours / total * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%";
     }
 
-    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
-
     /// <summary>
     /// What choosing the hold costs, against the same energy by the same time charged as cheaply as
     /// possible. Empty when there is nothing to say: no comparison built, or the two plans buy the same.
@@ -722,9 +720,9 @@ else
             return "Holding the last stretch costs nothing here — the forecast has no sun to give it up.";
         }
 
-        return $"Just in time buys about {extraWh / 1000:F1} kWh more from the grid than charging as cheaply as "
+        return $"Just in time buys about {Units.Energy(extraWh)} more from the grid than charging as cheaply as "
             + $"possible would, because the sun is turned down while the tail waits. That is the trade: the car "
-            + $"sits at {_restSocPercent:F0}% overnight instead of at its target.";
+            + $"sits at {Units.Percent(_restSocPercent)} overnight instead of at its target.";
     }
 
     /// <summary>
@@ -749,14 +747,14 @@ else
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Percent(basis.SocPercent)} — nothing to do.",
-            _ => $"From {Percent(basis.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
-                + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
+            <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
+            _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
+                + $"charger: {Units.Capacity(Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh))} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
                 + "of what the charger meters reaching the cells.",
         };
     }
@@ -787,23 +785,7 @@ else
         return $"{charger}, {car} by the car";
     }
 
-    // Coarse on purpose, exactly as the dashboard renders it: this data is hours old routinely, so
+    // Coarse on purpose, and the dashboard's own rendering: this data is hours old routinely, so
     // minutes of precision would imply an accuracy the source doesn't have.
-    private string VehicleAge(VehicleState vehicle)
-    {
-        var age = vehicle.AgeAt(Time.GetUtcNow());
-
-        return age switch
-        {
-            _ when age < TimeSpan.Zero => "just now",
-            _ when age < TimeSpan.FromMinutes(1) => "under a minute",
-            _ when age < TimeSpan.FromHours(1) => $"{age.TotalMinutes:F0} min",
-            _ when age < TimeSpan.FromDays(1) => $"{age.TotalHours:F1} h",
-            _ => $"{age.TotalDays:F0} d",
-        };
-    }
-
-    private static string Percent(double? percent) => percent is { } value ? $"{value:F0}%" : "—";
-
-    private static string Km(double? km) => km is { } value ? $"{value:F0} km" : "—";
+    private string VehicleAge(VehicleState vehicle) => VehicleFormatting.Age(vehicle, Time.GetUtcNow());
 }

@@ -29,25 +29,25 @@ public static class TargetedPlanNarrative
         if (plan.Strategy == TargetedChargeStrategy.Complete)
         {
             paragraphs.Add(
-                $"Target met: {Kwh(plan.DeliveredEnergyWh)} of the {Kwh(plan.RequiredEnergyWh)} asked for has "
+                $"Target met: {Units.Energy(plan.DeliveredEnergyWh)} of the {Units.Energy(plan.RequiredEnergyWh)} asked for has "
                 + $"reached the car. The charger has been released.");
 
             return paragraphs;
         }
 
-        var headline = $"{Kwh(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)}.";
+        var headline = $"{Units.Energy(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)}.";
         if (plan.DeliveredEnergyWh > 0)
         {
-            headline += $" {Kwh(plan.DeliveredEnergyWh)} of the {Kwh(plan.RequiredEnergyWh)} asked for is already in the car.";
+            headline += $" {Units.Energy(plan.DeliveredEnergyWh)} of the {Units.Energy(plan.RequiredEnergyWh)} asked for is already in the car.";
         }
 
         switch (plan.Strategy)
         {
             case TargetedChargeStrategy.Maximum:
                 paragraphs.Add(
-                    $"{Kwh(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)} is more than the "
+                    $"{Units.Energy(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)} is more than the "
                     + $"{Duration(plan.TimeRemaining)} left can deliver. Charging flat out from now, the car will have "
-                    + $"about {Kwh(plan.ExpectedEnergyWh)} — {Kwh(plan.ShortfallWh)} short."
+                    + $"about {Units.Energy(plan.ExpectedEnergyWh)} — {Units.Energy(plan.ShortfallWh)} short."
                     + (plan.FeasibleDeparture is { } later
                         ? $" Leaving at {At(later, plan.Now, zone)} instead would cover the full amount."
                         : string.Empty));
@@ -60,7 +60,7 @@ public static class TargetedPlanNarrative
             case TargetedChargeStrategy.Solar:
                 paragraphs.Add(headline);
                 paragraphs.Add(
-                    $"The forecast covers all of it: {Kwh(plan.SolarEnergyWh)} from surplus "
+                    $"The forecast covers all of it: {Units.Energy(plan.SolarEnergyWh)} from surplus "
                     + $"{Between(plan, zone)}, and no grid import is planned at all.");
                 break;
 
@@ -100,25 +100,25 @@ public static class TargetedPlanNarrative
     /// </summary>
     private static string SolarPlusGrid(TargetedChargePlan plan, TimeZoneInfo zone)
     {
-        var pace = $"{plan.RequiredPaceWatts / 1000:F1} kW";
+        var pace = Units.Power(plan.RequiredPaceWatts);
 
         if (plan.SolarEnergyWh > 0 && plan.GridEnergyWh > 0)
         {
-            return $"The sun should carry {Kwh(plan.SolarEnergyWh)} of it {Between(plan, zone)}, and the grid the "
-                + $"remaining {Kwh(plan.GridEnergyWh)}. Rather than charge flat out and finish early, the car is "
+            return $"The sun should carry {Units.Energy(plan.SolarEnergyWh)} of it {Between(plan, zone)}, and the grid the "
+                + $"remaining {Units.Energy(plan.GridEnergyWh)}. Rather than charge flat out and finish early, the car is "
                 + $"paced at about {pace} across the window, so the charger draws close to what the roof is "
                 + "producing and buys only the shortfall.";
         }
 
         if (plan.HasUnusableSurplus)
         {
-            return $"{Kwh(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs past "
+            return $"{Units.Energy(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs past "
                 + "the charger's 6 A minimum, so the car cannot run on it unaided. It is still worth having: the "
                 + $"charger is held at that minimum while the sun is up, the roof supplies what it has, and only the "
                 + $"difference is bought — about {pace} of grid on average.";
         }
 
-        return $"No surplus at all is forecast before then, so the whole {Kwh(plan.RemainingEnergyWh)} still needed "
+        return $"No surplus at all is forecast before then, so the whole {Units.Energy(plan.RemainingEnergyWh)} still needed "
             + $"comes from the grid, paced at about {pace} across the window. With no sun to wait for there is "
             + "nothing to be gained by putting it off, and spreading it leaves room to recover if anything drops out.";
     }
@@ -139,7 +139,7 @@ public static class TargetedPlanNarrative
             return null;
         }
 
-        var tail = Kwh(plan.TailEnergyWh);
+        var tail = Units.Energy(plan.TailEnergyWh);
 
         return plan.IsHoldingAt(plan.Now)
             ? $"Everything below the rest level is in the car, and the last {tail} is being held back until "
@@ -174,12 +174,6 @@ public static class TargetedPlanNarrative
         };
     }
 
-    private static string Duration(TimeSpan span) => span switch
-    {
-        { TotalMinutes: < 1 } => "no time",
-        { TotalHours: < 1 } => $"{span.TotalMinutes:F0} min",
-        _ => $"{(int)span.TotalHours} h {span.Minutes} min",
-    };
-
-    private static string Kwh(double wattHours) => $"{wattHours / 1000:F1} kWh";
+    private static string Duration(TimeSpan span) =>
+        span < TimeSpan.FromMinutes(1) ? "no time" : Units.Duration(span);
 }

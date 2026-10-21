@@ -24,13 +24,13 @@
 @if (Status is { } status)
 {
     <section class="stat-grid">
-        <Stat Label="Solar surplus" Value="@Watts(status.SurplusWatts)"
+        <Stat Label="Solar surplus" Value="@Units.Power(status.SurplusWatts)"
               Hint="PV left after household consumption — the smoothed 3-minute average this mode decides on. Blank while a mode that doesn't decide on surplus is driving." />
-        <Stat Label="Battery SOC" Value="@Percent(status.BatterySocPercent)"
+        <Stat Label="Battery SOC" Value="@Units.Percent(status.BatterySocPercent)"
               Hint="The gate for this mode: the car gets nothing until the home battery is full." />
-        <Stat Label="EV charging power" Value="@Watts(status.EvChargerPowerWatts)"
+        <Stat Label="EV charging power" Value="@Units.Power(status.EvChargerPowerWatts)"
               Hint="What the charger reports the car actually drawing right now — not a setpoint." />
-        <Stat Label="Target current" Value="@Amps(status.TargetCurrentAmps)"
+        <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)"
               Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
     </section>
 }
@@ -43,12 +43,4 @@
     [Parameter, EditorRequired] public Func<ChargeControlMode, Task<ChargeActionResult>> Start { get; set; } = default!;
 
     private Task StartSolar() => Start(ChargeControlMode.Solar);
-
-    private static string Watts(double watts) => $"{watts:F0} W";
-
-    private static string Watts(double? watts) => watts is null ? "—" : $"{watts.Value:F0} W";
-
-    private static string Percent(double percent) => $"{percent:F0}%";
-
-    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
 }

@@ -104,13 +104,13 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 @if (Status is { } status)
 {
     <section class="stat-grid">
-        <Stat Label="EV charging power" Value="@Watts(status.EvChargerPowerWatts)"
+        <Stat Label="EV charging power" Value="@Units.Power(status.EvChargerPowerWatts)"
               Hint="What the charger reports the car actually drawing right now — not a setpoint. This is what falls away when the car decides it is full." />
-        <Stat Label="EV charging current" Value="@Amps(status.EvChargingCurrentAmps)"
+        <Stat Label="EV charging current" Value="@Units.Current(status.EvChargingCurrentAmps)"
               Hint="Charging current derived from the charger's measured power: what the car really takes, which can be below the maximum if the car itself limits it." />
-        <Stat Label="Active current" Value="@Amps(status.ActiveCurrentAmps)"
+        <Stat Label="Active current" Value="@Units.Current(status.ActiveCurrentAmps)"
               Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
-        <Stat Label="Grid power" Value="@Watts(status.GridPowerWatts)"
+        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)"
               Hint="Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed." />
 
         @*
@@ -185,7 +185,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         else
         {
             _basis = FastChargeBasis.Energy;
-            _energyKWh = limit.RequiredEnergyWh / 1000;
+            _energyKWh = Units.KwhFromWattHours(limit.RequiredEnergyWh);
         }
 
         _departBy = limit.DepartBy is { } departure
@@ -204,7 +204,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 
         var composed = FastChargeLimitFactory.Create(
             basis: _basis == FastChargeBasis.Soc && !CanTargetSoc ? FastChargeBasis.Full : _basis,
-            energyWh: _energyKWh * 1000,
+            energyWh: Units.WattHoursFromKwh(_energyKWh),
             targetSocPercent: _targetSocPercent,
             vehicleSoc: SocBasis,
             pack: new VehiclePackLimits(VehicleDisplay.BatteryCapacityKWh, VehicleDisplay.ChargeEfficiency),
@@ -292,14 +292,14 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(
-            basis.ConvertibleSocPercent, _targetSocPercent, VehicleDisplay.BatteryCapacityKWh * 1000, VehicleDisplay.ChargeEfficiency);
+            basis.ConvertibleSocPercent, _targetSocPercent, Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh), VehicleDisplay.ChargeEfficiency);
 
         return requiredWh switch
         {
             null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Percent(basis.SocPercent)} — nothing to do.",
-            _ => $"From {Percent(basis.SocPercent)} now, that is about {requiredWh.Value / 1000:F1} kWh at the "
-                + $"charger: {VehicleDisplay.BatteryCapacityKWh:F0} kWh usable, {VehicleDisplay.ChargeEfficiency:P0} "
+            <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
+            _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
+                + $"charger: {Units.Capacity(Units.WattHoursFromKwh(VehicleDisplay.BatteryCapacityKWh))} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
                 + "of what the charger meters reaching the cells.",
         };
     }
@@ -308,36 +308,36 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     {
         if (progress.IsMet)
         {
-            return $"The {progress.Limit.RequiredEnergyWh / 1000:F1} kWh asked for has been delivered; "
+            return $"The {Units.Energy(progress.Limit.RequiredEnergyWh)} asked for has been delivered; "
                 + "the charge is stopping.";
         }
 
         var asked = progress.Limit.TargetSocPercent is { } soc
-            ? $"{progress.Limit.RequiredEnergyWh / 1000:F1} kWh, which is the {soc:F0}% asked for"
-            : $"{progress.Limit.RequiredEnergyWh / 1000:F1} kWh";
+            ? $"{Units.Energy(progress.Limit.RequiredEnergyWh)}, which is the {Units.Percent(soc)} asked for"
+            : Units.Energy(progress.Limit.RequiredEnergyWh);
 
-        return $"{progress.DeliveredWh / 1000:F1} kWh of {asked} is in the car; "
-            + $"{progress.RemainingWh / 1000:F1} kWh to go before this stops itself.";
+        return $"{Units.Energy(progress.DeliveredWh)} of {asked} is in the car; "
+            + $"{Units.Energy(progress.RemainingWh)} to go before this stops itself.";
     }
 
     private static string ScheduleNarrative(FastChargePlan plan, DateTimeOffset now)
     {
         var power = plan.PowerObserved
-            ? $"{plan.ChargePowerWatts / 1000:F1} kW (what the car is taking)"
-            : $"{plan.ChargePowerWatts / 1000:F1} kW (the installation's maximum — the car has not drawn yet)";
+            ? $"{Units.Power(plan.ChargePowerWatts)} (what the car is taking)"
+            : $"{Units.Power(plan.ChargePowerWatts)} (the installation's maximum — the car has not drawn yet)";
 
         if (!plan.IsFeasible)
         {
-            return $"Not enough time: about {plan.ShortfallWh / 1000:F1} kWh of this will not fit before "
+            return $"Not enough time: about {Units.Energy(plan.ShortfallWh)} of this will not fit before "
                 + $"{plan.ReadyBy.LocalDateTime:HH:mm}. Charging flat out from now at {power}.";
         }
 
         return plan.IsWaitingAt(now)
             ? $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm}, then charging flat out: "
-              + $"{plan.RemainingEnergyWh / 1000:F1} kWh at {power} takes about "
-              + $"{plan.Duration.TotalHours:F1} h, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}."
+              + $"{Units.Energy(plan.RemainingEnergyWh)} at {power} takes about "
+              + $"{Units.Duration(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}."
             : $"Charging flat out to be ready by {plan.ReadyBy.LocalDateTime:HH:mm}: "
-              + $"{plan.RemainingEnergyWh / 1000:F1} kWh to go at {power}.";
+              + $"{Units.Energy(plan.RemainingEnergyWh)} to go at {power}.";
     }
 
     // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock here
@@ -347,13 +347,5 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Time.LocalTimeZone.GetUtcOffset(local));
 
     private static string Delivered(FastChargeProgress progress) =>
-        $"{progress.DeliveredWh / 1000:F1} / {progress.Limit.RequiredEnergyWh / 1000:F1} kWh";
-
-    private static string Percent(double? value) => value is null ? "—" : $"{value.Value:F0}%";
-
-    private static string Watts(double watts) => $"{watts:F0} W";
-
-    private static string Amps(int amps) => $"{amps} A";
-
-    private static string Amps(int? amps) => amps is null ? "—" : $"{amps.Value} A";
+        $"{Units.Kwh(progress.DeliveredWh, unit: false)} / {Units.Kwh(progress.Limit.RequiredEnergyWh)}";
 }

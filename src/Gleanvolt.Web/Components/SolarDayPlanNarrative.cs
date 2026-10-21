@@ -37,6 +37,6 @@ public static class SolarDayPlanNarrative
         var start = TimeZoneInfo.ConvertTime(window.Start, zone);
         var end = TimeZoneInfo.ConvertTime(window.End, zone);
 
-        return $"Today gives the car about {plan.FeasibleEvEnergyWh / 1000:F1} kWh, in a window from {start:HH:mm} to {end:HH:mm}.";
+        return $"Today gives the car about {Units.Energy(plan.FeasibleEvEnergyWh)}, in a window from {start:HH:mm} to {end:HH:mm}.";
     }
 }

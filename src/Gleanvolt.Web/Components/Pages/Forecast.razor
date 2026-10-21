@@ -96,9 +96,9 @@ else
                         @if (day.Summary is { } summary)
                         {
                             <span class="day-totals">
-                                @Kwh(summary.ExpectedWh) kWh expected
-                                (@Kwh(summary.LowWh)–@Kwh(summary.HighWh) at p10–p90), peak
-                                @Kw(summary.PeakWatts) kW
+                                @Units.Kwh(summary.ExpectedWh, 2) expected
+                                (@Units.Kwh(summary.LowWh, 2, unit: false)–@Units.Kwh(summary.HighWh, 2, unit: false) at p10–p90), peak
+                                @Units.Kw(summary.PeakWatts, 2)
                             </span>
                         }
                     </th>
@@ -113,12 +113,12 @@ else
                 {
                     <tr>
                         <td>@Local(period.PeriodStart)–@Local(period.PeriodEnd)</td>
-                        <td class="num">@Watts(period.EstimatedPowerWatts)</td>
+                        <td class="num">@Units.Watts(period.EstimatedPowerWatts, unit: false)</td>
                         @* An em dash, not the median: the provider sent no p10 for this half hour,
                            which is a different fact from one it is as sure of as its middle guess. *@
-                        <td class="num">@(period.EstimatedPowerWattsP10 is { } low ? Watts(low) : "—")</td>
-                        <td class="num">@(period.EstimatedPowerWattsP90 is { } high ? Watts(high) : "—")</td>
-                        <td class="num">@Kwh(period.EnergyWattHours)</td>
+                        <td class="num">@Units.Watts(period.EstimatedPowerWattsP10, unit: false)</td>
+                        <td class="num">@Units.Watts(period.EstimatedPowerWattsP90, unit: false)</td>
+                        <td class="num">@Units.Kwh(period.EnergyWattHours, 2, unit: false)</td>
                     </tr>
                 }
             </tbody>
@@ -257,10 +257,4 @@ else
 
     private string Local(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("HH:mm");
-
-    private static string Watts(double value) => value.ToString("N0");
-
-    private static string Kwh(double wattHours) => (wattHours / 1000).ToString("F2");
-
-    private static string Kw(double watts) => (watts / 1000).ToString("F2");
 }

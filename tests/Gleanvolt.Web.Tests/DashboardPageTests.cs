@@ -338,16 +338,16 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        // The strip shows kilowatts with the direction as a word (#255); the session card keeps watts
+        // The strip shows power with the direction as a word (#255); the session card keeps watts
         // and amps, which is where the precision is read.
         Assert.Contains("3.2 kW", page.Find(".figure.solar").TextContent);
         Assert.Contains("surplus 1.8 kW", page.Find(".figure.solar").TextContent);
         Assert.Contains("72%", page.Find(".figure.battery").TextContent);
-        Assert.Contains("0.5 kW", page.Find(".figure.battery").TextContent);
+        Assert.Contains("450 W", page.Find(".figure.battery").TextContent);
         Assert.Contains("charging", page.Find(".figure.battery").TextContent);
-        Assert.Contains("0.3 kW", page.Find(".figure.grid-flow").TextContent);
+        Assert.Contains("300 W", page.Find(".figure.grid-flow").TextContent);
         Assert.Contains("exporting", page.Find(".figure.grid-flow").TextContent);
-        Assert.Contains("2760 W", page.Find("#this-session").TextContent);
+        Assert.Contains("2,760 W", page.Find("#this-session").TextContent);
         Assert.Contains("12 A", page.Find("#this-session").TextContent);
         Assert.Contains("Charging", page.Markup);
         Assert.Contains("Yes", page.Markup);
@@ -368,7 +368,7 @@ public class DashboardPageTests : PageTest
         Assert.Contains("Session energy", session);
         Assert.Contains("8.4 kWh", session);
         Assert.Contains("Battery loan power", session);
-        Assert.Contains("1140 W", session);
+        Assert.Contains("1,140 W", session);
     }
 
     [Fact]
@@ -401,7 +401,7 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         Assert.DoesNotContain("Nothing is charging", page.Markup);
-        Assert.Contains("3600 W", page.Markup);
+        Assert.Contains("3,600 W", page.Markup);
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("forecast 0.0 kW", page.Find(".figure.solar").TextContent);
+        Assert.Contains("forecast 0 W", page.Find(".figure.solar").TextContent);
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("0.8 kW", page.Find(".figure.house").TextContent);
+        Assert.Contains("800 W", page.Find(".figure.house").TextContent);
     }
 
     [Fact]
@@ -538,8 +538,8 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         page.WaitForAssertion(() => Assert.Contains("3.2 kWh", page.Find(".figure.solar").TextContent));
-        Assert.Contains("0.8 kWh", page.Find(".figure.ev").TextContent);
-        Assert.Contains("0.2 in · 0.4 out", page.Find(".figure.grid-flow").TextContent);
+        Assert.Contains("800 Wh", page.Find(".figure.ev").TextContent);
+        Assert.Contains("200 Wh in · 400 Wh out", page.Find(".figure.grid-flow").TextContent);
         Assert.DoesNotContain("needs the energy monitor", page.Markup);
     }
 

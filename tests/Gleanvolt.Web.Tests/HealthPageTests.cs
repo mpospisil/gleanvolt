@@ -293,7 +293,7 @@ public class HealthPageTests : PageTest
         var page = Render<Health>();
 
         Assert.Contains("8 of 9", page.Markup);
-        Assert.Contains("2.4 h", page.Markup);
+        Assert.Contains("2 h 24 min", page.Markup);
         Assert.Contains("1 sign-in", page.Markup);
         Assert.Contains("in 13 min", page.Markup);
 

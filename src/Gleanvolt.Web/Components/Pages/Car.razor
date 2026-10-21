@@ -158,7 +158,7 @@ else if (_runningFeed == VehicleFeed.OwnTopic)
         @if (Telemetry.GetCurrentState() is { } published)
         {
             <text>
-                The last one arrived carrying @VehicleFormatting.Percent(published.SocPercent), captured
+                The last one arrived carrying @Units.Percent(published.SocPercent), captured
                 @Age(published) ago.
             </text>
         }
@@ -210,7 +210,7 @@ else if (_reading is { Succeeded: true, State: { } state })
     @if (Telemetry.GetCurrentState() is { } held)
     {
         <p class="muted" id="against-the-feed">
-            The dashboard's card is showing @VehicleFormatting.Percent(held.SocPercent) from
+            The dashboard's card is showing @Units.Percent(held.SocPercent) from
             @(string.IsNullOrWhiteSpace(held.SourceId) ? "the feed" : held.SourceId), captured
             @Age(held) ago@(Difference(state, held)). That is a different session asking at a different
             moment, so a difference is not by itself a fault.
@@ -272,10 +272,10 @@ else
         <dd>@Text(string.Join(" ", new[] { Vehicle.Make, Vehicle.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
 
         <dt>Usable battery</dt>
-        <dd>@(Vehicle.CanTargetSoc ? $"{Vehicle.BatteryCapacityKWh.ToString("0.#", Invariant)} kWh" : Missing)</dd>
+        <dd>@(Vehicle.CanTargetSoc ? Units.Capacity(Units.WattHoursFromKwh(Vehicle.BatteryCapacityKWh)) : Missing)</dd>
 
         <dt>Charge efficiency</dt>
-        <dd>@Vehicle.ChargeEfficiency.ToString("P0", Invariant)</dd>
+        <dd>@Units.Fraction(Vehicle.ChargeEfficiency)</dd>
     </dl>
 
     @*
@@ -289,15 +289,15 @@ else
         <tbody>
             <tr>
                 <td>Minimum current</td>
-                <td>@Amps(Vehicle.MinChargingCurrentAmps)</td>
-                <td>@Amps(Limits.MinAmps == Vehicle.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
-                <td>@Amps(Limits.MinAmps)</td>
+                <td>@Units.Current(Vehicle.MinChargingCurrentAmps)</td>
+                <td>@Units.Current(Limits.MinAmps == Vehicle.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
+                <td>@Units.Current(Limits.MinAmps)</td>
             </tr>
             <tr>
                 <td>Maximum current</td>
-                <td>@Amps(Vehicle.MaxChargingCurrentAmps)</td>
-                <td>@Amps(Limits.MaxAmps == Vehicle.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
-                <td>@Amps(Limits.MaxAmps)</td>
+                <td>@Units.Current(Vehicle.MaxChargingCurrentAmps)</td>
+                <td>@Units.Current(Limits.MaxAmps == Vehicle.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
+                <td>@Units.Current(Limits.MaxAmps)</td>
             </tr>
             <tr>
                 <td>Phases</td>
@@ -359,7 +359,7 @@ else
 <PortalDiagnostics Reading="_reading" />
 
 @code {
-    private const string Missing = "—";
+    private const string Missing = Units.Missing;
 
     private static readonly System.Globalization.CultureInfo Invariant =
         System.Globalization.CultureInfo.InvariantCulture;
@@ -399,7 +399,7 @@ else
         <h3>@CarName</h3>
 
         <section class="stat-grid" id="car">
-            <Stat Label="Car battery" Value="@VehicleFormatting.Percent(state.SocPercent)"
+            <Stat Label="Car battery" Value="@Units.Percent(state.SocPercent)"
                   Hint="The car's own state of charge, as the source answered this press. Not the home battery." />
             <Stat Label="Car range" Value="@VehicleFormatting.Km(state.RangeKm)"
                   Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
@@ -409,7 +409,7 @@ else
                   Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
             <Stat Label="Car plug state" Value="@state.PlugState.ToString()"
                   Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
-            <Stat Label="Target SOC" Value="@VehicleFormatting.Percent(targetSoc)"
+            <Stat Label="Target SOC" Value="@Units.Percent(targetSoc)"
                   Hint="The car's own charge limit, set in the car or its app. The Data Act portal carries it and no live feed does: no plan reads it yet (#101). A dash means this source did not carry it." />
             <Stat Label="Time left" Value="@VehicleFormatting.ChargeTime(state)"
                   Hint="The car's own estimate of how much longer it needs, not one of ours. A dash means the source did not carry it — which is itself a finding." />
@@ -496,8 +496,6 @@ else
     }
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
-
-    private static string Amps(int? value) => value is { } amps ? $"{amps} A" : Missing;
 
     private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
 }

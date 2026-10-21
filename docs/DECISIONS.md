@@ -4,6 +4,46 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-21 — Units are the UI's concern: one base unit per quantity below it, one formatter in it
+
+**Context.** About twenty private `Kwh` / `Kw` / `Watts` / `Duration` helpers in `Gleanvolt.Web`, each
+with its own precision and its own idea of a missing value, and a few kWh / kW / km / minutes figures
+below the UI and in the HTTP API ([issue #263](https://github.com/mpospisil/gleanvolt/issues/263)).
+
+**Decision — the base units.** Power in **W**, energy in **Wh** (not J: meters, inverters, tariffs and
+Home Assistant all speak Wh), durations as **`TimeSpan`**, percentages **0–100** (`…Percent`; a fraction
+0–1 only where the name says so, as `ChargeEfficiency` does), temperature in **°C** (not K: every source
+and every display is °C), distance in **metres**, current in **A**. The unit stays in the name
+(`…Watts`, `…Wh`). Typed quantities (`record struct Power`, UnitsNet) would be a much larger change for
+little gain over a suffix that the compiler can't check but every reader can.
+
+**Decision — one formatter, `Units`, in `Gleanvolt.Web`.** It is the only code that scales a figure for a
+person or reads one back from a form, so no component divides by a thousand or appends a unit itself.
+Power and energy scale themselves: below 1000 as whole W / Wh, from there in kW / kWh to one decimal,
+decided on the rounded figure. A missing value is always "—", a rounded zero has no sign, and an optional
+signed form marks direction. Tables whose header names the unit use the fixed-unit forms, so a column
+never mixes Wh with kWh. Durations read in their two largest useful units ("1 min 30 s", "1 h 05 min",
+"3 days"); a reading's age is coarse on purpose ("3.5 h"). Numbers format by the current culture, which
+stays pinned to invariant: a locale or a unit choice (°F, miles) later is a change in one place.
+
+**Decision — the exceptions.** `EnergyInterval` and the `energy_intervals.*_kwh` columns stay in kWh: it is
+the analytics surface, and rescaling it would break SQL people already run against it. The settings keys
+(`Vehicle:BatteryCapacityKWh`, `Pv:CapacityKwp`, `Pv:InverterCapacityKw`) keep their names and scale,
+since renaming them breaks installs and docs; they are converted at the options boundary. Home Assistant
+keeps publishing kWh: it is another display edge, and changing a sensor's `unit_of_measurement` makes HA
+flag its long-term statistics for repair by hand.
+
+**Decision — the HTTP API carries base units only.** It is not a UI. Fields become `…Wh`, `…Watts`,
+`…Metres` and `…Seconds` (`peakPowerWatts`, `inverterCapacityWatts`, `chargeTimeRemainingSeconds`), and a
+kWh value still in the domain is converted at the edge, never the other way round. The routes stay
+`/api/v1`: the only client is `gleanvolt-mcp`, which is updated in the same step, and the release notes
+call the break out.
+
+**Order.** (1) the formatter, which changes no value below the UI; (2) the domain and options to base units;
+(3) the API, the OpenAPI copy and the MCP server.
+
+---
+
 ## 2026-10-20 — The LAN scan finds devices with a TCP connect, and can only read
 
 **Context.** Setting Gleanvolt up starts with the inverter's and the charger's address, port and unit id,

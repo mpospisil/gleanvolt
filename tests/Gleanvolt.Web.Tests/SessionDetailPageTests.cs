@@ -70,7 +70,7 @@ public class SessionDetailPageTests : PageTest
 
         // Local time, and the length beside it -- the denominator for "did it use the day it had?".
         Assert.Contains("Daylight", page.Markup);
-        Assert.Contains("12h 0m", page.Markup);
+        Assert.Contains("12 h", page.Markup);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public class SessionDetailPageTests : PageTest
         page.WaitForAssertion(() =>
         {
             Assert.Contains("Forecasted", page.Markup);
-            Assert.Contains("2h 30m", page.Markup);
+            Assert.Contains("2 h 30 min", page.Markup);
             Assert.Contains("60", page.Markup); // start SOC
             Assert.Contains("75", page.Markup); // end SOC
         });

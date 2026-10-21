@@ -59,10 +59,10 @@ else
                             <span class="muted">&nbsp;(in progress)</span>
                         }
                     </td>
-                    <td>@SessionFormatting.FormatDuration(session.Duration(Time.GetUtcNow()))</td>
+                    <td>@Units.Duration(session.Duration(Time.GetUtcNow()))</td>
                     <td>@session.FormatStrategy()</td>
-                    <td>@((session.EnergyDeliveredWh / 1000).ToString("F2")) kWh</td>
-                    <td>@(session.SolarFraction is { } fraction ? $"{fraction * 100:F0}%" : "—")</td>
+                    <td>@Units.Kwh(session.EnergyDeliveredWh, 2)</td>
+                    <td>@Units.Fraction(session.SolarFraction)</td>
                 </tr>
             }
         </tbody>

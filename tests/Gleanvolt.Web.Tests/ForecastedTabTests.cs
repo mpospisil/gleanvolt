@@ -103,7 +103,7 @@ public class ForecastedTabTests : PageTest
         Assert.Contains("Forecast accuracy", page.Markup);
         Assert.Contains("97%", page.Markup);
         Assert.Contains("Battery loaned today", page.Markup);
-        Assert.Contains("0.8 kWh", page.Markup);
+        Assert.Contains("800 Wh", page.Markup);
     }
 
     [Fact]
