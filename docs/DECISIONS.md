@@ -4,6 +4,63 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-21 — The grid tariff is an owner-entered table, behind strategies switched at runtime
+
+**Context.** Gleanvolt had no idea what grid energy costs at a given hour. On a Czech two-rate tariff
+(HDO: low rate NT, high rate VT), `Fast` and `SolarGrid` could buy their grid share in low tariff if
+they knew when it is ([issue #265](https://github.com/mpospisil/gleanvolt/issues/265), part one
+[#273](https://github.com/mpospisil/gleanvolt/issues/273)).
+
+**Decision — the owner types the table, rather than a distributor's feed providing it.** The issue
+began with EG.D's public HDO feed as the first provider. ČEZ's equivalent endpoint now rejects requests
+without a CAPTCHA (checked 2026-10-21), and automating past one is not something to build on. No feed
+covers every owner; a table the owner fills in from the distributor's HDO page does. Feeds stay possible
+as further providers, or as a way to pre-fill the table.
+
+**Decision — providers are strategies, selected by id and switched at runtime.** Each way of knowing is
+an `ITariffProvider` registered in DI: `None` and `Table` today. `TariffSchedule` asks whichever one the
+saved settings select, on every expansion, so a change on Settings applies without a restart. Ids are
+strings, not an enum, so a new provider edits no shared type. One that fetches implements
+`IRefreshingTariffProvider`, and one worker refreshes only the selected provider. Settings builds its
+choice from the registered providers, and each brings its own panel through a DI registration. A new
+strategy is a class, its registration and optionally a panel; nothing that reads the schedule changes.
+A shared contract test holds every provider to the same rules: windows tile without a gap, neighbours
+never share a rate, and `Expand` neither throws nor does I/O.
+
+**Decision — two rates for control, an optional price per window.** Fast and SolarGrid will act on
+`Low` / `High` only. A window may also carry its own price, which `PriceAt` prefers over the shared
+price of its rate. That is how a spot price fits without a third rate: the strategy decides which slots
+count as low, and the real price travels with each one.
+
+**Decision — the file keeps every provider's settings.** `data/tariff.json` holds the selection and the
+shared prices at the top, and each provider's settings under its own key (`"table"`). Prices are shared
+because a feed knows the times, not what the owner pays. A section for a provider this build does not
+have is carried through every save, so switching away and back, or an older build, never loses anyone's
+settings.
+
+**Decision — `None` means no restriction, and so does every failure.** A missing or unreadable file, a
+selected provider this build lacks, one that throws, and one with nothing fetched yet all give no
+timeline, with `ITariffSchedule.Unavailable` saying why. Never "always low", and never "always high":
+in Home Assistant the three entities read *unknown*, not `OFF` or zero.
+
+**Decision — a period belongs to one day, and the expansion joins them.** 22:00–06:00 is two rows,
+22:00–24:00 and 00:00–06:00. One rule (start before end) is easier to check, explain and draw than a
+period that may or may not wrap. The expansion joins touching low windows across midnight, Friday into
+Saturday and Sunday into Monday included, so the next change after 23:00 is 06:00. Edges go through the
+zone's rules rather than adding hours: one in the skipped spring hour moves to 03:00, one in the repeated
+autumn hour is the first time round.
+
+**Decision — small calls.** A low price above the high one is a warning, not a block: nothing acts on
+prices yet. Like the rest of Settings, the tariff is read-only without a login, because #274 makes it
+steer charging. `Tariff:Currency` (default `CZK`) is configuration, not a Settings field: it labels
+prices and converts nothing.
+
+**Not decided here.** Waiting for low tariff in `Fast` and `SolarGrid`, and what a high-tariff edge does
+to `SolarGrid` (#274). Public holidays on the weekend list, seasonal tables, and feeding high-tariff
+windows to `Targeted`'s `ForbiddenWindows` are follow-ups on #265.
+
+---
+
 ## 2026-10-21 — Units are the UI's concern: one base unit per quantity below it, one formatter in it
 
 **Context.** About twenty private `Kwh` / `Kw` / `Watts` / `Duration` helpers in `Gleanvolt.Web`, each

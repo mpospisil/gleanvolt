@@ -60,10 +60,15 @@ public static class WebUiHost
         // it has been registered.
         services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
         services.TryAddSingleton<IVehicleAccountSignIn, NoVehicleAccountSignIn>();
+        services.TryAddSingleton<ITariffSchedule, NoTariffSchedule>();
 
         // The one feed (#212). Gleanvolt.Hosting registers it with its startup note; a host that has
         // not gets whatever update service is registered, or none.
         services.TryAddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
+
+        // The Settings panel of each tariff strategy that has settings (#265). A new strategy registers
+        // its panel the same way, beside its ITariffProvider; one without a panel has nothing to set.
+        services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
 
         // The scheme is registered whenever the UI is enabled, whether or not RequireAuthentication
         // is on: the login and logout endpoints need it to exist either way, and it is DefaultPolicy

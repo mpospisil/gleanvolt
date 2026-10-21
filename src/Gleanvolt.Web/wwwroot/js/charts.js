@@ -24,7 +24,7 @@ window.solaxCharts = (function () {
     // on its own can't communicate. Recreated (not patched via setData) on every poll like the rest of
     // the plan page's live figures; a plan updates every few seconds, so a brief redraw is the honest
     // cost of staying current rather than a defect to work around.
-    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec, nowSec) {
+    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec, nowSec, lowTariffWindows) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -36,6 +36,7 @@ window.solaxCharts = (function () {
         const amber = cssVar("--amber", "#c98f1a");
         const ink = cssVar("--ink", "#201f1d");
         const line = cssVar("--line", "#dcd9d6");
+        const gridFlow = cssVar("--grid-flow", "#7d7872");
 
         const opts = {
             width: el.clientWidth || 600,
@@ -88,6 +89,33 @@ window.solaxCharts = (function () {
                         ctx.save();
                         ctx.fillStyle = accent + "1a";
                         ctx.fillRect(x0, u.bbox.top, x1 - x0, u.bbox.height);
+                        ctx.restore();
+                    },
+                    // Low tariff (#265): a strip along the bottom in the grid's colour, not a band, so it
+                    // never blurs into the charge window above. [start, end] pairs in Unix seconds;
+                    // optional, and only the overview passes them.
+                    (u) => {
+                        if (!lowTariffWindows || lowTariffWindows.length === 0) {
+                            return;
+                        }
+
+                        const ctx = u.ctx;
+                        const height = Math.round(6 * devicePixelRatio);
+                        const left = u.bbox.left;
+                        const right = u.bbox.left + u.bbox.width;
+
+                        ctx.save();
+                        ctx.fillStyle = gridFlow;
+
+                        for (const [start, end] of lowTariffWindows) {
+                            const x0 = Math.max(left, u.valToPos(start, "x", true));
+                            const x1 = Math.min(right, u.valToPos(end, "x", true));
+
+                            if (x1 > x0) {
+                                ctx.fillRect(x0, u.bbox.top + u.bbox.height - height, x1 - x0, height);
+                            }
+                        }
+
                         ctx.restore();
                     },
                     // "Now" (#255, the overview's Today's plan card): a hairline in ink, so the window

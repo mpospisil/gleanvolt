@@ -28,6 +28,8 @@ public sealed class HaDiscovery
     // which is what a fresh installation wants and what an existing one must not silently adopt.
     private readonly string _deviceId;
 
+    private readonly string _tariffCurrency;
+
     /// <param name="site">
     /// The installation (issue #111). Its id namespaces every topic and its name is what Home Assistant
     /// shows on the device page — the system is the thing being controlled, so it is the thing the
@@ -42,13 +44,19 @@ public sealed class HaDiscovery
     /// feed whose health could be reported, so <b>Car feed</b> is not published at all rather than
     /// published as an entity that would say nothing — the same rule the battery-hold switch follows.
     /// </param>
+    /// <param name="tariffCurrency">
+    /// <c>Tariff:Currency</c> (issue #265): the <b>Grid price</b> sensor's unit is this per kWh, which is
+    /// the form Home Assistant's energy dashboard takes a live price in.
+    /// </param>
     public HaDiscovery(
         HomeAssistantOptions options,
         PvSystemInfo site,
         bool batteryHoldEnabled = false,
-        bool vehicleFeedConfigured = false)
+        bool vehicleFeedConfigured = false,
+        string tariffCurrency = "CZK")
     {
         _options = options;
+        _tariffCurrency = tariffCurrency;
         _batteryHoldEnabled = batteryHoldEnabled;
         _vehicleFeedConfigured = vehicleFeedConfigured;
         _systemId = site.Id;
@@ -504,6 +512,25 @@ public sealed class HaDiscovery
         yield return Number(MinSolarSurplusNumber, "Min solar surplus", min: 0, max: 20000, step: 100, unit: "W", icon: "mdi:solar-power-variant");
         yield return Sensor("sun_until", "Sun until", template: Optional("sun_until"), icon: "mdi:weather-sunset-down");
 
+        // The tariff (issue #265). Published whatever the provider: it is switched on Settings at
+        // runtime, so the entities have to exist before a tariff does. With none, the fields are
+        // absent and all three read unknown -- no tariff, not a tariff that is always high.
+        yield return Config("binary_sensor", "low_tariff", new Dictionary<string, object?>
+        {
+            ["name"] = "Low tariff",
+            ["state_topic"] = StateTopic,
+            // ON/OFF in the payload itself, so the one guarded template every optional field uses is
+            // enough: an absent field is HA's "no value", never OFF.
+            ["value_template"] = Optional("low_tariff"),
+            ["icon"] = "mdi:cash-clock",
+        });
+        yield return Sensor("tariff_change", "Tariff change", template: Optional("tariff_change"), deviceClass: "timestamp", icon: "mdi:clock-end");
+        // No device class: "monetary" means an amount of money, and this is a rate per kWh. Unit and
+        // a measurement state class are what the energy dashboard's "entity with current price" wants.
+        yield return Sensor(
+            "grid_price", "Grid price", template: Optional("grid_price"),
+            unit: $"{_tariffCurrency}/kWh", stateClass: "measurement", icon: "mdi:cash");
+
         yield return Config("binary_sensor", "car_connected", new Dictionary<string, object?>
         {
             ["name"] = "Car connected",
@@ -567,7 +594,11 @@ public sealed class HaDiscovery
     /// payload rather than on a topic of its own because the <b>Car feed</b> sensor reads its state and
     /// its attribute from one message, and two topics could disagree for a status interval.
     /// </param>
-    public string StateJson(ChargeControlStatus s, VehicleSourceHealth? vehicleFeed = null)
+    /// <param name="tariff">
+    /// The tariff schedule (issue #265), or null for none, read at the poll's own timestamp so the rate
+    /// and the figures beside it describe the same instant.
+    /// </param>
+    public string StateJson(ChargeControlStatus s, VehicleSourceHealth? vehicleFeed = null, TariffTimeline? tariff = null)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -661,6 +692,15 @@ public sealed class HaDiscovery
             payload["sun_until"] = solarGrid.SunUntil is { } until
                 ? $"{until.LocalDateTime:HH:mm}"
                 : "none";
+        }
+
+        // Absent with no tariff, and absent where the schedule says nothing (a change beyond what the
+        // provider knows, a window with no price): unknown in Home Assistant, never a made-up value.
+        if (tariff?.WindowAt(s.Timestamp) is { } rate)
+        {
+            payload["low_tariff"] = SwitchState(rate.Rate == TariffRate.Low);
+            payload["tariff_change"] = tariff.NextChangeAfter(s.Timestamp)?.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            payload["grid_price"] = tariff.PriceAt(s.Timestamp) is { } price ? Math.Round(price, 4) : null;
         }
 
         // Dictionary null values are serialised as JSON null regardless of the ignore condition, so

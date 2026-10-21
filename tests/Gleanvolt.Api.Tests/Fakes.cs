@@ -302,3 +302,78 @@ internal sealed class FakeSecretStore : ISecretStore
 
     public string Describe() => Protection;
 }
+
+/// <summary>
+/// The tariff settings in memory, checked by the real strategies and the real price rules — what
+/// <c>TariffSettingsFile</c> does, without the file — so a test cannot store what the controller would refuse.
+/// </summary>
+internal sealed class FakeTariffEditor : ITariffEditor
+{
+    public IReadOnlyList<ITariffProvider> Providers { get; } =
+        [new Gleanvolt.Core.Strategies.NoTariffProvider(), new Gleanvolt.Core.Strategies.TableTariffProvider()];
+
+    public TariffSettings Stored { get; set; } = TariffSettings.None;
+
+    public int Saves { get; private set; }
+
+    public string Currency => "CZK";
+
+    public event Action? Saved;
+
+    public TariffSettings Read() => Stored;
+
+    public IReadOnlyList<TariffProblem> Check(TariffSettings settings)
+    {
+        if (settings.Selects(TariffProviderIds.None))
+        {
+            return [];
+        }
+
+        if (Providers.FirstOrDefault(provider => settings.Selects(provider.Id)) is not { } selected)
+        {
+            return [new TariffProblem(TariffFields.Provider, null, $"There is no tariff provider called {settings.Provider} in this build.")];
+        }
+
+        return
+        [
+            .. Gleanvolt.Core.Configuration.TariffRules.CheckPrices(settings.LowPricePerKwh, settings.HighPricePerKwh),
+            .. selected.Check(settings.SectionFor(selected.Id)),
+        ];
+    }
+
+    public TariffSaveResult Save(TariffSettings settings)
+    {
+        var problems = Check(settings);
+
+        if (problems.Any(problem => !problem.IsWarning))
+        {
+            return new TariffSaveResult(false, problems);
+        }
+
+        var selected = Providers.First(provider => settings.Selects(provider.Id));
+        Stored = settings.WithSection(selected.Id, selected.Normalize(settings.SectionFor(selected.Id))) with { Provider = selected.Id };
+        Saves++;
+        Saved?.Invoke();
+        return new TariffSaveResult(true, problems);
+    }
+}
+
+/// <summary>The schedule the editor's settings expand into for the test clock's day, as TariffSchedule would.</summary>
+internal sealed class FakeTariffSchedule(FakeTariffEditor editor, TimeProvider time) : ITariffSchedule
+{
+    public TariffTimeline? Timeline
+    {
+        get
+        {
+            var settings = editor.Read();
+            var provider = editor.Providers.FirstOrDefault(candidate => settings.Selects(candidate.Id));
+            var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
+            return provider?.Expand(new TariffContext(
+                time.GetUtcNow(), today, time.LocalTimeZone, settings.PricesIn(Currency), settings.SectionFor(provider.Id)));
+        }
+    }
+
+    public string? Unavailable { get; set; }
+
+    public string Currency => editor.Currency;
+}

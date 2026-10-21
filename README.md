@@ -33,6 +33,10 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Fast charge without the battery** — one mode for "I leave in an hour": maximum current from PV and grid, the home battery held out of it, and back to `Off` by itself when the car is full — or when the amount you asked for has been delivered, said in kilowatt-hours or as a battery target. Tell it when you leave and it waits, starting as late as it can and still finish — so a car charged above 80% sits there for minutes rather than all night.
 - **Targeted charging** — "15 kWh in the car by 17:00, and use as little grid as you can": the car is paced across the whole window at the rate the deadline needs, taking every watt of sun above that rate for free — because the charger can only use the sun that shines while it runs. Ask in kilowatt-hours, or, with a car that reports its own battery, in state of charge — "80% by seven". Either way the plan is put in front of you and started only when you confirm it. Choose **just in time** instead of cheapest and the last stretch is held back so the car reaches 100% shortly before you leave rather than sitting full all night — the preview names what that costs in grid before you commit to it.
 - **Solar with grid help** — "take the sun, let the grid make a weak sun usable, and stop when the day's sun is over": the car follows the surplus while it clears a minimum you set, a surplus too small for the charger's 6 A floor is topped up to it from the grid with the home battery held out of it, and once the forecast has no sun left today that clears your minimum the mode switches itself off.
+- **Grid tariff** — tell it when your grid is cheap (Czech *HDO*: the low rate, NT, and the high rate,
+  VT) by typing your low-tariff periods for weekdays and the weekend on Settings, with a price for each
+  rate. It shows on the Overview, in Home Assistant and on the API; a save applies at once. See
+  [Grid tariff](#grid-tariff-the-tariff-section).
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
 - **Self-hosted web UI** (on by default, no configuration — see [Self-hosted web UI](#self-hosted-web-ui-the-web-section) below) — a Blazor dashboard served by the controller itself at `http://<host>:8090`: live telemetry, every control Home Assistant has, charging-session history, the energy history, the solar forecast for today and tomorrow, and the forecast plan, all with no Home Assistant or MQTT broker required. Both surfaces are first-class: run either, both, or neither, and [`deploy/`](deploy/) can run the controller with neither Home Assistant nor a broker on a 1 GB board, at roughly a quarter of the memory the full stack needs.
@@ -362,8 +366,8 @@ quietly reverting to UTC.
 inverter has no opinion about how often it is asked — which is why it outlived the section the device
 addresses moved out of.
 
-The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `SessionStore` and `HomeAssistant` —
-are documented in the subsections that follow.
+The feature sections — `Solcast`, `ChargeControl`, `BatteryHold`, `Tariff`, `SessionStore` and
+`HomeAssistant` — are documented in the subsections that follow.
 
 ### The data directory holds secrets (the `Secrets` section)
 
@@ -1563,6 +1567,89 @@ held and the house on the grid for nothing.
 | `ChargeControl:SolarGrid:MinSurplusWatts` | `2000` | The boot value of the minimum solar surplus, in watts. |
 | `ChargeControl:SolarGrid:ForecastConfidence` | `P50` | The forecast band that decides whether sun is still to come. |
 
+### Grid tariff (the `Tariff` section)
+
+What grid energy costs at each hour, for a two-rate tariff: in Czech terms, the distributor's **HDO**
+switching between the low rate (**NT**) and the high rate (**VT**). This part only makes the tariff
+known and visible — on the Overview, in Home Assistant and on the HTTP API. **Nothing here changes how
+the car charges yet**; waiting for low tariff in `Fast` and `SolarGrid` is
+[#274](https://github.com/mpospisil/gleanvolt/issues/274).
+
+It is set up on the web UI's **Settings** page, under *Tariff*, rather than in configuration. A save
+applies at once, with no restart. Like the rest of Settings it is read-only until the UI has a login
+(`Web__PasswordHash`).
+
+**The provider.** Where the low-tariff times come from. Two are built in:
+
+- **None** — no tariff, the default. The grid costs the same at every hour, the Overview says nothing
+  about a tariff, and the Home Assistant entities read *unknown*. None never means "always low".
+- **Table** — the periods you type in, described below.
+
+More can follow (a distributor's feed, a spot price); each is a strategy of its own, chosen in the same
+control, and switching to another and back keeps the first one's settings.
+
+**The table.** Enter **only the low-tariff periods**; every other minute is high tariff. There are two
+lists: **weekdays** (Monday to Friday) and the **weekend** (Saturday and Sunday). Public holidays follow
+the weekday list for now. Times are local `HH:mm`, and an end may be `24:00`, meaning the end of the day.
+
+- **A period belongs to one day.** A night tariff of 22:00–06:00 is entered as two rows, **22:00–24:00**
+  and **00:00–06:00**. The controller joins them across midnight, so the Overview says *"Low tariff,
+  until 06:00"* at 23:00 rather than *"until 24:00"*. The same join works from Friday into Saturday and
+  from Sunday into Monday, where the rows come from different lists.
+- **Rows in one list must not overlap**; touching is fine (06:00–08:00 and 08:00–10:00). They are sorted
+  by start when saved, whatever order they were added in.
+- **The clock changes are handled for you.** On the spring-forward night a time between 02:00 and 03:00
+  does not exist, and an edge there moves to 03:00; in autumn that hour happens twice, and an edge in it
+  is the first time round.
+- Under the lists, **today and tomorrow are drawn as 24-hour bars** with low tariff shaded, from what the
+  form holds rather than what is saved: a `16:00` typed for `06:00` shows up as a wrong-looking day
+  before you press Save.
+
+**Where to find your times.** Your distributor publishes them for your HDO code (printed on the HDO
+receiver beside the meter, and in your contract): EG.D, ČEZ Distribuce and PREdistribuce each have an *HDO* or
+*časy spínání* page. If your times change with the season, edit the table when they do.
+
+**Prices.** A price per kWh for each rate, in the configured currency. Optional: without them the rate
+is still known and shown, just without a price. A low price above the high one is accepted with a
+warning, since nothing acts on prices yet.
+
+**The file.** Everything above is kept in `data/tariff.json`, beside `pv-system.json`, so under Docker it
+is on the same `./data` bind mount and survives a new image. You do not need to edit it; if you do, it
+looks like this:
+
+```jsonc
+{
+  "provider": "Table",              // "None", "Table", or a later provider's id
+  "lowPricePerKwh": 2.10,           // shared by every provider; optional
+  "highPricePerKwh": 4.80,
+  "table": {                        // the Table provider's own settings, kept while another is selected
+    "weekday": [ { "start": "00:00", "end": "06:00" }, { "start": "13:00", "end": "15:00" } ],
+    "weekend": [ { "start": "00:00", "end": "08:00" }, { "start": "20:00", "end": "24:00" } ]
+  }
+}
+```
+
+A missing file is no tariff. One that cannot be read is no tariff too, with a warning in the log; a
+table in it that breaks a rule is read as no tariff until it is fixed on Settings, which still shows it.
+
+**Configuration.** Two keys, neither of them on Settings:
+
+```jsonc
+"Tariff": {
+  "Path": "data/tariff.json",  // relative to the content root unless absolute
+  "Currency": "CZK"            // ISO 4217; labels the price fields and every price shown
+}
+```
+
+The `.deb` package points `Tariff__Path` at `/var/lib/gleanvolt/tariff.json`. `Currency` labels prices
+and converts nothing: change it only if your tariff is priced in something else.
+
+**Where it shows.** The Overview has a line under its headline — *"High tariff, 4.80 CZK/kWh, until
+22:00"* — and marks low tariff as a strip along the bottom of today's plan chart. Home Assistant gets
+**Low tariff**, **Tariff change** and **Grid price** ([the entity table](#what-each-entity-means)). The
+HTTP API has `GET /tariff`, `GET /tariff/providers` and `GET`/`PUT /tariff/settings`; see its OpenAPI
+document.
+
 ### Home Assistant (MQTT)
 
 The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)), so HA auto-creates a device with:
@@ -1628,6 +1715,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
 - the solar-grid controls — the **Min solar surplus** number, applied at once — plus its **Sun until**
   sensor, populated while the mode is driving.
+- the tariff — the **Low tariff** binary sensor and the **Tariff change** and **Grid price** sensors —
+  published whatever tariff provider is selected on Settings, and unknown while none is.
 - binary sensors: **Car connected** and **Charging now**.
 - **Car feed** — only on an installation with a
   [manufacturer vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section)
@@ -1667,6 +1756,9 @@ description or tooltip field. The meanings live here instead.
 | **Fast target** | kWh | The amount that fast charge is working to — the number **Fast delivered** is counting towards. Absent on the same terms. |
 | **Min solar surplus** | W | The smoothed surplus below which `SolarGrid` pauses the car instead of topping it up from the grid — and the line the rest of today's forecast has to clear for the mode to keep waiting. Applied at once, including to a running charge. The most the grid ever adds is the charger's floor (~4.14 kW on three phases) less this; at or above the floor the grid never helps. Doesn't persist across restarts. |
 | **Sun until** | sensor | When today's forecast surplus last clears **Min solar surplus**, as `HH:mm` — the time `SolarGrid` will switch itself off if the live surplus agrees. `none` when the forecast has no such sun left; absent with no usable forecast, and whenever another mode is driving. |
+| **Low tariff** | on/off | `ON` while the grid is in the low (cheap) rate of the tariff selected under *Tariff* on Settings, `OFF` in the high rate. **Unknown** with no tariff selected, or one that cannot answer — no tariff is not the same as high tariff. Follows a save on Settings by the next status publish, with no restart. |
+| **Tariff change** | timestamp | When the rate next changes. A night tariff entered as 22:00–24:00 and 00:00–06:00 changes at 06:00, not at midnight. Unknown with no tariff, and when the next change lies beyond what the provider knows (the `Table` provider knows today and tomorrow). |
+| **Grid price** | `Tariff:Currency`/kWh | What a kWh from the grid costs right now: the low or high price entered on Settings, or a provider's own price for the moment. Unknown without prices or a tariff. Shaped for Home Assistant's energy dashboard as an *entity with the current price*. |
 | **Control state** | — | What charge control is doing right now. `Disabled`: nothing is running, the charger is the owner's. `Idle`: a strategy is running but not acting — most often because the charger has been taken out of Fast at the wallbox since it was started. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
 | **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
 | **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |
@@ -3056,6 +3148,10 @@ which is the thing a client is generated from. Everything else is behind the key
 | `POST /charging/start/targeted` | Start a targeted charge under an edited plan's limits. Same body as the preview. |
 | `POST /charging/stop` | Stop charging and clear any standing target. |
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
+| `GET /tariff` | The [grid tariff](#grid-tariff-the-tariff-section): the low and high stretches as far ahead as the provider knows, the rate now with its price and next change, and the currency. Empty with no tariff — which means no restriction, never "always low". |
+| `GET /tariff/providers` | The tariff providers this build has, and which one is selected. |
+| `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
+| `PUT /tariff/settings` | Store them, applied at once. Held to the same rules as Settings: a 400 lists every problem with its field and row under `problems`, and nothing is written. Writes no hardware. |
 
 Two rules run across the read endpoints. **Ranges are bounded** — a caller will cheerfully ask for a
 year of quarter-hours, and this runs on a Raspberry Pi. And **staleness is reported rather than

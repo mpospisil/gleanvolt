@@ -152,6 +152,20 @@ internal static class Units
     public static string Fraction(double? fraction, int decimals = 0) =>
         Percent(fraction * 100, decimals);
 
+    // ---- Money (base: Tariff:Currency) ----
+
+    /// <summary>
+    /// A grid price per kWh, to the hundredth: "2.10 CZK/kWh". The currency is the installation's
+    /// configured code, so it is passed rather than assumed.
+    /// </summary>
+    public static string PricePerKwh(decimal? price, string currency) =>
+        price is { } value
+            ? $"{Math.Round(value, 2, MidpointRounding.AwayFromZero).ToString("N2", CultureInfo.CurrentCulture)} {currency}/kWh"
+            : Missing;
+
+    /// <summary>The unit a price is typed in, for a field's label: "CZK/kWh".</summary>
+    public static string PriceUnit(string currency) => $"{currency}/kWh";
+
     // ---- Everything else ----
 
     /// <summary>A current, to the amp's tenth where it has one: "16 A", "6.5 A".</summary>

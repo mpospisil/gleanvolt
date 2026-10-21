@@ -1,0 +1,202 @@
+@using System.Globalization
+@using System.Text.Json
+@using Gleanvolt.Core.Configuration
+@using Gleanvolt.Core.Strategies
+@inherits TariffProviderPanel
+@inject TimeProvider Time
+
+@*
+    The Table strategy's panel (issue #265): low-tariff periods for weekdays and the weekend as rows of
+    start and end boxes, and a preview of today and tomorrow drawn from what the rows hold, so a typo
+    (16:00 for 06:00) shows as a wrong-looking day before anything is saved. Text boxes rather than
+    time inputs, because an end of 24:00 is valid here and no time input can hold it.
+*@
+
+@foreach (var days in AllDays)
+{
+    var rows = Rows(days);
+    var key = days.ToString().ToLowerInvariant();
+
+    <h3>@(days == TariffDays.Weekday ? "Weekdays" : "Weekend") <span class="muted">@(days == TariffDays.Weekday ? "Mon–Fri" : "Sat–Sun")</span></h3>
+
+    @if (rows.Count == 0)
+    {
+        <p class="muted tariff-empty" id="tariff-@key-empty">
+            No periods: high tariff all day @(days == TariffDays.Weekday ? "Monday to Friday" : "on Saturday and Sunday").
+        </p>
+    }
+    else
+    {
+        <table class="sessions tariff-periods" id="tariff-@key">
+            <thead>
+                <tr><th>Low tariff from</th><th>until</th><th></th></tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < rows.Count; i++)
+                {
+                    var row = rows[i];
+                    var index = i;
+                    var problem = RowProblem(days, index);
+
+                    <tr class="@(problem is null ? null : "invalid")">
+                        <td>
+                            <input class="tariff-time" id="tariff-@key-@index-start" type="text" inputmode="numeric"
+                                   spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="Start" disabled="@ReadOnly"
+                                   value="@row.Start" @oninput="e => Edit(() => row.Start = Text(e))" />
+                        </td>
+                        <td>
+                            <input class="tariff-time" id="tariff-@key-@index-end" type="text" inputmode="numeric"
+                                   spellcheck="false" autocomplete="off" placeholder="HH:mm or 24:00" aria-label="End" disabled="@ReadOnly"
+                                   value="@row.End" @oninput="e => Edit(() => row.End = Text(e))" />
+                        </td>
+                        <td>
+                            @if (!ReadOnly)
+                            {
+                                <button type="button" class="link" id="tariff-@key-@index-remove"
+                                        @onclick="() => Edit(() => rows.RemoveAt(index))">Remove</button>
+                            }
+                        </td>
+                    </tr>
+                    @if (problem is not null)
+                    {
+                        <tr class="tariff-problem"><td colspan="3" class="error">@problem</td></tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!ReadOnly)
+    {
+        <div class="tariff-add">
+            <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">Add period</button>
+        </div>
+    }
+}
+
+@if (Problems.FirstOrDefault(problem => problem.Field == TariffFields.Table) is { } whole)
+{
+    <p class="@(whole.IsWarning ? "warning" : "error")" id="tariff-table-problem">@whole.Message</p>
+}
+
+<h3>Today and tomorrow</h3>
+
+<div class="tariff-preview" id="tariff-preview">
+    @foreach (var day in PreviewDays())
+    {
+        <div class="tariff-day">
+            <span class="tariff-day-name">@day.Name</span>
+            <div class="tariff-bar" role="img" aria-label="@day.Label">
+                @foreach (var (left, width) in day.Low)
+                {
+                    <span class="tariff-low" style="left: @Css(left)%; width: @Css(width)%"></span>
+                }
+            </div>
+        </div>
+    }
+    <div class="tariff-axis" aria-hidden="true">
+        <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+    </div>
+    <p class="table-note muted">Shaded is low tariff.</p>
+</div>
+
+@code {
+    private static readonly TariffDays[] AllDays = [TariffDays.Weekday, TariffDays.Weekend];
+
+    // A row as the panel holds it: whatever was typed, valid or not.
+    private sealed class Row
+    {
+        public string Start { get; set; } = string.Empty;
+
+        public string End { get; set; } = string.Empty;
+    }
+
+    private sealed record PreviewDay(string Name, string Label, IReadOnlyList<(double Left, double Width)> Low);
+
+    private List<Row> _weekday = [];
+    private List<Row> _weekend = [];
+
+    // Read once: after that the rows are the panel's, and the form recreates the panel to discard them.
+    protected override void OnInitialized()
+    {
+        var table = TableTariffProvider.Read(Settings) ?? TariffTable.Empty;
+        _weekday = [.. table.Weekday.Select(period => new Row { Start = period.Start, End = period.End })];
+        _weekend = [.. table.Weekend.Select(period => new Row { Start = period.Start, End = period.End })];
+    }
+
+    private List<Row> Rows(TariffDays days) => days == TariffDays.Weekday ? _weekday : _weekend;
+
+    private TariffTable Table() => new(
+        [.. _weekday.Select(row => new TariffPeriod(row.Start, row.End))],
+        [.. _weekend.Select(row => new TariffPeriod(row.Start, row.End))]);
+
+    // A new row starts where the last one ended, which is where the next period of a day usually does.
+    private Task Add(List<Row> rows) => Edit(() =>
+        rows.Add(new Row { Start = rows.Count > 0 && rows[^1].End.Trim() != "24:00" ? rows[^1].End : string.Empty }));
+
+    private Task Edit(Action change)
+    {
+        change();
+        return SettingsChanged.InvokeAsync(TableTariffProvider.Write(Table()));
+    }
+
+    private string? RowProblem(TariffDays days, int row)
+    {
+        var field = days == TariffDays.Weekday ? TariffFields.TableWeekday : TariffFields.TableWeekend;
+        return Problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row)?.Message;
+    }
+
+    // Each local day as the share of its own length that is low tariff, so a 23-hour spring day is drawn
+    // as the whole bar rather than as a bar that stops short.
+    private List<PreviewDay> PreviewDays()
+    {
+        var zone = Time.LocalTimeZone;
+        var today = DateOnly.FromDateTime(Time.GetLocalNow().DateTime);
+        var timeline = TariffExpansion.Expand(Table(), zone, today, prices: null);
+        var days = new List<PreviewDay>();
+
+        for (var offset = 0; offset < 2; offset++)
+        {
+            var date = today.AddDays(offset);
+            var start = TariffExpansion.ToInstant(date, 0, zone);
+            var end = TariffExpansion.ToInstant(date.AddDays(1), 0, zone);
+            var length = (end - start).TotalMinutes;
+            var low = new List<(double, double)>();
+            var spoken = new List<string>();
+
+            foreach (var window in timeline.LowWindows)
+            {
+                var from = window.Start > start ? window.Start : start;
+                var to = window.End < end ? window.End : end;
+
+                if (to <= from)
+                {
+                    continue;
+                }
+
+                low.Add(((from - start).TotalMinutes / length * 100, (to - from).TotalMinutes / length * 100));
+                spoken.Add($"{Clock(from, zone, start)}–{Clock(to, zone, start)}");
+            }
+
+            var name = offset == 0 ? "Today" : "Tomorrow";
+            var label = spoken.Count == 0
+                ? $"{name}: high tariff all day"
+                : $"{name}: low tariff {string.Join(", ", spoken)}";
+
+            days.Add(new PreviewDay($"{name} ({date.DayOfWeek.ToString()[..3]})", label, low));
+        }
+
+        return days;
+    }
+
+    // A preview edge as the owner typed it: the next midnight reads 24:00, not 00:00.
+    private static string Clock(DateTimeOffset instant, TimeZoneInfo zone, DateTimeOffset dayStart)
+    {
+        var local = TimeZoneInfo.ConvertTime(instant, zone);
+        return local.Date > TimeZoneInfo.ConvertTime(dayStart, zone).Date ? "24:00" : local.ToString("HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static string Css(double percent) => percent.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? string.Empty;
+}

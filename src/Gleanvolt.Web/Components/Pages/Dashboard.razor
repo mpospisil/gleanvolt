@@ -9,6 +9,7 @@
 @inject EvInfo Car
 @inject ConfiguredVehicleFeed VehicleFeed
 @inject ISolarForecastService Forecasts
+@inject ITariffSchedule Tariff
 @inject TimeProvider Time
 @inject IJSRuntime JS
 @using Microsoft.Extensions.DependencyInjection
@@ -38,7 +39,8 @@
     The overview (#255, direction 1a with 1b's prose status). One question per block, in the order
     they are asked:
 
-      the headline    -- what the controller is doing and why, in words (OverviewNarrative).
+      the headline    -- what the controller is doing and why, in words (OverviewNarrative), and
+                         under it the tariff now (TariffNarrative), when one is set up (#265).
       the figures     -- Solar, House, Battery, Car, Grid: each one's power now and its energy so far
                          today. "So far today" comes from the energy monitor's store when it is on, and
                          is simply left off when it is not.
@@ -76,6 +78,13 @@ else
             <p class="headline" id="overview-headline">
                 @string.Join(" ", OverviewNarrative.Describe(_status, Time.LocalTimeZone))
             </p>
+
+            @* Read on every render, which is every poll: the schedule is cached until midnight or a save,
+               so a tariff saved on Settings shows here by the next poll. *@
+            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
+            {
+                <p class="tariff-line @(Tariff.Timeline is null ? "warning" : "muted")" id="overview-tariff">@tariff</p>
+            }
 
             <section class="figures" aria-label="Power now and energy today">
                 <div class="figure solar">
@@ -181,6 +190,10 @@ else
                     @if (plan.Timeline.Count > 0)
                     {
                         <div id="overview-plan-chart" class="chart"></div>
+                        @if (Tariff.Timeline is { } tariffTimeline && tariffTimeline.LowWindows.Any())
+                        {
+                            <p class="table-note muted" id="overview-plan-tariff">The bar along the bottom is low tariff.</p>
+                        }
                     }
                     <table class="sessions plan-table">
                         <tbody>
@@ -578,7 +591,10 @@ else
             plan.Timeline.Select(p => p.RequiredSocFloorPercent).ToArray(),
             plan.NextFeasibleWindow?.Start.ToUnixTimeSeconds(),
             plan.NextFeasibleWindow?.End.ToUnixTimeSeconds(),
-            _status.Timestamp.ToUnixTimeSeconds());
+            _status.Timestamp.ToUnixTimeSeconds(),
+            Tariff.Timeline?.LowWindows
+                .Select(window => new[] { window.Start.ToUnixTimeSeconds(), window.End.ToUnixTimeSeconds() })
+                .ToArray());
     }
 
     /// <summary>The day so far, summed from the energy monitor's quarter hours.</summary>

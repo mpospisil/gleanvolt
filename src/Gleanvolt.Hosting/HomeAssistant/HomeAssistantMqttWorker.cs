@@ -37,6 +37,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private readonly IVehicleUpdateService? _vehicleFeed;
     private readonly TargetedChargeOptions _targetedOptions;
     private readonly ISolarGridSettings? _solarGrid;
+
+    // The tariff (issue #265), read on the publish tick like the vehicle feed's health.
+    private readonly ITariffSchedule? _tariff;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -84,9 +87,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         IVehicleTelemetry? vehicle = null,
         ConfiguredVehicleFeed? vehicleFeed = null,
         TimeProvider? timeProvider = null,
-        ISolarGridSettings? solarGrid = null)
+        ISolarGridSettings? solarGrid = null,
+        ITariffSchedule? tariff = null)
     {
         _solarGrid = solarGrid;
+        _tariff = tariff;
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
         _discovery = discovery;
@@ -256,7 +261,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             // nothing an automation could act on any sooner.
             await PublishAsync(
                 _discovery.StateTopic,
-                _discovery.StateJson(status, _vehicleFeed?.Health),
+                _discovery.StateJson(status, _vehicleFeed?.Health, _tariff?.Timeline),
                 retain: true,
                 cancellationToken).ConfigureAwait(false);
         }

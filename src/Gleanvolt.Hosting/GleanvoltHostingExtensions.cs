@@ -13,6 +13,7 @@ using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
+using Gleanvolt.Hosting.Tariff;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -87,6 +88,35 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>()));
+
+        // What grid energy costs when (issue #265). Each way of knowing is a strategy registered here as
+        // an ITariffProvider, in the order Settings offers them; the saved settings select one at runtime,
+        // and a new strategy is one more line here (and its panel in the web UI), nothing else. The
+        // settings are read once and held in memory, so the poll loop never touches the file.
+        services.Configure<TariffOptions>(configuration.GetSection(TariffOptions.SectionName));
+        services.AddSingleton<ITariffProvider, NoTariffProvider>();
+        services.AddSingleton<ITariffProvider, TableTariffProvider>();
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+
+            // Resolved against the content root so a relative path means the same thing however the
+            // service was started -- `dotnet run`, the debugger, or the container's working directory.
+            var path = Path.IsPathRooted(options.Path)
+                ? options.Path
+                : Path.Combine(environment.ContentRootPath, options.Path);
+
+            return new TariffSettingsFile(
+                Path.GetFullPath(path),
+                string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant(),
+                provider.GetServices<ITariffProvider>(),
+                provider.GetRequiredService<ILogger<TariffSettingsFile>>());
+        });
+        services.AddSingleton<ITariffEditor>(provider => provider.GetRequiredService<TariffSettingsFile>());
+        services.AddSingleton<TariffSchedule>();
+        services.AddSingleton<ITariffSchedule>(provider => provider.GetRequiredService<TariffSchedule>());
+        services.AddHostedService<TariffRefreshWorker>();
 
         // Where the bearer-equivalent secrets live, and what protects them (issue #215). One store for
         // all of them: the volkswagen.de session, the MyŠkoda key and -- once #214 lands -- the vehicle
@@ -606,7 +636,8 @@ public static class GleanvoltHostingExtensions
             provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value,
             provider.GetRequiredService<PvSystemInfo>(),
             provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled,
-            provider.GetServices<IVehicleUpdateService>().Any()));
+            provider.GetServices<IVehicleUpdateService>().Any(),
+            provider.GetRequiredService<ITariffEditor>().Currency));
 
         services.AddHostedService<HomeAssistantMqttWorker>();
 

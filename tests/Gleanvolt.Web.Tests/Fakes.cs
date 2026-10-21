@@ -1104,3 +1104,86 @@ internal static class TestForecasts
         new(retrievedAt, [.. watts.Select((w, i) =>
             At(firstPeriodEnd.AddMinutes(30 * i), w, w * 0.8, w * 1.2))]);
 }
+
+internal sealed class FakeTariffEditor : ITariffEditor
+{
+    public FakeTariffEditor(params ITariffProvider[] extra) =>
+        Providers = [new Gleanvolt.Core.Strategies.NoTariffProvider(), new Gleanvolt.Core.Strategies.TableTariffProvider(), .. extra];
+
+    public TariffSettings Stored { get; set; } = TariffSettings.None;
+
+    public List<TariffSettings> Saves { get; } = [];
+
+    public IReadOnlyList<ITariffProvider> Providers { get; }
+
+    public string Currency { get; set; } = "CZK";
+
+    public event Action? Saved;
+
+    public TariffSettings Read() => Stored;
+
+    // The real service's rules, so a test cannot pass settings the controller would refuse.
+    public IReadOnlyList<TariffProblem> Check(TariffSettings settings)
+    {
+        if (settings.Selects(TariffProviderIds.None))
+        {
+            return [];
+        }
+
+        if (Providers.FirstOrDefault(provider => settings.Selects(provider.Id)) is not { } selected)
+        {
+            return [new TariffProblem(TariffFields.Provider, null, $"There is no tariff provider called {settings.Provider} in this build.")];
+        }
+
+        return
+        [
+            .. Gleanvolt.Core.Configuration.TariffRules.CheckPrices(settings.LowPricePerKwh, settings.HighPricePerKwh),
+            .. selected.Check(settings.SectionFor(selected.Id)),
+        ];
+    }
+
+    public TariffSaveResult Save(TariffSettings settings)
+    {
+        var problems = Check(settings);
+
+        if (problems.Any(problem => !problem.IsWarning))
+        {
+            return new TariffSaveResult(false, problems);
+        }
+
+        var selected = Providers.First(provider => settings.Selects(provider.Id));
+        Saves.Add(settings);
+        Stored = settings.WithSection(selected.Id, selected.Normalize(settings.SectionFor(selected.Id))) with { Provider = selected.Id };
+        Saved?.Invoke();
+        return new TariffSaveResult(true, problems);
+    }
+}
+
+/// <summary>Tariff settings with the Table strategy selected and a table as its section, and the way back.</summary>
+internal static class TestTariffs
+{
+    public static TariffSettings Table(TariffTable table, decimal? low = 2.10m, decimal? high = 4.80m) =>
+        (TariffSettings.None with { Provider = TariffProviderIds.Table, LowPricePerKwh = low, HighPricePerKwh = high })
+            .WithSection(TariffProviderIds.Table, Gleanvolt.Core.Strategies.TableTariffProvider.Write(table));
+
+    public static TariffTable TableOf(TariffSettings settings) =>
+        Gleanvolt.Core.Strategies.TableTariffProvider.Read(settings.SectionFor(TariffProviderIds.Table))!;
+}
+
+/// <summary>A tariff schedule the test sets: none by default, which is an installation with no tariff.</summary>
+internal sealed class FakeTariffSchedule : ITariffSchedule
+{
+    public TariffTimeline? Timeline { get; set; }
+
+    public string? Unavailable { get; set; }
+
+    public string Currency { get; set; } = "CZK";
+
+    /// <summary>The Table strategy's timeline for <paramref name="today"/>: low 00:00–06:00 and 22:00–24:00, at 2.10 / 4.80 CZK.</summary>
+    public static TariffTimeline Night(DateOnly today, TimeZoneInfo zone) =>
+        TariffExpansion.Expand(
+            new TariffTable([new("00:00", "06:00"), new("22:00", "24:00")], [new("00:00", "06:00"), new("22:00", "24:00")]),
+            zone,
+            today,
+            new TariffPrices(2.10m, 4.80m, "CZK"));
+}
