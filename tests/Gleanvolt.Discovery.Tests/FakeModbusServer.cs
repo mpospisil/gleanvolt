@@ -17,6 +17,7 @@ internal sealed class FakeModbusServer : IAsyncDisposable
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentBag<TcpClient> _clients = [];
+    private readonly ConcurrentDictionary<TcpClient, byte> _live = new();
     private readonly Task _accepting;
     private int _open;
     private int _maxOpen;
@@ -78,8 +79,8 @@ internal sealed class FakeModbusServer : IAsyncDisposable
             var client = await _listener.AcceptTcpClientAsync(_stop.Token).ConfigureAwait(false);
             _clients.Add(client);
             Connections++;
-            var open = Interlocked.Increment(ref _open);
-            InterlockedMax(ref _maxOpen, open);
+            Interlocked.Increment(ref _open);
+            InterlockedMax(ref _maxOpen, CountOpenAtAccept(client));
             _ = ServeAsync(client);
         }
     }
@@ -163,9 +164,40 @@ internal sealed class FakeModbusServer : IAsyncDisposable
         }
         finally
         {
+            _live.TryRemove(client, out _);
             Interlocked.Decrement(ref _open);
             client.Dispose();
         }
+    }
+
+    // The client closes a connection before it opens the next, but the serving loop only notices the
+    // close when its read ends, which can come after the next accept. So the overlap is judged from
+    // the sockets themselves: one the peer has already closed reads as readable with nothing to read.
+    private int CountOpenAtAccept(TcpClient accepted)
+    {
+        _live[accepted] = 0;
+        var open = 0;
+
+        foreach (var client in _live.Keys)
+        {
+            try
+            {
+                var socket = client.Client;
+
+                if (socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0)
+                {
+                    continue;
+                }
+
+                open++;
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or SocketException)
+            {
+                // Already served and closed.
+            }
+        }
+
+        return open;
     }
 
     private static byte[] Exception(byte function, byte code) => [(byte)(function | 0x80), code];
