@@ -1591,6 +1591,10 @@ button.link:hover {
     margin-bottom: 0.5rem;
 }
 
+.tariff-line {
+    margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+}
+
 .tariff-empty {
     margin: 0 0 var(--space-2);
 }

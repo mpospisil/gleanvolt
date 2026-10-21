@@ -23,4 +23,10 @@ public interface ITariffSchedule
     /// or null when nothing is wrong.
     /// </summary>
     string? Unavailable { get; }
+
+    /// <summary>
+    /// What every price on the timeline is in, <c>Tariff:Currency</c>: also a window's own price, which
+    /// a strategy may set when the owner has entered no shared prices.
+    /// </summary>
+    string Currency { get; }
 }

@@ -34,8 +34,12 @@ public class DashboardPageTests : PageTest
     // never described one; a test that is about the card sets it before rendering.
     private EvInfo _car = EvInfo.Unknown;
 
+    // No tariff by default (#265), which is what most installations have.
+    private readonly FakeTariffSchedule _tariff = new();
+
     public DashboardPageTests()
     {
+        Services.AddSingleton<ITariffSchedule>(_tariff);
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IVehicleTelemetry>(_vehicle);
@@ -642,6 +646,57 @@ public class DashboardPageTests : PageTest
 
         // The plan's sentence leads the headline rather than repeating in the card.
         Assert.Contains("Today gives the car about 4.5 kWh", page.Find("#overview-headline").TextContent);
+    }
+
+    [Fact]
+    public void Says_nothing_about_a_tariff_when_none_is_set_up()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Empty(page.FindAll("#overview-tariff"));
+    }
+
+    [Fact]
+    public void Says_the_rate_now_its_price_and_when_it_changes()
+    {
+        // 10:00 UTC is noon in Prague: high tariff until the evening's low starts at 22:00.
+        _tariff.Timeline = FakeTariffSchedule.Night(new DateOnly(2026, 8, 12), Prague);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        Assert.Equal("High tariff, 4.80 CZK/kWh, until 22:00", page.Find("#overview-tariff").TextContent);
+    }
+
+    [Fact]
+    public void Says_why_a_selected_tariff_is_not_restricting_anything()
+    {
+        _tariff.Unavailable = "The selected tariff provider, Egd, is not in this build, so there is no tariff restriction.";
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var page = Render<Dashboard>();
+
+        var line = page.Find("#overview-tariff");
+        Assert.Contains("Egd, is not in this build", line.TextContent);
+        Assert.Contains("warning", line.ClassList);
+    }
+
+    [Fact]
+    public void Marks_low_tariff_on_todays_plan()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        _tariff.Timeline = FakeTariffSchedule.Night(new DateOnly(2026, 8, 12), Prague);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = TestPlans.Usable(_time.Now) });
+
+        var page = Render<Dashboard>();
+
+        var chart = Assert.Single(JSInterop.Invocations, i => i.Identifier == "solaxCharts.renderTimelineChart");
+        var low = Assert.IsType<long[][]>(chart.Arguments[7]);
+        var tonight = new DateTimeOffset(2026, 8, 12, 22, 0, 0, TimeSpan.FromHours(2));
+        Assert.Contains(low, window => window[0] == tonight.ToUnixTimeSeconds());
+        Assert.Contains("low tariff", page.Find("#overview-plan-tariff").TextContent);
     }
 
     [Fact]

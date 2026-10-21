@@ -1169,3 +1169,21 @@ internal static class TestTariffs
     public static TariffTable TableOf(TariffSettings settings) =>
         Gleanvolt.Core.Strategies.TableTariffProvider.Read(settings.SectionFor(TariffProviderIds.Table))!;
 }
+
+/// <summary>A tariff schedule the test sets: none by default, which is an installation with no tariff.</summary>
+internal sealed class FakeTariffSchedule : ITariffSchedule
+{
+    public TariffTimeline? Timeline { get; set; }
+
+    public string? Unavailable { get; set; }
+
+    public string Currency { get; set; } = "CZK";
+
+    /// <summary>The Table strategy's timeline for <paramref name="today"/>: low 00:00–06:00 and 22:00–24:00, at 2.10 / 4.80 CZK.</summary>
+    public static TariffTimeline Night(DateOnly today, TimeZoneInfo zone) =>
+        TariffExpansion.Expand(
+            new TariffTable([new("00:00", "06:00"), new("22:00", "24:00")], [new("00:00", "06:00"), new("22:00", "24:00")]),
+            zone,
+            today,
+            new TariffPrices(2.10m, 4.80m, "CZK"));
+}

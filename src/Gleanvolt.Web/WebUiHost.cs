@@ -60,6 +60,7 @@ public static class WebUiHost
         // it has been registered.
         services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
         services.TryAddSingleton<IVehicleAccountSignIn, NoVehicleAccountSignIn>();
+        services.TryAddSingleton<ITariffSchedule, NoTariffSchedule>();
 
         // The one feed (#212). Gleanvolt.Hosting registers it with its startup note; a host that has
         // not gets whatever update service is registered, or none.

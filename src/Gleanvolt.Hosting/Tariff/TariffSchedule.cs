@@ -40,6 +40,8 @@ public sealed class TariffSchedule : ITariffSchedule
 
     public string? Unavailable => Current().Unavailable;
 
+    public string Currency => _settings.Currency;
+
     /// <summary>Drops the cached expansion, for the refresh worker after a strategy fetched something new.</summary>
     public void Invalidate()
     {
