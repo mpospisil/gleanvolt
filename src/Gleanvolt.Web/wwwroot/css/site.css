@@ -991,7 +991,8 @@ h1 {
     background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-.control button.secondary {
+.control button.secondary,
+.tariff-add button.secondary {
     background: none;
     border: 1px solid var(--rule);
     border-radius: var(--radius-sm);
@@ -1012,7 +1013,8 @@ h1 {
     margin-left: 0;
 }
 
-.control button.secondary:hover {
+.control button.secondary:hover,
+.tariff-add button.secondary:hover {
     color: var(--ink);
     border-color: var(--accent);
 }
@@ -1587,6 +1589,14 @@ button.link:hover {
 .tariff-periods {
     width: auto;
     margin-bottom: 0.5rem;
+}
+
+.tariff-empty {
+    margin: 0 0 var(--space-2);
+}
+
+.tariff-add {
+    margin-bottom: var(--space-2);
 }
 
 .tariff-periods td {

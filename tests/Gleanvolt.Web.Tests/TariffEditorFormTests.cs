@@ -212,6 +212,18 @@ public class TariffEditorFormTests : BunitContext
     }
 
     [Fact]
+    public void AnEmptyListSaysWhatItMeans()
+    {
+        var form = RenderTable();
+
+        Assert.Empty(form.FindAll("#tariff-weekend-empty"));
+
+        form.Find("#tariff-weekend-0-remove").Click();
+
+        Assert.Contains("high tariff all day on Saturday and Sunday", form.Find("#tariff-weekend-empty").TextContent);
+    }
+
+    [Fact]
     public void ANewRowStartsWhereTheLastEnded()
     {
         var form = RenderTable();

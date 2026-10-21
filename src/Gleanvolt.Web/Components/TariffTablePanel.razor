@@ -19,50 +19,58 @@
 
     <h3>@(days == TariffDays.Weekday ? "Weekdays" : "Weekend") <span class="muted">@(days == TariffDays.Weekday ? "Mon–Fri" : "Sat–Sun")</span></h3>
 
-    <table class="sessions tariff-periods" id="tariff-@key">
-        @if (rows.Count > 0)
-        {
+    @if (rows.Count == 0)
+    {
+        <p class="muted tariff-empty" id="tariff-@key-empty">
+            No periods: high tariff all day @(days == TariffDays.Weekday ? "Monday to Friday" : "on Saturday and Sunday").
+        </p>
+    }
+    else
+    {
+        <table class="sessions tariff-periods" id="tariff-@key">
             <thead>
                 <tr><th>Low tariff from</th><th>until</th><th></th></tr>
             </thead>
-        }
-        <tbody>
-            @for (var i = 0; i < rows.Count; i++)
-            {
-                var row = rows[i];
-                var index = i;
-                var problem = RowProblem(days, index);
-
-                <tr class="@(problem is null ? null : "invalid")">
-                    <td>
-                        <input class="tariff-time" id="tariff-@key-@index-start" type="text" inputmode="numeric"
-                               spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="Start" disabled="@ReadOnly"
-                               value="@row.Start" @oninput="e => Edit(() => row.Start = Text(e))" />
-                    </td>
-                    <td>
-                        <input class="tariff-time" id="tariff-@key-@index-end" type="text" inputmode="numeric"
-                               spellcheck="false" autocomplete="off" placeholder="HH:mm or 24:00" aria-label="End" disabled="@ReadOnly"
-                               value="@row.End" @oninput="e => Edit(() => row.End = Text(e))" />
-                    </td>
-                    <td>
-                        @if (!ReadOnly)
-                        {
-                            <button type="button" class="link" id="tariff-@key-@index-remove"
-                                    @onclick="() => Edit(() => rows.RemoveAt(index))">Remove</button>
-                        }
-                    </td>
-                </tr>
-                @if (problem is not null)
+            <tbody>
+                @for (var i = 0; i < rows.Count; i++)
                 {
-                    <tr class="tariff-problem"><td colspan="3" class="error">@problem</td></tr>
+                    var row = rows[i];
+                    var index = i;
+                    var problem = RowProblem(days, index);
+
+                    <tr class="@(problem is null ? null : "invalid")">
+                        <td>
+                            <input class="tariff-time" id="tariff-@key-@index-start" type="text" inputmode="numeric"
+                                   spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="Start" disabled="@ReadOnly"
+                                   value="@row.Start" @oninput="e => Edit(() => row.Start = Text(e))" />
+                        </td>
+                        <td>
+                            <input class="tariff-time" id="tariff-@key-@index-end" type="text" inputmode="numeric"
+                                   spellcheck="false" autocomplete="off" placeholder="HH:mm or 24:00" aria-label="End" disabled="@ReadOnly"
+                                   value="@row.End" @oninput="e => Edit(() => row.End = Text(e))" />
+                        </td>
+                        <td>
+                            @if (!ReadOnly)
+                            {
+                                <button type="button" class="link" id="tariff-@key-@index-remove"
+                                        @onclick="() => Edit(() => rows.RemoveAt(index))">Remove</button>
+                            }
+                        </td>
+                    </tr>
+                    @if (problem is not null)
+                    {
+                        <tr class="tariff-problem"><td colspan="3" class="error">@problem</td></tr>
+                    }
                 }
-            }
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    }
 
     @if (!ReadOnly)
     {
-        <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">Add period</button>
+        <div class="tariff-add">
+            <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">Add period</button>
+        </div>
     }
 }
 
