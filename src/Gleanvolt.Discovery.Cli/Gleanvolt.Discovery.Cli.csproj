@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!--
+      The name an owner types, rather than the project's. Published self-contained and single-file
+      (see README, "Finding your devices") so it runs on a laptop or a Pi with no .NET installed.
+      Trimming stays off for the same reason as the worker's: System.Text.Json serialises the result
+      records reflectively.
+    -->
+    <AssemblyName>gleanvolt-discover</AssemblyName>
+    <RootNamespace>Gleanvolt.Discovery.Cli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Infrastructure brings SQLite's native library, which the scan never loads; inside the single
+         file it is at least not a second file to download. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Discovery\Gleanvolt.Discovery.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Discovery.Tests" />
+  </ItemGroup>
+
+</Project>

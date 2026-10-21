@@ -24,10 +24,6 @@ public sealed class PvSystemEditor : IPvSystemEditor
     // for longer than the Modbus client's own connect timeout plus one request.
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(8);
 
-    // The charger's RunMode register runs 0-13 (EvChargerStatusMapping); anything past it did not
-    // come from a charger.
-    private const ushort HighestChargerRunMode = 13;
-
     private readonly IConfigurationRoot? _configuration;
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IReadOnlyDictionary<string, string?> _running;
@@ -137,9 +133,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         CancellationToken cancellationToken = default)
     {
         var address = $"{host}:{port}";
-        var register = role == PvDeviceRole.Inverter
-            ? InverterRegisterMap.BatteryCapacity.Address
-            : EvChargerRegisterMap.RunMode.Address;
+        var register = DeviceRoleCheck.Register(role);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(ProbeTimeout);
@@ -149,17 +143,15 @@ public sealed class PvSystemEditor : IPvSystemEditor
             await using var client = _clientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
             await client.ConnectAsync(timeout.Token).ConfigureAwait(false);
             var value = (await client.ReadInputRegistersAsync(register, 1, timeout.Token).ConfigureAwait(false))[0];
+            var plausible = DeviceRoleCheck.IsPlausible(role, value);
 
-            // One register cannot prove what a box is, but it can catch the mistake this exists for: the
-            // inverter's state of charge read from the charger is a number no battery reports, and the
-            // other way round a run mode far outside the charger's range.
             return role == PvDeviceRole.Inverter
-                ? value <= 100
+                ? plausible
                     ? new DeviceProbeResult(true, true, $"{address} answered: battery at {value} %.")
                     : new DeviceProbeResult(true, false,
                         $"{address} answered, but its battery register reads {value}, which is no state of "
                         + "charge. Is this the charger's address?")
-                : value <= HighestChargerRunMode
+                : plausible
                     ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.")
                     : new DeviceProbeResult(true, false,
                         $"{address} answered, but its run-mode register reads {value}, which no charger "

@@ -4,6 +4,45 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-20 — The LAN scan finds devices with a TCP connect, and can only read
+
+**Context.** Setting Gleanvolt up starts with the inverter's and the charger's address, port and unit id,
+which the owner often does not know ([issue #267](https://github.com/mpospisil/gleanvolt/issues/267)).
+`gleanvolt-discover` scans the LAN for them: `Gleanvolt.Discovery` holds the scan and its result records,
+`Gleanvolt.Discovery.Cli` is a thin console, and `/pv-system` is meant to call the same library later.
+
+**Decision — a plain TCP connect, not ICMP or ARP.** Every host is probed with a connect to each
+candidate port (502, 8899, 80), closed at once. A ping sweep or an ARP scan needs raw sockets, so root on
+Linux, an administrator on Windows, and `NET_RAW` in a container, and a SolaX that drops ICMP would be
+missed anyway. A connect needs none of that, behaves the same on all three, and answers the question that
+matters: is something listening on the Modbus port? A dead host costs one connect timeout per port, bounded
+to 64 in flight. Only hosts with an open port are spoken Modbus to, and only one connection at a time each:
+unit ids in turn, the 250 ms SolaX pause between requests kept across them, every connection closed before
+the next one opens. A running Gleanvolt is then locked out for one probe at most.
+
+**Decision — read-only by construction.** The scanner wraps every client it speaks through in
+`ReadOnlyModbusClient` itself, whatever the client factory returns, so a scan of someone's LAN cannot write
+to a device even through a bug in the scan. It reads three things: the serial number (holding registers
+`0x00` for the inverter, `0x600` for the charger, upstream's addresses), and the input register
+`/pv-system`'s probe already reads to tell the two apart. That check moved from `PvSystemEditor` to
+`DeviceRoleCheck` in `Gleanvolt.Infrastructure`, so both use one copy. It went there rather than into
+`Gleanvolt.Discovery` so that `Gleanvolt.Hosting`, which is packaged, does not start depending on a library
+that is not.
+
+**A Modbus exception is not a device.** An RS485 bridge answers on the TCP side for every unit id, with
+exception `0x0A` or `0x0B` for an address nothing is at. Those count as "not there". Any other exception
+(an illegal address, say) does count: something is at that unit id. A port that accepts the connection and
+never replies is reported as *port open, no Modbus reply*, with the question whether Gleanvolt or Home
+Assistant holds the connection, because that is the usual cause and "not a SolaX" would be wrong.
+
+**Cost.** A device that answers on none of the candidate ports, or on a unit id not in the list, is not
+found; `--ports` and `--unit-ids` cover it. The serial-prefix table is a second copy of
+`SUPPORTED_PV_SYSTEMS.md`, kept in step by a test in one direction only (every prefix in code is in the
+doc). The port-80 dongle check looks for "SolaX" in the page and has not been tried on a real dongle yet,
+so a dongle that does not say so is simply not reported.
+
+---
+
 ## 2026-10-17 — `Forecasted` never arms the battery hold
 
 **Context.** On 2026-10-17 the charger started the car at plug-in and took the pack to 11% before a mode

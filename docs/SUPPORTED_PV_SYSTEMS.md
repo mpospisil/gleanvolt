@@ -15,6 +15,12 @@ same meaning, as the reference hardware.**
 > has been run. Register addresses can differ between firmware revisions, so **every write stays off
 > or in dry-run until you have checked the readings against the device's own display.**
 
+The serial-number prefixes in the tables below are also what
+[`gleanvolt-discover`](../README.md#finding-your-devices) names a device by when it scans the LAN, and
+the tier it prints is the tier here. The tool keeps them in one table in code
+(`src/Gleanvolt.Discovery/SolaxModels.cs`), and **the two must agree**: a prefix added to one is added to
+the other, and a test fails when the code names a device by a prefix this page does not list.
+
 ## At a glance
 
 | Tier | What it means |
@@ -149,6 +155,8 @@ need those registers — they serve only `UnmeteredGridPhase`, which is a three-
 
 ## Connecting
 
+- **Not sure of the address?** [`gleanvolt-discover`](../README.md#finding-your-devices) scans the LAN
+  and reports host, port and unit id for each device, from its serial number.
 - **Modbus TCP on port 502, unit id 1** for both devices. Both are configurable
   (`Pv:Inverter:Port`, `Pv:Inverter:UnitId`, and the same under `Pv:Chargers:0`).
 - **Inverter access.** G2 and G3 hybrids have Ethernet built in. G4 and later need the LAN port or a

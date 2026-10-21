@@ -48,4 +48,18 @@ public static class InverterRegisterMap
     /// </summary>
     public static readonly RegisterDescriptor PowerControlBlockStart =
         new((ushort)InverterControlRegister.PowerControlBlockStart, nameof(PowerControlBlockStart), "");
+
+    // --- Identity: Holding Registers (function code 0x03), read-only in practice. ---
+
+    /// <summary>
+    /// The serial number: 7 holding registers from <c>0x00</c>, 14 ASCII characters, high byte first.
+    /// Only the LAN scan reads it (issue #267), to name the family from the prefix. From the
+    /// wills106/homeassistant-solax-modbus integration (<c>plugin_solax.py</c>,
+    /// <c>async_determineInverterType</c>), which reads it the same way on every hybrid it supports.
+    /// Upstream falls back to <c>0x300</c> and <c>0x1A10</c> for lines with a different map; none of
+    /// those is a family Gleanvolt can drive, so the scan does not.
+    /// </summary>
+    public const ushort SerialNumberStart = 0x0000;
+
+    public const ushort SerialNumberCount = 7;
 }
