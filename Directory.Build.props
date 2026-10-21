@@ -7,7 +7,7 @@
       repository, in a commit, reviewable. Nothing else in the tree may hardcode it; anything that
       needs it reads it from here (see DockerfileTests for the one place that must mirror it).
     -->
-    <MajorMinorVersion>1.0</MajorMinorVersion>
+    <MajorMinorVersion>1.1</MajorMinorVersion>
 
     <!--
       The half a machine decides. release.yml takes the next build number not yet claimed by a

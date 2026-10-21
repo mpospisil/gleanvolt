@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Models;
+using static Gleanvolt.Api.Contracts.BaseUnits;
 
 namespace Gleanvolt.Api.Contracts;
 
@@ -6,22 +7,22 @@ namespace Gleanvolt.Api.Contracts;
 /// One window of the site's energy history — by default a quarter hour — recorded whether or not
 /// anything was charging.
 ///
-/// <para>Every figure is in kilowatt-hours over the window, and none of them are signed: import and
+/// <para>Every figure is in watt-hours over the window, and none of them are signed: import and
 /// export, charge and discharge, are separate columns rather than one number that changes sign.</para>
 /// </summary>
 /// <param name="PeriodStart">Start of the window, inclusive.</param>
 /// <param name="PeriodEnd">End of the window, exclusive.</param>
 /// <param name="LocalDate">The local day this window belongs to, in the site's own zone.</param>
 /// <param name="TimeZoneId">The zone that local day was computed in.</param>
-/// <param name="SolarKwh">What the roof produced.</param>
-/// <param name="ForecastSolarKwh">What the forecast said it would produce, or null when no forecast covered the window.</param>
-/// <param name="GridImportKwh">Energy drawn from the grid. Export is not subtracted from it.</param>
-/// <param name="GridExportKwh">Energy pushed to the grid, as a positive number.</param>
-/// <param name="EvKwh">Energy delivered to the car, measured at the charger.</param>
-/// <param name="BatteryChargeKwh">Energy into the home battery.</param>
-/// <param name="BatteryDischargeKwh">Energy out of the home battery, as a positive number.</param>
-/// <param name="HouseLoadKwh">Everything the house consumed, the car included — the residual of the energy balance.</param>
-/// <param name="OtherLoadsKwh">House consumption with the car taken out.</param>
+/// <param name="SolarWh">What the roof produced.</param>
+/// <param name="ForecastSolarWh">What the forecast said it would produce, or null when no forecast covered the window.</param>
+/// <param name="GridImportWh">Energy drawn from the grid. Export is not subtracted from it.</param>
+/// <param name="GridExportWh">Energy pushed to the grid, as a positive number.</param>
+/// <param name="EvWh">Energy delivered to the car, measured at the charger.</param>
+/// <param name="BatteryChargeWh">Energy into the home battery.</param>
+/// <param name="BatteryDischargeWh">Energy out of the home battery, as a positive number.</param>
+/// <param name="HouseLoadWh">Everything the house consumed, the car included — the residual of the energy balance.</param>
+/// <param name="OtherLoadsWh">House consumption with the car taken out.</param>
 /// <param name="SocStartPercent">Home battery SOC at the start of the window.</param>
 /// <param name="SocEndPercent">SOC at the last reading inside it.</param>
 /// <param name="SocMinPercent">Lowest SOC observed.</param>
@@ -38,15 +39,15 @@ public sealed record EnergyIntervalResponse(
     DateTimeOffset PeriodEnd,
     DateOnly LocalDate,
     string TimeZoneId,
-    double SolarKwh,
-    double? ForecastSolarKwh,
-    double GridImportKwh,
-    double GridExportKwh,
-    double EvKwh,
-    double BatteryChargeKwh,
-    double BatteryDischargeKwh,
-    double HouseLoadKwh,
-    double OtherLoadsKwh,
+    double SolarWh,
+    double? ForecastSolarWh,
+    double GridImportWh,
+    double GridExportWh,
+    double EvWh,
+    double BatteryChargeWh,
+    double BatteryDischargeWh,
+    double HouseLoadWh,
+    double OtherLoadsWh,
     double SocStartPercent,
     double SocEndPercent,
     double SocMinPercent,
@@ -60,15 +61,15 @@ public sealed record EnergyIntervalResponse(
         interval.PeriodEnd,
         interval.LocalDate,
         interval.TimeZoneId,
-        interval.SolarKwh,
-        interval.ForecastSolarKwh,
-        interval.GridImportKwh,
-        interval.GridExportKwh,
-        interval.EvKwh,
-        interval.BatteryChargeKwh,
-        interval.BatteryDischargeKwh,
-        interval.HouseLoadKwh,
-        interval.OtherLoadsKwh,
+        Wh(interval.SolarKwh),
+        Wh(interval.ForecastSolarKwh),
+        Wh(interval.GridImportKwh),
+        Wh(interval.GridExportKwh),
+        Wh(interval.EvKwh),
+        Wh(interval.BatteryChargeKwh),
+        Wh(interval.BatteryDischargeKwh),
+        Wh(interval.HouseLoadKwh),
+        Wh(interval.OtherLoadsKwh),
         interval.SocStartPercent,
         interval.SocEndPercent,
         interval.SocMinPercent,
@@ -98,15 +99,15 @@ public sealed record EnergySeriesResponse(
 /// <param name="TimeZoneId">The zone it was measured in.</param>
 /// <param name="From">The instant the day started.</param>
 /// <param name="To">The instant it ended.</param>
-/// <param name="SolarKwh">What the roof produced.</param>
-/// <param name="ForecastSolarKwh">What the forecast said it would, summed over the windows that had one.</param>
-/// <param name="GridImportKwh">Energy drawn from the grid.</param>
-/// <param name="GridExportKwh">Energy pushed to the grid.</param>
-/// <param name="EvKwh">Energy delivered to the car.</param>
-/// <param name="BatteryChargeKwh">Energy into the home battery.</param>
-/// <param name="BatteryDischargeKwh">Energy out of the home battery.</param>
-/// <param name="HouseLoadKwh">Everything the house consumed, the car included.</param>
-/// <param name="OtherLoadsKwh">House consumption with the car taken out.</param>
+/// <param name="SolarWh">What the roof produced.</param>
+/// <param name="ForecastSolarWh">What the forecast said it would, summed over the windows that had one.</param>
+/// <param name="GridImportWh">Energy drawn from the grid.</param>
+/// <param name="GridExportWh">Energy pushed to the grid.</param>
+/// <param name="EvWh">Energy delivered to the car.</param>
+/// <param name="BatteryChargeWh">Energy into the home battery.</param>
+/// <param name="BatteryDischargeWh">Energy out of the home battery.</param>
+/// <param name="HouseLoadWh">Everything the house consumed, the car included.</param>
+/// <param name="OtherLoadsWh">House consumption with the car taken out.</param>
 /// <param name="SocStartPercent">Home battery SOC at the first window of the day, or null when the day has no rows.</param>
 /// <param name="SocEndPercent">SOC at the last window, or null when the day has no rows.</param>
 /// <param name="SocMinPercent">Lowest SOC observed across the day.</param>
@@ -121,15 +122,15 @@ public sealed record EnergyDayResponse(
     string TimeZoneId,
     DateTimeOffset From,
     DateTimeOffset To,
-    double SolarKwh,
-    double? ForecastSolarKwh,
-    double GridImportKwh,
-    double GridExportKwh,
-    double EvKwh,
-    double BatteryChargeKwh,
-    double BatteryDischargeKwh,
-    double HouseLoadKwh,
-    double OtherLoadsKwh,
+    double SolarWh,
+    double? ForecastSolarWh,
+    double GridImportWh,
+    double GridExportWh,
+    double EvWh,
+    double BatteryChargeWh,
+    double BatteryDischargeWh,
+    double HouseLoadWh,
+    double OtherLoadsWh,
     double? SocStartPercent,
     double? SocEndPercent,
     double? SocMinPercent,
@@ -151,17 +152,17 @@ public sealed record EnergyDayResponse(
             timeZoneId,
             from,
             to,
-            ordered.Sum(i => i.SolarKwh),
+            Wh(ordered.Sum(i => i.SolarKwh)),
             // Null rather than zero when nothing forecast the day at all: a summed zero would read as
             // "the forecast expected darkness", which is a different claim from "there was no forecast".
-            ordered.Any(i => i.ForecastSolarKwh is not null) ? ordered.Sum(i => i.ForecastSolarKwh ?? 0) : null,
-            ordered.Sum(i => i.GridImportKwh),
-            ordered.Sum(i => i.GridExportKwh),
-            ordered.Sum(i => i.EvKwh),
-            ordered.Sum(i => i.BatteryChargeKwh),
-            ordered.Sum(i => i.BatteryDischargeKwh),
-            ordered.Sum(i => i.HouseLoadKwh),
-            ordered.Sum(i => i.OtherLoadsKwh),
+            ordered.Any(i => i.ForecastSolarKwh is not null) ? Wh(ordered.Sum(i => i.ForecastSolarKwh ?? 0)) : null,
+            Wh(ordered.Sum(i => i.GridImportKwh)),
+            Wh(ordered.Sum(i => i.GridExportKwh)),
+            Wh(ordered.Sum(i => i.EvKwh)),
+            Wh(ordered.Sum(i => i.BatteryChargeKwh)),
+            Wh(ordered.Sum(i => i.BatteryDischargeKwh)),
+            Wh(ordered.Sum(i => i.HouseLoadKwh)),
+            Wh(ordered.Sum(i => i.OtherLoadsKwh)),
             ordered.Count > 0 ? ordered[0].SocStartPercent : null,
             ordered.Count > 0 ? ordered[^1].SocEndPercent : null,
             ordered.Count > 0 ? ordered.Min(i => i.SocMinPercent) : null,

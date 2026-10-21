@@ -88,11 +88,11 @@ internal static class TargetedRequests
     {
         var now = time.GetUtcNow();
 
-        // The same factory the web UI's form goes through: the SOC to kilowatt-hours conversion, the
+        // The same factory the web UI's form goes through: the SOC to energy conversion, the
         // just-in-time split, the horizon and the "car is already there" refusal all live there.
         var composed = TargetedChargeRequestFactory.Create(
             departBy: body.DepartBy,
-            energyWh: body.EnergyKWh * 1000,
+            energyWh: body.EnergyWh,
             targetSocPercent: body.TargetSocPercent,
             priority: body.Priority,
             restSocPercent: body.RestSocPercent,

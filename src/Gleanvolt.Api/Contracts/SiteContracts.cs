@@ -24,8 +24,8 @@ namespace Gleanvolt.Api.Contracts;
 /// 180 south. Normalised, so a site configured as -180 reports 180.
 /// </param>
 /// <param name="TiltDegrees">Tilt from horizontal: 0 flat, 90 vertical.</param>
-/// <param name="CapacityKwp">Peak DC capacity of the array, in kWp.</param>
-/// <param name="InverterCapacityKw">AC-side capacity in kW, where it clips the array.</param>
+/// <param name="PeakPowerWatts">Peak DC power of the array (its kWp rating), in W.</param>
+/// <param name="InverterCapacityWatts">AC-side capacity in W, where it clips the array.</param>
 /// <param name="LossFactor">System loss factor in (0, 1] — the fraction of DC yield that reaches the meter.</param>
 /// <param name="InstallDate">Commissioning date.</param>
 /// <param name="Inverter">The inverter every figure in <c>/status</c> is read from.</param>
@@ -38,8 +38,8 @@ public sealed record SiteResponse(
     double? Longitude,
     double? AzimuthDegrees,
     double? TiltDegrees,
-    double? CapacityKwp,
-    double? InverterCapacityKw,
+    double? PeakPowerWatts,
+    double? InverterCapacityWatts,
     double? LossFactor,
     DateOnly? InstallDate,
     SiteDeviceResponse Inverter,
@@ -53,8 +53,8 @@ public sealed record SiteResponse(
         site.Longitude,
         site.AzimuthDegrees,
         site.TiltDegrees,
-        site.PeakPowerWatts / 1000,
-        site.InverterCapacityWatts / 1000,
+        site.PeakPowerWatts,
+        site.InverterCapacityWatts,
         site.LossFactor,
         site.InstallDate,
         SiteDeviceResponse.From(site.Inverter),

@@ -117,11 +117,11 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         var intervals = body.GetProperty("intervals");
 
         Assert.Equal(2, body.Number("count"));
-        Assert.Equal(0.9, intervals[0].Number("solarKwh"));
+        Assert.Equal(900, intervals[0].Number("solarWh"));
 
         // House load is the residual of the energy balance, computed rather than stored -- if the API
         // shipped it as a column of its own it could disagree with the columns it came from.
-        Assert.Equal(0.9 + 0.1 - 0.2 - 0.3, intervals[0].Number("houseLoadKwh"), 3);
+        Assert.Equal(500, intervals[0].Number("houseLoadWh"), 1);
         Assert.Equal(1, intervals[0].Number("coverage"));
     }
 
@@ -152,8 +152,8 @@ public sealed class ReadEndpointTests : IAsyncDisposable
 
         var body = await (await client.GetAsync("/api/v1/energy/days/2026-01-15")).ReadAsync();
 
-        Assert.Equal(5, body.Number("solarKwh"));
-        Assert.Equal(3, body.Number("evKwh"));
+        Assert.Equal(5_000, body.Number("solarWh"));
+        Assert.Equal(3_000, body.Number("evWh"));
         Assert.Equal(2, body.Number("intervalCount"));
         Assert.Equal("Europe/Prague", body.Text("timeZoneId"));
     }
@@ -231,6 +231,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
             CapturedAt: Fixtures.Now.AddHours(-13),
             SocPercent: 42,
             RangeMetres: 176_000,
+            ChargeTimeRemaining: TimeSpan.FromMinutes(45),
             PlugState: VehiclePlugState.Connected));
 
         var body = await (await client.GetAsync("/api/v1/vehicle")).ReadAsync();
@@ -238,6 +239,10 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         Assert.True(body.GetProperty("available").GetBoolean());
         Assert.Equal(42, body.Number("socPercent"));
         Assert.Equal(13 * 3600, body.Number("ageSeconds"));
+
+        // Base units, not display units (#263): metres and seconds, never km and minutes.
+        Assert.Equal(176_000, body.Number("rangeMetres"));
+        Assert.Equal(45 * 60, body.Number("chargeTimeRemainingSeconds"));
 
         // Past the configured 12 hours: the number is still reported, and so is the fact that the feed
         // has gone quiet, because a caller that cannot see the clock will otherwise treat it as current.
@@ -297,6 +302,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
 
         var asked = await (await client.GetAsync("/api/v1/forecast?weather=true")).ReadAsync();
         Assert.Equal("Clouds", asked.GetProperty("weather").Text("condition"));
+        Assert.Equal(101_300, asked.GetProperty("weather").Number("pressurePascals"));
         Assert.Equal(1, _host.Weather.Calls);
     }
 
@@ -339,7 +345,7 @@ public sealed class ReadEndpointTests : IAsyncDisposable
 
         Assert.Equal("id4", body.Text("id"));
         Assert.Equal("Volkswagen", body.Text("make"));
-        Assert.Equal(77, body.Number("batteryCapacityKWh"));
+        Assert.Equal(77_000, body.Number("batteryCapacityWh"));
         Assert.Equal(3, body.GetProperty("phases").GetInt32());
     }
 

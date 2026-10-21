@@ -39,8 +39,8 @@ public sealed class SiteEndpointTests : IAsyncDisposable
 
         Assert.Equal(172, site.Number("azimuthDegrees"));
         Assert.Equal(35, site.Number("tiltDegrees"));
-        Assert.Equal(9.2, site.Number("capacityKwp"), 2);
-        Assert.Equal(8, site.Number("inverterCapacityKw"));
+        Assert.Equal(9_200, site.Number("peakPowerWatts"));
+        Assert.Equal(8_000, site.Number("inverterCapacityWatts"));
         Assert.Equal(0.9, site.Number("lossFactor"), 2);
         Assert.Equal("2024-05-01", site.Text("installDate"));
     }

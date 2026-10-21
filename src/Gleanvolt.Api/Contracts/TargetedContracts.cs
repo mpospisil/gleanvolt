@@ -9,16 +9,16 @@ namespace Gleanvolt.Api.Contracts;
 ///
 /// <para>Say it either as energy at the charger or as a state of charge for the car, not
 /// both. A state of charge needs a vehicle feed with a reading and a configured pack size
-/// (<c>Vehicle:BatteryCapacityKWh</c>); without them, ask in kilowatt-hours. The conversion happens
+/// (<c>Ev:Vehicles:0:BatteryCapacityKWh</c>); without them, ask in energy. The conversion happens
 /// once, when the request is made, and is never re-derived from a later reading.</para>
 /// </summary>
-/// <param name="EnergyKWh">
-/// The energy to deliver, measured at the charger — not the energy that reaches the cells. Omit when
+/// <param name="EnergyWh">
+/// The energy to deliver in Wh, measured at the charger — not the energy that reaches the cells. Omit when
 /// asking in state of charge.
 /// </param>
 /// <param name="TargetSocPercent">
 /// The state of charge to reach, 0-100. Converted to energy from what the car last reported. Omit when
-/// asking in kilowatt-hours.
+/// asking in energy.
 /// </param>
 /// <param name="DepartBy">
 /// When the energy has to be in the car. An ISO-8601 timestamp with an offset: this is a
@@ -43,7 +43,7 @@ namespace Gleanvolt.Api.Contracts;
 /// "what you quote is what you commit to" true of the limits as well as of the target.</para>
 /// </param>
 public sealed record TargetedChargeRequestBody(
-    double? EnergyKWh,
+    double? EnergyWh,
     double? TargetSocPercent,
     DateTimeOffset DepartBy,
     TargetedChargePriority Priority = TargetedChargePriority.Cheapest,

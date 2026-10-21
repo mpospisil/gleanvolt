@@ -52,7 +52,7 @@ charged without the hold. It now reads `EvInfo`, as the web UI and the API do.
 `…Metres` and `…Seconds` (`peakPowerWatts`, `inverterCapacityWatts`, `chargeTimeRemainingSeconds`), and a
 kWh value still in the domain is converted at the edge, never the other way round. The routes stay
 `/api/v1`: the only client is `gleanvolt-mcp`, which is updated in the same step, and the release notes
-call the break out.
+call the break out, and the product line moves to 1.1 with it.
 
 **Order.** (1) the formatter, which changes no value below the UI; (2) the domain and options to base units;
 (3) the API, the OpenAPI copy and the MCP server.

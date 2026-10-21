@@ -2981,6 +2981,11 @@ Like the web UI, it is an adapter over the same Core seams the MQTT worker drive
 `IBatteryHoldSelector`) and owns no control logic of its own. It invents no capability: every action
 below is a button the web UI already has.
 
+**Every field is in a base unit, and its name says which** (issue #263): power in W (`…Watts`), energy in
+Wh (`…Wh`), durations in seconds (`…Seconds`), distance in metres (`…Metres`), pressure in Pa
+(`…Pascals`), percentages 0–100 (`…Percent`). Nothing is pre-scaled to kWh, kW or km for display: the
+client formats, as the web UI does. The settings keys keep their own units (`…KWh`, `…Kwp`).
+
 #### Switched on knowingly, and never open
 
 | Setting | Default | Meaning |
@@ -3111,7 +3116,7 @@ curl -sS -X POST http://gleanvolt.local:8090/api/v1/plans/targeted/preview \
 It returns the same plan the running mode would report — the strategy, the pace the charger must
 hold, the solar and grid shares, the forecast surplus in the window, when the import would start,
 what will actually arrive and, when it cannot be met, how far short and the departure that *would*
-have covered it. Ask in `energyKWh` instead of `targetSocPercent` on an installation with no vehicle
+have covered it. Ask in `energyWh` instead of `targetSocPercent` on an installation with no vehicle
 feed; the conversion, the horizon check and the just-in-time split are the same
 [`TargetedChargeRequestFactory`](src/Gleanvolt.Core/Strategies/TargetedChargeRequestFactory.cs) the web
 form goes through, so a quote and the promise made from it can never disagree.
@@ -3135,7 +3140,7 @@ Change a field, put the whole thing back under `editable`, and either **quote it
 preview endpoint) or **charge to it**:
 
 ```bash
-curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start/targeted   -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json'   -d '{"energyKWh": 22, "departBy": "2026-08-27T07:00:00+02:00",
+curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start/targeted   -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json'   -d '{"energyWh": 22000, "departBy": "2026-08-27T07:00:00+02:00",
        "editable": {"notBefore": "2026-08-27T02:00:00+02:00", "maxGridEnergyWh": 8000}}'
 ```
 
@@ -3177,7 +3182,7 @@ the difference in `gridEnergyWh`.
 ```bash
 curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start \
   -H "Authorization: Bearer $API_KEY" -H 'content-type: application/json' \
-  -d '{"mode": "targeted", "target": {"energyKWh": 22, "departBy": "2026-08-24T07:00:00+02:00"}}'
+  -d '{"mode": "targeted", "target": {"energyWh": 22000, "departBy": "2026-08-24T07:00:00+02:00"}}'
 ```
 
 One call does what one button does: the charger's Fast use-mode is written and the mode is then
@@ -3189,7 +3194,7 @@ refuses. It says **when to stop**, not how to charge:
 
 ```bash
 # 20 kWh, flat out, then stop.
--d '{"mode": "fastNoBattery", "fast": {"basis": "energy", "energyKWh": 20}}'
+-d '{"mode": "fastNoBattery", "fast": {"basis": "energy", "energyWh": 20000}}'
 
 # To 60% of the pack, converted once, here.
 -d '{"mode": "fastNoBattery", "fast": {"basis": "soc", "targetSocPercent": 60}}'
@@ -3349,8 +3354,8 @@ while the car was charging — plus the car's own view of itself:
 | `ForecastSolarWh` | What the forecast expected the roof to make over that same window. Against `SolarWh` it is the session's own forecast-versus-reality line. `null` — not `0` — while no forecast has been available for any part of the session. |
 | `GridImportWh` | Energy the **whole site** imported, export excluded rather than netted off, so a sunny hour can't cancel out an expensive evening. Again distinct from `FromGridWh`, the car's attributed share. |
 | `VehicleSocPercent` | The **car's own** battery SOC from the [vehicle feed](#vehicle-telemetry-the-vehicle-section), or `null` when none is configured or nothing has arrived. Advisory: nothing in charge control reads it. |
-| `VehicleChargeTimeRemainingMinutes` | How much longer the **car itself** reckons it needs, from `charge_time_remaining_minutes`. **`0` when the car did not report it** — not an error, just a feed that doesn't publish it. Because `0` is also a legitimate reading ("done"), never read this without the flag below. |
-| `VehicleChargeTimeRemainingReported` | Whether that `0` is the car's answer or the absence of one. `false` means no estimate was provided. |
+| `VehicleChargeTimeRemaining` | How much longer the **car itself** reckons it needs, from `charge_time_remaining_minutes` (stored in minutes). **Zero when the car did not report it** — not an error, just a feed that doesn't publish it. Because `0` is also a legitimate reading ("done"), never read this without the flag below. |
+| `VehicleChargeTimeRemainingReported` | Whether that zero is the car's answer or the absence of one. `false` means no estimate was provided. |
 | `VehicleSocCapturedAt` | When the *vehicle* produced that reading. Stored next to it because it routinely lags by hours — a SOC without its capture time cannot be told from a live one, and a chart would silently flatten. A feed that goes quiet mid-session leaves the last reading standing with a visibly ageing capture time rather than blanking the column. |
 
 These arrived in database schema **v2**; a v1 file is migrated in place on startup and its existing
