@@ -1628,6 +1628,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
 - the solar-grid controls — the **Min solar surplus** number, applied at once — plus its **Sun until**
   sensor, populated while the mode is driving.
+- the tariff — the **Low tariff** binary sensor and the **Tariff change** and **Grid price** sensors —
+  published whatever tariff provider is selected on Settings, and unknown while none is.
 - binary sensors: **Car connected** and **Charging now**.
 - **Car feed** — only on an installation with a
   [manufacturer vehicle feed](#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section)
@@ -1667,6 +1669,9 @@ description or tooltip field. The meanings live here instead.
 | **Fast target** | kWh | The amount that fast charge is working to — the number **Fast delivered** is counting towards. Absent on the same terms. |
 | **Min solar surplus** | W | The smoothed surplus below which `SolarGrid` pauses the car instead of topping it up from the grid — and the line the rest of today's forecast has to clear for the mode to keep waiting. Applied at once, including to a running charge. The most the grid ever adds is the charger's floor (~4.14 kW on three phases) less this; at or above the floor the grid never helps. Doesn't persist across restarts. |
 | **Sun until** | sensor | When today's forecast surplus last clears **Min solar surplus**, as `HH:mm` — the time `SolarGrid` will switch itself off if the live surplus agrees. `none` when the forecast has no such sun left; absent with no usable forecast, and whenever another mode is driving. |
+| **Low tariff** | on/off | `ON` while the grid is in the low (cheap) rate of the tariff selected under *Tariff* on Settings, `OFF` in the high rate. **Unknown** with no tariff selected, or one that cannot answer — no tariff is not the same as high tariff. Follows a save on Settings by the next status publish, with no restart. |
+| **Tariff change** | timestamp | When the rate next changes. A night tariff entered as 22:00–24:00 and 00:00–06:00 changes at 06:00, not at midnight. Unknown with no tariff, and when the next change lies beyond what the provider knows (the `Table` provider knows today and tomorrow). |
+| **Grid price** | `Tariff:Currency`/kWh | What a kWh from the grid costs right now: the low or high price entered on Settings, or a provider's own price for the moment. Unknown without prices or a tariff. Shaped for Home Assistant's energy dashboard as an *entity with the current price*. |
 | **Control state** | — | What charge control is doing right now. `Disabled`: nothing is running, the charger is the owner's. `Idle`: a strategy is running but not acting — most often because the charger has been taken out of Fast at the wallbox since it was started. `Charging`: a current is being commanded. `Paused`: the setpoint was dropped to the pause current, typically because the surplus fell below what the charger's 6 A floor needs. |
 | **Charger status** | — | The charger's own state, straight from its register. `Available`: no car. `Preparing`: plugged in, not yet drawing. `Charging`. `SuspendedEv`: the *car* stopped the draw, usually at its own charge limit. `SuspendedEvse` / `ChargePaused`: the *charger* stopped it — what our pause write produces. `Finishing`: session closing. `Faulted` / `Unavailable`: not usable. |
 | **Solar power** | W | PV production measured at the inverter, before the house, the battery or the car take any of it. |

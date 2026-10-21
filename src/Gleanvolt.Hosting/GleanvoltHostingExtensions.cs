@@ -636,7 +636,8 @@ public static class GleanvoltHostingExtensions
             provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value,
             provider.GetRequiredService<PvSystemInfo>(),
             provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value.Enabled,
-            provider.GetServices<IVehicleUpdateService>().Any()));
+            provider.GetServices<IVehicleUpdateService>().Any(),
+            provider.GetRequiredService<ITariffEditor>().Currency));
 
         services.AddHostedService<HomeAssistantMqttWorker>();
 

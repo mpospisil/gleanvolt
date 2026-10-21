@@ -1159,7 +1159,7 @@ internal sealed class FakeTariffEditor : ITariffEditor
     }
 }
 
-/// <summary>Tariff settings with the Table strategy selected and <paramref name="table"/> as its section.</summary>
+/// <summary>Tariff settings with the Table strategy selected and a table as its section, and the way back.</summary>
 internal static class TestTariffs
 {
     public static TariffSettings Table(TariffTable table, decimal? low = 2.10m, decimal? high = 4.80m) =>
