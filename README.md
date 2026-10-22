@@ -35,7 +35,8 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 - **Solar with grid help** — "take the sun, let the grid make a weak sun usable, and stop when the day's sun is over": the car follows the surplus while it clears a minimum you set, a surplus too small for the charger's 6 A floor is topped up to it from the grid with the home battery held out of it, and once the forecast has no sun left today that clears your minimum the mode switches itself off.
 - **Grid tariff** — tell it when your grid is cheap (Czech *HDO*: the low rate, NT, and the high rate,
   VT) by typing your low-tariff periods for weekdays and the weekend on Settings, with a price for each
-  rate. It shows on the Overview, in Home Assistant and on the API; a save applies at once. See
+  rate. It shows on the Overview, in Home Assistant and on the API; a save applies at once, and `Fast`
+  and `SolarGrid` can be set to wait for low tariff before buying from the grid. See
   [Grid tariff](#grid-tariff-the-tariff-section).
 - **Solar forecasting** — a cached [Solcast](https://solcast.com/) forecast for the site, logged against actual generation.
 - **Home Assistant integration** over MQTT discovery, with runtime control and telemetry.
@@ -1192,6 +1193,29 @@ so the rule leans on power and treats the status as a corroborating signal:
 `ChargePaused` and `SuspendedEvse` are deliberately *not* treated as "the car is done": those are the
 charger's own doing, which is exactly what our pause write produces.
 
+#### Low tariff only
+
+With a [grid tariff](#grid-tariff-the-tariff-section) set up, **Low tariff only** — a checkbox on the
+*Fast* tab, the **Fast low tariff only** switch in Home Assistant, or `PUT /charging/low-tariff-only` —
+makes the mode wait through high tariff and charge flat out once low tariff starts. The boot value is
+`ChargeControl:Fast:LowTariffOnly` (`false`); a runtime change doesn't survive a restart.
+
+- **A wait is not a finished car.** The car is "finished" only while the mode is asking it to charge,
+  so hours of no draw through high tariff end nothing, and when low tariff starts the car gets a fresh
+  `CompletionDwell` to spin up in. A car that reaches its own limit in low tariff still ends the mode.
+- **The charger is stood down** (use-mode `Stop`) for a wait of 15 minutes or more and paused for a
+  shorter one, the rule `SolarGrid` already uses: this wallbox tolerates 0 A in Fast for minutes, not
+  hours.
+- **The discharge hold is released through the wait** and armed again at the low edge. Nothing is
+  charging, and the hold also keeps the pack out of the house: armed through a high tariff, it would
+  run the house on the grid at the expensive rate.
+- **A car plugged in during high tariff draws for a moment.** The charger starts it on its own at
+  plug-in (Fast, 16 A), and the next poll stops it.
+- **A departure time doesn't know about the tariff.** The latest start is worked out as if the car could
+  charge at any hour, so a wait for low tariff can leave a deferred charge short of time; the plan says
+  so rather than hiding it.
+- **With no tariff set up the option is ignored**, and the Overview and the tab say so.
+
 #### What it doesn't do
 
 - **It doesn't survive a restart.** Like every mode, the service comes back in `Off` — a service that
@@ -1562,18 +1586,32 @@ held and the house on the grid for nothing.
   pack; a warning says so when the mode is selected.
 - **Nothing survives a restart**, the minimum set at runtime included.
 
+#### Low tariff only
+
+With a [grid tariff](#grid-tariff-the-tariff-section) set up, **Low tariff only** — on the *Solar +
+grid* tab, the **SolarGrid low tariff only** switch, or `PUT /charging/low-tariff-only` — makes **high
+tariff pause the car, sun or not.** The mode then charges only in low tariff, as `Fast` does with the
+same option. The cost is a sunny high-tariff afternoon: the surplus goes to the home battery or the grid
+rather than the car. Waits follow the rule above: stood down for 15 minutes or more, paused for less.
+
+The day's end still applies. The option narrows when the mode charges and never keeps it alive past its
+sun, so a low tariff that starts after dark charges nothing in this mode; use `Fast` with the same
+option for that. With no tariff set up the option is ignored, and the Overview and the tab say so.
+
 | Key | Default | Meaning |
 |---|---|---|
 | `ChargeControl:SolarGrid:MinSurplusWatts` | `2000` | The boot value of the minimum solar surplus, in watts. |
 | `ChargeControl:SolarGrid:ForecastConfidence` | `P50` | The forecast band that decides whether sun is still to come. |
+| `ChargeControl:SolarGrid:LowTariffOnly` | `false` | The boot value of **Low tariff only**. |
 
 ### Grid tariff (the `Tariff` section)
 
 What grid energy costs at each hour, for a two-rate tariff: in Czech terms, the distributor's **HDO**
 switching between the low rate (**NT**) and the high rate (**VT**). This part only makes the tariff
-known and visible — on the Overview, in Home Assistant and on the HTTP API. **Nothing here changes how
-the car charges yet**; waiting for low tariff in `Fast` and `SolarGrid` is
-[#274](https://github.com/mpospisil/gleanvolt/issues/274).
+known and visible — on the Overview, in Home Assistant and on the HTTP API. **On its own it changes
+nothing about how the car charges.** That is the **Low tariff only** option of
+[`Fast`](#low-tariff-only) and [`SolarGrid`](#low-tariff-only-1), which waits for low tariff before
+buying from the grid.
 
 It is set up on the web UI's **Settings** page, under *Tariff*, rather than in configuration. A save
 applies at once, with no restart. Like the rest of Settings it is read-only until the UI has a login
@@ -3152,6 +3190,8 @@ which is the thing a client is generated from. Everything else is behind the key
 | `POST /charging/start/targeted` | Start a targeted charge under an edited plan's limits. Same body as the preview. |
 | `POST /charging/stop` | Stop charging and clear any standing target. |
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
+| `GET /charging/low-tariff-only` | Whether `fastNoBattery` and `solarGrid` wait for low tariff, and whether there is a tariff for them to act on (`tariffKnown`). |
+| `PUT /charging/low-tariff-only` | Set either or both; a field left out is left as it is. Applies from the next poll, to a running mode too, and doesn't survive a restart. Accepted with no tariff set up, which the answer's `tariffKnown` shows. |
 | `GET /tariff` | The [grid tariff](#grid-tariff-the-tariff-section): the low and high stretches as far ahead as the provider knows, the rate now with its price and next change, and the currency. Empty with no tariff — which means no restriction, never "always low". |
 | `GET /tariff/providers` | The tariff providers this build has, and which one is selected. |
 | `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
