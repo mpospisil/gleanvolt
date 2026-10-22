@@ -377,3 +377,26 @@ internal sealed class FakeTariffSchedule(FakeTariffEditor editor, TimeProvider t
 
     public string Currency => editor.Currency;
 }
+
+internal sealed class FakeLowTariffSettings : ILowTariffSettings
+{
+    private readonly HashSet<Gleanvolt.Core.Enums.ChargeControlMode> _on = [];
+
+    public List<string> Sources { get; } = [];
+
+    public bool IsLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode mode) => _on.Contains(mode);
+
+    public void SetLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode mode, bool on, string source)
+    {
+        Sources.Add(source);
+
+        if (on)
+        {
+            _on.Add(mode);
+        }
+        else
+        {
+            _on.Remove(mode);
+        }
+    }
+}

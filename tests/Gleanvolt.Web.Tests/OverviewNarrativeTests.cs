@@ -84,4 +84,29 @@ public class OverviewNarrativeTests
 
         Assert.StartsWith("Dry run:", text);
     }
+
+    [Fact]
+    public void Names_the_tariff_when_a_low_tariff_only_mode_is_waiting()
+    {
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery) with
+        {
+            CarConnected = true,
+            State = Gleanvolt.Core.Enums.ChargeControlState.Paused,
+            LowTariff = new Gleanvolt.Core.Models.LowTariffStatus(Waiting: true, Until: new DateTimeOffset(2026, 10, 21, 20, 0, 0, TimeSpan.Zero), Ignored: false),
+        });
+
+        Assert.Contains("has paused the car", text);
+        Assert.Contains("High tariff until 22:00; it is waiting for low tariff (low tariff only).", text);
+    }
+
+    [Fact]
+    public void Says_when_low_tariff_only_has_nothing_to_wait_for()
+    {
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.SolarGrid) with
+        {
+            LowTariff = new Gleanvolt.Core.Models.LowTariffStatus(Waiting: false, Until: null, Ignored: true),
+        });
+
+        Assert.Contains("no tariff to wait for, so it charges whatever the hour", text);
+    }
 }

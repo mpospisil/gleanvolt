@@ -40,6 +40,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     // The tariff (issue #265), read on the publish tick like the vehicle feed's health.
     private readonly ITariffSchedule? _tariff;
+
+    // The low-tariff-only flags (#274), set by the two switches and published from on every tick.
+    private readonly ILowTariffSettings? _lowTariff;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -88,10 +91,12 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         ConfiguredVehicleFeed? vehicleFeed = null,
         TimeProvider? timeProvider = null,
         ISolarGridSettings? solarGrid = null,
-        ITariffSchedule? tariff = null)
+        ITariffSchedule? tariff = null,
+        ILowTariffSettings? lowTariff = null)
     {
         _solarGrid = solarGrid;
         _tariff = tariff;
+        _lowTariff = lowTariff;
         _options = options.Value;
         _batteryHoldEnabled = batteryHoldOptions.Value.Enabled;
         _discovery = discovery;
@@ -226,6 +231,14 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.TextCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        if (_lowTariff is not null)
+        {
+            foreach (var (objectId, _, _) in HaDiscovery.LowTariffSwitches)
+            {
+                await _client.SubscribeAsync(_discovery.SwitchCommandTopic(objectId), cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         await _client.SubscribeAsync(_discovery.ActivateTargetCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -251,6 +264,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
+        await PublishLowTariffStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishSelectStatesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -262,6 +276,24 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await PublishAsync(
                 _discovery.StateTopic,
                 _discovery.StateJson(status, _vehicleFeed?.Health, _tariff?.Timeline),
+                retain: true,
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // What the controller is using, on every tick, so a flag changed on the web page shows here too.
+    private async Task PublishLowTariffStatesAsync(CancellationToken cancellationToken)
+    {
+        if (_lowTariff is null)
+        {
+            return;
+        }
+
+        foreach (var (objectId, mode, _) in HaDiscovery.LowTariffSwitches)
+        {
+            await PublishAsync(
+                _discovery.SwitchStateTopic(objectId),
+                HaDiscovery.SwitchState(_lowTariff.IsLowTariffOnly(mode)),
                 retain: true,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -381,6 +413,14 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (_batteryHoldEnabled && topic == _discovery.BatteryHoldCommandTopic)
         {
             return OnBatteryHoldCommandAsync(payload);
+        }
+
+        foreach (var (objectId, mode, _) in HaDiscovery.LowTariffSwitches)
+        {
+            if (topic == _discovery.SwitchCommandTopic(objectId))
+            {
+                return OnLowTariffCommandAsync(objectId, mode, payload);
+            }
         }
 
         foreach (var objectId in HaDiscovery.NumberObjectIds)
@@ -531,6 +571,29 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // replaces it with what is actually armed on the inverter.
         return PublishAsync(
             _discovery.BatteryHoldStateTopic, HaDiscovery.SwitchState(_batteryHold.Hold), retain: true, CancellationToken.None);
+    }
+
+    // Accepted with no tariff set up too: the flag is the owner's, and the controller ignores it until
+    // there is a tariff to wait for, which the status says. Refusing it here would only make the switch
+    // spring back with no reason given.
+    private Task OnLowTariffCommandAsync(string objectId, ChargeControlMode mode, string? payload)
+    {
+        if (_lowTariff is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (HaDiscovery.TryParseSwitch(payload, out var on))
+        {
+            _lowTariff.SetLowTariffOnly(mode, on, "Home Assistant");
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown command '{Payload}' for {ObjectId}.", payload, objectId);
+        }
+
+        return PublishAsync(
+            _discovery.SwitchStateTopic(objectId), HaDiscovery.SwitchState(_lowTariff.IsLowTariffOnly(mode)), retain: true, CancellationToken.None);
     }
 
     private Task OnNumberCommandAsync(string objectId, string? payload)

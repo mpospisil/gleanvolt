@@ -56,6 +56,13 @@ public sealed class PollingService : BackgroundService
     private readonly BatteryHoldOptions _batteryHoldOptions;
     private readonly ForecastChargeOptions _forecastOptions;
     private readonly SolarGridProvider? _solarGrid;
+
+    // Low tariff only (#274): the schedule, the owner's flags, and whether Fast is holding the car back
+    // for low tariff this cycle -- which the hold reads, because a pack locked out of the house through a
+    // high tariff puts the house on the grid at the expensive rate for nothing.
+    private readonly ITariffSchedule? _tariff;
+    private readonly ILowTariffSettings? _lowTariff;
+    private bool _fastWaitingForLowTariff;
     private readonly ILogger<PollingService> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _pollInterval;
@@ -102,9 +109,13 @@ public sealed class PollingService : BackgroundService
         IOptions<ForecastChargeOptions> forecastOptions,
         ILogger<PollingService> logger,
         TimeProvider? timeProvider = null,
-        SolarGridProvider? solarGrid = null)
+        SolarGridProvider? solarGrid = null,
+        ITariffSchedule? tariff = null,
+        ILowTariffSettings? lowTariff = null)
     {
         _solarGrid = solarGrid;
+        _tariff = tariff;
+        _lowTariff = lowTariff;
         _energyStateReader = energyStateReader;
         _solarForecast = solarForecast;
         _chargingControl = chargingControl;
@@ -201,12 +212,14 @@ public sealed class PollingService : BackgroundService
                     ? Planned("solar-grid outlook", () => _solarGrid?.Update(state))
                     : null;
 
+                var (lowTariffGate, lowTariffStatus) = LowTariff(mode, state.Timestamp);
+
                 ChargeControlCycleResult result;
                 if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
                     or ChargeControlMode.Targeted or ChargeControlMode.SolarGrid)
                 {
                     result = await _chargingControl.RunCycleAsync(
-                        state, mode, plan, stoppingToken, targetedPlan, fastCharge, solarGrid);
+                        state, mode, plan, stoppingToken, targetedPlan, fastCharge, solarGrid, lowTariffGate);
                 }
                 else
                 {
@@ -231,6 +244,8 @@ public sealed class PollingService : BackgroundService
                     mode = ChargeControlMode.Off;
                     result = result with { State = ChargeControlState.Disabled, HoldingControl = false };
                 }
+
+                _fastWaitingForLowTariff = mode == ChargeControlMode.FastNoBattery && lowTariffStatus is { Waiting: true };
 
                 // Charging as it stands after the block above, so a mode that has just ended itself lets
                 // go of a bridge hold in this cycle instead of holding it through the release dwell.
@@ -275,6 +290,8 @@ public sealed class PollingService : BackgroundService
                     // amount it was working to belongs to the session that has just ended.
                     FastCharge: mode == ChargeControlMode.FastNoBattery ? fastCharge : null,
                     SolarGrid: mode == ChargeControlMode.SolarGrid ? solarGrid : null,
+                    // The same rule again: a mode that has just ended itself reads Off by here.
+                    LowTariff: LowTariffModes.Has(mode) ? lowTariffStatus : null,
                     LoanPowerWatts: result.LoanPowerWatts,
                     SessionEnergyWh: _chargingControl.SessionEnergyWh,
                     LoanedTodayWh: _chargingControl.LoanedTodayWh,
@@ -358,6 +375,27 @@ public sealed class PollingService : BackgroundService
                 + "bridged, but the gap will come out of the home battery rather than from the grid.",
                 mode);
         }
+    }
+
+    /// <summary>
+    /// What <b>low tariff only</b> means for <paramref name="mode"/> this cycle (#274): the gate the
+    /// controller reads, and the status the surfaces show. Both null while the mode has the option off,
+    /// or has none. With the option on but no tariff to wait for, the gate stays null -- no restriction
+    /// -- and the status says the option is being ignored, rather than pretending to wait.
+    /// </summary>
+    private (TariffGate? Gate, LowTariffStatus? Status) LowTariff(ChargeControlMode mode, DateTimeOffset now)
+    {
+        if (_lowTariff?.IsLowTariffOnly(mode) != true)
+        {
+            return (null, null);
+        }
+
+        if (TariffGate.At(_tariff?.Timeline, now) is not { } gate)
+        {
+            return (null, new LowTariffStatus(Waiting: false, Until: null, Ignored: true));
+        }
+
+        return (gate, new LowTariffStatus(gate.IsHigh, gate.IsHigh ? gate.NextChange : null, Ignored: false));
     }
 
     /// <summary>
@@ -645,8 +683,13 @@ public sealed class PollingService : BackgroundService
         if (mode == ChargeControlMode.FastNoBattery)
         {
             // A deferred charge (#122) is selected hours before it runs, and holding the pack out of a
-            // charge that has not started is six hours of the house on the grid for nothing.
-            SetFastHoldForCharging(mode, waiting: fastCharge?.Plan?.IsWaitingAt(state.Timestamp) == true);
+            // charge that has not started is six hours of the house on the grid for nothing. A wait for
+            // low tariff (#274) is the same wait: nothing draws, and the pack locked out of serving the
+            // house through a high tariff would put the house on the grid at the expensive rate. Two
+            // inverter writes per tariff edge are the cheaper side of that trade by far.
+            SetFastHoldForCharging(
+                mode,
+                waiting: fastCharge?.Plan?.IsWaitingAt(state.Timestamp) == true || _fastWaitingForLowTariff);
 
             // Nothing to add beyond that: the mode's own hold is on the switch, so returning true here
             // would put it back to being a floor and take the switch's authority away again.

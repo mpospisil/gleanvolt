@@ -113,6 +113,9 @@ public sealed class ChargingControlCoordinator
     /// modes and a fast charge asked for as Full.
     /// </param>
     /// <param name="solarGrid">The solar-grid mode's forecast outlook, or null when the mode doesn't use one.</param>
+    /// <param name="lowTariffOnly">
+    /// The tariff, when the mode has <b>low tariff only</b> set and a tariff is known (#274); null for no restriction.
+    /// </param>
     public async Task<ChargeControlCycleResult> RunCycleAsync(
         EnergyState state,
         ChargeControlMode mode,
@@ -120,7 +123,8 @@ public sealed class ChargingControlCoordinator
         CancellationToken cancellationToken,
         TargetedChargePlan? targetedPlan = null,
         FastChargeProgress? fastCharge = null,
-        SolarGridOutlook? solarGrid = null)
+        SolarGridOutlook? solarGrid = null,
+        TariffGate? lowTariffOnly = null)
     {
         if (!_controllers.TryGetValue(mode, out var controller))
         {
@@ -183,7 +187,8 @@ public sealed class ChargingControlCoordinator
                 _waitReleased,
                 solarGrid,
                 ChargedThisMode: _chargedThisMode,
-                LoanOutstandingWh: _loanedToday.OutstandingWattHours));
+                LoanOutstandingWh: _loanedToday.OutstandingWattHours,
+                LowTariffOnly: lowTariffOnly));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "

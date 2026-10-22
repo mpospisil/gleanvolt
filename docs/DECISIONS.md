@@ -4,6 +4,53 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-22 — Fast and SolarGrid can wait for low tariff; a wait is not a finished car
+
+**Context.** With the grid tariff known (#273), `Fast` and `SolarGrid` could buy their grid share in low
+tariff. The owner wants an option per mode, **low tariff only**
+([issue #274](https://github.com/mpospisil/gleanvolt/issues/274)).
+
+**Decision — SolarGrid: high tariff pauses the car, sun or not (option (a)).** The issue offered (a),
+the literal "charge only in low tariff", and (b), where high tariff only forbids the grid top-up and a
+surplus that clears the 6 A floor on its own still charges. It recommended (b). The owner chose (a), so
+with the option on SolarGrid follows the same rule as Fast, and the option is one sentence. **The cost**,
+accepted knowingly: on a sunny high-tariff afternoon the surplus goes to the home battery or the grid
+instead of the car. The mode's end-of-sun exit still applies, so the option narrows when it charges and
+never keeps it alive past its sun.
+
+**Decision — a wait is decided as a pause or a stand-down, never a charge.** One rule,
+`TariffWait`, for both modes: a stand-down (use-mode `Stop`) for a wait of 15 minutes or more, a pause
+for less, SolarGrid's existing rule for waiting on sun, because this wallbox tolerates 0 A in Fast for
+minutes, not hours (#135). That is also **why a tariff pause is not read as a full car**: both modes
+judge "finished" only while the coordinator says it is asking the car to charge, and a wait says it is
+not. On the low edge the coordinator rebases the idle clock, so the car gets a fresh `CompletionDwell`
+to spin up in. A test drives exactly this through the real poll loop: a high-tariff pause, twenty idle
+minutes, the low edge, a minute of no draw, then the car draws, and the mode is still Fast.
+
+**Decision — the discharge hold is released through a wait, against the issue's guess.** The issue
+expected the hold to stay armed through a tariff pause: nothing is drawing, so it costs nothing. It
+costs a lot. The hold keeps the pack out of the house as well as out of the car, so armed through a high
+tariff it runs the house on the grid at the expensive rate for as long as the wait lasts. A departure
+wait already releases it for that reason (#122), and a tariff wait now does the same. Two inverter
+writes per edge are the cheaper side by far.
+
+**Decision — the flags are runtime settings, ignored without a tariff.** Like the SolarGrid minimum,
+each is seeded from configuration (`ChargeControl:Fast:LowTariffOnly`, a new section, and
+`ChargeControl:SolarGrid:LowTariffOnly`), set from the web UI, Home Assistant or the API, and not kept
+across a restart. With no tariff to wait for, a flag that is on changes nothing; the controller does not
+refuse it, and every surface says it is being ignored, rather than pretending the mode is waiting.
+
+**Decision — Home Assistant gets two switches.** #89 kept every switch out of discovery, so that
+nothing but a button could start charging. These two cannot start anything; each only holds back a mode
+a button started. The guard test is narrowed to them, as #101 narrowed it for the priority select.
+
+**Known limitation.** A Fast charge with a departure time plans its latest start as if the car could
+charge at any hour. A wait for low tariff can then leave it short of time. The plan reports the shortfall
+rather than hiding it; planning around the tariff is what `Targeted` and its `ForbiddenWindows` are for,
+a follow-up on #265.
+
+---
+
 ## 2026-10-21 — The grid tariff is an owner-entered table, behind strategies switched at runtime
 
 **Context.** Gleanvolt had no idea what grid energy costs at a given hour. On a Czech two-rate tariff

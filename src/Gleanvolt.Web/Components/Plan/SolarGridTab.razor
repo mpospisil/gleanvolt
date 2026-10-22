@@ -42,6 +42,9 @@
     </span>
 </div>
 
+<LowTariffOption Mode="ChargeControlMode.SolarGrid" Status="Status"
+                 Hint="In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends with the day's useful sun, so a low tariff that starts after dark charges nothing here. Doesn't persist across restarts." />
+
 @if (Status is { } status)
 {
     <section class="stat-grid">

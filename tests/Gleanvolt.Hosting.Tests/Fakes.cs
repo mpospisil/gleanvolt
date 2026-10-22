@@ -154,3 +154,13 @@ internal static class Sites
         Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
         Chargers: [new PvDeviceInfo("charger", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.2" })]);
 }
+
+/// <summary>A tariff schedule that says what the test tells it to, at every instant.</summary>
+internal sealed class FixedTariffSchedule(TariffTimeline? timeline) : ITariffSchedule
+{
+    public TariffTimeline? Timeline { get; set; } = timeline;
+
+    public string? Unavailable { get; set; }
+
+    public string Currency => "CZK";
+}

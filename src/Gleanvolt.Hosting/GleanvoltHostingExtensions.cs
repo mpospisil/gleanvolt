@@ -462,6 +462,11 @@ public static class GleanvoltHostingExtensions
         // left that clears the minimum. The minimum is runtime state like the forecast mode's numbers.
         services.Configure<SolarGridChargeOptions>(configuration.GetSection(SolarGridChargeOptions.SectionName));
         services.AddSingleton<ISolarGridSettings, SolarGridSettings>();
+
+        // Low tariff only (#274): one flag each for Fast and SolarGrid, seeded from their sections and
+        // settable at runtime like the solar-grid minimum. Ignored while no tariff is set up.
+        services.Configure<FastChargeOptions>(configuration.GetSection(FastChargeOptions.SectionName));
+        services.AddSingleton<ILowTariffSettings, LowTariffSettings>();
         services.AddSingleton<SolarGridProvider>();
 
         services.AddSingleton(provider =>

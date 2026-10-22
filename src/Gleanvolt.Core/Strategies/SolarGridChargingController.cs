@@ -98,6 +98,20 @@ public sealed class SolarGridChargingController : IChargingController
         var threshold = input.Charging ? minimum : minimum + _options.ResumeHysteresisWatts;
         var thresholdName = input.Charging ? "minimum" : "start threshold";
 
+        // Low tariff only (#274), decided as (a): high tariff pauses the car, sun or not -- the owner's
+        // choice over following free surplus, so the mode charges in low tariff and nowhere else. The
+        // day's own end still applies, so the option narrows when the mode charges and never keeps it
+        // alive past its sun.
+        if (TariffWait.For(input, "SolarGrid") is { } wait)
+        {
+            if (surplus < threshold && outlook is { ForecastUsable: true, NoSunLeftToday: true })
+            {
+                return Complete(ChargingSessionEndReason.NoSunLeftToday, $"Nothing left of today will do better: {outlook.Reason}");
+            }
+
+            return wait;
+        }
+
         if (surplus >= threshold)
         {
             // The restart dwell spares the contactor when a charge this mode has run is flapping on the

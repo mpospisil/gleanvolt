@@ -33,4 +33,12 @@ public sealed class SolarGridChargeOptions
     /// gives up for the day — and giving up on a sunny afternoon is the expensive mistake here.
     /// </summary>
     public ForecastConfidence ForecastConfidence { get; init; } = ForecastConfidence.P50;
+
+    /// <summary>
+    /// The boot default for <b>low tariff only</b> (issue #274): with it on, high tariff pauses the car,
+    /// sun or not, so the mode charges only in low tariff. Off by default. Settable at runtime from the
+    /// web UI and Home Assistant; a runtime change does not survive a restart. Ignored while no tariff
+    /// is set up on Settings.
+    /// </summary>
+    public bool LowTariffOnly { get; init; }
 }

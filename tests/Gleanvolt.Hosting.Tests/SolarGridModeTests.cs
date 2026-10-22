@@ -42,6 +42,49 @@ public class SolarGridModeTests
         Assert.NotNull(_status.Current?.SolarGrid);
     }
 
+    // -- Low tariff only (#274), decided as (a): high tariff pauses the car, sun or not.
+
+    // High tariff for the next two hours, low after.
+    private static FixedTariffSchedule HighUntilNoon() => new(new TariffTimeline(
+        [
+            new TariffWindow(new TimeWindow(Now.AddHours(-1), Now.AddHours(2)), TariffRate.High),
+            new TariffWindow(new TimeWindow(Now.AddHours(2), Now.AddHours(6)), TariffRate.Low),
+        ],
+        Prices: null));
+
+    [Theory]
+    [InlineData(3_000)] // would be bridged from the grid
+    [InlineData(6_000)] // would follow the sun with nothing from the grid
+    public async Task InHighTariffTheCarWaitsWhateverTheSurplus_AndThePackStaysFree(double surplus)
+    {
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            HighUntilNoon(),
+            lowTariffOnly: true,
+            Exporting(Now, surplus),
+            Exporting(Now.AddMinutes(1), surplus));
+
+        Assert.Equal(ChargeControlMode.SolarGrid, _mode.Mode);
+        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.DoesNotContain(_writes, write => write.Target > 0);
+        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.Equal(new LowTariffStatus(Waiting: true, Until: Now.AddHours(2), Ignored: false), _status.Current!.LowTariff);
+    }
+
+    [Fact]
+    public async Task AtTheLowEdgeItChargesFromTheSunAsBefore()
+    {
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 8_000),
+            HighUntilNoon(),
+            lowTariffOnly: true,
+            Exporting(Now.AddHours(2), 6_000),
+            Exporting(Now.AddHours(2).AddMinutes(1), 6_000));
+
+        Assert.Empty(_charger.ModeWrites);
+        Assert.All(_writes, w => Assert.Equal(8, w.Target));
+    }
+
     [Fact]
     public async Task ASurplusOverTheFloor_TakesNothingFromTheGrid_AndLeavesThePackFree()
     {
@@ -174,7 +217,10 @@ public class SolarGridModeTests
 
     // Drives the real poll loop over a scripted telemetry sequence, then stops it -- the arrangement
     // TargetedModeTests uses, with the solar-grid mode's own provider in it.
-    private async Task RunAsync(ISolarForecastService forecast, params EnergyState[] states)
+    private Task RunAsync(ISolarForecastService forecast, params EnergyState[] states) =>
+        RunAsync(forecast, tariff: null, lowTariffOnly: false, states);
+
+    private async Task RunAsync(ISolarForecastService forecast, ITariffSchedule? tariff, bool lowTariffOnly, params EnergyState[] states)
     {
         var chargeControl = new ChargeControlOptions
         {
@@ -244,7 +290,12 @@ public class SolarGridModeTests
             Options.Create(new BatteryHoldOptions { Enabled = true, DryRun = true }),
             forecastOptions,
             NullLogger<PollingService>.Instance,
-            solarGrid: solarGrid);
+            solarGrid: solarGrid,
+            tariff: tariff,
+            lowTariff: new Gleanvolt.Hosting.Tariff.LowTariffSettings(
+                Options.Create(new FastChargeOptions()),
+                Options.Create(new SolarGridChargeOptions { LowTariffOnly = lowTariffOnly }),
+                NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance));
 
         await service.StartAsync(CancellationToken.None);
         await reader.Exhausted.WaitAsync(TimeSpan.FromSeconds(10));

@@ -39,6 +39,10 @@ public class HaButtonCommandTests
     private readonly FakeVehicleTelemetry _vehicle = new();
     private readonly SolarGridSettings _solarGrid =
         new(Options.Create(new SolarGridChargeOptions()), NullLogger<SolarGridSettings>.Instance);
+    private readonly Gleanvolt.Hosting.Tariff.LowTariffSettings _lowTariff = new(
+        Options.Create(new FastChargeOptions()),
+        Options.Create(new SolarGridChargeOptions()),
+        NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance);
 
     [Theory]
     [InlineData("start_solar", ChargeControlMode.Solar)]
@@ -60,6 +64,36 @@ public class HaButtonCommandTests
 
         Assert.Equal(3500, _solarGrid.MinSurplusWatts);
         Assert.Empty(_actions.Starts);
+    }
+
+    [Theory]
+    [InlineData("fast_low_tariff_only", ChargeControlMode.FastNoBattery)]
+    [InlineData("solar_grid_low_tariff_only", ChargeControlMode.SolarGrid)]
+    public async Task EachLowTariffSwitchSetsItsOwnMode_AndStartsNothing(string objectId, ChargeControlMode mode)
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(objectId), HaDiscovery.PayloadOn);
+
+        Assert.True(_lowTariff.IsLowTariffOnly(mode));
+        Assert.Single(LowTariffModes.All, other => _lowTariff.IsLowTariffOnly(other));
+        Assert.Empty(_actions.Starts);
+
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(objectId), HaDiscovery.PayloadOff);
+
+        Assert.False(_lowTariff.IsLowTariffOnly(mode));
+    }
+
+    [Theory]
+    [InlineData("PRESS")]
+    [InlineData("1")]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task ALowTariffSwitchIgnoresAnythingButOnAndOff(string? payload)
+    {
+        await Worker().HandleCommandAsync(Discovery.SwitchCommandTopic("fast_low_tariff_only"), payload);
+
+        Assert.False(_lowTariff.IsLowTariffOnly(ChargeControlMode.FastNoBattery));
     }
 
     [Fact]
@@ -381,7 +415,8 @@ public class HaButtonCommandTests
             // entity is not published at all without one.
             vehicleFeed: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")),
-            _solarGrid);
+            _solarGrid,
+            lowTariff: _lowTariff);
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>
     private sealed class RecordingChargeActions : IChargeActions

@@ -33,6 +33,7 @@ public sealed class TariffRegistrationTests : IDisposable
             new("Pv:Chargers:0:Host", "127.0.0.2"),
             new("Tariff:Path", Path.Combine(_root, "tariff.json")),
             new("Tariff:Currency", "eur"),
+            new("ChargeControl:SolarGrid:LowTariffOnly", "true"),
         ]);
         builder.Services.AddGleanvolt(builder.Configuration);
 
@@ -55,6 +56,27 @@ public sealed class TariffRegistrationTests : IDisposable
         Assert.Equal(
             [TariffProviderIds.None, TariffProviderIds.Table],
             services.GetRequiredService<ITariffEditor>().Providers.Select(provider => provider.Id));
+    }
+
+    [Fact]
+    public void TheLowTariffFlagsAreSeededFromTheirModesSections()
+    {
+        using var services = Start();
+        var flags = services.GetRequiredService<ILowTariffSettings>();
+
+        Assert.True(flags.IsLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode.SolarGrid));
+        Assert.False(flags.IsLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode.FastNoBattery));
+        Assert.False(flags.IsLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode.Targeted));
+    }
+
+    [Fact]
+    public void OnlyFastAndSolarGridHaveTheOption()
+    {
+        using var services = Start();
+        var flags = services.GetRequiredService<ILowTariffSettings>();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            flags.SetLowTariffOnly(Gleanvolt.Core.Enums.ChargeControlMode.Targeted, true, "test"));
     }
 
     [Fact]

@@ -36,6 +36,8 @@ public class FastTabTests : PageTest
 
         Services.AddSingleton(_holder);
         Services.AddSingleton<TimeProvider>(_time);
+        Services.AddSingleton<Core.Interfaces.ILowTariffSettings>(new FakeLowTariffSettings());
+        Services.AddSingleton<Core.Interfaces.ITariffSchedule>(new FakeTariffSchedule());
         Services.AddSingleton<Core.Interfaces.IChargeControlModeSelector>(_mode);
         Services.AddSingleton<Core.Interfaces.IChargeActions>(_actions);
         Services.AddSingleton<Core.Interfaces.ITargetedChargeSelector>(_target);
@@ -60,6 +62,18 @@ public class FastTabTests : PageTest
 
     private IRenderedComponent<ChargingPlan> RenderTab() =>
         Render<ChargingPlan>(parameters => parameters.Add(p => p.Tab, "fast"));
+
+    [Fact]
+    public void Offers_low_tariff_only_and_says_a_plug_in_draws_for_a_moment_first()
+    {
+        // Greyed out here, with no tariff set up; what matters is that it is there, before the button,
+        // and says what it cannot promise (#274).
+        var page = RenderTab();
+
+        var option = page.Find("#low-tariff-fast").ParentElement!.ParentElement!.TextContent;
+        Assert.Contains("charges flat out once low tariff starts", option);
+        Assert.Contains("draws for a moment", option);
+    }
 
     [Fact]
     public void Presses_through_to_the_mode_with_no_limit_by_default()

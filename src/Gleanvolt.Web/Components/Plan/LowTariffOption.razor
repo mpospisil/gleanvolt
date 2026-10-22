@@ -1,0 +1,81 @@
+@inject ILowTariffSettings LowTariff
+@inject ITariffSchedule Tariff
+@inject TimeProvider Time
+
+@*
+    "Low tariff only" for one of the two modes that buy from the grid (#274), the same control in both
+    tabs. Written through ILowTariffSettings, the seam Home Assistant's switch writes too, and re-read
+    whenever a new status lands, so a change made there shows here by the next poll.
+
+    Greyed out with no tariff to wait for, and said why: the flag would be ignored. Unless it is already
+    on -- set from Home Assistant, or before the tariff went away -- in which case it stays clickable, so
+    the owner can turn off from here what the page says is being ignored.
+*@
+
+<div class="control low-tariff-option">
+    <label class="@(HasTariff ? null : "muted")">
+        <input type="checkbox" id="@($"low-tariff-{Slug}")"
+               checked="@_on" disabled="@(!HasTariff && !_on)" @onchange="OnChanged" />
+        Low tariff only
+    </label>
+    <span class="hint">
+        @if (!HasTariff)
+        {
+            <text>Set up a tariff in <a href="/settings#tariff-editor">Settings</a> first; until then this has nothing to wait for. </text>
+        }
+        @Hint
+    </span>
+    @if (Note() is { } note)
+    {
+        <span class="hint @(Status?.LowTariff is { Ignored: true } ? "warning" : null)" id="@($"low-tariff-{Slug}-state")">@note</span>
+    }
+</div>
+
+@code {
+    /// <summary>The mode the option belongs to: FastNoBattery or SolarGrid.</summary>
+    [Parameter, EditorRequired] public ChargeControlMode Mode { get; set; }
+
+    /// <summary>What the option means for this mode, said under the box.</summary>
+    [Parameter, EditorRequired] public string Hint { get; set; } = string.Empty;
+
+    /// <summary>The last poll, for whether the mode is waiting now.</summary>
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    private bool _on;
+
+    private ChargeControlStatus? _seenStatus;
+
+    private bool HasTariff => Tariff.Timeline is not null;
+
+    private string Slug => Mode == ChargeControlMode.SolarGrid ? "solar-grid" : "fast";
+
+    protected override void OnInitialized() => _on = LowTariff.IsLowTariffOnly(Mode);
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_seenStatus, Status))
+        {
+            return;
+        }
+
+        _seenStatus = Status;
+        _on = LowTariff.IsLowTariffOnly(Mode);
+    }
+
+    private void OnChanged(ChangeEventArgs e)
+    {
+        _on = e.Value is true || (e.Value is string text && bool.TryParse(text, out var parsed) && parsed);
+        LowTariff.SetLowTariffOnly(Mode, _on, "Web UI");
+    }
+
+    // Only while this mode is the one driving: the status's low-tariff block belongs to it alone.
+    private string? Note() => Status is { } status && status.Mode == Mode
+        ? status.LowTariff switch
+        {
+            { Ignored: true } => "Set, but ignored: there is no tariff to wait for, so it charges whatever the hour.",
+            { Waiting: true, Until: { } until } => $"Waiting for low tariff, from {TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone):HH:mm}.",
+            { Waiting: true } => "Waiting for low tariff.",
+            _ => null,
+        }
+        : null;
+}

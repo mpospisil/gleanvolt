@@ -60,6 +60,10 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="ChargeControlMode.SolarGrid"/> is the mode driving the charger — the same rule the other
 /// mode-owned fields follow.
 /// </param>
+/// <param name="LowTariff">
+/// What <b>low tariff only</b> is doing for the mode driving (issue #274), or null when that mode has
+/// the option off or has none: waiting through high tariff, or set with no tariff to wait for.
+/// </param>
 /// <param name="Timestamp">When this snapshot was taken.</param>
 /// <param name="SessionEndReason">
 /// This cycle the controller ended the mode itself, and why: the fast, targeted and solar-grid modes all
@@ -98,8 +102,20 @@ public sealed record ChargeControlStatus(
     TargetedChargePlan? TargetedPlan = null,
     ChargingSessionEndReason? SessionEndReason = null,
     FastChargeProgress? FastCharge = null,
-    SolarGridOutlook? SolarGrid = null)
+    SolarGridOutlook? SolarGrid = null,
+    LowTariffStatus? LowTariff = null)
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;
 }
+
+/// <summary>
+/// What <b>low tariff only</b> is doing for the mode driving (issue #274), for the surfaces to say so.
+/// </summary>
+/// <param name="Waiting">True while the mode is holding the car back through high tariff.</param>
+/// <param name="Until">When low tariff starts, while waiting; null when that is beyond what the tariff knows.</param>
+/// <param name="Ignored">
+/// True when the option is set but there is no tariff to wait for — none selected on Settings, or the
+/// selected one cannot answer — so the mode charges whatever the hour.
+/// </param>
+public sealed record LowTariffStatus(bool Waiting, DateTimeOffset? Until, bool Ignored);

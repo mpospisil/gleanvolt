@@ -1187,3 +1187,26 @@ internal sealed class FakeTariffSchedule : ITariffSchedule
             today,
             new TariffPrices(2.10m, 4.80m, "CZK"));
 }
+
+internal sealed class FakeLowTariffSettings : ILowTariffSettings
+{
+    public HashSet<ChargeControlMode> On { get; } = [];
+
+    public List<(ChargeControlMode Mode, bool On, string Source)> Sets { get; } = [];
+
+    public bool IsLowTariffOnly(ChargeControlMode mode) => On.Contains(mode);
+
+    public void SetLowTariffOnly(ChargeControlMode mode, bool on, string source)
+    {
+        Sets.Add((mode, on, source));
+
+        if (on)
+        {
+            On.Add(mode);
+        }
+        else
+        {
+            On.Remove(mode);
+        }
+    }
+}

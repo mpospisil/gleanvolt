@@ -91,6 +91,12 @@ namespace Gleanvolt.Core.Models;
 /// mode was chosen, and a dwell gated on that stops a running car on the mode's first decision to wait
 /// out a "restart" of a charge the mode never ran (2026-09-13).
 /// </param>
+/// <param name="LowTariffOnly">
+/// The tariff, when the owner has set the mode driving to <b>low tariff only</b> and a tariff is known
+/// (issue #274); null otherwise, which means no restriction. Only
+/// <see cref="Strategies.FastChargingController"/> and <see cref="Strategies.SolarGridChargingController"/>
+/// read it, through <see cref="Strategies.TariffWait"/>.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -109,7 +115,8 @@ public sealed record ChargingControlInput(
     bool WaitAlreadyReleased = false,
     SolarGridOutlook? SolarGrid = null,
     bool ChargedThisMode = false,
-    double LoanOutstandingWh = 0);
+    double LoanOutstandingWh = 0,
+    TariffGate? LowTariffOnly = null);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for

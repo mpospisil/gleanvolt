@@ -43,6 +43,26 @@ public sealed record StartChargingRequest(
 public sealed record BatteryHoldRequest(bool Hold);
 
 /// <summary>
+/// Change <i>low tariff only</i> for one or both of the modes that buy from the grid (issue #274). A
+/// field left out, or null, is left as it is.
+/// </summary>
+/// <param name="FastNoBattery">With true, <c>fastNoBattery</c> waits through high tariff and charges flat out in low.</param>
+/// <param name="SolarGrid">With true, high tariff pauses <c>solarGrid</c>, sun or not.</param>
+public sealed record LowTariffOnlyRequest(bool? FastNoBattery = null, bool? SolarGrid = null);
+
+/// <summary>
+/// <i>Low tariff only</i> as the controller is using it. Takes effect on the next poll, including for a
+/// mode already running; it does not persist across restarts.
+/// </summary>
+/// <param name="FastNoBattery">Whether <c>fastNoBattery</c> waits for low tariff.</param>
+/// <param name="SolarGrid">Whether <c>solarGrid</c> does.</param>
+/// <param name="TariffKnown">
+/// Whether there is a tariff to wait for. False with no tariff selected (see GET /tariff), and then a flag
+/// that is on is ignored: the mode charges whatever the hour.
+/// </param>
+public sealed record LowTariffOnlyResponse(bool FastNoBattery, bool SolarGrid, bool TariffKnown);
+
+/// <summary>
 /// What an action did, and what the controller looks like afterwards — so a caller never has to poll
 /// to find out whether the thing it asked for happened.
 /// </summary>

@@ -289,7 +289,50 @@ internal static class ControlEndpoints
                 + "in force by batteryPowerWatts on the status, never by the flag.")
             .Produces<ControlActionResponse>()
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        api.MapGet("/charging/low-tariff-only", (ILowTariffSettings flags, ITariffSchedule tariff) =>
+                Results.Ok(LowTariffOnly(flags, tariff)))
+            .WithName("getLowTariffOnly")
+            .WithSummary("Whether fastNoBattery and solarGrid wait for low tariff")
+            .WithDescription(
+                "The owner's 'low tariff only' option for the two modes that buy from the grid, and whether "
+                + "there is a tariff for it to act on. With tariffKnown false, a flag that is on is ignored.")
+            .Produces<LowTariffOnlyResponse>();
+
+        api.MapPut("/charging/low-tariff-only", (
+            LowTariffOnlyRequest body,
+            HttpContext http,
+            ILowTariffSettings flags,
+            ITariffSchedule tariff) =>
+        {
+            // Accepted with no tariff too, as the switches accept it: the flag is the owner's, and the
+            // answer's tariffKnown says it has nothing to act on yet.
+            if (body.FastNoBattery is { } fast)
+            {
+                flags.SetLowTariffOnly(ChargeControlMode.FastNoBattery, fast, http.Source());
+            }
+
+            if (body.SolarGrid is { } solarGrid)
+            {
+                flags.SetLowTariffOnly(ChargeControlMode.SolarGrid, solarGrid, http.Source());
+            }
+
+            return Results.Ok(LowTariffOnly(flags, tariff));
+        })
+            .WithName("setLowTariffOnly")
+            .WithSummary("Make fastNoBattery or solarGrid wait for low tariff")
+            .WithDescription(
+                "With it on, fastNoBattery waits through high tariff and charges flat out once low tariff "
+                + "starts, and high tariff pauses solarGrid, sun or not. A wait is never read as a full car. "
+                + "Applies from the next poll, to a running mode too, and does not persist across "
+                + "restarts. Writes nothing to hardware itself; the mode does, on the next poll.")
+            .Produces<LowTariffOnlyResponse>();
     }
+
+    private static LowTariffOnlyResponse LowTariffOnly(ILowTariffSettings flags, ITariffSchedule tariff) => new(
+        flags.IsLowTariffOnly(ChargeControlMode.FastNoBattery),
+        flags.IsLowTariffOnly(ChargeControlMode.SolarGrid),
+        TariffKnown: tariff.Timeline is not null);
 
     /// <summary>
     /// The uniform answer to an action: what it did, the target now in force, and the controller's
