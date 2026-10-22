@@ -1715,6 +1715,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
 - the solar-grid controls — the **Min solar surplus** number, applied at once — plus its **Sun until**
   sensor, populated while the mode is driving.
+- the **Fast low tariff only** and **SolarGrid low tariff only** switches, which hold those two modes
+  back through high tariff ([the grid tariff](#grid-tariff-the-tariff-section)).
 - the tariff — the **Low tariff** binary sensor and the **Tariff change** and **Grid price** sensors —
   published whatever tariff provider is selected on Settings, and unknown while none is.
 - binary sensors: **Car connected** and **Charging now**.
@@ -1755,6 +1757,8 @@ description or tooltip field. The meanings live here instead.
 | **Fast delivered** | kWh | Energy delivered against the fast charge's amount, since it was started. Absent unless `FastNoBattery` is driving with an amount set. |
 | **Fast target** | kWh | The amount that fast charge is working to — the number **Fast delivered** is counting towards. Absent on the same terms. |
 | **Min solar surplus** | W | The smoothed surplus below which `SolarGrid` pauses the car instead of topping it up from the grid — and the line the rest of today's forecast has to clear for the mode to keep waiting. Applied at once, including to a running charge. The most the grid ever adds is the charger's floor (~4.14 kW on three phases) less this; at or above the floor the grid never helps. Doesn't persist across restarts. |
+| **Fast low tariff only** | switch | With it `ON`, `FastNoBattery` waits through high tariff and charges flat out once low tariff starts. The wait is never read as a full car, and the discharge hold is released while it lasts so the battery can serve the house. The charger starts a car on its own at plug-in, so one plugged in during high tariff draws for a moment until the next poll stops it. A departure time does not know about the tariff, so a deferred charge can run out of time, and says so. Ignored, and said so on the Overview, while no tariff is set up on Settings. Doesn't persist across restarts. |
+| **SolarGrid low tariff only** | switch | With it `ON`, high tariff pauses `SolarGrid`, sun or not: the car charges only in low tariff, and a sunny high-tariff afternoon's surplus goes to the home battery or the grid instead. The mode still ends with the day's useful sun, so a low tariff that starts after dark charges nothing here. Ignored while no tariff is set up. Doesn't persist across restarts. |
 | **Sun until** | sensor | When today's forecast surplus last clears **Min solar surplus**, as `HH:mm` — the time `SolarGrid` will switch itself off if the live surplus agrees. `none` when the forecast has no such sun left; absent with no usable forecast, and whenever another mode is driving. |
 | **Low tariff** | on/off | `ON` while the grid is in the low (cheap) rate of the tariff selected under *Tariff* on Settings, `OFF` in the high rate. **Unknown** with no tariff selected, or one that cannot answer — no tariff is not the same as high tariff. Follows a save on Settings by the next status publish, with no restart. |
 | **Tariff change** | timestamp | When the rate next changes. A night tariff entered as 22:00–24:00 and 00:00–06:00 changes at 06:00, not at midnight. Unknown with no tariff, and when the next change lies beyond what the provider knows (the `Table` provider knows today and tomorrow). |

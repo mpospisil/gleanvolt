@@ -146,6 +146,20 @@ public sealed class HaDiscovery
     public static readonly IReadOnlyList<string> TextObjectIds = [TargetDepartureText, FastDepartureText];
 
     /// <summary>
+    /// The <b>low tariff only</b> switches (#274), one per mode that buys from the grid: object id, the
+    /// mode it belongs to, and its name. Switches because each is one thing being on or off, and their
+    /// state topics are their own, like a number's, so the echo and the controller agree on one value.
+    /// </summary>
+    public static readonly IReadOnlyList<(string ObjectId, ChargeControlMode Mode, string Name)> LowTariffSwitches =
+    [
+        ("fast_low_tariff_only", ChargeControlMode.FastNoBattery, "Fast low tariff only"),
+        ("solar_grid_low_tariff_only", ChargeControlMode.SolarGrid, "SolarGrid low tariff only"),
+    ];
+
+    public string SwitchCommandTopic(string objectId) => NumberCommandTopic(objectId);
+    public string SwitchStateTopic(string objectId) => NumberStateTopic(objectId);
+
+    /// <summary>
     /// The strategy buttons, in the order they are published: object id -> the mode each one starts.
     /// <c>Targeted</c> is deliberately absent — it needs an amount and a departure, so its action stays
     /// on <see cref="ActivateTargetCommandTopic"/>, next to the entities that carry them.
@@ -510,6 +524,22 @@ public sealed class HaDiscovery
         // other modes' controls, so the minimum can be set before the button is pressed. The sensor is
         // the answer to "when will this switch itself off?" -- absent unless the mode is driving.
         yield return Number(MinSolarSurplusNumber, "Min solar surplus", min: 0, max: 20000, step: 100, unit: "W", icon: "mdi:solar-power-variant");
+
+        // Low tariff only (#274), beside the controls of the two modes it narrows. Published whatever
+        // the tariff, like the tariff's own entities: one can be set up on Settings at any moment, and
+        // a switch turned on with none is ignored, which the status and the web UI say.
+        foreach (var (objectId, _, name) in LowTariffSwitches)
+        {
+            yield return Config("switch", objectId, new Dictionary<string, object?>
+            {
+                ["name"] = name,
+                ["command_topic"] = SwitchCommandTopic(objectId),
+                ["state_topic"] = SwitchStateTopic(objectId),
+                ["payload_on"] = PayloadOn,
+                ["payload_off"] = PayloadOff,
+                ["icon"] = "mdi:cash-clock",
+            });
+        }
         yield return Sensor("sun_until", "Sun until", template: Optional("sun_until"), icon: "mdi:weather-sunset-down");
 
         // The tariff (issue #265). Published whatever the provider: it is switched on Settings at

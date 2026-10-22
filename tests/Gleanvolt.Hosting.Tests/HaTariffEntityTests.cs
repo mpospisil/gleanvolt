@@ -61,6 +61,19 @@ public class HaTariffEntityTests
         Assert.Equal("EUR/kWh", Config("sensor", "grid_price").GetProperty("unit_of_measurement").GetString());
     }
 
+    [Theory]
+    [InlineData("fast_low_tariff_only", "Fast low tariff only")]
+    [InlineData("solar_grid_low_tariff_only", "SolarGrid low tariff only")]
+    public void TheLowTariffSwitchesArePublishedWithTheirOwnTopics(string objectId, string name)
+    {
+        var config = Config("switch", objectId);
+
+        Assert.Equal(name, config.GetProperty("name").GetString());
+        Assert.Equal($"solax/home-roof/{objectId}/set", config.GetProperty("command_topic").GetString());
+        Assert.Equal($"solax/home-roof/{objectId}/state", config.GetProperty("state_topic").GetString());
+        Assert.Equal("ON", config.GetProperty("payload_on").GetString());
+    }
+
     [Fact]
     public void TheGridPriceIsARateNotAnAmountOfMoney()
     {

@@ -66,11 +66,15 @@ public class HaDiscoveryTests
         // different in the way that matters here: a mode select was a second way to start charging, in
         // competition with the buttons, whereas the priority only qualifies a target that the activate
         // button still has to apply. Nothing about it can put the charger into a mode.
+        //
+        // Narrowed again by #274 for the two low-tariff-only switches, on the same terms: each only holds
+        // back a mode a button started, and neither can start one.
         var messages = Discovery.DiscoveryMessages().ToList();
+        var allowedSwitches = HaDiscovery.LowTariffSwitches.Select(entry => $"/switch/solax_controller/{entry.ObjectId}/").ToList();
 
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/mode/"));
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/charge_mode/"));
-        Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/"));
+        Assert.DoesNotContain(messages, m => m.Topic.Contains("/switch/") && !allowedSwitches.Any(m.Topic.Contains));
         Assert.Contains(messages, m => m.Topic == "homeassistant/select/solax_controller/target_priority/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/sensor/solax_controller/control_state/config");
         Assert.Contains(messages, m => m.Topic == "homeassistant/binary_sensor/solax_controller/holding_control/config");
