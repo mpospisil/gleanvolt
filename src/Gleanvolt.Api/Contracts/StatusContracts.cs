@@ -46,6 +46,10 @@ namespace Gleanvolt.Api.Contracts;
 /// <c>FastNoBattery</c> is the mode driving the charger — the same rule. Null also when that mode is
 /// running with no limit, which means the car decides when to stop.
 /// </param>
+/// <param name="LowTariff">
+/// What <i>low tariff only</i> is doing for the mode driving (issue #274): waiting through high tariff
+/// until when, or set with no tariff to wait for. Null while that mode has the option off, or has none.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -71,7 +75,8 @@ public sealed record StatusResponse(
     BatteryHoldResponse BatteryHold,
     SolarDayPlanResponse? DayPlan,
     TargetedPlanResponse? TargetedPlan,
-    FastChargeResponse? FastCharge = null)
+    FastChargeResponse? FastCharge = null,
+    LowTariffStatusResponse? LowTariff = null)
 {
     internal static StatusResponse From(ChargeControlStatus status) => new(
         status.Timestamp,
@@ -102,8 +107,15 @@ public sealed record StatusResponse(
             status.BatteryHoldTargetWatts),
         status.Plan is { } plan ? SolarDayPlanResponse.From(plan) : null,
         status.TargetedPlan is { } targeted ? TargetedPlanResponse.From(targeted) : null,
-        status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null);
+        status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null,
+        status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null);
 }
+
+/// <summary>What <i>low tariff only</i> is doing for the mode driving.</summary>
+/// <param name="Waiting">True while the mode holds the car back through high tariff.</param>
+/// <param name="Until">When low tariff starts, while waiting; null when that is beyond what the tariff knows.</param>
+/// <param name="Ignored">True when the option is set but there is no tariff to wait for, so the mode charges whatever the hour.</param>
+public sealed record LowTariffStatusResponse(bool Waiting, DateTimeOffset? Until, bool Ignored);
 
 /// <summary>
 /// The battery discharge hold, which stops the home battery serving house load so the car charges

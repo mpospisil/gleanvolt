@@ -179,4 +179,68 @@ public sealed class TariffEndpointTests : IAsyncDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/tariff")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/tariff/settings")).StatusCode);
     }
+
+    // -- Low tariff only (#274)
+
+    [Fact]
+    public async Task LowTariffOnlyIsOffByDefaultWithNoTariffToActOn()
+    {
+        var client = await _host.StartAsync();
+
+        var flags = await (await client.GetAsync("/api/v1/charging/low-tariff-only")).ReadAsync();
+
+        Assert.False(flags.GetProperty("fastNoBattery").GetBoolean());
+        Assert.False(flags.GetProperty("solarGrid").GetBoolean());
+        Assert.False(flags.GetProperty("tariffKnown").GetBoolean());
+    }
+
+    [Fact]
+    public async Task APutSetsOnlyTheFlagsItNames()
+    {
+        var client = await _host.StartAsync();
+        await client.PutAsJsonAsync("/api/v1/tariff/settings", Night());
+
+        var first = await (await client.PutAsJsonAsync("/api/v1/charging/low-tariff-only", new { solarGrid = true })).ReadAsync();
+
+        Assert.True(first.GetProperty("solarGrid").GetBoolean());
+        Assert.False(first.GetProperty("fastNoBattery").GetBoolean());
+        Assert.True(first.GetProperty("tariffKnown").GetBoolean());
+
+        var second = await (await client.PutAsJsonAsync("/api/v1/charging/low-tariff-only", new { fastNoBattery = true })).ReadAsync();
+
+        Assert.True(second.GetProperty("solarGrid").GetBoolean());
+        Assert.True(second.GetProperty("fastNoBattery").GetBoolean());
+        Assert.All(_host.LowTariff.Sources, source => Assert.Equal($"API ({ApiTestHost.KeyName})", source));
+    }
+
+    [Fact]
+    public async Task AFlagSetWithNoTariffIsAcceptedAndTheAnswerSaysThereIsNothingToActOn()
+    {
+        var client = await _host.StartAsync();
+
+        var response = await client.PutAsJsonAsync("/api/v1/charging/low-tariff-only", new { fastNoBattery = true });
+        var flags = await response.ReadAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(flags.GetProperty("fastNoBattery").GetBoolean());
+        Assert.False(flags.GetProperty("tariffKnown").GetBoolean());
+    }
+
+    [Fact]
+    public async Task TheStatusSaysWhenAModeIsWaitingForLowTariff()
+    {
+        var client = await _host.StartAsync();
+        var until = new DateTimeOffset(2026, 1, 15, 22, 0, 0, TimeSpan.FromHours(1));
+        _host.Status.Set(Fixtures.Status() with
+        {
+            Mode = Gleanvolt.Core.Enums.ChargeControlMode.FastNoBattery,
+            LowTariff = new Gleanvolt.Core.Models.LowTariffStatus(Waiting: true, Until: until, Ignored: false),
+        });
+
+        var status = await (await client.GetAsync("/api/v1/status")).ReadAsync();
+        var low = status.GetProperty("lowTariff");
+
+        Assert.True(low.GetProperty("waiting").GetBoolean());
+        Assert.Equal(until, low.GetProperty("until").GetDateTimeOffset());
+    }
 }

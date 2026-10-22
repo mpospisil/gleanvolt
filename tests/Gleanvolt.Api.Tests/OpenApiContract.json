@@ -23,6 +23,24 @@
         ]
       }
     },
+    "/api/v1/charging/low-tariff-only": {
+      "get": {
+        "operationId": "getLowTariffOnly",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $LowTariffOnlyResponse"
+        ]
+      },
+      "put": {
+        "operationId": "setLowTariffOnly",
+        "parameters": [],
+        "requestBody": "application/json $LowTariffOnlyRequest",
+        "responses": [
+          "200 application/json $LowTariffOnlyResponse"
+        ]
+      }
+    },
     "/api/v1/charging/start": {
       "post": {
         "operationId": "startCharging",
@@ -396,6 +414,20 @@
       "version": "string (required)",
       "weatherConfigured": "boolean (required)"
     },
+    "LowTariffOnlyRequest": {
+      "fastNoBattery": "boolean?",
+      "solarGrid": "boolean?"
+    },
+    "LowTariffOnlyResponse": {
+      "fastNoBattery": "boolean (required)",
+      "solarGrid": "boolean (required)",
+      "tariffKnown": "boolean (required)"
+    },
+    "LowTariffStatusResponse": {
+      "ignored": "boolean (required)",
+      "until": "string(date-time)? (required)",
+      "waiting": "boolean (required)"
+    },
     "ProblemDetails": {
       "detail": "string?",
       "instance": "string?",
@@ -541,6 +573,7 @@
       "holdingControl": "boolean (required)",
       "loanPowerWatts": "number|string(double) (required)",
       "loanedTodayWh": "number|string(double) (required)",
+      "lowTariff": "any",
       "mode": "$ChargeControlMode (required)",
       "sessionEnergyWh": "number|string(double) (required)",
       "solarPowerWatts": "number|string(double) (required)",
