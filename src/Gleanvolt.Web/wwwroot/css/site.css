@@ -1877,10 +1877,6 @@ button.link:hover {
     .overview-lower { grid-area: lower; }
 }
 
-.overview-lower > h2:first-child {
-    margin-top: 0;
-}
-
 /* What is happening and why, in words: the display face at reading size, the first thing on the page
    after its name. */
 .headline {
@@ -2102,8 +2098,157 @@ a.seg-opt {
     text-align: right;
 }
 
-.glossary {
-    margin-top: var(--space-6);
+/* The running mode at the top of This session: its name in the display face, what it does, its hold,
+   and the way back to the plan page. */
+.session-mode {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line);
+}
+
+.session-mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.session-mode-name {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.session-mode-summary {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.session-mode .hold {
+    margin: 0;
+    padding-top: 0;
+    border-top: none;
+    font-size: 0.9rem;
+}
+
+.session-mode-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 0.95rem;
+}
+
+/* A heading with what qualifies it on the same line: the car and its reading's age, or a tip. */
+.section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-6) 0 var(--space-3);
+}
+
+.overview-lower > .section-head:first-child {
+    margin-top: 0;
+}
+
+.section-head h2 {
+    margin: 0;
+}
+
+/* The car's three figures share the main column's width in one row. */
+.overview-lower .stat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.stat .value-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 2px;
+}
+
+/* Labels that carry an InfoTip keep it on their line. */
+.figure-label,
+.stat .label,
+.session-facts dt,
+.figures-note {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/*
+    InfoTip: an (i) that opens a short popover. The summary is a 44px target pulled back by negative
+    margins, so it does not push its label's line apart.
+*/
+.info {
+    position: relative;
+    display: inline-block;
+}
+
+.info summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: -14px -12px -14px -10px;
+    color: var(--muted);
+    border-radius: 50%;
+}
+
+.info summary::-webkit-details-marker {
+    display: none;
+}
+
+.info summary:hover,
+.info[open] summary {
+    color: var(--ink);
+}
+
+.info summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -8px;
+}
+
+.info-pop {
+    position: absolute;
+    z-index: 10;
+    top: 34px;
+    left: -8px;
+    width: min(300px, 80vw);
+    box-sizing: border-box;
+    padding: 12px 14px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    font-size: 14px;
+    line-height: 1.45;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+}
+
+.info-pop.end {
+    left: auto;
+    right: -8px;
+}
+
+.info-pop.wide {
+    width: min(460px, 86vw);
+}
+
+.info-pop p {
+    margin: 0;
+}
+
+.info-pop p + p {
+    margin-top: 8px;
 }
 
 /*
