@@ -100,6 +100,16 @@ public static class OverviewNarrative
             return TargetedPlanNarrative.Describe(targeted, zone).FirstOrDefault();
         }
 
-        return null;
+        // Low tariff only (#274): the status carries it only for the mode driving, so this is about
+        // the mode the sentence before it named.
+        return status.LowTariff switch
+        {
+            { Waiting: true, Until: { } until } =>
+                $"High tariff until {TimeZoneInfo.ConvertTime(until, zone):HH:mm}; it is waiting for low tariff (low tariff only).",
+            { Waiting: true } => "High tariff; it is waiting for low tariff (low tariff only).",
+            { Ignored: true } =>
+                "Low tariff only is set, but there is no tariff to wait for, so it charges whatever the hour.",
+            _ => null,
+        };
     }
 }

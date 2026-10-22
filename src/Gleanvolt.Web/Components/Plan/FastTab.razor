@@ -89,6 +89,9 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     </div>
 }
 
+<LowTariffOption Mode="ChargeControlMode.FastNoBattery" Status="Status"
+                 Hint="In high tariff the car waits, and it charges flat out once low tariff starts. The charger starts a car on its own when it is plugged in, so one plugged in during high tariff draws for a moment until the next poll stops it. Doesn't persist across restarts." />
+
 <div class="control">
     <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
         Charge at maximum
