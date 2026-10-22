@@ -210,7 +210,7 @@ public class DashboardPageTests : PageTest
 
         var page = Render<Dashboard>();
 
-        Assert.Contains("Car connected", page.Markup);
+        Assert.Contains("Plugged in", page.Markup);
         Assert.DoesNotContain("No feed is configured", page.Markup);
         Assert.DoesNotContain("has not delivered", page.Markup);
         Assert.DoesNotContain("Sign-in required", page.Markup);
@@ -228,13 +228,14 @@ public class DashboardPageTests : PageTest
     public void Groups_what_it_reports_under_the_questions_being_asked()
     {
         // The overview (#255): the headline and the figures carry no heading of their own -- they are
-        // the page -- and the rest is the mode, the session, then the car and the forecast as before.
+        // the page -- and the rest is the session (which names the running mode), the car and the
+        // forecast.
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
         Assert.Equal(
-            ["Charge mode", "This session", "Vehicle", "Solar forecast"],
+            ["This session", "Vehicle", "Solar forecast"],
             page.FindAll("h2").Select(h => h.TextContent.Trim()));
     }
 
@@ -248,14 +249,17 @@ public class DashboardPageTests : PageTest
         var page = Render<Dashboard>();
 
         Assert.DoesNotContain("Car battery", page.Markup);
-        Assert.DoesNotContain("Car reading age", page.Markup);
-        Assert.Contains("Car connected", page.Markup);
+        Assert.Empty(page.FindAll("#vehicle-reading-age"));
+        Assert.Contains("Plugged in", page.Markup);
+        Assert.Contains("as the charger sees it", page.Markup);
     }
 
     [Fact]
     public void Shows_the_cars_soc_alongside_the_age_of_the_reading()
     {
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        // The charger sees a cable the car says is not there: the slower reading disagreeing is said
+        // under the figure rather than hidden.
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar) with { CarConnected = true });
         _vehicle.Set(new VehicleState(
             _time.Now.AddHours(-3.5),
             SocPercent: 28,
@@ -269,7 +273,7 @@ public class DashboardPageTests : PageTest
         Assert.Contains("28%", page.Markup);
         Assert.Contains("3.5 h", page.Markup);
         Assert.Contains("id4", page.Markup);
-        Assert.Contains("Disconnected", page.Markup);
+        Assert.Contains("the car says it is not", page.Markup);
     }
 
     [Fact]
@@ -376,18 +380,16 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void Offers_a_way_to_start_instead_of_a_grid_of_dashes_when_nothing_is_charging()
+    public void Shows_no_session_card_when_nothing_is_charging()
     {
-        // Mode Off and an idle charger: there is no session to report, and the useful thing to say is
-        // where a session is started from.
+        // Mode Off and an idle charger: there is no session to report, and the Charge mode strip is
+        // where one is started.
         _holder.Set(Statuses.Sample(_time.Now));
 
         var page = Render<Dashboard>();
 
-        var session = page.Find("#this-session");
-        Assert.Contains("Nothing is charging", session.TextContent);
-        Assert.DoesNotContain("Session energy", session.TextContent);
-        Assert.Contains("/charging-plan", session.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Empty(page.FindAll("#this-session"));
+        Assert.Contains("/charging-plan", page.Find(".mode-summary a").GetAttribute("href"));
     }
 
     [Fact]
@@ -575,30 +577,32 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void Marks_the_driving_mode_among_links_into_the_plan_tabs()
+    public void Names_the_driving_mode_in_the_session_card_with_a_way_to_its_tab()
     {
-        // A way to the controls, not a copy of them (#98): every segment but Off is a link to its tab,
-        // and the one driving is marked.
+        // A way to the controls, not a copy of them (#98): the running mode heads This session, and
+        // the mode strip is not shown while one is driving.
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted));
 
         var page = Render<Dashboard>();
 
-        var links = page.FindAll(".mode-seg a");
-        Assert.Equal(
-            ["/charging-plan/solar", "/charging-plan/forecasted", "/charging-plan/solar-grid", "/charging-plan/fast", "/charging-plan/targeted"],
-            links.Select(a => a.GetAttribute("href")));
-        Assert.Equal("Forecasted", page.Find(".mode-seg [aria-current=true]").TextContent.Trim());
+        Assert.Empty(page.FindAll(".mode-seg"));
+        Assert.Equal("Forecasted", page.Find(".session-mode-name").TextContent.Trim());
+        Assert.Contains("Running", page.Find(".session-mode").TextContent);
+        Assert.Equal("/charging-plan/forecasted", page.Find(".session-mode-link").GetAttribute("href"));
     }
 
     [Fact]
-    public void Marks_off_when_no_mode_is_driving()
+    public void Offers_every_mode_as_a_link_into_the_plan_tabs_when_none_is_driving()
     {
         _holder.Set(Statuses.Sample(_time.Now));
 
         var page = Render<Dashboard>();
 
+        Assert.Equal(
+            ["/charging-plan/solar", "/charging-plan/forecasted", "/charging-plan/solar-grid", "/charging-plan/fast", "/charging-plan/targeted"],
+            page.FindAll(".mode-seg a").Select(a => a.GetAttribute("href")));
         Assert.Equal("Off", page.Find(".mode-seg [aria-current=true]").TextContent.Trim());
-        Assert.Contains("No mode is driving the charger", page.Find(".mode-summary").TextContent);
+        Assert.Contains("No controlled charging session is running", page.Find(".mode-summary").TextContent);
     }
 
     [Fact]
@@ -770,14 +774,13 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
-    public void Explains_the_forecast_columns_beneath_the_table()
+    public void Explains_the_forecast_columns_in_the_tip_beside_the_heading()
     {
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
 
         var page = Render<Dashboard>();
 
-        var note = page.Find("#solar-forecast").NextElementSibling!;
-        Assert.Equal("P", note.TagName);
+        var note = page.Find("#solar-forecast").PreviousElementSibling!.QuerySelector(".info-pop")!;
         Assert.Contains("kWh", note.TextContent);
         Assert.Contains("Low (p10)", note.TextContent);
         Assert.Contains("High (p90)", note.TextContent);

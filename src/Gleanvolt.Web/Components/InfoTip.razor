@@ -1,0 +1,30 @@
+@* A figure's meaning one tap away: an (i) beside its label that opens a short popover. A <details>, so it
+   needs no script and works on a phone, and the browser keeps it open across the re-render every poll
+   brings -- Blazor never wrote the open attribute, so its diff leaves it alone. Every tip sharing a
+   Group closes the others when it opens. *@
+<details class="info" name="@Group">
+    <summary aria-label="About @Topic">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>
+        </svg>
+    </summary>
+    <div class="@PopClass">@ChildContent</div>
+</details>
+
+@code {
+    /// <summary>What the tip explains, for the button's accessible name: "About {Topic}".</summary>
+    [Parameter, EditorRequired] public string Topic { get; set; } = "";
+
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Opens leftwards, for a tip near the right edge of its column.</summary>
+    [Parameter] public bool End { get; set; }
+
+    /// <summary>A wider popover, for a tip that runs to several paragraphs.</summary>
+    [Parameter] public bool Wide { get; set; }
+
+    [Parameter] public string Group { get; set; } = "info";
+
+    private string PopClass => "info-pop" + (End ? " end" : "") + (Wide ? " wide" : "");
+}
