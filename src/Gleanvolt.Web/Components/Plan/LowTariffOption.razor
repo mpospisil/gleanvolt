@@ -13,18 +13,21 @@
 *@
 
 <div class="control low-tariff-option">
-    <label class="@(HasTariff ? null : "muted")">
-        <input type="checkbox" id="@($"low-tariff-{Slug}")"
-               checked="@_on" disabled="@(!HasTariff && !_on)" @onchange="OnChanged" />
-        Low tariff only
-    </label>
-    <span class="hint">
-        @if (!HasTariff)
-        {
-            <text>Set up a tariff in <a href="/settings#tariff-editor">Settings</a> first; until then this has nothing to wait for. </text>
-        }
-        @Hint
-    </span>
+    <div class="control-head">
+        <label class="@(HasTariff ? null : "muted")">
+            <input type="checkbox" id="@($"low-tariff-{Slug}")"
+                   checked="@_on" disabled="@(!HasTariff && !_on)" @onchange="OnChanged" />
+            Low tariff only
+        </label>
+        <InfoTip Topic="Low tariff only">
+            <p>@Hint</p>
+        </InfoTip>
+    </div>
+    @* Said out loud, not in the tip: it is why the box is greyed out, not what it means. *@
+    @if (!HasTariff)
+    {
+        <span class="hint">Set up a tariff in <a href="/settings#tariff-editor">Settings</a> first; until then this has nothing to wait for.</span>
+    }
     @if (Note() is { } note)
     {
         <span class="hint @(Status?.LowTariff is { Ignored: true } ? "warning" : null)" id="@($"low-tariff-{Slug}-state")">@note</span>
@@ -35,7 +38,7 @@
     /// <summary>The mode the option belongs to: FastNoBattery or SolarGrid.</summary>
     [Parameter, EditorRequired] public ChargeControlMode Mode { get; set; }
 
-    /// <summary>What the option means for this mode, said under the box.</summary>
+    /// <summary>What the option means for this mode, in the tip beside the box.</summary>
     [Parameter, EditorRequired] public string Hint { get; set; } = string.Empty;
 
     /// <summary>The last poll, for whether the mode is waiting now.</summary>

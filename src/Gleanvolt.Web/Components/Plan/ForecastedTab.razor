@@ -26,33 +26,44 @@
     not a verdict on whether it is enough, because only Targeted is entitled to the second sentence.
 *@
 
-<p class="muted">
-    Charge from surplus like <a href="/charging-plan/solar">Solar</a>, but with the fixed
-    battery-full gate replaced by the Solcast forecast: the plan decides how much of today's
-    remaining sun the car may have, so the home battery still reaches 100% by the evening deadline.
-    The midday plateau goes to the car, the shoulders stay with the house and the battery.
-</p>
+<div class="muted intro-line">
+    Charges from surplus, guided by the forecast so the home battery still fills by evening.
+    <InfoTip Topic="this mode">
+        <p>
+            Charge from surplus like <a href="/charging-plan/solar">Solar</a>, but with the fixed
+            battery-full gate replaced by the Solcast forecast: the plan decides how much of today's
+            remaining sun the car may have, so the home battery still reaches 100% by the evening
+            deadline. The midday plateau goes to the car, the shoulders stay with the house and the
+            battery.
+        </p>
+    </InfoTip>
+</div>
 
 <div class="control">
     <button type="button" class="primary" id="start-forecasted" disabled="@Busy" @onclick="StartForecasted">
         Charge to the forecast
     </button>
-    <span class="hint">
-        Falls back to plain surplus behaviour whenever no usable forecast is available, rather than
-        refusing to charge.
-    </span>
+    <InfoTip Topic="Charge to the forecast">
+        <p>
+            Falls back to plain surplus behaviour whenever no usable forecast is available, rather than
+            refusing to charge.
+        </p>
+    </InfoTip>
 </div>
 
 <section class="plan" id="ev-energy">
-    <h2>Where a charge stops</h2>
-
-    <p class="hint">
-        This mode takes no amount: it charges the car from whatever surplus the forecast says the home
-        battery will not need, until the car's own charge limit stops it. To keep the car below full,
-        set that limit in the car. To <em>ask</em> for an amount by a time, use
-        <a href="/charging-plan/targeted">Targeted</a>: when the forecast covers it in time, it charges
-        from the sun alone, and it buys grid only if the sun falls short.
-    </p>
+    <div class="plan-head">
+        <h2>Where a charge stops</h2>
+        <InfoTip Topic="Where a charge stops">
+            <p>
+                This mode takes no amount: it charges the car from whatever surplus the forecast says the
+                home battery will not need, until the car's own charge limit stops it. To keep the car
+                below full, set that limit in the car. To <em>ask</em> for an amount by a time, use
+                <a href="/charging-plan/targeted">Targeted</a>: when the forecast covers it in time, it
+                charges from the sun alone, and it buys grid only if the sun falls short.
+            </p>
+        </InfoTip>
+    </div>
 
     <p class="hint">@SessionProgress()</p>
 </section>
@@ -61,26 +72,35 @@
     <h2>What the home battery keeps</h2>
 
     <div class="control">
-        <label for="min-battery-soc">Minimum battery SOC (%)</label>
+        <div class="control-head">
+            <label for="min-battery-soc">Minimum battery SOC (%)</label>
+            <InfoTip Topic="Minimum battery SOC (%)">
+                <p>
+                    The lowest the home battery may go while it helps charge the car. When it gets there the
+                    car pauses until the battery has recovered by the resume margin below. The plan may keep
+                    a higher floor when the forecast says the battery needs it to be full by the plan's
+                    deadline. Shared with the Targeted mode, so changing it here changes it there too.
+                    Doesn't persist across restarts.
+                </p>
+            </InfoTip>
+        </div>
         <input id="min-battery-soc" type="number" step="1" min="0" max="100"
                @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
-        <span class="hint">
-            The lowest the home battery may go while it helps charge the car. When it gets there the
-            car pauses until the battery has recovered by the resume margin below. The plan may keep a
-            higher floor when the forecast says the battery needs it to be full by the plan's deadline.
-            Shared with the Targeted mode, so changing it here changes it there too. Doesn't persist
-            across restarts.
-        </span>
     </div>
 
     <div class="control">
-        <label for="resume-margin">SOC resume margin (%)</label>
+        <div class="control-head">
+            <label for="resume-margin">SOC resume margin (%)</label>
+            <InfoTip Topic="SOC resume margin (%)">
+                <p>
+                    How far above the floor the battery must recover before a paused session restarts. Raise
+                    it if the car starts and stops repeatedly on a marginal day. Doesn't persist across
+                    restarts.
+                </p>
+            </InfoTip>
+        </div>
         <input id="resume-margin" type="number" step="1" min="0" max="50"
                @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
-        <span class="hint">
-            How far above the floor the battery must recover before a paused session restarts. Raise it
-            if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.
-        </span>
     </div>
 </section>
 

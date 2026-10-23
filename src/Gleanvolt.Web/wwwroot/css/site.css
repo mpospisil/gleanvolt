@@ -2186,6 +2186,7 @@ a.seg-opt {
 .info {
     position: relative;
     display: inline-block;
+    vertical-align: middle;
 }
 
 .info summary {
@@ -2249,6 +2250,40 @@ a.seg-opt {
 
 .info-pop p + p {
     margin-top: 8px;
+}
+
+/*
+    The Charging plan's tips (#255): a control's label, a mode's one-line summary, a plan's heading and
+    the mode line each carry their (i) on the same line, where the hint under them used to be.
+*/
+.control-head,
+.plan-head,
+.control .mode-state {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.control-head {
+    margin-bottom: 0.35rem;
+}
+
+.control .control-head label,
+.control .control-head .control-label {
+    margin-bottom: 0;
+}
+
+/* A sentence, not a row: the (i) follows its last word and wraps with it. */
+.intro-line {
+    margin: 0 0 1rem;
+}
+
+.plan-head h2 {
+    margin: 0;
+}
+
+.control .mode-state {
+    gap: 6px;
 }
 
 /*

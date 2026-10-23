@@ -5,20 +5,27 @@
     achieve anything right now.
 *@
 
-<p class="muted">
-    Charge from whatever the roof is making that the house is not already using. The home battery
-    keeps first claim: this mode waits until the battery is full, then follows the surplus up and
-    down, and pauses when there is not enough of it to hold the charger's minimum current.
-</p>
+<div class="muted intro-line">
+    Charges from surplus the house isn’t using, once the home battery is full.
+    <InfoTip Topic="this mode">
+        <p>
+            Charge from whatever the roof is making that the house is not already using. The home battery
+            keeps first claim: this mode waits until the battery is full, then follows the surplus up and
+            down, and pauses when there is not enough of it to hold the charger's minimum current.
+        </p>
+    </InfoTip>
+</div>
 
 <div class="control">
     <button type="button" class="primary" id="start-solar" disabled="@Busy" @onclick="StartSolar">
         Charge from surplus
     </button>
-    <span class="hint">
-        Puts the charger into Fast and hands it to the surplus. Nothing else to set — the current is
-        whatever the sun leaves over, decided again every poll.
-    </span>
+    <InfoTip Topic="Charge from surplus">
+        <p>
+            Puts the charger into Fast and hands it to the surplus. Nothing else to set — the current is
+            whatever the sun leaves over, decided again every poll.
+        </p>
+    </InfoTip>
 </div>
 
 @if (Status is { } status)
@@ -30,7 +37,7 @@
               Hint="The gate for this mode: the car gets nothing until the home battery is full." />
         <Stat Label="EV charging power" Value="@Units.Power(status.EvChargerPowerWatts)"
               Hint="What the charger reports the car actually drawing right now — not a setpoint." />
-        <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)"
+        <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)" End="true"
               Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
     </section>
 }

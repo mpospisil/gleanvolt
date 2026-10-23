@@ -11,35 +11,46 @@
     Home Assistant or a second browser can move it, and this tab shows what the controller is using.
 *@
 
-<p class="muted">
-    Charge from the sun, and let the grid help. While the surplus the house isn't using stays above
-    your minimum, the car follows it; when that surplus is too small for the charger's minimum current
-    on its own, the grid tops it up to that minimum, with the home battery held out of it. There is no
-    full-battery gate. When the surplus drops below your minimum the car pauses — smoothed over a few
-    minutes, so a passing cloud doesn't stop it — and once the forecast has no sun left today that
-    clears the minimum, the mode switches itself off.
-</p>
+<div class="muted intro-line">
+    Follows the sun; the grid tops up to the charger’s minimum when surplus is small.
+    <InfoTip Topic="this mode">
+        <p>
+            Charge from the sun, and let the grid help. While the surplus the house isn't using stays above
+            your minimum, the car follows it; when that surplus is too small for the charger's minimum
+            current on its own, the grid tops it up to that minimum, with the home battery held out of it.
+            There is no full-battery gate. When the surplus drops below your minimum the car pauses —
+            smoothed over a few minutes, so a passing cloud doesn't stop it — and once the forecast has no
+            sun left today that clears the minimum, the mode switches itself off.
+        </p>
+    </InfoTip>
+</div>
 
 <div class="control">
     <button type="button" class="primary" id="start-solar-grid" disabled="@Busy" @onclick="StartSolarGrid">
         Charge from sun + grid
     </button>
-    <span class="hint">
-        Puts the charger into Fast and hands it to the surplus. Ends by itself at the end of the day's
-        useful sun, when the car stops drawing, or when it is unplugged.
-    </span>
+    <InfoTip Topic="Charge from sun + grid">
+        <p>
+            Puts the charger into Fast and hands it to the surplus. Ends by itself at the end of the day's
+            useful sun, when the car stops drawing, or when it is unplugged.
+        </p>
+    </InfoTip>
 </div>
 
 <div class="control">
-    <label for="min-solar-surplus">Minimum solar surplus (W)</label>
+    <div class="control-head">
+        <label for="min-solar-surplus">Minimum solar surplus (W)</label>
+        <InfoTip Topic="Minimum solar surplus (W)">
+            <p>
+                Below this the car pauses instead of taking grid. The most the grid ever adds is the
+                charger's minimum power (about 4.1 kW at 6 A on three phases) less this figure; set it at
+                or above that and the grid never helps at all. Also the line the rest of today's forecast
+                has to clear. Doesn't persist across restarts.
+            </p>
+        </InfoTip>
+    </div>
     <input id="min-solar-surplus" type="number" step="100" min="0"
            @bind="_minSurplusWatts" @bind:event="onchange" @bind:after="OnMinSurplusSelected" />
-    <span class="hint">
-        Below this the car pauses instead of taking grid. The most the grid ever adds is the charger's
-        minimum power (about 4.1 kW at 6 A on three phases) less this figure; set it at or above that
-        and the grid never helps at all. Also the line the rest of today's forecast has to clear.
-        Doesn't persist across restarts.
-    </span>
 </div>
 
 <LowTariffOption Mode="ChargeControlMode.SolarGrid" Status="Status"
@@ -54,7 +65,7 @@
               Hint="When the forecast says the surplus stops clearing your minimum today — when this mode will switch itself off if the live surplus agrees. Only shown while this mode is driving." />
         <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)"
               Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
-        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)"
+        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)" End="true"
               Hint="Positive while importing. While the grid is topping up a small surplus, this is roughly that top-up." />
     </section>
 

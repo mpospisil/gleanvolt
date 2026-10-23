@@ -22,12 +22,18 @@
     the API set one too, and the mode clears itself once the charge ends.
 *@
 
-<p class="muted">
-    Charge as fast as the installation allows and keep the home battery out of it. The setpoint is
-    pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid
-    covers the rest, so expect to import. The discharge hold is armed when the charge starts and
-    released when it ends — you can switch it off in between if you would rather the battery helped.
-</p>
+<div class="muted intro-line">
+    As fast as the installation allows, with the home battery kept out — expect grid import.
+    <InfoTip Topic="this mode">
+        <p>
+            Charge as fast as the installation allows and keep the home battery out of it. The setpoint is
+            pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid
+            covers the rest, so expect to import. The discharge hold is armed when the charge starts and
+            released when it ends — you can switch it off in between if you would rather the battery
+            helped.
+        </p>
+    </InfoTip>
+</div>
 
 @*
     The basis selector appears only when the battery target can be honoured: a capacity in
@@ -37,7 +43,12 @@
     car at all.
 *@
 <div class="control">
-    <label for="fast-basis">How much?</label>
+    <div class="control-head">
+        <label for="fast-basis">How much?</label>
+        <InfoTip Topic="How much?">
+            <p>@BasisHint()</p>
+        </InfoTip>
+    </div>
     <select id="fast-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
         <option value="@FastChargeBasis.Full">Until the car stops</option>
         <option value="@FastChargeBasis.Energy">Energy to add (kWh)</option>
@@ -46,16 +57,19 @@
             <option value="@FastChargeBasis.Soc">Battery target (%)</option>
         }
     </select>
-    <span class="hint">@BasisHint()</span>
 </div>
 
 @if (_basis == FastChargeBasis.Energy)
 {
     <div class="control">
-        <label for="fast-energy">Energy needed (kWh)</label>
+        <div class="control-head">
+            <label for="fast-energy">Energy needed (kWh)</label>
+            <InfoTip Topic="Energy needed (kWh)">
+                <p>Measured at the charger, from the moment you press the button.</p>
+            </InfoTip>
+        </div>
         <input id="fast-energy" type="number" step="0.5" min="0"
                @bind="_energyKWh" @bind:event="onchange" @bind:after="OnFormEdited" />
-        <span class="hint">Measured at the charger, from the moment you press the button.</span>
     </div>
 }
 else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
@@ -76,16 +90,20 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 @if (_basis != FastChargeBasis.Full)
 {
     <div class="control">
-        <label for="fast-departure">Ready by (optional)</label>
+        <div class="control-head">
+            <label for="fast-departure">Ready by (optional)</label>
+            <InfoTip Topic="Ready by">
+                <p>
+                    No time set: the charge starts straight away. With a time, the charge is held back and
+                    starts as late as it can while still finishing before you go — so a car asked to go above
+                    80% spends minutes there rather than the whole night, which is what actually ages the
+                    pack. It still charges flat out when it runs; only the start moves. To remove a time you
+                    have set, open the calendar and press its Clear button.
+                </p>
+            </InfoTip>
+        </div>
         <input id="fast-departure" type="datetime-local" step="900"
                @bind="_departBy" @bind:event="onchange" @bind:after="OnFormEdited" />
-        <span class="hint">
-            No time set: the charge starts straight away. With a time, the charge is held back and starts
-            as late as it can while still finishing before you go — so a car asked to go above 80% spends
-            minutes there rather than the whole night, which is what actually ages the pack. It still
-            charges flat out when it runs; only the start moves. To remove a time you have set, open the
-            calendar and press its Clear button.
-        </span>
     </div>
 }
 
@@ -96,7 +114,9 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
         Charge at maximum
     </button>
-    <span class="hint">@EndsHint()</span>
+    <InfoTip Topic="Charge at maximum">
+        <p>@EndsHint()</p>
+    </InfoTip>
 </div>
 
 @if (_error is { } error)
@@ -113,7 +133,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
               Hint="Charging current derived from the charger's measured power: what the car really takes, which can be below the maximum if the car itself limits it." />
         <Stat Label="Active current" Value="@Units.Current(status.ActiveCurrentAmps)"
               Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
-        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)"
+        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)" End="true"
               Hint="Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed." />
 
         @*
