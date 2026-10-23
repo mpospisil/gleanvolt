@@ -32,11 +32,16 @@
     sets one too, and the mode clears itself once the target is met.
 *@
 
-<p class="muted">
-    Say how much the car needs and when it has to be there, then look at the plan before it starts.
-    The plan takes every kilowatt-hour of forecast surplus the home battery has not already claimed,
-    and buys the rest from the grid as late as it can and still finish in time.
-</p>
+<div class="muted intro-line">
+    Say how much and by when; forecast sun goes first, the grid covers the rest as late as possible.
+    <InfoTip Topic="this mode">
+        <p>
+            Say how much the car needs and when it has to be there, then look at the plan before it starts.
+            The plan takes every kilowatt-hour of forecast surplus the home battery has not already
+            claimed, and buys the rest from the grid as late as it can and still finish in time.
+        </p>
+    </InfoTip>
+</div>
 
 @if (_vehicle is not null)
 {
@@ -66,7 +71,7 @@
                   Hint="What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip." />
             <Stat Label="Plugged in" Value="@PluggedIn()"
                   Hint="What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours." />
-            <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()"
+            <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()" End="true"
                   Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
         </section>
     </section>
@@ -81,7 +86,16 @@
 {
     @* A segmented control on native radios (#255): two answers to one question, both visible. *@
     <div class="control">
-        <span class="control-label" id="target-basis-label">What are you aiming at?</span>
+        <div class="control-head">
+            <span class="control-label" id="target-basis-label">What are you aiming at?</span>
+            <InfoTip Topic="What are you aiming at?">
+                <p>
+                    Either way the promise is metered in kilowatt-hours at the charger. A battery target is
+                    converted once, when you start it — a later reading from the car does not move a target
+                    that is already part delivered.
+                </p>
+            </InfoTip>
+        </div>
         <div class="seg" role="radiogroup" id="target-basis" aria-labelledby="target-basis-label">
             <label class="seg-opt">
                 <input type="radio" name="target-basis" id="target-basis-energy"
@@ -94,11 +108,6 @@
                 Battery target (%)
             </label>
         </div>
-        <span class="hint">
-            Either way the promise is metered in kilowatt-hours at the charger. A battery target is
-            converted once, when you start it — a later reading from the car does not move a target
-            that is already part delivered.
-        </span>
     </div>
 }
 
@@ -114,10 +123,14 @@
 else
 {
     <div class="control">
-        <label for="target-energy">Energy needed (kWh)</label>
+        <div class="control-head">
+            <label for="target-energy">Energy needed (kWh)</label>
+            <InfoTip Topic="Energy needed (kWh)">
+                <p>Measured at the charger, from the moment you press Start.</p>
+            </InfoTip>
+        </div>
         <input id="target-energy" type="number" step="0.5" min="0"
                @bind="_energyKWh" @bind:event="onchange" @bind:after="OnFormEdited" />
-        <span class="hint">Measured at the charger, from the moment you press Start.</span>
     </div>
 }
 
@@ -129,7 +142,18 @@ else
 @if (CanTargetSoc)
 {
     <div class="control">
-        <span class="control-label" id="charge-priority-label">Pacing</span>
+        <div class="control-head">
+            <span class="control-label" id="charge-priority-label">Pacing</span>
+            <InfoTip Topic="Pacing">
+                <p>
+                    Both meet the departure. <strong>Cheapest</strong> paces the charge across the window and
+                    takes every watt of sun above that pace, so the target is usually met well before you
+                    leave. <strong>Just in time</strong> delivers everything up to the rest level the same
+                    way, then holds the last stretch back so the car is not sitting full overnight — which
+                    costs grid, because the sun is turned down while it waits.
+                </p>
+            </InfoTip>
+        </div>
         <div class="seg" role="radiogroup" id="charge-priority" aria-labelledby="charge-priority-label">
             <label class="seg-opt">
                 <input type="radio" name="charge-priority" id="charge-priority-cheapest"
@@ -144,63 +168,69 @@ else
                 Just in time
             </label>
         </div>
-        <span class="hint">
-            Both meet the departure. <strong>Cheapest</strong> paces the charge across the window and
-            takes every watt of sun above that pace, so the target is usually met well before you
-            leave. <strong>Just in time</strong> delivers everything up to the rest level the same way,
-            then holds the last stretch back so the car is not sitting full overnight — which costs
-            grid, because the sun is turned down while it waits.
-        </span>
     </div>
 }
 
 @if (_priority == TargetedChargePriority.JustInTime && CanTargetSoc)
 {
     <div class="control">
-        <label for="rest-soc">Rest at (%)</label>
+        <div class="control-head">
+            <label for="rest-soc">Rest at (%)</label>
+            <InfoTip Topic="Rest at (%)">
+                <p>@RestHint()</p>
+            </InfoTip>
+        </div>
         <input id="rest-soc" type="number" step="5" min="0" max="100"
                @bind="_restSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
-        <span class="hint">@RestHint()</span>
     </div>
 }
 
 <div class="control">
-    <label for="target-departure">Ready by</label>
+    <div class="control-head">
+        <label for="target-departure">Ready by</label>
+        <InfoTip Topic="Ready by">
+            <p>
+                Charging finishes a few minutes before this, so the car is ready rather than still drawing.
+                At most @Units.Hours(Display.MaxHorizon) ahead.
+            </p>
+        </InfoTip>
+    </div>
     <input id="target-departure" type="datetime-local"
            @bind="_departure" @bind:event="onchange" @bind:after="OnFormEdited" />
-    <span class="hint">
-        Charging finishes a few minutes before this, so the car is ready rather than still drawing.
-        At most @Units.Hours(Display.MaxHorizon) ahead.
-    </span>
 </div>
 
 <div class="control">
-    <label for="min-battery-soc">Minimum battery SOC (%)</label>
+    <div class="control-head">
+        <label for="min-battery-soc">Minimum battery SOC (%)</label>
+        <InfoTip Topic="Minimum battery SOC (%)">
+            <p>
+                Below this level the home battery comes first: the sun charges it, and the car gets only
+                what it needs to be ready on time, from the grid. At or above it, the car also takes the
+                solar surplus. The home battery never charges the car in this mode. On a poor-sun day the
+                plan may keep a higher floor so the battery can still refill. Shared with the Forecasted
+                mode, so changing it here changes it there too. Doesn't persist across restarts.
+            </p>
+        </InfoTip>
+    </div>
     <input id="min-battery-soc" type="number" step="1" min="0" max="100"
            @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
-    <span class="hint">
-        Below this level the home battery comes first: the sun charges it, and the car gets only
-        what it needs to be ready on time, from the grid. At or above it, the car also takes the
-        solar surplus. The home battery never charges the car in this mode. On a poor-sun day the
-        plan may keep a higher floor so the battery can still refill. Shared with the Forecasted
-        mode, so changing it here changes it there too. Doesn't persist across restarts.
-    </span>
 </div>
 
 <div class="control">
     <button type="button" class="primary" id="preview-target" disabled="@Busy" @onclick="BuildPreview">Preview plan</button>
     <button type="button" class="secondary" id="cancel-target" disabled="@Busy" @onclick="Cancel">Cancel</button>
+    <InfoTip Topic="Preview plan">
+        <p>
+            Preview writes to nothing — it is the same planner the poll loop runs, asked what would happen
+            if you started now. The request does not survive a restart of the service: if it restarts
+            overnight the car stops charging, and nothing will have told you.
+        </p>
+    </InfoTip>
 
     @if (_error is not null)
     {
         <p class="error" role="alert">@_error</p>
     }
-
-    <span class="hint">
-        Preview writes to nothing — it is the same planner the poll loop runs, asked what would happen
-        if you started now. The request does not survive a restart of the service: if it restarts
-        overnight the car stops charging, and nothing will have told you.
-    </span>
 </div>
 
 @*

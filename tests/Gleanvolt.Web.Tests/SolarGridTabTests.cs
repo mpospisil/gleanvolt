@@ -53,7 +53,7 @@ public class SolarGridTabTests : PageTest
 
         var box = page.Find("#low-tariff-solar-grid");
         Assert.True(box.HasAttribute("disabled"));
-        Assert.Contains("Set up a tariff in Settings", box.ParentElement!.ParentElement!.TextContent);
+        Assert.Contains("Set up a tariff in Settings", box.Closest(".control")!.TextContent);
     }
 
     [Fact]

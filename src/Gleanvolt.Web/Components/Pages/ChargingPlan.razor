@@ -41,12 +41,21 @@
 
 <section class="controls">
     <div class="control">
-        <p id="mode-state" class="mode-state">
+        <div id="mode-state" class="mode-state">
             Charge mode: <span class="mode">@_currentMode</span>@if (_actionNote is not null)
             {
                 <span class="muted"> (@_actionNote)</span>
             }
-        </p>
+            <InfoTip Topic="charge mode">
+                <p>
+                    Starting any mode below puts the charger into Fast; Off stops the car, whichever mode
+                    was running. Nothing survives a restart — the service boots in Off and writes nothing
+                    until something here is pressed. Fast (no battery) and Targeted switch themselves off
+                    once the car finishes, Solar + grid once the day's useful sun is over, and the line
+                    above follows them without this page's help.
+                </p>
+            </InfoTip>
+        </div>
 
         <div class="actions">
             <button type="button" class="secondary off" id="charge-off" disabled="@_busy"
@@ -57,29 +66,25 @@
         {
             <p class="error" role="alert">@_actionError</p>
         }
-
-        <span class="hint">
-            Starting any mode below puts the charger into Fast; Off stops the car, whichever mode was
-            running. Nothing survives a restart — the service boots in Off and writes nothing until
-            something here is pressed. Fast (no battery) and Targeted switch themselves off once the
-            car finishes, Solar + grid once the day's useful sun is over, and the line above follows
-            them without this page's help.
-        </span>
     </div>
 
     @if (_status?.BatteryHoldEnabled == true)
     {
         <div class="control">
-            <label>
-                <input type="checkbox" @bind="_batteryHoldDisplay" @bind:after="OnBatteryHoldSelected" />
-                Battery discharge hold
-            </label>
-            <span class="hint">
-                Common to every mode, which is why it sits above them: it stops the home battery
-                serving household load, so the car charges from PV and grid while the battery can
-                still charge from surplus. Shows the last command written successfully, not a device
-                read-back — a failed write shows this switching back off on its own.
-            </span>
+            <div class="control-head">
+                <label>
+                    <input type="checkbox" @bind="_batteryHoldDisplay" @bind:after="OnBatteryHoldSelected" />
+                    Battery discharge hold
+                </label>
+                <InfoTip Topic="Battery discharge hold">
+                    <p>
+                        Common to every mode, which is why it sits above them: it stops the home battery
+                        serving household load, so the car charges from PV and grid while the battery can
+                        still charge from surplus. Shows the last command written successfully, not a
+                        device read-back — a failed write shows this switching back off on its own.
+                    </p>
+                </InfoTip>
+            </div>
         </div>
     }
 </section>
