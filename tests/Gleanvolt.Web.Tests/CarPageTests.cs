@@ -132,6 +132,21 @@ public class CarPageTests : PageTest
     // ---------------------------------------------------------------- the car the process resolved
 
     [Fact]
+    public void Shows_the_car_the_installation_and_which_of_them_is_in_effect()
+    {
+        // The third column is the interesting one: a page showing only the car's figures would leave
+        // somebody wondering why a 32 A car charges at 16.
+        var page = Page(Id4 with { Phases = 1, MinChargingCurrentAmps = 8, MaxChargingCurrentAmps = 32 });
+
+        Assert.Contains("In effect", page.Markup);
+        Assert.Contains("narrower of the two", page.Markup);
+
+        // The car refuses below 8; the installation gives out at 16; the car can only use one phase.
+        var row = page.FindAll("table.grid tbody tr").Last();
+        Assert.Contains("1", row.TextContent);
+    }
+
+    [Fact]
     public void An_undescribed_car_is_said_to_be_a_supported_installation()
     {
         var page = Page(EvInfo.Unknown);

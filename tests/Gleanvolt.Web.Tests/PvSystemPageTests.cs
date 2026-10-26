@@ -9,9 +9,10 @@ using Gleanvolt.Web.Components.Pages;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// The view of the installation as it is running (issue #111). What it has to get right is what a
-/// configuration page is for: showing what is actually configured and saying plainly when something is
-/// not. The edit form at its top (issue #204) has its own tests in PvSystemEditorFormTests.
+/// Settings, the installation (issue #111). What it has to get right is what a configuration page is
+/// for: showing what the controller talks through -- MQTT and the API -- and saying plainly when
+/// something is not configured. The edit form at its top (issue #204) has its own tests in
+/// PvSystemEditorFormTests.
 /// </summary>
 public class PvSystemPageTests : BunitContext
 {
@@ -156,100 +157,14 @@ public class PvSystemPageTests : BunitContext
         RenderIn(this, site, car, mqtt, api);
 
     [Fact]
-    public void Shows_what_the_system_is_called_and_where_it_is()
+    public void Points_to_the_car_page_for_the_cars_settings_and_limits()
     {
-        var page = Render();
+        // The running facts the page used to repeat -- the site, the devices, the car and its limits --
+        // are in the form above or on the Car page (#255).
+        var page = Render(car: Car());
 
-        Assert.Contains("Home Roof", page.Markup);
-        Assert.Contains("home-roof", page.Markup);
-        Assert.Contains("Krásného 12, Praha", page.Markup);
-        Assert.Contains("50.0755, 14.4378", page.Markup);
-    }
-
-    [Fact]
-    public void Spells_out_which_way_the_array_faces()
-    {
-        // 172° is only checkable by someone who already thinks in degrees; "south" is checkable by
-        // anyone who has stood in the garden, and this is the field that goes silently wrong.
-        var page = Render();
-
-        Assert.Contains("172° (south)", page.Markup);
-    }
-
-    [Theory]
-    [InlineData(0, "north")]
-    [InlineData(90, "east")]
-    [InlineData(225, "south-west")]
-    [InlineData(359, "north")]
-    public void Names_every_bearing_by_its_nearest_point(double bearing, string expected)
-    {
-        var page = Render(Site(azimuth: bearing));
-
-        Assert.Contains($"({expected})", page.Markup);
-    }
-
-    [Fact]
-    public void Shows_the_array_figures_with_their_units()
-    {
-        var page = Render();
-
-        Assert.Contains("9.2 kWp", page.Markup);
-        Assert.Contains("8 kW", page.Markup);
-        Assert.Contains("0.90", page.Markup);
-        Assert.Contains("2024-05-01", page.Markup);
-        Assert.Contains("35°", page.Markup);
-    }
-
-    [Fact]
-    public void Lists_the_devices_with_their_models_and_addresses()
-    {
-        var page = Render();
-
-        Assert.Contains("SolaX X3-HYB-G4 PRO", page.Markup);
-        Assert.Contains("192.168.2.10:502", page.Markup);
-        Assert.Contains("Garage wallbox", page.Markup);
-        Assert.Contains("SolaX X3-HAC", page.Markup);
-        Assert.Contains("192.168.2.6:502", page.Markup);
-        Assert.Contains("wallbox", page.Markup);
-    }
-
-    [Fact]
-    public void An_unset_value_reads_as_unset_rather_than_as_zero()
-    {
-        // The installation that has not been described yet -- which is every installation the moment
-        // before someone describes it. Zeroes here would be a site in the Atlantic facing north.
-        var page = Render(Site(
-            id: string.Empty,
-            name: string.Empty,
-            address: string.Empty,
-            latitude: null,
-            longitude: null,
-            azimuth: null,
-            tilt: null,
-            peakPowerWatts: null,
-            inverterCapacityWatts: null,
-            lossFactor: null));
-
-        Assert.DoesNotContain("0.0000", page.Markup);
-        Assert.DoesNotContain("(north)", page.Markup);
-        Assert.Contains("—", page.Markup);
-    }
-
-    [Fact]
-    public void Says_how_to_claim_an_id_when_there_is_none()
-    {
-        var page = Render(Site(id: string.Empty));
-
-        Assert.Contains("Pv__Id", page.Markup);
-    }
-
-    [Fact]
-    public void Says_what_no_coordinates_costs()
-    {
-        var page = Render(Site(latitude: null, longitude: null));
-
-        Assert.Contains("no weather is recorded", page.Markup);
-        Assert.Contains("Pv__Latitude", page.Markup);
+        Assert.Contains("/car", page.Find(".car-link a").GetAttribute("href"));
+        Assert.Empty(page.FindAll("table.grid"));
     }
 
     [Fact]
@@ -263,51 +178,6 @@ public class PvSystemPageTests : BunitContext
         Assert.Empty(page.FindAll("button"));
         Assert.Empty(page.FindAll("select"));
         Assert.Contains("no login", page.Find("#pv-readonly").TextContent);
-    }
-
-    // -- The car (#124).
-
-    [Fact]
-    public void Says_plainly_when_no_car_has_been_described()
-    {
-        var page = Render();
-
-        Assert.Contains("No car is described", page.Find("#no-vehicle").TextContent);
-        Assert.Contains("Ev:Vehicles:0", page.Find("#no-vehicle").TextContent);
-    }
-
-    [Fact]
-    public void Shows_what_the_car_is_and_what_its_pack_holds()
-    {
-        var page = Render(car: Car());
-
-        Assert.Contains("The ID.4", page.Markup);
-        Assert.Contains("Volkswagen ID.4 Pro", page.Markup);
-        Assert.Contains("77 kWh", page.Markup);
-    }
-
-    [Fact]
-    public void Shows_the_car_the_installation_and_which_of_them_is_in_effect()
-    {
-        // The third column is the interesting one: a page showing only the car's figures would leave
-        // somebody wondering why a 32 A car charges at 16.
-        var page = Render(car: Car(phases: 1, minAmps: 8, maxAmps: 32));
-        var markup = page.Markup;
-
-        Assert.Contains("In effect", markup);
-
-        // The car refuses below 8; the installation gives out at 16; the car can only use one phase.
-        var row = page.FindAll("table.grid tbody tr").Last();
-        Assert.Contains("1", row.TextContent);
-    }
-
-    [Fact]
-    public void Explains_that_a_car_can_only_ever_lower_a_limit()
-    {
-        var page = Render(car: Car());
-
-        Assert.Contains("narrower of the two", page.Markup);
-        Assert.Contains("only ever", page.Markup);
     }
 
     // -- MQTT (#143).

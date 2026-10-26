@@ -14,24 +14,29 @@
 *@
 
 <section class="controls pv-editor" id="pv-editor">
-    <h2>Edit</h2>
+    <div class="section-head tip-head">
+        <h2>Installation</h2>
+        <InfoTip Topic="saving installation settings" Group="settings-info">
+            <p>
+                A save is checked the way startup checks the configuration, and writes only what differs to
+                <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key.
+                Nothing changes until the controller restarts.
+            </p>
+            <p>
+                Each field's (i) says where its current value comes from. After a save, a field whose value
+                is not running yet says so under it.
+            </p>
+        </InfoTip>
+    </div>
 
     @if (_pending.Count > 0)
     {
-        <div class="alert pending" id="pv-pending">
-            <p>
-                <strong>Saved, not applied</strong> —
-                @($"{_pending.Count} {(_pending.Count == 1 ? "change takes" : "changes take")} effect on restart.")
-            </p>
-            <ul>
-                @foreach (var setting in _pending)
-                {
-                    <li>@Labels[setting.Key]: @Show(setting.Running) → @Show(setting.Saved)</li>
-                }
-            </ul>
-            <div class="control">
-                <RestartService Label="Apply them" />
-            </div>
+        <div class="restart-banner" id="pv-pending" role="status">
+            <span>
+                <strong>@($"{_pending.Count} {(_pending.Count == 1 ? "change" : "changes")} saved")</strong>
+                — not running until the controller restarts.
+            </span>
+            <a class="button-link" href="/settings/health">Restart on Health</a>
         </div>
     }
 
@@ -48,14 +53,6 @@
             editable here; until then, change them in <code>.env</code> and restart.
         </p>
     }
-    else
-    {
-        <p class="muted">
-            A save is checked the way startup checks the configuration, and writes only what differs to
-            <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key, so
-            each field says where its value comes from. Nothing changes until the controller restarts.
-        </p>
-    }
 
     @foreach (var (group, keys) in Groups)
     {
@@ -68,15 +65,26 @@
                 var id = "pv-" + key.Replace(':', '-');
 
                 <div class="pv-field">
-                    <label for="@id">@Labels[key]</label>
+                    <div class="field-head">
+                        <label for="@id">@Labels[key]</label>
+                        <InfoTip Topic="@Labels[key]" Group="settings-info">
+                            <p>Current value comes from @SourcePhrase(setting).</p>
+                            <p>@SourceTitle(setting)</p>
+                        </InfoTip>
+                    </div>
                     <input id="@id" type="text" spellcheck="false" autocomplete="off"
                            placeholder="@Hints.GetValueOrDefault(key)"
                            disabled="@(!Editable || _busy)"
                            value="@_values[key]"
                            @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
-                    <span class="source @(setting.IsEdited ? "edited" : null)" title="@SourceTitle(setting)">
-                        @SourceName(setting)
-                    </span>
+                    @if (Note(key, _values[key]) is { } note)
+                    {
+                        <span class="field-note">@note</span>
+                    }
+                    @if (setting.IsPending)
+                    {
+                        <span class="field-pending">Running: @Show(setting.Running) · restart to apply</span>
+                    }
                     @if (setting.IsEdited && Editable)
                     {
                         <button type="button" class="link revert" disabled="@_busy" @onclick="() => Revert(key)">
@@ -195,7 +203,7 @@
         [PvSystemSettingKeys.AzimuthDegrees] = "degrees from north, 180 = south",
         [PvSystemSettingKeys.TiltDegrees] = "degrees, 0 = flat",
         [PvSystemSettingKeys.LossFactor] = "0 to 1",
-        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "L1, L2, L3 or empty",
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "L1, L2, L3 (or R, S, T) or empty",
         [PvSystemSettingKeys.InverterPort] = "502",
         [PvSystemSettingKeys.ChargerPort] = "502",
         [PvSystemSettingKeys.InverterUnitId] = "1",
@@ -394,6 +402,47 @@
         SettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
         _ => "default",
     };
+
+    private static string SourcePhrase(ConfiguredSetting setting) => setting.Source switch
+    {
+        SettingSource.WebUi => "this page",
+        SettingSource.Environment => "the environment file",
+        SettingSource.CommandLine => "the command line",
+        SettingSource.AppSettings => SourceName(setting),
+        _ => "the built-in default",
+    };
+
+    // What a typed value means where it does not say so itself: a bearing outside 0-360, or SolaX's
+    // R/S/T for a phase, which is what the inverter's display shows and what an installer is likely to
+    // type. Null when the value says it plainly, or is one the save will refuse anyway.
+    private static string? Note(string key, string value)
+    {
+        value = value.Trim();
+
+        if (key == PvSystemSettingKeys.AzimuthDegrees
+            && double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var bearing))
+        {
+            var normalised = ((bearing % 360) + 360) % 360;
+            var facing = $"facing {Compass[(int)Math.Round(normalised / 45) % Compass.Length]}";
+            return normalised == bearing ? facing : $"= {Units.Angle(normalised)}, {facing}";
+        }
+
+        if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
+        {
+            return value.ToUpperInvariant() switch
+            {
+                "R" => "= L1, in SolaX's naming",
+                "S" => "= L2, in SolaX's naming",
+                "T" => "= L3, in SolaX's naming",
+                _ => null,
+            };
+        }
+
+        return null;
+    }
+
+    private static readonly string[] Compass =
+        ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
 
     private static string SourceTitle(ConfiguredSetting setting) => setting.Source switch
     {
