@@ -253,6 +253,70 @@ public class ChargingControlCoordinatorTests
         Assert.Equal(0, _coordinator.SessionEnergyWh, 1);
     }
 
+    // What the poll loop does on every poll while the mode is Off.
+    private void OffPoll(EnergyState state)
+    {
+        _coordinator.TrackWhileReleased(state);
+        _coordinator.ReleaseControl();
+    }
+
+    /// <summary>
+    /// The production sequence behind #283: the mode ends itself on a finished car, the car is unplugged
+    /// and plugged back in the next evening all while Off, and only then is a mode picked. The new
+    /// session starts from zero and includes what the car took before the mode was picked.
+    /// </summary>
+    [Fact]
+    public async Task UnpluggingWhileOff_StartsTheNextSessionAfresh_AndCountsTheDrawBeforeAModeIsPicked()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(207, _coordinator.SessionEnergyWh, 0);
+
+        OffPoll(Finished(Now.AddMinutes(3).AddSeconds(1)));
+        OffPoll(State(Now.AddMinutes(10)));                // unplugged
+        OffPoll(Charging(Now.AddHours(20)));               // plugged in; the charger starts it at Fast by itself
+        OffPoll(Charging(Now.AddHours(20).AddMinutes(3)));
+
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(20).AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(276, _coordinator.SessionEnergyWh, 0); // 4 minutes at 4140 W, none of yesterday's
+    }
+
+    [Fact]
+    public async Task ACarLeftPluggedInThroughOff_KeepsItsSessionEnergy()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        // A stopped charger with the car still in it reads Finishing, which is still a plugged-in car.
+        OffPoll(Finished(Now.AddMinutes(4)));
+        OffPoll(Finished(Now.AddMinutes(30)));
+
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(31)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(276, _coordinator.SessionEnergyWh, 0);
+    }
+
+    [Fact]
+    public async Task ADrawSeenWhileOff_IsNotHandedToTheModePickedNext()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
+
+        OffPoll(Charging(Now));
+        OffPoll(Connected(Now.AddMinutes(1)));
+
+        await _coordinator.RunCycleAsync(Connected(Now.AddMinutes(2)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.False(_controller.LastInput!.EvDrewPower);
+    }
+
     [Fact]
     public async Task TheCarsOwnDrawIsTrackedForTheFastMode()
     {
@@ -623,5 +687,9 @@ public class ChargingControlCoordinatorTests
     private static EnergyState Connected(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Preparing, EvChargerPowerWatts: 0);
+
+    private static EnergyState Finished(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Finishing, EvChargerPowerWatts: 0);
 }
 

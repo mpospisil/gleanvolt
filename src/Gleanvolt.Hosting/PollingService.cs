@@ -242,7 +242,11 @@ public sealed class PollingService : BackgroundService
                 }
                 else
                 {
-                    // Off: stop controlling and leave the charger's current setpoint exactly as it is.
+                    // Off: stop controlling and leave the charger's current setpoint exactly as it is --
+                    // but keep watching the plug, so an unplug in Off still ends the session's energy.
+                    // Tracked before the release, so a mode selected next still starts without the
+                    // "car has drawn power" verdict the release exists to clear.
+                    _chargingControl.TrackWhileReleased(state);
                     _chargingControl.ReleaseControl();
                     result = new ChargeControlCycleResult(ChargeControlState.Disabled, null, null, HoldingControl: false);
                 }
