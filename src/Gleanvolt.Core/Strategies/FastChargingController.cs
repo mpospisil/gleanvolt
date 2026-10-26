@@ -70,21 +70,7 @@ public sealed class FastChargingController : IChargingController
 
     public ChargingControlDecision Decide(ChargingControlInput input)
     {
-        // Precondition: only modulate the current while the charger is in Fast. Starting the mode wrote
-        // Fast once; if the charger has left it since, somebody changed it at the wallbox and we don't
-        // control it at all -- and we don't end the session either, since we were never driving it.
-        // Unless the Stop it is showing is our own: a deferred charge stands the charger down for the
-        // wait (ChargingControlAction.StandDown), and a guard that could not tell that from the owner's
-        // Stop would lock this mode out of the charger it is waiting to arm. That is not hypothetical --
-        // before the stand-down existed the wallbox reverted to Stop by itself after ~7 minutes at 0A,
-        // and this branch then returned None every poll for 8.5 hours while a 19.7kWh overnight charge
-        // was due. The flag comes from what we commanded, never from the register.
-        if (ChargerOwnership.NotOurs(input) is { } notOurs)
-        {
-            return notOurs;
-        }
-
-        // Checked before the idle branch below, and the order is the whole of why: a car that stops
+        // Checked before the car-full rule below, and the order is the whole of why: a car that stops
         // drawing at the very moment it reaches the number would otherwise be reported as having hit
         // *its own* limit. Downstream the two are indistinguishable once the mode reads Off, and this
         // is the true one.
@@ -96,25 +82,43 @@ public sealed class FastChargingController : IChargingController
                 + $"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
+        // After the target check above, so a charge that lands exactly on the deadline is reported as
+        // having succeeded rather than as having run out of time.
+        if (input.FastCharge is { Plan: { } departure } limited && departure.HasDepartedAt(input.State.Timestamp))
+        {
+            return Complete(
+                ChargingSessionEndReason.DeparturePassed,
+                $"Departure {departure.DepartBy.LocalDateTime:HH:mm} has passed with "
+                + $"{limited.DeliveredWh / 1000:F1}kWh of {limited.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
+        }
+
+        // The car finished or went away, or the charger is no longer ours to drive. "Finished" is only
+        // judged while we are asking the car to charge: through a wait, the car drawing nothing is our
+        // own doing, and the idle clock runs through it. A 07:47 start observed ending as "car stopped
+        // drawing for 41 min" is what that guard is for.
+        //
+        // The Stop a deferred charge stands the charger down into is our own, and the ownership rule
+        // knows it (ChargerStoodDown): a guard that could not tell that from the owner's Stop locked this
+        // mode out of the charger it was waiting to arm for 8.5 hours on 2026-08-28.
+        //
+        // A full car is said in the terms it happened in: it reached *its* limit before ours, and how far
+        // short of the asked-for amount that left things is the first thing anyone will want to know.
+        var shortfall = input.FastCharge is { } asked
+            ? $" at {asked.DeliveredWh / 1000:F1}kWh of the {asked.Limit.RequiredEnergyWh / 1000:F1}kWh asked for"
+            : null;
+
+        if (ChargerOwnership.Check(input, _completionDwell, shortfall) is { } ended)
+        {
+            return ended;
+        }
+
         if (input.FastCharge?.Plan is { } plan)
         {
             var now = input.State.Timestamp;
 
-            // After the target check above, so a charge that lands exactly on the deadline is reported
-            // as having succeeded rather than as having run out of time.
-            if (plan.HasDepartedAt(now))
-            {
-                return Complete(
-                    ChargingSessionEndReason.DeparturePassed,
-                    $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with "
-                    + $"{input.FastCharge.DeliveredWh / 1000:F1}kWh of "
-                    + $"{input.FastCharge.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
-            }
-
-            // Before the idle and unplug branches below, and not merely for tidiness: a car that drew
-            // power earlier in this session and is now being held back draws nothing, so the completion
-            // dwell would otherwise fire and end the very charge this plan exists to schedule. A mode
-            // waiting for 04:12 keeps its appointment; it does not decide the car has finished.
+            // A car that drew power earlier in this session and is now being held back draws nothing,
+            // and the car-full rule above leaves it alone only because we are not asking it to charge. A
+            // mode waiting for 04:12 keeps its appointment; it does not decide the car has finished.
             if (plan.IsWaitingAt(now) && !input.WaitAlreadyReleased)
             {
                 // Stood down rather than paused, and the difference is the whole of #135: a pause holds
@@ -126,50 +130,18 @@ public sealed class FastChargingController : IChargingController
                     null,
                     $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm} to start: "
                     + $"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs "
-                    + $"{Describe(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}.");
+                    + $"{Describe(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}.",
+                    WaitUntil: plan.StartNoLaterThan,
+                    Appointment: true);
             }
         }
 
         // Low tariff only (#274): after the target and the departure, so a charge that has met its
-        // amount or run out of time still ends, and before the idle check below, which a wait must
-        // never reach. Through a high tariff the car is not charging because we said so, and the
-        // guard below only judges a finished car while we are asking it to charge.
+        // amount or run out of time still ends. Through a high tariff the car is not charging because
+        // we said so, and the car-full rule above only judges a car we are asking to charge.
         if (TariffWait.For(input, "Fast") is { } wait)
         {
             return wait;
-        }
-
-        // "Has finished" is only meaningful once the car has actually started *and* while we are still
-        // asking it to charge. Before it starts, no draw means the car isn't ready yet (Preparing, or
-        // waiting on its own timer). While a plan holds it at the pause current, no draw is our own
-        // doing -- and the idle clock runs through that wait, so on the poll the appointment arrives
-        // the dwell is already long expired and the mode would end itself at the exact moment it was
-        // due to begin. A 07:47 start observed ending as "car stopped drawing for 41 min" is what this
-        // guard is for. <see cref="TargetedChargingController"/> has always tested Charging here, for
-        // the same reason between its blocks; the departure plan gave this mode the same waiting state
-        // without the same guard.
-        if (input.Charging && input.EvDrewPower)
-        {
-            // Known-disconnected, not merely "not connected": a charger that has stopped answering
-            // reports Unknown, and a dropped read is not a car that has gone away.
-            if (input.State.EvChargerStatus.IsCarKnownDisconnected())
-            {
-                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
-            }
-
-            if (input.EvIdleFor >= _completionDwell)
-            {
-                // Said in the terms it happened in: the car reached *its* limit before ours, and how
-                // far short of the asked-for amount that left things is the first thing anyone will
-                // want to know.
-                var shortfall = input.FastCharge is { } p
-                    ? $" at {p.DeliveredWh / 1000:F1}kWh of the {p.Limit.RequiredEnergyWh / 1000:F1}kWh asked for"
-                    : string.Empty;
-
-                return Complete(
-                    ChargingSessionEndReason.SessionComplete,
-                    $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){shortfall}");
-            }
         }
 
         var towards = input.FastCharge is { } left
@@ -198,8 +170,6 @@ public sealed class FastChargingController : IChargingController
         ? $"{(int)duration.TotalHours} h {duration.Minutes} m"
         : $"{Math.Max(1, (int)duration.TotalMinutes)} m";
 
-    // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever
-    // plugs in next. The orchestrator writes the pause current and then switches the mode to Off.
     private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
+        ChargerOwnership.End(reason, what);
 }

@@ -83,9 +83,11 @@ public sealed class ChargeControlOptions
     public double CompletionPowerThresholdWatts { get; init; } = 200;
 
     /// <summary>
-    /// FastNoBattery strategy only: how long the car must draw nothing before the mode calls the
-    /// session finished, pauses the charger and returns itself to Off. Long enough to ride out a
-    /// momentary dip and the gap between our setpoint reaching the charger and the car acting on it.
+    /// Every mode (#280): how long the car must draw nothing, while it is being asked to charge, before
+    /// the mode calls the session finished, pauses the charger and returns itself to Off. Long enough to
+    /// ride out a momentary dip and the gap between our setpoint reaching the charger and the car acting
+    /// on it. The fallback for a wallbox that stays in Fast at 0 W: this one closes the session itself on
+    /// a full car, and that is believed at once.
     /// </summary>
     public TimeSpan CompletionDwell { get; init; } = TimeSpan.FromMinutes(2);
 

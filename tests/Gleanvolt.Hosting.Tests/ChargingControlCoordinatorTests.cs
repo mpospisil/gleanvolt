@@ -362,6 +362,67 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task TheCarFullRuleSeesWhetherTheCarWasDrawingOnThePollBefore()
+    {
+        // On a full car this wallbox goes from drawing to Finishing / Stop in one poll (#280), so the rule
+        // needs the poll before, and a poll the charger did not answer is not one.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.False(_controller.LastInput!.EvWasDrawing);
+
+        await _coordinator.RunCycleAsync(Unreachable(Now.AddSeconds(8)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Finishing(Now.AddSeconds(16)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.True(_controller.LastInput!.EvWasDrawing);
+
+        await _coordinator.RunCycleAsync(Finishing(Now.AddSeconds(24)), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.False(_controller.LastInput!.EvWasDrawing);
+    }
+
+    [Fact]
+    public async Task ReArmingOutOfAWaitForSunLeavesALaterAppointmentToBeKept()
+    {
+        // A targeted charge stood down overnight for sun, re-armed when it comes, and then due to hold its
+        // tail until the afternoon: only leaving an appointment makes the release one-way.
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+
+        _controller.NextDecision = new(ChargingControlAction.StandDown, null, "waiting for sun", WaitUntil: Now.AddHours(9));
+        var waiting = await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+        Assert.Equal(Now.AddHours(9), waiting.WaitUntil);
+        Assert.True(waiting.ChargerStoodDown);
+
+        _controller.NextDecision = new(ChargingControlAction.Charge, 10, "sun");
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(9)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(9).AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.Equal(EvChargerMode.Fast, _charger.ModeWrites[^1].Mode);
+        Assert.False(_controller.LastInput!.WaitAlreadyReleased);
+
+        // The held tail, then its release: that one latches.
+        _controller.NextDecision = new(ChargingControlAction.StandDown, null, "holding the tail", Appointment: true);
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(10)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "tail");
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(14)), ChargeControlMode.Solar, null, CancellationToken.None);
+        await _coordinator.RunCycleAsync(Charging(Now.AddHours(14).AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.True(_controller.LastInput!.WaitAlreadyReleased);
+    }
+
+    [Fact]
+    public async Task OnlyAWaitCarriesAWaitUntil()
+    {
+        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+
+        _controller.NextDecision = new(ChargingControlAction.Pause, null, "dip", WaitUntil: Now.AddMinutes(3));
+        Assert.Equal(Now.AddMinutes(3), (await Cycle()).WaitUntil);
+
+        _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charge");
+        Assert.Null((await Cycle()).WaitUntil);
+    }
+
+    [Fact]
     public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
     {
         _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
@@ -497,6 +558,11 @@ public class ChargingControlCoordinatorTests
     private static EnergyState Charging(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Charging, EvChargerPowerWatts: 4140);
+
+    // The poll after a full car: the wallbox has closed the session and switched itself to Stop.
+    private static EnergyState Finishing(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Finishing, EvChargerPowerWatts: 0);
 
     // The car says it is done, but hasn't stopped drawing yet.
     private static EnergyState WindingDown(DateTimeOffset at) =>

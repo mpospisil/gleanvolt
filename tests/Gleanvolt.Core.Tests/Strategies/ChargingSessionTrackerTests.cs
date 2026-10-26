@@ -383,6 +383,26 @@ public class ChargingSessionTrackerTests
     }
 
     [Fact]
+    public void StandingTheChargerDownAndReArmingItAreRecordedAsEvents()
+    {
+        // On the chart a stand-down and a pause look the same: no draw. The event says which, and until when.
+        var tracker = NewTracker();
+        tracker.Observe(Status(Noon));
+
+        var until = Noon.AddHours(2);
+        var stoodDown = tracker.Observe(Status(Noon.AddMinutes(1), state: ChargeControlState.Paused, evWatts: 0) with
+        {
+            ChargerStoodDown = true,
+            WaitUntil = until,
+        });
+        var rearmed = tracker.Observe(Status(Noon.AddHours(2)));
+
+        var down = Assert.Single(stoodDown.Events, e => e.Kind == ChargingSessionEventKind.ChargerStoodDown);
+        Assert.Equal($"Charger stood down until {until.LocalDateTime:HH:mm}.", down.Detail);
+        Assert.Contains(rearmed.Events, e => e.Kind == ChargingSessionEventKind.ChargerRearmed);
+    }
+
+    [Fact]
     public void APlanThatFallsOutOfTrustMidSessionIsRecorded()
     {
         var usable = Plan(isUsable: true);

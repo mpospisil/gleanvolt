@@ -4,6 +4,74 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-26 — Every mode waits and ends the same way
+
+**Context.** Every mode talks to the same wallbox, but each one waited and ended in its own way, and
+some got it wrong ([issue #280](https://github.com/mpospisil/gleanvolt/issues/280)). Held in Fast at
+0 A, the wallbox ends the session itself after about seven minutes, reports `Finishing` and switches its
+own use-mode to `Stop` (#135). On a full car it does the same in a single poll: `Charging / Fast` at full
+power, then `Finishing / Stop / 0 W`, with no taper and no `SuspendedEv`. Either way the mode saw Fast →
+Stop, and two minutes later `ChargerOwnership` filed it as `ChargerTakenOver`. All three
+`ChargerTakenOver` endings in the Pi's logs for 13–26 October were a full car. Solar, Forecasted and
+Targeted's wait for sun paused however long the wait, and Forecasted lost the charger this way every
+evening.
+
+**Decision — one rule for waiting (`ChargerWait`).** A controller decides only "not now", and until
+when if it knows. The helper picks the action: a **pause** when the next change is under 15 minutes
+away, a **stand-down** when it is 15 minutes or more, or unknown, and a stand-down for any pause that
+has already lasted **5 minutes**. Fifteen minutes is SolarGrid's existing figure (`StandDownAfter`,
+moved here): long enough that a cloud inside a sunny period or a forecast period a few minutes off
+costs no use-mode writes. Five minutes sits under the wallbox's timeout of about seven with a poll or
+two to spare, so a short wait that keeps getting longer ends in our `Stop` and not the wallbox's.
+`TariffWait` goes through it, and SolarGrid's waits with it. A charger already stood down stays down
+until a charge re-arms it; going back to Fast only to sit at 0 A would be two writes for nothing.
+
+**The cost we accept.** "Unknown" includes every wait with no forecast behind it, so `Solar` without a
+forecast, and SolarGrid with an unusable one, now stand the charger down on the first cloud instead of
+pausing it: two use-mode writes per cloud rather than two setpoint writes. With a forecast, a dip inside
+a sunny stretch is still a pause, for up to five minutes.
+
+**Decision — appointments are one-way, waits are not.** The fast mode's deferred start and the targeted
+mode's held tail were already stood down, and their release latches (`WaitAlreadyReleased`) so a start
+time recomputed from a rising charge rate cannot stand the charger down again seconds after starting
+it. Now that a targeted charge can also be stood down overnight for sun, a re-arm out of that wait
+must not latch, or the held tail later that day would never be kept. A decision says which it is
+(`ChargingControlDecision.Appointment`), and only an appointment's re-arm latches.
+
+**Decision — one rule for "the car is full", in `ChargerOwnership.Check`.** Asked in this order:
+
+1. The charger reports `Finishing` or `SuspendedEv`, the mode was asking the car to charge, the car was
+   drawing on the poll before (`EvWasDrawing`, the last poll the charger answered), and we did not stand
+   it down: `SessionComplete`, at once. Our own 0 A timeout reads the same, but after a pause with
+   nothing drawing, which is what tells the two apart. This is before the ownership guard, because the
+   wallbox has already left Fast by the time it is seen.
+2. The ownership guard, unchanged.
+3. An unplugged car, and the car drawing nothing for `CompletionDwell` while being asked to charge: the
+   fallback for a wallbox that stays in Fast at 0 W. Fast, Targeted and SolarGrid each kept a copy of
+   these; Solar and Forecasted had none, and now end on a full car too.
+
+A mode's own endings come first: the energy delivered and the departure passed. For Fast that now
+includes the ownership guard, so a met amount ends the mode even while a junk use-mode is read. Ending
+writes nothing a takeover would not, two minutes later.
+
+**Not known yet.** Whether an owner pressing Stop in the SolaX app looks the same as a full car, mid-
+charge. If it does, that session is labelled "car full" rather than "taken over"; the mode ends either
+way. To be checked once on the real charger.
+
+**Decision — one rule for the end of the day.** Solar and Forecasted end themselves as `NoSunLeftToday`
+once the forecast has nothing left today that clears what they can charge on, as SolarGrid did. The
+outlook SolarGrid already built is now built for all three, each against its own minimum: the charger's
+6 A floor for Solar, and for Forecasted the least the battery loan will bridge (the floor with the loan
+off), so a day the loan could still use is never written off. Without a usable forecast they stay on,
+stood down, until the owner switches them off. Asked only of waits for sun or for the battery, never of
+a restart dwell: a mode in the sun now ends on the next poll the sun is not enough.
+
+**Surfaces.** The status carries whether the charger is stood down and until when; the Overview says
+"stood the charger down until 09:40", and the session records the stand-down and the re-arm as events,
+since on the chart a stand-down and a pause look the same. No Home Assistant entity changes.
+
+---
+
 ## 2026-10-22 — Fast and SolarGrid can wait for low tariff; a wait is not a finished car
 
 **Context.** With the grid tariff known (#273), `Fast` and `SolarGrid` could buy their grid share in low

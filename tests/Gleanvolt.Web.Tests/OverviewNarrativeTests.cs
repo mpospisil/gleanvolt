@@ -86,6 +86,34 @@ public class OverviewNarrativeTests
     }
 
     [Fact]
+    public void Says_when_a_stood_down_charger_is_due_back()
+    {
+        // #280: in Stop for a long wait, which the owner would otherwise read as the charger taken off the mode.
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.Solar) with
+        {
+            CarConnected = true,
+            State = ChargeControlState.Paused,
+            ChargerStoodDown = true,
+            WaitUntil = new DateTimeOffset(2026, 8, 12, 7, 40, 0, TimeSpan.Zero),
+        });
+
+        Assert.Contains("mode is on and has stood the charger down until 09:40.", text);
+    }
+
+    [Fact]
+    public void Says_a_stood_down_charger_waits_without_inventing_a_time()
+    {
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.Solar) with
+        {
+            CarConnected = true,
+            State = ChargeControlState.Paused,
+            ChargerStoodDown = true,
+        });
+
+        Assert.Contains("has stood the charger down until it can charge.", text);
+    }
+
+    [Fact]
     public void Names_the_tariff_when_a_low_tariff_only_mode_is_waiting()
     {
         var text = Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery) with

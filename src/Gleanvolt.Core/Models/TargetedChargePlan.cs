@@ -159,6 +159,16 @@ public sealed record TargetedChargePlan(
         .Max();
 
     /// <summary>
+    /// When the plan next expects to charge: <paramref name="instant"/> itself inside a planned block,
+    /// the start of the next one after it, or null when none is left. How long a wait for sun lasts,
+    /// which decides whether the charger is paused or stood down through it (#280).
+    /// </summary>
+    public DateTimeOffset? NextBlockAt(DateTimeOffset instant) => Blocks
+        .Where(b => b.End > instant)
+        .Select(b => (DateTimeOffset?)(b.Start > instant ? b.Start : instant))
+        .Min();
+
+    /// <summary>
     /// Whether <paramref name="instant"/> falls inside the planned grid block. This is what arms the
     /// battery discharge hold: the pack must stay out of a charge the grid is paying for.
     /// </summary>

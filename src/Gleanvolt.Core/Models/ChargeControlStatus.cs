@@ -72,6 +72,14 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="ChargeControlMode.Off"/> the two look identical. The session records this reason as its own
 /// (#198). Not published to Home Assistant.
 /// </param>
+/// <param name="ChargerStoodDown">
+/// Whether the mode has put the charger in Stop for a wait (#280), rather than holding it in Fast at the
+/// pause current. While true the charger's status says nothing about the plug.
+/// </param>
+/// <param name="WaitUntil">
+/// While the mode is waiting, when it expects the wait to end: the next sun, the next tariff edge, the
+/// deferred start. Null when it does not know, and whenever it is not waiting.
+/// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
     bool DryRun,
@@ -103,7 +111,9 @@ public sealed record ChargeControlStatus(
     ChargingSessionEndReason? SessionEndReason = null,
     FastChargeProgress? FastCharge = null,
     SolarGridOutlook? SolarGrid = null,
-    LowTariffStatus? LowTariff = null)
+    LowTariffStatus? LowTariff = null,
+    bool ChargerStoodDown = false,
+    DateTimeOffset? WaitUntil = null)
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;

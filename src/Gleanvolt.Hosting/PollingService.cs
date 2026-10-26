@@ -204,13 +204,11 @@ public sealed class PollingService : BackgroundService
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
 
-                // Only for the mode that reads it: unlike the three above there is no meter here that has
-                // to keep running across a mode switch, and building it elsewhere would only log an
-                // outlook nothing is acting on. After DayPlanProvider.Update, whose house-load profile
-                // it takes out of the forecast.
-                var solarGrid = mode == ChargeControlMode.SolarGrid
-                    ? Planned("solar-grid outlook", () => _solarGrid?.Update(state))
-                    : null;
+                // Only for the three modes that wait for sun, each against its own minimum: unlike the
+                // three above there is no meter here that has to keep running across a mode switch, and
+                // building it elsewhere would only log an outlook nothing is acting on. After
+                // DayPlanProvider.Update, whose house-load profile it takes out of the forecast.
+                var outlook = Planned("sun outlook", () => _solarGrid?.Update(state, mode));
 
                 var (lowTariffGate, lowTariffStatus) = LowTariff(mode, state.Timestamp);
 
@@ -219,7 +217,7 @@ public sealed class PollingService : BackgroundService
                     or ChargeControlMode.Targeted or ChargeControlMode.SolarGrid)
                 {
                     result = await _chargingControl.RunCycleAsync(
-                        state, mode, plan, stoppingToken, targetedPlan, fastCharge, solarGrid, lowTariffGate);
+                        state, mode, plan, stoppingToken, targetedPlan, fastCharge, outlook, lowTariffGate);
                 }
                 else
                 {
@@ -289,7 +287,7 @@ public sealed class PollingService : BackgroundService
                     // the cycle: a fast charge that has just met its limit reads Off by here, and the
                     // amount it was working to belongs to the session that has just ended.
                     FastCharge: mode == ChargeControlMode.FastNoBattery ? fastCharge : null,
-                    SolarGrid: mode == ChargeControlMode.SolarGrid ? solarGrid : null,
+                    SolarGrid: mode == ChargeControlMode.SolarGrid ? outlook : null,
                     // The same rule again: a mode that has just ended itself reads Off by here.
                     LowTariff: LowTariffModes.Has(mode) ? lowTariffStatus : null,
                     LoanPowerWatts: result.LoanPowerWatts,
@@ -300,7 +298,10 @@ public sealed class PollingService : BackgroundService
                     // Carried out of the loop because it is unrecoverable afterwards: the mode has
                     // already been returned to Off above, so nothing downstream could otherwise tell
                     // why it ended from "somebody switched it off".
-                    SessionEndReason: result.EndsSession));
+                    SessionEndReason: result.EndsSession,
+                    // Off by here for a mode that has just ended itself, and an ended mode waits for nothing.
+                    ChargerStoodDown: mode != ChargeControlMode.Off && result.ChargerStoodDown,
+                    WaitUntil: mode != ChargeControlMode.Off ? result.WaitUntil : null));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

@@ -89,9 +89,12 @@ public class TargetedModeTests
             Drawing(Now, 0, socPercent: 100),
             Drawing(Now.AddMinutes(20), 0, socPercent: 100));
 
+        // Waiting an hour for that sun stands the charger down rather than holding it at 0A, which this
+        // wallbox abandons after about seven minutes (#280).
         Assert.All(_writes, w => Assert.Equal(0, w.Target));
         Assert.All(_inverter.Applied, hold => Assert.False(hold));
-        Assert.Contains("Waiting for sun", _writes[^1].Reason);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Contains("Waiting for sun", _charger.ModeWrites[^1].Reason);
     }
 
     [Fact]
@@ -177,8 +180,11 @@ public class TargetedModeTests
     {
         await RunAsync(Drawing(Now, 0), Drawing(Now.AddMinutes(1), 0));
 
-        Assert.Equal(0, LastTarget);
-        Assert.Contains("No target set", _writes[^1].Reason);
+        // Nothing charges and nothing ends: the charger is stood down until a target is set, since nobody
+        // knows how long that will take.
+        Assert.Null(LastTarget);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Contains("No target set", _charger.ModeWrites[^1].Reason);
         Assert.Equal(ChargeControlMode.Targeted, _mode.Mode);
         Assert.Null(_status.Current?.TargetedPlan);
     }
@@ -256,7 +262,7 @@ public class TargetedModeTests
                         MinRunTime: TimeSpan.FromMinutes(10),
                         MinPauseTime: TimeSpan.FromMinutes(15),
                         CompletionDwell: chargeControl.CompletionDwell)),
-                [ChargeControlMode.Solar] = new LiveSolarChargingController(power, 6, 16, 1, 200, 95, 90),
+                [ChargeControlMode.Solar] = new LiveSolarChargingController(power, 6, 16, 1, 200, 95, 90, TimeSpan.FromMinutes(2)),
             },
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),

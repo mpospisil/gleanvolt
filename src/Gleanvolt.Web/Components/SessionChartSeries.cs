@@ -110,6 +110,8 @@ internal sealed record SessionChartSeries(
         ChargingSessionEventKind.ChargingPaused,
         ChargingSessionEventKind.PlanUnusable,
         ChargingSessionEventKind.PlanUsable,
+        ChargingSessionEventKind.ChargerStoodDown,
+        ChargingSessionEventKind.ChargerRearmed,
     ];
 
     /// <summary>
@@ -338,6 +340,8 @@ internal sealed record SessionChartSeries(
         ChargingSessionEventKind.ChargingPaused => "Charging paused",
         ChargingSessionEventKind.PlanUnusable => "Plan unusable",
         ChargingSessionEventKind.PlanUsable => "Plan usable again",
+        ChargingSessionEventKind.ChargerStoodDown => "Charger stood down",
+        ChargingSessionEventKind.ChargerRearmed => "Charger switched back to Fast",
         _ => kind.ToString(),
     };
 }

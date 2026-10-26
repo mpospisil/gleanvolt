@@ -33,7 +33,9 @@ public class ForecastedHoldTests
             Plugged(Now, socPercent: 30, solarWatts: 1_500, houseWatts: 4_000),
             Plugged(Now.AddMinutes(1), socPercent: 30, solarWatts: 1_500, houseWatts: 4_000));
 
-        Assert.Contains("needed to restart", _writes[^1].Reason);
+        // Stood down rather than paused: how long the pack takes to recover is not known (#280).
+        Assert.Contains("needed to restart", _charger.ModeWrites[^1].Reason);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal([false, false], _inverter.Applied);
     }
 
@@ -49,7 +51,7 @@ public class ForecastedHoldTests
             Drawing(Now.AddMinutes(20), socPercent: 49, surplusWatts: 6_000));
 
         Assert.Contains("minimum run time", _writes[1].Reason);
-        Assert.Equal(0, _writes[^1].Target);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal([false, false, false], _inverter.Applied);
     }
 
@@ -89,7 +91,8 @@ public class ForecastedHoldTests
                 chargeControl.CurrentStepAmps,
                 chargeControl.ResumeHysteresisWatts,
                 chargeControl.BatteryFullSocPercent,
-                chargeControl.BatteryReleaseSocPercent),
+                chargeControl.BatteryReleaseSocPercent,
+                chargeControl.CompletionDwell),
             new ForecastedChargingOptions(
                 MinChargingCurrentAmps: chargeControl.MinChargingCurrentAmps,
                 MaxChargingCurrentAmps: chargeControl.MaxChargingCurrentAmps,
@@ -105,7 +108,8 @@ public class ForecastedHoldTests
                 LoanSocMarginPercent: forecastSettings.LoanSocMarginPercent,
                 MinRunTime: TimeSpan.FromMinutes(10),
                 MinPauseTime: TimeSpan.FromMinutes(15),
-                FinalGuardBefore: forecastSettings.FinalGuardBefore));
+                FinalGuardBefore: forecastSettings.FinalGuardBefore,
+                CompletionDwell: chargeControl.CompletionDwell));
 
         var coordinator = new ChargingControlCoordinator(
             new Dictionary<ChargeControlMode, IChargingController> { [ChargeControlMode.Forecasted] = forecasted },

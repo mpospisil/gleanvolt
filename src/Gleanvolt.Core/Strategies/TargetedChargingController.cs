@@ -69,44 +69,31 @@ public sealed class TargetedChargingController : IChargingController
                 + $"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
-        // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
-        // wrote it) and we only modulate the current under it.
-        if (ChargerOwnership.NotOurs(input) is { } notOurs)
-        {
-            return notOurs;
-        }
-
-        if (plan is null)
-        {
-            // The mode is selected but nothing has been asked for. Pausing rather than completing:
-            // "no target set" is a state the owner can fix from the page, not a finished session.
-            return Pause("No target set: enter the energy and departure time to start.");
-        }
-
-        if (plan.IsComplete)
+        // Before the car-full rule, so a car that stops at the very moment it reaches the number is
+        // reported as having reached it.
+        if (plan is { IsComplete: true })
         {
             return Complete(ChargingSessionEndReason.TargetReached, $"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
         }
 
-        // "The car has stopped" is only meaningful while we are asking it to charge. Between blocks we
-        // are the ones holding it at the pause current, and reading that as a finished session would
-        // end the mode every time it waited for the sun.
-        if (input.Charging && input.EvDrewPower)
-        {
-            // Known-disconnected, not merely "not connected": Unknown is a failed read, and ending
-            // the mode on one costs the owner the whole request — there is nothing left to restart it.
-            if (input.State.EvChargerStatus.IsCarKnownDisconnected())
-            {
-                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
-            }
+        // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
+        // wrote it) and we only modulate the current under it. And a car that has finished, or gone,
+        // ends the mode -- judged only while we are asking it to charge, so a wait for sun is never
+        // read as a full car.
+        var shortfall = plan is null
+            ? null
+            : $" at {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh, short of the target";
 
-            if (input.EvIdleFor >= _options.CompletionDwell)
-            {
-                return Complete(
-                    ChargingSessionEndReason.SessionComplete,
-                    $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min at {plan.DeliveredEnergyWh / 1000:F1}kWh "
-                    + $"of {plan.RequiredEnergyWh / 1000:F1}kWh — its own limit, short of the target");
-            }
+        if (ChargerOwnership.Check(input, _options.CompletionDwell, shortfall) is { } ended)
+        {
+            return ended;
+        }
+
+        if (plan is null)
+        {
+            // The mode is selected but nothing has been asked for. Waiting rather than completing:
+            // "no target set" is a state the owner can fix from the page, not a finished session.
+            return ChargerWait.For(input, null, "No target set: enter the energy and departure time to start.");
         }
 
         // The two cases that take everything: no time left to be clever, or the planned import window
@@ -127,8 +114,8 @@ public sealed class TargetedChargingController : IChargingController
         // pace is zero here and the sun would otherwise walk straight through DecideFromPace.
         // Not re-entered once released, for the same reason the fast mode's start time is not
         // re-evaluated: the plan is rebuilt every poll and the tail's release can move forward under
-        // its own recomputation. The hold before the tail is unaffected -- the latch is set by leaving a
-        // stand-down, and the day's charging never enters one.
+        // its own recomputation. The hold before the tail is unaffected -- the latch is set only by leaving
+        // an appointment (ChargingControlDecision.Appointment), and the day's waits for sun are not one.
         if (plan.IsHoldingAt(now) && !input.WaitAlreadyReleased)
         {
             // Stood down, not paused. This hold is measured in hours by design -- its own reason says
@@ -136,8 +123,9 @@ public sealed class TargetedChargingController : IChargingController
             // spend in Fast at 0A: it abandons the session and reverts to Stop, after which this mode is
             // locked out of its own charger. Same reasoning, same mechanism, as the fast mode's deferred
             // start.
-            return StandDown(
+            return HoldTail(
                 input,
+                plan.HoldUntil,
                 $"Holding the last {plan.TailEnergyWh / 1000:F1}kWh until "
                 + $"{plan.HoldUntil?.LocalDateTime:HH:mm} so the car reaches its target just before "
                 + $"{plan.DepartBy.LocalDateTime:HH:mm} rather than sitting full overnight. "
@@ -222,7 +210,7 @@ public sealed class TargetedChargingController : IChargingController
             && RestartDwell.Holds(input, _options.MinPauseTime)
             && paceWatts < MinChargePowerWatts)
         {
-            return Pause(RestartDwell.Reason(input, _options.MinPauseTime));
+            return ChargerWait.For(input, ChargerWait.DwellEnds(input, _options.MinPauseTime), RestartDwell.Reason(input, _options.MinPauseTime));
         }
 
         var commandedWatts = _power.AmpsToWatts(targetAmps);
@@ -335,51 +323,37 @@ public sealed class TargetedChargingController : IChargingController
             : $"Battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun, and the "
                 + $"{paceWatts:F0}W pace alone is under the {MinChargePowerWatts:F0}W the charger needs.";
 
-        return SoftPause(
-            input,
-            $"{why} Waiting for sun; there is still time for the pace to carry "
-            + $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.");
-    }
+        // Until the plan next expects to charge. An idle car at 22:00 with a 07:00 departure is a wait
+        // of hours, and is stood down for it (#280): paused, the wallbox would give up on the session
+        // after about seven minutes and the mode would lose its charger.
+        var reason = $"{why} Waiting for sun; there is still time for the pace to carry "
+            + $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.";
 
-    private static string GridText(TargetedChargePlan plan) => plan.GridStart is { } start
-        ? $"grid top-up starts at {start.LocalDateTime:HH:mm} if it is still needed"
-        : "no grid import is planned";
+        return HoldForMinRunTime(input, reason)
+            ?? ChargerWait.For(input, plan.NextBlockAt(input.State.Timestamp), reason);
+    }
 
     /// <summary>
-    /// A pause for a soft reason (a surplus dip, a gap between blocks). While the minimum run time is
-    /// unexpired the session is held at the minimum current instead: stopping and restarting a charge
-    /// costs a contactor cycle and a vehicle wake, and a few minutes at 6 A is the cheaper trade.
+    /// The held tail: an appointment the plan set itself, measured in hours, so the charger is stood down
+    /// for it and its release is one-way (<see cref="ChargingControlDecision.Appointment"/>).
     /// </summary>
+    private ChargingControlDecision HoldTail(ChargingControlInput input, DateTimeOffset? until, string reason) =>
+        HoldForMinRunTime(input, reason)
+        ?? new ChargingControlDecision(ChargingControlAction.StandDown, null, reason, WaitUntil: until, Appointment: true);
+
     /// <summary>
-    /// A <see cref="SoftPause"/> for waits the plan intends to last hours: it writes the charger's Stop
-    /// use-mode instead of holding it at the pause current. The minimum-run-time courtesy is kept --
-    /// a charge that has just started still finishes its minute before anything stands it down.
+    /// Before any soft wait (a surplus dip, a gap between blocks, the held tail): while the minimum run
+    /// time is unexpired the session is held at the minimum current instead, because stopping and
+    /// restarting a charge costs a contactor cycle and a vehicle wake, and a few minutes at 6 A is the
+    /// cheaper trade. Null once the run time is served, or when nothing is running.
     /// </summary>
-    private ChargingControlDecision StandDown(ChargingControlInput input, string reason)
-    {
-        if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)
-        {
-            return new ChargingControlDecision(
+    private ChargingControlDecision? HoldForMinRunTime(ChargingControlInput input, string reason) =>
+        input.Charging && input.TimeInCurrentState < _options.MinRunTime
+            ? new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 _minAmps,
-                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.");
-        }
-
-        return new ChargingControlDecision(ChargingControlAction.StandDown, null, reason);
-    }
-
-    private ChargingControlDecision SoftPause(ChargingControlInput input, string reason)
-    {
-        if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)
-        {
-            return new ChargingControlDecision(
-                ChargingControlAction.Charge,
-                _minAmps,
-                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.");
-        }
-
-        return Pause(reason);
-    }
+                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.")
+            : null;
 
     /// <summary>
     /// Whether anything has actually been delivered against this target yet.
@@ -401,12 +375,8 @@ public sealed class TargetedChargingController : IChargingController
     /// </summary>
     private static bool HasChargedThisTarget(TargetedChargePlan plan) => plan.DeliveredEnergyWh > 0;
 
-    private static ChargingControlDecision Pause(string reason) => new(ChargingControlAction.Pause, null, reason);
-
-    // Pause rather than None: the charger must be left idle, not armed at the maximum for whatever
-    // plugs in next. The orchestrator writes the pause current and then switches the mode to Off.
     private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
+        ChargerOwnership.End(reason, what);
 
     // Whole-amp setpoint the charger accepts: convert (phase-aware), floor to the step, clamp to max.
     private int ToHardwareCurrent(double availableWatts)

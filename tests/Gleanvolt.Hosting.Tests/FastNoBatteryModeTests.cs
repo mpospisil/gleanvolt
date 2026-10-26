@@ -207,6 +207,17 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task AWallboxClosingTheSessionStraightAfterADrawEndsTheModeAtOnce()
+    {
+        // 2026-10-24 21:18: Charging at 10.6 kW, then Finishing / 0 W one poll later, with no taper and no
+        // dwell to wait out. Before #280 this sat until the takeover check filed it as ChargerTakenOver.
+        await RunAsync(Charging(Now), Finished(Now.AddSeconds(8)));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, _status.Current!.SessionEndReason);
+    }
+
+    [Fact]
     public async Task AFinishedCarStopsTheChargerTheWayTheOffButtonWould()
     {
         // #89: a mode that switches itself off must leave the charger exactly where Off leaves it --
@@ -656,6 +667,10 @@ public class FastNoBatteryModeTests
         _writes = [.. _charger.CurrentWrites];
         await service.StopAsync(CancellationToken.None);
     }
+
+    private static EnergyState Finished(DateTimeOffset at) =>
+        new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
+            EvChargerStatus.Finishing, EvChargerPowerWatts: 0);
 
     private static EnergyState Charging(DateTimeOffset at) =>
         new(at, BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 11040,

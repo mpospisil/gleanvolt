@@ -78,11 +78,18 @@ namespace Gleanvolt.Core.Models;
 /// moved the latest safe start from 04:16 to 04:17 -- back into the future. The mode stood the charger
 /// down again seventeen seconds after starting it, and only got going for good a minute later. Once a
 /// wait has been released it stays released.</para>
+///
+/// <para>Only an <see cref="ChargingControlDecision.Appointment"/> latches it. Since #280 every mode stands
+/// the charger down for a long wait for sun, and a targeted charge re-armed out of one overnight still has
+/// its held tail to keep in the afternoon.</para>
 /// </param>
-/// <param name="SolarGrid">
-/// What the rest of today's forecast says about sun clearing the owner's minimum, when the
-/// <see cref="Enums.ChargeControlMode.SolarGrid"/> mode is the one driving. Only
-/// <see cref="Strategies.SolarGridChargingController"/> reads it, which is why it defaults to null.
+/// <param name="Outlook">
+/// What the rest of today's forecast says about sun clearing the driving mode's minimum: the owner's
+/// minimum for <see cref="Enums.ChargeControlMode.SolarGrid"/>, the charger's floor for
+/// <see cref="Enums.ChargeControlMode.Solar"/>, and the lowest surplus a battery loan can bridge for
+/// <see cref="Enums.ChargeControlMode.Forecasted"/>. It says until when a wait for sun lasts
+/// (<see cref="Strategies.ChargerWait.NextSun"/>) and when the day is over (#280). Null for the modes
+/// that do not wait for sun.
 /// </param>
 /// <param name="ChargedThisMode">
 /// Whether the car has drawn power while this mode had it charging — since the running mode was
@@ -96,6 +103,11 @@ namespace Gleanvolt.Core.Models;
 /// (issue #274); null otherwise, which means no restriction. Only
 /// <see cref="Strategies.FastChargingController"/> and <see cref="Strategies.SolarGridChargingController"/>
 /// read it, through <see cref="Strategies.TariffWait"/>.
+/// </param>
+/// <param name="EvWasDrawing">
+/// Whether the car was drawing on the last poll the charger answered before this one. What tells a
+/// full car from the wallbox giving up on our own pause: both read Finishing / Stop, and only the
+/// first comes straight after a draw (see <see cref="Strategies.ChargerOwnership.Check"/>).
 /// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
@@ -113,10 +125,11 @@ public sealed record ChargingControlInput(
     bool ChargerStoodDown = false,
     TimeSpan ChargerNotFastFor = default,
     bool WaitAlreadyReleased = false,
-    SolarGridOutlook? SolarGrid = null,
+    SolarGridOutlook? Outlook = null,
     bool ChargedThisMode = false,
     double LoanOutstandingWh = 0,
-    TariffGate? LowTariffOnly = null);
+    TariffGate? LowTariffOnly = null,
+    bool EvWasDrawing = false);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for
@@ -145,10 +158,20 @@ public sealed record ChargingControlInput(
 /// <see cref="ChargeControlMode.Off"/>, which also releases the hold the fast mode armed.
 ///
 /// <para>A reason rather than a flag (#198). With a flag, every one of those endings was recorded as "the
-/// car finished charging"; now a completion cannot be written without saying which it is. Set by the fast,
-/// targeted and solar-grid modes and by <see cref="Strategies.ChargerOwnership"/>. The solar and
-/// forecast-driven modes never set it: they follow the sun for as long as they are selected, and a car that
-/// has stopped taking their surplus has not ended anything.</para>
+/// car finished charging"; now a completion cannot be written without saying which it is. Every mode can
+/// set it: the car finishing, going away or the charger being taken are one rule in
+/// <see cref="Strategies.ChargerOwnership"/>, and the day's sun running out is the end of the three solar
+/// modes (#280).</para>
+/// </param>
+/// <param name="WaitUntil">
+/// For a pause or a stand-down, when the mode expects the wait to end; null when it does not know. For the
+/// surfaces to say "stood down until 09:40".
+/// </param>
+/// <param name="Appointment">
+/// This stand-down waits for a time the mode set itself — the fast mode's deferred start, the targeted
+/// mode's held tail — and its release is one-way (<see cref="ChargingControlInput.WaitAlreadyReleased"/>).
+/// A wait for sun or for low tariff is not one: re-arming out of it must not stop a later appointment
+/// from being kept.
 /// </param>
 public sealed record ChargingControlDecision(
     ChargingControlAction Action,
@@ -156,7 +179,9 @@ public sealed record ChargingControlDecision(
     string Reason,
     double LoanPowerWatts = 0,
     ChargingSessionEndReason? EndsSession = null,
-    double GridBridgeWatts = 0)
+    double GridBridgeWatts = 0,
+    DateTimeOffset? WaitUntil = null,
+    bool Appointment = false)
 {
     /// <summary>Whether this decision ends the mode; <see cref="EndsSession"/> says why.</summary>
     public bool SessionComplete => EndsSession is not null;

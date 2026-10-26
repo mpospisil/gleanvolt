@@ -48,7 +48,7 @@ public class SolarGridChargingControllerTests
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
             ChargerStoodDown: stoodDown,
-            SolarGrid: outlook ?? SunNow,
+            Outlook: outlook ?? SunNow,
             ChargedThisMode: chargedThisMode);
 
     [Theory]
@@ -205,7 +205,7 @@ public class SolarGridChargingControllerTests
 
         var result = Controller.Decide(Input(0, outlook: unusable));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
         Assert.False(result.SessionComplete);
         Assert.Contains("No usable forecast", result.Reason);
     }
@@ -215,7 +215,7 @@ public class SolarGridChargingControllerTests
     {
         var result = Controller.Decide(Input(5000, timeInState: TimeSpan.FromMinutes(5), evDrewPower: true, chargedThisMode: true));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
         Assert.Contains("minimum before restarting", result.Reason);
     }
 

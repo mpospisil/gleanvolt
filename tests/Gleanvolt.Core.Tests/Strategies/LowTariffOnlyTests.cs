@@ -57,7 +57,7 @@ public class LowTariffOnlyTests
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
             FastCharge: fastCharge,
-            SolarGrid: outlook ?? SunNow,
+            Outlook: outlook ?? SunNow,
             LowTariffOnly: tariff);
 
     // -- Fast
@@ -70,9 +70,10 @@ public class LowTariffOnlyTests
         Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.False(decision.SessionComplete);
         // In the machine's own zone, as every controller's reasons are: the container's TZ is the site's.
-        Assert.Equal(
+        Assert.StartsWith(
             $"High tariff until {Now.AddHours(10).LocalDateTime:HH:mm}; waiting for low tariff (Fast, low tariff only).",
             decision.Reason);
+        Assert.Equal(Now.AddHours(10), decision.WaitUntil);
     }
 
     [Fact]
@@ -96,8 +97,9 @@ public class LowTariffOnlyTests
     [Fact]
     public void AWaitForLowTariffIsNeverReadAsAFullCar()
     {
-        // An hour of no draw, which outside a wait is a finished car. Inside one it is our own doing.
-        var decision = Fast.Decide(Input(High(TimeSpan.FromHours(2)), evIdleFor: TimeSpan.FromHours(1)));
+        // An hour of no draw, which outside a wait is a finished car. Inside one it is our own doing, and
+        // the coordinator says so: it reads "not charging" through the wait.
+        var decision = Fast.Decide(Input(High(TimeSpan.FromHours(2)), charging: false, evIdleFor: TimeSpan.FromHours(1)));
 
         Assert.Null(decision.EndsSession);
     }
