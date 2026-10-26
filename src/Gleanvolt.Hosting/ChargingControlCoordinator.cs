@@ -317,6 +317,21 @@ public sealed class ChargingControlCoordinator
     }
 
     /// <summary>
+    /// Called on every poll while control is Off, before <see cref="ReleaseControl"/>: keeps watching the
+    /// plug and metering the car's draw though nothing is deciding. Session energy belongs to the
+    /// plugged-in car, not to a mode, and a mode usually ends itself before the car is unplugged — so
+    /// without this the unplug and the next plug-in both happened unseen, and the next evening's charge
+    /// carried on from the last one's total (#283). It also counts what the car takes between plug-in
+    /// and a mode being picked: the charger starts it at Fast on its own.
+    ///
+    /// <para>Trusting the plug here is safe even though the charger is usually left in Stop: the stand-down
+    /// guard in <see cref="TrackSession"/> is about a Stop <em>we</em> wrote and will re-arm, and
+    /// <see cref="ReleaseControl"/> has dropped that claim. On this wallbox a car left plugged into a
+    /// stopped charger reads Finishing, which still counts as connected.</para>
+    /// </summary>
+    public void TrackWhileReleased(EnergyState state) => TrackSession(state);
+
+    /// <summary>
     /// Called when control is switched Off: we stop controlling but leave the charger's setpoint exactly
     /// as it is. Only resets our internal charging state so re-entering a controlled mode starts fresh.
     /// </summary>
