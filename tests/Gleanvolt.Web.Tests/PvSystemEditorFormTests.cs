@@ -12,24 +12,19 @@ namespace Gleanvolt.Web.Tests;
 /// The form that edits the installation from /pv-system (issue #204). What it has to get right: it
 /// sends only what changed, shows the startup resolver's refusal instead of saving, probes a changed
 /// device address before saving, asks before a change that moves topics, and says what is saved but
-/// not yet running — with the restart that applies it beside it.
+/// not yet running, and where the restart is.
 /// </summary>
 public class PvSystemEditorFormTests : BunitContext
 {
     private readonly FakePvSystemEditor _editor = new();
-    private readonly FakeServiceShutdown _shutdown = new();
 
     public PvSystemEditorFormTests()
     {
         Services.AddSingleton<IPvSystemEditor>(_editor);
-        Services.AddSingleton<IServiceShutdown>(_shutdown);
 
         // A login, which is what makes the form editable at all.
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
         Services.AddSingleton(new WebPasswordState("hash"));
-
-        // The restart asks the browser to watch for the controller coming back; the script is not here.
-        JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
     private static string Field(string key) => "#pv-" + key.Replace(':', '-');
@@ -41,12 +36,13 @@ public class PvSystemEditorFormTests : BunitContext
 
         var form = Render<PvSystemEditorForm>();
 
+        // In the (i) beside each label (#255), where the line under the box used to be.
         var tilt = form.Find(Field(PvSystemSettingKeys.TiltDegrees)).ParentElement!;
-        Assert.Contains("web UI", tilt.QuerySelector(".source")!.TextContent);
+        Assert.Contains("comes from this page", tilt.QuerySelector(".info-pop")!.TextContent);
         Assert.Contains("Revert to 35", tilt.QuerySelector(".revert")!.TextContent);
 
         var host = form.Find(Field(PvSystemSettingKeys.InverterHost)).ParentElement!;
-        Assert.Contains("environment", host.QuerySelector(".source")!.TextContent);
+        Assert.Contains("comes from the environment file", host.QuerySelector(".info-pop")!.TextContent);
         Assert.Null(host.QuerySelector(".revert"));
     }
 
@@ -144,7 +140,7 @@ public class PvSystemEditorFormTests : BunitContext
     }
 
     [Fact]
-    public void Lists_what_is_saved_but_not_running_with_the_restart_beside_it()
+    public void Says_what_is_saved_but_not_running_and_where_the_restart_is()
     {
         _editor.Stored[PvSystemSettingKeys.TiltDegrees] = "30";
         _editor.Stored[PvSystemSettingKeys.ChargerHost] = "192.168.2.20";
@@ -152,17 +148,44 @@ public class PvSystemEditorFormTests : BunitContext
         var form = Render<PvSystemEditorForm>();
 
         var pending = form.Find("#pv-pending");
-        Assert.Contains("Saved, not applied", pending.TextContent);
-        Assert.Contains("2 changes take effect on restart", pending.TextContent);
-        Assert.Contains("35 → 30", pending.TextContent);
-        Assert.Contains("192.168.2.6 → 192.168.2.20", pending.TextContent);
+        Assert.Contains("2 changes saved", pending.TextContent);
+        Assert.Equal("/settings/health", pending.QuerySelector("a")!.GetAttribute("href"));
 
-        form.Find("#restart").Click();
-        form.Find("#restart-confirm").Click();
+        // Each field still running something else says so under its box.
+        var tilt = form.Find(Field(PvSystemSettingKeys.TiltDegrees)).ParentElement!;
+        Assert.Contains("Running: 35", tilt.QuerySelector(".field-pending")!.TextContent);
+        var host = form.Find(Field(PvSystemSettingKeys.ChargerHost)).ParentElement!;
+        Assert.Contains("Running: 192.168.2.6", host.QuerySelector(".field-pending")!.TextContent);
+        Assert.Equal(2, form.FindAll(".field-pending").Count);
+    }
 
-        Assert.Equal(["Web UI"], _shutdown.Restarts);
-        Assert.Empty(_shutdown.Requests);
-        Assert.NotNull(form.Find("#restart-progress"));
+    [Theory]
+    [InlineData("T", "= L3, in SolaX's naming")]
+    [InlineData("r", "= L1, in SolaX's naming")]
+    public void Spells_out_solaxs_name_for_a_phase(string typed, string expected)
+    {
+        // R/S/T is what the inverter's display says, and the resolver accepts it; the box should not
+        // make it look wrong next to an "L1, L2, L3" hint.
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).Input(typed);
+
+        var field = form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).ParentElement!;
+        Assert.Equal(expected, field.QuerySelector(".field-note")!.TextContent);
+    }
+
+    [Theory]
+    [InlineData("-180", "= 180°, facing south")]
+    [InlineData("172", "facing south")]
+    [InlineData("270", "facing west")]
+    public void Says_which_way_a_typed_azimuth_faces(string typed, string expected)
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.AzimuthDegrees)).Input(typed);
+
+        var field = form.Find(Field(PvSystemSettingKeys.AzimuthDegrees)).ParentElement!;
+        Assert.Equal(expected, field.QuerySelector(".field-note")!.TextContent);
     }
 
     [Fact]

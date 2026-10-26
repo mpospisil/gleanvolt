@@ -2,26 +2,22 @@
 @page "/pv-system"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject PvSystemInfo Site
-@inject EvInfo Car
-@inject ChargingLimits Limits
 @inject MqttDisplayOptions Mqtt
 @inject ApiDisplayOptions Api
 @inject NavigationManager Nav
 
 @*
-    The installation, as configured (issue #111). What this page shows is still read-only, and not
-    merely for now: every value below is resolved once at startup — the Modbus clients are constructed
-    from it, and the resolver has already refused anything that could not be used — so a control that
-    edited it would be editing a copy of a decision that has already been made.
+    Settings: the installation (issue #111). The form at the top (issue #204) edits the configuration the
+    *next* start reads: a save goes to the web UI's overrides file, a restart applies it, and until then
+    each field says what is still running. See PvSystemEditorForm. The tariff below it (issue #265) is
+    the exception: it is the owner's data rather than configuration, and a save applies at once.
 
-    The form at the top (issue #204) edits something else: the configuration the *next* start reads.
-    A save goes to the web UI's overrides file, a restart applies it, and until then the form says what
-    is saved and not yet running. See PvSystemEditorForm. The tariff below it (issue #265) is the
-    exception: it is the owner's data rather than configuration, and a save applies at once.
-
-    What the rest is for: answering "which system is this, and what is it talking to?" from a browser,
-    the question the startup log answers once and then buries.
+    The MQTT and API sections are read-only, and not merely for now: they are resolved once at startup,
+    so a control that edited them would be editing a copy of a decision already made. They answer
+    "what is this talking to, and how do I reach it?" from a browser, the question the startup log
+    answers once and then buries. Since the redesign (#255) the explanations sit in (i) tips; what
+    reports a state -- a link that is off, a key withheld -- stays on the page. The car's facts and
+    limits live on the Car page.
 *@
 
 <SiteTitle Page="Settings" />
@@ -30,198 +26,32 @@
 
 <SettingsTabs Current="SettingsTab.Installation" />
 
-<p class="muted">
-    Everything after the form is what the controller is running with, read from the configuration at
-    startup. The form changes what the next start reads; a restart applies it.
-</p>
-
 <PvSystemEditorForm />
 
 <TariffEditorForm />
 
-<h2>Identity</h2>
+<p class="muted car-link">The car's settings and charging limits are on the <a href="/car">Car</a> page.</p>
 
-<dl class="facts">
-    <dt>Name</dt>
-    <dd>@Text(Site.Name)</dd>
-
-    <dt>Id</dt>
-    <dd>@Text(Site.Id)</dd>
-
-    <dt>Address</dt>
-    <dd>@Text(Site.Address)</dd>
-</dl>
-
-@if (string.IsNullOrWhiteSpace(Site.Id))
-{
-    <p class="table-note muted">
-        This system has no id yet. It is optional today; it becomes the name the controller publishes
-        under, so that two installations can share one MQTT broker. Set <code>Pv__Id</code> and
-        <code>Pv__Name</code> to claim one.
-    </p>
-}
-
-<h2>Location and orientation</h2>
-
-<dl class="facts">
-    <dt>Coordinates</dt>
-    <dd>
-        @if (Site.HasLocation)
-        {
-            @($"{Site.Latitude!.Value.ToString("0.####", Invariant)}, {Site.Longitude!.Value.ToString("0.####", Invariant)}")
-        }
-        else
-        {
-            <span class="muted">@Missing</span>
-        }
-    </dd>
-
-    <dt>Azimuth</dt>
-    <dd>@Azimuth()</dd>
-
-    <dt>Tilt</dt>
-    <dd>@Units.Angle(Site.TiltDegrees)</dd>
-</dl>
-
-@if (!Site.HasLocation)
-{
-    <p class="table-note muted">
-        Without coordinates no weather is recorded against a charging session — the feature is off
-        rather than wrong. Set <code>Pv__Latitude</code> and <code>Pv__Longitude</code>.
-    </p>
-}
-
-<h2>Array</h2>
-
-<dl class="facts">
-    <dt>Peak DC capacity</dt>
-    <dd>@Units.PeakPower(Site.PeakPowerWatts)</dd>
-
-    <dt>Inverter capacity</dt>
-    <dd>@Units.Rating(Site.InverterCapacityWatts)</dd>
-
-    <dt>Loss factor</dt>
-    <dd>@Number(Site.LossFactor, format: "0.00")</dd>
-
-    <dt>Commissioned</dt>
-    <dd>@(Site.InstallDate is { } date ? date.ToString("yyyy-MM-dd") : Missing)</dd>
-</dl>
-
-<h2>Devices</h2>
-
-<table class="sessions">
-    <thead>
-        <tr>
-            <th>Role</th>
-            <th>Name</th>
-            <th>Model</th>
-            <th>Address</th>
-            <th>Unit</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Inverter</td>
-            <td>@Text(Site.Inverter.Name)</td>
-            <td>@Text(Site.Inverter.Model)</td>
-            <td>@Address(Site.Inverter)</td>
-            <td>@Site.Inverter.Connection.UnitId</td>
-        </tr>
-        @foreach (var charger in Site.Chargers)
-        {
-            <tr>
-                <td>Charger <span class="muted">@charger.Id</span></td>
-                <td>@Text(charger.Name)</td>
-                <td>@Text(charger.Model)</td>
-                <td>@Address(charger)</td>
-                <td>@charger.Connection.UnitId</td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<p class="table-note muted">
-    A model is what the box is, not what the controller speaks: the register maps are compiled for the
-    devices in the README's hardware targets and are chosen by nothing here. One charger is supported;
-    the configuration is a list so that it need not change shape the day a second one can be driven.
-</p>
-
-<h2>The car</h2>
-
-@if (!Car.IsConfigured)
-{
-    <p class="muted" id="no-vehicle">
-        No car is described, so every charging limit is the installation's own and no target can be
-        asked for as a state of charge. Describe one under <code>Ev:Vehicles:0</code> to say what its
-        pack holds and what currents it will actually accept.
-    </p>
-}
-else
-{
-    <dl class="facts">
-        <dt>Name</dt>
-        <dd>@Text(Car.Name)</dd>
-
-        <dt>Id</dt>
-        <dd>@Text(Car.Id)</dd>
-
-        <dt>Model</dt>
-        <dd>@Text(string.Join(" ", new[] { Car.Make, Car.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
-
-        <dt>Usable battery</dt>
-        <dd>@(Car.CanTargetSoc ? Units.Capacity(Car.BatteryCapacityWh) : Missing)</dd>
-
-        <dt>Charge efficiency</dt>
-        <dd>@Units.Fraction(Car.ChargeEfficiency)</dd>
-    </dl>
-
-    <h3>What it will accept</h3>
-
-    @*
-        Three columns rather than one, because the interesting number is the third: what the car says,
-        what the installation says, and which of them the controller is actually working to. A page
-        that showed only the car's figures would leave somebody wondering why a 32 A car charges at 16.
-    *@
-    <table class="grid">
-        <thead>
-            <tr><th>&nbsp;</th><th>The car</th><th>The installation</th><th>In effect</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Minimum current</td>
-                <td>@Units.Current(Car.MinChargingCurrentAmps)</td>
-                <td>@Units.Current(Limits.MinAmps == Car.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
-                <td>@Units.Current(Limits.MinAmps)</td>
-            </tr>
-            <tr>
-                <td>Maximum current</td>
-                <td>@Units.Current(Car.MaxChargingCurrentAmps)</td>
-                <td>@Units.Current(Limits.MaxAmps == Car.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
-                <td>@Units.Current(Limits.MaxAmps)</td>
-            </tr>
-            <tr>
-                <td>Phases</td>
-                <td>@Count(Car.Phases)</td>
-                <td>@Count(Limits.Phases == Car.Phases ? null : Limits.Phases)</td>
-                <td>@Count(Limits.Phases)</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <p class="table-note muted">
-        The controller works to the narrower of the two. A car can only ever <em>lower</em> a limit —
-        the installation's maximum is the site's supply and the wiring in the wall, not a preference —
-        and anything the car leaves unstated is simply the installation's figure. Phases matter more
-        than they look: every power figure the controller reasons with, including when a deferred fast
-        charge has to start, is computed from the count in the last column.
-    </p>
-}
-
-<h2>MQTT</h2>
+<div class="section-head tip-head">
+    <h2>MQTT</h2>
+    <InfoTip Topic="MQTT" Group="settings-info" Wide="true">
+        <p>
+            Home Assistant is a <em>control</em> surface: the topics ending <code>/set</code> can start and
+            stop charging. Vehicle telemetry only listens, and the worst a wrong setting there can do is
+            leave the car's card empty.
+        </p>
+        <p>
+            None of this says whether either link is <em>up</em>. Everything on this page was read once at
+            startup; <a href="/settings/health">Health</a> reports the polling loop rather than the broker,
+            so until it reports this too, the broker's own log — or Home Assistant showing the device as
+            unavailable — is what answers that.
+        </p>
+    </InfoTip>
+</div>
 
 @*
-    The third and fourth things this controller is talking to (issue #143). The Devices table above is
-    what it drives; this is what it talks through, and unlike a Modbus address none of it is guessable:
+    The third and fourth things this controller is talking to (issue #143). The installation form
+    above is what it drives; this is what it talks through, and unlike a Modbus address none of it is guessable:
     the prefix everything is published under is composed at startup from two separate settings.
 
     Two links rather than one broker, kept apart on purpose. They are separately optional -- you can
@@ -230,13 +60,29 @@ else
     took that up.
 *@
 
-<p class="muted">
-    Home Assistant is a <em>control</em> surface: the topics ending <code>/set</code> can start and
-    stop charging. Vehicle telemetry only listens, and the worst a wrong setting there can do is leave
-    the car's card empty.
-</p>
-
-<h3>Home Assistant</h3>
+<div class="section-head tip-head minor">
+    <h3>Home Assistant</h3>
+    @if (Mqtt.HomeAssistant.Connection.Enabled)
+    {
+        <InfoTip Topic="Home Assistant" Group="settings-info" Wide="true">
+            <p>
+                The device id is the root of every entity's <code>unique_id</code>, and it is the one value
+                here that is expensive to change: Home Assistant keys an entity to its <code>unique_id</code>,
+                so a new one is a new entity, created beside the old one, and every graph starts again. The
+                topics and the names can be changed freely. The status interval is how often the state topic
+                is republished, which is usually the answer to "why is the Home Assistant dashboard behind?".
+            </p>
+            <p>
+                Every other entity — each number, select, text and button — follows the same pattern:
+                <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code> for what it reports and
+                <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code> for what it accepts. The
+                retained discovery configs Home Assistant reads them from live under
+                <code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>.
+                Anything marked <em>in</em> can change what the charger is doing.
+            </p>
+        </InfoTip>
+    }
+</div>
 
 @if (!Mqtt.HomeAssistant.Connection.Enabled)
 {
@@ -266,14 +112,6 @@ else
         <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
     </dl>
 
-    <p class="table-note muted">
-        The device id is the root of every entity's <code>unique_id</code>, and it is the one value
-        here that is expensive to change: Home Assistant keys an entity to its <code>unique_id</code>,
-        so a new one is a new entity, created beside the old one, and every graph starts again. The
-        topics and the names can be changed freely. The status interval is how often the state topic
-        is republished, which is usually the answer to "why is the Home Assistant dashboard behind?".
-    </p>
-
     <table class="sessions topics">
         <thead>
             <tr>
@@ -293,15 +131,6 @@ else
             }
         </tbody>
     </table>
-
-    <p class="table-note muted">
-        Every other entity — each number, select, text and button — follows the same pattern:
-        <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code> for what it reports and
-        <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code> for what it accepts. The
-        retained discovery configs Home Assistant reads them from live under
-        <code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>.
-        Anything marked <em>in</em> can change what the charger is doing.
-    </p>
 
     @if (Mqtt.HomeAssistant.IsRetiringAnything)
     {
@@ -324,7 +153,22 @@ else
     }
 }
 
-<h3>Vehicle telemetry</h3>
+<div class="section-head tip-head minor">
+    <h3>Vehicle telemetry</h3>
+    @if (Mqtt.Vehicle.Connection.Enabled)
+    {
+        <InfoTip Topic="vehicle telemetry" Group="settings-info" Wide="true">
+            <p>
+                One concrete topic, not a wildcard: this phase tracks one car, and a <code>+</code> across
+                several would quietly let the newest message win whichever car it described. The messages
+                are expected to be <strong>retained</strong>, so a restart is handed the last reading
+                straight away instead of waiting for a cloud-fed car's next update. Note that this client id
+                is not namespaced by the system's id, so two controllers on one machine would collide on the
+                broker.
+            </p>
+        </InfoTip>
+    }
+</div>
 
 @if (!Mqtt.Vehicle.Connection.Enabled)
 {
@@ -368,14 +212,6 @@ else
         </p>
     }
 
-    <p class="table-note muted">
-        One concrete topic, not a wildcard: this phase tracks one car, and a <code>+</code> across
-        several would quietly let the newest message win whichever car it described. The messages are
-        expected to be <strong>retained</strong>, so a restart is handed the last reading straight
-        away instead of waiting for a cloud-fed car's next update. Note that this client id is not
-        namespaced by the system's id, so two controllers on one machine would collide on the broker.
-    </p>
-
     @if (Mqtt.SharesOneBroker)
     {
         <p class="table-note muted" id="mqtt-one-broker">
@@ -386,14 +222,21 @@ else
     }
 }
 
-<p class="table-note muted">
-    None of this says whether either link is <em>up</em>. Everything on this page was read once at
-    startup; <a href="/settings/health">Health</a> reports the polling loop rather than the broker, so until it
-    reports this too, the broker's own log — or Home Assistant showing the device as unavailable — is
-    what answers that.
-</p>
-
-<h2>API</h2>
+<div class="section-head tip-head">
+    <h2>API</h2>
+    @if (Api.Enabled)
+    {
+        <InfoTip Topic="API" Group="settings-info" Wide="true">
+            <p>
+                The address is built from the one this page arrived on rather than from <code>Web:Port</code>:
+                a hostname or a reverse proxy in front means the configured port is not necessarily the one
+                that works, while the address that just delivered this page demonstrably does. Both links
+                answer without a key by design — a browser cannot send one, and neither carries anything to
+                act on — so opening either is the quickest proof that the API is up.
+            </p>
+        </InfoTip>
+    }
+</div>
 
 @*
     The third control surface (issue #142), and the one whose whole configuration lives in a file on
@@ -440,15 +283,17 @@ else
         <dd><a href="@_api.DocumentUrl">@Api.DocumentPath</a></dd>
     </dl>
 
-    <p class="table-note muted">
-        The address is built from the one this page arrived on rather than from <code>Web:Port</code>:
-        a hostname or a reverse proxy in front means the configured port is not necessarily the one
-        that works, while the address that just delivered this page demonstrably does. Both links
-        answer without a key by design — a browser cannot send one, and neither carries anything to act
-        on — so opening either is the quickest proof that the API is up.
-    </p>
-
-    <h3>Keys</h3>
+    <div class="section-head tip-head minor">
+        <h3>Keys</h3>
+        <InfoTip Topic="API keys" Group="settings-info" Wide="true">
+            <p>
+                The name is not a credential — it is what reaches the log and the recorded charging session
+                as the source of an action, so a charge started through this API is filed against the name
+                that started it rather than anonymously. Which is the whole reason several clients get
+                several keys.
+            </p>
+        </InfoTip>
+    </div>
 
     <table class="sessions">
         <thead>
@@ -477,12 +322,6 @@ else
         </tbody>
     </table>
 
-    <p class="table-note muted">
-        The name is not a credential — it is what reaches the log and the recorded charging session as
-        the source of an action, so a charge started through this API is filed against the name that
-        started it rather than anonymously. Which is the whole reason several clients get several keys.
-    </p>
-
     @if (Api.SecretsWithheld)
     {
         <p class="table-note muted" id="api-keys-withheld">
@@ -493,7 +332,16 @@ else
         </p>
     }
 
-    <h3>Calling it</h3>
+    <div class="section-head tip-head minor">
+        <h3>Calling it</h3>
+        <InfoTip Topic="calling the API" Group="settings-info" Wide="true">
+            <p>
+                The first key, this installation's own address and the endpoint worth trying first.
+                Everything else is under the same base URL and takes the same header; the document above is
+                the list.
+            </p>
+        </InfoTip>
+    </div>
 
     <p class="code-line">
         @if (Api.Keys[0].Secret is { } example)
@@ -506,15 +354,9 @@ else
         }
     </p>
 
-    <p class="table-note muted">
-        The first key, this installation's own address and the endpoint worth trying first. Everything
-        else is under the same base URL and takes the same header; the document above is the list.
-    </p>
 }
 
 @code {
-    private const string Missing = Units.Missing;
-
     // The example call the section exists to serve, split around the key so the secret can be masked
     // inside it while Copy still hands over the whole command.
     private const string CurlPrefix = "curl -H \"Authorization: Bearer ";
@@ -527,38 +369,7 @@ else
 
     protected override void OnInitialized() => _api = Api.AddressFrom(Nav.BaseUri);
 
-    private static readonly System.Globalization.CultureInfo Invariant =
-        System.Globalization.CultureInfo.InvariantCulture;
-
-    // The eight points are enough to catch the mistake this is here to catch -- an array described as
-    // facing north when it faces south -- and more would suggest a precision the bearing does not have.
-    private static readonly string[] Compass =
-        ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
-
-    private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
-
-    private static string Count(int? value) => value is { } number ? number.ToString(Invariant) : Missing;
-
-    private static string Address(PvDeviceInfo device) => $"{device.Connection.Host}:{device.Connection.Port}";
-
     // Intervals here run from fifteen seconds to twelve hours, and each reads in the units it
     // was configured in: Units.Duration keeps seconds below ten minutes and minutes below two days.
-    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Missing : Units.Duration(value);
-
-    // A plain figure with no unit, such as the loss factor.
-    private static string Number(double? value, string format) =>
-        value is { } number ? number.ToString(format, Invariant) : Missing;
-
-    // The bearing with the direction it means spelled out, because "172°" is only checkable by
-    // someone who already knows which way their roof faces in degrees.
-    private string Azimuth()
-    {
-        if (Site.AzimuthDegrees is not { } bearing)
-        {
-            return Missing;
-        }
-
-        var point = Compass[(int)Math.Round(bearing / 45) % Compass.Length];
-        return $"{Units.Angle(bearing)} ({point})";
-    }
+    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Units.Missing : Units.Duration(value);
 }

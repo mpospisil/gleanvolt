@@ -1565,7 +1565,89 @@ button.link:hover {
     margin: 1.25rem 0 0.5rem;
 }
 
-/* Saved, not applied: amber rather than the alert's red, because nothing is wrong -- it is waiting. */
+/*
+    The installation form's tips (#255): each label carries its (i) -- where the value comes from --
+    and under the box, what a typed value means where it does not say so itself, and what is still
+    running until a restart.
+*/
+.field-head {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 0.25rem;
+}
+
+.pv-field .field-head label {
+    margin-bottom: 0;
+}
+
+/* On its own line here, with no source label for it to follow. */
+#pv-editor .revert {
+    margin-left: 0;
+}
+
+.field-note,
+.field-pending {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.field-pending {
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+/* Saved, not applied: the accent rather than an alert's red, because nothing is wrong -- it is waiting. */
+.restart-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin: 0 0 var(--space-4);
+    border: 1px solid var(--accent);
+    background: var(--accent-wash);
+    border-radius: var(--radius-md);
+}
+
+.button-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    text-decoration: none;
+    background: var(--panel);
+}
+
+/* A heading and its (i) on one line, on Settings: the tip sits against the heading's last word. */
+.section-head.tip-head {
+    align-items: center;
+    gap: 2px;
+}
+
+.section-head.minor {
+    margin: var(--space-5) 0 var(--space-2);
+}
+
+.section-head h3 {
+    margin: 0;
+}
+
+.pv-editor > .section-head:first-child {
+    margin: 0 0 var(--space-3);
+}
+
+.car-link {
+    margin-top: var(--space-6);
+}
+
+/* The Car form's saved-not-applied list: amber rather than the alert's red, because nothing is wrong. */
 .alert.pending {
     border-color: var(--amber);
 }
