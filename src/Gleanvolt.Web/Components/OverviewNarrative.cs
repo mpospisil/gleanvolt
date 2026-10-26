@@ -49,6 +49,9 @@ public static class OverviewNarrative
     {
         var mode = ChargeModeTabs.Label(status.Mode);
 
+        // Until full (#279): one session over several days, so which day it is belongs with the mode.
+        var named = status.UntilFull is { Day: var day } ? $"{mode} mode (until full, day {day})" : $"{mode} mode";
+
         if (status.EvChargerPowerWatts > 0)
         {
             if (status.Mode == ChargeControlMode.Off)
@@ -63,7 +66,7 @@ public static class OverviewNarrative
                 ? $", {Units.Power(status.LoanPowerWatts)} of it lent by the home battery"
                 : "";
 
-            return $"Charging the car at {Units.Power(status.EvChargerPowerWatts)} in {mode} mode{loan}.";
+            return $"Charging the car at {Units.Power(status.EvChargerPowerWatts)} in {named}{loan}.";
         }
 
         if (status.Mode == ChargeControlMode.Off)
@@ -75,7 +78,7 @@ public static class OverviewNarrative
 
         if (!status.CarConnected)
         {
-            return $"{mode} mode is on, waiting for a car to be plugged in.";
+            return $"{named} is on, waiting for a car to be plugged in.";
         }
 
         return status.State switch
@@ -83,12 +86,24 @@ public static class OverviewNarrative
             // Stood down (#280): the charger is in Stop for a wait, which the owner would otherwise
             // read as the charger having been taken off the mode.
             ChargeControlState.Paused when status.ChargerStoodDown => status.WaitUntil is { } until
-                ? $"{mode} mode is on and has stood the charger down until {TimeZoneInfo.ConvertTime(until, zone):HH:mm}."
-                : $"{mode} mode is on and has stood the charger down until it can charge.",
-            ChargeControlState.Paused => $"{mode} mode is on and has paused the car.",
-            ChargeControlState.Idle => $"{mode} mode is on but not acting on the charger.",
-            _ => $"{mode} mode is on; the car is not drawing power.",
+                ? $"{named} is on and has stood the charger down until {StoodDownUntil(status, until, zone)}."
+                : status.UntilFull is not null
+                    ? $"{named} is on and has stood the charger down until tomorrow's sun."
+                    : $"{named} is on and has stood the charger down until it can charge.",
+            ChargeControlState.Paused => $"{named} is on and has paused the car.",
+            ChargeControlState.Idle => $"{named} is on but not acting on the charger.",
+            _ => $"{named} is on; the car is not drawing power.",
         };
+    }
+
+    // A night of until full waits for the next day's first window, which is the forecast's estimate
+    // rather than an appointment: "~09:40 (tomorrow's first window)".
+    private static string StoodDownUntil(ChargeControlStatus status, DateTimeOffset until, TimeZoneInfo zone)
+    {
+        var local = TimeZoneInfo.ConvertTime(until, zone);
+        var tomorrow = local.Date > TimeZoneInfo.ConvertTime(status.Timestamp, zone).Date;
+
+        return status.UntilFull is not null && tomorrow ? $"~{local:HH:mm} (tomorrow's first window)" : $"{local:HH:mm}";
     }
 
     // The reason, where the mode published one. Forecasted's day plan and Targeted's plan are the two

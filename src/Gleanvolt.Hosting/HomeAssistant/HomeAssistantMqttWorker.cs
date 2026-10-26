@@ -43,6 +43,9 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
     // The low-tariff-only flags (#274), set by the two switches and published from on every tick.
     private readonly ILowTariffSettings? _lowTariff;
+
+    // Forecasted until full (#279), set by its switch and published from on every tick like the two above.
+    private readonly IUntilFullSettings? _untilFull;
     private readonly IServiceShutdown _shutdown;
     private readonly TimeProvider _timeProvider;
     private readonly bool _batteryHoldEnabled;
@@ -92,8 +95,10 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         TimeProvider? timeProvider = null,
         ISolarGridSettings? solarGrid = null,
         ITariffSchedule? tariff = null,
-        ILowTariffSettings? lowTariff = null)
+        ILowTariffSettings? lowTariff = null,
+        IUntilFullSettings? untilFull = null)
     {
+        _untilFull = untilFull;
         _solarGrid = solarGrid;
         _tariff = tariff;
         _lowTariff = lowTariff;
@@ -239,6 +244,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             }
         }
 
+        if (_untilFull is not null)
+        {
+            await _client.SubscribeAsync(_discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
         await _client.SubscribeAsync(_discovery.ActivateTargetCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -265,6 +275,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishLowTariffStatesAsync(cancellationToken).ConfigureAwait(false);
+        await PublishUntilFullStateAsync(cancellationToken).ConfigureAwait(false);
         await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishSelectStatesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -297,6 +308,20 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 retain: true,
                 cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task PublishUntilFullStateAsync(CancellationToken cancellationToken)
+    {
+        if (_untilFull is null)
+        {
+            return;
+        }
+
+        await PublishAsync(
+            _discovery.SwitchStateTopic(HaDiscovery.UntilFullSwitch),
+            HaDiscovery.SwitchState(_untilFull.UntilFull),
+            retain: true,
+            cancellationToken).ConfigureAwait(false);
     }
 
     // The numbers carry the values the controller is actually using, so an HA restart (or a second
@@ -413,6 +438,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (_batteryHoldEnabled && topic == _discovery.BatteryHoldCommandTopic)
         {
             return OnBatteryHoldCommandAsync(payload);
+        }
+
+        if (topic == _discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch))
+        {
+            return OnUntilFullCommandAsync(payload);
         }
 
         foreach (var (objectId, mode, _) in HaDiscovery.LowTariffSwitches)
@@ -594,6 +624,27 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
 
         return PublishAsync(
             _discovery.SwitchStateTopic(objectId), HaDiscovery.SwitchState(_lowTariff.IsLowTariffOnly(mode)), retain: true, CancellationToken.None);
+    }
+
+    // Starts nothing: with Forecasted not running it only says how the next Forecasted session ends.
+    private Task OnUntilFullCommandAsync(string? payload)
+    {
+        if (_untilFull is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (HaDiscovery.TryParseSwitch(payload, out var on))
+        {
+            _untilFull.SetUntilFull(on, "Home Assistant");
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown command '{Payload}' for {ObjectId}.", payload, HaDiscovery.UntilFullSwitch);
+        }
+
+        return PublishAsync(
+            _discovery.SwitchStateTopic(HaDiscovery.UntilFullSwitch), HaDiscovery.SwitchState(_untilFull.UntilFull), retain: true, CancellationToken.None);
     }
 
     private Task OnNumberCommandAsync(string objectId, string? payload)

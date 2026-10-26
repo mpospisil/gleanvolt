@@ -50,6 +50,10 @@ namespace Gleanvolt.Api.Contracts;
 /// What <i>low tariff only</i> is doing for the mode driving (issue #274): waiting through high tariff
 /// until when, or set with no tariff to wait for. Null while that mode has the option off, or has none.
 /// </param>
+/// <param name="UntilFull">
+/// A <c>forecasted</c> session running <i>until full</i> (issue #279): since when, and which day of it this
+/// is. Null while another mode drives, or the option is off.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -76,7 +80,8 @@ public sealed record StatusResponse(
     SolarDayPlanResponse? DayPlan,
     TargetedPlanResponse? TargetedPlan,
     FastChargeResponse? FastCharge = null,
-    LowTariffStatusResponse? LowTariff = null)
+    LowTariffStatusResponse? LowTariff = null,
+    UntilFullStatusResponse? UntilFull = null)
 {
     internal static StatusResponse From(ChargeControlStatus status) => new(
         status.Timestamp,
@@ -108,7 +113,8 @@ public sealed record StatusResponse(
         status.Plan is { } plan ? SolarDayPlanResponse.From(plan) : null,
         status.TargetedPlan is { } targeted ? TargetedPlanResponse.From(targeted) : null,
         status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null,
-        status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null);
+        status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null,
+        status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null);
 }
 
 /// <summary>What <i>low tariff only</i> is doing for the mode driving.</summary>
@@ -116,6 +122,11 @@ public sealed record StatusResponse(
 /// <param name="Until">When low tariff starts, while waiting; null when that is beyond what the tariff knows.</param>
 /// <param name="Ignored">True when the option is set but there is no tariff to wait for, so the mode charges whatever the hour.</param>
 public sealed record LowTariffStatusResponse(bool Waiting, DateTimeOffset? Until, bool Ignored);
+
+/// <summary>A <c>forecasted</c> session running <i>until full</i>: one session over several days.</summary>
+/// <param name="Since">When the session started. A restart resumes it and keeps this.</param>
+/// <param name="Day">Which local day of the session this is, from 1 on the day it was started.</param>
+public sealed record UntilFullStatusResponse(DateTimeOffset Since, int Day);
 
 /// <summary>
 /// The battery discharge hold, which stops the home battery serving house load so the car charges

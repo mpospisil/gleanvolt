@@ -239,4 +239,59 @@ public class EveryModeWaitsAndEndsTheSameWayTests
         Assert.False(decision.SessionComplete);
         Assert.Equal(ChargingControlAction.StandDown, decision.Action);
     }
+
+    // -- 4. Until full (#279): the end of the day becomes a night stood down
+
+    [Fact]
+    public void UntilFullStandsTheChargerDownForTomorrowInsteadOfEnding()
+    {
+        var tomorrow = new DateTimeOffset(2026, 10, 26, 9, 40, 0, TimeSpan.Zero);
+        var input = Waiting(ChargeControlMode.Forecasted, sunFrom: null) with { UntilFull = true };
+        input = input with { Outlook = input.Outlook! with { TomorrowFirstSunAt = tomorrow } };
+
+        var decision = Controller(ChargeControlMode.Forecasted).Decide(input);
+
+        Assert.False(decision.SessionComplete);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
+        Assert.Equal(tomorrow, decision.WaitUntil);
+        Assert.Contains("tomorrow's first window", decision.Reason);
+    }
+
+    [Fact]
+    public void UntilFullWithNoWordOnTomorrowStandsDownUntilUnknown()
+    {
+        var input = Waiting(ChargeControlMode.Forecasted, sunFrom: null) with { UntilFull = true };
+
+        var decision = Controller(ChargeControlMode.Forecasted).Decide(input);
+
+        Assert.False(decision.SessionComplete);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
+        Assert.Null(decision.WaitUntil);
+    }
+
+    [Fact]
+    public void UntilFullStillEndsOnAFullCar()
+    {
+        // The wallbox closing the session straight after a draw is the car's limit, days in or not.
+        var input = Waiting(ChargeControlMode.Forecasted, sunFrom: null) with
+        {
+            UntilFull = true,
+            Charging = true,
+            EvWasDrawing = true,
+            State = new EnergyState(Now, 100, 0, 0, 0, EvChargerStatus.Finishing, 0),
+            CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 0),
+        };
+
+        var decision = Controller(ChargeControlMode.Forecasted).Decide(input);
+
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, decision.EndsSession);
+    }
+
+    [Fact]
+    public void UntilFullOnlyChangesTheModeTheHostSetsItFor()
+    {
+        // The flag is the input's, set by the host only while Forecasted drives; without it the rule is #280's.
+        Assert.NotNull(ChargerWait.DayIsOver(Waiting(ChargeControlMode.Forecasted, sunFrom: null), "Waiting.")?.EndsSession);
+        Assert.Null(ChargerWait.DayIsOver(Waiting(ChargeControlMode.Forecasted, sunFrom: null) with { UntilFull = true }, "Waiting.")?.EndsSession);
+    }
 }

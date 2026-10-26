@@ -156,6 +156,12 @@ public sealed class HaDiscovery
         ("solar_grid_low_tariff_only", ChargeControlMode.SolarGrid, "SolarGrid low tariff only"),
     ];
 
+    /// <summary>
+    /// Forecasted's <b>until full</b> switch (#279): one session over several days. A switch on the same
+    /// terms as the low-tariff ones: it changes how a mode a button started ends, and starts nothing.
+    /// </summary>
+    public const string UntilFullSwitch = "forecasted_until_full";
+
     public string SwitchCommandTopic(string objectId) => NumberCommandTopic(objectId);
     public string SwitchStateTopic(string objectId) => NumberStateTopic(objectId);
 
@@ -436,6 +442,15 @@ public sealed class HaDiscovery
 
         yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
         yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
+        yield return Config("switch", UntilFullSwitch, new Dictionary<string, object?>
+        {
+            ["name"] = "Forecasted until full",
+            ["command_topic"] = SwitchCommandTopic(UntilFullSwitch),
+            ["state_topic"] = SwitchStateTopic(UntilFullSwitch),
+            ["payload_on"] = PayloadOn,
+            ["payload_off"] = PayloadOff,
+            ["icon"] = "mdi:calendar-sync",
+        });
 
         // Targeted charging (issue #80). The mode needs no button of its own in the row above -- it
         // needs an amount, a time, and a press to apply both, which is what these three are. Published

@@ -253,7 +253,7 @@ else
                        it does, its discharge hold, and the way back to where it is changed or stopped. *@
                     <div class="session-mode">
                         <div class="session-mode-row">
-                            <span class="session-mode-name">@ChargeModeTabs.Label(_status.Mode)</span>
+                            <span class="session-mode-name">@ChargeModeTabs.Label(_status.Mode)@UntilFullSuffix(_status)</span>
                             @if (tab is not null)
                             {
                                 <span class="tag accent">Running</span>
@@ -790,6 +790,10 @@ else
     // the charger is in Fast on its own.
     private static bool IsCharging(ChargeControlStatus status) =>
         status.Mode != ChargeControlMode.Off || status.EvChargerPowerWatts > 0;
+
+    // Until full (#279): one session over several days, so the mode's name says which day it is.
+    private static string UntilFullSuffix(ChargeControlStatus status) =>
+        status.UntilFull is { Day: var day } ? $" · until full · day {day}" : string.Empty;
 
     private void RefreshVehicle()
     {

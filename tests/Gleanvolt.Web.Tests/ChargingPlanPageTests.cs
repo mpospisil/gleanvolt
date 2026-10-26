@@ -43,6 +43,7 @@ public class ChargingPlanPageTests : PageTest
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton<ISolarGridSettings>(new FakeSolarGridSettings());
         Services.AddSingleton<ILowTariffSettings>(new FakeLowTariffSettings());
+        Services.AddSingleton<IUntilFullSettings>(new FakeUntilFullSettings());
         Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule());
         Services.AddSingleton<ITargetedChargeSelector>(_target);
         Services.AddSingleton<IFastChargeSelector>(_fast);

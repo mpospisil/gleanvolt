@@ -29,6 +29,7 @@ public sealed class SolarGridProvider
     private readonly double? _chargerFloorWatts;
     private readonly ILogger<SolarGridProvider> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly IUntilFullSettings? _untilFull;
 
     private string? _lastLogged;
 
@@ -41,8 +42,10 @@ public sealed class SolarGridProvider
         ILogger<SolarGridProvider> logger,
         TimeProvider? timeProvider = null,
         ChargingLimits? limits = null,
-        ChargePowerConverter? power = null)
+        ChargePowerConverter? power = null,
+        IUntilFullSettings? untilFull = null)
     {
+        _untilFull = untilFull;
         _forecastOptions = forecastOptions.Value;
         _chargerFloorWatts = limits is not null && power is not null ? power.AmpsToWatts(limits.MinAmps) : null;
         _forecast = forecast;
@@ -62,7 +65,7 @@ public sealed class SolarGridProvider
     {
         ChargeControlMode.SolarGrid => Update(state),
         ChargeControlMode.Solar when _chargerFloorWatts is { } floor => Update(state, floor),
-        ChargeControlMode.Forecasted when _chargerFloorWatts is { } floor => Update(state, ForecastedMinimum(floor)),
+        ChargeControlMode.Forecasted when _chargerFloorWatts is { } floor => Forecasted(state, ForecastedMinimum(floor)),
         _ => null,
     };
 
@@ -78,11 +81,42 @@ public sealed class SolarGridProvider
         ? Math.Min(floorWatts, Math.Min(_forecastOptions.MinBridgeSurplusWatts, _forecastOptions.SpillBridgeSurplusWatts))
         : floorWatts;
 
-    private SolarGridOutlook Update(EnergyState state, double minSurplusWatts)
+    // Until full (#279): once today has nothing left, the night is a wait for tomorrow's first window,
+    // and the outlook says when that is expected so the surfaces can show it. Read from the whole cached
+    // forecast, which reaches past midnight; only while the option is on, since nothing else asks.
+    private SolarGridOutlook Forecasted(EnergyState state, double minSurplusWatts)
+    {
+        var outlook = Update(state, minSurplusWatts);
+
+        if (_untilFull?.UntilFull != true || !outlook.NoSunLeftToday)
+        {
+            return outlook;
+        }
+
+        var endOfDay = EndOfDay(state.Timestamp);
+        var endOfTomorrow = EndOfDay(endOfDay);
+        var tomorrow = SolarGridOutlookBuilder.FirstSunAt(
+            _forecast.GetForecast(endOfDay, endOfTomorrow),
+            endOfDay,
+            endOfTomorrow,
+            _dayPlan.HouseLoad,
+            minSurplusWatts,
+            _options.ForecastConfidence);
+
+        return outlook with { TomorrowFirstSunAt = tomorrow };
+    }
+
+    // The local midnight that ends the day `at` falls in.
+    private DateTimeOffset EndOfDay(DateTimeOffset at)
     {
         var zone = _timeProvider.LocalTimeZone;
-        var midnight = TimeZoneInfo.ConvertTime(state.Timestamp, zone).Date.AddDays(1);
-        var endOfDay = new DateTimeOffset(midnight, zone.GetUtcOffset(midnight));
+        var midnight = TimeZoneInfo.ConvertTime(at, zone).Date.AddDays(1);
+        return new DateTimeOffset(midnight, zone.GetUtcOffset(midnight));
+    }
+
+    private SolarGridOutlook Update(EnergyState state, double minSurplusWatts)
+    {
+        var endOfDay = EndOfDay(state.Timestamp);
 
         var outlook = SolarGridOutlookBuilder.Build(
             _forecast.GetForecastForToday(),

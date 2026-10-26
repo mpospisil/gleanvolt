@@ -1210,3 +1210,16 @@ internal sealed class FakeLowTariffSettings : ILowTariffSettings
         }
     }
 }
+
+internal sealed class FakeUntilFullSettings : IUntilFullSettings
+{
+    public bool UntilFull { get; set; }
+
+    public List<(bool On, string Source)> Sets { get; } = [];
+
+    public void SetUntilFull(bool on, string source)
+    {
+        Sets.Add((on, source));
+        UntilFull = on;
+    }
+}

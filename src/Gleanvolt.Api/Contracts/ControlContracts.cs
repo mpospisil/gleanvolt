@@ -63,6 +63,18 @@ public sealed record LowTariffOnlyRequest(bool? FastNoBattery = null, bool? Sola
 public sealed record LowTariffOnlyResponse(bool FastNoBattery, bool SolarGrid, bool TariffKnown);
 
 /// <summary>
+/// Change <i>until full</i> for <c>forecasted</c> (issue #279): with it on, one session runs over several
+/// days, stood down at night, until the car is full, it is unplugged, or the mode is stopped.
+/// </summary>
+/// <param name="UntilFull">Whether <c>forecasted</c> runs until the car is full rather than ending with the day's sun.</param>
+public sealed record UntilFullRequest(bool UntilFull);
+
+/// <summary><i>Until full</i> as the controller is using it, and the session running with it, if any.</summary>
+/// <param name="UntilFull">Whether <c>forecasted</c> runs until the car is full.</param>
+/// <param name="Session">The <c>forecasted</c> session running with it; null when there is none.</param>
+public sealed record UntilFullResponse(bool UntilFull, UntilFullStatusResponse? Session);
+
+/// <summary>
 /// What an action did, and what the controller looks like afterwards — so a caller never has to poll
 /// to find out whether the thing it asked for happened.
 /// </summary>

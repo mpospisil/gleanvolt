@@ -744,6 +744,8 @@ also counts as finished, and an unplugged car ends the mode as `CarUnplugged`. E
 the forecast has nothing left today that clears what they can charge on: the charger's 6 A floor for
 `Solar`, the least a battery loan will bridge for `Forecasted` (the floor with the loan off), your
 minimum for `SolarGrid`. Without a usable forecast they stay on, stood down, until you switch them off.
+`Forecasted` with [**Until full**](#until-full) on stands the charger down for the night instead, and
+carries on the next morning.
 
 ### Battery discharge hold (writes to the inverter)
 
@@ -980,6 +982,38 @@ forbid that too, cap its grid at zero (`maxGridEnergyWh: 0`, through the API): t
 met from the roof or reported as shortfall, never bought. See
 [Editing a quoted plan](#editing-a-quoted-plan-and-charging-to-it).
 
+#### Until full
+
+A car left at home over a weekend or a week rarely fills on one sunny afternoon; three usually do it.
+**Until full** — a checkbox on the *Forecasted* tab, the **Forecasted until full** switch in Home
+Assistant, or `PUT /charging/until-full` — keeps one `Forecasted` session going over as many days as that
+takes.
+
+- **By day, nothing changes.** The same plan, floor, loan, dwell timers and final guard: the home battery
+  still reaches 100 % by the deadline before the car gets anything extra, and the grid never helps.
+- **At nightfall it stands down instead of ending.** Where the mode would end itself as `NoSunLeftToday`,
+  it puts the charger in `Stop` for the night. The Overview says *"Forecasted mode (until full, day 2) is
+  on and has stood the charger down until ~09:40 (tomorrow's first window)"*; that time is the forecast's
+  estimate. The morning restart is the new day's plan: once it has a window and the sun is there, the
+  charger goes back to `Fast`. A day with no window stays stood down, and the session waits for the next.
+  It never gives up on its own.
+- **Without a usable forecast** it falls back to live surplus, as it always does, and the wait rule stands
+  it down through the night.
+- **It ends** when the car is full (`SessionComplete`), it is unplugged (`CarUnplugged`), the charger is
+  taken over (`ChargerTakenOver`), or you press **Off**.
+- **One session.** The session history keeps it as one charge, with each night's stand-down and each
+  morning's re-arm as events, and the Overview's session card reads *"Forecasted · until full · day 2"*.
+- **It survives a restart.** The charge mode is otherwise never restored: a restart comes back to Off.
+  A session running with **Until full** on is the one exception, because a deploy or a reboot would end a
+  week-long charge. It is kept in `data/until-full.json` while it lasts, and on startup the mode is started
+  again the way a button starts it: the charger goes to `Fast`, and the first poll stands it straight back
+  down if it is night. A charger that does not answer at startup is retried every poll for ten minutes.
+  The day count carries on; the session history records the restart as a new session, as it does for any
+  restart.
+
+With it off, `Forecasted` ends with the day's sun, as before. The option itself is a runtime setting:
+`ChargeControl:Forecast:UntilFull` is only its value at boot.
+
 #### Forecast versus reality
 
 A plan is only as good as the forecast under it, so the controller checks continuously:
@@ -1026,6 +1060,8 @@ deadline.
   // ... the live-solar settings above still apply; Forecasted reuses the same charger limits
   "Forecast": {
     "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
+    "UntilFull": false,              // boot value of "Until full": one session over several days
+    "UntilFullSessionPath": "data/until-full.json", // such a session, kept so a restart resumes it
     "BatteryCapacityKWh": 9.0,       // REQUIRED: USABLE capacity (see the warning below), not nameplate
     "ChargeEfficiency": 0.95,
     "BaselineHouseLoadWatts": 350,   // house load for an hour neither the history nor the live profile knows yet
@@ -1790,6 +1826,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   sensor, populated while the mode is driving.
 - the **Fast low tariff only** and **SolarGrid low tariff only** switches, which hold those two modes
   back through high tariff ([the grid tariff](#grid-tariff-the-tariff-section)).
+- the **Forecasted until full** switch, which keeps a `Forecasted` session going over several days
+  ([Until full](#until-full)).
 - the tariff — the **Low tariff** binary sensor and the **Tariff change** and **Grid price** sensors —
   published whatever tariff provider is selected on Settings, and unknown while none is.
 - binary sensors: **Car connected** and **Charging now**.
@@ -1822,6 +1860,7 @@ description or tooltip field. The meanings live here instead.
 | **Battery discharge hold** | switch | Stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a read-back — the register can't be read, so a failed write shows up as the switch springing back to `OFF`. `FastNoBattery` turns it **on** when it starts and **off** when it ends, whatever ended it — and in between this switch is yours: turning it off really releases the hold, and the car goes on charging at maximum. `Targeted` and `SolarGrid` are different: they arm their own hold only while the car draws more than the sun gives — `Targeted`'s grid block, the grid bridge, or a cloud the 3-minute average has not caught up with — keep it for `BatteryHold:BridgeReleaseDwell` after the last of those while charging, and never touch this switch. |
 | **Minimum battery SOC** | % | The hard floor the forecast plan may never take the home battery below, however good the forecast looks. Doesn't persist across restarts. |
 | **SOC resume margin** | % | How far above the floor the battery must recover before a paused session restarts — charging continues down to the floor itself, only coming back costs the margin. Raise it if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts. |
+| **Forecasted until full** | switch | With it `ON`, one `Forecasted` session runs over several days: stood down at night where it would have ended, re-armed on the next day's sun, until the car is full, unplugged, or switched **Off**. Starts nothing on its own. A session running with it on is resumed after a restart; the switch alone, with no session running, goes back to `ChargeControl:Forecast:UntilFull`. See [Until full](#until-full). |
 | **Fast basis** | select | What a fast charge is aiming at: `Full` (the car decides — the default), `Energy` (reads **Fast energy**) or `Soc` (reads **Fast target SOC**). Held until **Charge fast** is pressed; a basis chosen and not pressed changes nothing. Doesn't persist across restarts. |
 | **Fast energy** | kWh | How much to deliver before the fast charge stops itself, measured at the charger and metered from the press. Read only under the `Energy` basis. Doesn't persist across restarts. |
 | **Fast target SOC** | % | The state of charge to stop a fast charge at. Read only under the `Soc` basis, and only honoured with `Ev:Vehicles:0:BatteryCapacityKWh` configured and a reading from the car — converted to kilowatt-hours once, at the press, and not re-derived from a later reading. A reading older than `Vehicle:MaxAge` is **refused**, not converted: the press logs why and starts nothing, since a button has nowhere to show a message (#179). Ask in **Fast energy**, or press `Full`. Doesn't persist across restarts. |
@@ -3227,6 +3266,8 @@ which is the thing a client is generated from. Everything else is behind the key
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
 | `GET /charging/low-tariff-only` | Whether `fastNoBattery` and `solarGrid` wait for low tariff, and whether there is a tariff for them to act on (`tariffKnown`). |
 | `PUT /charging/low-tariff-only` | Set either or both; a field left out is left as it is. Applies from the next poll, to a running mode too, and doesn't survive a restart. Accepted with no tariff set up, which the answer's `tariffKnown` shows. |
+| `GET /charging/until-full` | Whether `forecasted` runs [until full](#until-full), and the session running with it (`session`: `since` and `day`), if any. `/status` carries the same session as `untilFull`. |
+| `PUT /charging/until-full` | `{"untilFull": true}` or `false`. Starts nothing; applies from the next poll, to a running session too. |
 | `GET /tariff` | The [grid tariff](#grid-tariff-the-tariff-section): the low and high stretches as far ahead as the provider knows, the rate now with its price and next change, and the currency. Empty with no tariff — which means no restriction, never "always low". |
 | `GET /tariff/providers` | The tariff providers this build has, and which one is selected. |
 | `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
@@ -3481,7 +3522,7 @@ how:
 | `SessionComplete` | The mode ended itself because the car was full: the wallbox closed the session straight after the car drew, or the car stopped drawing on its own limit. |
 | `TargetReached` | `Targeted`, or `FastNoBattery` with an amount, delivered what was asked for. |
 | `DeparturePassed` | `Targeted`, or `FastNoBattery` with a departure, ran out of time. |
-| `NoSunLeftToday` | `SolarGrid`, `Solar` or `Forecasted` ended for the day, however full the car is. |
+| `NoSunLeftToday` | `SolarGrid`, `Solar` or `Forecasted` ended for the day, however full the car is. Never `Forecasted` with **Until full** on, which stands down for the night instead. |
 | `ChargerTakenOver` | The charger left Fast, so the mode stopped driving it: its owner took it. |
 
 Sessions recorded before these reasons existed show `SessionComplete` for every session a mode ended

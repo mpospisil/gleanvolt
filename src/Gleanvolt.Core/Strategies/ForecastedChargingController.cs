@@ -28,7 +28,9 @@ namespace Gleanvolt.Core.Strategies;
 ///
 /// <para>It waits and ends like every other mode (#280): paused or stood down by
 /// <see cref="ChargerWait"/>, ended on a full car by <see cref="ChargerOwnership"/>, and ended for the day
-/// once the forecast has no sun left that clears what it could charge on.</para>
+/// once the forecast has no sun left that clears what it could charge on. With the owner's <b>until
+/// full</b> on (#279) that last step stands the charger down for the night instead, and the session goes
+/// on the next morning, as many days as the car takes; nothing else here knows about it.</para>
 ///
 /// <para>Whenever the plan is missing, stale or untrusted it delegates to the live-solar controller —
 /// the fallback is the whole point: an absent forecast must never be read as optimistic headroom.</para>

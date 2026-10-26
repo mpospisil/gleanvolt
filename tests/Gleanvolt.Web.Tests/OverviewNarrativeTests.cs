@@ -101,6 +101,23 @@ public class OverviewNarrativeTests
     }
 
     [Fact]
+    public void Says_an_until_full_night_waits_for_tomorrows_first_window_and_names_the_day()
+    {
+        // #279: the next day's window is the forecast's estimate, not an appointment.
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.Forecasted) with
+        {
+            Plan = null,
+            CarConnected = true,
+            State = ChargeControlState.Paused,
+            ChargerStoodDown = true,
+            WaitUntil = new DateTimeOffset(2026, 8, 13, 7, 40, 0, TimeSpan.Zero),
+            UntilFull = new Core.Models.UntilFullStatus(Now.AddDays(-1), Day: 2),
+        });
+
+        Assert.Contains("(until full, day 2) is on and has stood the charger down until ~09:40 (tomorrow's first window).", text);
+    }
+
+        [Fact]
     public void Says_a_stood_down_charger_waits_without_inventing_a_time()
     {
         var text = Describe(Statuses.Sample(Now, ChargeControlMode.Solar) with

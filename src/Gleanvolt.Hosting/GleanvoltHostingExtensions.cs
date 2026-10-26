@@ -469,6 +469,23 @@ public static class GleanvoltHostingExtensions
         // settable at runtime like the solar-grid minimum. Ignored while no tariff is set up.
         services.Configure<FastChargeOptions>(configuration.GetSection(FastChargeOptions.SectionName));
         services.AddSingleton<ILowTariffSettings, LowTariffSettings>();
+
+        // Forecasted until full (#279): the flag, seeded from ChargeControl:Forecast:UntilFull, and the
+        // one session that survives a restart, kept beside tariff.json and resolved the same way.
+        services.AddSingleton<IUntilFullSettings, UntilFullSettings>();
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<ForecastChargeOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var path = Path.IsPathRooted(options.UntilFullSessionPath)
+                ? options.UntilFullSessionPath
+                : Path.Combine(environment.ContentRootPath, options.UntilFullSessionPath);
+
+            return new UntilFullSessionFile(
+                Path.GetFullPath(path),
+                provider.GetRequiredService<ILogger<UntilFullSessionFile>>(),
+                provider.GetRequiredService<TimeProvider>());
+        });
         services.AddSingleton<SolarGridProvider>();
 
         services.AddSingleton(provider =>

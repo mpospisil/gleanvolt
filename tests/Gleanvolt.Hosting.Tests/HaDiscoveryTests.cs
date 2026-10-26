@@ -68,9 +68,12 @@ public class HaDiscoveryTests
         // button still has to apply. Nothing about it can put the charger into a mode.
         //
         // Narrowed again by #274 for the two low-tariff-only switches, on the same terms: each only holds
-        // back a mode a button started, and neither can start one.
+        // back a mode a button started, and neither can start one. And by #279 for Forecasted until
+        // full, which only changes how a Forecasted session a button started ends.
         var messages = Discovery.DiscoveryMessages().ToList();
-        var allowedSwitches = HaDiscovery.LowTariffSwitches.Select(entry => $"/switch/solax_controller/{entry.ObjectId}/").ToList();
+        var allowedSwitches = HaDiscovery.LowTariffSwitches.Select(entry => $"/switch/solax_controller/{entry.ObjectId}/")
+            .Append($"/switch/solax_controller/{HaDiscovery.UntilFullSwitch}/")
+            .ToList();
 
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/mode/"));
         Assert.DoesNotContain(messages, m => m.Topic.Contains("/select/solax_controller/charge_mode/"));

@@ -1,0 +1,61 @@
+@inject IUntilFullSettings UntilFull
+
+@*
+    "Until full" for the forecast-driven mode (#279): one session over several days, stood down at night.
+    Written through IUntilFullSettings, the seam Home Assistant's switch and the API write too, and re-read
+    whenever a new status lands, so a change made there shows here by the next poll.
+*@
+
+<div class="control until-full-option">
+    <div class="control-head">
+        <label>
+            <input type="checkbox" id="until-full" checked="@_on" @onchange="OnChanged" />
+            Until full
+        </label>
+        <InfoTip Topic="Until full">
+            <p>
+                Keeps one session going over several days, for a car left at home over a weekend or a
+                week: one sunny afternoon rarely fills it, three usually do. By day nothing changes. Where
+                the mode would end for the day, it stands the charger down for the night instead and starts
+                again on the next day's sun. It ends when the car is full, is unplugged, or you press Off.
+                A session running with it on is resumed after a restart.
+            </p>
+        </InfoTip>
+    </div>
+    @if (Note() is { } note)
+    {
+        <span class="hint" id="until-full-state">@note</span>
+    }
+</div>
+
+@code {
+    /// <summary>The last poll, for which day of the session this is.</summary>
+    [Parameter] public ChargeControlStatus? Status { get; set; }
+
+    private bool _on;
+
+    private ChargeControlStatus? _seenStatus;
+
+    protected override void OnInitialized() => _on = UntilFull.UntilFull;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_seenStatus, Status))
+        {
+            return;
+        }
+
+        _seenStatus = Status;
+        _on = UntilFull.UntilFull;
+    }
+
+    private void OnChanged(ChangeEventArgs e)
+    {
+        _on = e.Value is true || (e.Value is string text && bool.TryParse(text, out var parsed) && parsed);
+        UntilFull.SetUntilFull(_on, "Web UI");
+    }
+
+    private string? Note() => Status?.UntilFull is { Day: var day }
+        ? $"Running until full: day {day} of this session."
+        : null;
+}
