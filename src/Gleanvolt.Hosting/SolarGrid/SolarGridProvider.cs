@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
@@ -9,7 +10,9 @@ namespace Gleanvolt.Hosting.SolarGrid;
 
 /// <summary>
 /// Where <see cref="SolarGridOutlookBuilder"/> meets the clock, the forecast cache, the runtime minimum
-/// and the log. Called by the poll loop only while the solar-grid mode is selected.
+/// and the log. Called by the poll loop while one of the three modes that wait for sun is selected:
+/// SolarGrid against the owner's minimum, and since #280 Solar and Forecasted against what they can
+/// charge on, so all three know how long a wait for sun lasts and when their day is over.
 ///
 /// <para>Takes the house-load profile from <see cref="DayPlanProvider"/>, which learns it from every
 /// reading in every mode, so the forecast surplus here is the same PV-minus-house the day plan and the
@@ -22,6 +25,8 @@ public sealed class SolarGridProvider
     private readonly ISolarGridSettings _settings;
     private readonly SolarGridChargeOptions _options;
     private readonly TimeSpan _staleForecastAfter;
+    private readonly ForecastChargeOptions _forecastOptions;
+    private readonly double? _chargerFloorWatts;
     private readonly ILogger<SolarGridProvider> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -34,8 +39,12 @@ public sealed class SolarGridProvider
         IOptions<SolarGridChargeOptions> options,
         IOptions<ForecastChargeOptions> forecastOptions,
         ILogger<SolarGridProvider> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ChargingLimits? limits = null,
+        ChargePowerConverter? power = null)
     {
+        _forecastOptions = forecastOptions.Value;
+        _chargerFloorWatts = limits is not null && power is not null ? power.AmpsToWatts(limits.MinAmps) : null;
         _forecast = forecast;
         _dayPlan = dayPlan;
         _settings = settings;
@@ -45,8 +54,31 @@ public sealed class SolarGridProvider
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// The outlook for <paramref name="mode"/>, or null for a mode that does not wait for sun (or, for
+    /// Solar and Forecasted, when the charger's floor is not known).
+    /// </summary>
+    public SolarGridOutlook? Update(EnergyState state, ChargeControlMode mode) => mode switch
+    {
+        ChargeControlMode.SolarGrid => Update(state),
+        ChargeControlMode.Solar when _chargerFloorWatts is { } floor => Update(state, floor),
+        ChargeControlMode.Forecasted when _chargerFloorWatts is { } floor => Update(state, ForecastedMinimum(floor)),
+        _ => null,
+    };
+
     /// <summary>What the rest of today's forecast says about sun clearing the owner's minimum.</summary>
-    public SolarGridOutlook Update(EnergyState state)
+    public SolarGridOutlook Update(EnergyState state) => Update(state, _settings.MinSurplusWatts);
+
+    /// <summary>
+    /// The least surplus the forecast-driven mode can charge on: the charger's floor, or with the battery
+    /// loan on, the least the loan will bridge. The lower of the two, so a day the loan could still use is
+    /// never written off.
+    /// </summary>
+    private double ForecastedMinimum(double floorWatts) => _forecastOptions.EnableBatteryLoan
+        ? Math.Min(floorWatts, Math.Min(_forecastOptions.MinBridgeSurplusWatts, _forecastOptions.SpillBridgeSurplusWatts))
+        : floorWatts;
+
+    private SolarGridOutlook Update(EnergyState state, double minSurplusWatts)
     {
         var zone = _timeProvider.LocalTimeZone;
         var midnight = TimeZoneInfo.ConvertTime(state.Timestamp, zone).Date.AddDays(1);
@@ -57,7 +89,7 @@ public sealed class SolarGridProvider
             state.Timestamp,
             endOfDay,
             _dayPlan.HouseLoad,
-            _settings.MinSurplusWatts,
+            minSurplusWatts,
             _options.ForecastConfidence,
             _staleForecastAfter);
 
@@ -76,6 +108,6 @@ public sealed class SolarGridProvider
 
         _lastLogged = outlook.Reason;
         _logger.LogInformation(
-            "Solar-grid outlook: {Reason} ({Confidence}).", outlook.Reason, _options.ForecastConfidence);
+            "Sun outlook: {Reason} ({Confidence}).", outlook.Reason, _options.ForecastConfidence);
     }
 }

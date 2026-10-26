@@ -355,7 +355,8 @@ public static class GleanvoltHostingExtensions
                 options.CurrentStepAmps,
                 options.ResumeHysteresisWatts,
                 options.BatteryFullSocPercent,
-                options.BatteryReleaseSocPercent);
+                options.BatteryReleaseSocPercent,
+                options.CompletionDwell);
         });
 
         // Forecast-driven charge control (issue #22): the Solcast forecast decides how much of today's
@@ -396,7 +397,8 @@ public static class GleanvoltHostingExtensions
                     LoanSocMarginPercent: forecast.LoanSocMarginPercent,
                     MinRunTime: forecast.MinRunTime,
                     MinPauseTime: forecast.MinPauseTime,
-                    FinalGuardBefore: forecast.FinalGuardBefore),
+                    FinalGuardBefore: forecast.FinalGuardBefore,
+                    CompletionDwell: chargeControl.CompletionDwell),
                 provider.GetRequiredService<IForecastRuntimeSettings>());
         });
 

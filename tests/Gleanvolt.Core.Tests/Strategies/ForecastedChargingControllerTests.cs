@@ -41,7 +41,8 @@ public class ForecastedChargingControllerTests
             LoanSocMarginPercent: 2,
             MinRunTime: minRunTime ?? TimeSpan.FromMinutes(10),
             MinPauseTime: minPauseTime ?? TimeSpan.Zero,
-            FinalGuardBefore: TimeSpan.FromHours(1));
+            FinalGuardBefore: TimeSpan.FromHours(1),
+            CompletionDwell: TimeSpan.FromMinutes(2));
 
     private ForecastedChargingController Controller(ForecastedChargingOptions? options = null) =>
         new(new ChargePowerConverter(230, 3), _fallback, options ?? Options());
@@ -148,11 +149,11 @@ public class ForecastedChargingControllerTests
     }
 
     [Fact]
-    public void BelowTheSocFloor_ItPausesSoTheBatteryCanCatchUp()
+    public void BelowTheSocFloor_ItWaitsSoTheBatteryCanCatchUp()
     {
         var decision = Controller().Decide(Input(8000, socPercent: 45, plan: Plan(socFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("floor", decision.Reason);
     }
 
@@ -168,7 +169,7 @@ public class ForecastedChargingControllerTests
         var continuing = Controller(options).Decide(
             Input(8000, socPercent: 51, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, starting.Action);
+        Assert.Equal(ChargingControlAction.StandDown, starting.Action);
         Assert.Contains("has not recovered", starting.Reason);
         Assert.Equal(ChargingControlAction.Charge, continuing.Action);
     }
@@ -216,18 +217,18 @@ public class ForecastedChargingControllerTests
             Input(8000, socPercent: 49, charging: true, timeInState: TimeSpan.FromMinutes(2),
                 plan: Plan(socFloor: 50, trajectoryFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("floor", decision.Reason);
     }
 
     [Fact]
-    public void PastTheMinimumRunTime_AClampDipStillPauses()
+    public void PastTheMinimumRunTime_AClampDipStillWaits()
     {
         var decision = Controller(Options(enableLoan: false)).Decide(
             Input(8000, socPercent: 49, charging: true, timeInState: TimeSpan.FromHours(1),
                 plan: Plan(socFloor: 50, trajectoryFloor: 20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
     }
 
     [Fact]
@@ -266,7 +267,7 @@ public class ForecastedChargingControllerTests
         var decision = Controller(Options(enableLoan: false, floorResumeMarginPercent: 5, floorGuardReserveWatts: 750)).Decide(
             Input(4600, socPercent: 51, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("reserved for the battery", decision.Reason);
     }
 
@@ -278,16 +279,16 @@ public class ForecastedChargingControllerTests
         var decision = Controller(Options(floorResumeMarginPercent: 5, floorGuardReserveWatts: 0)).Decide(
             Input(3000, socPercent: 53, charging: true, timeInState: TimeSpan.FromHours(1), plan: Plan(socFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
     [Fact]
-    public void InsideTheFinalGuardWindow_ItPausesWhileTheBatteryIsNotFull()
+    public void InsideTheFinalGuardWindow_ItWaitsWhileTheBatteryIsNotFull()
     {
         var decision = Controller().Decide(Input(8000, socPercent: 90, now: Deadline.AddMinutes(-30)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("Final guard", decision.Reason);
     }
 
@@ -310,11 +311,11 @@ public class ForecastedChargingControllerTests
     }
 
     [Fact]
-    public void ADayWithNoChargeableWindowPauses()
+    public void ADayWithNoChargeableWindowWaits()
     {
         var decision = Controller().Decide(Input(8000, plan: Plan(feasibleEvWh: 0, hasWindow: false)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("No deliverable budget", decision.Reason);
     }
 
@@ -351,7 +352,7 @@ public class ForecastedChargingControllerTests
         // battery-to-car transfer, paying a round trip and a cycle for nothing.
         var decision = Controller().Decide(Input(1200, charging: true, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
@@ -367,7 +368,7 @@ public class ForecastedChargingControllerTests
             3000, socPercent: 70, charging: true, timeInState: TimeSpan.FromMinutes(20),
             plan: Plan(shortfallWh: 5000, socFloor: 80, trajectoryFloor: 80)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
         Assert.Contains("floor the forecast requires", decision.Reason);
     }
@@ -377,7 +378,7 @@ public class ForecastedChargingControllerTests
     {
         var decision = Controller().Decide(Input(3000, charging: true, timeInState: TimeSpan.FromMinutes(20), loanedTodayWh: 4000));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
@@ -439,7 +440,7 @@ public class ForecastedChargingControllerTests
             1600, socPercent: 80, charging: true, timeInState: TimeSpan.FromMinutes(20),
             plan: Plan(spillWh: 0)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
@@ -450,7 +451,7 @@ public class ForecastedChargingControllerTests
             3000, socPercent: 80, charging: true, timeInState: TimeSpan.FromMinutes(20),
             plan: Plan(feasibleEvWh: 0, hasWindow: false, spillWh: 0)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("No deliverable budget", decision.Reason);
     }
 
@@ -461,7 +462,7 @@ public class ForecastedChargingControllerTests
         var decision = Controller().Decide(Input(
             3000, socPercent: 51, charging: true, timeInState: TimeSpan.FromMinutes(20), plan: Plan(socFloor: 50)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.LoanPowerWatts);
     }
 
@@ -473,7 +474,7 @@ public class ForecastedChargingControllerTests
         // A 2.5kW surplus needs 1.64kW to reach the floor but may only borrow 500W, so it stays paused.
         var decision = controller.Decide(Input(2500, charging: true, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
     }
 
     [Fact]
@@ -488,12 +489,12 @@ public class ForecastedChargingControllerTests
     }
 
     [Fact]
-    public void OnceTheMinimumRunTimeHasPassed_TheSameDipPauses()
+    public void OnceTheMinimumRunTimeHasPassed_TheSameDipWaits()
     {
         var decision = Controller(Options(enableLoan: false)).Decide(
             Input(1000, charging: true, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
     }
 
     [Fact]
@@ -503,7 +504,7 @@ public class ForecastedChargingControllerTests
 
         var decision = controller.Decide(Input(8000, charging: false, timeInState: TimeSpan.FromMinutes(5), chargedThisMode: true));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("minimum before restarting", decision.Reason);
     }
 
@@ -527,16 +528,16 @@ public class ForecastedChargingControllerTests
         var starting = Controller(Options(enableLoan: false)).Decide(Input(MinChargePowerWatts, charging: false));
         var continuing = Controller(Options(enableLoan: false)).Decide(Input(MinChargePowerWatts, charging: true, timeInState: TimeSpan.FromHours(1)));
 
-        Assert.Equal(ChargingControlAction.Pause, starting.Action);
+        Assert.Equal(ChargingControlAction.StandDown, starting.Action);
         Assert.Equal(ChargingControlAction.Charge, continuing.Action);
     }
 
     [Fact]
-    public void AnExhaustedBudgetPausesEvenWithSunOnTheRoof()
+    public void AnExhaustedBudgetWaitsEvenWithSunOnTheRoof()
     {
         var decision = Controller().Decide(Input(8000, plan: Plan(feasibleEvWh: 0), timeInState: TimeSpan.FromHours(1)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("No deliverable budget", decision.Reason);
     }
 

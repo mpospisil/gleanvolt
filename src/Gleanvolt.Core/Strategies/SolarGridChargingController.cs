@@ -18,8 +18,8 @@ namespace Gleanvolt.Core.Strategies;
 /// a running charge at the floor for its minimum run time and keep a paused one paused for its minimum
 /// pause.</description></item>
 /// <item><description>What an idle car does next is the forecast's call: sun still to come today means
-/// wait — stood down when that sun is a while off — and none means the mode is over for the day and
-/// returns itself to <see cref="ChargeControlMode.Off"/>.</description></item>
+/// wait, paused or stood down by <see cref="ChargerWait"/>, and none means the mode is over for the day
+/// and returns itself to <see cref="ChargeControlMode.Off"/>.</description></item>
 /// </list>
 ///
 /// <para>The forecast never stops a car that is getting real sun. It is consulted only once the live
@@ -32,15 +32,6 @@ namespace Gleanvolt.Core.Strategies;
 /// </summary>
 public sealed class SolarGridChargingController : IChargingController
 {
-    /// <summary>
-    /// How far off the forecast's next sun has to be before a waiting car is stood down rather than
-    /// paused. A pause holds the charger in Fast at the pause current, which this installation's wallbox
-    /// tolerates for minutes and not for hours (#135); a wait measured by the forecast is measured in
-    /// half-hours, and belongs in Stop. Short gaps — a cloud inside a sunny period, a period boundary a
-    /// few minutes away — stay a pause, so a passing shadow costs no use-mode writes.
-    /// </summary>
-    public static readonly TimeSpan StandDownAfter = TimeSpan.FromMinutes(15);
-
     private readonly ChargePowerConverter _power;
     private readonly SolarGridChargingOptions _options;
     private readonly int _minAmps;
@@ -67,36 +58,22 @@ public sealed class SolarGridChargingController : IChargingController
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        if (ChargerOwnership.NotOurs(input) is { } notOurs)
+        // A full car must end this mode, not merely pause it: one held at a bridged 6 A keeps the
+        // discharge hold armed, and the house on the grid, for nothing.
+        if (ChargerOwnership.Check(input, _options.CompletionDwell) is { } ended)
         {
-            return notOurs;
+            return ended;
         }
 
-        var outlook = input.SolarGrid;
+        var outlook = input.Outlook;
         var minimum = Math.Max(0, outlook?.MinSurplusWatts ?? _options.MinSurplusWatts);
         var surplus = input.SurplusWatts;
-
-        // Only meaningful while we are asking the car to charge: during a pause the car drawing nothing
-        // is our own doing. Unlike the pure solar modes this one ends on it, and must -- a full car held
-        // at a bridged 6 A keeps the discharge hold armed, and the house on the grid, for nothing.
-        if (input.Charging && input.EvDrewPower)
-        {
-            // Known-disconnected, not merely "not connected": Unknown is a failed read.
-            if (input.State.EvChargerStatus.IsCarKnownDisconnected())
-            {
-                return Complete(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
-            }
-
-            if (input.EvIdleFor >= _options.CompletionDwell)
-            {
-                return Complete(ChargingSessionEndReason.SessionComplete, $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min — its own limit");
-            }
-        }
 
         // Asymmetric, like every other solar gate: keep charging down to the minimum, but only (re)start
         // a hysteresis margin above it.
         var threshold = input.Charging ? minimum : minimum + _options.ResumeHysteresisWatts;
         var thresholdName = input.Charging ? "minimum" : "start threshold";
+        var below = $"Surplus {surplus:F0}W is under the {threshold:F0}W {thresholdName}.";
 
         // Low tariff only (#274), decided as (a): high tariff pauses the car, sun or not -- the owner's
         // choice over following free surplus, so the mode charges in low tariff and nowhere else. The
@@ -104,12 +81,7 @@ public sealed class SolarGridChargingController : IChargingController
         // alive past its sun.
         if (TariffWait.For(input, "SolarGrid") is { } wait)
         {
-            if (surplus < threshold && outlook is { ForecastUsable: true, NoSunLeftToday: true })
-            {
-                return Complete(ChargingSessionEndReason.NoSunLeftToday, $"Nothing left of today will do better: {outlook.Reason}");
-            }
-
-            return wait;
+            return surplus < threshold && ChargerWait.DayIsOver(input, below) is { } dayOver ? dayOver : wait;
         }
 
         if (surplus >= threshold)
@@ -118,15 +90,15 @@ public sealed class SolarGridChargingController : IChargingController
             // threshold -- and only then: see RestartDwell for why a first charge never waits.
             if (RestartDwell.Holds(input, _options.MinPauseTime))
             {
-                return Pause(
+                return ChargerWait.For(
+                    input,
+                    ChargerWait.DwellEnds(input, _options.MinPauseTime),
                     $"Surplus {surplus:F0}W is back over the {threshold:F0}W {thresholdName}, but paused "
                     + $"{input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
             }
 
             return ChargeFromSurplus(surplus, minimum);
         }
-
-        var below = $"Surplus {surplus:F0}W is under the {threshold:F0}W {thresholdName}.";
 
         if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)
         {
@@ -135,29 +107,28 @@ public sealed class SolarGridChargingController : IChargingController
 
         if (outlook is null)
         {
-            return Pause($"{below} Waiting for sun.");
+            return ChargerWait.For(input, null, $"{below} Waiting for sun.");
         }
 
         if (!outlook.ForecastUsable)
         {
-            return Pause($"{below} No usable forecast ({outlook.Reason}), so waiting on live surplus alone.");
+            return ChargerWait.For(input, null, $"{below} No usable forecast ({outlook.Reason}), so waiting on live surplus alone.");
         }
 
-        if (outlook.NoSunLeftToday)
+        if (ChargerWait.DayIsOver(input, below) is { } over)
         {
-            return Complete(ChargingSessionEndReason.NoSunLeftToday, $"{below} Nothing left of today will do better: {outlook.Reason}");
+            return over;
         }
 
-        if (outlook.NextSunAt is { } next && next - input.State.Timestamp >= StandDownAfter)
+        if (outlook.NextSunAt is { } next && next > input.State.Timestamp)
         {
-            return new ChargingControlDecision(
-                ChargingControlAction.StandDown,
-                null,
-                $"{below} The forecast has the surplus clearing {minimum:F0}W from {next.LocalDateTime:HH:mm}; "
-                + "standing the charger down until the sun is here.");
+            return ChargerWait.For(
+                input, next, $"{below} The forecast has the surplus clearing {minimum:F0}W from {next.LocalDateTime:HH:mm}.");
         }
 
-        return Pause(
+        return ChargerWait.For(
+            input,
+            input.State.Timestamp,
             $"{below} The forecast still has it clearing {minimum:F0}W until {outlook.SunUntil?.LocalDateTime:HH:mm}; "
             + "waiting for this dip to pass.");
     }
@@ -202,12 +173,6 @@ public sealed class SolarGridChargingController : IChargingController
             GridBridgeWatts: bridge);
     }
 
-    private static ChargingControlDecision Pause(string reason) => new(ChargingControlAction.Pause, null, reason);
-
-    // Pause rather than None: the charger must be left idle, not armed at the last setpoint. The
-    // orchestrator writes the pause current and then switches the mode to Off.
-    private static ChargingControlDecision Complete(ChargingSessionEndReason reason, string what) =>
-        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
 
     // Whole-amp setpoint the charger accepts: convert (phase-aware), floor to the step, clamp to max.
     private int ToHardwareCurrent(double availableWatts)

@@ -81,7 +81,8 @@ public class BatteryLoanDaySimulationTests
         LoanSocMarginPercent: 2,
         MinRunTime: TimeSpan.FromMinutes(10),
         MinPauseTime: TimeSpan.FromMinutes(15),
-        FinalGuardBefore: TimeSpan.FromHours(1));
+        FinalGuardBefore: TimeSpan.FromHours(1),
+        CompletionDwell: TimeSpan.FromMinutes(2));
 
     private sealed record DayResult(
         double EndSocPercent,

@@ -25,6 +25,83 @@ public static class ChargerOwnership
     public static readonly TimeSpan DropoutGrace = TimeSpan.FromMinutes(2);
 
     /// <summary>
+    /// The one rule for "the car is done" (#280), together with the ownership guard, in the order they
+    /// have to be asked. Null when the caller should carry on deciding. The car is only ever judged while
+    /// the mode is asking it to charge: between charges, the car drawing nothing is the mode's own doing.
+    ///
+    /// <list type="number">
+    /// <item><description><b>The wallbox closed the session.</b> On a full car this one reads
+    /// <c>Charging / Fast</c> at full power on one poll and <c>Finishing / Stop / 0 W</c> on the next:
+    /// no taper and no <see cref="EvChargerStatus.SuspendedEv"/>. All three
+    /// <see cref="ChargingSessionEndReason.ChargerTakenOver"/> endings of 13–26 October 2026 were this.
+    /// Believed at once when the car was drawing on the poll before, which is what tells it from the
+    /// wallbox giving up on our own 0 A pause: that also reads Finishing / Stop, but after a pause, with
+    /// nothing drawing. Asked <em>before</em> the ownership guard, because the wallbox has already left
+    /// Fast by the time it is seen, and two minutes later the guard would file it as taken
+    /// over.</description></item>
+    /// <item><description><b>The charger is not ours</b> (<see cref="NotOurs"/>).</description></item>
+    /// <item><description><b>The car went away</b>, positively reported: Unknown is a failed read, and
+    /// ending the mode on one costs the owner the whole charge.</description></item>
+    /// <item><description><b>The car stopped drawing</b> for <paramref name="completionDwell"/>: the
+    /// fallback for a wallbox that stays in Fast at 0 W. Fast, Targeted and SolarGrid each kept a copy of
+    /// this; Solar and Forecasted had none and never ended on a full car at all.</description></item>
+    /// </list>
+    ///
+    /// <para>A mode's own endings — the energy delivered, the departure passed — are checked by the mode
+    /// before this, so a car that stops at the very moment it reaches the number is reported as having
+    /// reached it.</para>
+    /// </summary>
+    /// <param name="input">This cycle's input.</param>
+    /// <param name="completionDwell">How long a car in Fast may draw nothing before it counts as finished.</param>
+    /// <param name="finishedDetail">Appended to the reason for a full car, e.g. how much of an amount it took.</param>
+    public static ChargingControlDecision? Check(ChargingControlInput input, TimeSpan completionDwell, string? finishedDetail = null)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var judged = input.Charging && !input.ChargerStoodDown;
+        var status = input.State.EvChargerStatus;
+
+        if (judged && input.EvWasDrawing && status.IsChargeWindingDown())
+        {
+            return End(
+                ChargingSessionEndReason.SessionComplete,
+                $"The charger reports {status} straight after the car was drawing (charge limit reached){finishedDetail}");
+        }
+
+        if (NotOurs(input) is { } notOurs)
+        {
+            return notOurs;
+        }
+
+        if (!judged || !input.EvDrewPower)
+        {
+            return null;
+        }
+
+        if (status.IsCarKnownDisconnected())
+        {
+            return End(ChargingSessionEndReason.CarUnplugged, "Car unplugged");
+        }
+
+        if (input.EvIdleFor >= completionDwell)
+        {
+            return End(
+                ChargingSessionEndReason.SessionComplete,
+                $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){finishedDetail}");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// A decision that ends the mode. Pause rather than None: the charger must be left idle, not armed at
+    /// the last setpoint for whatever plugs in next. The orchestrator writes the pause current and then
+    /// switches the mode to Off.
+    /// </summary>
+    public static ChargingControlDecision End(ChargingSessionEndReason reason, string what) =>
+        new(ChargingControlAction.Pause, null, $"{what}; pausing and returning to Off.", EndsSession: reason);
+
+    /// <summary>
     /// The decision to return when the charger is not ours, or <c>null</c> when it is and the caller
     /// should carry on deciding.
     /// </summary>
@@ -42,11 +119,11 @@ public static class ChargerOwnership
             return null;
         }
 
-        // Sustained, so the charger really has left Fast underneath us: the car finished and the wallbox
-        // went Finishing -> Stop, or its owner took it. Either way this mode is no longer driving
-        // anything and should say so rather than sit "on" doing nothing -- observed on 2026-08-24 as
-        // Targeted logging "leaving it untouched" every eight seconds for 2 h 19 min after the car
-        // stopped.
+        // Sustained, so the charger really has left Fast underneath us: its owner took it, or the car
+        // finished in a way Check could not see (the poll that showed it drawing was lost). Either
+        // way this mode is no longer driving anything and should say so rather than sit "on" doing
+        // nothing -- observed on 2026-08-24 as Targeted logging "leaving it untouched" every eight
+        // seconds for 2 h 19 min after the car stopped.
         //
         // Action is None, never Pause: writing a current to a charger that is not ours is exactly what
         // the guard exists to prevent, and the orchestrator's stop path writes the use-mode anyway.

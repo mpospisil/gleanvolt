@@ -263,7 +263,7 @@
     "ChargeControlMode": "enum[off|solar|forecasted|fastNoBattery|targeted|solarGrid]",
     "ChargeControlState": "enum[disabled|idle|charging|paused]",
     "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|targetReached|departurePassed|noSunLeftToday|chargerTakenOver|]",
-    "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded]",
+    "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded|chargerStoodDown|chargerRearmed]",
     "ControlActionResponse": {
       "fast": "any",
       "forecastMovedSinceQuote": "boolean?",

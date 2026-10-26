@@ -36,4 +36,10 @@ public enum ChargingSessionEventKind
 
     /// <summary>The session closed.</summary>
     SessionEnded,
+
+    /// <summary>The mode put the charger in Stop for a wait, rather than holding it in Fast at 0 A (#280).</summary>
+    ChargerStoodDown,
+
+    /// <summary>The mode switched a stood-down charger back to Fast to charge.</summary>
+    ChargerRearmed,
 }

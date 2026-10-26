@@ -658,9 +658,9 @@ An EV won't accept a 2 A or 4 A charge — **6 A is the floor** (IEC 61851). So 
 | Surplus | Decision | Current written |
 |---|---|---|
 | ≥ 6 A equivalent | `Charge` | the computed current (whole amps, clamped to the min/max) |
-| < 6 A equivalent | `Pause` | `PauseCurrentAmps` (default **0 A**) |
+| < 6 A equivalent | `Pause`, or a stand-down for a longer wait | `PauseCurrentAmps` (default **0 A**), or use-mode `Stop` |
 
-If it simply left the charger at its 6 A minimum when the surplus dropped below it, the charger would **make up the shortfall from the grid** — exactly what solar-only charging avoids. So the pause drops the current to `PauseCurrentAmps`: **0 A**, which suspends the car the way Green mode does, without changing the mode or ending the session — charging resumes when surplus returns. (SolaX documents the current register as 6–32 A; if your charger doesn't accept 0, set `PauseCurrentAmps` to a sub-6 A value the car refuses instead.)
+If it simply left the charger at its 6 A minimum when the surplus dropped below it, the charger would **make up the shortfall from the grid** — exactly what solar-only charging avoids. So the pause drops the current to `PauseCurrentAmps`: **0 A**, which suspends the car the way Green mode does, without changing the mode or ending the session — charging resumes when surplus returns. A pause is only ever short: see [How every mode waits and ends](#how-every-mode-waits-and-ends). (SolaX documents the current register as 6–32 A; if your charger doesn't accept 0, set `PauseCurrentAmps` to a sub-6 A value the car refuses instead.)
 
 The threshold is **phase-aware** — the 6 A floor is ~1.4 kW single-phase but ~4.2 kW three-phase (see `Phases`), so on a three-phase charger the cutoff triggers far earlier in watt terms. Hysteresis is asymmetric on purpose: charging continues down to exactly the 6 A floor, but only *restarts* once the surplus clears `6 A + ResumeHysteresisWatts`.
 
@@ -710,6 +710,40 @@ There is deliberately **no `ChargeControl:Enabled`**: the service boots in mode 
 In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice: each write site is skipped, and the Modbus clients are wrapped in a read-only decorator that drops writes outright, so even a caller that forgot its guard cannot reach the hardware. A suppressed write logs a warning as a tripwire — it should never appear.
 
 > ⚠️ **This feature writes to your charger — two registers.** The charge-current setpoint (`ChargeCurrentSetpoint 0x628`, written by the control loop) and the use-mode (`ChargerUseMode 0x60D`, **written** by a start/stop action: `0=Stop, 1=Fast`). Both come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). `0x60D` in particular was read-only in this project until #89, so its write path has less mileage on it than the setpoint's. Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Run with `DryRun: true` and check the logged register values against your hardware first.** Nothing is written until a button is pressed, which is why there is no enable flag to forget.
+
+#### How every mode waits and ends
+
+Every mode talks to the same wallbox, so how a mode **waits** and how it **ends** are shared rules
+([#280](https://github.com/mpospisil/gleanvolt/issues/280)). How much current each mode asks for is
+not: that is what makes them different.
+
+**Waiting.** A mode decides only "not now", and until when if it knows: the next sun in the forecast,
+the next tariff edge, the end of a restart dwell. Then:
+
+- **Pause** (0 A in Fast) when the wait ends in under **15 minutes**.
+- **Stand down** (use-mode `Stop`) when it is 15 minutes or more away, or nobody knows.
+- **Stand down** a pause that has already lasted **5 minutes**.
+
+The reason is the wallbox: held in Fast at 0 A it ends the session itself after about seven minutes,
+reports `Finishing` and switches to `Stop`, and the mode then loses its charger. A stood-down charger
+stays in `Stop` until the mode wants to charge, which switches it back to `Fast`. A running charge
+still finishes its minimum run time at 6 A before it waits. The Overview says "stood the charger down
+until 09:40", and the session records a **Charger stood down** and a **Charger switched back to Fast**
+event. A fast charge's deferred start and a targeted charge's held tail were already stood down, and
+are kept as appointments: re-arming out of a wait for sun does not cancel a held tail later that day.
+
+**A full car.** On a full car this wallbox reads `Charging / Fast` at full power on one poll and
+`Finishing / Stop / 0 W` on the next, with no taper. A mode that was asking the car to charge, with the
+car drawing on the poll before, ends at once as `SessionComplete`. The wallbox giving up on our own
+pause reads the same, but comes after a pause with nothing drawing, so it is not mistaken for a full car.
+A car that stays in Fast and draws nothing for `CompletionDwell` (2 min) while being asked to charge
+also counts as finished, and an unplugged car ends the mode as `CarUnplugged`. Every mode applies these,
+`Solar` and `Forecasted` included. The energy asked for and the departure are checked first.
+
+**The end of the day.** `Solar`, `Forecasted` and `SolarGrid` end themselves as `NoSunLeftToday` once
+the forecast has nothing left today that clears what they can charge on: the charger's 6 A floor for
+`Solar`, the least a battery loan will bridge for `Forecasted` (the floor with the loan off), your
+minimum for `SolarGrid`. Without a usable forecast they stay on, stood down, until you switch them off.
 
 ### Battery discharge hold (writes to the inverter)
 
@@ -1204,8 +1238,8 @@ makes the mode wait through high tariff and charge flat out once low tariff star
   so hours of no draw through high tariff end nothing, and when low tariff starts the car gets a fresh
   `CompletionDwell` to spin up in. A car that reaches its own limit in low tariff still ends the mode.
 - **The charger is stood down** (use-mode `Stop`) for a wait of 15 minutes or more and paused for a
-  shorter one, the rule `SolarGrid` already uses: this wallbox tolerates 0 A in Fast for minutes, not
-  hours.
+  shorter one, the rule every mode uses (see [How every mode waits and ends](#how-every-mode-waits-and-ends)):
+  this wallbox tolerates 0 A in Fast for minutes, not hours.
 - **The discharge hold is released through the wait** and armed again at the low edge. Nothing is
   charging, and the hold also keeps the pack out of the house: armed through a high tariff, it would
   run the house on the grid at the expensive rate.
@@ -1556,15 +1590,16 @@ question: does any stretch of the rest of today have a forecast surplus — PV a
 `ChargeControl:SolarGrid:ForecastConfidence` (the median, `P50`, by default), less the learned house
 load — that clears the minimum?
 
-- **Yes, now or within 15 minutes** — pause; this is a dip.
+- **Yes, now or within 15 minutes** — pause; this is a dip. A dip that outlasts 5 minutes is stood
+  down all the same.
 - **Yes, but later** — the charger is **stood down** (use-mode `Stop`), because this wallbox will not
   sit in Fast at 0 A for hours. The first live surplus over the start threshold re-arms it.
 - **No** — the car is paused and the mode returns itself to `Off`, exactly as the Off button would.
 
 **The forecast never turns away real sun**: a surplus over the minimum charges the car whatever the
 forecast said about the afternoon. With **no usable forecast** — none fetched, or older than
-`ChargeControl:Forecast:StaleForecastAfter` with sun still in it — the mode waits on live surplus and
-never ends itself on the forecast's word. The one exception is an old forecast with no PV at all left
+`ChargeControl:Forecast:StaleForecastAfter` with sun still in it — the mode waits on live surplus,
+stood down because nobody knows for how long, and never ends itself on the forecast's word. The one exception is an old forecast with no PV at all left
 today, even in its optimistic band: the evening is exactly when the forecast stops being refreshed,
 and "the sun has set" does not go out of date.
 
@@ -3443,11 +3478,11 @@ how:
 | `CarUnplugged` | The car was unplugged. |
 | `ServiceStopped` | The service shut down with the session open. |
 | `Interrupted` | The service crashed or lost power; see below. |
-| `SessionComplete` | The mode ended itself because the car stopped drawing on its own limit. |
+| `SessionComplete` | The mode ended itself because the car was full: the wallbox closed the session straight after the car drew, or the car stopped drawing on its own limit. |
 | `TargetReached` | `Targeted`, or `FastNoBattery` with an amount, delivered what was asked for. |
 | `DeparturePassed` | `Targeted`, or `FastNoBattery` with a departure, ran out of time. |
-| `NoSunLeftToday` | `SolarGrid` ended for the day, however full the car is. |
-| `ChargerTakenOver` | The charger left Fast, so the mode stopped driving it. |
+| `NoSunLeftToday` | `SolarGrid`, `Solar` or `Forecasted` ended for the day, however full the car is. |
+| `ChargerTakenOver` | The charger left Fast, so the mode stopped driving it: its owner took it. |
 
 Sessions recorded before these reasons existed show `SessionComplete` for every session a mode ended
 itself.

@@ -12,7 +12,7 @@ namespace Gleanvolt.Hosting;
 /// the poll loop, which answers by returning the mode to Off and hands the reason on to the session.
 /// </param>
 /// <param name="ChargerStoodDown">
-/// Whether the charger is sitting in Stop because a deferred charge put it there for its wait. A
+/// Whether the charger is sitting in Stop because the mode put it there for a wait. A
 /// stood-down charger reports <see cref="EvChargerStatus.Available"/> or
 /// <see cref="EvChargerStatus.Finishing"/> whether or not a car is plugged into it, so while this is
 /// true its status says nothing about the plug.
@@ -22,6 +22,10 @@ namespace Gleanvolt.Hosting;
 /// Non-zero only in the targeted mode, and the poll loop arms the battery discharge hold on it: the
 /// bridge is only honest while the pack is kept out of it.
 /// </param>
+/// <param name="WaitUntil">
+/// While the mode is waiting, paused or stood down, when it expects the wait to end; null when it does
+/// not know, and whenever it is not waiting.
+/// </param>
 public readonly record struct ChargeControlCycleResult(
     ChargeControlState State,
     double? SurplusWatts,
@@ -30,7 +34,8 @@ public readonly record struct ChargeControlCycleResult(
     double LoanPowerWatts = 0,
     ChargingSessionEndReason? EndsSession = null,
     double GridBridgeWatts = 0,
-    bool ChargerStoodDown = false)
+    bool ChargerStoodDown = false,
+    DateTimeOffset? WaitUntil = null)
 {
     /// <summary>Whether the mode ends itself this cycle; <see cref="EndsSession"/> says why.</summary>
     public bool SessionComplete => EndsSession is not null;

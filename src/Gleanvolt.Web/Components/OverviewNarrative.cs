@@ -31,7 +31,7 @@ public static class OverviewNarrative
             sentences.Add("Dry run: decisions are logged, nothing is written to the charger.");
         }
 
-        sentences.Add(Charging(status));
+        sentences.Add(Charging(status, zone));
 
         if (Why(status, zone) is { } why)
         {
@@ -45,7 +45,7 @@ public static class OverviewNarrative
 
     // The car first: it is what the controller is for, and the one part of the picture that changes
     // because of a decision rather than because of the weather.
-    private static string Charging(ChargeControlStatus status)
+    private static string Charging(ChargeControlStatus status, TimeZoneInfo zone)
     {
         var mode = ChargeModeTabs.Label(status.Mode);
 
@@ -80,6 +80,11 @@ public static class OverviewNarrative
 
         return status.State switch
         {
+            // Stood down (#280): the charger is in Stop for a wait, which the owner would otherwise
+            // read as the charger having been taken off the mode.
+            ChargeControlState.Paused when status.ChargerStoodDown => status.WaitUntil is { } until
+                ? $"{mode} mode is on and has stood the charger down until {TimeZoneInfo.ConvertTime(until, zone):HH:mm}."
+                : $"{mode} mode is on and has stood the charger down until it can charge.",
             ChargeControlState.Paused => $"{mode} mode is on and has paused the car.",
             ChargeControlState.Idle => $"{mode} mode is on but not acting on the charger.",
             _ => $"{mode} mode is on; the car is not drawing power.",

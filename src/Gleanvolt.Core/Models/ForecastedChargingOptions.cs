@@ -50,6 +50,10 @@ namespace Gleanvolt.Core.Models;
 /// How long before the deadline the car is paused outright while the battery is under 100% — the
 /// belt-and-braces guard for an afternoon the forecast got wrong.
 /// </param>
+/// <param name="CompletionDwell">
+/// How long a car in Fast may draw nothing, while it is being asked to charge, before it counts as
+/// finished (see <see cref="Strategies.ChargerOwnership.Check"/>).
+/// </param>
 public sealed record ForecastedChargingOptions(
     int MinChargingCurrentAmps,
     int MaxChargingCurrentAmps,
@@ -65,4 +69,5 @@ public sealed record ForecastedChargingOptions(
     double LoanSocMarginPercent,
     TimeSpan MinRunTime,
     TimeSpan MinPauseTime,
-    TimeSpan FinalGuardBefore);
+    TimeSpan FinalGuardBefore,
+    TimeSpan CompletionDwell);

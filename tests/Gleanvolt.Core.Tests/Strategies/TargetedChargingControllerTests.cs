@@ -211,7 +211,7 @@ public class TargetedChargingControllerTests
 
         var decision = Controller().Decide(Input(plan, surplusWatts: 3_500, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.GridBridgeWatts);
     }
 
@@ -225,7 +225,7 @@ public class TargetedChargingControllerTests
         var decision = Controller().Decide(Input(
             plan, surplusWatts: 3_500, socPercent: 65, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.GridBridgeWatts);
     }
 
@@ -236,7 +236,7 @@ public class TargetedChargingControllerTests
         // unplanned grid block in the wrong place.
         var decision = Controller().Decide(Input(Plan(paceWatts: 0), surplusWatts: 900, timeInState: TimeSpan.FromMinutes(20)));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Equal(0, decision.GridBridgeWatts);
     }
 
@@ -318,7 +318,7 @@ public class TargetedChargingControllerTests
 
         var decision = Controller().Decide(Input(plan));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.Contains("Waiting for sun", decision.Reason);
         Assert.Contains($"{DepartBy.AddMinutes(-15).LocalDateTime:HH:mm}", decision.Reason);
         Assert.False(decision.SessionComplete);
@@ -396,7 +396,7 @@ public class TargetedChargingControllerTests
             status: EvChargerStatus.Finishing));
 
         Assert.Equal(ChargingSessionEndReason.SessionComplete, decision.EndsSession);
-        Assert.Contains("its own limit", decision.Reason);
+        Assert.Contains("charge limit reached", decision.Reason);
     }
 
     [Fact]
@@ -441,15 +441,15 @@ public class TargetedChargingControllerTests
             Plan(paceWatts: 0), charging: false, evDrewPower: true, evIdleFor: TimeSpan.FromHours(3)));
 
         Assert.False(decision.SessionComplete);
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
     }
 
     [Fact]
-    public void WithNoRequestAtAll_ItPausesRatherThanEndingTheMode()
+    public void WithNoRequestAtAll_ItWaitsRatherThanEndingTheMode()
     {
         var decision = Controller().Decide(Input(plan: null));
 
-        Assert.Equal(ChargingControlAction.Pause, decision.Action);
+        Assert.Equal(ChargingControlAction.StandDown, decision.Action);
         Assert.False(decision.SessionComplete);
         Assert.Contains("No target set", decision.Reason);
     }

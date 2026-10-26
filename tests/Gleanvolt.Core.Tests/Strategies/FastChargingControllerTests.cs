@@ -349,14 +349,15 @@ public class FastChargingControllerTests
     }
 
     [Fact]
-    public void ALimitDoesNotOverrideTheNotFastPrecondition()
+    public void AMetLimitEndsTheModeWhateverTheUseModeReads()
     {
-        // A charger taken out of Fast at the wallbox is not ours to end, met limit or not.
+        // Checked before the ownership guard since #280, as Targeted's departure always was: the car-full
+        // rule has to run before the guard, and a met limit before the car-full rule. Ending a mode
+        // writes nothing a takeover would not, two minutes later.
         var result = Controller.Decide(Input(
             chargerMode: EvChargerMode.Green, fastCharge: Progress(20_000, 25_000)));
 
-        Assert.Equal(ChargingControlAction.None, result.Action);
-        Assert.False(result.SessionComplete);
+        Assert.Equal(ChargingSessionEndReason.TargetReached, result.EndsSession);
     }
 
     // -- The departure (#122). It changes when the charge runs, never how.
@@ -377,12 +378,12 @@ public class FastChargingControllerTests
     [Fact]
     public void WaitingIsCheckedBeforeTheIdleDwell()
     {
-        // The bug this ordering exists to prevent: a car that drew power earlier in the session and is
-        // now being held back draws nothing, so the completion dwell would fire and end the very charge
-        // the plan exists to schedule.
+        // The bug this guards against: a car that drew power earlier in the session and is now being held
+        // back draws nothing, so the completion dwell would fire and end the very charge the plan exists to
+        // schedule. It is only judged while we are asking the car to charge, and through the wait we are not.
         var now = new DateTimeOffset(2026, 8, 10, 22, 0, 0, TimeSpan.Zero);
 
-        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))) with
+        var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9)), charging: false) with
         {
             State = new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.SuspendedEv, 0),
             EvIdleFor = TimeSpan.FromHours(3),

@@ -1,4 +1,3 @@
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Core.Strategies;
@@ -13,9 +12,9 @@ namespace Gleanvolt.Core.Strategies;
 /// to charge, and on the low-tariff edge the coordinator gives the car a fresh idle dwell to spin up
 /// in.</para>
 ///
-/// <para><b>Stood down for a long wait</b>, paused for a short one, by the same rule and the same
-/// fifteen minutes as SolarGrid's wait for sun: a high tariff can last most of a day, and this wallbox
-/// tolerates 0 A in Fast for minutes, not hours (#135).</para>
+/// <para><b>Stood down for a long wait</b>, paused for a short one, through <see cref="ChargerWait"/>
+/// like every other wait: a high tariff can last most of a day, and this wallbox tolerates 0 A in Fast
+/// for minutes, not hours (#135).</para>
 /// </summary>
 public static class TariffWait
 {
@@ -32,10 +31,7 @@ public static class TariffWait
         }
 
         var until = tariff.NextChange is { } change ? $"until {change.LocalDateTime:HH:mm}" : "for as far as the tariff is known";
-        var reason = $"High tariff {until}; waiting for low tariff ({mode}, low tariff only).";
 
-        var longWait = tariff.NextChange is not { } next || next - input.State.Timestamp >= SolarGridChargingController.StandDownAfter;
-
-        return new ChargingControlDecision(longWait ? ChargingControlAction.StandDown : ChargingControlAction.Pause, null, reason);
+        return ChargerWait.For(input, tariff.NextChange, $"High tariff {until}; waiting for low tariff ({mode}, low tariff only).");
     }
 }

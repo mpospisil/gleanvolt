@@ -15,7 +15,8 @@ public class LiveSolarChargingControllerTests
         currentStepAmps: 1,
         hysteresisWatts: 200,
         fullSocPercent: 95,
-        releaseSocPercent: 90);
+        releaseSocPercent: 90,
+        completionDwell: TimeSpan.FromMinutes(2));
 
     private static EnergyState State(double socPercent) =>
         new(DateTimeOffset.UtcNow, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, EvChargerStatus.Charging, EvChargerPowerWatts: 0);
@@ -47,30 +48,30 @@ public class LiveSolarChargingControllerTests
     }
 
     [Fact]
-    public void Fast_NotCharging_SurplusBetweenMinAndResume_Pauses()
+    public void Fast_NotCharging_SurplusBetweenMinAndResume_Waits()
     {
         // 1450W is above the min (1380) but below the resume threshold (1580); not charging -> stay paused.
         var result = Controller.Decide(Input(96, 1450, EvChargerMode.Fast, charging: false));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
 
     [Fact]
-    public void Fast_BatteryBelowFull_NotCharging_Pauses()
+    public void Fast_BatteryBelowFull_NotCharging_Waits()
     {
         // 94% < 95% engage threshold: don't start, and (being in Fast) actively hold it paused.
         var result = Controller.Decide(Input(94, 5000, EvChargerMode.Fast, charging: false));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
 
     [Fact]
-    public void Fast_BatteryBelowRelease_WhileCharging_Pauses()
+    public void Fast_BatteryBelowRelease_WhileCharging_Waits()
     {
         // Dropped to 89% (< 90% release) while charging: disengage and pause.
         var result = Controller.Decide(Input(89, 5000, EvChargerMode.Fast, charging: true));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
 
     [Fact]
@@ -84,11 +85,12 @@ public class LiveSolarChargingControllerTests
     }
 
     // The 6A hard cutoff (evaluated on the smoothed surplus): at or above the floor keep charging,
-    // below it pause -- never sit at the minimum drawing from the grid.
+    // below it wait (stood down: with no forecast nobody knows for how long) -- never sit at the minimum
+    // drawing from the grid.
     [Theory]
     [InlineData(1380, ChargingControlAction.Charge)]
-    [InlineData(1379, ChargingControlAction.Pause)]
-    [InlineData(920, ChargingControlAction.Pause)]
+    [InlineData(1379, ChargingControlAction.StandDown)]
+    [InlineData(920, ChargingControlAction.StandDown)]
     public void Fast_WhileCharging_SurplusAtTheSixAmpFloor(double surplusWatts, ChargingControlAction expected)
     {
         var result = Controller.Decide(Input(96, surplusWatts, EvChargerMode.Fast, charging: true));
@@ -111,7 +113,7 @@ public class LiveSolarChargingControllerTests
         var overConfigured = new LiveSolarChargingController(
             new ChargePowerConverter(nominalVoltage: 230, phases: 1),
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 40, currentStepAmps: 1,
-            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90);
+            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
         var result = overConfigured.Decide(Input(96, 30000, EvChargerMode.Fast, charging: true));
 
@@ -119,17 +121,17 @@ public class LiveSolarChargingControllerTests
     }
 
     [Fact]
-    public void ThreePhase_SurplusBelowThreePhaseFloor_Pauses()
+    public void ThreePhase_SurplusBelowThreePhaseFloor_Waits()
     {
         // Three-phase: min = 6 * 230 * 3 = 4140W. 3000W clears the single-phase floor but not this one.
         var threePhase = new LiveSolarChargingController(
             new ChargePowerConverter(nominalVoltage: 230, phases: 3),
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 20, currentStepAmps: 1,
-            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90);
+            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
         var result = threePhase.Decide(Input(96, 3000, EvChargerMode.Fast, charging: true));
 
-        Assert.Equal(ChargingControlAction.Pause, result.Action);
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
 
     [Fact]
@@ -139,7 +141,7 @@ public class LiveSolarChargingControllerTests
         var threePhase = new LiveSolarChargingController(
             new ChargePowerConverter(nominalVoltage: 230, phases: 3),
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 20, currentStepAmps: 1,
-            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90);
+            hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
         var result = threePhase.Decide(Input(96, 6900, EvChargerMode.Fast, charging: true));
 
@@ -148,15 +150,15 @@ public class LiveSolarChargingControllerTests
     }
 
     [Fact]
-    public void CloudCycle_ChargesThenPausesThenResumes()
+    public void CloudCycle_ChargesThenWaitsThenResumes()
     {
         // Charging on 4000W.
         var charging = Controller.Decide(Input(96, 4000, EvChargerMode.Fast, charging: true));
         Assert.Equal(ChargingControlAction.Charge, charging.Action);
 
-        // Cloud drops it below the floor -> pause.
+        // Cloud drops it below the floor -> wait, stood down: with no forecast nobody knows for how long.
         var paused = Controller.Decide(Input(96, 1000, EvChargerMode.Fast, charging: true));
-        Assert.Equal(ChargingControlAction.Pause, paused.Action);
+        Assert.Equal(ChargingControlAction.StandDown, paused.Action);
 
         // Cloud clears; now not charging, surplus clears the resume threshold -> charge again.
         var resumed = Controller.Decide(Input(96, 4000, EvChargerMode.Fast, charging: false));

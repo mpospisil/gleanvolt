@@ -65,6 +65,7 @@ public sealed class ChargingSessionTracker
     private ChargeControlState _lastState;
     private int? _lastTargetCurrentAmps;
     private bool _lastHoldActive;
+    private bool _lastStoodDown;
     private bool? _lastPlanUsable;
     private double _lastSocPercent;
 
@@ -240,6 +241,7 @@ public sealed class ChargingSessionTracker
         _lastState = status.State;
         _lastTargetCurrentAmps = status.TargetCurrentAmps;
         _lastHoldActive = status.BatteryHoldActive;
+        _lastStoodDown = status.ChargerStoodDown;
         _lastPlanUsable = status.Plan?.IsUsable;
         _lastSampleAt = null;
         _peakPowerWatts = 0;
@@ -289,6 +291,19 @@ public sealed class ChargingSessionTracker
                 ? Event(now, ChargingSessionEventKind.BatteryHoldArmed, $"Hold armed at {status.BatteryHoldTargetWatts:F0}W.")
                 : Event(now, ChargingSessionEventKind.BatteryHoldReleased, "Hold released."));
             _lastHoldActive = status.BatteryHoldActive;
+        }
+
+        // Every mode can stand the charger down for a wait (#280), and on the chart a stand-down and a
+        // pause look the same: no draw. This is what says which, and until when.
+        if (status.ChargerStoodDown != _lastStoodDown)
+        {
+            events.Add(status.ChargerStoodDown
+                ? Event(
+                    now,
+                    ChargingSessionEventKind.ChargerStoodDown,
+                    status.WaitUntil is { } until ? $"Charger stood down until {until.LocalDateTime:HH:mm}." : "Charger stood down.")
+                : Event(now, ChargingSessionEventKind.ChargerRearmed, "Charger switched back to Fast."));
+            _lastStoodDown = status.ChargerStoodDown;
         }
 
         // Only meaningful while a plan is being published at all, i.e. in the Forecasted mode.
@@ -443,6 +458,7 @@ public sealed class ChargingSessionTracker
         _lastTargetCurrentAmps = null;
         _lastPlanUsable = null;
         _lastHoldActive = false;
+        _lastStoodDown = false;
 
         _delivered.Reset();
         _fromSolar.Reset();

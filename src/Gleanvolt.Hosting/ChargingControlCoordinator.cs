@@ -57,7 +57,17 @@ public sealed class ChargingControlCoordinator
     // this session, and since when it has been drawing nothing. Together they are how the fast mode
     // tells "finished charging" from "hasn't started yet" -- the two are identical on power alone.
     private bool _evDrewPower;
+
+    // Whether the car was drawing on the last poll the charger answered, and on the one before it: the
+    // second is what the car-full rule reads, because on a full car this wallbox goes from drawing to
+    // Finishing / Stop in a single poll (#280).
+    private bool _evDrawing;
+    private bool _evWasDrawing;
+
+    // Whether the charger is in a Stop we wrote, and whether that Stop is an appointment -- a time the
+    // mode set itself, whose release is one-way -- rather than a wait for sun or tariff.
     private bool _stoodDown;
+    private bool _standDownIsAppointment;
     private DateTimeOffset? _chargerNotFastSince;
     private bool _waitReleased;
     private DateTimeOffset? _evIdleSince;
@@ -112,7 +122,7 @@ public sealed class ChargingControlCoordinator
     /// How a limited fast charge is going, or null when there is no limit — which covers both the other
     /// modes and a fast charge asked for as Full.
     /// </param>
-    /// <param name="solarGrid">The solar-grid mode's forecast outlook, or null when the mode doesn't use one.</param>
+    /// <param name="outlook">The forecast's sun outlook for the mode, or null when the mode doesn't wait for sun.</param>
     /// <param name="lowTariffOnly">
     /// The tariff, when the mode has <b>low tariff only</b> set and a tariff is known (#274); null for no restriction.
     /// </param>
@@ -123,7 +133,7 @@ public sealed class ChargingControlCoordinator
         CancellationToken cancellationToken,
         TargetedChargePlan? targetedPlan = null,
         FastChargeProgress? fastCharge = null,
-        SolarGridOutlook? solarGrid = null,
+        SolarGridOutlook? outlook = null,
         TariffGate? lowTariffOnly = null)
     {
         if (!_controllers.TryGetValue(mode, out var controller))
@@ -185,10 +195,11 @@ public sealed class ChargingControlCoordinator
                 _stoodDown,
                 ChargerNotFastFor(state.Timestamp),
                 _waitReleased,
-                solarGrid,
+                outlook,
                 ChargedThisMode: _chargedThisMode,
                 LoanOutstandingWh: _loanedToday.OutstandingWattHours,
-                LowTariffOnly: lowTariffOnly));
+                LowTariffOnly: lowTariffOnly,
+                EvWasDrawing: _evWasDrawing));
 
             _logger.LogInformation(
                 "Charge control: Mode={Mode} ChargerMode={ChargerMode} Surplus={RawSurplusWatts:F0}W Avg={AveragedSurplusWatts:F0}W "
@@ -222,10 +233,16 @@ public sealed class ChargingControlCoordinator
                         await _chargerControl.SetModeAsync(EvChargerMode.Fast, decision.Reason, cancellationToken).ConfigureAwait(false);
                         _stoodDown = false;
 
-                        // Latched here rather than on any Charge at all, and that is what keeps a
-                        // targeted charge's day-then-hold-then-tail shape working: only leaving a
-                        // stand-down counts, and the day's charging never enters one.
-                        _waitReleased = true;
+                        // Latched here rather than on any Charge at all, and only out of an
+                        // appointment, and that is what keeps a targeted charge's day-then-hold-then-tail
+                        // shape working: the day's charging can be stood down for sun overnight (#280),
+                        // and re-arming out of that must leave the held tail still to be kept.
+                        if (_standDownIsAppointment)
+                        {
+                            _waitReleased = true;
+                        }
+
+                        _standDownIsAppointment = false;
                     }
 
                     await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, decision.ChargeCurrentAmps!.Value, decision.Reason, cancellationToken).ConfigureAwait(false);
@@ -241,6 +258,11 @@ public sealed class ChargingControlCoordinator
                         await _chargerControl.SetModeAsync(EvChargerMode.Stop, decision.Reason, cancellationToken).ConfigureAwait(false);
                         _stoodDown = true;
                     }
+
+                    // Every poll rather than on the transition: a wait for sun overnight can become the
+                    // held tail without ever leaving Stop, and it is the wait in force at the re-arm
+                    // that decides whether the release is one-way.
+                    _standDownIsAppointment = decision.Appointment;
 
                     SetCharging(false, state.Timestamp);
                     break;
@@ -275,7 +297,10 @@ public sealed class ChargingControlCoordinator
 
             return new ChargeControlCycleResult(
                 reportedState, averagedSurplus, decision.ChargeCurrentAmps, _charging, decision.LoanPowerWatts,
-                decision.EndsSession, decision.GridBridgeWatts, _stoodDown);
+                decision.EndsSession, decision.GridBridgeWatts, _stoodDown,
+                WaitUntil: decision.Action is ChargingControlAction.Pause or ChargingControlAction.StandDown && !decision.SessionComplete
+                    ? decision.WaitUntil
+                    : null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -311,6 +336,7 @@ public sealed class ChargingControlCoordinator
         // through ChargeActions, and a stale claim would let that mode drive a charger its owner had
         // since stopped by hand.
         _stoodDown = false;
+        _standDownIsAppointment = false;
         _chargerNotFastSince = null;
         _waitReleased = false;
     }
@@ -379,6 +405,7 @@ public sealed class ChargingControlCoordinator
             {
                 _sessionEnergy.Reset();
                 _evDrewPower = false;
+                _evDrawing = false;
                 _evIdleSince = null;
             }
 
@@ -397,6 +424,8 @@ public sealed class ChargingControlCoordinator
             // still drawing a trickle (conditioning, cell balancing); waiting for the power alone would
             // then never call the session finished.
             var drawing = state.EvChargerPowerWatts > _idlePowerThresholdWatts && !state.EvChargerStatus.IsChargeWindingDown();
+            _evWasDrawing = _evDrawing;
+            _evDrawing = drawing;
             if (drawing)
             {
                 _evDrewPower = true;

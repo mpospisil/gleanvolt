@@ -42,6 +42,37 @@ public class SolarGridModeTests
         Assert.NotNull(_status.Current?.SolarGrid);
     }
 
+    // -- The end of the day (#280): Solar ends itself the way this mode does.
+
+    [Fact]
+    public async Task SolarEndsItselfOnceTheForecastHasNoSunLeftToday()
+    {
+        // It used to wait at 0A until the wallbox gave up on the session, and was filed as taken over.
+        _mode.Set(ChargeControlMode.Solar, "test");
+
+        await RunAsync(
+            new SunForecastService(Now, from: Now.AddHours(-6), until: Now.AddHours(-1), watts: 5_000),
+            Exporting(Now, 0));
+
+        Assert.Equal(ChargeControlMode.Off, _mode.Mode);
+        Assert.Equal(ChargingSessionEndReason.NoSunLeftToday, _status.Current!.SessionEndReason);
+    }
+
+    [Fact]
+    public async Task SolarStandsTheChargerDownForSunLaterToday()
+    {
+        _mode.Set(ChargeControlMode.Solar, "test");
+
+        await RunAsync(
+            new SunForecastService(Now, from: Now.AddHours(2), until: Now.AddHours(6), watts: 8_000),
+            Exporting(Now, 0) with { BatterySocPercent = 100 });
+
+        Assert.Equal(ChargeControlMode.Solar, _mode.Mode);
+        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.True(_status.Current!.ChargerStoodDown);
+        Assert.Equal(Now.AddHours(2), _status.Current.WaitUntil);
+    }
+
     // -- Low tariff only (#274), decided as (a): high tariff pauses the car, sun or not.
 
     // High tariff for the next two hours, low after.
@@ -248,6 +279,8 @@ public class SolarGridModeTests
                         MinRunTime: TimeSpan.FromMinutes(10),
                         MinPauseTime: TimeSpan.FromMinutes(15),
                         CompletionDwell: chargeControl.CompletionDwell)),
+                [ChargeControlMode.Solar] = new LiveSolarChargingController(
+                    power, 6, 16, 1, 200, 95, 90, chargeControl.CompletionDwell),
             },
             _charger,
             new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
@@ -269,7 +302,9 @@ public class SolarGridModeTests
             solarGridOptions,
             forecastOptions,
             NullLogger<SolarGridProvider>.Instance,
-            new UtcClock());
+            new UtcClock(),
+            new ChargingLimits(chargeControl.MinChargingCurrentAmps, chargeControl.MaxChargingCurrentAmps, chargeControl.Phases),
+            power);
 
         var reader = new ScriptedEnergyStateReader(states);
         var service = new PollingService(

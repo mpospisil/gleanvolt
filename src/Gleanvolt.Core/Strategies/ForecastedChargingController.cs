@@ -26,6 +26,10 @@ namespace Gleanvolt.Core.Strategies;
 /// <item><description>a <b>final guard</b> before the deadline.</description></item>
 /// </list>
 ///
+/// <para>It waits and ends like every other mode (#280): paused or stood down by
+/// <see cref="ChargerWait"/>, ended on a full car by <see cref="ChargerOwnership"/>, and ended for the day
+/// once the forecast has no sun left that clears what it could charge on.</para>
+///
 /// <para>Whenever the plan is missing, stale or untrusted it delegates to the live-solar controller —
 /// the fallback is the whole point: an absent forecast must never be read as optimistic headroom.</para>
 ///
@@ -87,10 +91,10 @@ public sealed class ForecastedChargingController : IChargingController
         ArgumentNullException.ThrowIfNull(input);
 
         // Precondition, unchanged from live-solar control: the charger is in Fast (starting the mode
-        // wrote it) and we only modulate the current under it.
-        if (ChargerOwnership.NotOurs(input) is { } notOurs)
+        // wrote it) and we only modulate the current under it. And a car that has finished ends the mode.
+        if (ChargerOwnership.Check(input, _options.CompletionDwell) is { } ended)
         {
-            return notOurs;
+            return ended;
         }
 
         var plan = input.Plan;
@@ -111,7 +115,7 @@ public sealed class ForecastedChargingController : IChargingController
             && state.Timestamp <= plan.Deadline
             && soc < 100 - FullSocEpsilon)
         {
-            return Pause($"Final guard before {plan.Deadline.LocalDateTime:HH:mm}: battery at {soc:F0}%, everything goes to it.");
+            return Wait(input, plan.Deadline, $"Final guard before {plan.Deadline.LocalDateTime:HH:mm}: battery at {soc:F0}%, everything goes to it.");
         }
 
         // The floor gate, asymmetric in the same way as the surplus threshold below: charging continues
@@ -133,7 +137,10 @@ public sealed class ForecastedChargingController : IChargingController
             // while the trajectory is still far below — the normal case on a sunny morning — costs only
             // a preference the rest of the day can make good, so it goes through the dwell timer like
             // any other soft reason rather than cutting a running session short on a 1% wobble.
-            return soc < plan.TrajectorySocFloorPercent ? Pause(reason) : SoftPause(input, reason);
+            //
+            // Either way the wait is not known: the battery recovers at whatever rate the sun and the
+            // house allow.
+            return soc < plan.TrajectorySocFloorPercent ? Wait(input, null, reason) : SoftPause(input, null, reason);
         }
 
         // --- Soft reasons: subject to the dwell timers. ---
@@ -142,7 +149,7 @@ public sealed class ForecastedChargingController : IChargingController
         // mode was selected, so every start waited 15 minutes. See RestartDwell.
         if (RestartDwell.Holds(input, _options.MinPauseTime))
         {
-            return Pause(RestartDwell.Reason(input, _options.MinPauseTime));
+            return ChargerWait.For(input, ChargerWait.DwellEnds(input, _options.MinPauseTime), RestartDwell.Reason(input, _options.MinPauseTime));
         }
 
         // No window, or nothing deliverable in it. Weather, not a promise: the hard stops above are
@@ -157,7 +164,8 @@ public sealed class ForecastedChargingController : IChargingController
         // is coming, the live surplus below is entitled to answer for itself.
         if (!plan.WillSpill && (plan.NextFeasibleWindow is null || plan.FeasibleEvEnergyWh <= 0))
         {
-            return SoftPause(input, $"No deliverable budget left today ({plan.Reason}).");
+            var window = plan.NextFeasibleWindow?.Start is { } start && start > state.Timestamp ? start : (DateTimeOffset?)null;
+            return SoftPause(input, window, $"No deliverable budget left today ({plan.Reason}).");
         }
 
         var surplusWatts = input.SurplusWatts;
@@ -189,13 +197,14 @@ public sealed class ForecastedChargingController : IChargingController
         {
             return SoftPause(
                 input,
+                ChargerWait.NextSun(input),
                 $"Available {availableWatts:F0}W (surplus {surplusWatts:F0}W + loan {loanWatts:F0}W{reserveText}) below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
         }
 
         var targetAmps = ToHardwareCurrent(availableWatts);
         if (targetAmps < _minAmps)
         {
-            return SoftPause(input, $"Available {availableWatts:F0}W quantises below the minimum {_minAmps}A.");
+            return SoftPause(input, ChargerWait.NextSun(input), $"Available {availableWatts:F0}W quantises below the minimum {_minAmps}A.");
         }
 
         var loanText = loanWatts > 0
@@ -271,11 +280,11 @@ public sealed class ForecastedChargingController : IChargingController
     }
 
     /// <summary>
-    /// A pause for a soft reason (budget, surplus dip). While the minimum run time is unexpired the
+    /// A wait for a soft reason (budget, surplus dip). While the minimum run time is unexpired the
     /// session is instead held at the minimum current: stopping and restarting a charge costs a
     /// contactor cycle and a vehicle wake, and a few minutes at 6 A is the cheaper trade.
     /// </summary>
-    private ChargingControlDecision SoftPause(ChargingControlInput input, string reason)
+    private ChargingControlDecision SoftPause(ChargingControlInput input, DateTimeOffset? until, string reason)
     {
         if (input.Charging && input.TimeInCurrentState < _options.MinRunTime)
         {
@@ -285,10 +294,12 @@ public sealed class ForecastedChargingController : IChargingController
                 $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.");
         }
 
-        return Pause(reason);
+        return Wait(input, until, reason);
     }
 
-    private static ChargingControlDecision Pause(string reason) => new(ChargingControlAction.Pause, null, reason);
+    // Not now: over for the day once the forecast has no sun left, otherwise paused or stood down.
+    private static ChargingControlDecision Wait(ChargingControlInput input, DateTimeOffset? until, string why) =>
+        ChargerWait.DayIsOver(input, why) ?? ChargerWait.For(input, until, why);
 
     // Whole-amp setpoint the charger accepts: convert (phase-aware), floor to the step, clamp to max.
     private int ToHardwareCurrent(double availableWatts)
