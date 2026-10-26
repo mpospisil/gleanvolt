@@ -43,6 +43,8 @@ public class HaButtonCommandTests
         Options.Create(new FastChargeOptions()),
         Options.Create(new SolarGridChargeOptions()),
         NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance);
+    private readonly UntilFullSettings _untilFull =
+        new(Options.Create(new ForecastChargeOptions()), NullLogger<UntilFullSettings>.Instance);
 
     [Theory]
     [InlineData("start_solar", ChargeControlMode.Solar)]
@@ -82,6 +84,23 @@ public class HaButtonCommandTests
         await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(objectId), HaDiscovery.PayloadOff);
 
         Assert.False(_lowTariff.IsLowTariffOnly(mode));
+    }
+
+    [Fact]
+    public async Task TheUntilFullSwitchSetsTheFlag_AndStartsNothing()
+    {
+        var worker = Worker();
+
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch), HaDiscovery.PayloadOn);
+
+        Assert.True(_untilFull.UntilFull);
+        Assert.Empty(_actions.Starts);
+
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch), "maybe");
+        Assert.True(_untilFull.UntilFull);
+
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch), HaDiscovery.PayloadOff);
+        Assert.False(_untilFull.UntilFull);
     }
 
     [Theory]
@@ -416,7 +435,8 @@ public class HaButtonCommandTests
             vehicleFeed: null,
             new FixedTimeProvider(Now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")),
             _solarGrid,
-            lowTariff: _lowTariff);
+            lowTariff: _lowTariff,
+            untilFull: _untilFull);
 
     /// <summary>Records presses without touching a charger; see <see cref="ChargeActionsTests"/> for the real one.</summary>
     private sealed class RecordingChargeActions : IChargeActions

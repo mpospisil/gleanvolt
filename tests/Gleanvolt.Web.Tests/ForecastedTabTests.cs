@@ -26,6 +26,7 @@ public class ForecastedTabTests : PageTest
     private readonly FakeChargeActions _actions;
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
+    private readonly FakeUntilFullSettings _untilFull = new();
 
     public ForecastedTabTests()
     {
@@ -37,6 +38,7 @@ public class ForecastedTabTests : PageTest
         Services.AddSingleton<IChargeActions>(_actions);
         Services.AddSingleton<IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<IForecastRuntimeSettings>(_forecast);
+        Services.AddSingleton<IUntilFullSettings>(_untilFull);
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -304,5 +306,20 @@ public class ForecastedTabTests : PageTest
         var page = RenderTab();
 
         Assert.Contains("3.0 kWh into the car since it was plugged in", page.Markup);
+    }
+
+    [Fact]
+    public void Until_full_is_set_from_the_tab_and_names_the_day()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
+        {
+            UntilFull = new UntilFullStatus(_time.Now.AddDays(-1), Day: 2),
+        });
+        var page = RenderTab();
+
+        page.Find("#until-full").Change(true);
+
+        Assert.Equal([(true, "Web UI")], _untilFull.Sets);
+        Assert.Contains("day 2", page.Find("#until-full-state").TextContent);
     }
 }

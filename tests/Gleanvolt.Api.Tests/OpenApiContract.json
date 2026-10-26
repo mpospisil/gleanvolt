@@ -74,6 +74,24 @@
         ]
       }
     },
+    "/api/v1/charging/until-full": {
+      "get": {
+        "operationId": "getUntilFull",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $UntilFullResponse"
+        ]
+      },
+      "put": {
+        "operationId": "setUntilFull",
+        "parameters": [],
+        "requestBody": "application/json $UntilFullRequest",
+        "responses": [
+          "200 application/json $UntilFullResponse"
+        ]
+      }
+    },
     "/api/v1/energy/days/{date}": {
       "get": {
         "operationId": "getEnergyDay",
@@ -582,7 +600,8 @@
       "targetCurrentAmps": "integer|string(int32)? (required)",
       "targetedPlan": "any (required)",
       "timestamp": "string(date-time) (required)",
-      "tomorrowForecastWh": "number|string(double)? (required)"
+      "tomorrowForecastWh": "number|string(double)? (required)",
+      "untilFull": "any"
     },
     "TargetedBlockResponse": {
       "end": "string(date-time) (required)",
@@ -693,6 +712,17 @@
     "TimeWindowBody": {
       "end": "string(date-time) (required)",
       "start": "string(date-time) (required)"
+    },
+    "UntilFullRequest": {
+      "untilFull": "boolean (required)"
+    },
+    "UntilFullResponse": {
+      "session": "any (required)",
+      "untilFull": "boolean (required)"
+    },
+    "UntilFullStatusResponse": {
+      "day": "integer|string(int32) (required)",
+      "since": "string(date-time) (required)"
     },
     "VehicleChargeState": "enum[unknown|idle|charging|complete]",
     "VehiclePlugState": "enum[unknown|disconnected|connected]",

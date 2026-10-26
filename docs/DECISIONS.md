@@ -4,6 +4,62 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-10-26 — Forecasted, until full: one session over several days, and the one mode that survives a restart
+
+**Context.** A car left at home over a weekend or a week rarely fills on one sunny afternoon, and
+`Forecasted` ended itself at nightfall as `NoSunLeftToday` (#280), so the owner had to start it again
+every morning ([issue #279](https://github.com/mpospisil/gleanvolt/issues/279)).
+
+**Decision — an option, *Until full*, that changes one step.** With it on, the end of the day stands the
+charger down instead of ending the mode: `ChargerWait.DayIsOver` returns a stand-down, through the same
+wait rule as every other wait, rather than the ending. Nothing else in the controller knows about it: by
+day the plan, floor, loan, dwell timers and final guard are unchanged, and the live-solar fallback
+without a usable forecast reads the same flag, so it stands down through the night too. The morning
+re-arm is the new day's plan having a window and the sun clearing it, which is what re-arms a charger
+stood down for sun already. The host sets the flag on the controller's input only while `Forecasted` is
+the mode driving, so the rule cannot leak into Solar or SolarGrid, which share the step. The name says
+when the session stops, which is what the owner is choosing; *multi-day* only says how long it might
+take.
+
+**The night's end is an estimate.** The outlook only covers today, so with the option on and today
+spent, the provider reads tomorrow's first stretch that clears the mode's minimum from the cached
+forecast, which reaches past midnight. That time is `WaitUntil`, for the surfaces to say "~09:40
+(tomorrow's first window)", and decides nothing: a wait that long is a stand-down whatever the time.
+
+**Decision 1 — persist the mode, but only this one (a).** The mode selector stays unpersisted, as it
+was decided for every other mode: a restart never grabs the charger. A session meant to last a week,
+though, is ended by any deploy or reboot. So a running
+`Forecasted` session with the option on, and nothing else, is kept in `data/until-full.json`, written
+when it starts and deleted when it ends, and on startup the mode is started again through
+`ChargeActions`, the path a button takes, so the charger is armed in Fast and the first poll stands it
+down again if it is night. Considered and not taken: (b), not persisting and warning on the Overview,
+which leaves the owner to notice and start it again, the chore the option exists to remove. The
+charger's Modbus link drops about 45 times a day, so a refused start is retried every poll for ten
+minutes, the file kept meanwhile; after that the mode stays Off and the file follows it.
+The file holds when the session started, so the day count carries on across a restart.
+
+**The cost we accept.** The restored start writes Fast before the first poll can stand the charger
+down, so at night a car can be offered current for one poll interval: the same moment the charger's own
+plug-in start already gives it. The session history records the restart as a new session, as it does
+for any restart; the day count is the one thing kept.
+
+**Decision 2 — one session, not one per day.** Each night's stand-down and morning's re-arm are events
+on it (#280), and the Overview's card reads *"Forecasted · until full · day 2"*. "Filled over three days"
+is one story about one car, like "Forecasted, then FastNoBattery at 17:00".
+
+**Decision 3 — no limit on days.** The car's own limit, unplugging, a takeover or Off ends it, and a
+charger stood down costs nothing. An owner-set "give up after N days", with its own end reason, can be
+added if one is wanted.
+
+**The flag is a runtime setting** like low tariff only: seeded from `ChargeControl:Forecast:UntilFull`
+and set from the web UI, the **Forecasted until full** switch and `PUT /charging/until-full`. The switch
+is allowed past #89's guard on the same terms as the low-tariff ones: it only changes how a mode a button
+started ends, and starts nothing.
+
+**Later, not now.** SolarGrid ends on the same step and could take the same option.
+
+---
+
 ## 2026-10-26 — Every mode waits and ends the same way
 
 **Context.** Every mode talks to the same wallbox, but each one waited and ended in its own way, and

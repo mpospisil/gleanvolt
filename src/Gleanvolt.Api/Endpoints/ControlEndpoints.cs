@@ -327,7 +327,39 @@ internal static class ControlEndpoints
                 + "Applies from the next poll, to a running mode too, and does not persist across "
                 + "restarts. Writes nothing to hardware itself; the mode does, on the next poll.")
             .Produces<LowTariffOnlyResponse>();
+
+        api.MapGet("/charging/until-full", (IUntilFullSettings settings, ChargeControlStatusHolder status) =>
+                Results.Ok(UntilFull(settings, status)))
+            .WithName("getUntilFull")
+            .WithSummary("Whether forecasted runs until the car is full")
+            .WithDescription(
+                "The owner's 'until full' option for forecasted, and the session running with it: since when, "
+                + "and which day of it this is.")
+            .Produces<UntilFullResponse>();
+
+        api.MapPut("/charging/until-full", (
+            UntilFullRequest body,
+            HttpContext http,
+            IUntilFullSettings settings,
+            ChargeControlStatusHolder status) =>
+        {
+            settings.SetUntilFull(body.UntilFull, http.Source());
+            return Results.Ok(UntilFull(settings, status));
+        })
+            .WithName("setUntilFull")
+            .WithSummary("Make forecasted run until the car is full")
+            .WithDescription(
+                "With it on, one forecasted session runs over several days: by day nothing changes, and where "
+                + "the mode would end for the day it stands the charger down for the night instead and starts "
+                + "again on the next day's sun. It ends when the car is full, is unplugged, the charger is "
+                + "taken over, or charging is stopped. A session running with it on is resumed after a "
+                + "restart. Starts nothing itself; applies from the next poll, to a running session too.")
+            .Produces<UntilFullResponse>();
     }
+
+    private static UntilFullResponse UntilFull(IUntilFullSettings settings, ChargeControlStatusHolder status) => new(
+        settings.UntilFull,
+        status.Current?.UntilFull is { } session ? new UntilFullStatusResponse(session.Since, session.Day) : null);
 
     private static LowTariffOnlyResponse LowTariffOnly(ILowTariffSettings flags, ITariffSchedule tariff) => new(
         flags.IsLowTariffOnly(ChargeControlMode.FastNoBattery),

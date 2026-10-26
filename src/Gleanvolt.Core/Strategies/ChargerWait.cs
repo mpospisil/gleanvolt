@@ -109,6 +109,11 @@ public static class ChargerWait
     ///
     /// <para>Asked only on a wait for sun or for the battery, never on a restart dwell: a mode that is
     /// in the sun now ends on the next poll the sun is not enough.</para>
+    ///
+    /// <para><b>Until full</b> (#279) changes this one step and nothing else: the day being over is then
+    /// a wait for tomorrow's sun, and the charger is stood down for it rather than the mode ended. The
+    /// morning re-arm is the mode's own next Charge, once the new day's plan has a window; the time here
+    /// is only the estimate the surfaces show.</para>
     /// </summary>
     /// <param name="input">This cycle's input; its <see cref="ChargingControlInput.Outlook"/> decides.</param>
     /// <param name="why">Why the mode is not charging now, in its own words.</param>
@@ -116,9 +121,21 @@ public static class ChargerWait
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        return input.Outlook is { NoSunLeftToday: true } outlook
-            ? ChargerOwnership.End(ChargingSessionEndReason.NoSunLeftToday, $"{why} Nothing left of today will do better: {outlook.Reason}")
-            : null;
+        if (input.Outlook is not { NoSunLeftToday: true } outlook)
+        {
+            return null;
+        }
+
+        if (input.UntilFull)
+        {
+            var tomorrow = outlook.TomorrowFirstSunAt;
+            return StandDown(
+                $"{why} Nothing left of today will do better ({outlook.Reason}); until full, so standing the charger down "
+                + (tomorrow is { } at ? $"until tomorrow's first window, ~{at.LocalDateTime:HH:mm}." : "until tomorrow's sun."),
+                tomorrow);
+        }
+
+        return ChargerOwnership.End(ChargingSessionEndReason.NoSunLeftToday, $"{why} Nothing left of today will do better: {outlook.Reason}");
     }
 
     private static ChargingControlDecision StandDown(string reason, DateTimeOffset? until) =>

@@ -80,6 +80,10 @@ namespace Gleanvolt.Core.Models;
 /// While the mode is waiting, when it expects the wait to end: the next sun, the next tariff edge, the
 /// deferred start. Null when it does not know, and whenever it is not waiting.
 /// </param>
+/// <param name="UntilFull">
+/// A Forecasted session running with <b>until full</b> on (issue #279): since when, and which day of it
+/// this is. Null whenever Forecasted is not the mode driving or the option is off.
+/// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
     bool DryRun,
@@ -113,7 +117,8 @@ public sealed record ChargeControlStatus(
     SolarGridOutlook? SolarGrid = null,
     LowTariffStatus? LowTariff = null,
     bool ChargerStoodDown = false,
-    DateTimeOffset? WaitUntil = null)
+    DateTimeOffset? WaitUntil = null,
+    UntilFullStatus? UntilFull = null)
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;
@@ -129,3 +134,11 @@ public sealed record ChargeControlStatus(
 /// selected one cannot answer — so the mode charges whatever the hour.
 /// </param>
 public sealed record LowTariffStatus(bool Waiting, DateTimeOffset? Until, bool Ignored);
+
+/// <summary>
+/// A Forecasted session running with <b>until full</b> on (issue #279), for the surfaces to say
+/// "Forecasted · until full · day 2".
+/// </summary>
+/// <param name="Since">When the session started; a restart resumes it and keeps this.</param>
+/// <param name="Day">Which local day of the session this is, from 1 on the day it was started.</param>
+public sealed record UntilFullStatus(DateTimeOffset Since, int Day);

@@ -26,13 +26,20 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 /// <param name="SunUntil">The end of the last such stretch today. Null when there is none.</param>
 /// <param name="Reason">One line saying what the forecast was read to mean, for the log and the UI.</param>
+/// <param name="TomorrowFirstSunAt">
+/// The start of tomorrow's first stretch that clears the minimum, once today has none left. Only asked for
+/// by Forecasted <b>until full</b> (issue #279), whose night is a wait for it; an estimate for the
+/// surfaces to say "stood down until ~09:40", since the morning re-arm is the day plan's to decide.
+/// Null otherwise, and when the forecast does not reach that far or shows no such stretch.
+/// </param>
 public sealed record SolarGridOutlook(
     double MinSurplusWatts,
     DateTimeOffset Timestamp,
     bool ForecastUsable,
     DateTimeOffset? NextSunAt,
     DateTimeOffset? SunUntil,
-    string Reason)
+    string Reason,
+    DateTimeOffset? TomorrowFirstSunAt = null)
 {
     /// <summary>
     /// The forecast is usable and nothing left of today clears the minimum: the mode's cue to end

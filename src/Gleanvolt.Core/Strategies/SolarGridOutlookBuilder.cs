@@ -80,6 +80,33 @@ public static class SolarGridOutlookBuilder
             $"forecast surplus clears {minimum:F0}W from {from.LocalDateTime:HH:mm} until {until.LocalDateTime:HH:mm}");
     }
 
+    /// <summary>
+    /// The start of the first stretch in <c>(from, to]</c> whose forecast surplus clears the minimum, or
+    /// null when there is none. For Forecasted <b>until full</b> (#279), which reads it for tomorrow once
+    /// today has nothing left: an estimate of when its night ends, so no staleness rule applies.
+    /// </summary>
+    public static DateTimeOffset? FirstSunAt(
+        SolarForecast? forecast,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        IHouseLoadProfile houseLoad,
+        double minSurplusWatts,
+        ForecastConfidence confidence)
+    {
+        ArgumentNullException.ThrowIfNull(houseLoad);
+
+        if (forecast is null || forecast.Periods.Count == 0)
+        {
+            return null;
+        }
+
+        var minimum = Math.Max(0, minSurplusWatts);
+        return ForecastSlicer
+            .Slice(forecast, from, to, houseLoad, biasFactor: 1.0, minChargePowerWatts: minimum, confidence)
+            .FirstOrDefault(slice => slice.SurplusWatts > 0 && slice.SurplusWatts >= minimum)
+            ?.Start;
+    }
+
     // The optimistic band, on purpose: "the sun has set" is only safe to conclude from an old forecast
     // when even the best case it offered has nothing left.
     private static double RemainingPvWh(

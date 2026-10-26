@@ -109,6 +109,11 @@ namespace Gleanvolt.Core.Models;
 /// full car from the wallbox giving up on our own pause: both read Finishing / Stop, and only the
 /// first comes straight after a draw (see <see cref="Strategies.ChargerOwnership.Check"/>).
 /// </param>
+/// <param name="UntilFull">
+/// Whether the owner has set <see cref="Enums.ChargeControlMode.Forecasted"/>, the mode driving, to
+/// <b>until full</b> (issue #279): the end of the day stands the charger down until the next day's sun
+/// instead of ending the mode (<see cref="Strategies.ChargerWait.DayIsOver"/>). False for every other mode.
+/// </param>
 public sealed record ChargingControlInput(
     EnergyState State,
     double SurplusWatts,
@@ -129,7 +134,8 @@ public sealed record ChargingControlInput(
     bool ChargedThisMode = false,
     double LoanOutstandingWh = 0,
     TariffGate? LowTariffOnly = null,
-    bool EvWasDrawing = false);
+    bool EvWasDrawing = false,
+    bool UntilFull = false);
 
 /// <summary>
 /// The controller's intent for this cycle. <see cref="ChargeCurrentAmps"/> is populated only for

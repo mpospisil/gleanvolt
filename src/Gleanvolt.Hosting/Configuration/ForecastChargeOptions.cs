@@ -169,4 +169,18 @@ public sealed class ForecastChargeOptions
 
     /// <summary>Consecutive out-of-band periods before the plan is abandoned for the day.</summary>
     public int TrustBreachPeriods { get; init; } = 3;
+
+    /// <summary>
+    /// The boot default for <b>until full</b> (issue #279): the session runs over several days, stood
+    /// down at night, until the car is full or someone presses Off. Off by default. Settable at runtime
+    /// from the web UI, Home Assistant and the API.
+    /// </summary>
+    public bool UntilFull { get; init; }
+
+    /// <summary>
+    /// Where a running Forecasted session with <b>until full</b> on is kept, so a deploy or a reboot comes
+    /// back into it rather than to Off (#279, decision 1). Relative to the content root unless absolute,
+    /// beside <c>tariff.json</c> on the same bind mount. Present only while such a session runs.
+    /// </summary>
+    public string UntilFullSessionPath { get; init; } = "data/until-full.json";
 }
