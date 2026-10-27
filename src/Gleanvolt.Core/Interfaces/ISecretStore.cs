@@ -57,4 +57,7 @@ public static class SecretNames
 
     /// <summary>The vehicle account password, when it is entered in the web UI rather than in the environment (#214).</summary>
     public const string VehicleAccountPassword = "vehicle-account-password";
+
+    /// <summary>The Solcast API key and rooftop site, when entered on Settings rather than in the environment (#286).</summary>
+    public const string SolcastAccount = "solcast-account";
 }

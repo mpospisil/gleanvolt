@@ -1105,6 +1105,60 @@ internal static class TestForecasts
             At(firstPeriodEnd.AddMinutes(30 * i), w, w * 0.8, w * 1.2))]);
 }
 
+/// <summary>
+/// The Solcast account on Settings, held in memory. A save records what it was given and applies
+/// <see cref="NextStatus"/>, as the real editor's fetch would.
+/// </summary>
+internal sealed class FakeSolcastAccountEditor : ISolcastAccountEditor
+{
+    public SolcastAccountSettings Settings { get; set; } = new(
+        SolcastAccountSource.None, string.Empty, string.Empty, false, "an owner-only file", SolcastFetchStatus.Never);
+
+    /// <summary>What the fetch after a save comes to.</summary>
+    public SolcastFetchStatus NextStatus { get; set; } = SolcastFetchStatus.Never;
+
+    public List<(string ApiKey, string ResourceId)> Saves { get; } = [];
+
+    public int Removes { get; private set; }
+
+    public event Action? Changed;
+
+    public SolcastAccountSettings Read() => Settings;
+
+    public Task<SolcastAccountSaveResult> SaveAsync(string apiKey, string resourceId, CancellationToken cancellationToken = default)
+    {
+        Saves.Add((apiKey, resourceId));
+        var key = apiKey.Trim().Length > 0 ? apiKey.Trim() : Settings.ApiKey;
+
+        if (key.Length == 0 || resourceId.Trim().Length == 0)
+        {
+            return Task.FromResult(new SolcastAccountSaveResult(["Enter both."], Persisted: false));
+        }
+
+        Settings = Settings with
+        {
+            Source = SolcastAccountSource.Page, ApiKey = key, ResourceId = resourceId.Trim(), Status = NextStatus,
+        };
+        return Task.FromResult(new SolcastAccountSaveResult([], Persisted: true));
+    }
+
+    public void Remove()
+    {
+        Removes++;
+        Settings = Settings with
+        {
+            Source = SolcastAccountSource.None, ApiKey = string.Empty, ResourceId = string.Empty, Status = SolcastFetchStatus.Never,
+        };
+    }
+
+    /// <summary>A fetch by the worker, as the page would hear of it.</summary>
+    public void Fetched(SolcastFetchStatus status)
+    {
+        Settings = Settings with { Status = status };
+        Changed?.Invoke();
+    }
+}
+
 internal sealed class FakeTariffEditor : ITariffEditor
 {
     public FakeTariffEditor(params ITariffProvider[] extra) =>

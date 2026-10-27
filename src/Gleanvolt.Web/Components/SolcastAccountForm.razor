@@ -1,0 +1,266 @@
+@implements IDisposable
+@inject ISolcastAccountEditor Editor
+@inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+@inject TimeProvider Time
+
+@*
+    The Solcast account (issue #286): the API key and the rooftop site the forecast is fetched for.
+    Like the tariff and unlike the installation form above, a save applies at once -- the forecast
+    service reads the account on every fetch -- so there is no restart to offer. That matters more here
+    than anywhere: a restart spends one of the day's calls.
+
+    A save is a fetch, and the fetch is the check. There is no separate "test the key" call to spend, and
+    the status line under the heading says what Solcast made of it. The line also redraws on the worker's
+    own fetches, which is why the form listens to Changed.
+
+    The key box is always empty, on every load and after every save, as the car's password is: a field
+    that rendered its value back would put the key on the wire for every browser that opened the page.
+    The key in use is behind Secret instead, and only behind a login.
+*@
+
+<section class="controls pv-editor solcast-editor" id="solcast-editor">
+    <div class="section-head tip-head">
+        <h2>Solar forecast</h2>
+        <InfoTip Topic="the Solcast account" Group="settings-info" Wide="true">
+            <p>
+                The forecast comes from a free Solcast hobbyist account: the API key is in the account's
+                settings on solcast.com, and the resource id is on the rooftop site's page. Without one the
+                controller runs as well as ever, without a forecast to plan with.
+            </p>
+            <p>
+                The free tier allows about ten calls a day. The controller spends about five in daylight and
+                none at night, and <strong>every save here and every restart spends one</strong> — so does a
+                second copy of the controller, such as a <code>dotnet run</code> on a laptop, using the same
+                account.
+            </p>
+            <p>
+                An account saved here wins over <code>SOLCAST_API_KEY</code> and <code>SOLCAST_RESOURCE_ID</code>
+                in <code>.env</code>. Remove it and the environment's is used again.
+            </p>
+        </InfoTip>
+    </div>
+
+    <p class="muted">
+        Solcast's forecast for this roof, which Forecasted and Targeted plan with. A save applies at once, and
+        fetches the forecast once to check the account — one of the day's calls.
+    </p>
+
+    <p class="@(_settings.Status.Failure == SolcastFetchFailure.None ? "muted" : "error")" id="solcast-status" role="status">
+        @StatusLine()
+    </p>
+
+    @if (ReadOnly)
+    {
+        <p class="muted" id="solcast-readonly">
+            Read-only, because this UI has no login, and the key is a secret. Configure
+            <code>Web__PasswordHash</code> (<code>hash-password</code>) and the account becomes editable here;
+            until then, set <code>SOLCAST_API_KEY</code> and <code>SOLCAST_RESOURCE_ID</code> in
+            <code>.env</code> and restart.
+        </p>
+    }
+    else
+    {
+        <div class="pv-fields">
+            <div class="pv-field">
+                <label for="solcast-api-key">API key</label>
+                <input id="solcast-api-key" type="password" autocomplete="new-password" spellcheck="false"
+                       placeholder="@(_settings.IsConfigured ? "unchanged" : "not set")"
+                       disabled="@_busy"
+                       value="@_apiKey"
+                       @oninput="e => Edit(() => _apiKey = Text(e))" />
+                <span class="source @(_settings.Source == SolcastAccountSource.Page ? "edited" : null)" id="solcast-source">
+                    @SourceName()
+                </span>
+                @if (_settings.IsConfigured)
+                {
+                    <div id="solcast-key-in-use"><Secret Value="@_settings.ApiKey" /></div>
+                }
+                <span class="hint">
+                    Kept in the secret store — @_settings.SecretProtection. Left empty, the key in use is kept.
+                </span>
+            </div>
+
+            <div class="pv-field">
+                <label for="solcast-resource-id">Rooftop site resource id</label>
+                <input id="solcast-resource-id" type="text" autocomplete="off" spellcheck="false"
+                       disabled="@_busy"
+                       value="@_resourceId"
+                       @oninput="e => Edit(() => _resourceId = Text(e))" />
+            </div>
+        </div>
+
+        <div class="control actions">
+            <button type="button" class="primary" id="solcast-save" disabled="@(_busy || !HasChanges)" @onclick="SaveAsync">
+                @(_busy ? "Fetching…" : "Save and fetch")
+            </button>
+            @if (_settings.Source == SolcastAccountSource.Page)
+            {
+                <button type="button" class="secondary" id="solcast-remove" disabled="@_busy" @onclick="Remove">Remove</button>
+            }
+        </div>
+    }
+
+    @if (_errors.Count > 0)
+    {
+        <ul class="error" id="solcast-errors">
+            @foreach (var error in _errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="muted" id="solcast-message">@message</p>
+    }
+</section>
+
+@code {
+    private SolcastAccountSettings _settings = new(
+        SolcastAccountSource.None, string.Empty, string.Empty, false, string.Empty, SolcastFetchStatus.Never);
+
+    private string _apiKey = string.Empty;
+    private string _resourceId = string.Empty;
+    private IReadOnlyList<string> _errors = [];
+    private string? _message;
+    private bool _busy;
+
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
+
+    // Nothing to save means nothing to spend a call on: an unchanged account is not fetched again.
+    private bool HasChanges =>
+        _apiKey.Trim().Length > 0
+        || !string.Equals(_resourceId.Trim(), _settings.ResourceId, StringComparison.Ordinal);
+
+    protected override void OnInitialized()
+    {
+        Reload();
+        Editor.Changed += OnChanged;
+    }
+
+    public void Dispose() => Editor.Changed -= OnChanged;
+
+    // Only the status and the source move under the owner's feet; what is typed in the boxes stays.
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        _settings = Editor.Read();
+        StateHasChanged();
+    });
+
+    private void Reload()
+    {
+        _settings = Editor.Read();
+        _apiKey = string.Empty;
+        _resourceId = _settings.ResourceId;
+    }
+
+    private void Edit(Action change)
+    {
+        change();
+        _message = null;
+        _errors = [];
+    }
+
+    private async Task SaveAsync()
+    {
+        if (ReadOnly || _busy || !HasChanges)
+        {
+            return;
+        }
+
+        _busy = true;
+        _message = null;
+        _errors = [];
+
+        try
+        {
+            var result = await Editor.SaveAsync(_apiKey, _resourceId);
+
+            if (!result.Saved)
+            {
+                _errors = result.Errors;
+                return;
+            }
+
+            Reload();
+            _message = result.Persisted
+                ? "Saved, and in use now."
+                : "In use now, but the secret store would not keep it: a restart will forget it.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Remove()
+    {
+        if (ReadOnly || _busy)
+        {
+            return;
+        }
+
+        Editor.Remove();
+        Reload();
+        _errors = [];
+        _message = _settings.IsConfigured
+            ? "Removed. The account from the environment is in use from the next refresh."
+            : "Removed. No forecast is held now.";
+    }
+
+    private string SourceName() => _settings.Source switch
+    {
+        SolcastAccountSource.Page => "Saved here",
+        SolcastAccountSource.Environment => "From the environment (SOLCAST_API_KEY, SOLCAST_RESOURCE_ID)",
+        _ => "Not configured",
+    };
+
+    private string StatusLine()
+    {
+        var status = _settings.Status;
+
+        if (!_settings.IsConfigured)
+        {
+            return "Not configured — the controller runs without a forecast.";
+        }
+
+        var held = status.FetchedAt is { } fetched ? $" The forecast fetched {When(fetched)} is still in use." : string.Empty;
+
+        return status.Failure switch
+        {
+            SolcastFetchFailure.KeyRefused =>
+                $"Solcast refused the key ({status.HttpStatus}) {When(status.FailedAt)}. It is not asked again until a new one is saved.{held}",
+            SolcastFetchFailure.SiteNotFound =>
+                $"Solcast has no rooftop site {_settings.ResourceId} for this key ({status.HttpStatus}) {When(status.FailedAt)}. It is not asked again until the account is changed.{held}",
+            SolcastFetchFailure.QuotaExhausted =>
+                $"Today's calls are used up ({status.HttpStatus}) {When(status.FailedAt)}; the next scheduled refresh tries again.{held}",
+            SolcastFetchFailure.Other =>
+                $"The last fetch failed {When(status.FailedAt)}; the next scheduled refresh tries again.{held}",
+            _ when status.FetchedAt is { } at => $"Forecast fetched {When(at)}.",
+            _ => "Configured. Nothing has been fetched since the controller started.",
+        };
+    }
+
+    // "at 14:05" today, "on Mon 14:05" any other day: the status of a forecast that is days old is
+    // worth knowing is days old.
+    private string When(DateTimeOffset? instant)
+    {
+        if (instant is not { } value)
+        {
+            return string.Empty;
+        }
+
+        var zone = Time.LocalTimeZone;
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var today = TimeZoneInfo.ConvertTime(Time.GetUtcNow(), zone).Date;
+
+        return local.Date == today
+            ? $"at {local:HH:mm}"
+            : $"on {local.ToString("ddd HH:mm", System.Globalization.CultureInfo.InvariantCulture)}";
+    }
+
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? string.Empty;
+}

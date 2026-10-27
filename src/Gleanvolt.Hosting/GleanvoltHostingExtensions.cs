@@ -1,5 +1,4 @@
-﻿using System.Net.Http.Headers;
-using Microsoft.AspNetCore.Hosting.Server;
+﻿using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
@@ -220,22 +219,21 @@ public static class GleanvoltHostingExtensions
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 
-        // Solcast solar-forecast integration. The API key is a secret and is not stored in
-        // appsettings.json -- supply it via user-secrets (development) or an environment variable
-        // (deployment): Solcast:ApiKey / Solcast__ApiKey.
+        // Solcast solar-forecast integration. The account is a secret and is not stored in
+        // appsettings.json -- enter it on Settings (issue #286), which keeps it in the secret store, or
+        // supply it via user-secrets (development) or an environment variable (deployment):
+        // Solcast:ApiKey / Solcast__ApiKey. The page's wins; see SolcastAccountStore.
         services.Configure<SolcastOptions>(configuration.GetSection(SolcastOptions.SectionName));
+        services.AddSingleton<SolcastAccountStore>();
 
+        // No Authorization header here: it is set on each request from the account store, so a key
+        // saved on Settings is used by the next fetch rather than by the next start.
         services.AddHttpClient(SolcastForecastService.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<SolcastOptions>>().Value;
             if (!string.IsNullOrWhiteSpace(options.BaseUrl))
             {
                 client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-            }
-
-            if (!string.IsNullOrWhiteSpace(options.ApiKey))
-            {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
             }
         });
 
@@ -250,6 +248,7 @@ public static class GleanvoltHostingExtensions
         // and until you did the process kept demanding a Solcast API key it had no use for.
         services.AddSingleton<ISolarForecastRefresh>(provider => provider.GetRequiredService<SolcastForecastService>());
         services.AddHostedService<SolarForecastRefreshWorker>();
+        services.AddSingleton<ISolcastAccountEditor, SolcastAccountEditor>();
 
         // The weather a session ran in (issue #96). Off unless a key and the site's coordinates are
         // configured, and secret on the same terms as Solcast: Weather:ApiKey / Weather__ApiKey.
