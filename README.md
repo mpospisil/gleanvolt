@@ -540,7 +540,9 @@ The worker fetches a solar-generation forecast for your site from [Solcast](http
 }
 ```
 
-The **API key is a secret and must not be committed**. Provide it out-of-band, using whichever of these fits how you run the app:
+The simplest route is the **Solar forecast** section of **Settings** in the web UI (issue #286): paste the API key and the rooftop site's resource id, and **Save and fetch**. The account is used from that fetch on, with no restart, and the status line under the heading says what Solcast made of it — a refused key, an unknown site, a spent quota. It is kept in the secret store as `solcast-account`, the key is never rendered into the form, and the section is read-only when the UI has no login. An account saved there wins over the environment; **Remove** hands back to `Solcast__ApiKey` / `Solcast__ResourceId` if they are set. A key Solcast refused (401/403) or a site it does not know (404) is not asked about again until the account changes, so a typo does not burn the day's calls.
+
+Otherwise the **API key is a secret and must not be committed**. Provide it out-of-band, using whichever of these fits how you run the app:
 
 - **`.env` file (recommended for local dev)** — copy `.env.example` to `.env` (which is gitignored) in the repo root and set your key. On startup the worker loads the nearest `.env` into the process environment, so it works both from `dotnet run` **and** the VS Code debugger without any shell setup:
 
@@ -562,7 +564,7 @@ The **API key is a secret and must not be committed**. Provide it out-of-band, u
   dotnet user-secrets set "Solcast:ApiKey" "<your-api-key>"
   ```
 
-If the API key or resource id is missing, the worker logs a warning and skips forecast refreshes; the rest of the service continues to run. The free Solcast hobbyist tier caps daily API calls, which is why the forecast is cached and refreshed only every 12 hours by default — keep the interval within your plan's quota.
+If no account is configured either way, the worker logs a warning and skips forecast refreshes; the rest of the service continues to run. The free Solcast hobbyist tier caps daily API calls, which is why the forecast is cached and refreshed only every 12 hours by default — keep the interval within your plan's quota.
 
 ### Weather (the `Weather` section, optional)
 

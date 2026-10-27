@@ -1,9 +1,10 @@
 using System.Collections.Frozen;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
@@ -15,6 +16,11 @@ namespace Gleanvolt.Infrastructure.Solcast;
 /// successfully-fetched forecast in memory and serves queries from it; refreshing is driven
 /// externally (see the worker that calls <see cref="RefreshAsync"/> on a schedule). A failed
 /// refresh keeps the previously cached forecast intact.
+///
+/// <para>The account is read from <see cref="SolcastAccountStore"/> on every fetch rather than baked
+/// into the HTTP client at startup (issue #286), so an account saved on Settings is used by the next
+/// fetch. A key Solcast refused, or a site it does not know, is not asked about again until the account
+/// changes: every such retry would be a call nothing can come of.</para>
 /// </summary>
 public sealed class SolcastForecastService : ISolarForecastService, ISolarForecastRefresh
 {
@@ -22,7 +28,7 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     public const string HttpClientName = "Solcast";
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly SolcastOptions _options;
+    private readonly SolcastAccountStore _account;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<SolcastForecastService> _logger;
 
@@ -44,14 +50,24 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     private volatile IReadOnlyDictionary<DateOnly, SolarDayForecastSummary> _daySummaries =
         FrozenDictionary<DateOnly, SolarDayForecastSummary>.Empty;
 
+    // The worker's schedule and a save on Settings can both ask for a fetch; one at a time, so two
+    // answers never race to publish and the history is never merged from two threads.
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+
+    private volatile SolcastFetchStatus _status = SolcastFetchStatus.Never;
+
+    // The account version Solcast refused (401/403/404), or -1. Compared with the store's, so a new
+    // account is tried at once and the refused one never again.
+    private int _refusedVersion = -1;
+
     public SolcastForecastService(
         IHttpClientFactory httpClientFactory,
-        IOptions<SolcastOptions> options,
+        SolcastAccountStore account,
         ILogger<SolcastForecastService> logger,
         TimeProvider? timeProvider = null)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
+        _account = account;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -95,17 +111,64 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
     /// <summary>Expected PV power right now per the cached forecast, or null when it can't say.</summary>
     public double? ExpectedPowerWattsNow(DateTimeOffset instant) => _cached?.ExpectedPowerWattsAt(instant);
 
+    /// <summary>How the last fetch went, for Settings.</summary>
+    public SolcastFetchStatus Status => _status;
+
+    /// <summary>Raised after every fetch attempt, whatever came of it, and after <see cref="Forget"/>.</summary>
+    public event Action? StatusChanged;
+
+    /// <summary>
+    /// Drops the held forecast, for an installation left with no account: charge control then plans
+    /// as it does without one, instead of on a forecast that will never be refreshed. The history of
+    /// what was expected stays — it is still what was expected.
+    /// </summary>
+    public void Forget()
+    {
+        _cached = null;
+        _status = SolcastFetchStatus.Never;
+        StatusChanged?.Invoke();
+    }
+
     /// <summary>
     /// Fetches the latest forecast from Solcast and replaces the cache. On any failure the cache
     /// is left untouched and the error is logged -- callers keep serving the last good forecast.
     /// </summary>
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.ResourceId))
+        await _refreshGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await FetchAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+
+        StatusChanged?.Invoke();
+    }
+
+    private async Task FetchAsync(CancellationToken cancellationToken)
+    {
+        // Read once: a save on Settings mid-fetch is for the next one, and the refusal below has to be
+        // filed against the account that was actually refused.
+        var version = _account.Version;
+        var account = _account.Current;
+
+        if (account is null)
         {
             _logger.LogWarning(
                 "Solcast is not configured (missing ApiKey and/or ResourceId); skipping forecast refresh. "
-                + "Set the API key via user-secrets or an environment variable.");
+                + "Enter the account on Settings, or set Solcast__ApiKey and Solcast__ResourceId.");
+            return;
+        }
+
+        if (Volatile.Read(ref _refusedVersion) == version)
+        {
+            _logger.LogInformation(
+                "Solcast refused this account at {FailedAt:u}; not asking again until it is changed on Settings.",
+                _status.FailedAt);
             return;
         }
 
@@ -114,9 +177,20 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
             var client = _httpClientFactory.CreateClient(HttpClientName);
 
             // rooftop_sites/{resource_id}/forecasts returns 30-minute pv_estimate periods (kW).
-            var requestUri = $"rooftop_sites/{Uri.EscapeDataString(_options.ResourceId)}/forecasts?format=json";
-            var response = await client
-                .GetFromJsonAsync<SolcastForecastResponse>(requestUri, cancellationToken)
+            var requestUri = $"rooftop_sites/{Uri.EscapeDataString(account.ResourceId)}/forecasts?format=json";
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", account.ApiKey);
+
+            using var reply = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!reply.IsSuccessStatusCode)
+            {
+                Refused(reply.StatusCode, version, account);
+                return;
+            }
+
+            var response = await reply.Content
+                .ReadFromJsonAsync<SolcastForecastResponse>(cancellationToken)
                 .ConfigureAwait(false);
 
             var entries = response?.Forecasts ?? [];
@@ -130,8 +204,11 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
                 .OrderBy(p => p.PeriodEnd)
                 .ToList();
 
-            var forecast = new SolarForecast(_timeProvider.GetUtcNow(), periods);
+            var fetchedAt = _timeProvider.GetUtcNow();
+            var forecast = new SolarForecast(fetchedAt, periods);
             _cached = forecast;
+            _status = new SolcastFetchStatus(fetchedAt, null, SolcastFetchFailure.None, (int)reply.StatusCode);
+            Volatile.Write(ref _refusedVersion, -1);
 
             // Merged, and the day summaries taken from it, *after* publication: the history is for later
             // analysis, and no query on the hot path should ever wait behind it.
@@ -152,11 +229,39 @@ public sealed class SolcastForecastService : ISolarForecastService, ISolarForeca
                 today?.EnergyWattHoursAt(Core.Enums.ForecastConfidence.P90) ?? 0,
                 _history.Count);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            // Keep the previously cached forecast; a transient outage/rate-limit must not blank it.
+            // Keep the previously cached forecast; a transient outage/rate-limit must not blank it. A
+            // timeout is an OperationCanceledException too, but not ours, so it lands here as well.
+            _status = _status with { FailedAt = _timeProvider.GetUtcNow(), Failure = SolcastFetchFailure.Other, HttpStatus = null };
             _logger.LogWarning(ex, "Failed to refresh Solcast forecast; keeping the last cached forecast.");
         }
+    }
+
+    // A status that is an answer: kept on the status line, and for a refusal remembered against the
+    // account so the next scheduled refresh does not spend a call to be told the same thing.
+    private void Refused(HttpStatusCode status, int version, SolcastAccount account)
+    {
+        var failure = status switch
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => SolcastFetchFailure.KeyRefused,
+            HttpStatusCode.NotFound => SolcastFetchFailure.SiteNotFound,
+            HttpStatusCode.TooManyRequests => SolcastFetchFailure.QuotaExhausted,
+            _ => SolcastFetchFailure.Other,
+        };
+
+        _status = _status with { FailedAt = _timeProvider.GetUtcNow(), Failure = failure, HttpStatus = (int)status };
+
+        if (_status.IsRefused)
+        {
+            Volatile.Write(ref _refusedVersion, version);
+        }
+
+        _logger.LogWarning(
+            "Solcast answered {StatusCode} for rooftop site {ResourceId} ({Failure}); keeping the last cached forecast.",
+            (int)status,
+            account.ResourceId,
+            failure);
     }
 
     // Solcast reports the period length as an ISO-8601 duration (e.g. "PT30M").

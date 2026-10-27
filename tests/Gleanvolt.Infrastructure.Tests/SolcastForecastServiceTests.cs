@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Solcast;
 
 namespace Gleanvolt.Infrastructure.Tests;
@@ -99,6 +100,111 @@ public sealed class SolcastForecastServiceTests
         Assert.Equal(day.ExpectedWh, service.GetDayEnergyWattHours(Today)!.Value, 3);
     }
 
+    [Fact]
+    public async Task TheKeyIsTakenFromTheAccountOnEveryRequest()
+    {
+        // Saved on Settings between two refreshes: the second has to use it, with no restart between.
+        var handler = new QueueHandler(Ok((At(11, 0), 4.0)), Ok((At(11, 0), 4.0)));
+        var account = Account();
+        var service = NewService(handler, new Clock(At(6, 0)), account);
+
+        await service.RefreshAsync();
+        account.Save(new SolcastAccount("new-key", "site"));
+        await service.RefreshAsync();
+
+        Assert.Equal(["key", "new-key"], handler.Keys);
+    }
+
+    [Fact]
+    public async Task WithNoAccountNothingIsAsked()
+    {
+        var handler = new QueueHandler();
+        var service = NewService(handler, new Clock(At(6, 0)), Account(new SolcastOptions()));
+
+        await service.RefreshAsync();
+
+        Assert.Equal(0, handler.Calls);
+        Assert.Equal(SolcastFetchStatus.Never, service.Status);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, SolcastFetchFailure.KeyRefused)]
+    [InlineData(HttpStatusCode.Forbidden, SolcastFetchFailure.KeyRefused)]
+    [InlineData(HttpStatusCode.NotFound, SolcastFetchFailure.SiteNotFound)]
+    public async Task ARefusedAccountIsNotAskedAgainUntilItChanges(HttpStatusCode refusal, SolcastFetchFailure failure)
+    {
+        // Every retry of a refused key is a call out of ten that nothing can come of.
+        var handler = new QueueHandler((refusal, "{}"), Ok((At(11, 0), 4.0)));
+        var account = Account();
+        var service = NewService(handler, new Clock(At(6, 0)), account);
+
+        await service.RefreshAsync();
+        await service.RefreshAsync();
+
+        Assert.Equal(1, handler.Calls);
+        Assert.Equal(failure, service.Status.Failure);
+        Assert.Equal((int)refusal, service.Status.HttpStatus);
+
+        account.Save(new SolcastAccount("new-key", "site"));
+        await service.RefreshAsync();
+
+        Assert.Equal(2, handler.Calls);
+        Assert.Equal(SolcastFetchFailure.None, service.Status.Failure);
+        Assert.Equal(At(6, 0), service.Status.FetchedAt);
+    }
+
+    [Fact]
+    public async Task AnExhaustedQuotaIsTriedAgainOnTheNextRefresh()
+    {
+        var handler = new QueueHandler((HttpStatusCode.TooManyRequests, "{}"), Ok((At(11, 0), 4.0)));
+        var service = NewService(handler, new Clock(At(6, 0)));
+
+        await service.RefreshAsync();
+        Assert.Equal(SolcastFetchFailure.QuotaExhausted, service.Status.Failure);
+
+        await service.RefreshAsync();
+
+        Assert.Equal(2, handler.Calls);
+        Assert.Equal(SolcastFetchFailure.None, service.Status.Failure);
+    }
+
+    [Fact]
+    public async Task AFailureKeepsTheTimeOfTheForecastStillHeld()
+    {
+        var clock = new Clock(At(6, 0));
+        var handler = new QueueHandler(Ok((At(11, 0), 4.0)), (HttpStatusCode.InternalServerError, "{}"));
+        var service = NewService(handler, clock);
+
+        await service.RefreshAsync();
+        clock.Now = At(9, 0);
+        await service.RefreshAsync();
+
+        Assert.Equal(At(6, 0), service.Status.FetchedAt);
+        Assert.Equal(At(9, 0), service.Status.FailedAt);
+        Assert.Equal(SolcastFetchFailure.Other, service.Status.Failure);
+    }
+
+    [Fact]
+    public async Task ForgettingDropsTheForecastButNotTheHistory()
+    {
+        var handler = new QueueHandler(Ok((At(11, 0), 4.0)));
+        var service = NewService(handler, new Clock(At(6, 0)));
+        var notified = 0;
+        service.StatusChanged += () => notified++;
+
+        await service.RefreshAsync();
+        Assert.NotNull(service.ExpectedPowerWattsNow(At(10, 45)));
+        service.Forget();
+
+        Assert.Null(service.ExpectedPowerWattsNow(At(10, 45)));
+        Assert.Equal(SolcastFetchStatus.Never, service.Status);
+        Assert.NotNull(service.GetDayForecast(Today));
+        Assert.Equal(2, notified);
+    }
+
+    private static SolcastAccountStore Account(SolcastOptions? options = null) =>
+        new(new MemorySecretStore(), Options.Create(options ?? new SolcastOptions { ApiKey = "key", ResourceId = "site" }));
+
     private static DateTimeOffset At(int hour, int minute) => new(2026, 8, 9, hour, minute, 0, TimeSpan.Zero);
 
     private static (HttpStatusCode, string) Ok(params (DateTimeOffset End, double Kw)[] periods) =>
@@ -107,12 +213,12 @@ public sealed class SolcastForecastServiceTests
             forecasts = periods.Select(p => new { pv_estimate = p.Kw, period_end = p.End, period = "PT30M" }),
         }));
 
-    private static SolcastForecastService NewService(HttpMessageHandler handler, TimeProvider clock)
+    private static SolcastForecastService NewService(
+        HttpMessageHandler handler, TimeProvider clock, SolcastAccountStore? account = null)
     {
-        var options = new SolcastOptions { ApiKey = "key", ResourceId = "site" };
         return new SolcastForecastService(
-            new SingleClientFactory(handler, options.BaseUrl),
-            Options.Create(options),
+            new SingleClientFactory(handler, new SolcastOptions().BaseUrl),
+            account ?? Account(),
             NullLogger<SolcastForecastService>.Instance,
             clock);
     }
@@ -139,9 +245,13 @@ public sealed class SolcastForecastServiceTests
 
         public int Calls { get; private set; }
 
+        /// <summary>The bearer token each request carried, in order.</summary>
+        public List<string?> Keys { get; } = [];
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
+            Keys.Add(request.Headers.Authorization?.Parameter);
             var (status, body) = _responses.Dequeue();
 
             return Task.FromResult(new HttpResponseMessage(status)

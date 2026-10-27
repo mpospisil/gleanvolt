@@ -140,6 +140,9 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
 
+        // The Solcast account's, with none configured.
+        context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
+
         // The tariff form's, with no tariff set up.
         context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
         context.Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
