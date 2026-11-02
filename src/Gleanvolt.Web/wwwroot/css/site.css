@@ -1880,6 +1880,16 @@ button.link:hover {
     outline-offset: 2px;
 }
 
+/* An option ruled out by another choice (Just in time under Sun only); the hint beside it says why. */
+.seg-opt:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.seg-opt:has(input:disabled):hover {
+    color: var(--muted);
+}
+
 /* A tag: a small outlined word, for a state beside a figure ("Live", "Running"). */
 .tag {
     display: inline-block;

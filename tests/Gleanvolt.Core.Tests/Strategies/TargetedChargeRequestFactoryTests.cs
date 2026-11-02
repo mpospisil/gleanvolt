@@ -27,7 +27,8 @@ public class TargetedChargeRequestFactoryTests
         double? vehicleSoc = null,
         TimeSpan? ahead = null,
         TargetedChargeRequestLimits? limits = null,
-        VehicleSocBasis? socBasis = null) =>
+        VehicleSocBasis? socBasis = null,
+        TargetedChargeConstraints? constraints = null) =>
         TargetedChargeRequestFactory.Create(
             Now + (ahead ?? TimeSpan.FromHours(9)),
             energyWh,
@@ -36,7 +37,8 @@ public class TargetedChargeRequestFactoryTests
             restSoc,
             socBasis ?? Fresh(vehicleSoc),
             limits ?? Limits,
-            Now);
+            Now,
+            constraints);
 
     /// <summary>
     /// A reading taken this instant — what every test written before #179 assumed a bare percentage
@@ -66,6 +68,24 @@ public class TargetedChargeRequestFactoryTests
         Assert.Equal(32_511, request!.RequiredEnergyWh, 0);
         Assert.Equal(80, request.TargetSocPercent);
         Assert.Equal(42, request.VehicleSocPercentAtRequest);
+    }
+
+    [Fact]
+    public void Carries_sun_only_onto_the_request()
+    {
+        // #251: the web form and Home Assistant attach their one constraint here, like the API.
+        var request = Create(energyWh: 22_000, constraints: TargetedChargeConstraints.SunOnly).Request;
+
+        Assert.NotNull(request);
+        Assert.Equal(0, request!.Constraints!.MaxGridEnergyWh);
+        Assert.True(request.Constraints.IsSunOnly);
+    }
+
+    [Fact]
+    public void Stores_constraints_that_narrow_nothing_as_none()
+    {
+        Assert.Null(Create(energyWh: 22_000).Request!.Constraints);
+        Assert.Null(Create(energyWh: 22_000, constraints: TargetedChargeConstraints.None).Request!.Constraints);
     }
 
     [Fact]

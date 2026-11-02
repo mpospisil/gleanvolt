@@ -519,6 +519,85 @@ public class TargetedTabTests : PageTest
     }
 
     [Fact]
+    public void Sun_only_is_off_by_default_and_the_request_carries_no_constraints()
+    {
+        var page = RenderTab();
+
+        Assert.False(page.Find("#sun-only").HasAttribute("checked"));
+
+        page.Find("#target-energy").Change("22");
+        Activate(page);
+
+        Assert.Null(Assert.Single(_target.Sets).Request.Constraints);
+    }
+
+    [Fact]
+    public void Sun_only_caps_the_grid_at_zero()
+    {
+        // #251: the one constraint the form offers. Shown without a known pack too -- it needs no SOC.
+        var page = RenderTab();
+
+        page.Find("#target-energy").Change("22");
+        page.Find("#sun-only").Change(true);
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+        Assert.Equal(0, request.Constraints!.MaxGridEnergyWh);
+    }
+
+    [Fact]
+    public void Ticking_sun_only_drops_the_preview()
+    {
+        var page = RenderTab();
+        page.Find("#preview-target").Click();
+        Assert.NotEmpty(page.FindAll("#activate-target"));
+
+        page.Find("#sun-only").Change(true);
+
+        Assert.Empty(page.FindAll("#target-preview"));
+    }
+
+    [Fact]
+    public void Sun_only_moves_the_pacing_off_just_in_time_and_greys_it_out()
+    {
+        WithAKnownPack();
+        CarReports(socPercent: 42);
+
+        var page = RenderTab();
+        page.Find("#charge-priority-justintime").Change(true);
+        Assert.NotEmpty(page.FindAll("#rest-soc"));
+
+        page.Find("#sun-only").Change(true);
+
+        // A hold with no grid to make up a cloudy hour can only lose sun, so the choice goes, and the
+        // form says why rather than leaving a greyed radio to be puzzled over.
+        Assert.True(page.Find("#charge-priority-justintime").HasAttribute("disabled"));
+        Assert.True(page.Find("#charge-priority-cheapest").HasAttribute("checked"));
+        Assert.Empty(page.FindAll("#rest-soc"));
+        Assert.Contains("Just in time is off", page.Find(".sun-only-option").TextContent);
+
+        page.Find("#target-basis-soc").Change(true);
+        page.Find("#target-soc").Change("100");
+        Activate(page);
+
+        var (request, _) = Assert.Single(_target.Sets);
+        Assert.Equal(TargetedChargePriority.Cheapest, request.Priority);
+        Assert.False(request.HoldsTail);
+    }
+
+    [Fact]
+    public void Shows_a_running_sun_only_request_as_ticked()
+    {
+        _target.Set(
+            new TargetedChargeRequest(18_000, Now.AddHours(9), Now) { Constraints = TargetedChargeConstraints.SunOnly },
+            "test");
+
+        var page = RenderTab();
+
+        Assert.True(page.Find("#sun-only").HasAttribute("checked"));
+    }
+
+    [Fact]
     public void Discarding_the_preview_goes_back_to_the_form_and_makes_no_request()
     {
         var page = RenderTab();

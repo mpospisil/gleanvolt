@@ -163,13 +163,42 @@ else
             </label>
             <label class="seg-opt">
                 <input type="radio" name="charge-priority" id="charge-priority-justintime"
-                       checked="@(_priority == TargetedChargePriority.JustInTime)"
+                       checked="@(_priority == TargetedChargePriority.JustInTime)" disabled="@_sunOnly"
                        @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
                 Just in time
             </label>
         </div>
     </div>
 }
+
+@*
+    Sun only (#251): the one constraint the form offers, as MaxGridEnergyWh 0. Shown whether or not
+    pacing is, since it needs no state of charge. A grid budget in kWh stays an API knob.
+*@
+<div class="control sun-only-option">
+    <div class="control-head">
+        <label>
+            <input type="checkbox" id="sun-only" checked="@_sunOnly" @onchange="OnSunOnlyChanged" />
+            Sun only
+        </label>
+        <InfoTip Topic="Sun only">
+            <p>
+                Nothing is bought from the grid. Whatever the sun can't deliver by the departure is reported
+                as shortfall, not imported — the preview shows how much before you start. A cloud the
+                3-minute average hasn't caught up with can still draw a little from the grid while the car
+                runs at its minimum, so expect close to none rather than exactly none.
+            </p>
+        </InfoTip>
+    </div>
+    @* Said out loud, not in the tip: it is why an option above is greyed out. *@
+    @if (_sunOnly && CanTargetSoc)
+    {
+        <span class="hint">
+            Just in time is off while this is ticked: holding the last stretch back with no grid to make up a
+            cloudy hour can only lose sun.
+        </span>
+    }
+</div>
 
 @if (_priority == TargetedChargePriority.JustInTime && CanTargetSoc)
 {
@@ -288,7 +317,7 @@ else
                         </label>
                         <label class="seg-opt">
                             <input type="radio" name="dialog-pacing" id="dialog-pacing-justintime"
-                                   checked="@(_priority == TargetedChargePriority.JustInTime)"
+                                   checked="@(_priority == TargetedChargePriority.JustInTime)" disabled="@_sunOnly"
                                    @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
                             Just in time@(JustInTimeExtraWh() is { } extra ? $" · {Units.Energy(extra, signed: true)} grid" : "")
                         </label>
@@ -369,6 +398,7 @@ else
 
     private TargetBasis _basis = TargetBasis.Energy;
     private TargetedChargePriority _priority = TargetedChargePriority.Cheapest;
+    private bool _sunOnly;
     private double _energyKWh = 20;
     private double _targetSocPercent = 80;
     private double _restSocPercent;
@@ -461,6 +491,7 @@ else
             }
 
             _priority = request.Priority;
+            _sunOnly = request.Constraints?.IsSunOnly == true;
 
             if (request.RestSocPercent is { } rest)
             {
@@ -506,6 +537,22 @@ else
 
         _dialogShown = true;
         await JS.InvokeVoidAsync("gleanvoltDialog.show", "target-preview");
+    }
+
+    /// <summary>
+    /// Sun only, ticked or not. An edit like any other, so it drops the preview; ticking it also moves
+    /// the pacing off Just in time, which it rules out.
+    /// </summary>
+    private void OnSunOnlyChanged(ChangeEventArgs e)
+    {
+        _sunOnly = e.Value is true;
+
+        if (_sunOnly)
+        {
+            _priority = TargetedChargePriority.Cheapest;
+        }
+
+        OnFormEdited();
     }
 
     private void SetBasis(TargetBasis basis)
@@ -556,7 +603,7 @@ else
         // And the other way round, to price Just in time on the dialog while Cheapest is chosen. Only
         // where pacing is offered at all, and only when the hold would actually hold something.
         _justInTimePreview = null;
-        if (CanTargetSoc && _priority == TargetedChargePriority.Cheapest
+        if (CanTargetSoc && !_sunOnly && _priority == TargetedChargePriority.Cheapest
             && TryCompose(Time.GetUtcNow(), TargetedChargePriority.JustInTime, out var heldRequest, out _)
             && heldRequest.HoldsTail)
         {
@@ -634,7 +681,8 @@ else
             restSocPercent: _restSocPercent,
             vehicleSoc: SocBasisAt(now),
             limits: Limits,
-            now: now);
+            now: now,
+            constraints: _sunOnly ? TargetedChargeConstraints.SunOnly : null);
 
         request = result.Request!;
         error = result.Error;

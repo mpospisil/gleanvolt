@@ -98,7 +98,8 @@ internal static class TargetedRequests
             restSocPercent: body.RestSocPercent,
             vehicleSoc: VehicleSocBasis.From(vehicle.GetCurrentState(), vehicleMaxAge, now),
             limits: limits,
-            now: now);
+            now: now,
+            constraints: body.Editable?.ToConstraints());
 
         if (composed.Request is not { } composedRequest)
         {
@@ -108,9 +109,9 @@ internal static class TargetedRequests
             return false;
         }
 
-        // The limits ride with the request through the same door, so a plan quoted under them and a
-        // charge started under them cannot be built two different ways (#128).
-        request = composedRequest with { Constraints = body.Editable?.ToConstraints() };
+        // The limits rode in through the factory above, so a plan quoted under them and a charge started
+        // under them cannot be built two different ways (#128).
+        request = composedRequest;
         error = null;
 
         return true;

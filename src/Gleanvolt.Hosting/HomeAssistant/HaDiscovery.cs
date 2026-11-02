@@ -162,6 +162,12 @@ public sealed class HaDiscovery
     /// </summary>
     public const string UntilFullSwitch = "forecasted_until_full";
 
+    /// <summary>
+    /// <b>Sun only</b> on a targeted charge (#251): nothing bought from the grid. Held like the other
+    /// target entities until <c>Activate target</c> applies it, and not kept across a restart.
+    /// </summary>
+    public const string TargetSunOnlySwitch = "target_sun_only";
+
     public string SwitchCommandTopic(string objectId) => NumberCommandTopic(objectId);
     public string SwitchStateTopic(string objectId) => NumberStateTopic(objectId);
 
@@ -482,6 +488,18 @@ public sealed class HaDiscovery
             icon: "mdi:timer-sand");
 
         yield return Number(TargetRestSocNumber, "Target rest SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-80");
+
+        // Sun only (#251), the last of the things the button applies. On the same terms as the priority:
+        // held until the press, and a running request outranks it in the state.
+        yield return Config("switch", TargetSunOnlySwitch, new Dictionary<string, object?>
+        {
+            ["name"] = "Target sun only",
+            ["command_topic"] = SwitchCommandTopic(TargetSunOnlySwitch),
+            ["state_topic"] = SwitchStateTopic(TargetSunOnlySwitch),
+            ["payload_on"] = PayloadOn,
+            ["payload_off"] = PayloadOff,
+            ["icon"] = "mdi:solar-power",
+        });
 
         // Pressing this is what makes the two above real: it sets the request and then starts the mode,
         // the same order and the same seam the web page uses. The object id is unchanged from #80 on

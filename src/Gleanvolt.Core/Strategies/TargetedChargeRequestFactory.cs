@@ -20,6 +20,9 @@ namespace Gleanvolt.Core.Strategies;
 /// arrives when it feels like it, and a promise already half delivered must not move at 02:00 because
 /// the car finally phoned home.</para>
 ///
+/// <para>The constraints ride through here too (#251), so the form, Home Assistant and the API attach
+/// them in one place rather than each patching them onto a request it has already built.</para>
+///
 /// <para>That one-shot rule is exactly why <see cref="VehicleSocBasis"/> is checked before the
 /// conversion rather than after (#179): if the amount is fixed here for good, the reading it is fixed
 /// from has to be one worth fixing on.</para>
@@ -60,6 +63,11 @@ public static class TargetedChargeRequestFactory
     /// </param>
     /// <param name="limits">The installation's horizon and pack figures.</param>
     /// <param name="now">The instant the request is being made — what delivery is metered from.</param>
+    /// <param name="constraints">
+    /// The limits on how it may be met, or null for none. The API sends any of the four; the web form and
+    /// Home Assistant send <see cref="TargetedChargeConstraints.SunOnly"/> or nothing. An empty set is
+    /// stored as null, so a request that narrows nothing looks exactly like one that never said.
+    /// </param>
     public static Result Create(
         DateTimeOffset departBy,
         double? energyWh,
@@ -68,7 +76,8 @@ public static class TargetedChargeRequestFactory
         double? restSocPercent,
         VehicleSocBasis vehicleSoc,
         TargetedChargeRequestLimits limits,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        TargetedChargeConstraints? constraints = null)
     {
         ArgumentNullException.ThrowIfNull(vehicleSoc);
 
@@ -141,7 +150,11 @@ public static class TargetedChargeRequestFactory
                 + "the forecast — or a request that does not survive a restart — can honestly promise.");
         }
 
-        var request = new TargetedChargeRequest(askedWh, departBy, now, soc, socNow) with { Priority = priority };
+        var request = new TargetedChargeRequest(askedWh, departBy, now, soc, socNow) with
+        {
+            Priority = priority,
+            Constraints = constraints is { IsEmpty: false } ? constraints : null,
+        };
 
         // The split, made once and here — the same place and the same moment as the SOC → kWh
         // conversion above, so a reading that lands later cannot move a promise already part delivered.
