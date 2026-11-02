@@ -980,9 +980,8 @@ from filling up, set the charge limit in the car — it stops drawing on its own
 the way any other does. To name an amount, give `Targeted` a departure: when the forecast covers the
 amount in time, it charges from the sun alone and buys nothing — and if the sun then falls short,
 it buys the rest rather than miss the departure, which is the one thing this mode never does. To
-forbid that too, cap its grid at zero (`maxGridEnergyWh: 0`, through the API): the amount is then
-met from the roof or reported as shortfall, never bought. See
-[Editing a quoted plan](#editing-a-quoted-plan-and-charging-to-it).
+forbid that too, tick **Sun only** ([below](#sun-first-grid-allowed--or-sun-only)): the amount is then
+met from the roof or reported as shortfall, never bought.
 
 #### Until full
 
@@ -1369,7 +1368,7 @@ A pace of **zero** means the forecast covers the target outright — then the ca
 sun and buys nothing. Activated at 02:00 for 15 kWh by 17:00 on a good forecast, nothing happens
 overnight and charging starts at the first half-hour whose surplus clears the charger's 6 A minimum.
 
-#### Sun first, grid allowed
+#### Sun first, grid allowed — or sun only
 
 Solar is the **preferred** source and the car takes as much of it as the window will give. Live
 surplus is never refused for being unplanned: the plan schedules *imports*, not sunshine, so a
@@ -1395,6 +1394,18 @@ import to bring forward, and the day was about to hand that energy over free), r
 plan's SOC floor, refused on a surplus under `ChargeControl:Forecast:MinBridgeSurplusWatts`, and sized
 to reach the floor and not one watt past it. Set `ChargeControl:Targeted:GridBridge` to `false` to
 keep imports strictly inside the blocks the plan drew.
+
+**Sun only** turns the grid off for one request: a checkbox on the *Targeted* tab, the **Target sun
+only** switch in Home Assistant, `maxGridEnergyWh: 0` through the API. The plan is then met from the
+roof or not at all. Whatever the sun can't deliver by the departure is reported as **shortfall**, not
+bought, and the preview shows that figure before you start. With nothing planned from the grid there
+is no committed import for the bridge to bring forward, so it never arms. Expect close to no import
+rather than exactly none: a cloud the 3-minute average hasn't caught up with can still draw a little
+while the car runs at its floor, the same measurement limit `Forecasted` has.
+**Just in time** is off under Sun only. Holding the last stretch back to the departure, with no grid
+to make up a cloudy hour, can only lose sun. The web form greys it out, and Home Assistant charges a
+sun-only `JustInTime` request as `Cheapest` and says so in the log. The API takes any grid budget in
+kWh; the form and Home Assistant offer only the two ends.
 
 #### What it does and doesn't do
 
@@ -1784,8 +1795,8 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
     surplus up from the grid, and switch itself off once the forecast has no sun left today. See
     [Solar with grid help](#solar-with-grid-help-the-solargrid-mode) above.
   - **Activate target** — deliver a stated amount of energy by a stated departure time, sun first and
-    paced across the window so the roof covers as much of it as it can. See
-    [Targeted charging](#targeted-charging-the-targeted-mode) below.
+    paced across the window so the roof covers as much of it as it can, or from the sun alone with
+    **Target sun only** on. See [Targeted charging](#targeted-charging-the-targeted-mode) below.
     It has no button of its own in the row because it needs a request: set **Target energy** and
     **Departure time**, and this button applies both and starts the mode. Like `FastNoBattery`, it
     stops itself once the target is met.
@@ -1820,7 +1831,7 @@ The worker can expose itself to Home Assistant over MQTT ([HA MQTT Discovery](ht
   the mode runs with no amount, which is how a dashboard shows "the car decides". See
   [Fast charge without the battery](#fast-charge-without-the-battery-the-fastnobattery-mode) above.
 - the targeted-charge controls — the **Target energy** number, the **Departure time** text, the
-  **Charge priority** select, the **Target rest SOC** number and the
+  **Charge priority** select, the **Target rest SOC** number, the **Target sun only** switch and the
   **Activate target** button — plus its plan sensors: **Target plan state**, **Target solar energy**,
   **Target grid energy**, **Target expected**, **Target shortfall** and **Grid top-up start**. See
   [Targeted charging](#targeted-charging-the-targeted-mode) above.
@@ -1915,7 +1926,7 @@ nothing rather than stale numbers from a plan nobody is acting on.
 | **Battery loaned today** | kWh | Energy the home battery has lent the car today so that a surplus below the charger's floor could still reach it. The loan is repaid from sun that would otherwise have been exported. Resets at local midnight. |
 | **Battery loan power** | W | How much of what the car is drawing right now is being covered by the home battery rather than by live sun. Zero outside the `Forecasted` mode. |
 
-The targeted-charge entities. The five controls are always live — a request can be prepared before
+The targeted-charge entities. The six controls are always live — a request can be prepared before
 the mode is selected — while the nine sensors are populated only while **Targeted** is driving, by the
 same rule the forecast plan follows.
 
@@ -1925,7 +1936,8 @@ same rule the forecast plan follows.
 | **Departure time** | text | When that energy has to be there. A bare `07:00` means the **next** 07:00 — which is what somebody typing it at 22:00 means by it; `2026-08-11 07:00` means exactly that. MQTT discovery has no datetime platform, which is why this is text. Read back as the resolved timestamp, so a day later it is still unambiguous. **Empty means no departure** — which is what it holds whenever no target is set, and clearing the box clears the pending departure. Anything else is refused with a warning in the log rather than guessed at. |
 | **Charge priority** | select | `Cheapest` (the default, and what every request did before this existed) or `JustInTime`. Under `JustInTime` the last stretch of the target is held back so the car finishes shortly before departure instead of hours early. Applies to the next **Activate target**, like the two above. Needs the car's SOC and `Ev:Vehicles:0:BatteryCapacityKWh` to find the rest point; without both, the press logs a warning and charges with nothing held. |
 | **Target rest SOC** | % | Where the car waits under `JustInTime` before the final stretch is released. Ignored under `Cheapest`. |
-| **Activate target** | button | Applies the two above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with either half missing, or with a departure already past, it logs a warning and does nothing. |
+| **Target sun only** | switch | Nothing bought from the grid: what the sun can't deliver by the departure is reported as **Target shortfall** rather than imported. Off by default. Applies to the next **Activate target**, like the others, and doesn't persist across restarts. Overrides `JustInTime`, which with no grid can only lose sun — the press charges as `Cheapest` and logs a warning. Shows a running request's setting, wherever it was started. |
+| **Activate target** | button | Applies the ones above: sets the request, then starts the `Targeted` mode — which writes the charger's use-mode `Fast`, like every other way of starting charging. Pressed with energy or departure missing, a departure already past, or one beyond `ChargeControl:Targeted:MaxHorizon`, it logs a warning and does nothing. |
 | **Target plan state** | — | One line on what the plan is doing and why — the same explanation the log carries. |
 | **Target forecast surplus** | kWh | All the surplus the window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided. Read it against **Target solar energy**: the gap between them is sun the roof will produce but the charger cannot run on by itself. |
 | **Target solar energy** | kWh | The share of what is still needed that the roof is expected to supply, after the home battery's own booking — including surplus below the charger's 6 A minimum, which the car can still use while the grid holds it at that minimum. Read it against **Target forecast surplus**. |
@@ -2906,7 +2918,7 @@ other:
 | **Solar** | Charge from surplus | Nothing to configure — the current is whatever the sun leaves over. The surplus, the battery SOC that gates it, and what the car is drawing. |
 | **Forecasted** | Charge to the forecast | The four runtime numbers the plan reads, then the day plan itself and the timeline chart. |
 | **Fast (no battery)** | Charge at maximum | How much to deliver before it stops — until the car stops, an amount in kWh, or a battery target — and optionally when you need it, which holds the charge back so it finishes just in time. Then what the speed costs: the car's actual draw and current, the setpoint read back, grid power, and the amount delivered so far when there is one. |
-| **Targeted** | Preview plan → Start charging / Cancel | What the car says about itself, then what you want — kilowatt-hours or a battery target — the charging priority and its rest level, the departure, the minimum battery SOC the planner works to, and the plan in words and figures *before* the charger moves. |
+| **Targeted** | Preview plan → Start charging / Cancel | What the car says about itself, then what you want — kilowatt-hours or a battery target — the charging priority and its rest level, **Sun only**, the departure, the minimum battery SOC the planner works to, and the plan in words and figures *before* the charger moves. |
 
 The tab is in the URL (`/charging-plan/forecasted`), so a bookmark and a refresh come back to the same
 mode and the back button walks them; `/charging-plan` with no tab opens on whatever is actually

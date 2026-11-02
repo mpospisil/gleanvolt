@@ -4,6 +4,37 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-02 — Sun only on a targeted charge, from the web UI and Home Assistant
+
+**Context.** The #249 record below left one case API-only: *"this much from the sun, and I'll accept
+falling short"*, which is `Targeted` with `maxGridEnergyWh: 0`. Someone using the web UI or Home
+Assistant could not ask for it ([issue #251](https://github.com/mpospisil/gleanvolt/issues/251)).
+
+**Decision — one boolean, not a grid budget.** The useful choices are "grid allowed" and "sun only". A
+kWh cap would put a third number beside the amount and the departure, and it is one the owner can't
+easily estimate, so it stays API-only. **Sun only** is a checkbox on the *Targeted* tab and the
+`target_sun_only` switch in Home Assistant, and maps to `TargetedChargeConstraints.SunOnly`
+(`MaxGridEnergyWh: 0`). Unticked leaves `Constraints` null, as before.
+
+**All three surfaces compose through `TargetedChargeRequestFactory`**, which now takes the constraints.
+The API passes its full `editable` set, and the form and HA pass sun only or nothing. Home Assistant's
+**Activate target** used to build its request by hand; it goes through the factory now too. So it also
+refuses a departure past `MaxHorizon`, as the form and the API already did.
+
+**Sun only rules out Just in time.** Holding the last stretch back to the departure, with no grid to
+make up a cloudy hour, can only lose sun. The form greys the choice out and says why. HA can't grey a
+select, so the press charges as `Cheapest` and logs a warning. The factory does not refuse the
+combination, because the API has accepted it since #128 and the MCP server relies on that.
+
+Consequences:
+
+- Nothing new while it runs. With nothing planned from the grid `plan.ImportsFromGrid` is false, so
+  the grid bridge never arms; a test now pins that on sun too weak for the charger's floor.
+- A cloud the 3-minute average hasn't caught up with can still import a little while the car runs at
+  its floor. The hint says "close to none", not zero.
+
+---
+
 ## 2026-10-26 — Forecasted, until full: one session over several days, and the one mode that survives a restart
 
 **Context.** A car left at home over a weekend or a week rarely fills on one sunny afternoon, and

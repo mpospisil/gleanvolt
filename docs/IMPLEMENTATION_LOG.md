@@ -4,6 +4,24 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-02 — Sun only on a targeted charge, from the web UI and Home Assistant (issue #251)
+
+`maxGridEnergyWh: 0` was API-only after #249. It is now a **Sun only** checkbox on the *Targeted* tab
+and a `target_sun_only` switch in Home Assistant. The reasoning is in `DECISIONS.md`.
+
+- `TargetedChargeRequestFactory.Create` takes `constraints`. The API passes `editable` through it
+  rather than patching the request afterwards. `TargetedChargeConstraints.SunOnly` and `IsSunOnly`
+  are new.
+- **Web:** the checkbox drops the preview like any edit. Ticking it moves the pacing to Cheapest and
+  disables Just in time, with a hint saying why. A running sun-only request seeds the box ticked.
+- **Home Assistant:** the switch is held until **Activate target**, like the other target entities,
+  and echoes a running request's setting. **Activate target** now composes through the factory, which
+  adds the `MaxHorizon` refusal it lacked. A sun-only `JustInTime` press charges as `Cheapest`.
+- Tests: the factory carries the constraint; a sun-only plan never `ImportsFromGrid` on sub-floor sun;
+  the form and HA paths, including the horizon refusal.
+
+---
+
 ## 2026-10-13 — The session energy target comes out of `Forecasted` too (issue #249)
 
 #217 kept the session energy target, on the grounds that a ceiling is not a request. #249 drops it

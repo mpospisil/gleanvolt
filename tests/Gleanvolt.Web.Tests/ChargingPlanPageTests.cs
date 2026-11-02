@@ -233,9 +233,10 @@ public class ChargingPlanPageTests : PageTest
 
         var page = RenderTab("targeted");
 
-        // The switch is in the header section, which the tab strip follows -- not inside any one tab.
+        // The switch is in the header section, which the tab strip follows -- not inside any one tab. The
+        // tab's own Sun only box (#251) is the one checkbox that belongs there.
         Assert.NotEmpty(page.FindAll("section.controls input[type=checkbox]"));
-        Assert.Empty(page.FindAll("section.tab-panel input[type=checkbox]"));
+        Assert.Empty(page.FindAll("section.tab-panel input[type=checkbox]:not(#sun-only)"));
     }
 
     [Fact]

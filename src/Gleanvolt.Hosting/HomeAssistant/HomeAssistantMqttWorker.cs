@@ -61,6 +61,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private string _pendingDepartureText = string.Empty;
     private TargetedChargePriority _pendingPriority = TargetedChargePriority.Cheapest;
     private double _pendingRestSocPercent;
+    private bool _pendingSunOnly;
 
     // The same arrangement for the fast charge's amount (#119). Full is the default, so a dashboard
     // nobody has touched presses the button and gets what the button has always done.
@@ -249,6 +250,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             await _client.SubscribeAsync(_discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        await _client.SubscribeAsync(_discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.ActivateTargetCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -276,6 +278,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         await PublishNumberStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishLowTariffStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishUntilFullStateAsync(cancellationToken).ConfigureAwait(false);
+        await PublishSunOnlyStateAsync(cancellationToken).ConfigureAwait(false);
         await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishSelectStatesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -322,6 +325,19 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             HaDiscovery.SwitchState(_untilFull.UntilFull),
             retain: true,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // The running request outranks whatever was last switched, like the priority: a sun-only charge
+    // started from the web UI shows up here too.
+    private Task PublishSunOnlyStateAsync(CancellationToken cancellationToken)
+    {
+        var sunOnly = _target.Request is { } request ? request.Constraints?.IsSunOnly == true : _pendingSunOnly;
+
+        return PublishAsync(
+            _discovery.SwitchStateTopic(HaDiscovery.TargetSunOnlySwitch),
+            HaDiscovery.SwitchState(sunOnly),
+            retain: true,
+            cancellationToken);
     }
 
     // The numbers carry the values the controller is actually using, so an HA restart (or a second
@@ -438,6 +454,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (_batteryHoldEnabled && topic == _discovery.BatteryHoldCommandTopic)
         {
             return OnBatteryHoldCommandAsync(payload);
+        }
+
+        if (topic == _discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch))
+        {
+            return OnSunOnlyCommandAsync(payload);
         }
 
         if (topic == _discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch))
@@ -647,6 +668,21 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             _discovery.SwitchStateTopic(HaDiscovery.UntilFullSwitch), HaDiscovery.SwitchState(_untilFull.UntilFull), retain: true, CancellationToken.None);
     }
 
+    // Held, not applied, like the energy and the priority: the button is what makes it part of a request.
+    private Task OnSunOnlyCommandAsync(string? payload)
+    {
+        if (HaDiscovery.TryParseSwitch(payload, out var on))
+        {
+            _pendingSunOnly = on;
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown command '{Payload}' for {ObjectId}.", payload, HaDiscovery.TargetSunOnlySwitch);
+        }
+
+        return PublishSunOnlyStateAsync(CancellationToken.None);
+    }
+
     private Task OnNumberCommandAsync(string objectId, string? payload)
     {
         if (!double.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
@@ -831,48 +867,50 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
             return;
         }
 
-        var now = _timeProvider.GetUtcNow();
-        if (departure <= now)
+        // Sun only rules Just in time out, as the web form does by greying it: holding the last stretch
+        // back with no grid to make up a cloudy hour can only lose sun. A switch can't grey a select, so
+        // the press says so in the log and charges as cheaply as it can.
+        var priority = _pendingPriority;
+        if (_pendingSunOnly && priority == TargetedChargePriority.JustInTime)
         {
-            _logger.LogWarning(
-                "Activate target pressed with a departure already past ({Departure}); set it again.",
-                departure.LocalDateTime);
-            return;
+            _logger.LogWarning("Just in time asked for with Sun only on; charging as Cheapest, since a hold with no grid can only lose sun.");
+            priority = TargetedChargePriority.Cheapest;
         }
 
-        var energyWh = _pendingEnergyWh;
-        var request = new TargetedChargeRequest(energyWh, departure, now) with { Priority = _pendingPriority };
-
-        // The same split the web tab makes, made in the same place in the sequence and by the same
-        // arithmetic. It needs the car's SOC and a configured capacity: without both there is no honest
-        // rest point, so the priority is honoured as far as it can be -- the request is still marked
-        // JustInTime -- and the tail is zero, which means nothing is held. Warned about rather than
-        // silently ignored, because a hold that quietly did not happen is the worst of the three.
-        if (_pendingPriority == TargetedChargePriority.JustInTime)
+        // A hold needs the car's SOC and a configured capacity to place a rest point. Without both the
+        // factory still marks the request JustInTime but holds nothing -- warned about rather than left
+        // silent, because a hold that quietly did not happen is the worst of the outcomes.
+        if (priority == TargetedChargePriority.JustInTime
+            && (_vehicle?.GetCurrentState()?.SocPercent is null || !_pack.CanTargetSoc))
         {
-            var socNow = _vehicle?.GetCurrentState()?.SocPercent;
-            var capacityWh = _pack.BatteryCapacityWh;
-            var endSoc = VehicleTargetEnergy.ResultingSocPercent(
-                socNow, energyWh, capacityWh, _pack.ChargeEfficiency);
+            _logger.LogWarning(
+                "Just-in-time asked for, but there is no car SOC and/or no Ev:Vehicles:0:BatteryCapacityKWh to "
+                + "measure a {Rest:F0}% rest point from; charging without a hold.",
+                _pendingRestSocPercent);
+        }
 
-            var tailWh = endSoc is { } end
-                ? VehicleTargetEnergy.TailAboveRestWh(
-                    socNow, end, _pendingRestSocPercent, capacityWh, _pack.ChargeEfficiency)
-                : null;
+        // The same factory the web tab and the API compose through (#251), so all three doors reject
+        // the same things -- a departure past, or past the horizon -- and split the tail the same way.
+        var now = _timeProvider.GetUtcNow();
+        var composed = TargetedChargeRequestFactory.Create(
+            departBy: departure,
+            energyWh: _pendingEnergyWh,
+            targetSocPercent: null,
+            priority: priority,
+            restSocPercent: _pendingRestSocPercent,
+            vehicleSoc: VehicleSocBasis.From(_vehicle?.GetCurrentState(), _vehicleOptions.MaxAge, now),
+            limits: new TargetedChargeRequestLimits(
+                _targetedOptions.MaxHorizon,
+                _pack.BatteryCapacityWh,
+                _pack.ChargeEfficiency,
+                _targetedOptions.JustInTime.RestSocPercent),
+            now: now,
+            constraints: _pendingSunOnly ? TargetedChargeConstraints.SunOnly : null);
 
-            if (tailWh is null)
-            {
-                _logger.LogWarning(
-                    "Just-in-time asked for, but there is no car SOC and/or no Ev:Vehicles:0:BatteryCapacityKWh to "
-                    + "measure a {Rest:F0}% rest point from; charging without a hold.",
-                    _pendingRestSocPercent);
-            }
-
-            request = request with
-            {
-                TailEnergyWh = Math.Clamp(tailWh ?? 0, 0, energyWh),
-                RestSocPercent = _pendingRestSocPercent,
-            };
+        if (composed.Request is not { } request)
+        {
+            _logger.LogWarning("Activate target pressed but the request was refused: {Reason}", composed.Error);
+            return;
         }
 
         _target.Set(request, "Home Assistant");

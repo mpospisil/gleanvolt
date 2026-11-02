@@ -46,6 +46,15 @@ public sealed record TargetedChargeConstraints(
     /// <summary>The constraint set that constrains nothing — what a request without one behaves as.</summary>
     public static TargetedChargeConstraints None { get; } = new();
 
+    /// <summary>
+    /// Nothing bought from the grid, and nothing else narrowed: the one constraint the web form and
+    /// Home Assistant offer (#251), as a single tick box. The API can still send any grid budget.
+    /// </summary>
+    public static TargetedChargeConstraints SunOnly { get; } = new(MaxGridEnergyWh: 0);
+
+    /// <summary>Whether this forbids buying anything from the grid at all.</summary>
+    public bool IsSunOnly => MaxGridEnergyWh is <= 0;
+
     /// <summary>Whether anything here actually narrows a plan.</summary>
     public bool IsEmpty =>
         NotBefore is null

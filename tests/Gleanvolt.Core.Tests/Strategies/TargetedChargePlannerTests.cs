@@ -791,6 +791,27 @@ public class TargetedChargePlannerTests
     }
 
     [Fact]
+    public void SunOnly_NeverArmsTheGridBridge_EvenOnSunTooWeakForTheCharger()
+    {
+        // #251. Sun under the 4.14kW floor all day: the case the bridge exists for, where an uncapped
+        // plan buys the gap. Sun only must leave nothing for TargetedChargingController.Bridge to arm on,
+        // which reads ImportsFromGrid -- not merely a grid figure rounded close to zero.
+        var now = FirstPeriodEnd.AddHours(-1);
+        var weak = Forecast(3_500, 3_500, 3_500, 3_500, 3_500, 3_500, 3_500);
+
+        var uncapped = Plan(requiredWh: 10_000, departBy: now.AddHours(4), now: now, forecast: weak);
+        var sunOnly = Plan(
+            requiredWh: 10_000, departBy: now.AddHours(4), now: now, forecast: weak,
+            constraints: TargetedChargeConstraints.SunOnly);
+
+        Assert.True(uncapped.ImportsFromGrid);
+        Assert.False(sunOnly.ImportsFromGrid);
+        Assert.Equal(0, sunOnly.GridEnergyWh);
+        Assert.Null(sunOnly.GridStart);
+        Assert.True(sunOnly.HasShortfall);
+    }
+
+    [Fact]
     public void AGridCapAboveWhatIsNeeded_ChangesNothing()
     {
         var now = FirstPeriodEnd.AddHours(-1);

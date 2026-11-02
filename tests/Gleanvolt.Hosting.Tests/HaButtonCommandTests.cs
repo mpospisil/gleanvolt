@@ -164,6 +164,71 @@ public class HaButtonCommandTests
     }
 
     [Fact]
+    public async Task SunOnlyIsHeldUntilActivateTarget_AndThenCapsTheGridAtZero()
+    {
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), HaDiscovery.PayloadOn);
+
+        // Held, like the energy and the departure: a switch flipped is not yet a request.
+        Assert.Null(_target.Request);
+        Assert.Empty(_actions.Starts);
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.Equal(0, _target.Request!.Constraints!.MaxGridEnergyWh);
+        Assert.Equal((ChargeControlMode.Targeted, "Home Assistant"), Assert.Single(_actions.Starts));
+    }
+
+    [Fact]
+    public async Task WithSunOnlyOff_TheRequestCarriesNoConstraints()
+    {
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), HaDiscovery.PayloadOn);
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), HaDiscovery.PayloadOff);
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.Null(_target.Request!.Constraints);
+    }
+
+    [Fact]
+    public async Task SunOnlyOverridesJustInTime_AsTheWebFormDoes()
+    {
+        // A hold with no grid to make up a cloudy hour can only lose sun. The web form greys Just in time
+        // out; a switch cannot grey a select, so the press charges as Cheapest instead.
+        _vehicle.State = new VehicleState(Now, SocPercent: 40);
+        var worker = Worker(EvInfo.Unknown with { BatteryCapacityWh = 77_000, ChargeEfficiency = 0.9 });
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "30");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.SelectCommandTopic(HaDiscovery.TargetPrioritySelect), "JustInTime");
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), HaDiscovery.PayloadOn);
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.Equal(TargetedChargePriority.Cheapest, _target.Request!.Priority);
+        Assert.False(_target.Request.HoldsTail);
+    }
+
+    [Fact]
+    public async Task ActivateTargetRefusesADepartureBeyondTheHorizon()
+    {
+        // Through the same factory as the web form and the API now, so the same horizon applies.
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(
+            Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "2026-08-20 07:00");
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.Null(_target.Request);
+        Assert.Empty(_actions.Starts);
+    }
+
+    [Fact]
     public async Task ActivateTargetStillRefusesToFireWithNoEnergy()
     {
         var worker = Worker();
