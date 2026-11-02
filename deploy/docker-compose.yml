@@ -19,18 +19,28 @@
 # being present: HomeAssistant:Enabled is its own switch (HOMEASSISTANT_ENABLED below), off by
 # default, so a controller-only run neither starts nor waits on a broker that was never asked for. See
 # deploy/README.md's "Running without Home Assistant".
+#
+# All three services run on the host's network (issue #268), not on a compose bridge network. The
+# controller then sees the Pi's real interface, so anything that works out the LAN's range from the
+# interfaces finds the LAN and not Docker's 172.x network, and the three reach each other on
+# localhost, which is also how a broker or Home Assistant on another device is reached: by address,
+# never by a compose service name. The cost is that 8090, 1883 and 8123 are the host's own ports: a
+# second program already listening on one of them is a startup failure in that service's log
+# ("address already in use") -- new for 1883, which used to be unpublished. See the README's
+# "Troubleshooting".
 
 name: solax
 
 services:
-  # The broker is deliberately NOT published to the LAN -- no `ports:` entry. Only the other two
-  # services reach it, over this compose network. Authentication is on regardless (mosquitto.conf),
-  # so a future decision to expose it doesn't silently open the control topics.
+  # Listens on the Pi's :1883, so it is reachable from the LAN -- which a broker that other devices
+  # publish to has to be anyway. Authentication is on (mosquitto.conf), so reachable is not open:
+  # the topics carry runtime control, and an anonymous client is refused.
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: gleanvolt-mosquitto
     restart: unless-stopped
     profiles: ["mosquitto"]
+    network_mode: host
     volumes:
       # Config is read-only to the broker; the password file is created out-of-band, see README.
       - ./mosquitto/config:/mosquitto/config:ro
@@ -61,6 +71,10 @@ services:
     # `docker compose stop` also stays stopped -- a manually stopped container ignores the policy
     # entirely, whatever it exited with.
     restart: on-failure
+    # The host's network, not a bridge (see the top of this file): the web UI binds the Pi's own
+    # :${WEB_PORT} directly, with nothing to publish, and the Modbus devices and any broker are reached
+    # exactly as the Pi itself reaches them.
+    network_mode: host
     # Docker's default grace period is 10s, which would SIGKILL the container part-way through the one
     # thing a graceful stop exists to do -- releasing the charger. 60s because a real stop was measured
     # at 19s on a healthy system: a Modbus read already in flight when the stop arrives cannot notice
@@ -116,8 +130,11 @@ services:
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
       # together under one heading rather than as independent-looking settings.
       HomeAssistant__Enabled: ${HOMEASSISTANT_ENABLED:-false}
-      HomeAssistant__BrokerHost: mosquitto     # compose-network name, not localhost
-      HomeAssistant__BrokerPort: "1883"
+      # MQTT_BROKER_HOST is the one broker address both MQTT links dial (this one and Vehicle__ below).
+      # The default is the `mosquitto` service on this Pi, which on the host's network is localhost; a
+      # broker on another device is its address in .env.
+      HomeAssistant__BrokerHost: ${MQTT_BROKER_HOST:-localhost}
+      HomeAssistant__BrokerPort: ${MQTT_BROKER_PORT:-1883}
       HomeAssistant__Username: ${MQTT_USERNAME:-}
       HomeAssistant__Password: ${MQTT_PASSWORD:-}
 
@@ -143,18 +160,16 @@ services:
       # Vehicle telemetry (issue #73). Reads the car's own SOC off MQTT; writes nothing, so there is no
       # dry-run and the worst a wrong topic can do is leave the dashboard's Vehicle card absent.
       #
-      # Unlike HomeAssistant__BrokerHost above, this one is overridable rather than pinned to the
-      # compose-network name. The car's data is *published* by Home Assistant, and under
-      # deploy-controller-only.sh there is no mosquitto on this network at all -- so "the broker beside
-      # us" is the common case, not the only one, and pointing this at the machine that does run Home
-      # Assistant has to stay possible.
+      # The same MQTT_BROKER_HOST as the block above. VEHICLE_BROKER_HOST/_PORT are the older names
+      # for this one link and still win when set, so an .env written before MQTT_BROKER_HOST existed
+      # keeps working untouched; nothing new needs them.
       #
       # The credentials are deliberately the same MQTT_USERNAME/MQTT_PASSWORD the block above uses:
       # publishing status to a broker and subscribing to it are the same broker in every deployment
       # this file describes, and a second pair of variables would only be a way to get them out of sync.
       Vehicle__Enabled: ${VEHICLE_ENABLED:-false}
-      Vehicle__BrokerHost: ${VEHICLE_BROKER_HOST:-mosquitto}
-      Vehicle__BrokerPort: ${VEHICLE_BROKER_PORT:-1883}
+      Vehicle__BrokerHost: ${VEHICLE_BROKER_HOST:-${MQTT_BROKER_HOST:-localhost}}
+      Vehicle__BrokerPort: ${VEHICLE_BROKER_PORT:-${MQTT_BROKER_PORT:-1883}}
       Vehicle__Username: ${MQTT_USERNAME:-}
       Vehicle__Password: ${MQTT_PASSWORD:-}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
@@ -240,9 +255,9 @@ services:
       BatteryHold__Enabled: ${BATTERY_HOLD_ENABLED:-false}
       BatteryHold__DryRun: ${BATTERY_HOLD_DRY_RUN:-true}
 
-      # The self-hosted UI (issue #44). On by default, and published below without anything in .env
-      # having to say so: a fresh deploy must produce a working UI, not a container that needs two
-      # more settings before it shows anything.
+      # The self-hosted UI (issue #44). On by default, and on the Pi's own port without anything in
+      # .env having to say so: a fresh deploy must produce a working UI, not a container that needs
+      # two more settings before it shows anything.
       #
       # Web__RequireAuthentication is deliberately NOT passed through as a default. Unset means
       # "follow the password": WEB_PASSWORD_HASH turns the login on, and no hash means an open UI on
@@ -257,18 +272,13 @@ services:
       # write to hardware and any program on the LAN can reach a port. Enabling it with no key set is
       # refused at startup rather than served.
       #
-      # It shares the UI's port -- one appliance, one socket -- so nothing extra is published below.
+      # It shares the UI's port -- one appliance, one socket -- so there is no second port to open.
       # The key's name is what appears in the log and in the recorded session as the source of an
       # action, so name it after the client. Add more Api__Keys__<name> lines here for more clients.
       Api__Enabled: ${API_ENABLED:-false}
       Api__Keys__client: ${API_KEY:-}
-    ports:
-      # Published unconditionally, which is why WEB_ENABLED=false is worth understanding: the port is
-      # still bound on the host, but nothing inside the container listens on it (Program.cs replaces
-      # the server outright), so connections are refused rather than served. Before this file
-      # published anything, turning the UI on also meant merging docker-compose.web.yml via
-      # COMPOSE_FILE -- a second, easily-forgotten step whose only symptom was an unreachable UI.
-      - "${WEB_PORT:-8090}:${WEB_PORT:-8090}"
+    # No `ports:` -- on the host's network there is nothing to publish; the process binds the Pi's
+    # port itself, and with WEB_ENABLED=false it binds nothing at all.
     volumes:
       # Serilog's rolling file sink. Must be chowned to the image's non-root uid (1654) on the host.
       - ./logs:/app/logs
@@ -295,10 +305,16 @@ services:
       mosquitto:
         condition: service_started
         required: false
+    # Home Assistant's own recommended way to run in Docker, and what gives it its LAN discovery.
+    network_mode: host
+    # Home Assistant keeps its MQTT broker address in its own config (.storage), and every install
+    # made while these services shared a compose network has `mosquitto` there -- a name that only the
+    # compose network resolved. This keeps it resolving, to the broker on this same host, so an
+    # upgrade needs no change in Home Assistant. A new install may enter `localhost` instead.
+    extra_hosts:
+      - "mosquitto:127.0.0.1"
     environment:
       TZ: ${TZ:-Europe/Prague}
-    ports:
-      - "8123:8123"
     volumes:
       # Holds .storage/ (account, entity registry, integration config) and the recorder database.
       # This is the one directory whose loss cannot be recovered from git -- back it up.
@@ -309,7 +325,7 @@ services:
     # reservation -- raising it does not make HA use more, it only stops the kernel killing it at a
     # bad moment, so the default is set well clear of the measured figure rather than just above it.
     # Lower it only on a board too small for the headroom, and see README.md for the recorder tuning
-    # that brings the usage itself down. Bridge networking is enough -- HA only speaks MQTT here.
+    # that brings the usage itself down.
     mem_limit: ${HA_MEM_LIMIT:-1536m}
     logging:
       driver: json-file

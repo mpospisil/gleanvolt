@@ -4,6 +4,24 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-02 — The Pi's containers on the host's network, and one broker address (issue #268)
+
+The controller, Mosquitto and Home Assistant now run with `network_mode: host`, so the controller sees
+the Pi's real interface and a broker on another device is reached by address. The reasoning is in
+`DECISIONS.md`.
+
+- `deploy/docker-compose.yml`: `network_mode: host` on all three, no `ports:`. `MQTT_BROKER_HOST`
+  (default `localhost`) and `MQTT_BROKER_PORT` feed both MQTT links. `VEHICLE_BROKER_HOST`/`_PORT`
+  still win for the car's link. Home Assistant gets `extra_hosts: mosquitto:127.0.0.1`, because every
+  existing install has `mosquitto` saved as its broker.
+- `docker-compose.web.yml` is empty: its port mapping would clash with host networking when merged.
+- `NetworkSelection`: no "this looks like a container" warning when the host's Docker bridges are
+  visible, which only happens on the host's network. One new test.
+- Docs: the deploy README (a controller-only deploy beside an existing broker, the upgrade, port
+  clashes), `.env.example` and the root README's note on the discover tool.
+
+---
+
 ## 2026-11-02 — Sun only on a targeted charge, from the web UI and Home Assistant (issue #251)
 
 `maxGridEnergyWh: 0` was API-only after #249. It is now a **Sun only** checkbox on the *Targeted* tab

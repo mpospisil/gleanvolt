@@ -4,6 +4,45 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-02 — The Pi's containers run on the host's network, and the broker can be anywhere
+
+**Context.** The 2026-08-02 record below put the three services on a compose network and kept the
+broker off the LAN. Two things followed that fit only that all-in-one layout
+([issue #268](https://github.com/mpospisil/gleanvolt/issues/268)). The controller cannot see the LAN
+it runs on: its only interface is the container's own `172.x`, so anything that works out the LAN's
+range from the interfaces finds Docker's network (`gleanvolt-discover` today, the scan on `/pv-system`
+next). And `HomeAssistant__BrokerHost` was pinned to the service name `mosquitto`, so adding only the
+controller beside an existing broker meant editing the compose file.
+
+**Decision — `network_mode: host` for all three services**, not only the controller. With the
+controller alone on the host it would reach a bridged broker through a published `1883` anyway, so the
+broker's port is on the LAN either way; doing all three keeps one rule. It is also Home Assistant's own
+recommended way to run in Docker. **This supersedes Decision 5's "no host port" for the broker.** The
+part that mattered, authentication, stays: the broker refuses anonymous clients, and a broker other
+devices use has to be reachable.
+
+**One broker address, `MQTT_BROKER_HOST` (default `localhost`)**, feeds both MQTT links.
+`VEHICLE_BROKER_HOST`/`_PORT` still win for the car's link when set, so no existing `.env` changes.
+
+**The name `mosquitto` keeps resolving for Home Assistant** (`extra_hosts: mosquitto:127.0.0.1`).
+Home Assistant stores its broker address in `.storage`, and every existing install has `mosquitto`
+there; without the mapping an upgrade would silently cut it off from the broker.
+
+**The discover tool's container warning stays, but not on the host network.** A container on the
+host's network sees the host's Docker bridges (`docker0`, `br-…`); a bridged one never does. So a
+bridge in the interface list means the LAN interface beside it is real.
+
+Consequences:
+
+- `8090`, `1883` and `8123` are the Pi's own ports. A second program on one of them is a crash loop
+  with "address already in use" in that service's log; the deploy README's troubleshooting says how
+  to find it. A host that already runs its own broker or Home Assistant wants the controller-only
+  deploy with `MQTT_BROKER_HOST`, not a second copy.
+- Docker Desktop on Windows is untouched: `Dockerfile.windows` is a Windows container, not this
+  compose file.
+
+---
+
 ## 2026-11-02 — Sun only on a targeted charge, from the web UI and Home Assistant
 
 **Context.** The #249 record below left one case API-only: *"this much from the sun, and I'll accept
