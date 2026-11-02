@@ -56,6 +56,19 @@ public class NetworkSelectionTests
     }
 
     [Fact]
+    public void A_container_on_the_host_network_sees_the_hosts_bridges_and_is_not_flagged()
+    {
+        var selection = NetworkSelection.FromInterfaces(
+        [
+            Interface("docker0", "172.17.0.1", 16, up: false),
+            Interface("eth0", "192.168.2.7", 24),
+        ], inContainer: true);
+
+        Assert.Equal("192.168.2.0/24", Assert.Single(selection.Subnets).ToString());
+        Assert.DoesNotContain(selection.Warnings, warning => warning.Contains("looks like a container", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void No_interface_to_scan_says_what_to_pass_instead()
     {
         var selection = NetworkSelection.FromInterfaces([Interface("lo", "127.0.0.1", 8, loopback: true)], inContainer: false);

@@ -12,12 +12,13 @@ steps further down apply to you.
 ```
                   Raspberry Pi  (192.168.2.7, arm64)
     ┌────────────────────────────────────────────────────────────────────┐
-    │ compose project "solax"        (all state on bind mounts)          │
+    │ compose project "solax"   (all state on bind mounts,               │
+    │                            every service on the host's network)    │
     │                                                                    │
-    │ gleanvolt-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant       │
-    │      │             (opt-in profile,     opt-in profile,            │
-    │      │              no host port)          LAN :8123)              │
-    │      └── LAN :8090, the web UI -- on by default                    │
+    │ gleanvolt-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant   │
+    │      │                   (opt-in profile,    (opt-in profile,      │
+    │      │                    :1883, password)    :8123)               │
+    │      └── :8090, the web UI -- on by default                        │
     └────────────────────────────────────────────────────────────────────┘
          │ Modbus TCP
          ▼
@@ -122,8 +123,8 @@ INVERTER_HOST=192.168.2.10      # your inverter's address
 EV_CHARGER_HOST=192.168.2.6   # your charger's address
 ```
 
-Nothing about the web UI needs setting: it is on by default, on port 8090, and `docker-compose.yml`
-publishes that port, so the deploy ends at a working `http://192.168.2.7:8090`. The first page it
+Nothing about the web UI needs setting: it is on by default, on the Pi's own port 8090 (the
+controller runs on the host's network), so the deploy ends at a working `http://192.168.2.7:8090`. The first page it
 serves asks you to choose a password, and nothing else is reachable until you do — see
 [Setting the web UI password](#setting-the-web-ui-password).
 
@@ -143,6 +144,29 @@ happens to be sitting in `.env` on the Pi.
 To move from B to A: set `HOMEASSISTANT_ENABLED=true`, add the MQTT credentials, create the broker
 password file (step 7), and run `./deploy/deploy.sh`. To go the other way, just run
 `./deploy/deploy-controller-only.sh` — the extra containers are removed and your data is untouched.
+
+### Workflow B beside a broker and Home Assistant you already run
+
+Workflow B with `HOMEASSISTANT_ENABLED=true` adds only the controller to an existing setup: Home
+Assistant and Mosquitto stay where they are, on this Pi outside this stack or on another device, and
+the controller dials them by address. One setting says where the broker is, for both MQTT links (Home
+Assistant's and the car's):
+
+```bash
+HOMEASSISTANT_ENABLED=true
+MQTT_BROKER_HOST=192.168.2.20  # the broker's address; unset is this Pi (localhost)
+MQTT_BROKER_PORT=1883          # only if it is not 1883
+MQTT_USERNAME=solax            # an account on *that* broker
+MQTT_PASSWORD=<its password>
+```
+
+`PV_ID` is required once Home Assistant is enabled — see [`.env.example`](.env.example). Deploy with
+`./deploy/deploy-controller-only.sh`; skip step 7, which is about this stack's own broker. The
+entities appear in the Home Assistant that broker serves, through its MQTT integration's discovery,
+exactly as they do in workflow A.
+
+An `.env` that already has `VEHICLE_BROKER_HOST`/`VEHICLE_BROKER_PORT` keeps working: they are the
+older names for the car's link alone, and still win over `MQTT_BROKER_HOST` for that link when set.
 
 ## Storage and the boot medium
 
@@ -389,15 +413,32 @@ automations keep working. Only the device's display name changes, to "Gleanvolt"
 topics would rename every entity, and that is not worth doing outside a major version with a
 migration path.
 
+### Upgrading to the host network
+
+Since [issue #268](https://github.com/mpospisil/gleanvolt/issues/268) all three services run on the
+Pi's own network instead of a compose network. Redeploying is the whole upgrade, with nothing to change
+in `.env` or in Home Assistant:
+
+- **Home Assistant's MQTT integration** still says broker `mosquitto`. That name used to be resolved by
+  the compose network; the compose file now maps it to this Pi, so it keeps working. Changing it to
+  `localhost` (Settings → Devices & Services → MQTT → Reconfigure) is tidier and optional.
+- **The controller** dials `localhost`, or `MQTT_BROKER_HOST` when set. An `.env` with
+  `VEHICLE_BROKER_HOST=mosquitto` would break the car's feed, because the controller has no such name;
+  delete that line.
+- **The broker is now on the Pi's `:1883`**, reachable from the LAN. It always required a password, so
+  this exposes nothing that was open; it is also what lets another device use it. If the Pi already ran
+  a second broker on 1883, see [Troubleshooting](#troubleshooting).
+- **The `solax_default` network** the old layout used may be left behind, unused and harmless;
+  `docker network rm solax_default` clears it.
+
 ### Upgrading a Pi deployed before the UI was on by default
 
 Earlier releases had the UI off, required `WEB_ENABLED=true`, and published its port only if `.env`
 merged a second compose file. Deploying this release onto such a Pi works, but two lines in `.env`
 are now stale and one of them is actively harmful:
 
-- **`COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml`** — delete it. `docker-compose.yml`
-  publishes the port itself; the second file is kept only so this line doesn't break the deploy
-  outright, and merging it does nothing.
+- **`COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml`** — delete it. The second file is now
+  empty and kept only so this line doesn't break the deploy outright; merging it does nothing.
 - **`WEB_ENABLED=true`** — harmless, now the default. Delete it or leave it.
 - **`WEB_REQUIRE_AUTHENTICATION=true`** — if you had this *and* a `WEB_PASSWORD_HASH`, nothing
   changes and you can delete the line: the hash alone requires the login. If you had it **without** a
@@ -705,7 +746,7 @@ This directory mirrors `/opt/gleanvolt` on the Pi, so what you edit here is what
 ```
 deploy/
 ├── docker-compose.yml              → /opt/gleanvolt/docker-compose.yml
-├── docker-compose.web.yml          → /opt/gleanvolt/docker-compose.web.yml (published UI port; opt-in via .env)
+├── docker-compose.web.yml          → /opt/gleanvolt/docker-compose.web.yml (empty; kept for old .env files)
 ├── mosquitto/config/mosquitto.conf → /opt/gleanvolt/mosquitto/config/    (overwritten each deploy)
 ├── homeassistant/config/*.yaml     → /opt/gleanvolt/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/gleanvolt/.env
@@ -728,8 +769,7 @@ setting `COMPOSE_PROFILES` itself for that restart (`mosquitto,homeassistant` or
 what actually decides whether the other two containers run, regardless of what's already in `.env`
 on the Pi. Both create `logs/` and `data/` and hand them to uid 1654 if they are missing or wrongly
 owned; for anything else they refuse to run rather than guess. Neither copies `.env` — which still
-decides whether `docker-compose.web.yml` (the UI's published port) and `HomeAssistant:Enabled`
-actually take effect.
+decides whether `HomeAssistant:Enabled` actually takes effect.
 
 | Variable | Default | |
 |---|---|---|
@@ -752,7 +792,8 @@ Assistant's presence or absence changes nothing about it.
 **If you deployed with `deploy.sh`** (the full stack, Home Assistant included):
 
 1. Open `http://192.168.2.7:8123` and complete Home Assistant onboarding (local account).
-2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `mosquitto`, port `1883`, and
+2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `localhost` (Home Assistant
+   and the broker share the Pi's network; `mosquitto` also works, and is what older installs have), port `1883`, and
    **the username and password from `.env`** — unlike the dev stack, this broker is authenticated.
 3. The controller publishes MQTT discovery configs on connect; the SolaX device and its entities
    appear by themselves.
@@ -1239,12 +1280,20 @@ fault rather than a missing setting. Start with what the container says about it
 docker compose logs gleanvolt-controller | grep -i "web ui"
 ```
 
-`Web UI enabled; listening on port 8090, login not required` means the *process* is listening. If the
-browser still can't connect, check the port is actually published — `docker compose ps` should show
-`0.0.0.0:8090->8090/tcp`, and a bare `8090/tcp` means it isn't. That is the symptom of an `.env` left
-over from an older release: a `COMPOSE_FILE=` line that no longer matches the files on the Pi
-overrides the base compose file rather than adding to it. Delete the `COMPOSE_FILE` line — it is
-obsolete, `docker-compose.yml` publishes the port itself now — and redeploy.
+`Web UI enabled; listening on port 8090, login not required` means the *process* is listening, and
+because the controller runs on the host's network that is the Pi's own port: `ss -ltnp | grep 8090`
+on the Pi shows it. If the browser still can't connect, look at the Pi's firewall, if it has one.
+
+A crash loop with `address already in use` in the log means something else on the Pi already listens on
+that port; on the host's network the port is simply the Pi's, so `ss -ltnp | grep 8090` names the
+other program. Move it, or move the UI with
+`WEB_PORT` in `.env`. The same goes for Home Assistant on `8123`, and for the broker on `1883`
+(`docker compose logs mosquitto`), which used to be unpublished and so could never clash — a Pi that already runs its own Mosquitto or Home Assistant outside this stack
+wants [workflow B beside them](#workflow-b-beside-a-broker-and-home-assistant-you-already-run), not a
+second copy.
+
+A `COMPOSE_FILE=` line in `.env` from an older release is obsolete and safe to delete; the file it
+names is now empty.
 
 No `Web UI enabled` line at all means `WEB_ENABLED=false` is set in `.env`. A startup failure instead
 means `WEB_REQUIRE_AUTHENTICATION=true` was set with no `WEB_PASSWORD_HASH`; the log says so
@@ -1272,7 +1321,7 @@ sudo chown -R 1654:1654 /opt/gleanvolt/data && docker compose restart gleanvolt-
 ```
 
 **The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 8).
-Bridge networking routes through the host, so if the Pi can reach the inverter, the container can.
+The controller is on the Pi's own network, so if the Pi can reach the inverter, the controller can.
 
 **`docker compose` says permission denied.** The ssh user isn't in the `docker` group yet, or hasn't
 logged out and back in since being added.

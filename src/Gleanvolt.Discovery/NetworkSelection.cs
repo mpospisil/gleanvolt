@@ -35,8 +35,14 @@ public sealed record NetworkSelection(IReadOnlyList<Ipv4Subnet> Subnets, IReadOn
     {
         var subnets = new List<Ipv4Subnet>();
         var warnings = new List<string>();
+        var list = interfaces.ToList();
 
-        foreach (var entry in interfaces)
+        // A container on the host's network (`network_mode: host`, as deploy/docker-compose.yml runs the
+        // controller) sees the host's own interfaces, Docker's bridges among them. A bridged container
+        // never does -- it has only its own end of one -- so a bridge in the list means the LAN is here.
+        var onHostNetwork = list.Any(IsVirtualBridge);
+
+        foreach (var entry in list)
         {
             if (!entry.IsUp || entry.IsLoopback || entry.Address.AddressFamily != AddressFamily.InterNetwork
                 || !Ipv4Subnet.IsPrivate(entry.Address))
@@ -46,7 +52,7 @@ public sealed record NetworkSelection(IReadOnlyList<Ipv4Subnet> Subnets, IReadOn
 
             var actual = Ipv4Subnet.Containing(entry.Address, entry.PrefixLength);
 
-            if (VirtualBridgePrefixes.Any(prefix => entry.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            if (IsVirtualBridge(entry))
             {
                 warnings.Add($"Skipped {entry.Name} ({actual}): a container or VM bridge, not your LAN.");
                 continue;
@@ -62,7 +68,7 @@ public sealed record NetworkSelection(IReadOnlyList<Ipv4Subnet> Subnets, IReadOn
                     + $"the /{WidestDefaultPrefix} around this machine. Pass --subnet {actual} to scan all of it.");
             }
 
-            if (inContainer)
+            if (inContainer && !onHostNetwork)
             {
                 warnings.Add(
                     $"This looks like a container, so {subnet} on {entry.Name} is most likely the container's own "
@@ -84,6 +90,9 @@ public sealed record NetworkSelection(IReadOnlyList<Ipv4Subnet> Subnets, IReadOn
 
         return new NetworkSelection(subnets, warnings);
     }
+
+    private static bool IsVirtualBridge(InterfaceAddress entry) =>
+        VirtualBridgePrefixes.Any(prefix => entry.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>This machine's IPv4 addresses.</summary>
     public static IEnumerable<InterfaceAddress> LocalInterfaces()

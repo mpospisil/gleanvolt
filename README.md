@@ -242,10 +242,10 @@ Pv__Inverter__UnitId=1
 ```
 
 `--json` prints the same results as JSON, `--help` lists the rest (ports, unit ids, timeouts), and Ctrl+C
-stops the scan and prints what it had found. Inside a container the default subnet is the container's
-own, not your LAN, even when the container reaches the devices fine: the tool says so, and the fix is
-`--subnet` with your LAN's range, or running the container with `--network host`
-([issue #268](https://github.com/mpospisil/gleanvolt/issues/268)).
+stops the scan and prints what it had found. Inside a bridged container the default subnet is the
+container's own, not your LAN, even when the container reaches the devices fine: the tool says so, and
+the fix is `--subnet` with your LAN's range, or running the container with `--network host`, as the
+Pi's compose stack runs the controller ([issue #268](https://github.com/mpospisil/gleanvolt/issues/268)).
 
 ## Install on Linux
 
