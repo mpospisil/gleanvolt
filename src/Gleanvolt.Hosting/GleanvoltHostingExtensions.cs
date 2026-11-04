@@ -355,7 +355,9 @@ public static class GleanvoltHostingExtensions
                 options.ResumeHysteresisWatts,
                 options.BatteryFullSocPercent,
                 options.BatteryReleaseSocPercent,
-                options.CompletionDwell);
+                options.CompletionDwell,
+                options.BatteryStallDwell,
+                options.BatteryStallWatts);
         });
 
         // Forecast-driven charge control (issue #22): the Solcast forecast decides how much of today's

@@ -16,7 +16,8 @@ namespace Gleanvolt.Core.Strategies;
 /// alone. Nothing writes Fast back: a charger changed at the wallbox mid-session belongs to whoever
 /// changed it. Above the battery-SOC gate it sets the current the surplus can cover (phase-aware, whole
 /// amps, clamped to min/max), with resume hysteresis; below the gate or below the minimum it waits,
-/// paused or stood down by <see cref="ChargerWait"/>.
+/// paused or stood down by <see cref="ChargerWait"/>. A battery that has stopped taking charge short of
+/// the gate, with sun to spare, counts as full.
 ///
 /// <para>It ends like every other mode (#280): on a full car, through <see cref="ChargerOwnership"/>,
 /// and once the forecast has no sun left today that clears the charger's floor, through
@@ -33,6 +34,13 @@ public sealed class LiveSolarChargingController : IChargingController
     private readonly double _fullSocPercent;
     private readonly double _releaseSocPercent;
     private readonly TimeSpan _completionDwell;
+    private readonly TimeSpan _stallDwell;
+    private readonly double _stallWatts;
+
+    // When the battery was first seen stalled (in the band, taking next to nothing, sun to spare), or
+    // null. Our own state, like the hysteresis: the gate needs it held over a dwell, not one poll.
+    private DateTimeOffset? _stalledSince;
+    private DateTimeOffset? _stallLastSeen;
 
     public LiveSolarChargingController(
         ChargePowerConverter powerConverter,
@@ -42,7 +50,9 @@ public sealed class LiveSolarChargingController : IChargingController
         double hysteresisWatts,
         double fullSocPercent,
         double releaseSocPercent,
-        TimeSpan completionDwell)
+        TimeSpan completionDwell,
+        TimeSpan? stallDwell = null,
+        double stallWatts = 100)
     {
         if (currentStepAmps <= 0)
         {
@@ -67,6 +77,8 @@ public sealed class LiveSolarChargingController : IChargingController
         _fullSocPercent = fullSocPercent;
         _releaseSocPercent = releaseSocPercent;
         _completionDwell = completionDwell;
+        _stallDwell = stallDwell ?? TimeSpan.FromMinutes(10);
+        _stallWatts = stallWatts;
     }
 
     /// <summary>The charger's minimum viable power: the surplus the forecast has to clear for there to be sun worth waiting for.</summary>
@@ -90,13 +102,6 @@ public sealed class LiveSolarChargingController : IChargingController
         // keep going down to the release threshold, so EV load dipping the battery doesn't immediately
         // close the gate.
         var soc = input.State.BatterySocPercent;
-        var gateOpen = charging ? soc >= _releaseSocPercent : soc >= _fullSocPercent;
-        if (!gateOpen)
-        {
-            // Not known for how long: the battery fills at whatever rate the sun and the house allow.
-            var threshold = charging ? _releaseSocPercent : _fullSocPercent;
-            return Wait(input, null, Invariant($"Battery {soc:F0}% below {threshold:F0}% full-battery gate."));
-        }
 
         // The smoothed (moving-average) surplus, so a passing cloud doesn't interrupt the session.
         var availableWatts = input.SurplusWatts;
@@ -105,6 +110,16 @@ public sealed class LiveSolarChargingController : IChargingController
         // Asymmetric threshold: keep charging down to the minimum, but only (re)start once we're a
         // hysteresis margin above it.
         var startThresholdWatts = charging ? minWatts : minWatts + _hysteresisWatts;
+
+        var stalled = Stalled(input, startThresholdWatts);
+        var gateOpen = charging ? soc >= _releaseSocPercent : soc >= _fullSocPercent || stalled;
+        if (!gateOpen)
+        {
+            // Not known for how long: the battery fills at whatever rate the sun and the house allow.
+            var threshold = charging ? _releaseSocPercent : _fullSocPercent;
+            return Wait(input, null, Invariant($"Battery {soc:F0}% below {threshold:F0}% full-battery gate."));
+        }
+
         if (availableWatts < startThresholdWatts)
         {
             return Wait(
@@ -120,8 +135,38 @@ public sealed class LiveSolarChargingController : IChargingController
                 input, ChargerWait.NextSun(input), Invariant($"Live surplus {availableWatts:F0}W quantises below minimum {_minChargingCurrentAmps}A."));
         }
 
+        var stalledNote = !charging && soc < _fullSocPercent
+            ? Invariant($" Battery {soc:F0}% has stopped taking charge; counted as full.")
+            : "";
         return new ChargingControlDecision(
-            ChargingControlAction.Charge, targetAmps, Invariant($"Live surplus {availableWatts:F0}W -> charge at {targetAmps}A."));
+            ChargingControlAction.Charge,
+            targetAmps,
+            Invariant($"Live surplus {availableWatts:F0}W -> charge at {targetAmps}A.{stalledNote}"));
+    }
+
+    // An aging or unbalanced pack can stop charging short of the full threshold: the BMS ends the
+    // charge when its highest cell reaches the limit, and SOC drift leaves the reading short of where
+    // it would otherwise read. Waiting for the number would then wait all day with the sun exported.
+    // So a battery inside the hysteresis band that has taken next to nothing for a while, with the
+    // sun to start the car, counts as full: it is full in the only sense the gate cares about.
+    private bool Stalled(ChargingControlInput input, double startThresholdWatts)
+    {
+        var state = input.State;
+        var stalledNow = state.BatterySocPercent >= _releaseSocPercent
+            && state.BatteryPowerWatts < _stallWatts
+            && input.SurplusWatts >= startThresholdWatts;
+        // Only a run of consecutive polls counts: one from an earlier session, before a gap in which
+        // this mode was not driving, says nothing about the battery now.
+        var gap = state.Timestamp - _stallLastSeen;
+        _stallLastSeen = state.Timestamp;
+        if (!stalledNow || gap > TimeSpan.FromMinutes(1))
+        {
+            _stalledSince = stalledNow ? state.Timestamp : null;
+            return false;
+        }
+
+        _stalledSince ??= state.Timestamp;
+        return state.Timestamp - _stalledSince >= _stallDwell;
     }
 
     // Not now: over for the day once the forecast has no sun left, otherwise paused or stood down.
