@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Menu" xml:space="preserve">
+    <value>Nabídka</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Přehled</value>
+  </data>
+  <data name="NavChargingPlan" xml:space="preserve">
+    <value>Plán nabíjení</value>
+  </data>
+  <data name="NavSessions" xml:space="preserve">
+    <value>Nabíjení</value>
+  </data>
+  <data name="NavEnergy" xml:space="preserve">
+    <value>Energie</value>
+  </data>
+  <data name="NavForecast" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="NavCar" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Nastavení</value>
+  </data>
+  <data name="SignOut" xml:space="preserve">
+    <value>Odhlásit</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Jazyk</value>
+  </data>
+  <data name="NotFound" xml:space="preserve">
+    <value>Taková stránka neexistuje. Vraťte se na {0}.</value>
+  </data>
+  <data name="Days_One" xml:space="preserve">
+    <value>{0} den</value>
+  </data>
+  <data name="Days_Few" xml:space="preserve">
+    <value>{0} dny</value>
+  </data>
+  <data name="Days_Other" xml:space="preserve">
+    <value>{0} dní</value>
+  </data>
+  <data name="JustNow" xml:space="preserve">
+    <value>právě teď</value>
+  </data>
+  <data name="UnderAMinute" xml:space="preserve">
+    <value>méně než minuta</value>
+  </data>
+  <data name="Percent" xml:space="preserve">
+    <value>{0} %</value>
+  </data>
+  <data name="ModeOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="ModeSolar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="ModeForecasted" xml:space="preserve">
+    <value>Forecasted</value>
+  </data>
+  <data name="ModeSolarGrid" xml:space="preserve">
+    <value>Solar + grid</value>
+  </data>
+  <data name="ModeFast" xml:space="preserve">
+    <value>Fast (no battery)</value>
+  </data>
+  <data name="ModeTargeted" xml:space="preserve">
+    <value>Targeted</value>
+  </data>
+  <data name="ModeSolarSummary" xml:space="preserve">
+    <value>Nabíjí ze slunce, které dům nespotřebuje, jakmile je domácí baterie plná.</value>
+  </data>
+  <data name="ModeForecastedSummary" xml:space="preserve">
+    <value>Nabíjí z přebytku jako Solar, ale o tom, kolik dnešního slunce smí dostat auto, rozhoduje předpověď, aby domácí baterie přesto do večera dosáhla 100 %.</value>
+  </data>
+  <data name="ModeSolarGridSummary" xml:space="preserve">
+    <value>Sleduje slunce a když samotný přebytek nestačí, síť dorovná nabíječku na její minimum.</value>
+  </data>
+  <data name="ModeFastSummary" xml:space="preserve">
+    <value>Nabíjí tak rychle, jak instalace dovolí, ze slunce i ze sítě, a domácí baterii z toho vynechává.</value>
+  </data>
+  <data name="ModeTargetedSummary" xml:space="preserve">
+    <value>Dodá zadané množství do zadaného času: nejdřív předpovězený přebytek, zbytek co nejpozději ze sítě.</value>
+  </data>
+  <data name="ModeChange" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="WeatherLine" xml:space="preserve">
+    <value>{0}, oblačnost {1}</value>
+  </data>
+  <data name="WeatherLineWithCondition" xml:space="preserve">
+    <value>{0}, {1}, oblačnost {2}</value>
+  </data>
+  <data name="DayForecastLine" xml:space="preserve">
+    <value>{0} (p10 {1} – p90 {2})</value>
+  </data>
+  <data name="AboutTopic" xml:space="preserve">
+    <value>O položce {0}</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Skrýt</value>
+  </data>
+  <data name="Reveal" xml:space="preserve">
+    <value>Zobrazit</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Kopírovat</value>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>Zkopírováno</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Zrušit</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Uložit</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>žádné</value>
+  </data>
+  <data name="SiteTitleFallback" xml:space="preserve">
+    <value>Gleanvolt</value>
+  </data>
+  <data name="SignInRequired" xml:space="preserve">
+    <value>Je potřeba se přihlásit</value>
+  </data>
+  <data name="SignInOnCarPage" xml:space="preserve">
+    <value>Přihlaste se na stránce Auto</value>
+  </data>
+  <data name="RestartLabel" xml:space="preserve">
+    <value>Restartovat službu</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>Restartovat</value>
+  </data>
+  <data name="RestartQuestion" xml:space="preserve">
+    <value>Restartovat řídicí jednotku?</value>
+  </data>
+  <data name="RestartConfirm" xml:space="preserve">
+    <value>Ano, restartovat</value>
+  </data>
+  <data name="RestartProgress" xml:space="preserve">
+    <value>Restartuje se… Nabíječka se pozastavuje a otevřené nabíjení se uzavírá. Stránka se sama znovu načte, až bude řídicí jednotka zpět.</value>
+  </data>
+  <data name="RestartNotBack" xml:space="preserve">
+    <value>Pokud se do minuty či dvou nevrátí, nic ji znovu nespouští: podívejte se na {0} nebo {1}, případně ji spusťte ručně.</value>
+  </data>
+  <data name="RestartCost" xml:space="preserve">
+    <value>Probíhající nabíjení se pozastaví a řídicí jednotka se vrátí v režimu Off, jako po každém startu — režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, takže je pak zvolte znovu. Toto rozhraní i Home Assistant budou zhruba půl minuty nedostupné. Při startu se stahuje předpověď výroby, takže restart spotřebuje jedno z denních volání Solcastu, je-li nastaven klíč. Sama se vrátí pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb; spuštěná jinak — {1}, prostý {2}, zip pro Windows — se jen ukončí a je třeba ji spustit znovu.</value>
+  </data>
+  <data name="MqttBroker" xml:space="preserve">
+    <value>Broker</value>
+  </data>
+  <data name="MqttBrokerNote" xml:space="preserve">
+    <value>— kam se řídicí jednotka připojuje; odsud nemusí být dosažitelný.</value>
+  </data>
+  <data name="MqttUsername" xml:space="preserve">
+    <value>Uživatelské jméno</value>
+  </data>
+  <data name="MqttAnonymous" xml:space="preserve">
+    <value>žádné (anonymní)</value>
+  </data>
+  <data name="MqttPassword" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="MqttPasswordWithheld" xml:space="preserve">
+    <value>nastaveno, ale zde se nezobrazuje — toto rozhraní nemá přihlášení, takže by ho mohl přečíst kdokoli v síti. Nastavte {0} ({1}) a půjde přečíst.</value>
+  </data>
+  <data name="MqttClientId" xml:space="preserve">
+    <value>ID klienta</value>
+  </data>
+  <data name="SettingsTabsLabel" xml:space="preserve">
+    <value>Nastavení</value>
+  </data>
+  <data name="SettingsInstallation" xml:space="preserve">
+    <value>Instalace</value>
+  </data>
+  <data name="SettingsHealth" xml:space="preserve">
+    <value>Stav</value>
+  </data>
+  <data name="SignInTitle" xml:space="preserve">
+    <value>Přihlášení — Gleanvolt</value>
+  </data>
+  <data name="ProductName" xml:space="preserve">
+    <value>Gleanvolt</value>
+  </data>
+  <data name="PasswordLabel" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="WrongPassword" xml:space="preserve">
+    <value>Špatné heslo.</value>
+  </data>
+  <data name="EnterPassword" xml:space="preserve">
+    <value>Zadejte heslo.</value>
+  </data>
+  <data name="SignIn" xml:space="preserve">
+    <value>Přihlásit</value>
+  </data>
+  <data name="SignInHint" xml:space="preserve">
+    <value>Jedno heslo pro tuto instalaci, zvolené na stránce nastavení při prvním spuštění nebo zadané jako {0}. Odsud ho obnovit nelze: zapomenuté se nahrazuje v nastavení přímo na stroji.</value>
+  </data>
+  <data name="SetupTitle" xml:space="preserve">
+    <value>Nastavení hesla — Gleanvolt</value>
+  </data>
+  <data name="AlreadySetUp" xml:space="preserve">
+    <value>Už je nastaveno</value>
+  </data>
+  <data name="AlreadySetUpText" xml:space="preserve">
+    <value>Tato instalace už heslo má. {0}.</value>
+  </data>
+  <data name="SetPassword" xml:space="preserve">
+    <value>Nastavte heslo</value>
+  </data>
+  <data name="SetupIntro" xml:space="preserve">
+    <value>Gleanvolt umí ukázat historii energie a nabíjení této instalace a měnit, jak se nabíječka řídí. Je dostupný čemukoli v této síti, a proto potřebuje heslo, než cokoli z toho ukáže.</value>
+  </data>
+  <data name="RepeatPassword" xml:space="preserve">
+    <value>Zopakujte ho</value>
+  </data>
+  <data name="SetThePassword" xml:space="preserve">
+    <value>Nastavit heslo</value>
+  </data>
+  <data name="SetupNote" xml:space="preserve">
+    <value>Jedno heslo pro celou instalaci, ne účet pro každého. Uložte si ho tak, abyste ho našli: v rozhraní se obnovit nedá, jen úpravou souboru nastavení přímo na stroji.</value>
+  </data>
+  <data name="PasswordsDiffer" xml:space="preserve">
+    <value>Hesla se neshodují.</value>
+  </data>
+  <data name="PasswordNotSaved" xml:space="preserve">
+    <value>Heslo se na této instalaci nepodařilo uložit, takže nastaveno není. Nastavte místo toho Web__PasswordHash v konfiguraci.</value>
+  </data>
+  <data name="PasswordTooShort" xml:space="preserve">
+    <value>Použijte aspoň 8 znaků.</value>
+  </data>
+  <data name="RepeatThePassword" xml:space="preserve">
+    <value>Zopakujte heslo.</value>
+  </data>
+  <data name="DayMonthPattern" xml:space="preserve">
+    <value>ddd d. MMM</value>
+  </data>
+  <data name="DayTimePattern" xml:space="preserve">
+    <value>ddd HH:mm</value>
+  </data>
+  <data name="DateTimePattern" xml:space="preserve">
+    <value>d. M. yyyy HH:mm</value>
+  </data>
+  <data name="DateTimeSecondsPattern" xml:space="preserve">
+    <value>d. M. yyyy HH:mm:ss</value>
+  </data>
+  <data name="DayDateTimePattern" xml:space="preserve">
+    <value>ddd d. MMM HH:mm</value>
+  </data>
+  <data name="ChargeControlState_Disabled" xml:space="preserve">
+    <value>Vypnuto</value>
+  </data>
+  <data name="ChargeControlState_Idle" xml:space="preserve">
+    <value>Nečinné</value>
+  </data>
+  <data name="ChargeControlState_Charging" xml:space="preserve">
+    <value>Nabíjí</value>
+  </data>
+  <data name="ChargeControlState_Paused" xml:space="preserve">
+    <value>Pozastaveno</value>
+  </data>
+  <data name="EvChargerStatus_Unknown" xml:space="preserve">
+    <value>Neznámý</value>
+  </data>
+  <data name="EvChargerStatus_Available" xml:space="preserve">
+    <value>Volná</value>
+  </data>
+  <data name="EvChargerStatus_Preparing" xml:space="preserve">
+    <value>Připravuje se</value>
+  </data>
+  <data name="EvChargerStatus_Charging" xml:space="preserve">
+    <value>Nabíjí</value>
+  </data>
+  <data name="EvChargerStatus_Finishing" xml:space="preserve">
+    <value>Dokončuje</value>
+  </data>
+  <data name="EvChargerStatus_Faulted" xml:space="preserve">
+    <value>Porucha</value>
+  </data>
+  <data name="EvChargerStatus_Unavailable" xml:space="preserve">
+    <value>Nedostupná</value>
+  </data>
+  <data name="EvChargerStatus_Reserved" xml:space="preserve">
+    <value>Rezervována</value>
+  </data>
+  <data name="EvChargerStatus_SuspendedEv" xml:space="preserve">
+    <value>Pozastaveno autem</value>
+  </data>
+  <data name="EvChargerStatus_SuspendedEvse" xml:space="preserve">
+    <value>Pozastaveno nabíječkou</value>
+  </data>
+  <data name="EvChargerStatus_Update" xml:space="preserve">
+    <value>Aktualizace</value>
+  </data>
+  <data name="EvChargerStatus_CardActivation" xml:space="preserve">
+    <value>Aktivace kartou</value>
+  </data>
+  <data name="EvChargerStatus_StartDelay" xml:space="preserve">
+    <value>Odložený start</value>
+  </data>
+  <data name="EvChargerStatus_ChargePaused" xml:space="preserve">
+    <value>Nabíjení pozastaveno</value>
+  </data>
+  <data name="EvChargerStatus_Stopping" xml:space="preserve">
+    <value>Zastavuje se</value>
+  </data>
+  <data name="VehicleChargeState_Unknown" xml:space="preserve">
+    <value>Neznámý</value>
+  </data>
+  <data name="VehicleChargeState_Idle" xml:space="preserve">
+    <value>Nenabíjí</value>
+  </data>
+  <data name="VehicleChargeState_Charging" xml:space="preserve">
+    <value>Nabíjí</value>
+  </data>
+  <data name="VehicleChargeState_Complete" xml:space="preserve">
+    <value>Dokončeno</value>
+  </data>
+  <data name="VehiclePlugState_Unknown" xml:space="preserve">
+    <value>Neznámý</value>
+  </data>
+  <data name="VehiclePlugState_Disconnected" xml:space="preserve">
+    <value>Odpojeno</value>
+  </data>
+  <data name="VehiclePlugState_Connected" xml:space="preserve">
+    <value>Připojeno</value>
+  </data>
+  <data name="VehicleSourceState_Ok" xml:space="preserve">
+    <value>V pořádku</value>
+  </data>
+  <data name="VehicleSourceState_Degraded" xml:space="preserve">
+    <value>Omezeno</value>
+  </data>
+  <data name="VehicleSourceState_NeedsOwner" xml:space="preserve">
+    <value>Čeká na vás</value>
+  </data>
+  <data name="ListSeparator" xml:space="preserve">
+    <value>, </value>
+  </data>
+  <data name="LowTariff" xml:space="preserve">
+    <value>Nízký tarif</value>
+  </data>
+  <data name="HighTariff" xml:space="preserve">
+    <value>Vysoký tarif</value>
+  </data>
+  <data name="TariffUntil" xml:space="preserve">
+    <value>{0}, do {1}</value>
+  </data>
+  <data name="TomorrowAt" xml:space="preserve">
+    <value>zítra {0}</value>
+  </data>
+  <data name="WeekdayAt" xml:space="preserve">
+    <value>{0} {1}</value>
+  </data>
+  <data name="TargetedChargeStrategy_Complete" xml:space="preserve">
+    <value>Splněno</value>
+  </data>
+  <data name="TargetedChargeStrategy_Solar" xml:space="preserve">
+    <value>Slunce</value>
+  </data>
+  <data name="TargetedChargeStrategy_SolarPlusGrid" xml:space="preserve">
+    <value>Slunce + síť</value>
+  </data>
+  <data name="TargetedChargeStrategy_Maximum" xml:space="preserve">
+    <value>Naplno</value>
+  </data>
+  <data name="ChartDayMonthTemplate" xml:space="preserve">
+    <value>{D}. {MMM}</value>
+  </data>
+  <data name="ChartLegendTimeTemplate" xml:space="preserve">
+    <value>{WWW} {D}. {MMM} {HH}:{mm}</value>
+  </data>
+  <data name="ChargingSessionEndReason_ModeOff" xml:space="preserve">
+    <value>Řízení nabíjení se vrátilo do Off</value>
+  </data>
+  <data name="ChargingSessionEndReason_SessionComplete" xml:space="preserve">
+    <value>Auto dokončilo nabíjení</value>
+  </data>
+  <data name="ChargingSessionEndReason_CarUnplugged" xml:space="preserve">
+    <value>Auto bylo odpojeno</value>
+  </data>
+  <data name="ChargingSessionEndReason_ServiceStopped" xml:space="preserve">
+    <value>Služba se zastavila</value>
+  </data>
+  <data name="ChargingSessionEndReason_Interrupted" xml:space="preserve">
+    <value>Nabíjení bylo přerušeno</value>
+  </data>
+  <data name="ChargingSessionEndReason_TargetReached" xml:space="preserve">
+    <value>Požadovaná energie byla dodána</value>
+  </data>
+  <data name="ChargingSessionEndReason_DeparturePassed" xml:space="preserve">
+    <value>Čas odjezdu uplynul</value>
+  </data>
+  <data name="ChargingSessionEndReason_NoSunLeftToday" xml:space="preserve">
+    <value>Dnes už nezbylo slunce, ze kterého by šlo nabíjet</value>
+  </data>
+  <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
+    <value>Nabíječka byla přepnuta z režimu Fast</value>
+  </data>
+  <data name="DatePattern" xml:space="preserve">
+    <value>d. M. yyyy</value>
+  </data>
+</root>

@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SignInsSinceStart_One" xml:space="preserve">
+    <value>({0} přihlášení od startu)</value>
+  </data>
+  <data name="SignInsSinceStart_Few" xml:space="preserve">
+    <value>({0} přihlášení od startu)</value>
+  </data>
+  <data name="SignInsSinceStart_Other" xml:space="preserve">
+    <value>({0} přihlášení od startu)</value>
+  </data>
+  <data name="SignInsSinceStartExpiring" xml:space="preserve">
+    <value>({0} přihlášení od startu — relace vypršují)</value>
+  </data>
+  <data name="HealthPageTitle" xml:space="preserve">
+    <value>Stav</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Nastavení</value>
+  </data>
+  <data name="Build" xml:space="preserve">
+    <value>Verze</value>
+  </data>
+  <data name="TimeZone" xml:space="preserve">
+    <value>Časové pásmo</value>
+  </data>
+  <data name="LastPoll" xml:space="preserve">
+    <value>Poslední čtení</value>
+  </data>
+  <data name="NoPollYet" xml:space="preserve">
+    <value>zatím neproběhlo žádné čtení</value>
+  </data>
+  <data name="AgoParenthesised" xml:space="preserve">
+    <value>(před {0})</value>
+  </data>
+  <data name="ChargeMode" xml:space="preserve">
+    <value>Režim nabíjení</value>
+  </data>
+  <data name="Secrets" xml:space="preserve">
+    <value>Tajné údaje</value>
+  </data>
+  <data name="BearerEquivalent" xml:space="preserve">
+    <value>— datový adresář je rovnocenný přístupovým údajům; podle toho ho zálohujte</value>
+  </data>
+  <data name="CarFeed" xml:space="preserve">
+    <value>Zdroj dat auta</value>
+  </data>
+  <data name="FeedReads" xml:space="preserve">
+    <value>Čtení zdroje</value>
+  </data>
+  <data name="ReadingsOfAttempts" xml:space="preserve">
+    <value>{0} z {1}</value>
+  </data>
+  <data name="LastReadAgo" xml:space="preserve">
+    <value>— naposledy před {0}</value>
+  </data>
+  <data name="PortalSession" xml:space="preserve">
+    <value>Relace portálu</value>
+  </data>
+  <data name="NoSession" xml:space="preserve">
+    <value>žádná</value>
+  </data>
+  <data name="NextRead" xml:space="preserve">
+    <value>Další čtení</value>
+  </data>
+  <data name="FeedStopped" xml:space="preserve">
+    <value>nikdy — zdroj se zastavil</value>
+  </data>
+  <data name="Service" xml:space="preserve">
+    <value>Služba</value>
+  </data>
+  <data name="Stopping" xml:space="preserve">
+    <value>Zastavuje se. Nabíječka se pozastavuje a otevřené nabíjení se uzavírá; tato stránka za pár sekund přestane odpovídat.</value>
+  </data>
+  <data name="StartAgain" xml:space="preserve">
+    <value>Znovu ji spustíte na Pi příkazem {0} v adresáři {1}. Sama se znovu nespustí — tím se zastavení liší od restartu.</value>
+  </data>
+  <data name="StopQuestion" xml:space="preserve">
+    <value>Zastavit službu?</value>
+  </data>
+  <data name="StopConfirm" xml:space="preserve">
+    <value>Ano, zastavit</value>
+  </data>
+  <data name="StopConfirmHint" xml:space="preserve">
+    <value>Nabíjení se zastaví, toto rozhraní i integrace Home Assistant přejdou do offline a řídicí jednotka zůstane vypnutá, dokud ji znovu nespustíte z příkazové řádky na Pi.</value>
+  </data>
+  <data name="StopLabel" xml:space="preserve">
+    <value>Zastavit službu</value>
+  </data>
+  <data name="StopService" xml:space="preserve">
+    <value>Zastavit službu</value>
+  </data>
+  <data name="StopHint" xml:space="preserve">
+    <value>Bezpečný způsob, jak řídicí jednotku vypnout: nabíječka se vrátí na proud pro pauzu, otevřené nabíjení se uzavře a zapíše a úložiště nabíjení se vyprázdní — nic z toho se nestane, když se proces prostě ukončí. Sama se nevrátí; Restart níže je totéž vypnutí pro řídicí jednotku, která se vrátit má.</value>
+  </data>
+  <data name="RestartHint" xml:space="preserve">
+    <value>Totéž šetrné vypnutí jako Zastavit, zakončené návratovým kódem, který Dockeru nebo systemd řekne, ať ji znovu spustí. Nový proces si načte konfiguraci znovu, a tak se uplatní změna uložená v Nastavení.</value>
+  </data>
+  <data name="Due" xml:space="preserve">
+    <value>nyní</value>
+  </data>
+  <data name="InDuration" xml:space="preserve">
+    <value>za {0}</value>
+  </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>Nastavení</value>
+  </data>
+  <data name="CarLink_0" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="CarLink" xml:space="preserve">
+    <value>Nastavení auta a jeho limity nabíjení jsou na stránce {0}.</value>
+  </data>
+  <data name="Mqtt" xml:space="preserve">
+    <value>MQTT</value>
+  </data>
+  <data name="MqttTopic" xml:space="preserve">
+    <value>MQTT</value>
+  </data>
+  <data name="MqttTip1_0" xml:space="preserve">
+    <value>řídicí</value>
+  </data>
+  <data name="MqttTip1" xml:space="preserve">
+    <value>Home Assistant je {0} rozhraní: témata končící na {1} umí nabíjení spustit i zastavit. Telemetrie vozidla jen poslouchá a nejhorší, co tam špatné nastavení způsobí, je prázdná karta auta.</value>
+  </data>
+  <data name="MqttTip2_0" xml:space="preserve">
+    <value>funkční</value>
+  </data>
+  <data name="MqttTip2_1" xml:space="preserve">
+    <value>Stav</value>
+  </data>
+  <data name="MqttTip2" xml:space="preserve">
+    <value>Nic z toho neříká, zda je některé spojení {0}. Vše na této stránce se načetlo jednou při startu; stránka {1} hlásí smyčku čtení, ne broker, takže dokud nehlásí i tohle, odpoví na to log brokeru — nebo Home Assistant, který zařízení ukazuje jako nedostupné.</value>
+  </data>
+  <data name="HomeAssistant" xml:space="preserve">
+    <value>Home Assistant</value>
+  </data>
+  <data name="HomeAssistantTopic" xml:space="preserve">
+    <value>Home Assistant</value>
+  </data>
+  <data name="HaTip1" xml:space="preserve">
+    <value>ID zařízení je základem {0} každé entity a je to jediná hodnota zde, jejíž změna je drahá: Home Assistant váže entitu na její {1}, takže nové ID je nová entita, vytvořená vedle staré, a každý graf začíná znovu. Témata a názvy lze měnit volně. Interval stavu je, jak často se znovu publikuje stavové téma, a to bývá odpověď na otázku „proč je přehled v Home Assistant pozadu?“.</value>
+  </data>
+  <data name="HaTip2_3" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="HaTip2" xml:space="preserve">
+    <value>Každá další entita — každé číslo, výběr, text a tlačítko — má stejný vzor: {0} pro to, co hlásí, a {1} pro to, co přijímá. Uchované konfigurace discovery, ze kterých je Home Assistant čte, jsou pod {2}. Cokoli označené {3} může změnit, co nabíječka dělá.</value>
+  </data>
+  <data name="HaOff" xml:space="preserve">
+    <value>Vypnuto, což je výchozí stav: nic se nepublikuje a žádný příkaz se nepřijímá. Nastavte {0} na {1}, zadejte {2} a {3} pro broker a zvolte {4} — ID je segment tématu, kterým by se dvě instalace na jednom brokeru jinak navzájem přepisovaly, takže bez něj řídicí jednotka odmítne startovat.</value>
+  </data>
+  <data name="DiscoveryPrefix" xml:space="preserve">
+    <value>Prefix discovery</value>
+  </data>
+  <data name="DeviceId" xml:space="preserve">
+    <value>ID zařízení</value>
+  </data>
+  <data name="TopicPrefix" xml:space="preserve">
+    <value>Prefix témat</value>
+  </data>
+  <data name="StatusInterval" xml:space="preserve">
+    <value>Interval stavu</value>
+  </data>
+  <data name="Carries" xml:space="preserve">
+    <value>Obsah</value>
+  </data>
+  <data name="TopicColumn" xml:space="preserve">
+    <value>Téma</value>
+  </data>
+  <data name="Direction" xml:space="preserve">
+    <value>Směr</value>
+  </data>
+  <data name="In" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="Out" xml:space="preserve">
+    <value>out</value>
+  </data>
+  <data name="VehicleTelemetry" xml:space="preserve">
+    <value>Telemetrie vozidla</value>
+  </data>
+  <data name="VehicleTelemetryTopic" xml:space="preserve">
+    <value>telemetrie vozidla</value>
+  </data>
+  <data name="VehicleTelemetryTip_1" xml:space="preserve">
+    <value>uchované (retained)</value>
+  </data>
+  <data name="VehicleTelemetryTip" xml:space="preserve">
+    <value>Jedno konkrétní téma, ne zástupný znak: tato fáze sleduje jedno auto a {0} přes několik témat by potichu nechal vyhrát nejnovější zprávu, ať popisuje kterékoli auto. Zprávy mají být {1}, takže restart hned dostane poslední údaj, místo aby čekal na další aktualizaci auta z cloudu. Pozor, toto ID klienta není odlišené ID systému, takže dvě řídicí jednotky na jednom stroji by se na brokeru střetly.</value>
+  </data>
+  <data name="VehicleMqttOff" xml:space="preserve">
+    <value>Vypnuto, což je výchozí stav: stav nabití auta se nečte a Přehled ukazuje jen to, co vidí nabíječka. Nastavte {0} na {1} a pod {2} uveďte téma, do kterého váš zdroj zapisuje.</value>
+  </data>
+  <data name="SubscribedTo" xml:space="preserve">
+    <value>Odběr tématu</value>
+  </data>
+  <data name="Nothing" xml:space="preserve">
+    <value>nic</value>
+  </data>
+  <data name="StaleAfter" xml:space="preserve">
+    <value>Zastaralé po</value>
+  </data>
+  <data name="RetryEvery" xml:space="preserve">
+    <value>Opakovat každých</value>
+  </data>
+  <data name="NoTopic" xml:space="preserve">
+    <value>Zdroj je zapnutý, ale nemá k čemu se přihlásit, takže se nepřipojí k žádnému brokeru a nic nečte — což je z Přehledu k nerozeznání od auta, které nikdy nic nehlásí. Nastavte {0} na téma, do kterého váš zdroj zapisuje.</value>
+  </data>
+  <data name="OneBroker" xml:space="preserve">
+    <value>Obě spojení používají tentýž broker, {0}. Pořád jsou to dvě připojení se dvěma ID klienta a kterékoli lze nasměrovat jinam, aniž by se změnilo druhé.</value>
+  </data>
+  <data name="Api" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="ApiTopic" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="ApiTip" xml:space="preserve">
+    <value>Adresa je sestavená z té, přes kterou přišla tato stránka, ne z {0}: název hostitele nebo reverzní proxy vepředu znamená, že nastavený port nemusí být ten, který funguje, kdežto adresa, která tuto stránku právě doručila, prokazatelně funguje. Oba odkazy záměrně odpovídají bez klíče — prohlížeč ho poslat neumí a ani jeden nenese nic, podle čeho by se jednalo — takže otevřít kterýkoli je nejrychlejší důkaz, že API běží.</value>
+  </data>
+  <data name="ApiOff" xml:space="preserve">
+    <value>Vypnuto, což je výchozí stav: není namapovaná žádná cesta a nepodává se žádný dokument, takže není co najít, místo aby něco odpovídalo 401. Dva jeho koncové body zapisují do hardwaru, proto se zapíná vědomě — pomocí {0} a aspoň jednoho klíče, {1}. Zapnuté bez klíče je chyba při startu, ne otevřené řídicí rozhraní.</value>
+  </data>
+  <data name="BaseUrl" xml:space="preserve">
+    <value>Základní URL</value>
+  </data>
+  <data name="DefaultPort" xml:space="preserve">
+    <value>— tato stránka přišla na výchozím portu, takže přímá adresa v LAN je {0}, ať je vepředu cokoli.</value>
+  </data>
+  <data name="Index" xml:space="preserve">
+    <value>Rozcestník</value>
+  </data>
+  <data name="OpenApiDocument" xml:space="preserve">
+    <value>Dokument OpenAPI</value>
+  </data>
+  <data name="Keys" xml:space="preserve">
+    <value>Klíče</value>
+  </data>
+  <data name="ApiKeysTopic" xml:space="preserve">
+    <value>klíče API</value>
+  </data>
+  <data name="ApiKeysTip" xml:space="preserve">
+    <value>Název není přihlašovací údaj — je to, co se dostane do logu a do zaznamenaného nabíjení jako zdroj akce, takže nabíjení spuštěné přes toto API se připíše názvu, který ho spustil, ne anonymně. Právě proto dostane víc klientů víc klíčů.</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Název</value>
+  </data>
+  <data name="Key" xml:space="preserve">
+    <value>Klíč</value>
+  </data>
+  <data name="Configured" xml:space="preserve">
+    <value>nastaven</value>
+  </data>
+  <data name="KeysWithheld" xml:space="preserve">
+    <value>Samotné klíče se nezobrazují, protože toto rozhraní nemá přihlášení: kdokoli, kdo se k němu dostane, by je mohl přečíst, a klíč má stejnou moc jako tlačítko stop na wallboxu. Nastavte {0} ({1}) a půjdou tu přečíst.</value>
+  </data>
+  <data name="CallingIt" xml:space="preserve">
+    <value>Volání</value>
+  </data>
+  <data name="CallingTopic" xml:space="preserve">
+    <value>volání API</value>
+  </data>
+  <data name="CallingTip" xml:space="preserve">
+    <value>První klíč, vlastní adresa této instalace a koncový bod, který stojí za to zkusit jako první. Vše ostatní je pod stejnou základní URL a bere stejnou hlavičku; seznamem je dokument výše.</value>
+  </data>
+  <data name="Retiring_0" xml:space="preserve">
+    <value>vymaže</value>
+  </data>
+  <data name="Retiring" xml:space="preserve">
+    <value>Při každém připojení tato instalace také {0} uchované zprávy, které zanechal název, pod kterým dřív publikovala:</value>
+  </data>
+  <data name="RetiringConfigs" xml:space="preserve">
+    <value>konfigurace discovery pro {0}.</value>
+  </data>
+  <data name="RetiringConfigsAnd" xml:space="preserve">
+    <value>konfigurace discovery pro {0};</value>
+  </data>
+  <data name="RetiringState" xml:space="preserve">
+    <value>uchovaný stav pod {0}.</value>
+  </data>
+  <data name="RetiringNote" xml:space="preserve">
+    <value>Nastavuje se po přejmenování a po proběhnutí ho lze odstranit.</value>
+  </data>
+  <data name="ChangesSaved_One" xml:space="preserve">
+    <value>{0} změna uložena</value>
+  </data>
+  <data name="ChangesSaved_Few" xml:space="preserve">
+    <value>{0} změny uloženy</value>
+  </data>
+  <data name="ChangesSaved_Other" xml:space="preserve">
+    <value>{0} změn uloženo</value>
+  </data>
+  <data name="Installation" xml:space="preserve">
+    <value>Instalace</value>
+  </data>
+  <data name="SavingTopic" xml:space="preserve">
+    <value>ukládání nastavení instalace</value>
+  </data>
+  <data name="SavingTip1" xml:space="preserve">
+    <value>Uložení se kontroluje stejně, jako start kontroluje konfiguraci, a do {0} se zapíše jen to, co se liší. Ten soubor má přednost před {1}, klíč po klíči. Nic se nezmění, dokud se řídicí jednotka nerestartuje.</value>
+  </data>
+  <data name="SavingTip2" xml:space="preserve">
+    <value>(i) u každého pole říká, odkud pochází jeho aktuální hodnota. Po uložení pole, jehož hodnota ještě neběží, to pod sebou uvede.</value>
+  </data>
+  <data name="NotRunningUntilRestart" xml:space="preserve">
+    <value>— neběží, dokud se řídicí jednotka nerestartuje.</value>
+  </data>
+  <data name="RestartOnHealth" xml:space="preserve">
+    <value>Restartovat na stránce Stav</value>
+  </data>
+  <data name="ReadOnlyNoLogin" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Tato pole zahrnují adresy, na které řídicí jednotka zapisuje příkazy Modbus, a bez přihlášení by je kdokoli v LAN mohl nasměrovat jinam. Nastavte {0} ({1}) a půjdou tu upravovat; do té doby je měňte v {2} a restartujte.</value>
+  </data>
+  <data name="CurrentValueFrom" xml:space="preserve">
+    <value>Aktuální hodnota pochází z: {0}.</value>
+  </data>
+  <data name="RunningRestartToApply" xml:space="preserve">
+    <value>Běží: {0} · projeví se po restartu</value>
+  </data>
+  <data name="RevertTo" xml:space="preserve">
+    <value>Vrátit na {0}</value>
+  </data>
+  <data name="SaveAnyway" xml:space="preserve">
+    <value>Přesto uložit</value>
+  </data>
+  <data name="Checking" xml:space="preserve">
+    <value>Kontroluje se…</value>
+  </data>
+  <data name="SaveButton" xml:space="preserve">
+    <value>Uložit</value>
+  </data>
+  <data name="DiscardChanges" xml:space="preserve">
+    <value>Zahodit změny</value>
+  </data>
+  <data name="SavedAnyway" xml:space="preserve">
+    <value>Přesto uloženo: vypnutá nabíječka neodpovídá nic a pořád je to správná adresa. Obě zařízení odpovídají na Modbus na portu 502, takže prohozená dvojice se po spuštění projeví jako zamrzlá baterie a nulové slunce — před restartem ověřte, které je které.</value>
+  </data>
+  <data name="NotSaved" xml:space="preserve">
+    <value>Neuloženo — s tímto by řídicí jednotka odmítla startovat:</value>
+  </data>
+  <data name="GroupIdentity" xml:space="preserve">
+    <value>Identita</value>
+  </data>
+  <data name="GroupLocation" xml:space="preserve">
+    <value>Poloha a orientace</value>
+  </data>
+  <data name="GroupCapacity" xml:space="preserve">
+    <value>Výkon</value>
+  </data>
+  <data name="Inverter" xml:space="preserve">
+    <value>Střídač</value>
+  </data>
+  <data name="Charger" xml:space="preserve">
+    <value>Nabíječka</value>
+  </data>
+  <data name="FieldId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="FieldName" xml:space="preserve">
+    <value>Název</value>
+  </data>
+  <data name="FieldAddress" xml:space="preserve">
+    <value>Adresa</value>
+  </data>
+  <data name="FieldCommissioned" xml:space="preserve">
+    <value>Uvedeno do provozu</value>
+  </data>
+  <data name="FieldLatitude" xml:space="preserve">
+    <value>Zeměpisná šířka</value>
+  </data>
+  <data name="FieldLongitude" xml:space="preserve">
+    <value>Zeměpisná délka</value>
+  </data>
+  <data name="FieldAzimuth" xml:space="preserve">
+    <value>Azimut</value>
+  </data>
+  <data name="FieldTilt" xml:space="preserve">
+    <value>Sklon</value>
+  </data>
+  <data name="FieldCapacityKwp" xml:space="preserve">
+    <value>Špičkový výkon DC (kWp)</value>
+  </data>
+  <data name="FieldInverterCapacity" xml:space="preserve">
+    <value>Výkon střídače (kW)</value>
+  </data>
+  <data name="FieldLossFactor" xml:space="preserve">
+    <value>Ztrátový koeficient</value>
+  </data>
+  <data name="FieldInverterModel" xml:space="preserve">
+    <value>Model střídače</value>
+  </data>
+  <data name="FieldInverterHost" xml:space="preserve">
+    <value>Adresa střídače</value>
+  </data>
+  <data name="FieldInverterPort" xml:space="preserve">
+    <value>Port střídače</value>
+  </data>
+  <data name="FieldInverterUnitId" xml:space="preserve">
+    <value>Unit ID střídače</value>
+  </data>
+  <data name="FieldUnmeteredPhase" xml:space="preserve">
+    <value>Neměřená fáze sítě</value>
+  </data>
+  <data name="FieldChargerId" xml:space="preserve">
+    <value>ID nabíječky</value>
+  </data>
+  <data name="FieldChargerModel" xml:space="preserve">
+    <value>Model nabíječky</value>
+  </data>
+  <data name="FieldChargerHost" xml:space="preserve">
+    <value>Adresa nabíječky</value>
+  </data>
+  <data name="FieldChargerPort" xml:space="preserve">
+    <value>Port nabíječky</value>
+  </data>
+  <data name="FieldChargerUnitId" xml:space="preserve">
+    <value>Unit ID nabíječky</value>
+  </data>
+  <data name="HintId" xml:space="preserve">
+    <value>a-z, 0-9, - a _</value>
+  </data>
+  <data name="HintDecimalDegrees" xml:space="preserve">
+    <value>desetinné stupně</value>
+  </data>
+  <data name="HintAzimuth" xml:space="preserve">
+    <value>stupně od severu, 180 = jih</value>
+  </data>
+  <data name="HintTilt" xml:space="preserve">
+    <value>stupně, 0 = vodorovně</value>
+  </data>
+  <data name="HintLossFactor" xml:space="preserve">
+    <value>0 až 1</value>
+  </data>
+  <data name="HintPhase" xml:space="preserve">
+    <value>L1, L2, L3 (nebo R, S, T), nebo prázdné</value>
+  </data>
+  <data name="SavedRestart" xml:space="preserve">
+    <value>Uloženo. Projeví se po restartu řídicí jednotky.</value>
+  </data>
+  <data name="SavedRunning" xml:space="preserve">
+    <value>Uloženo. Řídicí jednotka už s těmito hodnotami běží.</value>
+  </data>
+  <data name="IdWarning" xml:space="preserve">
+    <value>Změna ID přesune každé téma MQTT, pod kterým řídicí jednotka publikuje, takže Home Assistant po restartu uvidí nová témata. Viz „Renaming what Home Assistant sees“ v deploy/README.md a HA_RETIRE_TOPIC_PREFIX pro vyčištění starých. ID zařízení v Home Assistant se nastavuje zvlášť a nepřesouvá se.</value>
+  </data>
+  <data name="CoordinatesWarning" xml:space="preserve">
+    <value>Vymazání souřadnic vypne zaznamenávání počasí k nabíjení i místo pro předpověď.</value>
+  </data>
+  <data name="SourceWebUi" xml:space="preserve">
+    <value>webové rozhraní</value>
+  </data>
+  <data name="SourceEnvironment" xml:space="preserve">
+    <value>prostředí</value>
+  </data>
+  <data name="SourceCommandLine" xml:space="preserve">
+    <value>příkazová řádka</value>
+  </data>
+  <data name="SourceDefault" xml:space="preserve">
+    <value>výchozí</value>
+  </data>
+  <data name="PhraseThisPage" xml:space="preserve">
+    <value>tato stránka</value>
+  </data>
+  <data name="PhraseEnvironment" xml:space="preserve">
+    <value>soubor prostředí</value>
+  </data>
+  <data name="PhraseCommandLine" xml:space="preserve">
+    <value>příkazová řádka</value>
+  </data>
+  <data name="PhraseDefault" xml:space="preserve">
+    <value>vestavěná výchozí hodnota</value>
+  </data>
+  <data name="Facing" xml:space="preserve">
+    <value>orientace {0}</value>
+  </data>
+  <data name="BearingNormalised" xml:space="preserve">
+    <value>= {0}, {1}</value>
+  </data>
+  <data name="PhaseR" xml:space="preserve">
+    <value>= L1, v pojmenování SolaX</value>
+  </data>
+  <data name="PhaseS" xml:space="preserve">
+    <value>= L2, v pojmenování SolaX</value>
+  </data>
+  <data name="PhaseT" xml:space="preserve">
+    <value>= L3, v pojmenování SolaX</value>
+  </data>
+  <data name="North" xml:space="preserve">
+    <value>sever</value>
+  </data>
+  <data name="NorthEast" xml:space="preserve">
+    <value>severovýchod</value>
+  </data>
+  <data name="East" xml:space="preserve">
+    <value>východ</value>
+  </data>
+  <data name="SouthEast" xml:space="preserve">
+    <value>jihovýchod</value>
+  </data>
+  <data name="South" xml:space="preserve">
+    <value>jih</value>
+  </data>
+  <data name="SouthWest" xml:space="preserve">
+    <value>jihozápad</value>
+  </data>
+  <data name="West" xml:space="preserve">
+    <value>západ</value>
+  </data>
+  <data name="NorthWest" xml:space="preserve">
+    <value>severozápad</value>
+  </data>
+  <data name="TitleWebUi" xml:space="preserve">
+    <value>Uloženo z této stránky v {0}; má přednost před .env.</value>
+  </data>
+  <data name="TitleEnvironment" xml:space="preserve">
+    <value>{0}, z .env pod Dockerem nebo /etc/gleanvolt/gleanvolt.env pod systemd.</value>
+  </data>
+  <data name="TitleCommandLine" xml:space="preserve">
+    <value>Argument příkazové řádky, který má přednost před touto stránkou.</value>
+  </data>
+  <data name="TitleAppSettings" xml:space="preserve">
+    <value>Z {0} v instalačním adresáři.</value>
+  </data>
+  <data name="TitleDefault" xml:space="preserve">
+    <value>Nikde nenastaveno; platí vestavěná výchozí hodnota.</value>
+  </data>
+  <data name="SolarForecast" xml:space="preserve">
+    <value>Předpověď výroby</value>
+  </data>
+  <data name="SolcastTopic" xml:space="preserve">
+    <value>účet Solcast</value>
+  </data>
+  <data name="SolcastTip1" xml:space="preserve">
+    <value>Předpověď pochází z bezplatného účtu Solcast pro hobby: klíč API je v nastavení účtu na solcast.com a ID zdroje je na stránce střešní instalace. Bez něj řídicí jednotka běží stejně dobře, jen nemá předpověď, se kterou by plánovala.</value>
+  </data>
+  <data name="SolcastTip2_0" xml:space="preserve">
+    <value>každé uložení tady a každý restart jedno spotřebuje</value>
+  </data>
+  <data name="SolcastTip2" xml:space="preserve">
+    <value>Bezplatná úroveň dovoluje zhruba deset volání denně. Řídicí jednotka jich přes den spotřebuje asi pět a v noci žádné a {0} — stejně jako druhá kopie řídicí jednotky se stejným účtem, třeba {1} na notebooku.</value>
+  </data>
+  <data name="SolcastTip3" xml:space="preserve">
+    <value>Účet uložený tady má přednost před {0} a {1} v {2}. Odstraňte ho a znovu se použije ten z prostředí.</value>
+  </data>
+  <data name="SolcastIntro" xml:space="preserve">
+    <value>Předpověď Solcastu pro tuto střechu, se kterou plánují Forecasted a Targeted. Uložení platí hned a jednou stáhne předpověď, aby ověřilo účet — jedno z denních volání.</value>
+  </data>
+  <data name="SolcastReadOnly" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení a klíč je tajný. Nastavte {0} ({1}) a účet půjde tu upravovat; do té doby nastavte {2} a {3} v {4} a restartujte.</value>
+  </data>
+  <data name="ApiKey" xml:space="preserve">
+    <value>Klíč API</value>
+  </data>
+  <data name="Unchanged" xml:space="preserve">
+    <value>beze změny</value>
+  </data>
+  <data name="NotSet" xml:space="preserve">
+    <value>nenastaveno</value>
+  </data>
+  <data name="KeptInSecretStore" xml:space="preserve">
+    <value>Uloženo v úložišti tajných údajů — {0}. Ponecháte-li prázdné, používaný klíč zůstane.</value>
+  </data>
+  <data name="ResourceId" xml:space="preserve">
+    <value>ID zdroje střešní instalace</value>
+  </data>
+  <data name="Fetching" xml:space="preserve">
+    <value>Stahuje se…</value>
+  </data>
+  <data name="SaveAndFetch" xml:space="preserve">
+    <value>Uložit a stáhnout</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Odstranit</value>
+  </data>
+  <data name="SavedInUse" xml:space="preserve">
+    <value>Uloženo a už se používá.</value>
+  </data>
+  <data name="InUseNotKept" xml:space="preserve">
+    <value>Používá se, ale úložiště tajných údajů ho nepodrželo: restart ho zapomene.</value>
+  </data>
+  <data name="RemovedEnvironment" xml:space="preserve">
+    <value>Odstraněno. Od příští aktualizace se používá účet z prostředí.</value>
+  </data>
+  <data name="RemovedNone" xml:space="preserve">
+    <value>Odstraněno. Teď není k dispozici žádná předpověď.</value>
+  </data>
+  <data name="SourcePage" xml:space="preserve">
+    <value>Uloženo tady</value>
+  </data>
+  <data name="SourceEnvironmentSolcast" xml:space="preserve">
+    <value>Z prostředí (SOLCAST_API_KEY, SOLCAST_RESOURCE_ID)</value>
+  </data>
+  <data name="NotConfigured" xml:space="preserve">
+    <value>Nenastaveno</value>
+  </data>
+  <data name="NotConfiguredNoForecast" xml:space="preserve">
+    <value>Nenastaveno — řídicí jednotka běží bez předpovědi.</value>
+  </data>
+  <data name="StillInUse" xml:space="preserve">
+    <value>Předpověď stažená {0} se stále používá.</value>
+  </data>
+  <data name="KeyRefused" xml:space="preserve">
+    <value>Solcast odmítl klíč ({0}) {1}. Znovu se nezeptáme, dokud neuložíte nový.{2}</value>
+  </data>
+  <data name="SiteNotFound" xml:space="preserve">
+    <value>Solcast pro tento klíč nemá střešní instalaci {0} ({1}) {2}. Znovu se nezeptáme, dokud se účet nezmění.{3}</value>
+  </data>
+  <data name="QuotaExhausted" xml:space="preserve">
+    <value>Dnešní volání jsou vyčerpána ({0}) {1}; další plánovaná aktualizace to zkusí znovu.{2}</value>
+  </data>
+  <data name="FetchFailed" xml:space="preserve">
+    <value>Poslední stažení selhalo {0}; další plánovaná aktualizace to zkusí znovu.{1}</value>
+  </data>
+  <data name="FetchedAt" xml:space="preserve">
+    <value>Předpověď stažena {0}.</value>
+  </data>
+  <data name="NothingFetched" xml:space="preserve">
+    <value>Nastaveno. Od startu řídicí jednotky se nic nestáhlo.</value>
+  </data>
+  <data name="AtTime" xml:space="preserve">
+    <value>v {0:HH:mm}</value>
+  </data>
+  <data name="OnDayTime" xml:space="preserve">
+    <value>v {0}</value>
+  </data>
+  <data name="Tariff" xml:space="preserve">
+    <value>Tarif</value>
+  </data>
+  <data name="TariffIntro" xml:space="preserve">
+    <value>Kdy je elektřina ze sítě levná, aby na ni nabíjení mohlo počkat. Zvolte, odkud se berou časy nízkého tarifu; každá jiná minuta je vysoký tarif. Uložení platí hned.</value>
+  </data>
+  <data name="TariffReadOnly" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Nastavte {0} ({1}) a tarif půjde tu upravovat.</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Zdroj</value>
+  </data>
+  <data name="UnknownProvider" xml:space="preserve">
+    <value>Uložený zdroj {0} v této verzi není. Zvolte jiný.</value>
+  </data>
+  <data name="NoTariff" xml:space="preserve">
+    <value>Bez tarifu: síť stojí v každou hodinu stejně.</value>
+  </data>
+  <data name="NothingToSet" xml:space="preserve">
+    <value>{0} tady nemá co nastavit.</value>
+  </data>
+  <data name="Prices" xml:space="preserve">
+    <value>Ceny</value>
+  </data>
+  <data name="LowPrice" xml:space="preserve">
+    <value>Cena v nízkém tarifu, {0}</value>
+  </data>
+  <data name="HighPrice" xml:space="preserve">
+    <value>Cena ve vysokém tarifu, {0}</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Uložit</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Zrušit</value>
+  </data>
+  <data name="NotAPrice" xml:space="preserve">
+    <value>Není to cena.</value>
+  </data>
+  <data name="Weekdays" xml:space="preserve">
+    <value>Pracovní dny</value>
+  </data>
+  <data name="Weekend" xml:space="preserve">
+    <value>Víkend</value>
+  </data>
+  <data name="MonFri" xml:space="preserve">
+    <value>po–pá</value>
+  </data>
+  <data name="SatSun" xml:space="preserve">
+    <value>so–ne</value>
+  </data>
+  <data name="LowTariffFrom" xml:space="preserve">
+    <value>Nízký tarif od</value>
+  </data>
+  <data name="Until" xml:space="preserve">
+    <value>do</value>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>Začátek</value>
+  </data>
+  <data name="End" xml:space="preserve">
+    <value>Konec</value>
+  </data>
+  <data name="HhMmOr24" xml:space="preserve">
+    <value>HH:mm nebo 24:00</value>
+  </data>
+  <data name="AddPeriod" xml:space="preserve">
+    <value>Přidat období</value>
+  </data>
+  <data name="TodayAndTomorrow" xml:space="preserve">
+    <value>Dnes a zítra</value>
+  </data>
+  <data name="ShadedIsLow" xml:space="preserve">
+    <value>Stínované je nízký tarif.</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Dnes</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Zítra</value>
+  </data>
+  <data name="HighAllDay" xml:space="preserve">
+    <value>{0}: celý den vysoký tarif</value>
+  </data>
+  <data name="LowTariffAt" xml:space="preserve">
+    <value>{0}: nízký tarif {1}</value>
+  </data>
+  <data name="NoPeriodsWeekdays" xml:space="preserve">
+    <value>Žádná období: od pondělí do pátku celý den vysoký tarif.</value>
+  </data>
+  <data name="NoPeriodsWeekend" xml:space="preserve">
+    <value>Žádná období: v sobotu a neděli celý den vysoký tarif.</value>
+  </data>
+  <data name="TariffProvider_None" xml:space="preserve">
+    <value>Žádný</value>
+  </data>
+  <data name="TariffProvider_Table" xml:space="preserve">
+    <value>Tabulka</value>
+  </data>
+  <data name="KeyPlaceholder" xml:space="preserve">
+    <value>klíč</value>
+  </data>
+</root>

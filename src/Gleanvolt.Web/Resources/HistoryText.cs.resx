@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="DeliveredOnly" xml:space="preserve">
+    <value>dodáno {0}</value>
+  </data>
+  <data name="DeliveredWithLoan" xml:space="preserve">
+    <value>dodáno {0} — z toho {1} půjčeno z baterie</value>
+  </data>
+  <data name="ChartNote" xml:space="preserve">
+    <value>Každý měřák tak, jak byl vzorkován, ve wattech. {0} je nad čarou import a pod ní export; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Stínovaný pás označuje úseky, kdy byla aktivní blokace baterie, a úsek bez vzorků je mezera, ne čára přes něj nakreslená.</value>
+  </data>
+  <data name="ChartNoteFloor" xml:space="preserve">
+    <value>{0} je čára, se kterou se porovnává SOC domácí baterie: nad ní smí baterie autu půjčovat, pod ní patří slunce baterii.</value>
+  </data>
+  <data name="ChartNoteLoan" xml:space="preserve">
+    <value>Stínovaná {0} pod přebytkem ukazuje, kolik nabíjení financovala baterie, aby se k autu dostal i přebytek pod minimem nabíječky.</value>
+  </data>
+  <data name="ChartNoteCarSoc" xml:space="preserve">
+    <value>{0} se mění v čase, kdy auto každý údaj zachytilo, což bývá běžně hodiny před vzorkem, který ho přinesl.</value>
+  </data>
+  <data name="SeriesSolar" xml:space="preserve">
+    <value>Slunce</value>
+  </data>
+  <data name="SeriesGrid" xml:space="preserve">
+    <value>Síť</value>
+  </data>
+  <data name="SeriesBattery" xml:space="preserve">
+    <value>Baterie</value>
+  </data>
+  <data name="SeriesEv" xml:space="preserve">
+    <value>Nabíječka</value>
+  </data>
+  <data name="SeriesHouse" xml:space="preserve">
+    <value>Dům</value>
+  </data>
+  <data name="SeriesForecast" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="SeriesSurplus" xml:space="preserve">
+    <value>Přebytek</value>
+  </data>
+  <data name="SeriesBatteryLoan" xml:space="preserve">
+    <value>Výpůjčka z baterie</value>
+  </data>
+  <data name="SeriesBatterySoc" xml:space="preserve">
+    <value>SOC baterie</value>
+  </data>
+  <data name="SeriesSocFloor" xml:space="preserve">
+    <value>Mez SOC</value>
+  </data>
+  <data name="SeriesCarSoc" xml:space="preserve">
+    <value>SOC auta</value>
+  </data>
+  <data name="SeriesExpected" xml:space="preserve">
+    <value>Očekávaná</value>
+  </data>
+  <data name="SeriesLow" xml:space="preserve">
+    <value>Nízká (p10)</value>
+  </data>
+  <data name="SeriesHigh" xml:space="preserve">
+    <value>Vysoká (p90)</value>
+  </data>
+  <data name="SeriesForecastSurplus" xml:space="preserve">
+    <value>Předpovězený přebytek</value>
+  </data>
+  <data name="SeriesRequiredFloor" xml:space="preserve">
+    <value>Požadovaná mez SOC</value>
+  </data>
+  <data name="SessionsPageTitle" xml:space="preserve">
+    <value>Nabíjení</value>
+  </data>
+  <data name="SessionsTitle" xml:space="preserve">
+    <value>Nabíjení</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Zobrazit</value>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>Posledních 7 dní</value>
+  </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>Posledních 30 dní</value>
+  </data>
+  <data name="Last90Days" xml:space="preserve">
+    <value>Posledních 90 dní</value>
+  </data>
+  <data name="LastYear" xml:space="preserve">
+    <value>Poslední rok</value>
+  </data>
+  <data name="HistoryUnavailable" xml:space="preserve">
+    <value>Historie nabíjení teď není k dispozici.</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>Načítá se…</value>
+  </data>
+  <data name="NoSessions" xml:space="preserve">
+    <value>V tomto rozsahu žádné nabíjení.</value>
+  </data>
+  <data name="Started" xml:space="preserve">
+    <value>Začátek</value>
+  </data>
+  <data name="Duration" xml:space="preserve">
+    <value>Doba</value>
+  </data>
+  <data name="Strategy" xml:space="preserve">
+    <value>Režim</value>
+  </data>
+  <data name="Delivered" xml:space="preserve">
+    <value>Dodáno</value>
+  </data>
+  <data name="SolarShare" xml:space="preserve">
+    <value>Podíl slunce</value>
+  </data>
+  <data name="InProgressParenthesised" xml:space="preserve">
+    <value>(probíhá)</value>
+  </data>
+  <data name="SessionPageTitle" xml:space="preserve">
+    <value>Nabíjení</value>
+  </data>
+  <data name="AllSessions" xml:space="preserve">
+    <value>← Všechna nabíjení</value>
+  </data>
+  <data name="NoSuchSession" xml:space="preserve">
+    <value>Takové nabíjení neexistuje.</value>
+  </data>
+  <data name="Session" xml:space="preserve">
+    <value>Nabíjení</value>
+  </data>
+  <data name="Ended" xml:space="preserve">
+    <value>Konec</value>
+  </data>
+  <data name="InProgress" xml:space="preserve">
+    <value>probíhá</value>
+  </data>
+  <data name="EndReason" xml:space="preserve">
+    <value>Důvod ukončení</value>
+  </data>
+  <data name="BatterySoc" xml:space="preserve">
+    <value>SOC baterie</value>
+  </data>
+  <data name="PeakPower" xml:space="preserve">
+    <value>Nejvyšší nabíjecí výkon</value>
+  </data>
+  <data name="DayForecast" xml:space="preserve">
+    <value>Předpověď na den</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Počasí</value>
+  </data>
+  <data name="Daylight" xml:space="preserve">
+    <value>Denní světlo</value>
+  </data>
+  <data name="EnergySplit" xml:space="preserve">
+    <value>Zdroje energie</value>
+  </data>
+  <data name="SplitSolar" xml:space="preserve">
+    <value>Slunce: {0}</value>
+  </data>
+  <data name="SplitGrid" xml:space="preserve">
+    <value>Síť: {0}</value>
+  </data>
+  <data name="SplitBattery" xml:space="preserve">
+    <value>Baterie: {0}</value>
+  </data>
+  <data name="NoEnergy" xml:space="preserve">
+    <value>Nebyla dodána žádná energie.</value>
+  </data>
+  <data name="TheSession" xml:space="preserve">
+    <value>Průběh nabíjení</value>
+  </data>
+  <data name="NoSamples" xml:space="preserve">
+    <value>Pro toto nabíjení nebyly zaznamenány žádné vzorky.</value>
+  </data>
+  <data name="Rows_One" xml:space="preserve">
+    <value>{0} řádek</value>
+  </data>
+  <data name="Rows_Few" xml:space="preserve">
+    <value>{0} řádky</value>
+  </data>
+  <data name="Rows_Other" xml:space="preserve">
+    <value>{0} řádků</value>
+  </data>
+  <data name="PartialRowsNote_One" xml:space="preserve">
+    <value>{0} pokrývá méně než celý interval — služba startovala, zastavovala se nebo ztratila spojení se střídačem — takže každý údaj energie na tom řádku je o stejný podíl menší.</value>
+  </data>
+  <data name="PartialRowsNote_Few" xml:space="preserve">
+    <value>{0} pokrývají méně než celý interval — služba startovala, zastavovala se nebo ztratila spojení se střídačem — takže každý údaj energie na těch řádcích je o stejný podíl menší.</value>
+  </data>
+  <data name="PartialRowsNote_Other" xml:space="preserve">
+    <value>{0} pokrývá méně než celý interval — služba startovala, zastavovala se nebo ztratila spojení se střídačem — takže každý údaj energie na těch řádcích je o stejný podíl menší.</value>
+  </data>
+  <data name="EnergyPageTitle" xml:space="preserve">
+    <value>Energie</value>
+  </data>
+  <data name="EnergyTitle" xml:space="preserve">
+    <value>Energie</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>Den</value>
+  </data>
+  <data name="PreviousDay" xml:space="preserve">
+    <value>Předchozí den</value>
+  </data>
+  <data name="NextDay" xml:space="preserve">
+    <value>Následující den</value>
+  </data>
+  <data name="EnergyUnavailable" xml:space="preserve">
+    <value>Historie energie teď není k dispozici.</value>
+  </data>
+  <data name="NothingRecorded" xml:space="preserve">
+    <value>V tento den se nic nezaznamenalo.</value>
+  </data>
+  <data name="TheDay" xml:space="preserve">
+    <value>Průběh dne</value>
+  </data>
+  <data name="EnergyChartNote" xml:space="preserve">
+    <value>Výkon zprůměrovaný za každou pozorovanou čtvrthodinu — úložiště drží energii a čtvrthodina, kterou služba viděla jen zčásti, se dělí tou částí, takže restart je mezera, ne propad, který slunce neudělalo. {0} je nad čarou import a pod ní export; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Pruh podél spodního okraje označuje okna pozorovaná jen zčásti — tatáž, která tabulka níže ukazuje kurzívou.</value>
+  </data>
+  <data name="From" xml:space="preserve">
+    <value>Od</value>
+  </data>
+  <data name="ColSolar" xml:space="preserve">
+    <value>Slunce</value>
+  </data>
+  <data name="ColForecast" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="ColImport" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="ColExport" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="ColToCar" xml:space="preserve">
+    <value>Do auta</value>
+  </data>
+  <data name="ColBattIn" xml:space="preserve">
+    <value>Bat. dovnitř</value>
+  </data>
+  <data name="ColBattOut" xml:space="preserve">
+    <value>Bat. ven</value>
+  </data>
+  <data name="ColHouse" xml:space="preserve">
+    <value>Dům</value>
+  </data>
+  <data name="ColSoc" xml:space="preserve">
+    <value>SOC</value>
+  </data>
+  <data name="ColCovered" xml:space="preserve">
+    <value>Pokryto</value>
+  </data>
+  <data name="DayRow" xml:space="preserve">
+    <value>Den</value>
+  </data>
+  <data name="EnergyTableNote" xml:space="preserve">
+    <value>Každý údaj je v kWh za daný interval, v čase {0}. Import a export jsou zvlášť, stejně jako oba směry baterie — čistý údaj by nerozlišil klidnou čtvrthodinu od rušné, která se náhodou vyrovnala. {1} je zbytek ostatních (včetně auta), ne samostatné měření.</value>
+  </data>
+  <data name="ForecastPageTitle" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="ForecastTitle" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="NoForecastHeld_0" xml:space="preserve">
+    <value>Nastavení</value>
+  </data>
+  <data name="NoForecastHeld" xml:space="preserve">
+    <value>Zatím není k dispozici žádná předpověď. Buď pro tuto instalaci není nastaven účet Solcast, nebo se od startu řídicí jednotky nic nestáhlo — {0} řekne které a je místem, kde se účet zadává. Předpověď se přes den obnovuje podle vlastního plánu; tato stránka ukazuje, co se stáhlo naposledy, a sama si o ni nikdy neříká.</value>
+  </data>
+  <data name="TheTwoDays" xml:space="preserve">
+    <value>Dva dny</value>
+  </data>
+  <data name="ForecastChartNote_1" xml:space="preserve">
+    <value>Očekávaná</value>
+  </data>
+  <data name="ForecastChartNote_2" xml:space="preserve">
+    <value>p10 až p90</value>
+  </data>
+  <data name="ForecastChartNote" xml:space="preserve">
+    <value>Očekávaný výkon FV v čase, 30minutová období, v čase {0}. Čára je {1} — medián, stejně pravděpodobně překonaný jako nedosažený — a pás za ní je {2}: šířka toho rozpětí vyjadřuje, jak jisté je nebe, a je důvodem, proč je tohle obrázek, a ne čtyři čísla. Plná čára je půlnoc mezi oběma dny, přerušovaná je teď. Kliknutím na název v legendě řadu skryjete.</value>
+  </data>
+  <data name="NoRangeNote_0" xml:space="preserve">
+    <value>Některá období nemají vlastní rozpětí</value>
+  </data>
+  <data name="NoRangeNote" xml:space="preserve">
+    <value>{0} — poskytovatel pro ně poslal jen medián a pás tam splývá s čárou. Pás ne širší než čára není slib; tabulka níže v těch řádcích ukazuje pomlčku.</value>
+  </data>
+  <data name="MorningMissing" xml:space="preserve">
+    <value>{0} Poskytovatel předpovědi odpovídá jen na to, co teprve přijde, takže co mělo přinést dnešní dopoledne, řídicí jednotka ví, jen pokud během něj běžela — a tato z doby předtím nic nemá. Prázdný úsek vlevo v grafu je mezera ve znalostech, ne tmavé dopoledne.</value>
+  </data>
+  <data name="Period" xml:space="preserve">
+    <value>Období</value>
+  </data>
+  <data name="ColExpected" xml:space="preserve">
+    <value>Očekávaná</value>
+  </data>
+  <data name="ColLow" xml:space="preserve">
+    <value>Nízká (p10)</value>
+  </data>
+  <data name="ColHigh" xml:space="preserve">
+    <value>Vysoká (p90)</value>
+  </data>
+  <data name="ColEnergy" xml:space="preserve">
+    <value>Energie</value>
+  </data>
+  <data name="DayTotals" xml:space="preserve">
+    <value>očekáváno {0} ({1}–{2} při p10–p90), špička {3}</value>
+  </data>
+  <data name="NothingHeld" xml:space="preserve">
+    <value>Pro tento den nic není.</value>
+  </data>
+  <data name="ForecastTableNote_1" xml:space="preserve">
+    <value>je</value>
+  </data>
+  <data name="ForecastTableNote_2" xml:space="preserve">
+    <value>končí</value>
+  </data>
+  <data name="ForecastTableNote_3" xml:space="preserve">
+    <value>Zítřejší čísla se ještě hýbou</value>
+  </data>
+  <data name="ForecastTableNote" xml:space="preserve">
+    <value>Výkon ve W, energie v kWh, časy v čase {0}. Každý řádek je půlhodina, kterou uvádí, a každý údaj na něm je průměrný výkon, který poskytovatel na tu půlhodinu čeká — sloupec energie je tedy prostě ten výkon za třicet minut. Noční řádky zůstávají: řádek 0 W ve 02:00 {1} předpověď a tabulce, která řádky vynechává, se musíte naučit pravidla, než mezeře v ní uvěříte. Období se počítá pod den, ve kterém {2}, stejně jako na přehledu a v denním plánu, takže každý den začíná půlhodinou, která končí jeho vlastní půlnocí. {3} — každá aktualizace je znovu předpoví, dokud den nenastane.</value>
+  </data>
+  <data name="LastFetched" xml:space="preserve">
+    <value>Naposledy staženo {0} dne {1}.</value>
+  </data>
+  <data name="ForecastHorizonNote_0" xml:space="preserve">
+    <value>Předpověď výroby</value>
+  </data>
+  <data name="ForecastHorizonNote" xml:space="preserve">
+    <value>Horizont je zhruba 48 hodin, proto jsou to dva dny, a ne týden. Tabulka {0} na přehledu ukazuje tytéž dva dny, každý čtyřmi čísly.</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Dnes</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Zítra</value>
+  </data>
+  <data name="TodayStartsAt" xml:space="preserve">
+    <value>Dnešek začíná v {0}.</value>
+  </data>
+  <data name="MarkModeChanged" xml:space="preserve">
+    <value>Změna režimu</value>
+  </data>
+  <data name="MarkChargingStarted" xml:space="preserve">
+    <value>Nabíjení zahájeno</value>
+  </data>
+  <data name="MarkChargingPaused" xml:space="preserve">
+    <value>Nabíjení pozastaveno</value>
+  </data>
+  <data name="MarkPlanUnusable" xml:space="preserve">
+    <value>Plán nepoužitelný</value>
+  </data>
+  <data name="MarkPlanUsable" xml:space="preserve">
+    <value>Plán opět použitelný</value>
+  </data>
+  <data name="MarkStoodDown" xml:space="preserve">
+    <value>Nabíječka odstavena</value>
+  </data>
+  <data name="MarkRearmed" xml:space="preserve">
+    <value>Nabíječka přepnuta zpět do Fast</value>
+  </data>
+</root>

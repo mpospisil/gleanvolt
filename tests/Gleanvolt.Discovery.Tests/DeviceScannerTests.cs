@@ -177,10 +177,15 @@ public class DeviceScannerTests
         var times = server.Requests.Select(request => request.Timestamp).ToList();
         Assert.True(times.Count >= 4);
 
+        // The server stamps a request when it reads it, so one late read on a busy runner shortens the
+        // gap after it and lengthens the one before. The run as a whole can't be shorter than the
+        // pacing allows; each single gap only has to be clearly not back to back (well under 1 ms).
+        var slack = TimeSpan.FromMilliseconds(20);
+        Assert.True(Stopwatch.GetElapsedTime(times[0], times[^1]) >= (interval * (times.Count - 1)) - slack);
+
         foreach (var (earlier, later) in times.Zip(times.Skip(1)))
         {
-            // A little slack for the timer's resolution; back to back would be well under a millisecond.
-            Assert.True(Stopwatch.GetElapsedTime(earlier, later) >= interval - TimeSpan.FromMilliseconds(20));
+            Assert.True(Stopwatch.GetElapsedTime(earlier, later) >= interval / 2);
         }
     }
 

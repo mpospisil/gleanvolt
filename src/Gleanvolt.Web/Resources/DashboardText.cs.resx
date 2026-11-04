@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Přehled</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Přehled</value>
+  </data>
+  <data name="Live" xml:space="preserve">
+    <value>Živě</value>
+  </data>
+  <data name="Updated" xml:space="preserve">
+    <value>Aktualizováno {0}</value>
+  </data>
+  <data name="NoPollYet" xml:space="preserve">
+    <value>Zatím neproběhlo žádné čtení.</value>
+  </data>
+  <data name="FiguresLabel" xml:space="preserve">
+    <value>Výkon teď a energie dnes</value>
+  </data>
+  <data name="Solar" xml:space="preserve">
+    <value>Slunce</value>
+  </data>
+  <data name="SolarTopic" xml:space="preserve">
+    <value>slunce</value>
+  </data>
+  <data name="SolarTip1" xml:space="preserve">
+    <value>Výroba FV naměřená na střídači, dřív než si z ní cokoli vezme dům, baterie nebo auto.</value>
+  </data>
+  <data name="SolarTip2_0" xml:space="preserve">
+    <value>Předpověď:</value>
+  </data>
+  <data name="SolarTip2" xml:space="preserve">
+    <value>{0} kolik měla střecha podle předpovědi právě teď vyrábět, pro srovnání s naměřenou hodnotou. 0, když tuto chvíli žádná předpověď nepokrývá.</value>
+  </data>
+  <data name="SolarTip3_0" xml:space="preserve">
+    <value>Přebytek:</value>
+  </data>
+  <data name="SolarTip3" xml:space="preserve">
+    <value>{0} FV, která zbude po spotřebě domu — vyhlazený tříminutový průměr, podle kterého se rozhodují solární režimy. Zobrazuje se jen tehdy, když zvolený režim rozhoduje podle přebytku.</value>
+  </data>
+  <data name="ForecastNow" xml:space="preserve">
+    <value>předpověď {0}</value>
+  </data>
+  <data name="SurplusNow" xml:space="preserve">
+    <value>přebytek {0}</value>
+  </data>
+  <data name="House" xml:space="preserve">
+    <value>Dům</value>
+  </data>
+  <data name="HouseTopic" xml:space="preserve">
+    <value>dům</value>
+  </data>
+  <data name="HouseTip1" xml:space="preserve">
+    <value>Co odebírá dům kromě auta: slunce plus import ze sítě, minus to, co si bere baterie a odebírá auto. Tentýž zbytek, kterému stránka Energie říká Dům.</value>
+  </data>
+  <data name="HouseTip2" xml:space="preserve">
+    <value>Pomlčka, když součet vyjde pod nulou: elektroměr na přípojce nevidí všechny fáze, takže během nabíjení v něm může část zátěže auta chybět.</value>
+  </data>
+  <data name="WithoutCar" xml:space="preserve">
+    <value>bez auta</value>
+  </data>
+  <data name="NotMeasurable" xml:space="preserve">
+    <value>nelze změřit</value>
+  </data>
+  <data name="Battery" xml:space="preserve">
+    <value>Baterie</value>
+  </data>
+  <data name="BatteryTopic" xml:space="preserve">
+    <value>baterie</value>
+  </data>
+  <data name="BatteryTip1" xml:space="preserve">
+    <value>Výkon domácí baterie: kladný při nabíjení, záporný při vybíjení.</value>
+  </data>
+  <data name="BatteryTip2" xml:space="preserve">
+    <value>Procento je stav nabití domácí baterie, jak ho hlásí střídač.</value>
+  </data>
+  <data name="BatteryCharging" xml:space="preserve">
+    <value>nabíjí se</value>
+  </data>
+  <data name="BatterySupplying" xml:space="preserve">
+    <value>dodává</value>
+  </data>
+  <data name="BatteryIdle" xml:space="preserve">
+    <value>v klidu</value>
+  </data>
+  <data name="In" xml:space="preserve">
+    <value>dovnitř</value>
+  </data>
+  <data name="Out" xml:space="preserve">
+    <value>ven</value>
+  </data>
+  <data name="Car" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="CarTopic" xml:space="preserve">
+    <value>výkon auta</value>
+  </data>
+  <data name="CarTip" xml:space="preserve">
+    <value>Co podle nabíječky auto právě skutečně odebírá — ne nastavená hodnota. Připojeno je pohled samotné nabíječky na to, zda je vůz připojen.</value>
+  </data>
+  <data name="PluggedInTopic" xml:space="preserve">
+    <value>připojeno</value>
+  </data>
+  <data name="PluggedIn" xml:space="preserve">
+    <value>připojeno</value>
+  </data>
+  <data name="NotPluggedIn" xml:space="preserve">
+    <value>nepřipojeno</value>
+  </data>
+  <data name="Grid" xml:space="preserve">
+    <value>Síť</value>
+  </data>
+  <data name="GridTopic" xml:space="preserve">
+    <value>síť</value>
+  </data>
+  <data name="GridTip" xml:space="preserve">
+    <value>Výkon sítě: kladný při importu ze sítě, záporný při exportu do sítě.</value>
+  </data>
+  <data name="Importing" xml:space="preserve">
+    <value>import</value>
+  </data>
+  <data name="Exporting" xml:space="preserve">
+    <value>export</value>
+  </data>
+  <data name="Balanced" xml:space="preserve">
+    <value>vyrovnáno</value>
+  </data>
+  <data name="FiguresNote" xml:space="preserve">
+    <value>Výkon teď; pod ním energie od půlnoci.</value>
+  </data>
+  <data name="FiguresNoteTopic" xml:space="preserve">
+    <value>dnešní hodnoty</value>
+  </data>
+  <data name="FiguresNoteTip" xml:space="preserve">
+    <value>Energie od místní půlnoci, jak ji monitor energie zaznamenal po čtvrthodinách: úsek, kdy služba neběžela, v ní chybí, není odhadnut.</value>
+  </data>
+  <data name="NoEnergyMonitor" xml:space="preserve">
+    <value>Dnešní energie potřebuje monitor energie, který je na této instalaci vypnutý; hodnoty výše jsou jen okamžitý výkon.</value>
+  </data>
+  <data name="ChargeMode" xml:space="preserve">
+    <value>Režim nabíjení</value>
+  </data>
+  <data name="ChargeModesLabel" xml:space="preserve">
+    <value>Režimy nabíjení</value>
+  </data>
+  <data name="NoSession_0" xml:space="preserve">
+    <value>Plán nabíjení</value>
+  </data>
+  <data name="NoSession" xml:space="preserve">
+    <value>Neběží žádné řízené nabíjení. Režim nastavíte a spustíte na stránce {0}.</value>
+  </data>
+  <data name="TodaysPlan" xml:space="preserve">
+    <value>Dnešní plán</value>
+  </data>
+  <data name="LowTariffBar" xml:space="preserve">
+    <value>Pruh podél spodního okraje je nízký tarif.</value>
+  </data>
+  <data name="Window" xml:space="preserve">
+    <value>Okno</value>
+  </data>
+  <data name="CarEnergy" xml:space="preserve">
+    <value>Energie pro auto</value>
+  </data>
+  <data name="BatteryFloor" xml:space="preserve">
+    <value>Spodní mez baterie</value>
+  </data>
+  <data name="Shortfall" xml:space="preserve">
+    <value>Chybí</value>
+  </data>
+  <data name="WholePlan" xml:space="preserve">
+    <value>Celý plán</value>
+  </data>
+  <data name="ThePlan" xml:space="preserve">
+    <value>Plán</value>
+  </data>
+  <data name="ThisSession" xml:space="preserve">
+    <value>Toto nabíjení</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Běží</value>
+  </data>
+  <data name="NoModeDriving" xml:space="preserve">
+    <value>Nabíječku neřídí žádný režim, ale auto odebírá: nabíječka hlásí {0}.</value>
+  </data>
+  <data name="HoldLabel" xml:space="preserve">
+    <value>Blokace vybíjení baterie</value>
+  </data>
+  <data name="On" xml:space="preserve">
+    <value>Zapnuto</value>
+  </data>
+  <data name="ChangeOrStop" xml:space="preserve">
+    <value>Změnit nebo zastavit v Plánu nabíjení</value>
+  </data>
+  <data name="DrawingNow" xml:space="preserve">
+    <value>odebírá teď; energie nabíjení se ještě nezapočítala</value>
+  </data>
+  <data name="ControlState" xml:space="preserve">
+    <value>Stav řízení</value>
+  </data>
+  <data name="ControlStateTopic" xml:space="preserve">
+    <value>stav řízení</value>
+  </data>
+  <data name="ControlStateTip" xml:space="preserve">
+    <value>Co řízení nabíjení právě dělá: Vypnuto (nic neběží), Nečinné (běží, ale nezasahuje, obvykle proto, že nabíječka už není v režimu Fast), Nabíjí nebo Pozastaveno.</value>
+  </data>
+  <data name="ChargerStatus" xml:space="preserve">
+    <value>Stav nabíječky</value>
+  </data>
+  <data name="ChargerStatusTopic" xml:space="preserve">
+    <value>stav nabíječky</value>
+  </data>
+  <data name="ChargerStatusTip" xml:space="preserve">
+    <value>Stav, který hlásí sama nabíječka, přímo z jejího registru.</value>
+  </data>
+  <data name="SessionEnergy" xml:space="preserve">
+    <value>Energie nabíjení</value>
+  </data>
+  <data name="SessionEnergyTopic" xml:space="preserve">
+    <value>energie nabíjení</value>
+  </data>
+  <data name="SessionEnergyTip" xml:space="preserve">
+    <value>Energie dodaná do auta od připojení. Po odpojení začíná znovu od nuly.</value>
+  </data>
+  <data name="EvPower" xml:space="preserve">
+    <value>Nabíjecí výkon auta</value>
+  </data>
+  <data name="EvCurrent" xml:space="preserve">
+    <value>Nabíjecí proud auta</value>
+  </data>
+  <data name="EvCurrentTopic" xml:space="preserve">
+    <value>nabíjecí proud auta</value>
+  </data>
+  <data name="EvCurrentTip" xml:space="preserve">
+    <value>Nabíjecí proud odvozený z naměřeného výkonu nabíječky: co auto opravdu bere.</value>
+  </data>
+  <data name="TargetCurrent" xml:space="preserve">
+    <value>Cílový proud</value>
+  </data>
+  <data name="TargetCurrentTopic" xml:space="preserve">
+    <value>cílový proud</value>
+  </data>
+  <data name="TargetCurrentTip" xml:space="preserve">
+    <value>Proud, na kterém se řídicí jednotka v tomto cyklu rozhodla, ještě před zápisem. Prázdné, kdykoli nenabíjí.</value>
+  </data>
+  <data name="ActiveCurrent" xml:space="preserve">
+    <value>Aktivní proud</value>
+  </data>
+  <data name="ActiveCurrentTopic" xml:space="preserve">
+    <value>aktivní proud</value>
+  </data>
+  <data name="ActiveCurrentTip" xml:space="preserve">
+    <value>Nastavená hodnota nabíječky přečtená zpět z hardwaru: na čem opravdu zůstala.</value>
+  </data>
+  <data name="LoanPower" xml:space="preserve">
+    <value>Výpůjčka z baterie</value>
+  </data>
+  <data name="LoanPowerTopic" xml:space="preserve">
+    <value>výpůjčka z baterie</value>
+  </data>
+  <data name="LoanPowerTip" xml:space="preserve">
+    <value>Kolik z toho, co auto právě odebírá, kryje domácí baterie místo živého slunce. Mimo režim Forecasted nula.</value>
+  </data>
+  <data name="Vehicle" xml:space="preserve">
+    <value>Vozidlo</value>
+  </data>
+  <data name="StaleOlderThan" xml:space="preserve">
+    <value>— zastaralé, starší než {0}</value>
+  </data>
+  <data name="ReadingTopic" xml:space="preserve">
+    <value>údaje z auta</value>
+  </data>
+  <data name="ReadingTip" xml:space="preserve">
+    <value>Stáří udává, kdy údaj vytvořilo samo auto — ne kdy jsme ho dostali. Hodiny staré údaje jsou u zaparkovaného auta normální; dny staré znamenají, že zdroj přestal fungovat.</value>
+  </data>
+  <data name="NoReadingYet" xml:space="preserve">
+    <value>{0} zatím nedodal žádný údaj — {1}</value>
+  </data>
+  <data name="NoFeed" xml:space="preserve">
+    <value>Pro toto auto není nastaven žádný zdroj dat, takže žádný údaj není — nic není špatně. Nabíjení funguje v kilowatthodinách tak jako tak; zdroj jen přidává pohled auta na sebe sama.</value>
+  </data>
+  <data name="AskingTheCar" xml:space="preserve">
+    <value>Ptám se auta…</value>
+  </data>
+  <data name="AskTheCar" xml:space="preserve">
+    <value>Zeptat se auta</value>
+  </data>
+  <data name="NothingToAsk" xml:space="preserve">
+    <value>Pro toto auto není nastaven žádný zdroj dat, takže není koho se ptát.</value>
+  </data>
+  <data name="CarDidNotAnswer" xml:space="preserve">
+    <value>Auto neodpovědělo — {0}</value>
+  </data>
+  <data name="NotAskedYet" xml:space="preserve">
+    <value>Baterie a dojezd se zobrazí, až se na ně zeptáte. Údaj může být o hodiny pozadu za autem a hodnotě, o kterou nikdo nežádal, nikdo nezkontroluje stáří.</value>
+  </data>
+  <data name="CarBattery" xml:space="preserve">
+    <value>Baterie auta</value>
+  </data>
+  <data name="CarBatteryTopic" xml:space="preserve">
+    <value>baterie auta</value>
+  </data>
+  <data name="CarBatteryTip1" xml:space="preserve">
+    <value>Stav nabití auta, jak ho naposledy nahlásila jeho cloudová služba. Ne domácí baterie.</value>
+  </data>
+  <data name="CarBatteryTip2" xml:space="preserve">
+    <value>Dojezd je, kolik si auto myslí, že v něm zbývá, podle své nedávné spotřeby. Nic tady s ním neplánuje; říká, zda bude nabíjení, o které se chystáte požádat, stačit.</value>
+  </data>
+  <data name="Range" xml:space="preserve">
+    <value>dojezd {0}</value>
+  </data>
+  <data name="PluggedInLabel" xml:space="preserve">
+    <value>Připojeno</value>
+  </data>
+  <data name="PluggedInTip1_0" xml:space="preserve">
+    <value>Nabíječka:</value>
+  </data>
+  <data name="PluggedInTip1" xml:space="preserve">
+    <value>{0} zda je vůz připojen, jak to vidí nabíječka. Neříká nic o tom, zda odebírá.</value>
+  </data>
+  <data name="PluggedInTip2_0" xml:space="preserve">
+    <value>Auto:</value>
+  </data>
+  <data name="PluggedInTip2" xml:space="preserve">
+    <value>{0} zda auto hlásí kabel v zásuvce. Samostatný údaj vedle stavu nabíječky a mnohem pomalejší.</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Ano</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>Ne</value>
+  </data>
+  <data name="ChargeState" xml:space="preserve">
+    <value>Stav nabíjení</value>
+  </data>
+  <data name="ChargeStateTopic" xml:space="preserve">
+    <value>stav nabíjení</value>
+  </data>
+  <data name="ChargeStateTip" xml:space="preserve">
+    <value>Co auto hlásí, že dělá: Nenabíjí, Nabíjí, Dokončeno, nebo Neznámý, když nic nehlásí.</value>
+  </data>
+  <data name="AsReportedByCar" xml:space="preserve">
+    <value>jak hlásí auto</value>
+  </data>
+  <data name="SolarForecast" xml:space="preserve">
+    <value>Předpověď výroby</value>
+  </data>
+  <data name="SolarForecastTopic" xml:space="preserve">
+    <value>předpověď výroby</value>
+  </data>
+  <data name="ForecastTip1" xml:space="preserve">
+    <value>Energie v kWh, špičkový výkon v kW. Každý řádek je celý den, od půlnoci do půlnoci v čase {0}. Dnešek zahrnuje i uplynulé hodiny, jak byly naposledy předpovězeny, než nastaly, takže je to, co měl den přinést, ne co ještě přijde.</value>
+  </data>
+  <data name="ForecastTip2_0" xml:space="preserve">
+    <value>Očekávaná</value>
+  </data>
+  <data name="ForecastTip2" xml:space="preserve">
+    <value>{0} je medián Solcastu: stejně pravděpodobně bude překonán jako nedosažen.</value>
+  </data>
+  <data name="ForecastTip3_0" xml:space="preserve">
+    <value>Nízká (p10)</value>
+  </data>
+  <data name="ForecastTip3" xml:space="preserve">
+    <value>{0} je opatrná hodnota, kterou by den měl překonat zhruba devětkrát z deseti — režim Forecasted s tímto pásmem plánuje ve výchozím nastavení.</value>
+  </data>
+  <data name="ForecastTip4_0" xml:space="preserve">
+    <value>Vysoká (p90)</value>
+  </data>
+  <data name="ForecastTip4" xml:space="preserve">
+    <value>{0} je ta nadějná, překonaná jen asi jednou z deseti; čím širší rozdíl mezi nimi, tím méně jisté nebe.</value>
+  </data>
+  <data name="ForecastTip5_0" xml:space="preserve">
+    <value>Špička</value>
+  </data>
+  <data name="ForecastTip5" xml:space="preserve">
+    <value>{0} je nejsilnější půlhodina, kterou medián čeká, ještě než si dům vezme svůj díl — rychlá kontrola, zda střecha vůbec vyrobí dost na nabíjení auta.</value>
+  </data>
+  <data name="ForecastTip6" xml:space="preserve">
+    <value>Solcast se přes den ptáme znovu každých pár hodin, takže zítřejší čísla se hýbou, dokud den nenastane. Pomlčka znamená, že pro ten den zatím žádná předpověď není.</value>
+  </data>
+  <data name="ForecastTip7_0" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="ForecastTip7" xml:space="preserve">
+    <value>Stránka {0} má tytéž dva dny po jednotlivých obdobích — denní součet a průběh dne jsou různé věci a tohle je součet.</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>Den</value>
+  </data>
+  <data name="Expected" xml:space="preserve">
+    <value>Očekávaná</value>
+  </data>
+  <data name="Low" xml:space="preserve">
+    <value>Nízká (p10)</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>Vysoká (p90)</value>
+  </data>
+  <data name="Peak" xml:space="preserve">
+    <value>Špička</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Dnes</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Zítra</value>
+  </data>
+  <data name="HoldArmedAt" xml:space="preserve">
+    <value>aktivní na střídači, drží na {0}</value>
+  </data>
+  <data name="HoldArmed" xml:space="preserve">
+    <value>aktivní na střídači</value>
+  </data>
+  <data name="HoldRequested" xml:space="preserve">
+    <value>vyžádaná, zatím neaktivní</value>
+  </data>
+  <data name="HoldOff" xml:space="preserve">
+    <value>baterie obsluhuje dům jako obvykle</value>
+  </data>
+  <data name="UntilFullDay" xml:space="preserve">
+    <value>· do plna · den {0}</value>
+  </data>
+  <data name="TheFeed" xml:space="preserve">
+    <value>Zdroj</value>
+  </data>
+  <data name="TheCar" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="Usable" xml:space="preserve">
+    <value>{0}, využitelných {1}</value>
+  </data>
+  <data name="AsChargerSees" xml:space="preserve">
+    <value>jak to vidí nabíječka</value>
+  </data>
+  <data name="CarDoesNotSay" xml:space="preserve">
+    <value>auto to neříká</value>
+  </data>
+  <data name="Agree" xml:space="preserve">
+    <value>nabíječka a auto se shodují</value>
+  </data>
+  <data name="CarSaysIs" xml:space="preserve">
+    <value>auto tvrdí, že je</value>
+  </data>
+  <data name="CarSaysIsNot" xml:space="preserve">
+    <value>auto tvrdí, že není</value>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Vypnuto</value>
+  </data>
+  <data name="NoWindow" xml:space="preserve">
+    <value>žádné</value>
+  </data>
+  <data name="IntoCar" xml:space="preserve">
+    <value>do auta od připojení</value>
+  </data>
+  <data name="IntoCarWithSoc" xml:space="preserve">
+    <value>do auta od připojení; auto naposledy hlásilo {0}</value>
+  </data>
+  <data name="UpdatedAgo" xml:space="preserve">
+    <value>aktualizováno před {0}</value>
+  </data>
+  <data name="UpdatedAgoVia" xml:space="preserve">
+    <value>aktualizováno před {0} přes {1}</value>
+  </data>
+  <data name="DryRun" xml:space="preserve">
+    <value>Zkušební provoz: rozhodnutí se zapisují do logu, do nabíječky se nic nezapisuje.</value>
+  </data>
+  <data name="ModeNamedUntilFull" xml:space="preserve">
+    <value>Režim {0} (do plna, den {1})</value>
+  </data>
+  <data name="ModeNamed" xml:space="preserve">
+    <value>Režim {0}</value>
+  </data>
+  <data name="DrawingNoMode" xml:space="preserve">
+    <value>Auto odebírá {0}, aniž by nabíječku řídil nějaký režim — nabíječka ho spustila sama.</value>
+  </data>
+  <data name="LentByBattery" xml:space="preserve">
+    <value>, z toho {0} půjčuje domácí baterie</value>
+  </data>
+  <data name="ChargingInMode" xml:space="preserve">
+    <value>Nabíjí auto výkonem {0} — {1}{2}.</value>
+  </data>
+  <data name="PluggedNotCharging" xml:space="preserve">
+    <value>Auto je připojené, ale nic se nenabíjí: nabíječku neřídí žádný režim.</value>
+  </data>
+  <data name="NothingCharging" xml:space="preserve">
+    <value>Nic se nenabíjí a žádné auto není připojené.</value>
+  </data>
+  <data name="WaitingForCar" xml:space="preserve">
+    <value>{0} je zapnutý a čeká na připojení auta.</value>
+  </data>
+  <data name="StoodDownUntil" xml:space="preserve">
+    <value>{0} je zapnutý a odstavil nabíječku do {1}.</value>
+  </data>
+  <data name="StoodDownTomorrow" xml:space="preserve">
+    <value>{0} je zapnutý a odstavil nabíječku do zítřejšího slunce.</value>
+  </data>
+  <data name="StoodDownUntilCan" xml:space="preserve">
+    <value>{0} je zapnutý a odstavil nabíječku, dokud nebude moct nabíjet.</value>
+  </data>
+  <data name="PausedCar" xml:space="preserve">
+    <value>{0} je zapnutý a pozastavil auto.</value>
+  </data>
+  <data name="NotActing" xml:space="preserve">
+    <value>{0} je zapnutý, ale do nabíječky nezasahuje.</value>
+  </data>
+  <data name="NotDrawing" xml:space="preserve">
+    <value>{0} je zapnutý; auto neodebírá.</value>
+  </data>
+  <data name="TomorrowsFirstWindow" xml:space="preserve">
+    <value>~{0:HH:mm} (první zítřejší okno)</value>
+  </data>
+  <data name="HighTariffUntil" xml:space="preserve">
+    <value>Vysoký tarif do {0:HH:mm}; čeká na nízký tarif (jen nízký tarif).</value>
+  </data>
+  <data name="HighTariffWaiting" xml:space="preserve">
+    <value>Vysoký tarif; čeká na nízký tarif (jen nízký tarif).</value>
+  </data>
+  <data name="LowTariffIgnored" xml:space="preserve">
+    <value>Je nastaveno Jen nízký tarif, ale není na co čekat, takže nabíjí bez ohledu na hodinu.</value>
+  </data>
+</root>

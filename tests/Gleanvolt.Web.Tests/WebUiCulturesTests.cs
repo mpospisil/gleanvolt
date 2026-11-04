@@ -63,13 +63,29 @@ public sealed class WebUiCulturesTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task With_one_language_there_is_nothing_to_pick()
+    public async Task Production_offers_english_and_czech_and_never_the_pseudo_locale()
     {
         var client = await StartAsync(Environments.Production);
 
-        var html = await client.GetStringAsync("/login");
+        // Razor writes anything outside ASCII as a character reference; a browser shows it as written.
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync("/login"));
 
-        Assert.DoesNotContain("name=\"culture\"", html);
+        Assert.Contains("<option value=\"en\"", html);
+        Assert.Contains("<option value=\"cs\"", html);
+        Assert.Contains(">Čeština</option>", html);
+        Assert.DoesNotContain("qps", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task A_czech_browser_gets_czech()
+    {
+        var client = await StartAsync(Environments.Production);
+        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("cs-CZ");
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync("/login"));
+
+        Assert.Contains("<html lang=\"cs\">", html);
+        Assert.Contains("Přihlásit", html);
     }
 
     [Fact]

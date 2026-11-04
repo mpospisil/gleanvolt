@@ -24,7 +24,7 @@ public static class WebUiCultures
     /// The languages the UI ships in, the first being the default. Adding one means a .resx beside
     /// each neutral one under Resources/ and its name here -- nothing else.
     /// </summary>
-    public static IReadOnlyList<string> Shipped { get; } = ["en"];
+    public static IReadOnlyList<string> Shipped { get; } = ["en", "cs"];
 
     /// <summary>
     /// The pseudo-locale, offered in Development only: every string accented and bracketed, so a

@@ -62,10 +62,16 @@
                         </form>
                     </Authorized>
                 </AuthorizeView>
+                @* Inside the menu, so on a phone it folds behind the Menu button with the links rather than
+                   pushing the installation's name off a bar that has no room left (#291). *@
+                <LanguagePicker />
             </div>
         </Authorized>
+        <NotAuthorized>
+            @* The sign-in page has no menu and plenty of room: the picker sits in the bar. *@
+            <LanguagePicker />
+        </NotAuthorized>
     </AuthorizeView>
-    <LanguagePicker />
 </header>
 
 <main class="content">
