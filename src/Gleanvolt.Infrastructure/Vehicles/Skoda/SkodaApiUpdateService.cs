@@ -92,6 +92,8 @@ public sealed class SkodaApiUpdateService(
             ? SkodaApiSentences.OwnerAction
             : null;
 
+    public Phrase? OwnerActionPhrase => OwnerAction is null ? null : Phrase.Of("Feed.SkodaNeedsKey");
+
     public VehicleSourceHealth Health
     {
         get

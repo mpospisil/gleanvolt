@@ -156,4 +156,11 @@
   <data name="Tariff_ProviderEmpty" xml:space="preserve">
     <value>The {0} tariff provider has nothing to answer from yet, so there is no tariff restriction.</value>
   </data>
+  <!-- The car's feed, when it needs its owner -->
+  <data name="Feed_VolkswagenWantsCode" xml:space="preserve">
+    <value>volkswagen.de wants a one-time code — sign in again on the Car page.</value>
+  </data>
+  <data name="Feed_SkodaNeedsKey" xml:space="preserve">
+    <value>No MyŠkoda API key yet, or it has expired — paste one on the Car page.</value>
+  </data>
 </root>

@@ -50,6 +50,9 @@ public interface IVehicleUpdateService
     /// </summary>
     string? OwnerAction => null;
 
+    /// <summary><see cref="OwnerAction"/> for the web UI to say in the viewer's language (#290).</summary>
+    Phrase? OwnerActionPhrase => null;
+
     /// <summary>
     /// Whether this feed can currently produce a reading, with a sentence for the UI. Cheap and
     /// synchronous: it is read on a Blazor render and on the Home Assistant publish tick, so it

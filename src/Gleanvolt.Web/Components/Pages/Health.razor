@@ -176,6 +176,9 @@
 </section>
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     private ChargeControlStatus? _status;
     private bool _confirming;
     private bool _stopping;
@@ -216,7 +219,7 @@
         // by contract, and a page left open is exactly where a feed's state changing has to show up.
         RefreshFeed();
 
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(_viewer.Wrap(StateHasChanged));
     }
 
     private void RefreshFeed()

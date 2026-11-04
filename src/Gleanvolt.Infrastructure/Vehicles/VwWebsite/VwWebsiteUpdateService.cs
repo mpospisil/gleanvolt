@@ -48,6 +48,8 @@ public sealed class VwWebsiteUpdateService(
 
     public string? OwnerAction => Health.IsBlocked ? OwnerActionSentence : null;
 
+    public Phrase? OwnerActionPhrase => Health.IsBlocked ? Phrase.Of("Feed.VolkswagenWantsCode") : null;
+
     /// <summary>
     /// Blocked until the owner has signed in again since it stopped. Read by the worker every minute
     /// while it waits, so a sign-in on the Car page resumes the feed within one.

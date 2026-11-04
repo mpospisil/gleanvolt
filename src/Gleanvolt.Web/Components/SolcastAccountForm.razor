@@ -108,6 +108,9 @@
 </section>
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     private SolcastAccountSettings _settings = new(
         SolcastAccountSource.None, string.Empty, string.Empty, false, string.Empty, SolcastFetchStatus.Never);
 
@@ -134,11 +137,11 @@
     public void Dispose() => Editor.Changed -= OnChanged;
 
     // Only the status and the source move under the owner's feet; what is typed in the boxes stays.
-    private void OnChanged() => _ = InvokeAsync(() =>
+    private void OnChanged() => _ = InvokeAsync(_viewer.Wrap(() =>
     {
         _settings = Editor.Read();
         StateHasChanged();
-    });
+    }));
 
     private void Reload()
     {

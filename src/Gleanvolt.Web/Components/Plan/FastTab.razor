@@ -152,6 +152,9 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     [Parameter] public ChargeControlStatus? Status { get; set; }
 
     [Parameter] public bool Busy { get; set; }
@@ -176,11 +179,11 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     public void Dispose() => Fast.Changed -= OnLimitChanged;
 
     private void OnLimitChanged(FastChargeLimit? limit) =>
-        InvokeAsync(() =>
+        InvokeAsync(_viewer.Wrap(() =>
         {
             AdoptRunningLimit(limit);
             StateHasChanged();
-        });
+        }));
 
     // A limit set from Home Assistant or the API is what this charge is actually stopping at, so the
     // form shows it rather than whatever was last typed here. Clearing does not reset the boxes: the

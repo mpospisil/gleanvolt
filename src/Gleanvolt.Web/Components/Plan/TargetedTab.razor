@@ -360,6 +360,9 @@ else
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     [Parameter] public ChargeControlStatus? Status { get; set; }
 
     [Parameter] public bool Busy { get; set; }
@@ -441,7 +444,7 @@ else
     private void OnRequestChanged(TargetedChargeRequest? request)
     {
         SeedForm(request);
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(_viewer.Wrap(StateHasChanged));
     }
 
     public void Dispose() => Target.Changed -= OnRequestChanged;

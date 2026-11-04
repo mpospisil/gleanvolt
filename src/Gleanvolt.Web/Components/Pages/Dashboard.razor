@@ -415,7 +415,7 @@ else
     @if (_feed is { IsBlocked: true } blocked)
     {
         <p class="error" id="vehicle-feed-blocked">
-            <strong>Sign-in required</strong> — @(_service?.OwnerAction ?? blocked.Message)
+            <strong>Sign-in required</strong> — @(_service?.OwnerAction is { } action ? Localized.Say(_service.OwnerActionPhrase, action) : blocked.Message)
             <a href="/car">Sign in on the car page</a>
         </p>
     }
@@ -565,6 +565,9 @@ else
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     private ChargeControlStatus? _status;
     private VehicleState? _vehicle;
 
@@ -630,11 +633,11 @@ else
         // the Forecasted tab makes.
         _chartRendered = false;
 
-        InvokeAsync(async () =>
+        InvokeAsync(_viewer.Wrap(async () =>
         {
             await ReadTodayAsync();
             StateHasChanged();
-        });
+        }));
     }
 
     /// <summary>
