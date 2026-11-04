@@ -18,7 +18,7 @@
 @if (_blocked is not null)
 {
     <div class="alert" role="alert">
-        <strong>@SharedText.SignInRequired</strong> — @(VehicleFeed.Service?.OwnerAction is { } action ? Localized.Say(VehicleFeed.Service.OwnerActionPhrase, action) : _blocked.Message)
+        <strong>@SharedText.SignInRequired</strong> — @(VehicleFeed.Service?.OwnerAction is { } action ? Localized.Say(VehicleFeed.Service.OwnerActionPhrase, action) : Localized.Say(_blocked.Phrase, _blocked.Message))
         <a href="/car">@SharedText.SignInOnCarPage</a>
     </div>
 }

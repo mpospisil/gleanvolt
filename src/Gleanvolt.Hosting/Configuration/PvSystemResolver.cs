@@ -44,14 +44,12 @@ public static class PvSystemResolver
     {
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
 
-        var problems = new List<string>();
+        var problems = new ConfigurationProblems();
         var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, problems);
 
         if (problems.Count > 0)
         {
-            throw new InvalidOperationException(
-                "The PV system is not configured usably:" + Environment.NewLine
-                + string.Join(Environment.NewLine, problems.Select(problem => "  - " + problem)));
+            throw new ConfigurationRefusedException("The PV system is not configured usably:", problems);
         }
 
         return site;

@@ -35,14 +35,12 @@ public static class EvResolver
     {
         var ev = configuration.GetSection(EvOptions.SectionName).Get<EvOptions>() ?? new EvOptions();
 
-        var problems = new List<string>();
+        var problems = new ConfigurationProblems();
         var info = EvRules.Resolve(ev, chargerMinAmps, chargerMaxAmps, problems);
 
         if (problems.Count > 0)
         {
-            throw new InvalidOperationException(
-                "The vehicle is not configured usably:" + Environment.NewLine
-                + string.Join(Environment.NewLine, problems.Select(problem => "  - " + problem)));
+            throw new ConfigurationRefusedException("The vehicle is not configured usably:", problems);
         }
 
         return info;

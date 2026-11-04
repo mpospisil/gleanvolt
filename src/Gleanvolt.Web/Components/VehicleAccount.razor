@@ -1,4 +1,5 @@
 @inject IVehicleAccountSignIn Account
+@inject TimeProvider Time
 
 @*
     The manufacturer account, on /car (issues #170, #193, #227).
@@ -32,12 +33,12 @@
     @if (Account.IsConfigured)
     {
         <p class="muted" id="account-explanation">
-            <strong>@Account.AccountName</strong> — @Account.Explanation
+            <strong>@Account.AccountName</strong> — @Localized.Say(Account.ExplanationPhrase, Account.Explanation)
         </p>
 
         @if (_signIn.IsSignedIn)
         {
-            <p class="muted"><strong>@CarText.SignedIn</strong> — @_signIn.Message</p>
+            <p class="muted"><strong>@CarText.SignedIn</strong> — @Localized.Say(_signIn.Phrase, _signIn.Message, Time.LocalTimeZone)</p>
             <div class="actions">
                 <button type="button" class="secondary" id="account-signout" @onclick="SignOutAsync">@CarText.SignOut</button>
             </div>
@@ -46,7 +47,7 @@
         {
             @if (_signIn.Status != VehicleSignInStatus.Unknown)
             {
-                <p class="@(_signIn.Status == VehicleSignInStatus.Failed ? "error" : "muted")">@_signIn.Message</p>
+                <p class="@(_signIn.Status == VehicleSignInStatus.Failed ? "error" : "muted")">@Localized.Say(_signIn.Phrase, _signIn.Message, Time.LocalTimeZone)</p>
             }
 
             @if (_signIn.WantsCode)
@@ -129,7 +130,7 @@
             CarText.AccountChargeOnly,
         _ => string.IsNullOrWhiteSpace(Account.Explanation)
             ? CarText.NoAccountYet
-            : Account.Explanation,
+            : Localized.Say(Account.ExplanationPhrase, Account.Explanation),
     };
 
     /// <summary>

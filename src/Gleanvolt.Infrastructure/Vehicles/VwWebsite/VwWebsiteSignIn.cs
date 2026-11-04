@@ -21,6 +21,8 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
         + "for a code again, the feed stops until you sign in here once more. The code Volkswagen "
         + "emails can only be answered by you, which is why this is a page and not a background job.";
 
+    public Phrase? ExplanationPhrase { get; } = Phrase.Of("Account.Volkswagen");
+
     public bool IsConfigured => options.IsConfigured;
 
     public VehicleSignInState State => IsConfigured ? _state : VehicleSignInState.NotConfigured;
@@ -46,7 +48,7 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return _state = VehicleSignInState.CodeRequired("Enter the code from the email.");
+            return _state = VehicleSignInState.CodeRequired("Enter the code from the email.", Phrase.Of("SignIn.VwEnterCode"));
         }
 
         var step = await client.SubmitCodeAsync(code, cancellationToken).ConfigureAwait(false);
@@ -62,22 +64,22 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
     private static VehicleSignInState Describe(VwWebsiteLoginStep step, bool afterCode) => step switch
     {
         VwWebsiteLoginStep.SignedIn => VehicleSignInState.SignedIn(
-            "Signed in. This browser is remembered, so a restart should not need another code."),
+            "Signed in. This browser is remembered, so a restart should not need another code.", Phrase.Of("SignIn.VwSignedIn")),
 
         // The ordinary path on a cold login, not an error -- said plainly so it does not read as one.
         VwWebsiteLoginStep.OneTimeCodeRequired when !afterCode => VehicleSignInState.CodeRequired(
-            "Volkswagen has emailed a one-time code. Enter it below."),
+            "Volkswagen has emailed a one-time code. Enter it below.", Phrase.Of("SignIn.VwCodeSent")),
 
         VwWebsiteLoginStep.OneTimeCodeRequired => VehicleSignInState.CodeRequired(
             "That code was not accepted. Check the newest email — an earlier one will not work — and "
-            + "try again. The challenge is still open, so this does not need starting over."),
+            + "try again. The challenge is still open, so this does not need starting over.", Phrase.Of("SignIn.VwCodeRejected")),
 
         VwWebsiteLoginStep.OwnerActionRequired => VehicleSignInState.Failed(
             "Volkswagen is showing a consent or terms screen. Open volkswagen.de in a browser, clear "
-            + "it there, then sign in here again."),
+            + "it there, then sign in here again.", Phrase.Of("SignIn.VwConsent")),
 
         VwWebsiteLoginStep.CredentialsRequired => VehicleSignInState.Failed(
-            "The credentials were not accepted. Check Vehicle:Website:Username and :Password."),
+            "The credentials were not accepted. Check Vehicle:Website:Username and :Password.", Phrase.Of("SignIn.VwCredentials")),
 
         // Nothing left our machine, so none of the lockout advice below applies. Said separately
         // because the old catch-all sent an owner to wait and worry about their Volkswagen account
@@ -85,10 +87,10 @@ public sealed class VwWebsiteSignIn(VwWebsiteOptions options, VwWebsiteClient cl
         VwWebsiteLoginStep.NoChallenge => VehicleSignInState.Failed(
             "There is no code challenge open, so that code was not sent anywhere. Press Sign in to "
             + "start one. If Volkswagen does not email a new code, press Sign out first and then "
-            + "Sign in: that discards a challenge left over from an earlier attempt."),
+            + "Sign in: that discards a challenge left over from an earlier attempt.", Phrase.Of("SignIn.VwNoChallenge")),
 
         _ => VehicleSignInState.Failed(
             "The sign-in did not complete. If this repeats, wait a few minutes rather than retrying: "
-            + "a replayed login at a real identity provider risks locking the account."),
+            + "a replayed login at a real identity provider risks locking the account.", Phrase.Of("SignIn.VwIncomplete")),
     };
 }

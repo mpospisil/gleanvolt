@@ -33,6 +33,9 @@ public interface IVehicleAccountSignIn
     /// </summary>
     string Explanation { get; }
 
+    /// <summary><see cref="Explanation"/> for the web UI to say in the viewer's language (#292).</summary>
+    Phrase? ExplanationPhrase => null;
+
     /// <summary>Whether this is configured at all. False leaves the page saying so and offering nothing.</summary>
     bool IsConfigured { get; }
 

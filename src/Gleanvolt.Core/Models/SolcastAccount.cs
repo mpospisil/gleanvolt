@@ -63,7 +63,8 @@ public sealed record SolcastAccountSettings(
     string ResourceId,
     bool EnvironmentConfigured,
     string SecretProtection,
-    SolcastFetchStatus Status)
+    SolcastFetchStatus Status,
+    Phrase? SecretProtectionPhrase = null)
 {
     /// <summary>A key and a site: what a fetch needs.</summary>
     public bool IsConfigured => Source != SolcastAccountSource.None;
@@ -76,7 +77,8 @@ public sealed record SolcastAccountSettings(
 /// <summary>What a save on Settings came to.</summary>
 /// <param name="Errors">Why nothing was saved; empty when the account was saved.</param>
 /// <param name="Persisted">False when the account is in use but the secret store would not keep it, so a restart forgets it.</param>
-public sealed record SolcastAccountSaveResult(IReadOnlyList<string> Errors, bool Persisted)
+/// <param name="ErrorPhrases">The same errors for the web UI to say in the viewer's language (#292).</param>
+public sealed record SolcastAccountSaveResult(IReadOnlyList<string> Errors, bool Persisted, IReadOnlyList<Phrase?>? ErrorPhrases = null)
 {
     public bool Saved => Errors.Count == 0;
 }

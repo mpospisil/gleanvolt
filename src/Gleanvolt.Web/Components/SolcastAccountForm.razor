@@ -67,7 +67,7 @@
                     <div id="solcast-key-in-use"><Secret Value="@_settings.ApiKey" /></div>
                 }
                 <span class="hint">
-                    @Localized.Format(SettingsText.KeptInSecretStore, _settings.SecretProtection)
+                    @Localized.Format(SettingsText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
                 </span>
             </div>
 
@@ -174,7 +174,7 @@
 
             if (!result.Saved)
             {
-                _errors = result.Errors;
+                _errors = Localized.Say(result.Errors, result.ErrorPhrases);
                 return;
             }
 

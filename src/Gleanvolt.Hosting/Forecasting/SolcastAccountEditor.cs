@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Solcast;
@@ -43,7 +44,8 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
             current?.ResourceId ?? string.Empty,
             _account.EnvironmentConfigured,
             _account.Protection,
-            _forecast.Status);
+            _forecast.Status,
+            _account.ProtectionPhrase);
     }
 
     public async Task<SolcastAccountSaveResult> SaveAsync(
@@ -51,7 +53,7 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
     {
         var key = apiKey.Trim();
         var site = resourceId.Trim();
-        var errors = new List<string>();
+        var errors = new ConfigurationProblems();
 
         // An empty key box keeps the key in use, so a corrected site does not mean pasting the key again.
         if (key.Length == 0)
@@ -61,17 +63,17 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
 
         if (key.Length == 0)
         {
-            errors.Add("Enter the API key from your Solcast account.");
+            errors.Add("Enter the API key from your Solcast account.", Phrase.Of("Solcast.EnterKey"));
         }
 
         if (site.Length == 0)
         {
-            errors.Add("Enter the rooftop site's resource id.");
+            errors.Add("Enter the rooftop site's resource id.", Phrase.Of("Solcast.EnterSite"));
         }
 
         if (errors.Count > 0)
         {
-            return new SolcastAccountSaveResult(errors, Persisted: false);
+            return new SolcastAccountSaveResult(errors, Persisted: false, errors.Phrases);
         }
 
         var persisted = _account.Save(new SolcastAccount(key, site));

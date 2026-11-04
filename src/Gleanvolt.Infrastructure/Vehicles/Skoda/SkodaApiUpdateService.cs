@@ -100,7 +100,7 @@ public sealed class SkodaApiUpdateService(
         {
             if (store.Current is not { } key)
             {
-                return VehicleSourceHealth.NeedsOwner(SkodaApiSentences.NoKey);
+                return VehicleSourceHealth.NeedsOwner(SkodaApiSentences.NoKey, Phrase.Of("Skoda.NoKey"));
             }
 
             // Blocked on the key it was refused with. A key pasted since is a different key, and the
@@ -114,7 +114,7 @@ public sealed class SkodaApiUpdateService(
 
             if (health.State == VehicleSourceState.Ok && ExpiringSoon(key) is { } warning)
             {
-                return VehicleSourceHealth.Degraded(warning);
+                return VehicleSourceHealth.Degraded(warning, Phrase.Of("Skoda.KeyExpiresSoon", new PhraseArg.Date(key.ExpiresAt!.Value)));
             }
 
             return health;
@@ -185,7 +185,8 @@ public sealed class SkodaApiUpdateService(
         {
             _health = VehicleSourceHealth.Degraded(
                 $"This hour's Škoda requests are used up; the next is available at {resets.LocalDateTime:HH:mm}. "
-                + "The last reading stands.");
+                + "The last reading stands.",
+                Phrase.Of("Skoda.QuotaUsedUp", new PhraseArg.Clock(resets)));
             return null;
         }
 
@@ -207,7 +208,9 @@ public sealed class SkodaApiUpdateService(
                 or SkodaApiOutcome.KeyNotAuthorized
                 or SkodaApiOutcome.VehicleNotFound:
                 _blockedBy = response.Outcome;
-                _blocked = VehicleSourceHealth.NeedsOwner(SkodaApiSentences.ForFeed(response.Outcome, options.Vin));
+                _blocked = VehicleSourceHealth.NeedsOwner(
+                    SkodaApiSentences.ForFeed(response.Outcome, options.Vin),
+                    SkodaApiSentences.ForFeedPhrase(response.Outcome, options.Vin));
                 Volatile.Write(ref _blockedAtVersion, version);
 
                 _logger.LogWarning(
@@ -224,7 +227,8 @@ public sealed class SkodaApiUpdateService(
 
                 _health = VehicleSourceHealth.Degraded(
                     $"Škoda's hourly request quota is used up; asking again at {_notBefore.Value.LocalDateTime:HH:mm}. "
-                    + "The last reading stands.");
+                    + "The last reading stands.",
+                    Phrase.Of("Skoda.QuotaAskingAgain", new PhraseArg.Clock(_notBefore.Value)));
 
                 _logger.LogWarning("The Škoda feed for {Vehicle} hit the rate limit; waiting until {NotBefore:u}.",
                     VehicleId, _notBefore);
@@ -236,7 +240,8 @@ public sealed class SkodaApiUpdateService(
                 _health = VehicleSourceHealth.Degraded(
                     "The car itself is declining requests — usually a low 12 V battery or deep sleep, not "
                     + $"Gleanvolt or the key; asking again at {_notBefore.Value.LocalDateTime:HH:mm}. "
-                    + "The last reading stands.");
+                    + "The last reading stands.",
+                    Phrase.Of("Skoda.CarDeclining", new PhraseArg.Clock(_notBefore.Value)));
 
                 _logger.LogWarning(
                     "The Škoda feed for {Vehicle}: the car declined the request; waiting until {NotBefore:u}.",
@@ -252,7 +257,8 @@ public sealed class SkodaApiUpdateService(
                 }
 
                 _health = VehicleSourceHealth.Degraded(
-                    $"Škoda did not answer ({response.Detail}); the last reading stands.");
+                    $"Škoda did not answer ({response.Detail}); the last reading stands.",
+                    Phrase.Of("Skoda.FeedNoAnswer", new PhraseArg.Text(response.Detail ?? string.Empty)));
 
                 _logger.LogWarning(
                     "Asking Škoda for {Vehicle} failed ({Detail}); next attempt in {Delay}.",
@@ -275,14 +281,18 @@ public sealed class SkodaApiUpdateService(
             // Not a fault the owner can fix and not one worth hammering: the next capture may well be
             // whole. It counts towards the backoff so a car that has stopped reporting is asked less.
             _consecutiveFailures++;
-            _health = VehicleSourceHealth.Degraded($"Škoda answered, but {error}. The last reading stands.");
+            _health = VehicleSourceHealth.Degraded(
+                $"Škoda answered, but {error}. The last reading stands.",
+                Phrase.Of("Skoda.Unusable", new PhraseArg.Text(error ?? string.Empty)));
             _logger.LogWarning("Škoda answered for {Vehicle} with something unusable: {Reason}", VehicleId, error);
             return null;
         }
 
         _consecutiveFailures = 0;
         _lastReading = state;
-        _health = VehicleSourceHealth.Ok($"Answering; the car reported at {state.CapturedAt.LocalDateTime:HH:mm}.");
+        _health = VehicleSourceHealth.Ok(
+            $"Answering; the car reported at {state.CapturedAt.LocalDateTime:HH:mm}.",
+            Phrase.Of("Skoda.Answering", new PhraseArg.Clock(state.CapturedAt)));
 
         if (store.Current is { } key
             && ExpiringSoon(key) is { } warning

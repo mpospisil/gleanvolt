@@ -80,7 +80,7 @@
             who has just read this can actually go.
         *@
         <p class="error" id="portal-unconfigured">
-            @Localized.Format(CarText.NotConfiguredNeeds, Portal.DescribeWhatIsMissing())
+            @Localized.Format(CarText.NotConfiguredNeeds, Localized.Say(Portal.DescribeWhatIsMissingPhrase(), Portal.DescribeWhatIsMissing()))
         </p>
 
         <p class="hint">
@@ -163,7 +163,7 @@ else
 @if (_reading is { Succeeded: false } failed)
 {
     <p class="error">
-        <strong>@failed.FailureKind</strong> — @failed.Message
+        <strong>@FailureKind(failed.FailureKind)</strong> — @Localized.Say(failed.MessagePhrase, failed.Message ?? string.Empty, Time.LocalTimeZone)
     </p>
 
     <p class="hint">
@@ -211,7 +211,7 @@ else if (_reading is { Succeeded: true, State: { } state })
 {
     @if (!answer.Succeeded)
     {
-        <p class="error" id="car-ask-failed">@Localized.Format(CarText.CarDidNotAnswer, answer.Message)</p>
+        <p class="error" id="car-ask-failed">@Localized.Format(CarText.CarDidNotAnswer, Localized.Say(answer.MessagePhrase, answer.Message ?? string.Empty, Time.LocalTimeZone))</p>
     }
 
     @if (answer.State is { } reading)
@@ -305,7 +305,7 @@ else
         <dd>@Text(running.VehicleId)</dd>
 
         <dt>@CarText.State</dt>
-        <dd>@Localized.Name(running.Health.State) — @running.Health.Message</dd>
+        <dd>@Localized.Name(running.Health.State) — @Localized.Say(running.Health.Phrase, running.Health.Message, Time.LocalTimeZone)</dd>
     </dl>
 }
 else
@@ -469,6 +469,10 @@ else
                 : Localized.Plural(points, CarText.PointsAbove_One, CarText.PointsAbove_Few, CarText.PointsAbove_Other),
             points);
     }
+
+    // The portal's failure kinds, by name; a kind this build does not name shows as it came.
+    private static string? FailureKind(string? kind) =>
+        kind is null ? null : CarText.ResourceManager.GetString($"PortalFailure_{kind}", System.Globalization.CultureInfo.CurrentUICulture) ?? kind;
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
 

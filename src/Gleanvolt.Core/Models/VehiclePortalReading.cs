@@ -56,7 +56,8 @@ public sealed record VehiclePortalReading(
     bool IsWorthRetrying = false,
     IReadOnlyDictionary<string, VehicleFieldReading>? MatchedFields = null,
     IReadOnlyList<string>? Diagnostics = null,
-    IReadOnlyList<string>? DroppedFields = null)
+    IReadOnlyList<string>? DroppedFields = null,
+    Phrase? MessagePhrase = null)
 {
     /// <summary>The unrecognised field names, never null.</summary>
     public IReadOnlyList<string> Unmapped => UnmappedFields ?? [];
@@ -83,8 +84,9 @@ public sealed record VehiclePortalReading(
         IReadOnlyList<string>? unmapped = null,
         IReadOnlyDictionary<string, VehicleFieldReading>? matched = null,
         IReadOnlyList<string>? diagnostics = null,
-        IReadOnlyList<string>? dropped = null) =>
+        IReadOnlyList<string>? dropped = null,
+        Phrase? phrase = null) =>
         new(false, FailureKind: kind, Message: message, IsWorthRetrying: worthRetrying,
             UnmappedFields: unmapped, MatchedFields: matched, Diagnostics: diagnostics,
-            DroppedFields: dropped);
+            DroppedFields: dropped, MessagePhrase: phrase);
 }

@@ -163,4 +163,300 @@
   <data name="Feed_SkodaNeedsKey" xml:space="preserve">
     <value>No MyŠkoda API key yet, or it has expired — paste one on the Car page.</value>
   </data>
+  <!-- The car's feed and its account -->
+  <data name="Health_Starting" xml:space="preserve">
+    <value>waiting for the first reading</value>
+  </data>
+  <data name="SignIn_NotConfigured" xml:space="preserve">
+    <value>No manufacturer account is configured, so there is nothing to sign in to.</value>
+  </data>
+  <data name="SignIn_NotTried" xml:space="preserve">
+    <value>Not tried yet.</value>
+  </data>
+  <!-- volkswagen.de sign-in -->
+  <data name="SignIn_VwEnterCode" xml:space="preserve">
+    <value>Enter the code from the email.</value>
+  </data>
+  <data name="SignIn_VwSignedIn" xml:space="preserve">
+    <value>Signed in. This browser is remembered, so a restart should not need another code.</value>
+  </data>
+  <data name="SignIn_VwCodeSent" xml:space="preserve">
+    <value>Volkswagen has emailed a one-time code. Enter it below.</value>
+  </data>
+  <data name="SignIn_VwCodeRejected" xml:space="preserve">
+    <value>That code was not accepted. Check the newest email — an earlier one will not work — and try again. The challenge is still open, so this does not need starting over.</value>
+  </data>
+  <data name="SignIn_VwConsent" xml:space="preserve">
+    <value>Volkswagen is showing a consent or terms screen. Open volkswagen.de in a browser, clear it there, then sign in here again.</value>
+  </data>
+  <data name="SignIn_VwCredentials" xml:space="preserve">
+    <value>The credentials were not accepted. Check Vehicle:Website:Username and :Password.</value>
+  </data>
+  <data name="SignIn_VwNoChallenge" xml:space="preserve">
+    <value>There is no code challenge open, so that code was not sent anywhere. Press Sign in to start one. If Volkswagen does not email a new code, press Sign out first and then Sign in: that discards a challenge left over from an earlier attempt.</value>
+  </data>
+  <data name="SignIn_VwIncomplete" xml:space="preserve">
+    <value>The sign-in did not complete. If this repeats, wait a few minutes rather than retrying: a replayed login at a real identity provider risks locking the account.</value>
+  </data>
+  <!-- MyŠkoda -->
+  <data name="SignIn_SkodaAskForKey" xml:space="preserve">
+    <value>Create an API key for this car in the MySkoda app and paste it here.</value>
+  </data>
+  <data name="SignIn_SkodaPasteKey" xml:space="preserve">
+    <value>Paste the API key from the MySkoda app.</value>
+  </data>
+  <data name="SignIn_SkodaSignedOut" xml:space="preserve">
+    <value>Signed out: the key is deleted from this controller, but it keeps working at Škoda until you revoke it in the MySkoda app. Paste a key here to sign in again.</value>
+  </data>
+  <data name="SignIn_SkodaValidUntil" xml:space="preserve">
+    <value>Key valid until {0}{1}</value>
+    <comment>{1} is " · " and the car's name, or nothing.</comment>
+  </data>
+  <data name="SignIn_SkodaValidUntilUnsaved" xml:space="preserve">
+    <value>Key valid until {0}{1}. It could not be saved to this controller's data directory, so a restart will ask for it again.</value>
+  </data>
+  <data name="SignIn_SkodaAccepted" xml:space="preserve">
+    <value>Key accepted{0}</value>
+  </data>
+  <data name="SignIn_SkodaAcceptedUnsaved" xml:space="preserve">
+    <value>Key accepted{0}. It could not be saved to this controller's data directory, so a restart will ask for it again.</value>
+  </data>
+  <data name="Skoda_KeyExpired" xml:space="preserve">
+    <value>That key has expired — create a new one in the app.</value>
+  </data>
+  <data name="Skoda_KeyUnknown" xml:space="preserve">
+    <value>Škoda did not recognise that key.</value>
+  </data>
+  <data name="Skoda_KeyNotAuthorized" xml:space="preserve">
+    <value>That key is not allowed for VIN {0}; include this car when creating it.</value>
+  </data>
+  <data name="Skoda_VehicleNotFound" xml:space="preserve">
+    <value>Škoda has no car with VIN {0} — check Vehicle:Skoda:Vin.</value>
+  </data>
+  <data name="Skoda_NoAnswer" xml:space="preserve">
+    <value>Škoda did not answer; nothing was saved — try again later.</value>
+  </data>
+  <data name="Skoda_FeedKeyExpired" xml:space="preserve">
+    <value>The Škoda API key has expired — create a new one in the app and paste it on the Car page.</value>
+  </data>
+  <data name="Skoda_FeedKeyUnknown" xml:space="preserve">
+    <value>Škoda no longer recognises the stored API key — paste a new one on the Car page.</value>
+  </data>
+  <data name="Skoda_FeedKeyNotAuthorized" xml:space="preserve">
+    <value>The stored Škoda API key is not allowed for VIN {0} — create one that includes this car and paste it on the Car page.</value>
+  </data>
+  <data name="Skoda_NoKey" xml:space="preserve">
+    <value>Paste an API key on the Car page.</value>
+  </data>
+  <data name="Skoda_KeyExpiresSoon" xml:space="preserve">
+    <value>The Škoda API key expires on {0} — create a new one in the MySkoda app and paste it on the Car page.</value>
+  </data>
+  <data name="Skoda_QuotaUsedUp" xml:space="preserve">
+    <value>This hour's Škoda requests are used up; the next is available at {0}. The last reading stands.</value>
+  </data>
+  <data name="Skoda_QuotaAskingAgain" xml:space="preserve">
+    <value>Škoda's hourly request quota is used up; asking again at {0}. The last reading stands.</value>
+  </data>
+  <data name="Skoda_CarDeclining" xml:space="preserve">
+    <value>The car itself is declining requests — usually a low 12 V battery or deep sleep, not Gleanvolt or the key; asking again at {0}. The last reading stands.</value>
+  </data>
+  <data name="Skoda_FeedNoAnswer" xml:space="preserve">
+    <value>Škoda did not answer ({0}); the last reading stands.</value>
+    <comment>{0} is the network or HTTP error, as reported.</comment>
+  </data>
+  <data name="Skoda_Unusable" xml:space="preserve">
+    <value>Škoda answered, but {0}. The last reading stands.</value>
+    <comment>{0} is what was wrong with the answer, in English from the parser.</comment>
+  </data>
+  <data name="Skoda_Answering" xml:space="preserve">
+    <value>Answering; the car reported at {0}.</value>
+  </data>
+  <!-- volkswagen.de and the VW Group Data Act portal -->
+  <data name="Feed_Answering" xml:space="preserve">
+    <value>Answering; last reading captured {0} {1}.</value>
+  </data>
+  <data name="Feed_VwStoppedForCode" xml:space="preserve">
+    <value>volkswagen.de wants a one-time code. Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+  </data>
+  <data name="Feed_VwStoppedNoReading" xml:space="preserve">
+    <value>volkswagen.de did not answer with a reading. Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+  </data>
+  <data name="Feed_VwStoppedUnreachable" xml:space="preserve">
+    <value>volkswagen.de was unreachable ({0}). Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+  </data>
+  <data name="Feed_PortalNeeds" xml:space="preserve">
+    <value>The VW portal feed is switched on but needs {0}.</value>
+  </data>
+  <data name="Feed_PortalAnswered" xml:space="preserve">
+    <value>The portal answered; the car reported at {0}.</value>
+  </data>
+  <data name="Portal_SignInRejected" xml:space="preserve">
+    <value>The portal refused the sign-in: {0}. Check the password in .env — this one is not retried, because repeated failures put the account at risk.</value>
+    <comment>{0} quotes the portal's own answer.</comment>
+  </data>
+  <data name="Portal_OwnerAction" xml:space="preserve">
+    <value>The portal is showing something only you can answer ({0}) — consent, terms, an OTP or a CAPTCHA. Open it in a browser and clear it.</value>
+  </data>
+  <data name="Portal_Detail" xml:space="preserve">
+    <value>{0}</value>
+    <comment>The portal client's own sentence, shown as it is.</comment>
+  </data>
+  <data name="Portal_NoData" xml:space="preserve">
+    <value>Signed in, but {0}.</value>
+  </data>
+  <data name="Portal_Unusable" xml:space="preserve">
+    <value>A delivery arrived and could not be read: {0}. The last good reading stands and is ageing.</value>
+  </data>
+  <data name="Portal_NoReading" xml:space="preserve">
+    <value>The last read did not produce a reading: {0}.</value>
+  </data>
+  <data name="Account_Volkswagen" xml:space="preserve">
+    <value>The car's live source. Signing in here is what lets the car be followed; if Volkswagen asks for a code again, the feed stops until you sign in here once more. The code Volkswagen emails can only be answered by you, which is why this is a page and not a background job.</value>
+  </data>
+  <data name="Account_Skoda" xml:space="preserve">
+    <value>The live source for this Škoda, read between charges as well as during them. Škoda asks for an API key rather than a password: you create it in the MySkoda app, bound to this car, and paste it here once. It is checked with Škoda, kept on this controller only, and never shown again.</value>
+  </data>
+  <data name="Portal_Missing" xml:space="preserve">
+    <value>{0}</value>
+    <comment>A list of what the portal client still needs, from the Portal_Missing… phrases.</comment>
+  </data>
+  <data name="Portal_MissingBrand" xml:space="preserve">
+    <value>a brand (one of {0}) or an explicit client id</value>
+  </data>
+  <data name="Portal_UnknownBrand" xml:space="preserve">
+    <value>a known brand — '{0}' is not one of {1}; set an explicit client id if yours is missing</value>
+  </data>
+  <data name="Portal_MissingVwId" xml:space="preserve">
+    <value>a VW ID</value>
+  </data>
+  <data name="Portal_MissingPassword" xml:space="preserve">
+    <value>a password</value>
+  </data>
+  <data name="Portal_ClientNeeds" xml:space="preserve">
+    <value>The portal client needs {0}.</value>
+  </data>
+  <!-- Asking the car -->
+  <data name="Refresh_NoFeed" xml:space="preserve">
+    <value>No vehicle feed is configured, so there is nothing to ask.</value>
+  </data>
+  <data name="Refresh_NothingToGive" xml:space="preserve">
+    <value>{0} had nothing to give — {1}</value>
+    <comment>{0} is the feed's name, {1} what the feed says about itself.</comment>
+  </data>
+  <data name="Refresh_Failed" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the feed's name, {1} the error as reported.</comment>
+  </data>
+  <!-- What protects the stored secrets -->
+  <data name="Secrets_PlainFiles" xml:space="preserve">
+    <value>plain files, protected by the data directory's permissions</value>
+  </data>
+  <data name="Secrets_OwnerOnlyFiles" xml:space="preserve">
+    <value>owner-only files (0600) in the data directory</value>
+  </data>
+  <data name="Secrets_Dpapi" xml:space="preserve">
+    <value>Windows DPAPI, this user</value>
+  </data>
+  <!-- The car's settings, as the form or startup checks them -->
+  <data name="Config_EvOneVehicle" xml:space="preserve">
+    <value>Ev:Vehicles has {0} entries and exactly {1} is supported. The list is a shape for later, not a feature yet.</value>
+  </data>
+  <data name="Config_EvIdSlug" xml:space="preserve">
+    <value>Ev:Vehicles:0:Id ('{0}') must be a slug: lower-case letters, digits, '-' and '_', starting with a letter or digit, at most 48 characters.</value>
+  </data>
+  <data name="Config_EvBandInverted" xml:space="preserve">
+    <value>Ev:Vehicles:0:MinChargingCurrentAmps ({0} A) is above Ev:Vehicles:0:MaxChargingCurrentAmps ({1} A); no current satisfies both.</value>
+  </data>
+  <data name="Config_EvNoCommonCurrent" xml:space="preserve">
+    <value>The car and the charger have no current in common: the car needs at least {0} A (Ev:Vehicles:0:MinChargingCurrentAmps) and the installation allows at most {1} A (ChargeControl:MaxChargingCurrentAmps). It could never charge.</value>
+  </data>
+  <data name="Config_Negative" xml:space="preserve">
+    <value>{0} ({1}) cannot be negative.</value>
+  </data>
+  <data name="Config_EvEfficiency" xml:space="preserve">
+    <value>Ev:Vehicles:0:ChargeEfficiency ({0}) must be greater than 0 and at most 1 — it is the fraction of metered energy that reaches the cells.</value>
+  </data>
+  <data name="Config_EvPhases" xml:space="preserve">
+    <value>Ev:Vehicles:0:Phases ({0}) must be 1, 2 or 3.</value>
+  </data>
+  <data name="Config_Positive" xml:space="preserve">
+    <value>{0} ({1}) must be greater than zero.</value>
+  </data>
+  <!-- The installation's settings, as the form or startup checks them -->
+  <data name="Config_PvPhase" xml:space="preserve">
+    <value>Pv:Inverter:UnmeteredGridPhase ('{0}') must be L1, L2 or L3 (or SolaX's R, S or T), or empty for a grid meter that measures all three phases.</value>
+  </data>
+  <data name="Config_PvIdSlug" xml:space="preserve">
+    <value>Pv:Id ('{0}') must be a slug: lower-case letters, digits, '-' and '_', starting with a letter or digit, at most 48 characters. It becomes an MQTT topic segment and a Home Assistant object id.</value>
+  </data>
+  <data name="Config_PvLocation" xml:space="preserve">
+    <value>A latitude without a longitude (or the other way round) describes nowhere. Set both Pv:Latitude and Pv:Longitude, or neither.</value>
+  </data>
+  <data name="Config_PvNoInverter" xml:space="preserve">
+    <value>No inverter is configured. Set Pv:Inverter:Host.</value>
+  </data>
+  <data name="Config_PvNoCharger" xml:space="preserve">
+    <value>No EV charger is configured. Set Pv:Chargers:0:Host.</value>
+  </data>
+  <data name="Config_PvOneCharger" xml:space="preserve">
+    <value>Only {0} EV charger is supported; Pv:Chargers has {1}. The configuration can express more so that it need not change when the control logic can drive more, which it cannot yet.</value>
+  </data>
+  <data name="Config_PvChargerIdSlug" xml:space="preserve">
+    <value>{0}:Id ('{1}') must be a slug: lower-case letters, digits, '-' and '_'.</value>
+  </data>
+  <data name="Config_PvChargerIdTwice" xml:space="preserve">
+    <value>{0}:Id ('{1}') is used by more than one charger; each id must be unique.</value>
+  </data>
+  <data name="Config_PvHostRequired" xml:space="preserve">
+    <value>{0}:Host is required.</value>
+  </data>
+  <data name="Config_PvPort" xml:space="preserve">
+    <value>{0}:Port ({1}) is not a TCP port.</value>
+  </data>
+  <data name="Config_PvInterval" xml:space="preserve">
+    <value>{0}:MinRequestInterval ({1}) cannot be negative.</value>
+  </data>
+  <data name="Config_PvInstallDate" xml:space="preserve">
+    <value>Pv:InstallDate ('{0}') is not a date. Write it as yyyy-MM-dd.</value>
+  </data>
+  <data name="Config_Range" xml:space="preserve">
+    <value>{0} ({1}) is outside {2}..{3}.</value>
+  </data>
+  <data name="Config_Fraction" xml:space="preserve">
+    <value>{0} ({1}) must be a fraction in (0, 1].</value>
+  </data>
+  <data name="Config_NotEditable" xml:space="preserve">
+    <value>{0} cannot be edited from the web UI.</value>
+  </data>
+  <data name="Config_NoOverridesFile" xml:space="preserve">
+    <value>This host does not read a web UI overrides file, so an edit here would never be applied.</value>
+  </data>
+  <data name="Config_NotWritten" xml:space="preserve">
+    <value>Could not write {0}: {1}</value>
+    <comment>{1} is the system's own error.</comment>
+  </data>
+  <data name="Config_PasswordNotRemoved" xml:space="preserve">
+    <value>The saved password could not be removed. Check the data directory's permissions.</value>
+  </data>
+  <data name="Config_TwoPasswords" xml:space="preserve">
+    <value>Two different passwords were submitted at once; only one vehicle account is kept.</value>
+  </data>
+  <data name="Config_PasswordNotStored" xml:space="preserve">
+    <value>The password could not be stored ({0}). Nothing else was changed.</value>
+  </data>
+  <data name="Config_TwoFeeds" xml:space="preserve">
+    <value>Vehicle:Website and Vehicle:Skoda would both be enabled, and they read two different cars (volkswagen.de and the MyŠkoda API). An installation has one car.</value>
+  </data>
+  <data name="Config_FeedNeeds" xml:space="preserve">
+    <value>{0} is needed by the feed that is switched on, and is empty.</value>
+  </data>
+  <data name="Config_UnknownBrand" xml:space="preserve">
+    <value>Vehicle:DataAct:Brand ('{0}') is not one of {1}. Pick one, or state Vehicle:DataAct:ClientId outright if yours is missing.</value>
+  </data>
+  <data name="Solcast_EnterKey" xml:space="preserve">
+    <value>Enter the API key from your Solcast account.</value>
+  </data>
+  <data name="Solcast_EnterSite" xml:space="preserve">
+    <value>Enter the rooftop site's resource id.</value>
+  </data>
 </root>

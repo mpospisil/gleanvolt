@@ -34,6 +34,9 @@ public interface IVehiclePortalReader
     /// </summary>
     string DescribeWhatIsMissing();
 
+    /// <summary><see cref="DescribeWhatIsMissing"/> for the web UI to say in the viewer's language (#292).</summary>
+    Phrase? DescribeWhatIsMissingPhrase() => null;
+
     /// <summary>
     /// Signs in, downloads the newest dataset and maps it. Never throws for an expected failure — a
     /// refused password, a consent screen, a portal with nothing to give — those come back as an

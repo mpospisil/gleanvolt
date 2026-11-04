@@ -37,6 +37,8 @@ public sealed class SkodaApiSignIn(
         + "paste it here once. It is checked with Škoda, kept on this controller only, and never shown "
         + "again.";
 
+    public Phrase? ExplanationPhrase { get; } = Phrase.Of("Account.Skoda");
+
     public bool IsConfigured => options.IsConfigured;
 
     public VehicleSignInState State
@@ -58,7 +60,7 @@ public sealed class SkodaApiSignIn(
     }
 
     private static VehicleSignInState AskForKey { get; } = VehicleSignInState.KeyRequired(
-        "Create an API key for this car in the MySkoda app and paste it here.");
+        "Create an API key for this car in the MySkoda app and paste it here.", Phrase.Of("SignIn.SkodaAskForKey"));
 
     /// <summary>No network: a stored key is already signed in, and without one the answer is a key.</summary>
     public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default) =>
@@ -73,7 +75,7 @@ public sealed class SkodaApiSignIn(
 
         if (string.IsNullOrWhiteSpace(answer))
         {
-            return Say(VehicleSignInState.KeyRequired("Paste the API key from the MySkoda app."));
+            return Say(VehicleSignInState.KeyRequired("Paste the API key from the MySkoda app.", Phrase.Of("SignIn.SkodaPasteKey")));
         }
 
         var key = answer.Trim();
@@ -85,7 +87,9 @@ public sealed class SkodaApiSignIn(
                 "Škoda refused the pasted API key for VIN {Vin} ({Outcome}, {Detail}); nothing was saved.",
                 options.Vin, response.Outcome, response.Detail);
 
-            return Say(VehicleSignInState.KeyRequired(SkodaApiSentences.ForSignIn(response.Outcome, options.Vin)));
+            return Say(VehicleSignInState.KeyRequired(
+                SkodaApiSentences.ForSignIn(response.Outcome, options.Vin),
+                SkodaApiSentences.ForSignInPhrase(response.Outcome, options.Vin)));
         }
 
         var stored = new SkodaApiKey(key, response.KeyExpiresAt, SkodaVehicleResponse.Name(response.Body));
@@ -120,7 +124,8 @@ public sealed class SkodaApiSignIn(
 
         Say(VehicleSignInState.KeyRequired(
             "Signed out: the key is deleted from this controller, but it keeps working at Škoda until you "
-            + "revoke it in the MySkoda app. Paste a key here to sign in again."));
+            + "revoke it in the MySkoda app. Paste a key here to sign in again.",
+            Phrase.Of("SignIn.SkodaSignedOut")));
 
         _logger.LogInformation("The Škoda API key for VIN {Vin} was deleted from this controller.", options.Vin);
     }
@@ -145,7 +150,13 @@ public sealed class SkodaApiSignIn(
             : ". It could not be saved to this controller's data directory, so a restart will ask for "
               + "it again.";
 
-        return VehicleSignInState.SignedIn(validity + car + persistence);
+        // The car's name with its separator, or nothing: a name, not words to translate.
+        var named = new PhraseArg.Text(car);
+        var phrase = key.ExpiresAt is { } until
+            ? Phrase.Of(saved ? "SignIn.SkodaValidUntil" : "SignIn.SkodaValidUntilUnsaved", new PhraseArg.Date(until), named)
+            : Phrase.Of(saved ? "SignIn.SkodaAccepted" : "SignIn.SkodaAcceptedUnsaved", named);
+
+        return VehicleSignInState.SignedIn(validity + car + persistence, phrase);
     }
 }
 
@@ -172,6 +183,26 @@ public static class SkodaApiSentences
     };
 
     /// <summary>The feed's version of a key problem: the same fact, and where to go to fix it.</summary>
+    /// <summary><see cref="ForSignIn"/> for the web UI to say in the viewer's language (#292).</summary>
+    public static Phrase ForSignInPhrase(SkodaApiOutcome outcome, string vin) => outcome switch
+    {
+        SkodaApiOutcome.KeyExpired => Phrase.Of("Skoda.KeyExpired"),
+        SkodaApiOutcome.KeyUnknown => Phrase.Of("Skoda.KeyUnknown"),
+        SkodaApiOutcome.KeyNotAuthorized => Phrase.Of("Skoda.KeyNotAuthorized", new PhraseArg.Text(vin)),
+        SkodaApiOutcome.VehicleNotFound => Phrase.Of("Skoda.VehicleNotFound", new PhraseArg.Text(vin)),
+        _ => Phrase.Of("Skoda.NoAnswer"),
+    };
+
+    /// <summary><see cref="ForFeed"/> for the web UI to say in the viewer's language (#292).</summary>
+    public static Phrase ForFeedPhrase(SkodaApiOutcome outcome, string vin) => outcome switch
+    {
+        SkodaApiOutcome.KeyExpired => Phrase.Of("Skoda.FeedKeyExpired"),
+        SkodaApiOutcome.KeyUnknown => Phrase.Of("Skoda.FeedKeyUnknown"),
+        SkodaApiOutcome.KeyNotAuthorized => Phrase.Of("Skoda.FeedKeyNotAuthorized", new PhraseArg.Text(vin)),
+        SkodaApiOutcome.VehicleNotFound => Phrase.Of("Skoda.VehicleNotFound", new PhraseArg.Text(vin)),
+        _ => ForSignInPhrase(outcome, vin),
+    };
+
     public static string ForFeed(SkodaApiOutcome outcome, string vin) => outcome switch
     {
         SkodaApiOutcome.KeyExpired =>

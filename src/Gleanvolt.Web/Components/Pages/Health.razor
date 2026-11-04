@@ -59,7 +59,7 @@
     *@
     <dt>@SettingsText.Secrets</dt>
     <dd>
-        @Secrets.Describe()
+        @Localized.Say(Secrets.DescribePhrase(), Secrets.Describe())
         <span class="muted">@SettingsText.BearerEquivalent</span>
     </dd>
 
@@ -72,7 +72,7 @@
     {
         <dt>@SettingsText.CarFeed</dt>
         <dd class="@(_feed.IsBlocked ? "error" : null)">
-            @Localized.Name(_feed.State) — @_feed.Message
+            @Localized.Name(_feed.State) — @Localized.Say(_feed.Phrase, _feed.Message, Time.LocalTimeZone)
             @if (_feed.IsBlocked)
             {
                 <a href="/car">@SharedText.SignInOnCarPage</a>

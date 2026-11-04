@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Models;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -126,4 +127,6 @@ public sealed class DpapiSecretStore : ISecretStore
 
     /// <inheritdoc />
     public string Describe() => "Windows DPAPI, this user";
+
+    public Phrase DescribePhrase() => Phrase.Of("Secrets.Dpapi");
 }

@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Configuration;
 using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Gleanvolt.Core.Interfaces;
@@ -89,7 +90,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         if (refused.Count > 0)
         {
             return SettingsSaveResult.Refused(
-                [.. refused.Select(key => $"{key} cannot be edited from the web UI.")]);
+                ConfigurationProblems.NotEditable(refused));
         }
 
         return Change(stored =>
@@ -119,7 +120,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     {
         if (!PvSystemSettingKeys.IsEditable(key))
         {
-            return SettingsSaveResult.Refused([$"{key} cannot be edited from the web UI."]);
+            return SettingsSaveResult.Refused(ConfigurationProblems.NotEditable([key]));
         }
 
         return Change(stored => stored.Remove(key), "reverted");
@@ -174,7 +175,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         if (_configuration is null || _overrides is null)
         {
             return SettingsSaveResult.Refused(
-                ["This host does not read a web UI overrides file, so an edit here would never be applied."]);
+                ConfigurationProblems.NoOverridesFile());
         }
 
         lock (_gate)
@@ -212,7 +213,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return SettingsSaveResult.Refused([$"Could not write {_overrides.Path}: {ex.Message}"]);
+                return SettingsSaveResult.Refused(ConfigurationProblems.NotWritten(_overrides.Path, ex.Message));
             }
 
             _logger.LogInformation(
@@ -228,7 +229,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
     // The startup resolver, run on the configuration the next start would read with `stored` as the
     // file. Its messages are the ones a failed start would print, one per problem.
-    private List<string> Check(IReadOnlyDictionary<string, string> stored)
+    private ConfigurationProblems Check(IReadOnlyDictionary<string, string> stored)
     {
         var keys = _configuration!.GetSection(PvSystemOptions.SectionName).AsEnumerable()
             .Where(entry => entry.Value is not null)
@@ -251,13 +252,17 @@ public sealed class PvSystemEditor : IPvSystemEditor
             PvSystemResolver.Resolve(new ConfigurationBuilder().AddInMemoryCollection(candidate).Build());
             return [];
         }
+        catch (ConfigurationRefusedException refused)
+        {
+            return refused.Problems;
+        }
         catch (InvalidOperationException ex)
         {
             // The resolver lists its problems one per line under a heading; the binder, for a value that
             // is not a number at all, says one thing.
             var lines = ex.Message.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             var listed = lines.Where(line => line.StartsWith("- ", StringComparison.Ordinal)).Select(line => line[2..]).ToList();
-            return listed.Count > 0 ? listed : [ex.Message];
+            return [.. listed.Count > 0 ? listed : [ex.Message]];
         }
     }
 

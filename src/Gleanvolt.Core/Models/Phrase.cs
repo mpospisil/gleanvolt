@@ -48,6 +48,9 @@ public abstract record PhraseArg
     /// <summary>A moment, shown as a time of day in the installation's zone.</summary>
     public sealed record Clock(DateTimeOffset At) : PhraseArg;
 
+    /// <summary>A moment, shown as a date in the installation's zone.</summary>
+    public sealed record Date(DateTimeOffset At) : PhraseArg;
+
     /// <summary>A span of time.</summary>
     public sealed record Duration(TimeSpan Span) : PhraseArg;
 
@@ -56,4 +59,18 @@ public abstract record PhraseArg
 
     /// <summary>Words that are not ours to translate: a host name, an id, a third party's message.</summary>
     public sealed record Text(string Value) : PhraseArg;
+
+    /// <summary>
+    /// Something another service said, quoted inside this sentence: its phrase when it has one, and its
+    /// English either way, which is what a reader without the phrase sees.
+    /// </summary>
+    public sealed record Said(Phrase? Phrase, string English) : PhraseArg;
+
+    /// <summary>Several arguments read as one list ("a VW ID, a password").</summary>
+    public sealed record List(IReadOnlyList<PhraseArg> Items) : PhraseArg
+    {
+        public bool Equals(List? other) => other is not null && Items.SequenceEqual(other.Items);
+
+        public override int GetHashCode() => Items.Aggregate(0, HashCode.Combine);
+    }
 }

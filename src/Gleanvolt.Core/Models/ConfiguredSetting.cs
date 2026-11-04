@@ -62,9 +62,15 @@ public sealed record ConfiguredSetting(
 /// <summary>What became of a save or a revert.</summary>
 /// <param name="Saved">Whether the overrides file was written (or removed).</param>
 /// <param name="Problems">Why not, each naming its key; empty when <paramref name="Saved"/>.</param>
-public sealed record SettingsSaveResult(bool Saved, IReadOnlyList<string> Problems)
+/// <param name="ProblemPhrases">
+/// The same problems for the web UI to say in the viewer's language (#292), in the same order; empty,
+/// or null at an index, where a problem has none.
+/// </param>
+public sealed record SettingsSaveResult(bool Saved, IReadOnlyList<string> Problems, IReadOnlyList<Phrase?>? ProblemPhrases = null)
 {
     public static SettingsSaveResult Success { get; } = new(true, []);
 
-    public static SettingsSaveResult Refused(IReadOnlyList<string> problems) => new(false, problems);
+    /// <summary>Refused, with the phrases <paramref name="problems"/> carries when it is a <see cref="Configuration.ConfigurationProblems"/>.</summary>
+    public static SettingsSaveResult Refused(IReadOnlyList<string> problems) =>
+        new(false, problems, Configuration.ConfigurationProblems.PhrasesOf(problems));
 }
