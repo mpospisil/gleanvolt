@@ -77,18 +77,18 @@ public class PvSystemPageTests : BunitContext
         // feature is on -- which is the one thing about the list that varies.
         List<MqttTopicDisplay> topics =
         [
-            new("Availability", $"{topicPrefix}/availability", false),
-            new("Status, as one JSON payload", $"{topicPrefix}/state", false),
+            new("Availability", $"{topicPrefix}/availability", false, Phrase.Of("Topic.Availability")),
+            new("Status, as one JSON payload", $"{topicPrefix}/state", false, Phrase.Of("Topic.State")),
         ];
 
         if (batteryHold)
         {
-            topics.Add(new("Battery hold", $"{topicPrefix}/battery_hold/state", false));
-            topics.Add(new("Battery hold, set", $"{topicPrefix}/battery_hold/set", true));
+            topics.Add(new("Battery hold", $"{topicPrefix}/battery_hold/state", false, Phrase.Of("Topic.BatteryHold")));
+            topics.Add(new("Battery hold, set", $"{topicPrefix}/battery_hold/set", true, Phrase.Of("Topic.BatteryHoldSet")));
         }
 
-        topics.Add(new("Start a targeted charge", $"{topicPrefix}/activate_target/set", true));
-        topics.Add(new("Stop the controller", $"{topicPrefix}/stop_service/set", true));
+        topics.Add(new("Start a targeted charge", $"{topicPrefix}/activate_target/set", true, Phrase.Of("Topic.ActivateTarget")));
+        topics.Add(new("Stop the controller", $"{topicPrefix}/stop_service/set", true, Phrase.Of("Topic.StopService")));
 
         return new MqttDisplayOptions(
             new HomeAssistantMqttDisplay(
@@ -460,11 +460,10 @@ public class PvSystemPageTests : BunitContext
             mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
             api: Api(new ApiKeyDisplay("home-assistant", null))));
 
-        // The topic descriptions are HaDiscovery's own words: service text, a later step of #290.
+        // Only the configuration's own values: host names, ids, topic paths and the example command.
         PseudoLocale.AssertTranslated(
             page.Markup,
             "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
-            "Availability", "Status, as one JSON payload", "Battery hold, set", "Start a targeted charge", "Stop the controller",
-            "curl Authorization Bearer http localhost status api openapi json home assistant availability");
+            "curl Authorization Bearer http localhost status api openapi json home assistant availability set");
     }
 }

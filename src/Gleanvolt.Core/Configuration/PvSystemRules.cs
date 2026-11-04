@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Configuration;
 
@@ -53,7 +54,7 @@ public static partial class PvSystemRules
     /// The resolved system. When <paramref name="problems"/> is non-empty this is a partially-filled
     /// placeholder — it exists so that resolution can continue and report everything, not to be used.
     /// </returns>
-    public static PvSystemInfo Resolve(PvSystemOptions pv, string inverterDeviceId, List<string> problems)
+    public static PvSystemInfo Resolve(PvSystemOptions pv, string inverterDeviceId, ConfigurationProblems problems)
     {
         ArgumentNullException.ThrowIfNull(pv);
         ArgumentNullException.ThrowIfNull(problems);
@@ -83,7 +84,7 @@ public static partial class PvSystemRules
 
     // Empty is the ordinary installation. Both spellings are accepted because the one on the inverter's
     // display and in its register names is SolaX's R/S/T, and the one on an electrician's drawing is L1-L3.
-    private static Enums.GridPhase? ResolveUnmeteredGridPhase(PvSystemOptions pv, List<string> problems)
+    private static Enums.GridPhase? ResolveUnmeteredGridPhase(PvSystemOptions pv, ConfigurationProblems problems)
     {
         var value = pv.Inverter?.UnmeteredGridPhase.Trim() ?? string.Empty;
 
@@ -99,7 +100,7 @@ public static partial class PvSystemRules
         {
             problems.Add(
                 $"Pv:Inverter:UnmeteredGridPhase ('{value}') must be L1, L2 or L3 (or SolaX's R, S or T), or "
-                + "empty for a grid meter that measures all three phases.");
+                + "empty for a grid meter that measures all three phases.", Phrase.Of("Config.PvPhase", new PhraseArg.Text(value)));
         }
 
         return phase;
@@ -110,9 +111,9 @@ public static partial class PvSystemRules
     /// than what it resolves to — the portal validating a form before it writes a row.
     /// </summary>
     /// <returns>Every problem found, each naming the configuration key it is about. Empty means usable.</returns>
-    public static IReadOnlyList<string> Validate(PvSystemOptions pv)
+    public static ConfigurationProblems Validate(PvSystemOptions pv)
     {
-        var problems = new List<string>();
+        var problems = new ConfigurationProblems();
         Resolve(pv, DefaultInverterDeviceId, problems);
         return problems;
     }
@@ -124,7 +125,7 @@ public static partial class PvSystemRules
     // Optional, still. Nothing consumes the id yet -- it becomes the MQTT topic segment and the Home
     // Assistant device identity in the phase that publishes them, and that is the phase in which an
     // anonymous system stops being a describable one.
-    private static string ResolveId(PvSystemOptions pv, List<string> problems)
+    private static string ResolveId(PvSystemOptions pv, ConfigurationProblems problems)
     {
         var id = pv.Id.Trim();
 
@@ -138,19 +139,19 @@ public static partial class PvSystemRules
             problems.Add(
                 $"Pv:Id ('{id}') must be a slug: lower-case letters, digits, '-' and '_', starting with a "
                 + "letter or digit, at most 48 characters. It becomes an MQTT topic segment and a Home "
-                + "Assistant object id.");
+                + "Assistant object id.", Phrase.Of("Config.PvIdSlug", new PhraseArg.Text(id)));
         }
 
         return id;
     }
 
-    private static (double? Latitude, double? Longitude) ResolveLocation(PvSystemOptions pv, List<string> problems)
+    private static (double? Latitude, double? Longitude) ResolveLocation(PvSystemOptions pv, ConfigurationProblems problems)
     {
         if (pv.Latitude is null != pv.Longitude is null)
         {
             problems.Add(
                 "A latitude without a longitude (or the other way round) describes nowhere. Set both "
-                + "Pv:Latitude and Pv:Longitude, or neither.");
+                + "Pv:Latitude and Pv:Longitude, or neither.", Phrase.Of("Config.PvLocation"));
             return (null, null);
         }
 
@@ -160,14 +161,14 @@ public static partial class PvSystemRules
         return (pv.Latitude, pv.Longitude);
     }
 
-    private static PvDeviceInfo ResolveInverter(PvSystemOptions pv, string inverterDeviceId, List<string> problems)
+    private static PvDeviceInfo ResolveInverter(PvSystemOptions pv, string inverterDeviceId, ConfigurationProblems problems)
     {
         var name = pv.Inverter?.Name.Trim() ?? string.Empty;
         var model = pv.Inverter?.Model.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(pv.Inverter?.Host))
         {
-            problems.Add("No inverter is configured. Set Pv:Inverter:Host.");
+            problems.Add("No inverter is configured. Set Pv:Inverter:Host.", Phrase.Of("Config.PvNoInverter"));
 
             // A placeholder so the rest of the resolution can be reported too; the throw the caller makes
             // is unconditional once anything has landed in `problems`.
@@ -179,11 +180,11 @@ public static partial class PvSystemRules
         return new PvDeviceInfo(inverterDeviceId, name, model, pv.Inverter.ToDeviceConfig());
     }
 
-    private static IReadOnlyList<PvDeviceInfo> ResolveChargers(PvSystemOptions pv, List<string> problems)
+    private static IReadOnlyList<PvDeviceInfo> ResolveChargers(PvSystemOptions pv, ConfigurationProblems problems)
     {
         if (pv.Chargers.Length == 0)
         {
-            problems.Add("No EV charger is configured. Set Pv:Chargers:0:Host.");
+            problems.Add("No EV charger is configured. Set Pv:Chargers:0:Host.", Phrase.Of("Config.PvNoCharger"));
             return [];
         }
 
@@ -195,7 +196,7 @@ public static partial class PvSystemRules
             problems.Add(
                 $"Only {SupportedChargerCount} EV charger is supported; Pv:Chargers has {pv.Chargers.Length}. "
                 + "The configuration can express more so that it need not change when the control logic can "
-                + "drive more, which it cannot yet.");
+                + "drive more, which it cannot yet.", Phrase.Of("Config.PvOneCharger", new PhraseArg.Number(SupportedChargerCount), new PhraseArg.Number(pv.Chargers.Length)));
         }
 
         var chargers = new List<PvDeviceInfo>();
@@ -209,17 +210,17 @@ public static partial class PvSystemRules
 
             if (!Slug().IsMatch(id))
             {
-                problems.Add($"{path}:Id ('{id}') must be a slug: lower-case letters, digits, '-' and '_'.");
+                problems.Add($"{path}:Id ('{id}') must be a slug: lower-case letters, digits, '-' and '_'.", Phrase.Of("Config.PvChargerIdSlug", new PhraseArg.Text(path), new PhraseArg.Text(id)));
             }
 
             if (!seen.Add(id))
             {
-                problems.Add($"{path}:Id ('{id}') is used by more than one charger; each id must be unique.");
+                problems.Add($"{path}:Id ('{id}') is used by more than one charger; each id must be unique.", Phrase.Of("Config.PvChargerIdTwice", new PhraseArg.Text(path), new PhraseArg.Text(id)));
             }
 
             if (string.IsNullOrWhiteSpace(charger.Host))
             {
-                problems.Add($"{path}:Host is required.");
+                problems.Add($"{path}:Host is required.", Phrase.Of("Config.PvHostRequired", new PhraseArg.Text(path)));
                 continue;
             }
 
@@ -231,20 +232,20 @@ public static partial class PvSystemRules
         return chargers;
     }
 
-    private static void ValidateConnection(PvDeviceOptions device, string path, List<string> problems)
+    private static void ValidateConnection(PvDeviceOptions device, string path, ConfigurationProblems problems)
     {
         if (device.Port is { } port && port is < 1 or > 65535)
         {
-            problems.Add($"{path}:Port ({port}) is not a TCP port.");
+            problems.Add($"{path}:Port ({port}) is not a TCP port.", Phrase.Of("Config.PvPort", new PhraseArg.Text(path), new PhraseArg.Number(port)));
         }
 
         if (device.MinRequestInterval is { } interval && interval < TimeSpan.Zero)
         {
-            problems.Add($"{path}:MinRequestInterval ({interval}) cannot be negative.");
+            problems.Add($"{path}:MinRequestInterval ({interval}) cannot be negative.", Phrase.Of("Config.PvInterval", new PhraseArg.Text(path), new PhraseArg.Duration(interval)));
         }
     }
 
-    private static DateOnly? ParseInstallDate(string value, List<string> problems)
+    private static DateOnly? ParseInstallDate(string value, ConfigurationProblems problems)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -256,35 +257,35 @@ public static partial class PvSystemRules
             return date;
         }
 
-        problems.Add($"Pv:InstallDate ('{value}') is not a date. Write it as yyyy-MM-dd.");
+        problems.Add($"Pv:InstallDate ('{value}') is not a date. Write it as yyyy-MM-dd.", Phrase.Of("Config.PvInstallDate", new PhraseArg.Text(value)));
         return null;
     }
 
-    private static double? Range(double? value, double min, double max, string key, List<string> problems)
+    private static double? Range(double? value, double min, double max, string key, ConfigurationProblems problems)
     {
         if (value is { } number && (number < min || number > max))
         {
-            problems.Add($"{key} ({number}) is outside {min}..{max}.");
+            problems.Add($"{key} ({number}) is outside {min}..{max}.", Phrase.Of("Config.Range", new PhraseArg.Text(key), new PhraseArg.Text(Invariant($"{number}")), new PhraseArg.Text(Invariant($"{min}")), new PhraseArg.Text(Invariant($"{max}"))));
         }
 
         return value;
     }
 
-    private static double? Positive(double? value, string key, List<string> problems)
+    private static double? Positive(double? value, string key, ConfigurationProblems problems)
     {
         if (value is { } number && number <= 0)
         {
-            problems.Add($"{key} ({number}) must be greater than zero.");
+            problems.Add($"{key} ({number}) must be greater than zero.", Phrase.Of("Config.Positive", new PhraseArg.Text(key), new PhraseArg.Text(Invariant($"{number}"))));
         }
 
         return value;
     }
 
-    private static double? Fraction(double? value, string key, List<string> problems)
+    private static double? Fraction(double? value, string key, ConfigurationProblems problems)
     {
         if (value is { } number && (number <= 0 || number > 1))
         {
-            problems.Add($"{key} ({number}) must be a fraction in (0, 1].");
+            problems.Add($"{key} ({number}) must be a fraction in (0, 1].", Phrase.Of("Config.Fraction", new PhraseArg.Text(key), new PhraseArg.Text(Invariant($"{number}"))));
         }
 
         return value;

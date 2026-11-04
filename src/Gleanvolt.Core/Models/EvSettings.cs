@@ -265,7 +265,8 @@ public sealed record EvSettings(
     string SecretProtection,
     int ChargerMinAmps,
     int ChargerMaxAmps,
-    string? Unavailable = null)
+    string? Unavailable = null,
+    Phrase? SecretProtectionPhrase = null)
 {
     public ConfiguredSetting this[string key] =>
         Settings.First(setting => string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));

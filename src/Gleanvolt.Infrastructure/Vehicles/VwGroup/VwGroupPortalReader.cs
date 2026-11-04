@@ -33,6 +33,8 @@ public sealed class VwGroupPortalReader(
 
     public string DescribeWhatIsMissing() => options.DescribeWhatIsMissing();
 
+    public Phrase? DescribeWhatIsMissingPhrase() => options.DescribeWhatIsMissingPhrase();
+
     public async Task<VehiclePortalReading> ReadAsync(CancellationToken cancellationToken = default)
     {
         if (!IsConfigured)
@@ -40,7 +42,8 @@ public sealed class VwGroupPortalReader(
             return VehiclePortalReading.Failed(
                 nameof(VwGroupFailure.NotConfigured),
                 $"The portal client needs {DescribeWhatIsMissing()}.",
-                worthRetrying: false);
+                worthRetrying: false,
+                phrase: Phrase.Of("Portal.ClientNeeds", new PhraseArg.Said(DescribeWhatIsMissingPhrase(), DescribeWhatIsMissing())));
         }
 
         using var handler = VwGroupSignIn.CreateHandler(new CookieContainer());

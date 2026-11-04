@@ -30,6 +30,7 @@ public sealed class VehicleStateRefresh(
         }
 
         string failure;
+        Phrase phrase;
 
         try
         {
@@ -47,6 +48,10 @@ public sealed class VehicleStateRefresh(
             }
 
             failure = $"{service.DisplayName} had nothing to give — {service.Health.Message}";
+            phrase = Phrase.Of(
+                "Refresh.NothingToGive",
+                new PhraseArg.Text(service.DisplayName),
+                new PhraseArg.Said(service.Health.Phrase, service.Health.Message));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -56,11 +61,12 @@ public sealed class VehicleStateRefresh(
         {
             logger?.LogWarning(ex, "Asking {Manufacturer} for the car failed.", service.Manufacturer);
             failure = $"{service.DisplayName}: {ex.Message}";
+            phrase = Phrase.Of("Refresh.Failed", new PhraseArg.Text(service.DisplayName), new PhraseArg.Text(ex.Message));
         }
 
         // Nothing answered. The last known reading goes back with the failure so a caller that can
         // use an old number -- a plan, which would rather be built on something than nothing -- can,
         // and one that cannot simply ignores it.
-        return VehicleRefreshResult.Failed(failure, holder.GetCurrentState());
+        return VehicleRefreshResult.Failed(failure, holder.GetCurrentState(), phrase);
     }
 }

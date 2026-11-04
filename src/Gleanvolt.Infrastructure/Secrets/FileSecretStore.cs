@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Interfaces;
 
 namespace Gleanvolt.Infrastructure.Secrets;
@@ -69,6 +70,9 @@ public sealed class FileSecretStore(string directory) : ISecretStore
         // which is the honest answer and the reason DPAPI is deliberately not used there.
         ? "plain files, protected by the data directory's permissions"
         : "owner-only files (0600) in the data directory";
+
+    /// <inheritdoc />
+    public Phrase DescribePhrase() => Phrase.Of(OperatingSystem.IsWindows() ? "Secrets.PlainFiles" : "Secrets.OwnerOnlyFiles");
 
     /// <summary>The file a secret lives in. Public so the DPAPI store can share the layout.</summary>
     public string PathFor(string name) => Path.Combine(directory, name + ".json");

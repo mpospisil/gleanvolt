@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Models;
 namespace Gleanvolt.Core.Interfaces;
 
 /// <summary>
@@ -41,6 +42,9 @@ public interface ISecretStore
     /// "is it safe to copy the data directory?" has an answer that is in front of the person copying it.
     /// </summary>
     string Describe();
+
+    /// <summary><see cref="Describe"/> for the web UI to say in the viewer's language (#292).</summary>
+    Phrase? DescribePhrase() => null;
 }
 
 /// <summary>

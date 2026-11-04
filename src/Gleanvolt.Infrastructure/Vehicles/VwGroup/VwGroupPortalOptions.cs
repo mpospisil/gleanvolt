@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Models;
 namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 /// <summary>
@@ -180,5 +181,34 @@ public sealed class VwGroupPortalOptions
         }
 
         return missing.Count == 0 ? string.Empty : string.Join(", ", missing);
+    }
+
+    /// <summary><see cref="DescribeWhatIsMissing"/> for the web UI to say in the viewer's language (#292).</summary>
+    public Phrase DescribeWhatIsMissingPhrase()
+    {
+        var missing = new List<PhraseArg>();
+
+        if (string.IsNullOrWhiteSpace(ResolvedClientId))
+        {
+            missing.Add(new PhraseArg.Said(
+                string.IsNullOrWhiteSpace(Brand)
+                    ? Phrase.Of("Portal.MissingBrand", new PhraseArg.Text(VwGroupBrands.Known))
+                    : Phrase.Of("Portal.UnknownBrand", new PhraseArg.Text(Brand.Trim()), new PhraseArg.Text(VwGroupBrands.Known)),
+                string.IsNullOrWhiteSpace(Brand)
+                    ? $"a brand (one of {VwGroupBrands.Known}) or an explicit client id"
+                    : $"a known brand -- '{Brand.Trim()}' is not one of {VwGroupBrands.Known}; set an explicit client id if yours is missing"));
+        }
+
+        if (string.IsNullOrWhiteSpace(Username))
+        {
+            missing.Add(new PhraseArg.Said(Phrase.Of("Portal.MissingVwId"), "a VW ID"));
+        }
+
+        if (string.IsNullOrWhiteSpace(Password))
+        {
+            missing.Add(new PhraseArg.Said(Phrase.Of("Portal.MissingPassword"), "a password"));
+        }
+
+        return Phrase.Of("Portal.Missing", new PhraseArg.List(missing));
     }
 }

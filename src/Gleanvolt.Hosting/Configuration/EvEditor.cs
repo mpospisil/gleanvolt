@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Configuration;
 using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Gleanvolt.Core.Interfaces;
@@ -121,7 +122,7 @@ public sealed class EvEditor : IEvEditor
     {
         if (EvSettingKeys.Canonical(key) is not { } canonical)
         {
-            return SettingsSaveResult.Refused([$"{key} cannot be edited from the web UI."]);
+            return SettingsSaveResult.Refused(ConfigurationProblems.NotEditable([key]));
         }
 
         if (EvSettingKeys.IsSecret(canonical))
@@ -132,7 +133,9 @@ public sealed class EvEditor : IEvEditor
             if (!_secrets.Delete(SecretNames.VehicleAccountPassword))
             {
                 return SettingsSaveResult.Refused(
-                    ["The saved password could not be removed. Check the data directory's permissions."]);
+                    new ConfigurationProblems(
+                        "The saved password could not be removed. Check the data directory's permissions.",
+                        Phrase.Of("Config.PasswordNotRemoved")));
             }
 
             _logger.LogInformation("The vehicle account password was removed from the secret store by the web UI.");
@@ -153,7 +156,7 @@ public sealed class EvEditor : IEvEditor
         if (refused.Count > 0)
         {
             return SettingsSaveResult.Refused(
-                [.. refused.Select(key => $"{key} cannot be edited from the web UI.")]);
+                ConfigurationProblems.NotEditable(refused));
         }
 
         // An empty secret means "unchanged", never "clear": a password box renders empty on every
@@ -169,7 +172,9 @@ public sealed class EvEditor : IEvEditor
             // the Data Act portal are entered with the same VW ID. Two different ones in one save is a
             // form bug rather than something to resolve by picking one.
             return SettingsSaveResult.Refused(
-                ["Two different passwords were submitted at once; only one vehicle account is kept."]);
+                new ConfigurationProblems(
+                    "Two different passwords were submitted at once; only one vehicle account is kept.",
+                    Phrase.Of("Config.TwoPasswords")));
         }
 
         return Change(
@@ -221,7 +226,7 @@ public sealed class EvEditor : IEvEditor
         if (_configuration is null || _overrides is null)
         {
             return SettingsSaveResult.Refused(
-                ["This host does not read a web UI overrides file, so an edit here would never be applied."]);
+                ConfigurationProblems.NoOverridesFile());
         }
 
         lock (_gate)
@@ -263,14 +268,16 @@ public sealed class EvEditor : IEvEditor
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return SettingsSaveResult.Refused([$"Could not write {_overrides.Path}: {ex.Message}"]);
+                    return SettingsSaveResult.Refused(ConfigurationProblems.NotWritten(_overrides.Path, ex.Message));
                 }
             }
 
             if (password is not null && !_secrets.Write(SecretNames.VehicleAccountPassword, password))
             {
                 return SettingsSaveResult.Refused(
-                    [$"The password could not be stored ({_secrets.Describe()}). Nothing else was changed."]);
+                    new ConfigurationProblems(
+                        $"The password could not be stored ({_secrets.Describe()}). Nothing else was changed.",
+                        Phrase.Of("Config.PasswordNotStored", new PhraseArg.Said(_secrets.DescribePhrase(), _secrets.Describe()))));
             }
 
             _logger.LogInformation(
@@ -288,19 +295,23 @@ public sealed class EvEditor : IEvEditor
     // Everything a start would refuse, run against the configuration the next start would read. The
     // Ev section goes through the startup resolver itself; the feed rules are stated here because the
     // composition root states them as a throw rather than as a validator.
-    private List<string> Check(IReadOnlyDictionary<string, string> stored, string? password)
+    private ConfigurationProblems Check(IReadOnlyDictionary<string, string> stored, string? password)
     {
-        var problems = new List<string>();
+        var problems = new ConfigurationProblems();
         var candidate = Candidate(stored);
 
         try
         {
             EvResolver.Resolve(candidate, _chargerMinAmps, _chargerMaxAmps);
         }
+        catch (ConfigurationRefusedException refused)
+        {
+            problems = refused.Problems;
+        }
         catch (InvalidOperationException ex)
         {
-            // The resolver lists its problems one per line under a heading; the binder, for a value
-            // that is not a number at all, says one thing.
+            // The binder, for a value that is not a number at all, says one thing; the resolver's own
+            // refusal, a list under a heading, is the case above.
             var lines = ex.Message.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             var listed = lines.Where(line => line.StartsWith("- ", StringComparison.Ordinal)).Select(line => line[2..]).ToList();
             problems.AddRange(listed.Count > 0 ? listed : [ex.Message]);
@@ -316,7 +327,8 @@ public sealed class EvEditor : IEvEditor
         {
             problems.Add(
                 "Vehicle:Website and Vehicle:Skoda would both be enabled, and they read two different "
-                + "cars (volkswagen.de and the MyŠkoda API). An installation has one car.");
+                + "cars (volkswagen.de and the MyŠkoda API). An installation has one car.",
+                Phrase.Of("Config.TwoFeeds"));
         }
 
         foreach (var feed in enabled)
@@ -329,7 +341,9 @@ public sealed class EvEditor : IEvEditor
 
                 if (!present)
                 {
-                    problems.Add($"{key} is needed by the feed that is switched on, and is empty.");
+                    problems.Add(
+                        $"{key} is needed by the feed that is switched on, and is empty.",
+                        Phrase.Of("Config.FeedNeeds", new PhraseArg.Text(key)));
                 }
             }
         }
@@ -343,7 +357,8 @@ public sealed class EvEditor : IEvEditor
             {
                 problems.Add(
                     $"Vehicle:DataAct:Brand ('{brand}') is not one of {VwGroupBrands.Known}. Pick one, or "
-                    + "state Vehicle:DataAct:ClientId outright if yours is missing.");
+                    + "state Vehicle:DataAct:ClientId outright if yours is missing.",
+                    Phrase.Of("Config.UnknownBrand", new PhraseArg.Text(brand ?? string.Empty), new PhraseArg.Text(VwGroupBrands.Known)));
             }
         }
 
@@ -426,7 +441,8 @@ public sealed class EvEditor : IEvEditor
             _secrets.Describe(),
             _chargerMinAmps,
             _chargerMaxAmps,
-            unavailable);
+            unavailable,
+            _secrets.DescribePhrase());
     }
 
     private EvSettings Unavailable(string reason) => new(
@@ -454,7 +470,8 @@ public sealed class EvEditor : IEvEditor
         _secrets.Describe(),
         _chargerMinAmps,
         _chargerMaxAmps,
-        reason);
+        reason,
+        _secrets.DescribePhrase());
 
     // Whether a password would be available to the next start for `key` -- from the store, or from the
     // environment beside it. Never what it is.

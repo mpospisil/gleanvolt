@@ -295,4 +295,27 @@ public class SessionDetailPageTests : PageTest
 
         page.WaitForAssertion(() => PseudoLocale.AssertTranslated(page.Markup));
     }
+
+    [Fact]
+    public void The_marks_beside_the_chart_are_in_the_viewers_language()
+    {
+        var session = TestSessions.Sample(startedAt: _time.Now.AddHours(-1), endedAt: _time.Now);
+        var samples = new[] { TestSessions.Sample(session.Id, _time.Now.AddMinutes(-30), 68) };
+        var events = new[]
+        {
+            new ChargingSessionEvent(
+                session.Id, _time.Now.AddMinutes(-40), ChargingSessionEventKind.ModeChanged, "Solar → Forecasted.",
+                Phrase.Of("Event.ModeChanged", new PhraseArg.Mode(ChargeControlMode.Solar), new PhraseArg.Mode(ChargeControlMode.Forecasted))),
+            new ChargingSessionEvent(
+                session.Id, _time.Now.AddMinutes(-20), ChargingSessionEventKind.ChargingPaused, "Charging paused.",
+                Phrase.Of("Event.ChargingPaused")),
+        };
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, samples, events);
+
+        var page = PseudoLocale.Render(() => RenderFor(session.Id));
+
+        page.WaitForAssertion(() => Assert.Equal(2, page.FindAll(".chart-marks li").Count));
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
 }

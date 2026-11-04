@@ -23,11 +23,12 @@ public sealed record VehicleRefreshResult(
     VehicleState? State = null,
     bool IsFresh = false,
     string? Source = null,
-    string? Message = null)
+    string? Message = null,
+    Phrase? MessagePhrase = null)
 {
     /// <summary>Nothing is configured to ask, so nothing was asked.</summary>
     public static VehicleRefreshResult NoFeed { get; } =
-        new(false, Message: "No vehicle feed is configured, so there is nothing to ask.");
+        new(false, Message: "No vehicle feed is configured, so there is nothing to ask.", MessagePhrase: Phrase.Of("Refresh.NoFeed"));
 
     public static VehicleRefreshResult Fresh(VehicleState state, string? source) =>
         new(true, state, IsFresh: true, Source: source);
@@ -36,6 +37,6 @@ public sealed record VehicleRefreshResult(
     /// The ask failed. <paramref name="lastKnown"/> is handed back when there is one — a plan built on
     /// an old number that says so is worth more than no plan at all.
     /// </summary>
-    public static VehicleRefreshResult Failed(string message, VehicleState? lastKnown = null) =>
-        new(false, lastKnown, IsFresh: false, Source: lastKnown?.SourceId, Message: message);
+    public static VehicleRefreshResult Failed(string message, VehicleState? lastKnown = null, Phrase? phrase = null) =>
+        new(false, lastKnown, IsFresh: false, Source: lastKnown?.SourceId, Message: message, MessagePhrase: phrase);
 }

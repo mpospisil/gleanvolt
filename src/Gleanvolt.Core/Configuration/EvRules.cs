@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Configuration;
 
@@ -33,7 +34,7 @@ public static partial class EvRules
     /// Collects every problem found, each naming the configuration key it is about. The caller decides
     /// what a non-empty list means: a startup failure in the controller, a rejected save in the portal.
     /// </param>
-    public static EvInfo Resolve(EvOptions ev, int chargerMinAmps, int chargerMaxAmps, List<string> problems)
+    public static EvInfo Resolve(EvOptions ev, int chargerMinAmps, int chargerMaxAmps, ConfigurationProblems problems)
     {
         ArgumentNullException.ThrowIfNull(ev);
         ArgumentNullException.ThrowIfNull(problems);
@@ -49,7 +50,7 @@ public static partial class EvRules
             // starting: the other two are configured, visible in the file, and doing nothing.
             problems.Add(
                 $"Ev:Vehicles has {ev.Vehicles.Length} entries and exactly {SupportedVehicleCount} is "
-                + "supported. The list is a shape for later, not a feature yet.");
+                + "supported. The list is a shape for later, not a feature yet.", Phrase.Of("Config.EvOneVehicle", new PhraseArg.Number(ev.Vehicles.Length), new PhraseArg.Number(SupportedVehicleCount)));
         }
 
         var vehicle = ev.Vehicles[0];
@@ -78,14 +79,14 @@ public static partial class EvRules
     /// what it resolves to — the portal validating a form before it writes a row.
     /// </summary>
     /// <returns>Every problem found, each naming the configuration key it is about. Empty means usable.</returns>
-    public static IReadOnlyList<string> Validate(EvOptions ev, int chargerMinAmps, int chargerMaxAmps)
+    public static ConfigurationProblems Validate(EvOptions ev, int chargerMinAmps, int chargerMaxAmps)
     {
-        var problems = new List<string>();
+        var problems = new ConfigurationProblems();
         Resolve(ev, chargerMinAmps, chargerMaxAmps, problems);
         return problems;
     }
 
-    private static string ResolveId(EvVehicleOptions vehicle, List<string> problems)
+    private static string ResolveId(EvVehicleOptions vehicle, ConfigurationProblems problems)
     {
         var id = vehicle.Id.Trim();
 
@@ -98,7 +99,7 @@ public static partial class EvRules
         {
             problems.Add(
                 $"Ev:Vehicles:0:Id ('{id}') must be a slug: lower-case letters, digits, '-' and '_', "
-                + "starting with a letter or digit, at most 48 characters.");
+                + "starting with a letter or digit, at most 48 characters.", Phrase.Of("Config.EvIdSlug", new PhraseArg.Text(id)));
         }
 
         return id;
@@ -109,13 +110,13 @@ public static partial class EvRules
     /// at all, and every symptom of that is silence. Caught here, naming both keys, rather than
     /// discovered one evening as "I pressed the button and nothing happened".
     /// </summary>
-    private static void ValidateBand(EvInfo ev, int chargerMinAmps, int chargerMaxAmps, List<string> problems)
+    private static void ValidateBand(EvInfo ev, int chargerMinAmps, int chargerMaxAmps, ConfigurationProblems problems)
     {
         if (ev.MinChargingCurrentAmps is { } evMin && ev.MaxChargingCurrentAmps is { } evMax && evMin > evMax)
         {
             problems.Add(
                 $"Ev:Vehicles:0:MinChargingCurrentAmps ({evMin}A) is above "
-                + $"Ev:Vehicles:0:MaxChargingCurrentAmps ({evMax}A); no current satisfies both.");
+                + $"Ev:Vehicles:0:MaxChargingCurrentAmps ({evMax}A); no current satisfies both.", Phrase.Of("Config.EvBandInverted", new PhraseArg.Number(evMin), new PhraseArg.Number(evMax)));
             return;
         }
 
@@ -126,35 +127,35 @@ public static partial class EvRules
             problems.Add(
                 $"The car and the charger have no current in common: the car needs at least "
                 + $"{limits.MinAmps}A (Ev:Vehicles:0:MinChargingCurrentAmps) and the installation allows "
-                + $"at most {limits.MaxAmps}A (ChargeControl:MaxChargingCurrentAmps). It could never charge.");
+                + $"at most {limits.MaxAmps}A (ChargeControl:MaxChargingCurrentAmps). It could never charge.", Phrase.Of("Config.EvNoCommonCurrent", new PhraseArg.Number(limits.MinAmps), new PhraseArg.Number(limits.MaxAmps)));
         }
     }
 
-    private static double Positive(double value, string key, List<string> problems)
+    private static double Positive(double value, string key, ConfigurationProblems problems)
     {
         if (value < 0)
         {
-            problems.Add($"{key} ({value}) cannot be negative.");
+            problems.Add(Invariant($"{key} ({value}) cannot be negative."), Phrase.Of("Config.Negative", new PhraseArg.Text(key), new PhraseArg.Text(Invariant($"{value}"))));
             return 0;
         }
 
         return value;
     }
 
-    private static double Efficiency(double value, List<string> problems)
+    private static double Efficiency(double value, ConfigurationProblems problems)
     {
         if (value is <= 0 or > 1)
         {
             problems.Add(
                 $"Ev:Vehicles:0:ChargeEfficiency ({value}) must be greater than 0 and at most 1 — it is "
-                + "the fraction of metered energy that reaches the cells.");
+                + "the fraction of metered energy that reaches the cells.", Phrase.Of("Config.EvEfficiency", new PhraseArg.Text(Invariant($"{value}"))));
             return 0.9;
         }
 
         return value;
     }
 
-    private static int? Phases(int? value, List<string> problems)
+    private static int? Phases(int? value, ConfigurationProblems problems)
     {
         if (value is null)
         {
@@ -163,14 +164,14 @@ public static partial class EvRules
 
         if (value is not (1 or 2 or 3))
         {
-            problems.Add($"Ev:Vehicles:0:Phases ({value}) must be 1, 2 or 3.");
+            problems.Add(Invariant($"Ev:Vehicles:0:Phases ({value}) must be 1, 2 or 3."), Phrase.Of("Config.EvPhases", new PhraseArg.Text(Invariant($"{value}"))));
             return null;
         }
 
         return value;
     }
 
-    private static int? Amps(int? value, string key, List<string> problems)
+    private static int? Amps(int? value, string key, ConfigurationProblems problems)
     {
         if (value is null)
         {
@@ -179,7 +180,7 @@ public static partial class EvRules
 
         if (value <= 0)
         {
-            problems.Add($"{key} ({value}) must be greater than zero.");
+            problems.Add(Invariant($"{key} ({value}) must be greater than zero."), Phrase.Of("Config.Positive", new PhraseArg.Text(key), new PhraseArg.Text(Invariant($"{value}"))));
             return null;
         }
 

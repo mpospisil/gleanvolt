@@ -105,7 +105,8 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
         _health = _options.IsConfigured
             ? VehicleSourceHealth.Starting
             : VehicleSourceHealth.NeedsOwner(
-                $"The VW portal feed is switched on but needs {_options.DescribeWhatIsMissing()}.");
+                $"The VW portal feed is switched on but needs {_options.DescribeWhatIsMissing()}.",
+                Phrase.Of("Feed.PortalNeeds", new PhraseArg.Said(_options.DescribeWhatIsMissingPhrase(), _options.DescribeWhatIsMissing())));
 
         NextDelay = Health.IsBlocked ? Timeout.InfiniteTimeSpan : Interval;
     }
@@ -173,7 +174,8 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
             _consecutiveFailures = 0;
             NextDelay = Interval;
             Health = VehicleSourceHealth.Ok(
-                $"The portal answered; the car reported at {state.CapturedAt.LocalDateTime:HH:mm}.");
+                $"The portal answered; the car reported at {state.CapturedAt.LocalDateTime:HH:mm}.",
+                Phrase.Of("Feed.PortalAnswered", new PhraseArg.Clock(state.CapturedAt)));
 
             if (result.TargetSocPercent is { } targetSoc)
             {
@@ -231,7 +233,7 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
 
         if (needsTheOwner)
         {
-            Health = VehicleSourceHealth.NeedsOwner(Sentence(failure));
+            Health = VehicleSourceHealth.NeedsOwner(Sentence(failure), SentencePhrase(failure));
             NextDelay = Timeout.InfiniteTimeSpan;
 
             _logger.LogWarning(
@@ -252,7 +254,7 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
             ? Interval
             : Backoff(_consecutiveFailures);
 
-        Health = VehicleSourceHealth.Degraded(Sentence(failure));
+        Health = VehicleSourceHealth.Degraded(Sentence(failure), SentencePhrase(failure));
 
         _logger.LogWarning(
             "The VW portal feed for {Vehicle} produced no reading ({Failure}): {Reason} Next attempt "
@@ -273,6 +275,17 @@ public sealed class VwGroupUpdateService : IVehicleUpdateService, IVehicleFeedDi
     /// owner has to do where the answer is not obvious, and never carries a credential — the client's
     /// own messages are written to that rule and are quoted rather than rephrased.
     /// </summary>
+    // The portal client's own detail travels as text: it quotes what the portal said.
+    private static Phrase SentencePhrase(VwGroupPortalException failure) => failure.Failure switch
+    {
+        VwGroupFailure.SignInRejected => Phrase.Of("Portal.SignInRejected", new PhraseArg.Text(failure.Message)),
+        VwGroupFailure.OwnerActionRequired => Phrase.Of("Portal.OwnerAction", new PhraseArg.Text(failure.Message)),
+        VwGroupFailure.NoDataRequest or VwGroupFailure.NotConfigured => Phrase.Of("Portal.Detail", new PhraseArg.Text(failure.Message)),
+        VwGroupFailure.NoDataAvailable => Phrase.Of("Portal.NoData", new PhraseArg.Text(failure.Message)),
+        VwGroupFailure.UnusableData => Phrase.Of("Portal.Unusable", new PhraseArg.Text(failure.Message)),
+        _ => Phrase.Of("Portal.NoReading", new PhraseArg.Text(failure.Message)),
+    };
+
     private static string Sentence(VwGroupPortalException failure) => failure.Failure switch
     {
         VwGroupFailure.SignInRejected =>

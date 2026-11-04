@@ -55,6 +55,9 @@ public sealed class SolcastAccountStore
     /// <summary>What protects the saved key, for a sentence that has to mention it. Never the key itself.</summary>
     public string Protection => _secrets.Describe();
 
+    /// <summary><see cref="Protection"/> for the web UI (#292).</summary>
+    public Phrase? ProtectionPhrase => _secrets.DescribePhrase();
+
     /// <summary>Moves on every save and clear, so a reader can tell a new account from the one it had.</summary>
     public int Version => Volatile.Read(ref _version);
 

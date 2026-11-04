@@ -39,8 +39,13 @@ public sealed record ChargingSessionDocument(
     /// reported it when the session opened and when it closed — plus <c>sunrise</c> and <c>sunset</c>
     /// for the day it started on. Additive, and null throughout wherever no weather provider is
     /// configured, which is the default.</para>
+    ///
+    /// <para>5 added phrases (#290, #292): <c>startPlan.reasonPhrase</c> and each event's
+    /// <c>detailPhrase</c>, a key and typed arguments (each argument tagged with its <c>type</c>) that
+    /// say the English beside them in another language. Additive, and null wherever nothing was said
+    /// that way — every event recorded before.</para>
     /// </summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Builds a document at the current schema version.

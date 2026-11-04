@@ -118,7 +118,7 @@ public class EvResolverTests
     {
         // Silently driving the first of two is worse than not starting: the other is configured,
         // visible in the file, and doing nothing.
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Ev:Vehicles:0:Id", "id4"),
             ("Ev:Vehicles:1:Id", "leaf")));
 
@@ -128,7 +128,7 @@ public class EvResolverTests
     [Fact]
     public void RefusesAnIdThatIsNotASlug()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(("Ev:Vehicles:0:Id", "The ID.4")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Ev:Vehicles:0:Id", "The ID.4")));
 
         Assert.Contains("Ev:Vehicles:0:Id", error.Message);
         Assert.Contains("slug", error.Message);
@@ -140,7 +140,7 @@ public class EvResolverTests
     [InlineData("-0.2")]
     public void RefusesAnImpossibleChargeEfficiency(string value)
     {
-        var error = Assert.Throws<InvalidOperationException>(() =>
+        var error = Assert.ThrowsAny<InvalidOperationException>(() =>
             Resolve(("Ev:Vehicles:0:Id", "id4"), ("Ev:Vehicles:0:ChargeEfficiency", value)));
 
         Assert.Contains("ChargeEfficiency", error.Message);
@@ -149,7 +149,7 @@ public class EvResolverTests
     [Fact]
     public void RefusesAPhaseCountNoWallboxHas()
     {
-        var error = Assert.Throws<InvalidOperationException>(() =>
+        var error = Assert.ThrowsAny<InvalidOperationException>(() =>
             Resolve(("Ev:Vehicles:0:Id", "id4"), ("Ev:Vehicles:0:Phases", "4")));
 
         Assert.Contains("must be 1, 2 or 3", error.Message);
@@ -158,7 +158,7 @@ public class EvResolverTests
     [Fact]
     public void RefusesACarWhoseOwnFloorIsAboveItsOwnCeiling()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Ev:Vehicles:0:Id", "id4"),
             ("Ev:Vehicles:0:MinChargingCurrentAmps", "16"),
             ("Ev:Vehicles:0:MaxChargingCurrentAmps", "10")));
@@ -171,7 +171,7 @@ public class EvResolverTests
     {
         // Its floor is above the installation's ceiling. Every symptom of that is silence, which is
         // why it is caught at startup naming both keys.
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Ev:Vehicles:0:Id", "id4"),
             ("Ev:Vehicles:0:MinChargingCurrentAmps", "20")));
 
@@ -183,7 +183,7 @@ public class EvResolverTests
     public void CollectsEveryProblemRatherThanStoppingAtTheFirst()
     {
         // Fixing configuration one restart per mistake is a miserable way to spend an evening.
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Ev:Vehicles:0:Id", "Not A Slug"),
             ("Ev:Vehicles:0:Phases", "7"),
             ("Ev:Vehicles:0:ChargeEfficiency", "3")));

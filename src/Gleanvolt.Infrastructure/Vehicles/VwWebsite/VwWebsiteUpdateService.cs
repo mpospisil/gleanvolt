@@ -82,29 +82,34 @@ public sealed class VwWebsiteUpdateService(
 
             if (state is null)
             {
-                return Stop(client.AwaitingCode
-                    ? "volkswagen.de wants a one-time code."
-                    : "volkswagen.de did not answer with a reading.");
+                return client.AwaitingCode
+                    ? Stop("volkswagen.de wants a one-time code.", Phrase.Of("Feed.VwStoppedForCode"))
+                    : Stop("volkswagen.de did not answer with a reading.", Phrase.Of("Feed.VwStoppedNoReading"));
             }
 
             _blocked = null;
-            _health = VehicleSourceHealth.Ok($"Answering; last reading captured {state.CapturedAt:u}.");
+            _health = VehicleSourceHealth.Ok(
+                $"Answering; last reading captured {state.CapturedAt:u}.",
+                Phrase.Of("Feed.Answering", new PhraseArg.Date(state.CapturedAt), new PhraseArg.Clock(state.CapturedAt)));
             return state;
         }
         catch (Exception ex) when (ex is HttpRequestException
                                    || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
             _logger.LogWarning(ex, "Asking volkswagen.de for the car failed.");
-            return Stop($"volkswagen.de was unreachable ({ex.Message}).");
+            return Stop(
+                $"volkswagen.de was unreachable ({ex.Message}).",
+                Phrase.Of("Feed.VwStoppedUnreachable", new PhraseArg.Text(ex.Message)));
         }
     }
 
-    private VehicleState? Stop(string what)
+    private VehicleState? Stop(string what, Phrase phrase)
     {
         Volatile.Write(ref _blockedAtSignIns, client.SignIns);
         _blocked = VehicleSourceHealth.NeedsOwner(
             $"{what} Sign in again on the Car page; the feed resumes once you have. The charge is "
-            + "unaffected.");
+            + "unaffected.",
+            phrase);
 
         return null;
     }

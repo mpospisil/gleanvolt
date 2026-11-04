@@ -61,15 +61,26 @@ public static partial class Localized
     /// </summary>
     public static string Say(Phrase? phrase, string english) => Say(phrase, english, TimeZoneInfo.Utc);
 
+    /// <summary>
+    /// A list of what a service said, each in the viewer's language where its phrase is known: the
+    /// English and the phrases side by side, as a save result carries them.
+    /// </summary>
+    public static IReadOnlyList<string> Say(IReadOnlyList<string> english, IReadOnlyList<Phrase?>? phrases) =>
+        [.. english.Select((sentence, index) => Say(phrases is not null && index < phrases.Count ? phrases[index] : null, sentence))];
+
     private static string Argument(PhraseArg arg, TimeZoneInfo zone) => arg switch
     {
         PhraseArg.Energy energy => Units.Energy(energy.WattHours),
         PhraseArg.Power power => Units.Power(power.Watts),
         PhraseArg.Percent percent => Units.Percent(percent.Value),
         PhraseArg.Clock clock => TimeZoneInfo.ConvertTime(clock.At, zone).ToString("HH:mm", CultureInfo.CurrentCulture),
+        PhraseArg.Date date => TimeZoneInfo.ConvertTime(date.At, zone).ToString(SharedText.DatePattern, CultureInfo.CurrentCulture),
         PhraseArg.Duration duration => Units.Duration(duration.Span),
         PhraseArg.Number number => number.Value.ToString(CultureInfo.CurrentCulture),
         PhraseArg.Text text => text.Value,
+        PhraseArg.Mode mode => ChargeModeTabs.Label(mode.Value),
+        PhraseArg.Said said => Say(said.Phrase, said.English, zone),
+        PhraseArg.List list => string.Join(SharedText.ListSeparator, list.Items.Select(item => Argument(item, zone))),
         _ => arg.ToString(),
     };
 

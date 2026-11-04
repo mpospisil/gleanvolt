@@ -415,13 +415,13 @@ else
     @if (_feed is { IsBlocked: true } blocked)
     {
         <p class="error" id="vehicle-feed-blocked">
-            <strong>Sign-in required</strong> — @(_service?.OwnerAction is { } action ? Localized.Say(_service.OwnerActionPhrase, action) : blocked.Message)
-            <a href="/car">Sign in on the car page</a>
+            <strong>@SharedText.SignInRequired</strong> — @(_service?.OwnerAction is { } action ? Localized.Say(_service.OwnerActionPhrase, action) : Localized.Say(blocked.Phrase, blocked.Message, Time.LocalTimeZone))
+            <a href="/car">@SharedText.SignInOnCarPage</a>
         </p>
     }
     else if (_vehicle is null && _feed is not null)
     {
-        <p class="muted">@Localized.Format(DashboardText.NoReadingYet, FeedName, _feed.Message)</p>
+        <p class="muted">@Localized.Format(DashboardText.NoReadingYet, FeedName, Localized.Say(_feed.Phrase, _feed.Message, Time.LocalTimeZone))</p>
     }
     else if (_vehicle is null && Car.IsConfigured)
     {
@@ -876,7 +876,7 @@ else
             }
             else
             {
-                _askError = result.Message;
+                _askError = result.Message is { } message ? Localized.Say(result.MessagePhrase, message, Time.LocalTimeZone) : null;
                 _asked ??= result.State;
             }
         }

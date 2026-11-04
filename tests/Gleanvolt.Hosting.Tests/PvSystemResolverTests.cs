@@ -122,7 +122,7 @@ public class PvSystemResolverTests
     [Fact]
     public void HalfAPairOfCoordinatesDescribesNowhereAndStopsTheHost()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(WithDevices(("Pv:Latitude", "50.0755"))));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(WithDevices(("Pv:Latitude", "50.0755"))));
 
         Assert.Contains("Pv:Latitude", error.Message);
         Assert.Contains("Pv:Longitude", error.Message);
@@ -131,7 +131,7 @@ public class PvSystemResolverTests
     [Fact]
     public void NoInverterIsAStartupFailureRatherThanAConnectionErrorLater()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(("Pv:Chargers:0:Host", "192.168.2.6")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Pv:Chargers:0:Host", "192.168.2.6")));
 
         Assert.Contains("Pv:Inverter:Host", error.Message);
     }
@@ -139,7 +139,7 @@ public class PvSystemResolverTests
     [Fact]
     public void NoChargerIsAStartupFailureToo()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(("Pv:Inverter:Host", "192.168.2.10")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Pv:Inverter:Host", "192.168.2.10")));
 
         Assert.Contains("Pv:Chargers:0:Host", error.Message);
     }
@@ -150,7 +150,7 @@ public class PvSystemResolverTests
         // Configuration can express two so that it need not change shape when the control logic can
         // drive two. Accepting the first and dropping the second would mean a car that never charges
         // and nothing anywhere saying why.
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Pv:Inverter:Host", "192.168.2.10"),
             ("Pv:Chargers:0:Host", "192.168.2.6"),
             ("Pv:Chargers:1:Host", "192.168.2.7")));
@@ -162,7 +162,7 @@ public class PvSystemResolverTests
     public void EveryProblemIsReportedAtOnce()
     {
         // One restart per mistake is a miserable way to configure anything.
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Pv:Id", "Home Roof"),
             ("Pv:TiltDegrees", "120"),
             ("Pv:LossFactor", "9"),
@@ -181,7 +181,7 @@ public class PvSystemResolverTests
     [InlineData("-roof")]       // nor a leading separator
     public void AnIdThatCannotBeATopicSegmentIsRefused(string id)
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(WithDevices(("Pv:Id", id))));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(WithDevices(("Pv:Id", id))));
 
         Assert.Contains("Pv:Id", error.Message);
     }
@@ -199,7 +199,7 @@ public class PvSystemResolverTests
     [Fact]
     public void TwoChargersCannotShareAnId()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Resolve(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
             ("Pv:Inverter:Host", "192.168.2.10"),
             ("Pv:Chargers:0:Id", "wallbox"),
             ("Pv:Chargers:0:Host", "192.168.2.6"),

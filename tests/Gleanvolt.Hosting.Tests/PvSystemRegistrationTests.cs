@@ -57,7 +57,7 @@ public class PvSystemRegistrationTests
     {
         // What keeps the alias above an alias rather than a service that resolves itself: charger ids
         // are slugs, and the fixed key is not one, so the two keyspaces cannot meet.
-        var error = Assert.Throws<InvalidOperationException>(
+        var error = Assert.ThrowsAny<InvalidOperationException>(
             () => Build(("Pv:Inverter:Host", "127.0.0.1"), ("Pv:Chargers:0:Id", ModbusClientKeys.EvCharger), ("Pv:Chargers:0:Host", "127.0.0.2")));
 
         Assert.Contains("must be a slug", error.Message);
@@ -68,7 +68,7 @@ public class PvSystemRegistrationTests
     {
         // The id fills a topic segment from here on, so an anonymous system is one that would collide
         // with every other anonymous system on the same broker.
-        var error = Assert.Throws<InvalidOperationException>(() => BuildWithPvDevices(("HomeAssistant:Enabled", "true")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => BuildWithPvDevices(("HomeAssistant:Enabled", "true")));
 
         Assert.Contains("Pv:Id is required", error.Message);
     }
@@ -88,7 +88,7 @@ public class PvSystemRegistrationTests
     {
         // The check runs first in AddGleanvolt, ahead of the section it replaces, so an operator who
         // upgraded without editing .env is told what to change rather than being pointed at a default.
-        var error = Assert.Throws<InvalidOperationException>(() => Build(
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Build(
             ("Pv:Inverter:Host", "127.0.0.1"),
             ("Pv:Chargers:0:Host", "127.0.0.2"),
             ("Solax:Inverter:Host", "127.0.0.9")));
@@ -102,7 +102,7 @@ public class PvSystemRegistrationTests
     {
         // Registration time, not first-poll time: an address nobody set is a fact about the
         // configuration, and a configuration error should be visible before anything else is.
-        var error = Assert.Throws<InvalidOperationException>(() => Build(("Pv:Name", "Nowhere")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Build(("Pv:Name", "Nowhere")));
 
         Assert.Contains("Pv:Inverter:Host", error.Message);
     }

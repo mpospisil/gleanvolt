@@ -456,4 +456,8 @@
   <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
     <value>The charger was switched out of Fast</value>
   </data>
+  <data name="DatePattern" xml:space="preserve">
+    <value>yyyy-MM-dd</value>
+    <comment>A date on its own.</comment>
+  </data>
 </root>

@@ -663,7 +663,7 @@ public class CarPageTests : PageTest
 
         page.Find("#car-ask").Click();
 
-        Assert.Contains("OwnerActionRequired", page.Markup);
+        Assert.Contains("Needs you", page.Markup);
         Assert.Contains("will not help", page.Markup);
         Assert.DoesNotContain("Worth pressing again", page.Markup);
     }
@@ -677,7 +677,7 @@ public class CarPageTests : PageTest
 
         page.Find("#car-ask").Click();
 
-        Assert.Contains("SessionExpired", page.Markup);
+        Assert.Contains("Session expired", page.Markup);
         Assert.Contains("Worth pressing again", page.Markup);
         Assert.DoesNotContain("will not help", page.Markup);
     }
@@ -715,7 +715,7 @@ public class CarPageTests : PageTest
 
         page.Find("#car-ask").Click();
 
-        Assert.Contains("UnusableData", page.Markup);
+        Assert.Contains("Unreadable data", page.Markup);
         Assert.Contains("odometer_km_v2", page.Markup);
         Assert.Contains("battery.soc_pct", page.Markup);
         Assert.Contains("VwGroupFieldNames", page.Markup);
@@ -1045,7 +1045,7 @@ public class CarPageTests : PageTest
             ? DataActPage()
             : Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, feed));
 
-        // The account and portal null objects describe themselves: service text, a later step of #290.
+        // Only names: the car's, the feeds', the brands' and the JSON fields a publisher writes.
         PseudoLocale.AssertTranslated(
             page.Markup,
             "The ID.4", "Volkswagen ID.4 Pro", "id4", "gleanvolt vehicle state", "volkswagen.de", "MyŠkoda", "Škoda",

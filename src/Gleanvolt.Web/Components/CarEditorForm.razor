@@ -322,7 +322,7 @@
 
             if (!result.Saved)
             {
-                _problems = result.Problems;
+                _problems = Localized.Say(result.Problems, result.ProblemPhrases);
                 return;
             }
 
@@ -344,7 +344,7 @@
 
         if (!result.Saved)
         {
-            _problems = result.Problems;
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
             return;
         }
 
@@ -360,7 +360,7 @@
 
         if (!result.Saved)
         {
-            _problems = result.Problems;
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
             return;
         }
 
@@ -438,7 +438,7 @@
             taken from the store itself so this cannot drift into claiming more than is true.
         *@
         <span class="hint">
-            @Localized.Format(CarText.KeptInSecretStore, _settings.SecretProtection)
+            @Localized.Format(CarText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
         </span>
     </div>;
 

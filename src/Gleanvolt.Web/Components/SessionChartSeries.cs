@@ -201,7 +201,7 @@ internal sealed record SessionChartSeries(
         }
 
         var (holdStarts, holdEnds) = HoldBands(samples);
-        var (markTimes, markLabels) = Marks(document.Events);
+        var (markTimes, markLabels) = Marks(document.Events, zone);
 
         // While the session is still open the window runs to now, so a live chart grows rather than
         // redrawing its axis around each new sample. A finished one stops where it stopped -- and
@@ -321,7 +321,7 @@ internal sealed record SessionChartSeries(
     /// The events that get a rule, with the words that go beside the chart. Kept in one place so the
     /// list under the picture and the marks on it can never disagree about what is marked.
     /// </summary>
-    private static (long[] Times, string[] Labels) Marks(IReadOnlyList<ChargingSessionEvent> events)
+    private static (long[] Times, string[] Labels) Marks(IReadOnlyList<ChargingSessionEvent> events, TimeZoneInfo zone)
     {
         var marked = events
             .Where(e => MarkedKinds.Contains(e.Kind))
@@ -330,7 +330,7 @@ internal sealed record SessionChartSeries(
 
         return (
             [.. marked.Select(e => e.Timestamp.ToUnixTimeSeconds())],
-            [.. marked.Select(e => string.IsNullOrWhiteSpace(e.Detail) ? Describe(e.Kind) : e.Detail)]);
+            [.. marked.Select(e => string.IsNullOrWhiteSpace(e.Detail) ? Describe(e.Kind) : Localized.Say(e.DetailPhrase, e.Detail, zone))]);
     }
 
     /// <summary>The kind in words, for the events whose detail line is empty.</summary>

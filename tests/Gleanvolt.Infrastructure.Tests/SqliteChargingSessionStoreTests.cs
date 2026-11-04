@@ -260,6 +260,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
             ALTER TABLE sessions DROP COLUMN weather_end_condition_desc;
             ALTER TABLE sessions DROP COLUMN sunrise;
             ALTER TABLE sessions DROP COLUMN sunset;
+            ALTER TABLE session_events DROP COLUMN detail_phrase_json;
             PRAGMA user_version = 1;
             """;
         await command.ExecuteNonQueryAsync(Ct);
@@ -686,6 +687,85 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         PlanRemainingPvWh: null,
         PlanFeasibleEvEnergyWh: null,
         PlanRequiredSocFloorPercent: null);
+
+    [Fact]
+    public async Task AnEventKeepsItsPhrase()
+    {
+        // What a mark on the session's chart says in the viewer's language (#292); the English beside
+        // it is what the log and the API keep.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+
+        var phrase = Phrase.Of("Event.ModeChanged", new PhraseArg.Mode(ChargeControlMode.Solar), new PhraseArg.Mode(ChargeControlMode.Forecasted));
+        await store.AppendAsync(
+            [],
+            [
+                new ChargingSessionEvent(session.Id, Noon, ChargingSessionEventKind.ModeChanged, "Solar → Forecasted.", phrase),
+                new ChargingSessionEvent(session.Id, Noon.AddMinutes(1), ChargingSessionEventKind.ChargingPaused, "Charging paused."),
+            ],
+            Ct);
+
+        var events = (await store.ExportAsync(session.Id, Ct))!.Events;
+
+        Assert.Equal(phrase, events[0].DetailPhrase);
+        Assert.Null(events[1].DetailPhrase);
+    }
+
+    [Fact]
+    public async Task AnOpeningPlanThatCarriesAPhraseStillReadsBack()
+    {
+        // Since #290 a plan carries its reason as a Phrase too, with arguments of an abstract type. A
+        // stored plan that could not be read back would take every page that lists sessions with it.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+
+        var plan = Plan() with
+        {
+            ReasonPhrase = Phrase.Of(
+                "DayPlan.Window",
+                new PhraseArg.Energy(12_000),
+                new PhraseArg.Clock(Noon),
+                new PhraseArg.Clock(Noon.AddHours(4)),
+                new PhraseArg.Percent(55)),
+        };
+        var session = OpenSession() with { StartPlan = plan };
+        await store.StartSessionAsync(session, Ct);
+
+        var stored = (await store.ExportAsync(session.Id, Ct))!.Session;
+
+        Assert.Equal(plan.Reason, stored.StartPlan!.Reason);
+    }
+
+    [Fact]
+    public async Task APlanStoredWithAnUntaggedPhraseStillReadsBack()
+    {
+        // What a build between #290 and #292 wrote: the phrase's arguments untagged, as {}.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+        var session = OpenSession() with { StartPlan = Plan() };
+        await store.StartSessionAsync(session, Ct);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(Plan(), ChargingSessionJson.Options)
+            .Replace("\"reasonPhrase\":null", "\"reasonPhrase\":{\"key\":\"DayPlan.Window\",\"args\":[{},{}]}", StringComparison.Ordinal);
+        Assert.Contains("\"args\":[{},{}]", json);
+
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={store.DatabasePath};Pooling=False"))
+        {
+            await connection.OpenAsync(Ct);
+            await using var update = connection.CreateCommand();
+            update.CommandText = "UPDATE sessions SET start_plan_json = $json WHERE id = $id;";
+            update.Parameters.AddWithValue("$json", json);
+            update.Parameters.AddWithValue("$id", session.Id.ToString());
+            Assert.Equal(1, await update.ExecuteNonQueryAsync(Ct));
+        }
+
+        var stored = (await store.ExportAsync(session.Id, Ct))!.Session;
+
+        Assert.Equal("Plenty of sun left today.", stored.StartPlan!.Reason);
+        Assert.Null(stored.StartPlan.ReasonPhrase);
+    }
 
     private static SolarDayPlan Plan() => new(
         RemainingPvWh: 18_000,

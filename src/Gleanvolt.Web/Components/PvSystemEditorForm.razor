@@ -275,7 +275,7 @@
 
             if (!result.Saved)
             {
-                _problems = result.Problems;
+                _problems = Localized.Say(result.Problems, result.ProblemPhrases);
                 return;
             }
 
@@ -298,7 +298,7 @@
 
         if (!result.Saved)
         {
-            _problems = result.Problems;
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
             return;
         }
 

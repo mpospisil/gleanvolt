@@ -598,4 +598,32 @@
   <data name="NoAccountExplanation" xml:space="preserve">
     <value>No manufacturer account is wired up, so there is nothing to sign in to. A feed that needs one brings its own sign-in as soon as every field it requires is filled in and the controller has restarted into them.</value>
   </data>
+  <!-- The portal's failure kinds, as the Ask the car result names them -->
+  <data name="PortalFailure_NotConfigured" xml:space="preserve">
+    <value>Not configured</value>
+  </data>
+  <data name="PortalFailure_SessionExpired" xml:space="preserve">
+    <value>Session expired</value>
+  </data>
+  <data name="PortalFailure_SignInRejected" xml:space="preserve">
+    <value>Sign-in rejected</value>
+  </data>
+  <data name="PortalFailure_OwnerActionRequired" xml:space="preserve">
+    <value>Needs you</value>
+  </data>
+  <data name="PortalFailure_VehicleNotFound" xml:space="preserve">
+    <value>Car not found</value>
+  </data>
+  <data name="PortalFailure_NoDataAvailable" xml:space="preserve">
+    <value>No data yet</value>
+  </data>
+  <data name="PortalFailure_NoDataRequest" xml:space="preserve">
+    <value>No data request</value>
+  </data>
+  <data name="PortalFailure_UnusableData" xml:space="preserve">
+    <value>Unreadable data</value>
+  </data>
+  <data name="PortalFailure_Transient" xml:space="preserve">
+    <value>Temporary failure</value>
+  </data>
 </root>

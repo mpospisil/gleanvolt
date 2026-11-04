@@ -5,8 +5,14 @@ namespace Gleanvolt.Core.Models;
 /// </summary>
 /// <param name="Status">What the flow needs next.</param>
 /// <param name="Message">A sentence for the page. Never carries a credential or a cookie.</param>
-public sealed record VehicleSignInState(VehicleSignInStatus Status, string Message)
+public sealed record VehicleSignInState(VehicleSignInStatus Status, string Message, Phrase? Phrase = null)
 {
+    // The phrase restates the message for the web UI (#292), so it does not make two states differ.
+    public bool Equals(VehicleSignInState? other) =>
+        other is not null && Status == other.Status && Message == other.Message;
+
+    public override int GetHashCode() => HashCode.Combine(Status, Message);
+
     public bool IsSignedIn => Status == VehicleSignInStatus.SignedIn;
 
     /// <summary>Whether a code box should be on screen.</summary>
@@ -17,20 +23,21 @@ public sealed record VehicleSignInState(VehicleSignInStatus Status, string Messa
 
     public static VehicleSignInState NotConfigured { get; } = new(
         VehicleSignInStatus.NotConfigured,
-        "No manufacturer account is configured, so there is nothing to sign in to.");
+        "No manufacturer account is configured, so there is nothing to sign in to.",
+        Phrase.Of("SignIn.NotConfigured"));
 
     public static VehicleSignInState Unknown { get; } = new(
-        VehicleSignInStatus.Unknown, "Not tried yet.");
+        VehicleSignInStatus.Unknown, "Not tried yet.", Phrase.Of("SignIn.NotTried"));
 
-    public static VehicleSignInState SignedIn(string message) => new(VehicleSignInStatus.SignedIn, message);
+    public static VehicleSignInState SignedIn(string message, Phrase? phrase = null) => new(VehicleSignInStatus.SignedIn, message, phrase);
 
-    public static VehicleSignInState CodeRequired(string message) =>
-        new(VehicleSignInStatus.CodeRequired, message);
+    public static VehicleSignInState CodeRequired(string message, Phrase? phrase = null) =>
+        new(VehicleSignInStatus.CodeRequired, message, phrase);
 
-    public static VehicleSignInState KeyRequired(string message) =>
-        new(VehicleSignInStatus.KeyRequired, message);
+    public static VehicleSignInState KeyRequired(string message, Phrase? phrase = null) =>
+        new(VehicleSignInStatus.KeyRequired, message, phrase);
 
-    public static VehicleSignInState Failed(string message) => new(VehicleSignInStatus.Failed, message);
+    public static VehicleSignInState Failed(string message, Phrase? phrase = null) => new(VehicleSignInStatus.Failed, message, phrase);
 }
 
 /// <summary>The states a sign-in can be in. The kinds are the point: each needs a different thing.</summary>
