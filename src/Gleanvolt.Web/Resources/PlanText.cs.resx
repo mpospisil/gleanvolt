@@ -310,7 +310,7 @@
     <value>Okno nabíjení</value>
   </data>
   <data name="ChargeWindowHint" xml:space="preserve">
-    <value>Nejbližší úsek dneška, ve kterém má podle předpovědi výroba překračovat minimální výkon nabíječky dost dlouho, aby se vyplatilo začít. „žádné“, když dnes takové okno není.</value>
+    <value>Nejbližší úsek dneška, ve kterém má solární energie dle předpovědi překračovat minimální výkon nabíječky dost dlouho, aby se vyplatilo začít. „žádné“, když dnes takové okno není.</value>
   </data>
   <data name="EvBudget" xml:space="preserve">
     <value>Energie pro auto</value>
@@ -346,7 +346,7 @@
     <value>Zbývající předpověď na dnes</value>
   </data>
   <data name="ForecastRemainingHint" xml:space="preserve">
-    <value>Předpovězená výroba FVE, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
+    <value>Solární energie dle předpovědi, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
   </data>
   <data name="TomorrowForecast" xml:space="preserve">
     <value>Předpověď na zítra</value>
