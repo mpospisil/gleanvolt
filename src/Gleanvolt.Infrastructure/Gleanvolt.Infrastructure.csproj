@@ -30,4 +30,9 @@
     <Description>Modbus TCP client, SolaX Gen4 and EV charger register maps, the SQLite charging-session store and the Solcast forecast client for the Gleanvolt.</Description>
   </PropertyGroup>
 
+  <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
 </Project>

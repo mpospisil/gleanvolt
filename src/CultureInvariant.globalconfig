@@ -1,0 +1,8 @@
+is_global = true
+
+# The services are culture-invariant (#290). The process pins invariant in Gleanvolt.Worker, but a
+# service method called from a web UI page runs on that page's circuit, in the viewer's culture --
+# so formatting and parsing below the UI must name its culture rather than inherit one. Included by
+# Gleanvolt.Core, .Infrastructure, .Api and .Hosting; never by Gleanvolt.Web, which formats in the
+# current culture on purpose.
+dotnet_diagnostic.CA1305.severity = error

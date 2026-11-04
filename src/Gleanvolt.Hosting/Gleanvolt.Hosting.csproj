@@ -55,4 +55,9 @@
     <ProjectReference Include="..\Gleanvolt.Web\Gleanvolt.Web.csproj" />
   </ItemGroup>
 
+  <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
 </Project>

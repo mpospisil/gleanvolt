@@ -20,7 +20,7 @@
         </Found>
         <NotFound>
             <LayoutView Layout="typeof(MainLayout)">
-                <p>No such page. This build serves <a href="/">/</a> and <a href="health">/health</a>.</p>
+                <p>@Localized.Rich(SharedText.NotFound, @<a href="/">@SharedText.NavOverview</a>)</p>
             </LayoutView>
         </NotFound>
     </Router>

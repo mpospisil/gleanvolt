@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Layout -->
+  <data name="Menu" xml:space="preserve">
+    <value>Menu</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="NavChargingPlan" xml:space="preserve">
+    <value>Charging plan</value>
+  </data>
+  <data name="NavSessions" xml:space="preserve">
+    <value>Sessions</value>
+  </data>
+  <data name="NavEnergy" xml:space="preserve">
+    <value>Energy</value>
+  </data>
+  <data name="NavForecast" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="NavCar" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SignOut" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+    <comment>The label of the language picker, read by screen readers.</comment>
+  </data>
+  <data name="NotFound" xml:space="preserve">
+    <value>No such page. Go back to the {0}.</value>
+    <comment>{0} is a link to the overview page, with NavOverview as its text.</comment>
+  </data>
+</root>

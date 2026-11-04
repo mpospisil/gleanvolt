@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
@@ -191,9 +192,9 @@ public sealed class FastChargeProvider
         _logger.LogInformation(
             "Fast charge plan: start by {StartAt}, ready by {ReadyBy}, leaving {DepartBy}. "
             + "{RemainingKWh:F1}kWh at {PowerKW:F1}kW ({PowerSource}) takes {Hours:F1}h.{Shortfall}",
-            plan.StartNoLaterThan.LocalDateTime.ToString("HH:mm"),
-            plan.ReadyBy.LocalDateTime.ToString("HH:mm"),
-            plan.DepartBy.LocalDateTime.ToString("HH:mm"),
+            plan.StartNoLaterThan.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+            plan.ReadyBy.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+            plan.DepartBy.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
             plan.RemainingEnergyWh / 1000,
             plan.ChargePowerWatts / 1000,
             plan.PowerObserved ? "measured at the car" : "the installation's maximum, not yet measured",

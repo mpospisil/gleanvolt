@@ -411,6 +411,27 @@ textarea {
     border-color: var(--accent);
 }
 
+/* The language picker (#290): the last thing in the bar, beside Sign out or the Menu button, and on
+   the sign-in page pushed to the right edge on its own. Styled like Sign out, a quiet control. */
+.language {
+    margin: 0 0 0 auto;
+}
+
+.language select {
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: var(--space-1) var(--space-2);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.language select:hover {
+    border-color: var(--accent);
+}
+
 /* The Menu button and the checkbox behind it (MainLayout.razor). Out of sight on a screen wide
    enough for the links; the box stays in the accessibility tree and focusable, so a keyboard opens
    the menu with Space even though the visible thing is the label. */
