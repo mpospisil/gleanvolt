@@ -352,7 +352,7 @@
     <value>Předpověď na zítra</value>
   </data>
   <data name="TomorrowForecastHint" xml:space="preserve">
-    <value>Předpověď výroby na zítřek. Jen pro informaci: pomůže posoudit, zda se vyplatí dnešní deficit přečkat.</value>
+    <value>Předpověď solární energie na zítřek. Jen pro informaci: pomůže posoudit, zda se vyplatí dnešní deficit přečkat.</value>
   </data>
   <data name="ForecastAccuracy" xml:space="preserve">
     <value>Přesnost předpovědi</value>

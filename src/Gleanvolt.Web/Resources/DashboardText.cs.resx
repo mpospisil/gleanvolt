@@ -355,10 +355,10 @@
     <value>jak hlásí auto</value>
   </data>
   <data name="SolarForecast" xml:space="preserve">
-    <value>Předpověď výroby</value>
+    <value>Předpověď solární energie</value>
   </data>
   <data name="SolarForecastTopic" xml:space="preserve">
-    <value>předpověď výroby</value>
+    <value>předpověď solární energie</value>
   </data>
   <data name="ForecastTip1" xml:space="preserve">
     <value>Energie v kWh, špičkový výkon v kW. Každý řádek je celý den od půlnoci do půlnoci (časové pásmo {0}). Dnešní řádek zahrnuje i uplynulé hodiny podle poslední předpovědi, která pro ně platila. Ukazuje tedy, co měl přinést celý den, ne kolik ještě zbývá.</value>

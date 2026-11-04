@@ -337,7 +337,7 @@
     <value>Naposledy staženo {1} v {0}.</value>
   </data>
   <data name="ForecastHorizonNote_0" xml:space="preserve">
-    <value>Předpověď výroby</value>
+    <value>Předpověď solární energie</value>
   </data>
   <data name="ForecastHorizonNote" xml:space="preserve">
     <value>Předpověď sahá zhruba 48 hodin dopředu, proto jsou tu dva dny, a ne týden. Tabulka {0} na přehledu ukazuje tytéž dva dny, každý čtyřmi čísly.</value>

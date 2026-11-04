@@ -538,7 +538,7 @@
     <value>Nikde nenastaveno; platí vestavěná výchozí hodnota.</value>
   </data>
   <data name="SolarForecast" xml:space="preserve">
-    <value>Předpověď výroby</value>
+    <value>Předpověď solární energie</value>
   </data>
   <data name="SolcastTopic" xml:space="preserve">
     <value>účet Solcast</value>
