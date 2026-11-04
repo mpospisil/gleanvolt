@@ -13,37 +13,37 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="DayPlan_NoWindow" xml:space="preserve">
-    <value>Dnes žádné okno pro nabíjení; přednost má baterie. Mez SOC {0}.</value>
+    <value>Dnes není okno pro nabíjení; přednost má baterie. Mez SOC {0}.</value>
   </data>
   <data name="DayPlan_Window" xml:space="preserve">
-    <value>Pro auto {0}, okno {1}–{2}, mez SOC {3}.</value>
+    <value>Pro auto je k dispozici {0}, okno {1}–{2}, mez SOC {3}.</value>
   </data>
   <data name="DayPlan_WindowShort" xml:space="preserve">
-    <value>Pro auto {0}, okno {1}–{2}, mez SOC {3}. Do termínu chybí {4} do plné baterie.</value>
+    <value>Pro auto je k dispozici {0}, okno {1}–{2}, mez SOC {3}. Do termínu chybí {4} k plnému nabití baterie.</value>
   </data>
   <data name="SolarGrid_NoForecast" xml:space="preserve">
-    <value>zatím nestažena žádná předpověď</value>
+    <value>zatím není stažena žádná předpověď</value>
   </data>
   <data name="SolarGrid_NoPvLeft" xml:space="preserve">
-    <value>v dnešní předpovědi už nezbývá žádná FV (stažena před {0})</value>
+    <value>dnešní předpověď už nepočítá s žádnou výrobou (stažena před {0})</value>
   </data>
   <data name="SolarGrid_Stale" xml:space="preserve">
     <value>předpověď je stará {0} (zastaralá po {1})</value>
   </data>
   <data name="SolarGrid_NoneClears" xml:space="preserve">
-    <value>dnes už žádné období předpovědi nepřekročí přebytek {0}</value>
+    <value>dnes už žádný úsek předpovědi nemá přebytek nad {0}</value>
   </data>
   <data name="SolarGrid_Clears" xml:space="preserve">
-    <value>předpovězený přebytek překročí {0} od {1} do {2}</value>
+    <value>předpovězený přebytek je nad {0} od {1} do {2}</value>
   </data>
   <data name="Tariff_NegativePrice" xml:space="preserve">
     <value>Cena nemůže být záporná.</value>
   </data>
   <data name="Tariff_LowAboveHigh" xml:space="preserve">
-    <value>Nízký tarif stojí víc než vysoký.</value>
+    <value>Nízký tarif je dražší než vysoký.</value>
   </data>
   <data name="Tariff_NoPeriods" xml:space="preserve">
-    <value>Žádná období nízkého tarifu: vše by bylo vysoký tarif.</value>
+    <value>Žádná období nízkého tarifu: vše by bylo ve vysokém tarifu.</value>
   </data>
   <data name="Tariff_NotATime" xml:space="preserve">
     <value>Není to čas.</value>
@@ -67,55 +67,55 @@
     <value>Čas odjezdu je v minulosti.</value>
   </data>
   <data name="Request_TooFarAhead" xml:space="preserve">
-    <value>Odjezd za víc než {0} je dál, než může poctivě slíbit nabíjení, které nepřežije restart.</value>
+    <value>Odjezd za víc než {0} je příliš daleko: nabíjení, které se při restartu nezachová, nemůže tak dlouhý termín spolehlivě slíbit.</value>
   </data>
   <data name="Request_TooFarAheadForecast" xml:space="preserve">
-    <value>Odjezd za víc než {0} je dál, než může poctivě slíbit předpověď — nebo požadavek, který nepřežije restart.</value>
+    <value>Odjezd za víc než {0} je příliš daleko: předpověď ani požadavek, který se při restartu nezachová, nemohou tak dlouhý termín spolehlivě slíbit.</value>
   </data>
   <data name="Request_DepartureNeedsAmount" xml:space="preserve">
-    <value>Odjezd potřebuje množství, od kterého se odpočítá — řekněte, kolik energie nebo jaký stav nabití auto potřebuje. Bez něj není co časovat.</value>
+    <value>Pro čas odjezdu je potřeba zadat množství — kolik energie nebo jaký stav nabití auto potřebuje. Bez toho není podle čeho časovat.</value>
   </data>
   <data name="Request_EnterEnergy" xml:space="preserve">
     <value>Zadejte, kolik energie auto potřebuje.</value>
   </data>
   <data name="Request_EnterSoc" xml:space="preserve">
-    <value>Zadejte stav nabití, na kterém skončit.</value>
+    <value>Zadejte cílový stav nabití.</value>
   </data>
   <data name="Request_NoCapacity" xml:space="preserve">
-    <value>Cílový stav nabití potřebuje využitelnou kapacitu auta, která není nastavena (Vehicle:BatteryCapacityKWh). Zadejte místo toho kilowatthodiny.</value>
+    <value>Cílový stav nabití vyžaduje využitelnou kapacitu baterie auta, která není nastavena (Vehicle:BatteryCapacityKWh). Zadejte místo toho kilowatthodiny.</value>
   </data>
   <data name="Request_NoSoc" xml:space="preserve">
-    <value>Auto nenahlásilo stav nabití, takže není od čeho rozdíl měřit. Zadejte místo toho kilowatthodiny.</value>
+    <value>Auto nenahlásilo stav nabití, takže nelze spočítat, kolik chybí. Zadejte místo toho kilowatthodiny.</value>
   </data>
   <data name="Request_AlreadyAt" xml:space="preserve">
     <value>Auto už je na {0}, tedy na požadovaných {1} nebo výš.</value>
   </data>
   <data name="Request_UnknownBasis" xml:space="preserve">
-    <value>Neznámý základ rychlého nabíjení '{0}'.</value>
+    <value>Neznámý způsob zadání rychlého nabíjení „{0}“.</value>
   </data>
   <data name="Request_EnergyOrSoc" xml:space="preserve">
     <value>Zadejte buď energii, nebo stav nabití, ne obojí.</value>
   </data>
   <data name="Request_Stale" xml:space="preserve">
-    <value>Auto naposledy hlásilo {0} před {1}, což je víc než {2}, které tato instalace považuje za aktuální (Vehicle:MaxAge), takže nelze poctivě říct, kolik kilowatthodin ten cíl je. Přečtěte auto znovu, nebo zadejte kilowatthodiny.</value>
+    <value>Auto naposledy hlásilo {0} před {1}, což je déle než {2}, které tato instalace považuje za aktuální (Vehicle:MaxAge). Nelze proto spolehlivě určit, kolik kilowatthodin cíl představuje. Načtěte údaje z auta znovu, nebo zadejte kilowatthodiny.</value>
   </data>
   <data name="Action_FastRefused" xml:space="preserve">
-    <value>Nabíječka nepřijala Fast, takže režim nebyl spuštěn — zůstává v předchozím režimu. {0}</value>
+    <value>Nabíječka nepřijala příkaz Fast, takže režim nebyl spuštěn a zůstává předchozí režim. {0}</value>
   </data>
   <data name="Action_StopRefused" xml:space="preserve">
-    <value>Řízení nabíjení bylo vypnuto, ale nabíječka nepřijala Stop. {0}</value>
+    <value>Řízení nabíjení bylo vypnuto, ale nabíječka nepřijala příkaz Stop. {0}</value>
   </data>
   <data name="Probe_InverterOk" xml:space="preserve">
-    <value>{0} odpověděl: baterie na {1} %.</value>
+    <value>{0} odpovídá: baterie na {1} %.</value>
   </data>
   <data name="Probe_InverterImplausible" xml:space="preserve">
-    <value>{0} odpověděl, ale jeho registr baterie ukazuje {1}, což není stav nabití. Není to adresa nabíječky?</value>
+    <value>{0} odpovídá, ale registr baterie ukazuje {1}, což není platný stav nabití. Není to adresa nabíječky?</value>
   </data>
   <data name="Probe_ChargerOk" xml:space="preserve">
-    <value>{0} odpověděla: provozní režim nabíječky {1}.</value>
+    <value>{0} odpovídá: provozní režim nabíječky {1}.</value>
   </data>
   <data name="Probe_ChargerImplausible" xml:space="preserve">
-    <value>{0} odpověděla, ale její registr provozního režimu ukazuje {1}, což žádná nabíječka nehlásí. Není to adresa střídače?</value>
+    <value>{0} odpovídá, ale registr provozního režimu ukazuje {1}, což žádná nabíječka nehlásí. Není to adresa střídače?</value>
   </data>
   <data name="Probe_NoAnswer" xml:space="preserve">
     <value>{0} neodpovídá ({1}).</value>
@@ -139,19 +139,19 @@
     <value>Zastavit řídicí jednotku</value>
   </data>
   <data name="Tariff_ProviderMissing" xml:space="preserve">
-    <value>Zvolený zdroj tarifu {0} v této verzi není, takže tarif nic neomezuje.</value>
+    <value>Zvolený zdroj tarifu {0} v této verzi není, takže se tarif nebere v úvahu.</value>
   </data>
   <data name="Tariff_ProviderFailed" xml:space="preserve">
-    <value>Zdroj tarifu {0} selhal ({1}), takže tarif nic neomezuje.</value>
+    <value>Zdroj tarifu {0} selhal ({1}), takže se tarif nebere v úvahu.</value>
   </data>
   <data name="Tariff_ProviderEmpty" xml:space="preserve">
-    <value>Zdroj tarifu {0} zatím nemá z čeho odpovídat, takže tarif nic neomezuje.</value>
+    <value>Zdroj tarifu {0} zatím nemá data, takže se tarif nebere v úvahu.</value>
   </data>
   <data name="Feed_VolkswagenWantsCode" xml:space="preserve">
-    <value>volkswagen.de chce jednorázový kód — přihlaste se znovu na stránce Auto.</value>
+    <value>volkswagen.de vyžaduje jednorázový kód — přihlaste se znovu na stránce Auto.</value>
   </data>
   <data name="Feed_SkodaNeedsKey" xml:space="preserve">
-    <value>Zatím není klíč API MyŠkoda, nebo vypršel — vložte ho na stránce Auto.</value>
+    <value>Chybí klíč API MyŠkoda, nebo vypršel — vložte nový na stránce Auto.</value>
   </data>
   <data name="Health_Starting" xml:space="preserve">
     <value>čeká na první údaj</value>
@@ -166,13 +166,13 @@
     <value>Zadejte kód z e-mailu.</value>
   </data>
   <data name="SignIn_VwSignedIn" xml:space="preserve">
-    <value>Přihlášeno. Tento prohlížeč si portál pamatuje, takže restart by neměl chtít další kód.</value>
+    <value>Přihlášeno. Tento prohlížeč si portál pamatuje, takže po restartu by neměl být potřeba další kód.</value>
   </data>
   <data name="SignIn_VwCodeSent" xml:space="preserve">
     <value>Volkswagen poslal e-mailem jednorázový kód. Zadejte ho níže.</value>
   </data>
   <data name="SignIn_VwCodeRejected" xml:space="preserve">
-    <value>Tento kód nebyl přijat. Zkontrolujte nejnovější e-mail — starší nebude fungovat — a zkuste to znovu. Výzva je pořád otevřená, takže není třeba začínat znovu.</value>
+    <value>Kód nebyl přijat. Zkontrolujte nejnovější e-mail — starší kód nebude fungovat — a zkuste to znovu. Výzva je stále otevřená, takže není třeba začínat znovu.</value>
   </data>
   <data name="SignIn_VwConsent" xml:space="preserve">
     <value>Volkswagen ukazuje obrazovku se souhlasem nebo podmínkami. Otevřete volkswagen.de v prohlížeči, potvrďte ji tam a pak se tady přihlaste znovu.</value>
@@ -181,10 +181,10 @@
     <value>Přihlašovací údaje nebyly přijaty. Zkontrolujte Vehicle:Website:Username a :Password.</value>
   </data>
   <data name="SignIn_VwNoChallenge" xml:space="preserve">
-    <value>Není otevřená žádná výzva ke kódu, takže kód nebyl nikam odeslán. Stiskněte Přihlásit a jednu zahajte. Pokud Volkswagen nepošle nový kód, stiskněte nejdřív Odhlásit a pak Přihlásit: tím se zahodí výzva, která zbyla z dřívějšího pokusu.</value>
+    <value>Není otevřená žádná výzva k zadání kódu, takže kód nebyl nikam odeslán. Stiskněte Přihlásit a začněte znovu. Pokud Volkswagen nepošle nový kód, stiskněte nejdřív Odhlásit a pak Přihlásit: tím se zahodí výzva, která zůstala z dřívějšího pokusu.</value>
   </data>
   <data name="SignIn_VwIncomplete" xml:space="preserve">
-    <value>Přihlášení se nedokončilo. Pokud se to opakuje, počkejte pár minut a nezkoušejte to hned znovu: opakované přihlašování u skutečného poskytovatele identity hrozí zablokováním účtu.</value>
+    <value>Přihlášení se nedokončilo. Pokud se to opakuje, počkejte několik minut a nezkoušejte to hned znovu: opakované přihlašování může vést k zablokování účtu.</value>
   </data>
   <data name="SignIn_SkodaAskForKey" xml:space="preserve">
     <value>Vytvořte pro toto auto klíč API v aplikaci MySkoda a vložte ho sem.</value>
@@ -193,19 +193,19 @@
     <value>Vložte klíč API z aplikace MySkoda.</value>
   </data>
   <data name="SignIn_SkodaSignedOut" xml:space="preserve">
-    <value>Odhlášeno: klíč je z této řídicí jednotky smazán, ale u Škody funguje dál, dokud ho nezrušíte v aplikaci MySkoda. Pro nové přihlášení sem vložte klíč.</value>
+    <value>Odhlášeno: klíč je z této řídicí jednotky smazán, ale u Škody platí, dokud ho nezrušíte v aplikaci MySkoda. Pro nové přihlášení sem vložte klíč.</value>
   </data>
   <data name="SignIn_SkodaValidUntil" xml:space="preserve">
     <value>Klíč platí do {0}{1}</value>
   </data>
   <data name="SignIn_SkodaValidUntilUnsaved" xml:space="preserve">
-    <value>Klíč platí do {0}{1}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu bude potřeba znovu.</value>
+    <value>Klíč platí do {0}{1}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu ho bude potřeba zadat znovu.</value>
   </data>
   <data name="SignIn_SkodaAccepted" xml:space="preserve">
     <value>Klíč přijat{0}</value>
   </data>
   <data name="SignIn_SkodaAcceptedUnsaved" xml:space="preserve">
-    <value>Klíč přijat{0}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu bude potřeba znovu.</value>
+    <value>Klíč přijat{0}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu ho bude potřeba zadat znovu.</value>
   </data>
   <data name="Skoda_KeyExpired" xml:space="preserve">
     <value>Tento klíč vypršel — vytvořte v aplikaci nový.</value>
@@ -214,13 +214,13 @@
     <value>Škoda tento klíč nerozpoznala.</value>
   </data>
   <data name="Skoda_KeyNotAuthorized" xml:space="preserve">
-    <value>Tento klíč není povolen pro VIN {0}; při vytváření zahrňte toto auto.</value>
+    <value>Tento klíč neplatí pro VIN {0}; při vytváření klíče vyberte i toto auto.</value>
   </data>
   <data name="Skoda_VehicleNotFound" xml:space="preserve">
     <value>Škoda nemá auto s VIN {0} — zkontrolujte Vehicle:Skoda:Vin.</value>
   </data>
   <data name="Skoda_NoAnswer" xml:space="preserve">
-    <value>Škoda neodpověděla; nic se neuložilo — zkuste to později.</value>
+    <value>Škoda neodpověděla; nic se neuložilo — zkuste to později znovu.</value>
   </data>
   <data name="Skoda_FeedKeyExpired" xml:space="preserve">
     <value>Klíč API Škody vypršel — vytvořte v aplikaci nový a vložte ho na stránce Auto.</value>
@@ -229,7 +229,7 @@
     <value>Škoda už uložený klíč API nerozpoznává — vložte nový na stránce Auto.</value>
   </data>
   <data name="Skoda_FeedKeyNotAuthorized" xml:space="preserve">
-    <value>Uložený klíč API Škody není povolen pro VIN {0} — vytvořte takový, který toto auto zahrnuje, a vložte ho na stránce Auto.</value>
+    <value>Uložený klíč API Škody neplatí pro VIN {0} — vytvořte klíč, který zahrnuje toto auto, a vložte ho na stránce Auto.</value>
   </data>
   <data name="Skoda_NoKey" xml:space="preserve">
     <value>Vložte klíč API na stránce Auto.</value>
@@ -238,34 +238,34 @@
     <value>Klíč API Škody vyprší {0} — vytvořte nový v aplikaci MySkoda a vložte ho na stránce Auto.</value>
   </data>
   <data name="Skoda_QuotaUsedUp" xml:space="preserve">
-    <value>Požadavky na Škodu pro tuto hodinu jsou vyčerpány; další bude k dispozici v {0}. Poslední údaj platí dál.</value>
+    <value>Limit požadavků na Škodu pro tuto hodinu je vyčerpán; další bude možný v {0}. Platí poslední údaj.</value>
   </data>
   <data name="Skoda_QuotaAskingAgain" xml:space="preserve">
-    <value>Hodinová kvóta požadavků Škody je vyčerpána; znovu se zeptáme v {0}. Poslední údaj platí dál.</value>
+    <value>Hodinový limit požadavků Škody je vyčerpán; další dotaz v {0}. Platí poslední údaj.</value>
   </data>
   <data name="Skoda_CarDeclining" xml:space="preserve">
-    <value>Požadavky odmítá samo auto — obvykle kvůli slabé 12V baterii nebo hlubokému spánku, ne kvůli Gleanvoltu nebo klíči; znovu se zeptáme v {0}. Poslední údaj platí dál.</value>
+    <value>Požadavky odmítá samo auto — obvykle kvůli slabé 12V baterii nebo hlubokému spánku, ne kvůli Gleanvoltu nebo klíči. Další dotaz v {0}. Platí poslední údaj.</value>
   </data>
   <data name="Skoda_FeedNoAnswer" xml:space="preserve">
-    <value>Škoda neodpověděla ({0}); poslední údaj platí dál.</value>
+    <value>Škoda neodpověděla ({0}); platí poslední údaj.</value>
   </data>
   <data name="Skoda_Unusable" xml:space="preserve">
-    <value>Škoda odpověděla, ale {0}. Poslední údaj platí dál.</value>
+    <value>Škoda odpověděla, ale {0}. Platí poslední údaj.</value>
   </data>
   <data name="Skoda_Answering" xml:space="preserve">
-    <value>Odpovídá; auto hlásilo v {0}.</value>
+    <value>Funguje; auto hlásilo v {0}.</value>
   </data>
   <data name="Feed_Answering" xml:space="preserve">
-    <value>Odpovídá; poslední údaj zachycen {0} {1}.</value>
+    <value>Funguje; poslední údaj pořízen {0} {1}.</value>
   </data>
   <data name="Feed_VwStoppedForCode" xml:space="preserve">
-    <value>volkswagen.de chce jednorázový kód. Přihlaste se znovu na stránce Auto; zdroj pak bude pokračovat. Nabíjení to neovlivní.</value>
+    <value>volkswagen.de vyžaduje jednorázový kód. Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
   </data>
   <data name="Feed_VwStoppedNoReading" xml:space="preserve">
-    <value>volkswagen.de neodpověděl údajem. Přihlaste se znovu na stránce Auto; zdroj pak bude pokračovat. Nabíjení to neovlivní.</value>
+    <value>volkswagen.de nevrátil žádný údaj. Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
   </data>
   <data name="Feed_VwStoppedUnreachable" xml:space="preserve">
-    <value>volkswagen.de byl nedostupný ({0}). Přihlaste se znovu na stránce Auto; zdroj pak bude pokračovat. Nabíjení to neovlivní.</value>
+    <value>volkswagen.de nebyl dostupný ({0}). Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
   </data>
   <data name="Feed_PortalNeeds" xml:space="preserve">
     <value>Zdroj z portálu VW je zapnutý, ale chybí {0}.</value>
@@ -274,10 +274,10 @@
     <value>Portál odpověděl; auto hlásilo v {0}.</value>
   </data>
   <data name="Portal_SignInRejected" xml:space="preserve">
-    <value>Portál odmítl přihlášení: {0}. Zkontrolujte heslo v .env — tohle se neopakuje, protože opakovaná selhání ohrožují účet.</value>
+    <value>Portál odmítl přihlášení: {0}. Zkontrolujte heslo v .env — přihlášení se automaticky neopakuje, protože opakovaná selhání ohrožují účet.</value>
   </data>
   <data name="Portal_OwnerAction" xml:space="preserve">
-    <value>Portál ukazuje něco, na co můžete odpovědět jen vy ({0}) — souhlas, podmínky, OTP nebo CAPTCHA. Otevřete ho v prohlížeči a vyřešte to.</value>
+    <value>Portál vyžaduje něco, co můžete vyřešit jen vy ({0}) — souhlas, podmínky, OTP nebo CAPTCHA. Otevřete ho v prohlížeči a vyřešte to.</value>
   </data>
   <data name="Portal_Detail" xml:space="preserve">
     <value>{0}</value>
@@ -286,25 +286,25 @@
     <value>Přihlášeno, ale {0}.</value>
   </data>
   <data name="Portal_Unusable" xml:space="preserve">
-    <value>Přišla dodávka, kterou nešlo přečíst: {0}. Poslední dobrý údaj platí dál a stárne.</value>
+    <value>Přišla dodávka dat, kterou nešlo přečíst: {0}. Platí poslední platný údaj, který postupně zastarává.</value>
   </data>
   <data name="Portal_NoReading" xml:space="preserve">
-    <value>Poslední čtení nepřineslo údaj: {0}.</value>
+    <value>Poslední čtení nevrátilo žádný údaj: {0}.</value>
   </data>
   <data name="Account_Volkswagen" xml:space="preserve">
-    <value>Živý zdroj auta. Přihlášením tady umožníte auto sledovat; pokud si Volkswagen znovu řekne o kód, zdroj se zastaví, dokud se tu znovu nepřihlásíte. Na kód, který Volkswagen posílá e-mailem, můžete odpovědět jen vy, a proto je to stránka, a ne úloha na pozadí.</value>
+    <value>Živý zdroj údajů o autu. Přihlášením tady umožníte auto sledovat; pokud Volkswagen znovu požádá o kód, zdroj se zastaví, dokud se tu znovu nepřihlásíte. Kód, který Volkswagen posílá e-mailem, můžete zadat jen vy, proto je to tato stránka, a ne úloha na pozadí.</value>
   </data>
   <data name="Account_Skoda" xml:space="preserve">
-    <value>Živý zdroj této Škody, čtený mezi nabíjeními i během nich. Škoda chce místo hesla klíč API: vytvoříte ho v aplikaci MySkoda, vázaný na toto auto, a jednou ho sem vložíte. Ověří se u Škody, uloží se jen v této řídicí jednotce a už se nikdy nezobrazí.</value>
+    <value>Živý zdroj údajů o této Škodě, čtený mezi nabíjeními i během nich. Škoda místo hesla používá klíč API: vytvoříte ho v aplikaci MySkoda pro toto auto a jednou ho sem vložíte. Klíč se ověří u Škody, uloží se jen v této řídicí jednotce a už se nikdy nezobrazí.</value>
   </data>
   <data name="Portal_Missing" xml:space="preserve">
     <value>{0}</value>
   </data>
   <data name="Portal_MissingBrand" xml:space="preserve">
-    <value>značka (jedna z {0}) nebo výslovné ID klienta</value>
+    <value>značka (jedna z {0}) nebo vlastní ID klienta</value>
   </data>
   <data name="Portal_UnknownBrand" xml:space="preserve">
-    <value>známá značka — '{0}' není jedna z {1}; pokud ta vaše chybí, nastavte výslovné ID klienta</value>
+    <value>známá značka — „{0}“ není jedna z {1}; pokud vaše chybí, nastavte vlastní ID klienta</value>
   </data>
   <data name="Portal_MissingVwId" xml:space="preserve">
     <value>VW ID</value>
@@ -316,10 +316,10 @@
     <value>Klientovi portálu chybí {0}.</value>
   </data>
   <data name="Refresh_NoFeed" xml:space="preserve">
-    <value>Není nastaven žádný zdroj dat vozidla, takže není koho se ptát.</value>
+    <value>Není nastaven žádný zdroj dat vozidla, takže není koho se zeptat.</value>
   </data>
   <data name="Refresh_NothingToGive" xml:space="preserve">
-    <value>{0} neměl co dát — {1}</value>
+    <value>{0}: žádný údaj — {1}</value>
   </data>
   <data name="Refresh_Failed" xml:space="preserve">
     <value>{0}: {1}</value>
@@ -334,19 +334,19 @@
     <value>Windows DPAPI, tento uživatel</value>
   </data>
   <data name="Config_EvOneVehicle" xml:space="preserve">
-    <value>Ev:Vehicles má {0} položek a podporována je právě {1}. Seznam je tvar pro budoucnost, zatím ne funkce.</value>
+    <value>Ev:Vehicles má {0} položek, ale podporována je právě {1}. Seznam je připraven do budoucna, zatím to není funkce.</value>
   </data>
   <data name="Config_EvIdSlug" xml:space="preserve">
-    <value>Ev:Vehicles:0:Id ('{0}') musí být slug: malá písmena, číslice, '-' a '_', začínající písmenem nebo číslicí, nejvýš 48 znaků.</value>
+    <value>Ev:Vehicles:0:Id ('{0}') musí být slug: jen malá písmena, číslice, '-' a '_', na začátku písmeno nebo číslice, nejvýš 48 znaků.</value>
   </data>
   <data name="Config_EvBandInverted" xml:space="preserve">
-    <value>Ev:Vehicles:0:MinChargingCurrentAmps ({0} A) je nad Ev:Vehicles:0:MaxChargingCurrentAmps ({1} A); oběma nevyhoví žádný proud.</value>
+    <value>Ev:Vehicles:0:MinChargingCurrentAmps ({0} A) je větší než Ev:Vehicles:0:MaxChargingCurrentAmps ({1} A); žádný proud nesplní obě podmínky.</value>
   </data>
   <data name="Config_EvNoCommonCurrent" xml:space="preserve">
     <value>Auto a nabíječka nemají společný proud: auto potřebuje aspoň {0} A (Ev:Vehicles:0:MinChargingCurrentAmps) a instalace dovoluje nejvýš {1} A (ChargeControl:MaxChargingCurrentAmps). Nikdy by se nenabilo.</value>
   </data>
   <data name="Config_Negative" xml:space="preserve">
-    <value>{0} ({1}) nemůže být záporné.</value>
+    <value>{0} ({1}) nesmí být záporné.</value>
   </data>
   <data name="Config_EvEfficiency" xml:space="preserve">
     <value>Ev:Vehicles:0:ChargeEfficiency ({0}) musí být větší než 0 a nejvýš 1 — je to podíl naměřené energie, který se dostane do článků.</value>
@@ -361,10 +361,10 @@
     <value>Pv:Inverter:UnmeteredGridPhase ('{0}') musí být L1, L2 nebo L3 (nebo R, S či T podle SolaXu), případně prázdné pro elektroměr, který měří všechny tři fáze.</value>
   </data>
   <data name="Config_PvIdSlug" xml:space="preserve">
-    <value>Pv:Id ('{0}') musí být slug: malá písmena, číslice, '-' a '_', začínající písmenem nebo číslicí, nejvýš 48 znaků. Stává se segmentem tématu MQTT a ID objektu v Home Assistant.</value>
+    <value>Pv:Id ('{0}') musí být slug: jen malá písmena, číslice, '-' a '_', na začátku písmeno nebo číslice, nejvýš 48 znaků. Používá se jako část tématu MQTT a ID objektu v Home Assistant.</value>
   </data>
   <data name="Config_PvLocation" xml:space="preserve">
-    <value>Zeměpisná šířka bez délky (nebo naopak) nepopisuje žádné místo. Nastavte obě Pv:Latitude i Pv:Longitude, nebo žádnou.</value>
+    <value>Zeměpisná šířka bez délky (nebo naopak) neurčuje žádné místo. Nastavte Pv:Latitude i Pv:Longitude, nebo ani jedno.</value>
   </data>
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>Není nastaven žádný střídač. Nastavte Pv:Inverter:Host.</value>
@@ -373,13 +373,13 @@
     <value>Není nastavena žádná nabíječka. Nastavte Pv:Chargers:0:Host.</value>
   </data>
   <data name="Config_PvOneCharger" xml:space="preserve">
-    <value>Podporována je jen {0} nabíječka; Pv:Chargers jich má {1}. Konfigurace umí vyjádřit víc, aby se nemusela měnit, až řízení zvládne víc, což zatím neumí.</value>
+    <value>Podporována je jen {0} nabíječka; Pv:Chargers jich obsahuje {1}. Konfigurace umožňuje zadat víc nabíječek, aby se nemusela měnit, až je řízení bude umět obsluhovat. Zatím to neumí.</value>
   </data>
   <data name="Config_PvChargerIdSlug" xml:space="preserve">
     <value>{0}:Id ('{1}') musí být slug: malá písmena, číslice, '-' a '_'.</value>
   </data>
   <data name="Config_PvChargerIdTwice" xml:space="preserve">
-    <value>{0}:Id ('{1}') používá víc než jedna nabíječka; každé ID musí být jedinečné.</value>
+    <value>{0}:Id ('{1}') používá víc nabíječek; každé ID musí být jedinečné.</value>
   </data>
   <data name="Config_PvHostRequired" xml:space="preserve">
     <value>{0}:Host je povinný.</value>
@@ -388,7 +388,7 @@
     <value>{0}:Port ({1}) není port TCP.</value>
   </data>
   <data name="Config_PvInterval" xml:space="preserve">
-    <value>{0}:MinRequestInterval ({1}) nemůže být záporný.</value>
+    <value>{0}:MinRequestInterval ({1}) nesmí být záporný.</value>
   </data>
   <data name="Config_PvInstallDate" xml:space="preserve">
     <value>Pv:InstallDate ('{0}') není datum. Zapište ho jako yyyy-MM-dd.</value>
@@ -397,13 +397,13 @@
     <value>{0} ({1}) je mimo rozsah {2}..{3}.</value>
   </data>
   <data name="Config_Fraction" xml:space="preserve">
-    <value>{0} ({1}) musí být podíl v (0, 1].</value>
+    <value>{0} ({1}) musí být číslo větší než 0 a nejvýš 1.</value>
   </data>
   <data name="Config_NotEditable" xml:space="preserve">
     <value>{0} nelze upravovat z webového rozhraní.</value>
   </data>
   <data name="Config_NoOverridesFile" xml:space="preserve">
-    <value>Tento hostitel nečte soubor přepsání z webového rozhraní, takže úprava tady by se nikdy neuplatnila.</value>
+    <value>Tento hostitel nečte soubor s nastavením z webového rozhraní, takže úprava tady by se nikdy neprojevila.</value>
   </data>
   <data name="Config_NotWritten" xml:space="preserve">
     <value>Nepodařilo se zapsat {0}: {1}</value>
@@ -412,19 +412,19 @@
     <value>Uložené heslo se nepodařilo odstranit. Zkontrolujte oprávnění datového adresáře.</value>
   </data>
   <data name="Config_TwoPasswords" xml:space="preserve">
-    <value>Najednou byla odeslána dvě různá hesla; uchovává se jen jeden účet vozidla.</value>
+    <value>Najednou byla odeslána dvě různá hesla; uložit lze jen jeden účet vozidla.</value>
   </data>
   <data name="Config_PasswordNotStored" xml:space="preserve">
     <value>Heslo se nepodařilo uložit ({0}). Nic jiného se nezměnilo.</value>
   </data>
   <data name="Config_TwoFeeds" xml:space="preserve">
-    <value>Vehicle:Website a Vehicle:Skoda by byly zapnuté oba, a ty čtou dvě různá auta (volkswagen.de a MyŠkoda API). Instalace má jedno auto.</value>
+    <value>Vehicle:Website i Vehicle:Skoda by byly zapnuté zároveň, ale čtou dvě různá auta (volkswagen.de a MyŠkoda API). Instalace má jen jedno auto.</value>
   </data>
   <data name="Config_FeedNeeds" xml:space="preserve">
-    <value>{0} potřebuje zapnutý zdroj, a je prázdné.</value>
+    <value>Zapnutý zdroj potřebuje {0}, ale hodnota je prázdná.</value>
   </data>
   <data name="Config_UnknownBrand" xml:space="preserve">
-    <value>Vehicle:DataAct:Brand ('{0}') není jedna z {1}. Vyberte jednu, nebo rovnou zadejte Vehicle:DataAct:ClientId, pokud ta vaše chybí.</value>
+    <value>Vehicle:DataAct:Brand ('{0}') není jedna z {1}. Vyberte jednu, nebo zadejte přímo Vehicle:DataAct:ClientId, pokud vaše značka chybí.</value>
   </data>
   <data name="Solcast_EnterKey" xml:space="preserve">
     <value>Zadejte klíč API ze svého účtu Solcast.</value>
@@ -445,10 +445,10 @@
     <value>Nabíjení pozastaveno.</value>
   </data>
   <data name="Event_StoodDownUntil" xml:space="preserve">
-    <value>Nabíječka odstavena do {0}.</value>
+    <value>Nabíječka pozastavena do {0}.</value>
   </data>
   <data name="Event_StoodDown" xml:space="preserve">
-    <value>Nabíječka odstavena.</value>
+    <value>Nabíječka pozastavena.</value>
   </data>
   <data name="Event_Rearmed" xml:space="preserve">
     <value>Nabíječka přepnuta zpět do Fast.</value>

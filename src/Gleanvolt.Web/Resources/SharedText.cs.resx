@@ -43,7 +43,7 @@
     <value>Jazyk</value>
   </data>
   <data name="NotFound" xml:space="preserve">
-    <value>Taková stránka neexistuje. Vraťte se na {0}.</value>
+    <value>Taková stránka neexistuje. Vraťte se na stránku {0}.</value>
   </data>
   <data name="Days_One" xml:space="preserve">
     <value>{0} den</value>
@@ -82,19 +82,19 @@
     <value>Targeted</value>
   </data>
   <data name="ModeSolarSummary" xml:space="preserve">
-    <value>Nabíjí ze slunce, které dům nespotřebuje, jakmile je domácí baterie plná.</value>
+    <value>Nabíjí z přebytku ze slunce, který dům nespotřebuje, až když je domácí baterie plná.</value>
   </data>
   <data name="ModeForecastedSummary" xml:space="preserve">
-    <value>Nabíjí z přebytku jako Solar, ale o tom, kolik dnešního slunce smí dostat auto, rozhoduje předpověď, aby domácí baterie přesto do večera dosáhla 100 %.</value>
+    <value>Nabíjí z přebytku jako Solar. Kolik dnešního slunce smí dostat auto, určuje předpověď tak, aby se domácí baterie do večera přesto nabila na 100 %.</value>
   </data>
   <data name="ModeSolarGridSummary" xml:space="preserve">
-    <value>Sleduje slunce a když samotný přebytek nestačí, síť dorovná nabíječku na její minimum.</value>
+    <value>Nabíjí ze slunce. Když přebytek nestačí na minimální výkon nabíječky, zbytek doplní síť.</value>
   </data>
   <data name="ModeFastSummary" xml:space="preserve">
-    <value>Nabíjí tak rychle, jak instalace dovolí, ze slunce i ze sítě, a domácí baterii z toho vynechává.</value>
+    <value>Nabíjí tak rychle, jak instalace dovolí, ze slunce i ze sítě. Domácí baterii přitom nepoužívá.</value>
   </data>
   <data name="ModeTargetedSummary" xml:space="preserve">
-    <value>Dodá zadané množství do zadaného času: nejdřív předpovězený přebytek, zbytek co nejpozději ze sítě.</value>
+    <value>Nabije zadané množství energie do zadaného času. Nejdřív využije předpovězený přebytek, zbytek dokoupí ze sítě co nejpozději.</value>
   </data>
   <data name="ModeChange" xml:space="preserve">
     <value>{0} → {1}</value>
@@ -109,7 +109,7 @@
     <value>{0} (p10 {1} – p90 {2})</value>
   </data>
   <data name="AboutTopic" xml:space="preserve">
-    <value>O položce {0}</value>
+    <value>Nápověda: {0}</value>
   </data>
   <data name="Hide" xml:space="preserve">
     <value>Skrýt</value>
@@ -154,19 +154,19 @@
     <value>Ano, restartovat</value>
   </data>
   <data name="RestartProgress" xml:space="preserve">
-    <value>Restartuje se… Nabíječka se pozastavuje a otevřené nabíjení se uzavírá. Stránka se sama znovu načte, až bude řídicí jednotka zpět.</value>
+    <value>Restartuje se… Nabíjení se pozastavuje a otevřený záznam nabíjení se uzavírá. Stránka se sama znovu načte, až řídicí jednotka znovu poběží.</value>
   </data>
   <data name="RestartNotBack" xml:space="preserve">
-    <value>Pokud se do minuty či dvou nevrátí, nic ji znovu nespouští: podívejte se na {0} nebo {1}, případně ji spusťte ručně.</value>
+    <value>Pokud se do minuty nebo dvou nespustí, nic ji automaticky nerestartuje. Podívejte se na {0} nebo {1}, případně ji spusťte ručně.</value>
   </data>
   <data name="RestartCost" xml:space="preserve">
-    <value>Probíhající nabíjení se pozastaví a řídicí jednotka se vrátí v režimu Off, jako po každém startu — režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, takže je pak zvolte znovu. Toto rozhraní i Home Assistant budou zhruba půl minuty nedostupné. Při startu se stahuje předpověď výroby, takže restart spotřebuje jedno z denních volání Solcastu, je-li nastaven klíč. Sama se vrátí pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb; spuštěná jinak — {1}, prostý {2}, zip pro Windows — se jen ukončí a je třeba ji spustit znovu.</value>
+    <value>Probíhající nabíjení se pozastaví a řídicí jednotka se jako po každém startu spustí v režimu Off. Režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, proto je po restartu nastavte znovu. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď výroby, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se řídicí jednotka spustí znovu sama. Pokud ji spouštíte jinak — {1}, prostý {2}, zip pro Windows — jen se ukončí a musíte ji spustit znovu ručně.</value>
   </data>
   <data name="MqttBroker" xml:space="preserve">
     <value>Broker</value>
   </data>
   <data name="MqttBrokerNote" xml:space="preserve">
-    <value>— kam se řídicí jednotka připojuje; odsud nemusí být dosažitelný.</value>
+    <value>— adresa, ke které se připojuje řídicí jednotka; odsud nemusí být dosažitelná.</value>
   </data>
   <data name="MqttUsername" xml:space="preserve">
     <value>Uživatelské jméno</value>
@@ -178,7 +178,7 @@
     <value>Heslo</value>
   </data>
   <data name="MqttPasswordWithheld" xml:space="preserve">
-    <value>nastaveno, ale zde se nezobrazuje — toto rozhraní nemá přihlášení, takže by ho mohl přečíst kdokoli v síti. Nastavte {0} ({1}) a půjde přečíst.</value>
+    <value>nastaveno, ale nezobrazuje se — toto rozhraní nemá přihlášení, takže by ho mohl přečíst kdokoli v síti. Chcete-li ho zobrazit, nastavte {0} ({1}).</value>
   </data>
   <data name="MqttClientId" xml:space="preserve">
     <value>ID klienta</value>
@@ -211,7 +211,7 @@
     <value>Přihlásit</value>
   </data>
   <data name="SignInHint" xml:space="preserve">
-    <value>Jedno heslo pro tuto instalaci, zvolené na stránce nastavení při prvním spuštění nebo zadané jako {0}. Odsud ho obnovit nelze: zapomenuté se nahrazuje v nastavení přímo na stroji.</value>
+    <value>Jedno heslo pro celou instalaci. Zvolili jste ho při prvním spuštění na stránce nastavení hesla, nebo je zadané jako {0}. Odsud ho obnovit nelze; zapomenuté heslo se mění v nastavení přímo na počítači, kde služba běží.</value>
   </data>
   <data name="SetupTitle" xml:space="preserve">
     <value>Nastavení hesla — Gleanvolt</value>
@@ -226,7 +226,7 @@
     <value>Nastavte heslo</value>
   </data>
   <data name="SetupIntro" xml:space="preserve">
-    <value>Gleanvolt umí ukázat historii energie a nabíjení této instalace a měnit, jak se nabíječka řídí. Je dostupný čemukoli v této síti, a proto potřebuje heslo, než cokoli z toho ukáže.</value>
+    <value>Gleanvolt zobrazuje historii energie a nabíjení této instalace a umí měnit řízení nabíječky. Přístup k němu má kdokoli v této síti, proto ho nejdřív chraňte heslem.</value>
   </data>
   <data name="RepeatPassword" xml:space="preserve">
     <value>Zopakujte ho</value>
@@ -235,7 +235,7 @@
     <value>Nastavit heslo</value>
   </data>
   <data name="SetupNote" xml:space="preserve">
-    <value>Jedno heslo pro celou instalaci, ne účet pro každého. Uložte si ho tak, abyste ho našli: v rozhraní se obnovit nedá, jen úpravou souboru nastavení přímo na stroji.</value>
+    <value>Jedno heslo pro celou instalaci, ne účet pro každého uživatele. Uložte si ho na bezpečné místo: v rozhraní ho obnovit nelze, jen úpravou souboru nastavení přímo na počítači.</value>
   </data>
   <data name="PasswordsDiffer" xml:space="preserve">
     <value>Hesla se neshodují.</value>
@@ -289,7 +289,7 @@
     <value>Nabíjí</value>
   </data>
   <data name="EvChargerStatus_Finishing" xml:space="preserve">
-    <value>Dokončuje</value>
+    <value>Dokončuje se</value>
   </data>
   <data name="EvChargerStatus_Faulted" xml:space="preserve">
     <value>Porucha</value>
@@ -388,7 +388,7 @@
     <value>{WWW} {D}. {MMM} {HH}:{mm}</value>
   </data>
   <data name="ChargingSessionEndReason_ModeOff" xml:space="preserve">
-    <value>Řízení nabíjení se vrátilo do Off</value>
+    <value>Řízení nabíjení se přepnulo do režimu Off</value>
   </data>
   <data name="ChargingSessionEndReason_SessionComplete" xml:space="preserve">
     <value>Auto dokončilo nabíjení</value>
@@ -409,10 +409,10 @@
     <value>Čas odjezdu uplynul</value>
   </data>
   <data name="ChargingSessionEndReason_NoSunLeftToday" xml:space="preserve">
-    <value>Dnes už nezbylo slunce, ze kterého by šlo nabíjet</value>
+    <value>Dnes už nezbylo slunce na nabíjení</value>
   </data>
   <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
-    <value>Nabíječka byla přepnuta z režimu Fast</value>
+    <value>Nabíječka byla přepnuta mimo režim Fast</value>
   </data>
   <data name="DatePattern" xml:space="preserve">
     <value>d. M. yyyy</value>
