@@ -13,7 +13,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="NoUsableForecast" xml:space="preserve">
-    <value>Solární energie dle předpovědi není k dispozici, takže na dnešek není plán; režim se proto chová jako Solar: auto nabíjí z aktuálního přebytku, až když je domácí baterie plná.</value>
+    <value>Solární energie dle předpovědi není k dispozici, takže na dnešek není plán; režim se proto chová jako Solar: auto nabíjí z aktuálního přebytku až po plném nabití domácí baterie.</value>
   </data>
   <data name="NoChargeableWindow" xml:space="preserve">
     <value>Dnes není žádné okno pro nabíjení: slunce nepřekročí minimum nabíječky dost dlouho, nebo všechnu výrobu potřebuje domácí baterie. Auto čeká.</value>
@@ -250,7 +250,7 @@
     <value>Nabíjet podle předpovědi</value>
   </data>
   <data name="StartForecastedTip" xml:space="preserve">
-    <value>Když solární energie dle předpovědi není k dispozici, režim nabíjení neodmítne, ale chová se jako Solar: auto nabíjí z aktuálního přebytku, až když je domácí baterie plná.</value>
+    <value>Když solární energie dle předpovědi není k dispozici, režim nabíjení neodmítne, ale chová se jako Solar: auto nabíjí z aktuálního přebytku až po plném nabití domácí baterie.</value>
   </data>
   <data name="WhereChargeStopsTopic" xml:space="preserve">
     <value>Kdy nabíjení skončí</value>
