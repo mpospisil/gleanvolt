@@ -147,7 +147,7 @@ public class EnergyPageTests : PageTest
         {
             Assert.Single(page.FindAll("tr.partial"));
             Assert.Contains("33%", page.Markup);                  // 5 of 15 minutes
-            Assert.Contains("1 row</strong> covers less", page.Markup);
+            Assert.Contains("1 row</strong> covers only part", page.Markup);
         });
     }
 

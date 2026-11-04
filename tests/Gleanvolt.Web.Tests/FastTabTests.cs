@@ -71,8 +71,8 @@ public class FastTabTests : PageTest
         var page = RenderTab();
 
         var option = page.Find("#low-tariff-fast").ParentElement!.ParentElement!.TextContent;
-        Assert.Contains("charges flat out once low tariff starts", option);
-        Assert.Contains("draws for a moment", option);
+        Assert.Contains("charges at full power once low tariff starts", option);
+        Assert.Contains("draws power briefly", option);
     }
 
     [Fact]

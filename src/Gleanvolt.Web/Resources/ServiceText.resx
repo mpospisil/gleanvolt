@@ -32,20 +32,20 @@
     <value>forecast is {0} old (stale after {1})</value>
   </data>
   <data name="SolarGrid_NoneClears" xml:space="preserve">
-    <value>no forecast period left today clears {0} of surplus</value>
+    <value>no forecast period left today has surplus above {0}</value>
   </data>
   <data name="SolarGrid_Clears" xml:space="preserve">
-    <value>forecast surplus clears {0} from {1} until {2}</value>
+    <value>forecast surplus is above {0} from {1} until {2}</value>
   </data>
   <!-- Tariff -->
   <data name="Tariff_NegativePrice" xml:space="preserve">
     <value>A price can't be negative.</value>
   </data>
   <data name="Tariff_LowAboveHigh" xml:space="preserve">
-    <value>Low tariff costs more than high.</value>
+    <value>The low tariff costs more than the high tariff.</value>
   </data>
   <data name="Tariff_NoPeriods" xml:space="preserve">
-    <value>No low-tariff periods: everything would be high tariff.</value>
+    <value>No low-tariff periods: every hour would be high tariff.</value>
   </data>
   <data name="Tariff_NotATime" xml:space="preserve">
     <value>Not a time.</value>
@@ -71,25 +71,25 @@
     <value>The departure time is in the past.</value>
   </data>
   <data name="Request_TooFarAhead" xml:space="preserve">
-    <value>A departure more than {0} away is further than a charge that does not survive a restart can honestly promise.</value>
+    <value>A departure more than {0} away is too far: a charge that does not survive a restart cannot reliably promise that.</value>
   </data>
   <data name="Request_TooFarAheadForecast" xml:space="preserve">
-    <value>A departure more than {0} away is further than the forecast — or a request that does not survive a restart — can honestly promise.</value>
+    <value>A departure more than {0} away is too far: neither the forecast nor a request that does not survive a restart can reliably promise that.</value>
   </data>
   <data name="Request_DepartureNeedsAmount" xml:space="preserve">
-    <value>A departure needs an amount to work back from — say how much energy, or what state of charge, the car needs. Without one there is nothing to time.</value>
+    <value>A departure time needs an amount to plan from — say how much energy, or what state of charge, the car needs.</value>
   </data>
   <data name="Request_EnterEnergy" xml:space="preserve">
     <value>Enter how much energy the car needs.</value>
   </data>
   <data name="Request_EnterSoc" xml:space="preserve">
-    <value>Enter the state of charge to stop at.</value>
+    <value>Enter the target state of charge.</value>
   </data>
   <data name="Request_NoCapacity" xml:space="preserve">
     <value>A target state of charge needs the car's usable capacity, which is not configured (Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.</value>
   </data>
   <data name="Request_NoSoc" xml:space="preserve">
-    <value>The car has not reported a state of charge, so there is nothing to measure the gap from. Ask in kilowatt-hours instead.</value>
+    <value>The car has not reported a state of charge, so the difference cannot be calculated. Enter kilowatt-hours instead.</value>
   </data>
   <data name="Request_AlreadyAt" xml:space="preserve">
     <value>The car is already at {0}, at or above the {1} asked for.</value>
@@ -101,11 +101,11 @@
     <value>Ask for energy or for a state of charge, not both.</value>
   </data>
   <data name="Request_Stale" xml:space="preserve">
-    <value>The car last reported {0} {1} ago, past the {2} this installation treats as current (Vehicle:MaxAge), so there is no honest way to say what that target is in kilowatt-hours. Read the car again, or ask in kilowatt-hours instead.</value>
+    <value>The car last reported {0} {1} ago, longer than the {2} this installation accepts as current (Vehicle:MaxAge), so the target cannot be reliably converted to kilowatt-hours. Read the car again, or enter kilowatt-hours instead.</value>
   </data>
   <!-- Starting and stopping -->
   <data name="Action_FastRefused" xml:space="preserve">
-    <value>The charger did not accept Fast, so the mode was not started — it is still in its previous mode. {0}</value>
+    <value>The charger did not accept Fast, so the mode was not started and the previous mode is still active. {0}</value>
     <comment>{0} is the error the charger's connection reported, in its own words.</comment>
   </data>
   <data name="Action_StopRefused" xml:space="preserve">
@@ -116,7 +116,7 @@
     <value>{0} answered: battery at {1} %.</value>
   </data>
   <data name="Probe_InverterImplausible" xml:space="preserve">
-    <value>{0} answered, but its battery register reads {1}, which is no state of charge. Is this the charger's address?</value>
+    <value>{0} answered, but its battery register reads {1}, which is not a valid state of charge. Is this the charger's address?</value>
   </data>
   <data name="Probe_ChargerOk" xml:space="preserve">
     <value>{0} answered: charger run mode {1}.</value>
@@ -148,20 +148,20 @@
     <value>Stop the controller</value>
   </data>
   <data name="Tariff_ProviderMissing" xml:space="preserve">
-    <value>The selected tariff provider, {0}, is not in this build, so there is no tariff restriction.</value>
+    <value>The selected tariff provider, {0}, is not in this build, so the tariff is ignored.</value>
   </data>
   <data name="Tariff_ProviderFailed" xml:space="preserve">
-    <value>The {0} tariff provider failed ({1}), so there is no tariff restriction.</value>
+    <value>The {0} tariff provider failed ({1}), so the tariff is ignored.</value>
   </data>
   <data name="Tariff_ProviderEmpty" xml:space="preserve">
-    <value>The {0} tariff provider has nothing to answer from yet, so there is no tariff restriction.</value>
+    <value>The {0} tariff provider has no data yet, so the tariff is ignored.</value>
   </data>
   <!-- The car's feed, when it needs its owner -->
   <data name="Feed_VolkswagenWantsCode" xml:space="preserve">
     <value>volkswagen.de wants a one-time code — sign in again on the Car page.</value>
   </data>
   <data name="Feed_SkodaNeedsKey" xml:space="preserve">
-    <value>No MyŠkoda API key yet, or it has expired — paste one on the Car page.</value>
+    <value>No MyŠkoda API key, or it has expired — paste a new one on the Car page.</value>
   </data>
   <!-- The car's feed and its account -->
   <data name="Health_Starting" xml:space="preserve">
@@ -178,13 +178,13 @@
     <value>Enter the code from the email.</value>
   </data>
   <data name="SignIn_VwSignedIn" xml:space="preserve">
-    <value>Signed in. This browser is remembered, so a restart should not need another code.</value>
+    <value>Signed in. This browser session is remembered, so a restart should not need another code.</value>
   </data>
   <data name="SignIn_VwCodeSent" xml:space="preserve">
     <value>Volkswagen has emailed a one-time code. Enter it below.</value>
   </data>
   <data name="SignIn_VwCodeRejected" xml:space="preserve">
-    <value>That code was not accepted. Check the newest email — an earlier one will not work — and try again. The challenge is still open, so this does not need starting over.</value>
+    <value>That code was not accepted. Check the newest email — an older code will not work — and try again. The request is still open, so there is no need to start over.</value>
   </data>
   <data name="SignIn_VwConsent" xml:space="preserve">
     <value>Volkswagen is showing a consent or terms screen. Open volkswagen.de in a browser, clear it there, then sign in here again.</value>
@@ -193,10 +193,10 @@
     <value>The credentials were not accepted. Check Vehicle:Website:Username and :Password.</value>
   </data>
   <data name="SignIn_VwNoChallenge" xml:space="preserve">
-    <value>There is no code challenge open, so that code was not sent anywhere. Press Sign in to start one. If Volkswagen does not email a new code, press Sign out first and then Sign in: that discards a challenge left over from an earlier attempt.</value>
+    <value>No code request is open, so the code was not sent anywhere. Press Sign in to start one. If Volkswagen does not email a new code, press Sign out first and then Sign in: that clears a request left over from an earlier attempt.</value>
   </data>
   <data name="SignIn_VwIncomplete" xml:space="preserve">
-    <value>The sign-in did not complete. If this repeats, wait a few minutes rather than retrying: a replayed login at a real identity provider risks locking the account.</value>
+    <value>The sign-in did not complete. If this repeats, wait a few minutes before retrying: repeated sign-ins at a real identity provider can lock the account.</value>
   </data>
   <!-- MyŠkoda -->
   <data name="SignIn_SkodaAskForKey" xml:space="preserve">
@@ -228,7 +228,7 @@
     <value>Škoda did not recognise that key.</value>
   </data>
   <data name="Skoda_KeyNotAuthorized" xml:space="preserve">
-    <value>That key is not allowed for VIN {0}; include this car when creating it.</value>
+    <value>That key is not allowed for VIN {0}; include this car when you create it.</value>
   </data>
   <data name="Skoda_VehicleNotFound" xml:space="preserve">
     <value>Škoda has no car with VIN {0} — check Vehicle:Skoda:Vin.</value>
@@ -252,37 +252,37 @@
     <value>The Škoda API key expires on {0} — create a new one in the MySkoda app and paste it on the Car page.</value>
   </data>
   <data name="Skoda_QuotaUsedUp" xml:space="preserve">
-    <value>This hour's Škoda requests are used up; the next is available at {0}. The last reading stands.</value>
+    <value>This hour's Škoda requests are used up; the next one is available at {0}. The last reading still applies.</value>
   </data>
   <data name="Skoda_QuotaAskingAgain" xml:space="preserve">
-    <value>Škoda's hourly request quota is used up; asking again at {0}. The last reading stands.</value>
+    <value>Škoda's hourly request limit is used up; asking again at {0}. The last reading still applies.</value>
   </data>
   <data name="Skoda_CarDeclining" xml:space="preserve">
-    <value>The car itself is declining requests — usually a low 12 V battery or deep sleep, not Gleanvolt or the key; asking again at {0}. The last reading stands.</value>
+    <value>The car itself is declining requests — usually because of a low 12 V battery or deep sleep, not Gleanvolt or the key. Asking again at {0}. The last reading still applies.</value>
   </data>
   <data name="Skoda_FeedNoAnswer" xml:space="preserve">
-    <value>Škoda did not answer ({0}); the last reading stands.</value>
+    <value>Škoda did not answer ({0}); the last reading still applies.</value>
     <comment>{0} is the network or HTTP error, as reported.</comment>
   </data>
   <data name="Skoda_Unusable" xml:space="preserve">
-    <value>Škoda answered, but {0}. The last reading stands.</value>
+    <value>Škoda answered, but {0}. The last reading still applies.</value>
     <comment>{0} is what was wrong with the answer, in English from the parser.</comment>
   </data>
   <data name="Skoda_Answering" xml:space="preserve">
-    <value>Answering; the car reported at {0}.</value>
+    <value>Working; the car reported at {0}.</value>
   </data>
   <!-- volkswagen.de and the VW Group Data Act portal -->
   <data name="Feed_Answering" xml:space="preserve">
-    <value>Answering; last reading captured {0} {1}.</value>
+    <value>Working; last reading captured {0} {1}.</value>
   </data>
   <data name="Feed_VwStoppedForCode" xml:space="preserve">
-    <value>volkswagen.de wants a one-time code. Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+    <value>volkswagen.de wants a one-time code. Sign in again on the Car page; the feed resumes once you have. Charging is unaffected.</value>
   </data>
   <data name="Feed_VwStoppedNoReading" xml:space="preserve">
-    <value>volkswagen.de did not answer with a reading. Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+    <value>volkswagen.de did not return a reading. Sign in again on the Car page; the feed resumes once you have. Charging is unaffected.</value>
   </data>
   <data name="Feed_VwStoppedUnreachable" xml:space="preserve">
-    <value>volkswagen.de was unreachable ({0}). Sign in again on the Car page; the feed resumes once you have. The charge is unaffected.</value>
+    <value>volkswagen.de was unreachable ({0}). Sign in again on the Car page; the feed resumes once you have. Charging is unaffected.</value>
   </data>
   <data name="Feed_PortalNeeds" xml:space="preserve">
     <value>The VW portal feed is switched on but needs {0}.</value>
@@ -291,11 +291,11 @@
     <value>The portal answered; the car reported at {0}.</value>
   </data>
   <data name="Portal_SignInRejected" xml:space="preserve">
-    <value>The portal refused the sign-in: {0}. Check the password in .env — this one is not retried, because repeated failures put the account at risk.</value>
+    <value>The portal refused the sign-in: {0}. Check the password in .env — this is not retried automatically, because repeated failures put the account at risk.</value>
     <comment>{0} quotes the portal's own answer.</comment>
   </data>
   <data name="Portal_OwnerAction" xml:space="preserve">
-    <value>The portal is showing something only you can answer ({0}) — consent, terms, an OTP or a CAPTCHA. Open it in a browser and clear it.</value>
+    <value>The portal is showing something only you can deal with ({0}) — consent, terms, a one-time code or a CAPTCHA. Open it in a browser and complete it.</value>
   </data>
   <data name="Portal_Detail" xml:space="preserve">
     <value>{0}</value>
@@ -305,16 +305,16 @@
     <value>Signed in, but {0}.</value>
   </data>
   <data name="Portal_Unusable" xml:space="preserve">
-    <value>A delivery arrived and could not be read: {0}. The last good reading stands and is ageing.</value>
+    <value>A delivery arrived but could not be read: {0}. The last good reading still applies and is getting older.</value>
   </data>
   <data name="Portal_NoReading" xml:space="preserve">
     <value>The last read did not produce a reading: {0}.</value>
   </data>
   <data name="Account_Volkswagen" xml:space="preserve">
-    <value>The car's live source. Signing in here is what lets the car be followed; if Volkswagen asks for a code again, the feed stops until you sign in here once more. The code Volkswagen emails can only be answered by you, which is why this is a page and not a background job.</value>
+    <value>The car's live source. Signing in here lets the car be followed. If Volkswagen asks for a code again, the feed stops until you sign in here again. Only you can enter the code Volkswagen emails, which is why this is a page and not a background task.</value>
   </data>
   <data name="Account_Skoda" xml:space="preserve">
-    <value>The live source for this Škoda, read between charges as well as during them. Škoda asks for an API key rather than a password: you create it in the MySkoda app, bound to this car, and paste it here once. It is checked with Škoda, kept on this controller only, and never shown again.</value>
+    <value>The live source for this Škoda, read between charges as well as during them. Škoda uses an API key instead of a password: create it in the MySkoda app for this car and paste it here once. It is checked with Škoda, stored only on this controller, and never shown again.</value>
   </data>
   <data name="Portal_Missing" xml:space="preserve">
     <value>{0}</value>
@@ -340,7 +340,7 @@
     <value>No vehicle feed is configured, so there is nothing to ask.</value>
   </data>
   <data name="Refresh_NothingToGive" xml:space="preserve">
-    <value>{0} had nothing to give — {1}</value>
+    <value>{0} had no reading — {1}</value>
     <comment>{0} is the feed's name, {1} what the feed says about itself.</comment>
   </data>
   <data name="Refresh_Failed" xml:space="preserve">
@@ -359,7 +359,7 @@
   </data>
   <!-- The car's settings, as the form or startup checks them -->
   <data name="Config_EvOneVehicle" xml:space="preserve">
-    <value>Ev:Vehicles has {0} entries and exactly {1} is supported. The list is a shape for later, not a feature yet.</value>
+    <value>Ev:Vehicles has {0} entries, but exactly {1} is supported. The list is prepared for later; it is not a feature yet.</value>
   </data>
   <data name="Config_EvIdSlug" xml:space="preserve">
     <value>Ev:Vehicles:0:Id ('{0}') must be a slug: lower-case letters, digits, '-' and '_', starting with a letter or digit, at most 48 characters.</value>
@@ -390,7 +390,7 @@
     <value>Pv:Id ('{0}') must be a slug: lower-case letters, digits, '-' and '_', starting with a letter or digit, at most 48 characters. It becomes an MQTT topic segment and a Home Assistant object id.</value>
   </data>
   <data name="Config_PvLocation" xml:space="preserve">
-    <value>A latitude without a longitude (or the other way round) describes nowhere. Set both Pv:Latitude and Pv:Longitude, or neither.</value>
+    <value>A latitude without a longitude (or the other way round) is not a location. Set both Pv:Latitude and Pv:Longitude, or neither.</value>
   </data>
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>No inverter is configured. Set Pv:Inverter:Host.</value>
@@ -399,7 +399,7 @@
     <value>No EV charger is configured. Set Pv:Chargers:0:Host.</value>
   </data>
   <data name="Config_PvOneCharger" xml:space="preserve">
-    <value>Only {0} EV charger is supported; Pv:Chargers has {1}. The configuration can express more so that it need not change when the control logic can drive more, which it cannot yet.</value>
+    <value>Only {0} EV charger is supported; Pv:Chargers has {1}. The configuration can describe more, so it will not need to change when the control logic supports more — which it does not yet.</value>
   </data>
   <data name="Config_PvChargerIdSlug" xml:space="preserve">
     <value>{0}:Id ('{1}') must be a slug: lower-case letters, digits, '-' and '_'.</value>
@@ -429,7 +429,7 @@
     <value>{0} cannot be edited from the web UI.</value>
   </data>
   <data name="Config_NoOverridesFile" xml:space="preserve">
-    <value>This host does not read a web UI overrides file, so an edit here would never be applied.</value>
+    <value>This host does not read a web UI settings file, so a change here would never be applied.</value>
   </data>
   <data name="Config_NotWritten" xml:space="preserve">
     <value>Could not write {0}: {1}</value>
@@ -439,19 +439,19 @@
     <value>The saved password could not be removed. Check the data directory's permissions.</value>
   </data>
   <data name="Config_TwoPasswords" xml:space="preserve">
-    <value>Two different passwords were submitted at once; only one vehicle account is kept.</value>
+    <value>Two different passwords were submitted at once; only one vehicle account can be stored.</value>
   </data>
   <data name="Config_PasswordNotStored" xml:space="preserve">
     <value>The password could not be stored ({0}). Nothing else was changed.</value>
   </data>
   <data name="Config_TwoFeeds" xml:space="preserve">
-    <value>Vehicle:Website and Vehicle:Skoda would both be enabled, and they read two different cars (volkswagen.de and the MyŠkoda API). An installation has one car.</value>
+    <value>Vehicle:Website and Vehicle:Skoda would both be on, but they read two different cars (volkswagen.de and the MyŠkoda API). An installation has one car.</value>
   </data>
   <data name="Config_FeedNeeds" xml:space="preserve">
-    <value>{0} is needed by the feed that is switched on, and is empty.</value>
+    <value>The feed that is switched on needs {0}, but it is empty.</value>
   </data>
   <data name="Config_UnknownBrand" xml:space="preserve">
-    <value>Vehicle:DataAct:Brand ('{0}') is not one of {1}. Pick one, or state Vehicle:DataAct:ClientId outright if yours is missing.</value>
+    <value>Vehicle:DataAct:Brand ('{0}') is not one of {1}. Pick one, or set Vehicle:DataAct:ClientId directly if yours is missing.</value>
   </data>
   <data name="Solcast_EnterKey" xml:space="preserve">
     <value>Enter the API key from your Solcast account.</value>
@@ -473,10 +473,10 @@
     <value>Charging paused.</value>
   </data>
   <data name="Event_StoodDownUntil" xml:space="preserve">
-    <value>Charger stood down until {0}.</value>
+    <value>Charger paused until {0}.</value>
   </data>
   <data name="Event_StoodDown" xml:space="preserve">
-    <value>Charger stood down.</value>
+    <value>Charger paused.</value>
   </data>
   <data name="Event_Rearmed" xml:space="preserve">
     <value>Charger switched back to Fast.</value>

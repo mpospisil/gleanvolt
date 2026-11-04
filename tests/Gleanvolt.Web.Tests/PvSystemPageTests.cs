@@ -352,7 +352,7 @@ public class PvSystemPageTests : BunitContext
         // Everything here was read at startup; nothing on this page knows whether the broker answered.
         var page = Render(mqtt: Mqtt(homeAssistant: Link()));
 
-        Assert.Contains("whether either link is", page.Markup);
+        Assert.Contains("whether either connection is", page.Markup);
     }
 
     // -- The API (#142).

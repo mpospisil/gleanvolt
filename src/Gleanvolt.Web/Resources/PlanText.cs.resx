@@ -529,7 +529,7 @@
     <value>Ze slunce</value>
   </data>
   <data name="FromSunHint" xml:space="preserve">
-    <value>Část přebytku výše, na kterou auto skutečně může nabíjet samo. Nula neznamená, že nesvítí: znamená, že žádná půlhodina nepřekročí minimum nabíječky 6 A. Proto se nabíjení ze sítě plánuje do nejslunečnějších hodin, ne až po nich.</value>
+    <value>Část přebytku výše, na kterou auto skutečně může nabíjet samo. Nula neznamená, že nesvítí: znamená, že žádná půlhodina nepřekročí minimum nabíječky 6 A. I takové slunce se využije, zatímco nabíječka běží na minimu, a ze sítě se dokoupí jen rozdíl.</value>
   </data>
   <data name="FromGrid" xml:space="preserve">
     <value>Ze sítě</value>

@@ -47,7 +47,7 @@ public class ForecastPageTests : PageTest
     {
         var page = Render<Forecast>();
 
-        Assert.Contains("No forecast is held yet", page.Markup);
+        Assert.Contains("No forecast is available yet", page.Markup);
 
         // Not an empty chart and not a table of dashes: there is nothing to draw and nothing to print.
         Assert.DoesNotContain("forecast-chart", page.Markup);
@@ -113,8 +113,8 @@ public class ForecastPageTests : PageTest
 
         var page = Render<Forecast>();
 
-        Assert.Contains("Today starts at 10:30", page.Markup);
-        Assert.Contains("gap in what is known", page.Markup);
+        Assert.Contains("Data for today starts at 10:30", page.Markup);
+        Assert.Contains("missing data, not a morning without sun", page.Markup);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class ForecastPageTests : PageTest
         var page = Render<Forecast>();
 
         // Tomorrow past the provider's horizon is a day nothing is known about, not a day with no sun.
-        Assert.Contains("Nothing is held for this day", page.Markup);
+        Assert.Contains("No forecast for this day", page.Markup);
     }
 
     [Fact]

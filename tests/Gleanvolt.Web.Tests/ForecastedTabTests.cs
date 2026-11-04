@@ -62,7 +62,7 @@ public class ForecastedTabTests : PageTest
 
         var page = RenderTab();
 
-        Assert.Contains("only shown while", page.Markup);
+        Assert.Contains("shown only while", page.Markup);
         Assert.Contains("Solar", page.Markup);
 
         Assert.Empty(page.FindAll(".stat-grid"));
@@ -276,7 +276,7 @@ public class ForecastedTabTests : PageTest
 
         var page = RenderTab();
 
-        Assert.Contains("no chargeable window", page.Markup);
+        Assert.Contains("no charging window", page.Markup);
         Assert.Contains("The car waits", page.Markup);
     }
 
@@ -286,7 +286,7 @@ public class ForecastedTabTests : PageTest
         var page = RenderTab();
 
         Assert.Contains("/charging-plan/targeted", page.Markup);
-        Assert.Contains("This mode takes no amount", page.Markup);
+        Assert.Contains("This mode does not take an amount", page.Markup);
     }
 
     [Fact]

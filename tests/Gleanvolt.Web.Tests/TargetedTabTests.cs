@@ -247,7 +247,7 @@ public class TargetedTabTests : PageTest
             TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
         });
 
-        page.WaitForAssertion(() => Assert.Contains("The sun should carry", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("The sun should cover", page.Markup));
     }
 
     // --- What the car says, and asking in its terms (#99) ---
@@ -357,7 +357,7 @@ public class TargetedTabTests : PageTest
 
         page.Find("#preview-target").Click();
 
-        Assert.Contains("Charging to 80%, from the 42% the car last reported", page.Find("#target-preview").TextContent);
+        Assert.Contains("Charging to 80% from the 42% the car last reported", page.Find("#target-preview").TextContent);
     }
 
     /// <summary>
@@ -464,7 +464,7 @@ public class TargetedTabTests : PageTest
 
         var page = RenderTab();
 
-        Assert.Contains("Charging to 80%, from the 42% the car last reported", page.Markup);
+        Assert.Contains("Charging to 80% from the 42% the car last reported", page.Markup);
     }
 
     // --- The plan before the charger moves (#99) ---
@@ -488,7 +488,7 @@ public class TargetedTabTests : PageTest
 
         // And the plan is on screen, in the same words the running one is shown in.
         var preview = page.Find("#target-preview").TextContent;
-        Assert.Contains("The sun should carry", preview);
+        Assert.Contains("The sun should cover", preview);
         Assert.Contains("Charge pace", preview);
     }
 
@@ -647,12 +647,12 @@ public class TargetedTabTests : PageTest
         var text = Narrate(TestTargetedPlans.SolarPlusGrid(Now));
 
         Assert.Contains("22.0 kWh by 07:00 tomorrow", text);
-        Assert.Contains("The sun should carry", text);
-        Assert.Contains("The sun should carry 14.6 kWh", text);
+        Assert.Contains("The sun should cover", text);
+        Assert.Contains("The sun should cover 14.6 kWh", text);
         Assert.Contains("the grid the remaining 7.4 kWh", text);
-        Assert.Contains("paced at about", text);
-        Assert.Contains("draws close to what the roof is producing", text);
-        Assert.Contains("discharge hold arms whenever the car is drawing more than the roof is giving", text);
+        Assert.Contains("the car charges at about", text);
+        Assert.Contains("draws close to what the panels produce", text);
+        Assert.Contains("whenever the car draws more than the panels produce, the discharge hold turns on", text);
 
         // The old design's vocabulary must not survive anywhere in the sentence.
         Assert.DoesNotContain("sunniest hours", text);
@@ -669,7 +669,7 @@ public class TargetedTabTests : PageTest
         var text = Narrate(TestTargetedPlans.WeakSun(Now));
 
         Assert.Contains("6.4 kWh of surplus is forecast for this window", text);
-        Assert.Contains("never climbs past the charger's 6 A minimum", text);
+        Assert.Contains("never exceeds the charger's 6 A minimum", text);
         Assert.Contains("only the difference is bought", text);
 
         // The two claims that were wrong, and the overstatement the user caught.
@@ -685,8 +685,8 @@ public class TargetedTabTests : PageTest
         // all, so starting at once really does cost nothing.
         var text = Narrate(TestTargetedPlans.DarkWindow(Now));
 
-        Assert.Contains("No surplus at all is forecast before then", text);
-        Assert.Contains("nothing to be gained by putting it off", text);
+        Assert.Contains("No surplus is forecast before then", text);
+        Assert.Contains("nothing to gain by delaying", text);
         Assert.DoesNotContain("of surplus is forecast for this window", text);
     }
 
@@ -696,7 +696,7 @@ public class TargetedTabTests : PageTest
         var text = Narrate(TestTargetedPlans.Solar(Now));
 
         Assert.Contains("The forecast covers all of it", text);
-        Assert.Contains("no grid import is planned at all", text);
+        Assert.Contains("No grid import is planned", text);
         Assert.DoesNotContain("from the grid, starting", text);
     }
 
@@ -706,8 +706,8 @@ public class TargetedTabTests : PageTest
         var text = Narrate(TestTargetedPlans.Maximum(Now));
 
         Assert.Contains("12.0 kWh by 00:10 tomorrow is more than the", text);
-        Assert.Contains("the car will have about 8.3 kWh — 3.7 kWh short", text);
-        Assert.Contains("Leaving at 01:05 tomorrow instead would cover the full amount", text);
+        Assert.Contains("the car will get about 8.3 kWh — 3.7 kWh short", text);
+        Assert.Contains("Leaving at 01:05 tomorrow instead would allow the full amount", text);
     }
 
     [Fact]
@@ -812,7 +812,7 @@ public class TargetedTabTests : PageTest
         page.Find("#charge-priority-justintime").Change(true);
 
         Assert.Contains("already at 85%", page.Find("#rest-soc").ParentElement!.TextContent);
-        Assert.Contains("the whole charge is the held stretch", page.Find("#rest-soc").ParentElement!.TextContent);
+        Assert.Contains("the whole charge is held back", page.Find("#rest-soc").ParentElement!.TextContent);
     }
 
     [Fact]
@@ -826,7 +826,7 @@ public class TargetedTabTests : PageTest
         page.Find("#target-soc").Change("70");
         page.Find("#charge-priority-justintime").Change(true);
 
-        Assert.Contains("nothing above it to hold", page.Find("#rest-soc").ParentElement!.TextContent);
+        Assert.Contains("nothing to hold back", page.Find("#rest-soc").ParentElement!.TextContent);
     }
 
     [Fact]
@@ -842,7 +842,7 @@ public class TargetedTabTests : PageTest
 
         Assert.Contains("6.0 kWh", text);
         Assert.Contains("held back until", text);
-        Assert.Contains("finishes just before departure", text);
+        Assert.Contains("finishes just before you leave", text);
     }
 
     [Fact]
@@ -860,7 +860,7 @@ public class TargetedTabTests : PageTest
         var text = Narrate(plan);
 
         Assert.Contains("idle on purpose", text);
-        Assert.Contains("turned down", text);
+        Assert.Contains("before then is not used", text);
     }
 
     [Fact]

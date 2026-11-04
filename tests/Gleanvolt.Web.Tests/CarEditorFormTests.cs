@@ -60,7 +60,7 @@ public class CarEditorFormTests : BunitContext
 
         // Not an error state, and it must not read like an unfinished form: every EV with a Type 2
         // inlet charges without a feed.
-        Assert.Contains("supported installation", form.Find("#car-feed-note").TextContent);
+        Assert.Contains("supported setup", form.Find("#car-feed-note").TextContent);
         Assert.Empty(form.FindAll(Field(EvSettingKeys.WebsiteVin)));
     }
 

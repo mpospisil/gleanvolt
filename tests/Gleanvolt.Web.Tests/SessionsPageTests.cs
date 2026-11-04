@@ -25,7 +25,7 @@ public class SessionsPageTests : PageTest
     {
         var page = Render<Sessions>();
 
-        page.WaitForAssertion(() => Assert.Contains("No sessions in this range", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("No sessions in this period", page.Markup));
     }
 
     [Fact]
@@ -83,11 +83,11 @@ public class SessionsPageTests : PageTest
         var page = Render<Sessions>();
 
         // Default range is 30 days.
-        page.WaitForAssertion(() => Assert.Contains("No sessions in this range", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("No sessions in this period", page.Markup));
 
         page.Find("#range").Change("90");
 
-        page.WaitForAssertion(() => Assert.DoesNotContain("No sessions in this range", page.Markup));
+        page.WaitForAssertion(() => Assert.DoesNotContain("No sessions in this period", page.Markup));
     }
 
     [Fact]
