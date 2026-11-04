@@ -64,7 +64,7 @@
     <value>dům</value>
   </data>
   <data name="HouseTip1" xml:space="preserve">
-    <value>Co odebírá dům kromě auta: slunce plus odběr ze sítě, minus to, co si bere baterie a odebírá auto. Tentýž zbytek, kterému stránka Energie říká Dům.</value>
+    <value>Co odebírá dům kromě auta: slunce plus import ze sítě, minus to, co si bere baterie a odebírá auto. Tentýž zbytek, kterému stránka Energie říká Dům.</value>
   </data>
   <data name="HouseTip2" xml:space="preserve">
     <value>Pomlčka, když součet vyjde pod nulou: elektroměr na přípojce nevidí všechny fáze, takže během nabíjení v něm může část zátěže auta chybět.</value>
@@ -127,13 +127,13 @@
     <value>síť</value>
   </data>
   <data name="GridTip" xml:space="preserve">
-    <value>Výkon sítě: kladný při odběru ze sítě, záporný při dodávce do sítě.</value>
+    <value>Výkon sítě: kladný při importu ze sítě, záporný při exportu do sítě.</value>
   </data>
   <data name="Importing" xml:space="preserve">
-    <value>odběr</value>
+    <value>import</value>
   </data>
   <data name="Exporting" xml:space="preserve">
-    <value>dodávka</value>
+    <value>export</value>
   </data>
   <data name="Balanced" xml:space="preserve">
     <value>vyrovnáno</value>

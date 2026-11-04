@@ -40,7 +40,7 @@
     <value>Domácí baterie zůstává stranou, zatímco síť auto dobíjí, aby se nevybila do nabíjení, které by stejně nestačilo.</value>
   </data>
   <data name="ForecastCoversAll" xml:space="preserve">
-    <value>Předpověď pokryje všechno: {0} z přebytku {1} a odběr ze sítě se neplánuje vůbec.</value>
+    <value>Předpověď pokryje všechno: {0} z přebytku {1} a import ze sítě se neplánuje vůbec.</value>
   </data>
   <data name="BatteryKeepsPriority" xml:space="preserve">
     <value>Domácí baterie má po celou dobu přednost: blokace vybíjení se zapne, kdykoli auto odebírá víc, než dává střecha, takže ho baterie nikdy nenapájí.</value>
@@ -193,7 +193,7 @@
     <value>Výkon sítě</value>
   </data>
   <data name="GridPowerTopUpHint" xml:space="preserve">
-    <value>Kladný při odběru. Když síť dorovnává malý přebytek, je to zhruba to dorovnání.</value>
+    <value>Kladný při importu. Když síť dorovnává malý přebytek, je to zhruba to dorovnání.</value>
   </data>
   <data name="NoForecast" xml:space="preserve">
     <value>žádná předpověď</value>
@@ -379,10 +379,10 @@
     <value>žádné</value>
   </data>
   <data name="FastIntro" xml:space="preserve">
-    <value>Tak rychle, jak instalace dovolí, s domácí baterií stranou — počítejte s odběrem ze sítě.</value>
+    <value>Tak rychle, jak instalace dovolí, s domácí baterií stranou — počítejte s importem ze sítě.</value>
   </data>
   <data name="FastTip" xml:space="preserve">
-    <value>Nabíjí tak rychle, jak instalace dovolí, a domácí baterii z toho vynechává. Nastavená hodnota je pevně na nastaveném maximu, ať dělá slunce cokoli: FV pokryje, co může, a síť zbytek, takže počítejte s odběrem. Blokace vybíjení se zapne se začátkem nabíjení a uvolní s jeho koncem — mezitím ji můžete vypnout, pokud chcete, aby baterie pomohla.</value>
+    <value>Nabíjí tak rychle, jak instalace dovolí, a domácí baterii z toho vynechává. Nastavená hodnota je pevně na nastaveném maximu, ať dělá slunce cokoli: FV pokryje, co může, a síť zbytek, takže počítejte s importem. Blokace vybíjení se zapne se začátkem nabíjení a uvolní s jeho koncem — mezitím ji můžete vypnout, pokud chcete, aby baterie pomohla.</value>
   </data>
   <data name="HowMuchTopic" xml:space="preserve">
     <value>Kolik?</value>
@@ -445,7 +445,7 @@
     <value>Nastavená hodnota nabíječky přečtená zpět z hardwaru: na čem opravdu zůstala.</value>
   </data>
   <data name="FastGridPowerHint" xml:space="preserve">
-    <value>Kladný při odběru ze sítě, záporný při dodávce. V tomto režimu je to cena za rychlost.</value>
+    <value>Kladný při importu ze sítě, záporný při exportu. V tomto režimu je to cena za rychlost.</value>
   </data>
   <data name="Delivered" xml:space="preserve">
     <value>Dodáno</value>
@@ -505,7 +505,7 @@
     <value>Nabíjí naplno, aby bylo hotovo v {0:HH:mm}: ještě {1} při {2}.</value>
   </data>
   <data name="TargetedPlanStateHint" xml:space="preserve">
-    <value>Splněno: cíl je dosažen. Slunce: předpověď ho pokryje bez jakéhokoli odběru. Slunce + síť: slunce pokryje, co může, a zbytek rovnoměrně dodá síť. Naplno: času není dost, takže se bere všechno, co je k dispozici.</value>
+    <value>Splněno: cíl je dosažen. Slunce: předpověď ho pokryje bez jakéhokoli importu. Slunce + síť: slunce pokryje, co může, a zbytek rovnoměrně dodá síť. Naplno: času není dost, takže se bere všechno, co je k dispozici.</value>
   </data>
   <data name="StillNeeded" xml:space="preserve">
     <value>Ještě chybí</value>
@@ -670,7 +670,7 @@
     <value>Jen slunce</value>
   </data>
   <data name="SunOnlyTip" xml:space="preserve">
-    <value>Nic se nekupuje ze sítě. Co slunce do odjezdu nedodá, se ukáže jako deficit, ne jako odběr — náhled před spuštěním ukáže kolik. Mrak, na který tříminutový průměr ještě nezareagoval, může ze sítě trochu vzít, zatímco auto běží na minimu, takže počítejte s téměř nulou, ne s přesnou nulou.</value>
+    <value>Nic se nekupuje ze sítě. Co slunce do odjezdu nedodá, se ukáže jako deficit, ne jako import — náhled před spuštěním ukáže kolik. Mrak, na který tříminutový průměr ještě nezareagoval, může ze sítě trochu vzít, zatímco auto běží na minimu, takže počítejte s téměř nulou, ne s přesnou nulou.</value>
   </data>
   <data name="SunOnlyNoJustInTime" xml:space="preserve">
     <value>Na poslední chvíli je vypnuto, dokud je toto zaškrtnuto: odkládat poslední úsek bez sítě, která by zakryla zamračenou hodinu, může slunce jen ztratit.</value>

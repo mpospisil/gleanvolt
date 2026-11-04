@@ -19,7 +19,7 @@
     <value>dodáno {0} — z toho {1} půjčeno z baterie</value>
   </data>
   <data name="ChartNote" xml:space="preserve">
-    <value>Každý měřák tak, jak byl vzorkován, ve wattech. {0} je nad čarou odběr a pod ní dodávka; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Stínovaný pás označuje úseky, kdy byla aktivní blokace baterie, a úsek bez vzorků je mezera, ne čára přes něj nakreslená.</value>
+    <value>Každý měřák tak, jak byl vzorkován, ve wattech. {0} je nad čarou import a pod ní export; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Stínovaný pás označuje úseky, kdy byla aktivní blokace baterie, a úsek bez vzorků je mezera, ne čára přes něj nakreslená.</value>
   </data>
   <data name="ChartNoteFloor" xml:space="preserve">
     <value>{0} je čára, se kterou se porovnává SOC domácí baterie: nad ní smí baterie autu půjčovat, pod ní patří slunce baterii.</value>
@@ -226,7 +226,7 @@
     <value>Průběh dne</value>
   </data>
   <data name="EnergyChartNote" xml:space="preserve">
-    <value>Výkon zprůměrovaný za každou pozorovanou čtvrthodinu — úložiště drží energii a čtvrthodina, kterou služba viděla jen zčásti, se dělí tou částí, takže restart je mezera, ne propad, který slunce neudělalo. {0} je nad čarou odběr a pod ní dodávka; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Pruh podél spodního okraje označuje okna pozorovaná jen zčásti — tatáž, která tabulka níže ukazuje kurzívou.</value>
+    <value>Výkon zprůměrovaný za každou pozorovanou čtvrthodinu — úložiště drží energii a čtvrthodina, kterou služba viděla jen zčásti, se dělí tou částí, takže restart je mezera, ne propad, který slunce neudělalo. {0} je nad čarou import a pod ní export; {1} je nad čarou nabíjení a pod ní vybíjení. Kliknutím na název v legendě řadu skryjete. Pruh podél spodního okraje označuje okna pozorovaná jen zčásti — tatáž, která tabulka níže ukazuje kurzívou.</value>
   </data>
   <data name="From" xml:space="preserve">
     <value>Od</value>
@@ -238,10 +238,10 @@
     <value>Předpověď</value>
   </data>
   <data name="ColImport" xml:space="preserve">
-    <value>Odběr</value>
+    <value>Import</value>
   </data>
   <data name="ColExport" xml:space="preserve">
-    <value>Dodávka</value>
+    <value>Export</value>
   </data>
   <data name="ColToCar" xml:space="preserve">
     <value>Do auta</value>
@@ -265,7 +265,7 @@
     <value>Den</value>
   </data>
   <data name="EnergyTableNote" xml:space="preserve">
-    <value>Každý údaj je v kWh za daný interval, v čase {0}. Odběr a dodávka jsou zvlášť, stejně jako oba směry baterie — čistý údaj by nerozlišil klidnou čtvrthodinu od rušné, která se náhodou vyrovnala. {1} je zbytek ostatních (včetně auta), ne samostatné měření.</value>
+    <value>Každý údaj je v kWh za daný interval, v čase {0}. Import a export jsou zvlášť, stejně jako oba směry baterie — čistý údaj by nerozlišil klidnou čtvrthodinu od rušné, která se náhodou vyrovnala. {1} je zbytek ostatních (včetně auta), ne samostatné měření.</value>
   </data>
   <data name="ForecastPageTitle" xml:space="preserve">
     <value>Předpověď</value>
