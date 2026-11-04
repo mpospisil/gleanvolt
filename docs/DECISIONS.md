@@ -39,7 +39,7 @@ test host: a pseudo-localized page turned English with the first poll. Component
 event capture the viewer's culture on their circuit (`ViewerCulture`) and apply it inside the
 dispatched work, never on the calling thread.
 
-**Guards.** A Debug-only pseudo-locale (`qps-ploc`) generated from the English, which each page's
+**Guards.** A pseudo-locale (`qps-ploc`) generated from the English, built in every configuration but offered only in Development, which each page's
 fixture renders once and fails on any plain English outside a translated string; key, placeholder and
 plural-form parity for every translation; every enum the UI names has every value named; every phrase
 key a service uses has a template.

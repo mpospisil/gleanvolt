@@ -56,10 +56,11 @@
   <!--
     The pseudo-locale (qps-ploc): every neutral string with its vowels accented and in brackets,
     generated from the English rather than checked in, so it can never fall behind. Text on a page
-    that does not look like "[Óvéřvíéw]" under it was never moved into a resource. Debug builds only;
-    the published image has no use for it, and WebUiCultures only offers it in Development anyway.
+    that does not look like "[Óvéřvíéw]" under it was never moved into a resource. Built in every
+    configuration, because CI tests a Release build and the page checks need it there; it ships as one
+    small satellite that WebUiCultures offers only in Development, so production never shows it.
   -->
-  <Target Name="GeneratePseudoLocale" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' == 'Debug'">
+  <Target Name="GeneratePseudoLocale" BeforeTargets="PrepareForBuild">
     <MakeDir Directories="$(IntermediateOutputPath)pseudo" />
     <XslTransformation XmlInputPaths="%(NeutralResx.FullPath)" XslInputPath="Resources\pseudo-locale.xslt"
                        OutputPaths="$(IntermediateOutputPath)pseudo\%(NeutralResx.Filename).qps-ploc.resx" />
