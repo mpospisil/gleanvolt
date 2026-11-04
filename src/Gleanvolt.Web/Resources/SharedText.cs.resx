@@ -82,7 +82,7 @@
     <value>Targeted</value>
   </data>
   <data name="ModeSolarSummary" xml:space="preserve">
-    <value>Nabíjí z přebytku ze slunce, který dům nespotřebuje, až když je domácí baterie plná.</value>
+    <value>Nabíjí z přebytku ze slunce, který dům nespotřebuje, až po plném nabití domácí baterie.</value>
   </data>
   <data name="ModeForecastedSummary" xml:space="preserve">
     <value>Nabíjí z přebytku jako Solar. Kolik dnešního slunce smí dostat auto, určuje předpověď tak, aby se domácí baterie do večera přesto nabila na 100 %.</value>
