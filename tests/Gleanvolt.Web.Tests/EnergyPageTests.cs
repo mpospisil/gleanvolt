@@ -258,4 +258,14 @@ public class EnergyPageTests : PageTest
             Assert.Equal(8000, series.Solar[0]!.Value, 3);
         });
     }
+
+    [Fact]
+    public void Every_string_on_the_energy_page_comes_from_a_resource()
+    {
+        _store.Intervals.Add(TestIntervals.Sample(PragueMorning(), solarKwh: 1.42, evKwh: 0.75));
+
+        var page = PseudoLocale.Render(() => Render<Energy>());
+
+        page.WaitForAssertion(() => PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague"));
+    }
 }

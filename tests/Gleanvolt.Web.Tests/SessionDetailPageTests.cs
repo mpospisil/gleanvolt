@@ -283,4 +283,16 @@ public class SessionDetailPageTests : PageTest
 
         withCar.WaitForAssertion(() => Assert.Contains("Car SOC", withCar.Markup));
     }
+
+    [Fact]
+    public void Every_string_on_a_session_comes_from_a_resource()
+    {
+        var session = TestSessions.Sample(startedAt: new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero));
+        _store.Sessions.Add(session);
+        _store.Documents[session.Id] = ChargingSessionDocument.Create(session, [], []);
+
+        var page = PseudoLocale.Render(() => RenderFor(session.Id));
+
+        page.WaitForAssertion(() => PseudoLocale.AssertTranslated(page.Markup));
+    }
 }

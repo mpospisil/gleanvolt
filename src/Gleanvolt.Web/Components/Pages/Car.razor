@@ -34,21 +34,19 @@
     the feed this installation actually runs, and both say something for every one of the five.
 *@
 
-<SiteTitle Page="Car" />
+<SiteTitle Page="@CarText.CarPageTitle" />
 
-<h1>Car</h1>
+<h1>@CarText.CarTitle</h1>
 
 <p class="muted">
-    Everything after the form is what the controller is running with, resolved from the configuration
-    at startup. The form changes what the next start reads; a restart applies it, and then the account
-    below is where it gets proved.
+    @CarText.CarIntro
 </p>
 
 <CarEditorForm />
 
 <VehicleAccount Feed="_runningFeed" />
 
-<h2>Ask the car</h2>
+<h2>@CarText.AskTheCarHeading</h2>
 
 @*
     One button, against whatever feed this installation has (#227).
@@ -70,10 +68,7 @@
 @if (_runningFeed == VehicleFeed.DataAct)
 {
     <p class="muted">
-        Asks @Portal.PortalName for @CarName, once, when you press the button. <em>This press</em> runs
-        on no schedule and what it shows is fed to nothing — not the dashboard's card, not any charging
-        decision — so it is how you check that the credentials work and that the portal's fields are
-        understood, whether or not the feed on its own clock is switched on.
+        @Localized.Rich(CarText.PortalIntro, @<text>@(Portal.PortalName)</text>, @<text>@(CarName)</text>, @<em>@CarText.PortalIntro_2</em>)
     </p>
 
     @if (!Portal.IsConfigured)
@@ -85,27 +80,23 @@
             who has just read this can actually go.
         *@
         <p class="error" id="portal-unconfigured">
-            Not configured: needs @Portal.DescribeWhatIsMissing().
+            @Localized.Format(CarText.NotConfiguredNeeds, Portal.DescribeWhatIsMissing())
         </p>
 
         <p class="hint">
-            Those are the <em>Brand</em>, <em>VW ID</em>, <em>Password</em> and <em>VIN</em> fields in
-            the form above; fill them in and restart. The portal also needs a <em>continuous data
-            request</em> enabling by hand before it delivers anything — see
-            <code>docs/VW_PORTAL_SETUP.md</code>.
+            @Localized.Rich(CarText.PortalFieldsHint, @<em>@CarText.PortalFieldsHint_0</em>, @<em>@CarText.PortalFieldsHint_1</em>, @<em>@CarText.PortalFieldsHint_2</em>, @<em>@CarText.PortalFieldsHint_3</em>, @<em>@CarText.PortalFieldsHint_4</em>, @<code>docs/VW_PORTAL_SETUP.md</code>)
         </p>
     }
     else
     {
         <div class="actions">
             <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="ReadPortalAsync">
-                @(_busy ? "Asking the car…" : "Ask the car")
+                @(_busy ? CarText.AskingTheCar : CarText.AskTheCar)
             </button>
         </div>
 
         <p class="hint">
-            Each press signs in afresh. That is fine by hand and is why this is not a poll: repeatedly
-            replaying a password at a real identity provider is how accounts get locked.
+            @CarText.SignsInAfresh
         </p>
     }
 }
@@ -114,22 +105,17 @@ else if (_runningFeed is VehicleFeed.Volkswagen or VehicleFeed.Skoda)
     @if (Feed.Service is { } service)
     {
         <p class="muted">
-            Asks @service.DisplayName for @CarName, once, now — the same call the feed makes on its own
-            clock, made because you asked rather than because the clock said so. Unlike a Data Act
-            read, what comes back <em>does</em> reach the dashboard's card: an owner who presses a
-            button is asking the whole UI to catch up, not just this page. It does not disturb the
-            feed's own cadence.
+            @Localized.Rich(CarText.FeedIntro, @<text>@(service.DisplayName)</text>, @<text>@(CarName)</text>, @<em>@CarText.FeedIntro_2</em>)
         </p>
 
         <div class="actions">
             <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="AskFeedAsync">
-                @(_busy ? "Asking the car…" : "Ask the car")
+                @(_busy ? CarText.AskingTheCar : CarText.AskTheCar)
             </button>
         </div>
 
         <p class="hint">
-            If the account above is not signed in, this is what says so: the feed answers with what is
-            stopping it rather than with a reading.
+            @CarText.FeedAskHint
         </p>
     }
     else
@@ -140,41 +126,32 @@ else if (_runningFeed is VehicleFeed.Volkswagen or VehicleFeed.Skoda)
             used to show: a sentence about the feed that was chosen.
         *@
         <p class="muted" id="car-ask-unavailable">
-            Nothing to ask yet: this feed is switched on but did not start, so the controller has no
-            client for it. Fill in the fields it needs in the form above and restart.
+            @CarText.NothingToAskYet
         </p>
     }
 }
 else if (_runningFeed == VehicleFeed.OwnTopic)
 {
     <p class="muted" id="car-ask-own-topic">
-        Nothing to press, because nothing here fetches: you publish this car's readings yourself on
-        @(string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic)
-            ? (MarkupString)"the topic in the form above"
-            : (MarkupString)$"<code>{System.Net.WebUtility.HtmlEncode(Vehicle.TelemetryTopic)}</code>")
-        — one JSON object per reading, with the <em>car's</em> own capture time in
-        <code>captured_at</code> and <code>soc_percent</code>, <code>range_km</code>,
-        <code>charge_state</code> and <code>plug_state</code> as far as your source carries them.
+        @Localized.Rich(
+            CarText.OwnTopicNothingToPress,
+            string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic) ? @<text>@CarText.TheTopicInTheForm</text> : @<code>@Vehicle.TelemetryTopic</code>,
+            @<em>@CarText.OwnTopicNothingToPress_Cars</em>,
+            @<code>captured_at</code>, @<code>soc_percent</code>, @<code>range_km</code>, @<code>charge_state</code>, @<code>plug_state</code>)
         @if (Telemetry.GetCurrentState() is { } published)
         {
-            <text>
-                The last one arrived carrying @Units.Percent(published.SocPercent), captured
-                @Age(published) ago.
-            </text>
+            @Localized.Format(CarText.LastArrived, Units.Percent(published.SocPercent), Age(published))
         }
         else
         {
-            <text>Nothing has arrived on it yet.</text>
+            @CarText.NothingArrived
         }
     </p>
 }
 else
 {
     <p class="muted" id="car-ask-charge-only">
-        Nothing to ask, because nothing reads this car — and nothing here needs to. Whether a cable is
-        in the socket comes from the charger rather than from the car, so the dashboard answers that
-        either way; what no feed costs is the pack's own state of charge, and a target is asked for in
-        kWh instead.
+        @CarText.NothingToAskChargeOnly
     </p>
 }
 
@@ -191,8 +168,8 @@ else
 
     <p class="hint">
         @(failed.IsWorthRetrying
-            ? "Worth pressing again — this one is expected and usually clears itself."
-            : "Pressing again will not help. This one needs something changed, or a browser.")
+            ? CarText.WorthRetrying
+            : CarText.NotWorthRetrying)
     </p>
 }
 else if (_reading is { Succeeded: true, State: { } state })
@@ -210,18 +187,18 @@ else if (_reading is { Succeeded: true, State: { } state })
     @if (Telemetry.GetCurrentState() is { } held)
     {
         <p class="muted" id="against-the-feed">
-            The dashboard's card is showing @Units.Percent(held.SocPercent) from
-            @(string.IsNullOrWhiteSpace(held.SourceId) ? "the feed" : held.SourceId), captured
-            @Age(held) ago@(Difference(state, held)). That is a different session asking at a different
-            moment, so a difference is not by itself a fault.
+            @Localized.Format(
+                CarText.CardShowing,
+                Units.Percent(held.SocPercent),
+                string.IsNullOrWhiteSpace(held.SourceId) ? CarText.TheFeed : held.SourceId,
+                Age(held),
+                Difference(state, held))
         </p>
     }
     else
     {
         <p class="muted" id="against-the-feed">
-            Nothing has reached the dashboard's card yet, so there is nothing to hold this against.
-            That is what an install with no feed switched on looks like, and it is not a fault: this
-            press is the whole reading.
+            @CarText.NothingOnTheCard
         </p>
     }
 }
@@ -234,7 +211,7 @@ else if (_reading is { Succeeded: true, State: { } state })
 {
     @if (!answer.Succeeded)
     {
-        <p class="error" id="car-ask-failed">The car did not answer — @answer.Message</p>
+        <p class="error" id="car-ask-failed">@Localized.Format(CarText.CarDidNotAnswer, answer.Message)</p>
     }
 
     @if (answer.State is { } reading)
@@ -243,38 +220,36 @@ else if (_reading is { Succeeded: true, State: { } state })
 
         <p class="muted table-note" id="car-ask-source">
             @(answer.IsFresh
-                ? $"Fresh, from {answer.Source ?? "the feed"}, and the dashboard's card is now showing it too."
-                : "That is the reading the feed was already holding, not a new one.")
+                ? Localized.Format(CarText.FreshFrom, answer.Source ?? CarText.TheFeed)
+                : CarText.AlreadyHeld)
         </p>
     }
 }
 
-<h2>Running</h2>
+<h2>@CarText.Running</h2>
 
 @if (!Vehicle.IsConfigured)
 {
     <p class="muted" id="car-unconfigured">
-        Nothing is described yet, so every charging limit is the installation's own and no target can be
-        asked for as a state of charge. That is a supported installation — the charge still runs — and
-        the form above is how to change it.
+        @CarText.NothingDescribed
     </p>
 }
 else
 {
     <dl class="facts">
-        <dt>Name</dt>
+        <dt>@CarText.Name</dt>
         <dd>@Text(Vehicle.Name)</dd>
 
         <dt>Id</dt>
         <dd>@Text(Vehicle.Id)</dd>
 
-        <dt>Model</dt>
+        <dt>@CarText.Model</dt>
         <dd>@Text(string.Join(" ", new[] { Vehicle.Make, Vehicle.Model }.Where(part => !string.IsNullOrWhiteSpace(part))))</dd>
 
-        <dt>Usable battery</dt>
+        <dt>@CarText.UsableBattery</dt>
         <dd>@(Vehicle.CanTargetSoc ? Units.Capacity(Vehicle.BatteryCapacityWh) : Missing)</dd>
 
-        <dt>Charge efficiency</dt>
+        <dt>@CarText.ChargeEfficiency</dt>
         <dd>@Units.Fraction(Vehicle.ChargeEfficiency)</dd>
     </dl>
 
@@ -284,23 +259,23 @@ else
     *@
     <table class="grid">
         <thead>
-            <tr><th>&nbsp;</th><th>The car</th><th>The installation</th><th>In effect</th></tr>
+            <tr><th>&nbsp;</th><th>@CarText.TheCarColumn</th><th>@CarText.TheInstallation</th><th>@CarText.InEffect</th></tr>
         </thead>
         <tbody>
             <tr>
-                <td>Minimum current</td>
+                <td>@CarText.MinimumCurrent</td>
                 <td>@Units.Current(Vehicle.MinChargingCurrentAmps)</td>
                 <td>@Units.Current(Limits.MinAmps == Vehicle.MinChargingCurrentAmps ? null : Limits.MinAmps)</td>
                 <td>@Units.Current(Limits.MinAmps)</td>
             </tr>
             <tr>
-                <td>Maximum current</td>
+                <td>@CarText.MaximumCurrent</td>
                 <td>@Units.Current(Vehicle.MaxChargingCurrentAmps)</td>
                 <td>@Units.Current(Limits.MaxAmps == Vehicle.MaxChargingCurrentAmps ? null : Limits.MaxAmps)</td>
                 <td>@Units.Current(Limits.MaxAmps)</td>
             </tr>
             <tr>
-                <td>Phases</td>
+                <td>@CarText.Phases</td>
                 <td>@Count(Vehicle.Phases)</td>
                 <td>@Count(Limits.Phases == Vehicle.Phases ? null : Limits.Phases)</td>
                 <td>@Count(Limits.Phases)</td>
@@ -309,13 +284,11 @@ else
     </table>
 
     <p class="table-note muted">
-        The controller works to the narrower of the two. A car can only ever <em>lower</em> a limit —
-        the installation's maximum is the site's supply and the wiring in the wall, not a preference —
-        and anything the car leaves unstated is simply the installation's figure.
+        @Localized.Rich(CarText.NarrowerOfTwo, @<em>@CarText.NarrowerOfTwo_0</em>)
     </p>
 }
 
-<h2>Feed</h2>
+<h2>@CarText.Feed</h2>
 
 @*
     Which feed this process actually started, as opposed to which one the configuration asks for. They
@@ -325,21 +298,20 @@ else
 @if (Feed.Service is { } running)
 {
     <dl class="facts">
-        <dt>Reading the car</dt>
+        <dt>@CarText.ReadingTheCar</dt>
         <dd>@running.DisplayName <span class="muted">(@running.Manufacturer)</span></dd>
 
-        <dt>For</dt>
+        <dt>@CarText.For</dt>
         <dd>@Text(running.VehicleId)</dd>
 
-        <dt>State</dt>
-        <dd>@running.Health.State — @running.Health.Message</dd>
+        <dt>@CarText.State</dt>
+        <dd>@Localized.Name(running.Health.State) — @running.Health.Message</dd>
     </dl>
 }
 else
 {
     <p class="muted" id="no-feed">
-        No manufacturer feed is running. Charging is unaffected; what is missing is the car's own state
-        of charge, so a target is asked for in kWh rather than as a percentage.
+        @CarText.NoManufacturerFeed
     </p>
 }
 
@@ -351,8 +323,7 @@ else
 @if (!string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic))
 {
     <p class="table-note muted" id="own-topic">
-        This car also has a topic of its own, <code>@Vehicle.TelemetryTopic</code>. It may run beside a
-        manufacturer feed — the freshest reading wins.
+        @Localized.Rich(CarText.OwnTopicToo, @<code>@Vehicle.TelemetryTopic</code>)
     </p>
 }
 
@@ -385,7 +356,7 @@ else
     protected override void OnInitialized() => _runningFeed = Editor.Read().RunningFeed;
 
     /// <summary>The owner's word for the car, falling back to something that reads as a sentence.</summary>
-    private string CarName => string.IsNullOrWhiteSpace(Vehicle.Name) ? "the car" : Vehicle.Name;
+    private string CarName => string.IsNullOrWhiteSpace(Vehicle.Name) ? CarText.TheCarFallback : Vehicle.Name;
 
     /// <summary>
     /// The car in the dashboard card's own figures and its own component (#178).
@@ -399,25 +370,24 @@ else
         <h3>@CarName</h3>
 
         <section class="stat-grid" id="car">
-            <Stat Label="Car battery" Value="@Units.Percent(state.SocPercent)"
-                  Hint="The car's own state of charge, as the source answered this press. Not the home battery." />
-            <Stat Label="Car range" Value="@Units.Distance(state.RangeMetres)"
-                  Hint="What the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it is the figure that says whether the charge you are about to ask for is enough." />
-            <Stat Label="Car reading age" Value="@Age(state)"
-                  Hint="How long ago the car itself produced this reading — not how long ago you pressed the button. Hours old is normal for a parked car." />
-            <Stat Label="Car charge state" Value="@state.ChargeState.ToString()"
-                  Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
-            <Stat Label="Car plug state" Value="@state.PlugState.ToString()"
-                  Hint="Whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one." />
-            <Stat Label="Target SOC" Value="@Units.Percent(targetSoc)"
-                  Hint="The car's own charge limit, set in the car or its app. The Data Act portal carries it and no live feed does: no plan reads it yet (#101). A dash means this source did not carry it." />
-            <Stat Label="Time left" Value="@VehicleFormatting.ChargeTime(state)"
-                  Hint="The car's own estimate of how much longer it needs, not one of ours. A dash means the source did not carry it — which is itself a finding." />
+            <Stat Label="@CarText.CarBattery" Value="@Units.Percent(state.SocPercent)"
+                  Hint="@CarText.CarBatteryPressHint" />
+            <Stat Label="@CarText.CarRange" Value="@Units.Distance(state.RangeMetres)"
+                  Hint="@CarText.CarRangeHint" />
+            <Stat Label="@CarText.CarReadingAge" Value="@Age(state)"
+                  Hint="@CarText.CarReadingAgeHint" />
+            <Stat Label="@CarText.CarChargeState" Value="@Localized.Name(state.ChargeState)"
+                  Hint="@CarText.CarChargeStateHint" />
+            <Stat Label="@CarText.CarPlugState" Value="@Localized.Name(state.PlugState)"
+                  Hint="@CarText.CarPlugStateHint" />
+            <Stat Label="@CarText.TargetSoc" Value="@Units.Percent(targetSoc)"
+                  Hint="@CarText.TargetSocHint" />
+            <Stat Label="@CarText.TimeLeft" Value="@VehicleFormatting.ChargeTime(state)"
+                  Hint="@CarText.TimeLeftHint" />
         </section>
 
         <p class="muted table-note">
-            The capture time is the <em>car's</em>, not this moment's. A parked car reporting hours ago
-            is normal and not a fault — its state of charge does not drift.
+            @Localized.Tagged(CarText.CaptureTimeNote, ("em", CarText.CaptureTimeNote_0))
         </p>
     </text>;
 
@@ -488,11 +458,16 @@ else
 
         if (gap == 0)
         {
-            return " — the same state of charge";
+            return " " + CarText.SameSoc;
         }
 
         var size = Math.Abs(gap);
-        return $" — {size:F0} point{(size == 1 ? "" : "s")} {(gap > 0 ? "below" : "above")} this press";
+        var points = (long)size;
+        return " " + Localized.Format(
+            gap > 0
+                ? Localized.Plural(points, CarText.PointsBelow_One, CarText.PointsBelow_Few, CarText.PointsBelow_Other)
+                : Localized.Plural(points, CarText.PointsAbove_One, CarText.PointsAbove_Few, CarText.PointsAbove_Other),
+            points);
     }
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;

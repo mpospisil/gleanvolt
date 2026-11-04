@@ -71,6 +71,18 @@ public static partial class Localized
         }
     };
 
+    /// <summary>
+    /// <see cref="Rich"/> for markup that is only an element around words, where an inline Razor
+    /// template is not allowed (inside another one): <c>("em", "car's")</c>.
+    /// </summary>
+    public static RenderFragment Tagged(string template, params (string Element, string Text)[] parts) =>
+        Rich(template, [.. parts.Select(part => (RenderFragment)(builder =>
+        {
+            builder.OpenElement(0, part.Element);
+            builder.AddContent(1, part.Text);
+            builder.CloseElement();
+        }))]);
+
     [GeneratedRegex(@"\{(\d+)\}")]
     private static partial Regex PlaceholderPattern();
 }

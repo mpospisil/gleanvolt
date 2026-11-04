@@ -157,4 +157,19 @@ public class SolarGridTabTests : PageTest
 
         Assert.Contains("none left today", page.Markup);
     }
+
+    [Fact]
+    public void Every_string_on_the_solar_grid_tab_comes_from_a_resource()
+    {
+        WithATariff();
+        _lowTariff.On.Add(ChargeControlMode.SolarGrid);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.SolarGrid) with
+        {
+            LowTariff = new LowTariffStatus(Waiting: true, Until: new DateTimeOffset(2026, 9, 12, 20, 0, 0, TimeSpan.Zero), Ignored: false),
+        });
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
 }

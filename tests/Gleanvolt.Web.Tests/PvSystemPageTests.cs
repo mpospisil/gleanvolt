@@ -452,4 +452,19 @@ public class PvSystemPageTests : BunitContext
         // Masked in the line, whole when copied -- so the command stays a command.
         Assert.DoesNotContain("a-real-key", call);
     }
+
+    [Fact]
+    public void Every_string_on_the_settings_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => Render(
+            mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
+            api: Api(new ApiKeyDisplay("home-assistant", null))));
+
+        // The topic descriptions are HaDiscovery's own words: service text, a later step of #290.
+        PseudoLocale.AssertTranslated(
+            page.Markup,
+            "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
+            "Availability", "Status, as one JSON payload", "Battery hold, set", "Start a targeted charge", "Stop the controller",
+            "curl Authorization Bearer http localhost status api openapi json home assistant availability");
+    }
 }

@@ -981,4 +981,17 @@ public class TargetedTabTests : PageTest
                 : plan;
         }
     }
+
+    [Fact]
+    public void Every_string_on_the_targeted_tab_comes_from_a_resource()
+    {
+        _holder.Set(Statuses.Sample(Now, ChargeControlMode.Targeted) with
+        {
+            TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
+        });
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        PseudoLocale.AssertTranslated(page.Markup, TestTargetedPlans.SolarPlusGrid(Now).Reason);
+    }
 }

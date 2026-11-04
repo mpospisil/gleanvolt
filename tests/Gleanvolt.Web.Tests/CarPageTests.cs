@@ -1034,4 +1034,21 @@ public class CarPageTests : PageTest
         Assert.Contains("Nothing has reached the dashboard's card yet", against);
         Assert.DoesNotContain("below this press", against);
     }
+
+    [Theory]
+    [InlineData(VehicleFeed.ChargeOnly)]
+    [InlineData(VehicleFeed.OwnTopic)]
+    [InlineData(VehicleFeed.DataAct)]
+    public void Every_string_on_the_car_page_comes_from_a_resource(VehicleFeed feed)
+    {
+        var page = PseudoLocale.Render(() => feed == VehicleFeed.DataAct
+            ? DataActPage()
+            : Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, feed));
+
+        // The account and portal null objects describe themselves: service text, a later step of #290.
+        PseudoLocale.AssertTranslated(
+            page.Markup,
+            "The ID.4", "Volkswagen ID.4 Pro", "id4", "gleanvolt vehicle state", "volkswagen.de", "MyŠkoda", "Škoda",
+            "Audi SEAT Cupra Bentley VW", "captured_at soc_percent range_km charge_state plug_state");
+    }
 }

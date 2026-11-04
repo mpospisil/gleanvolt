@@ -450,4 +450,14 @@ public class FastTabTests : PageTest
         Assert.Empty(page.FindAll("p.error"));
         Assert.Contains(_actions.Starts, start => start.Mode == ChargeControlMode.FastNoBattery);
     }
+
+    [Fact]
+    public void Every_string_on_the_fast_tab_comes_from_a_resource()
+    {
+        _holder.Set(Status(Deferred(departIn: TimeSpan.FromHours(1))));
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
 }

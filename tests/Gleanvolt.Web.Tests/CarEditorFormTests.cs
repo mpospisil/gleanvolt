@@ -371,4 +371,15 @@ public class CarEditorFormTests : BunitContext
         Assert.All(form.FindAll("input, select"), control => Assert.True(control.HasAttribute("disabled")));
         Assert.Empty(form.FindAll("#car-save"));
     }
+
+    [Theory]
+    [InlineData(VehicleFeed.Volkswagen)]
+    [InlineData(VehicleFeed.DataAct)]
+    [InlineData(VehicleFeed.ChargeOnly)]
+    public void Every_string_on_the_form_comes_from_a_resource(VehicleFeed feed)
+    {
+        var form = PseudoLocale.Render(() => Form(feed));
+
+        PseudoLocale.AssertTranslated(form.Markup, "volkswagen.de", "MyŠkoda", "Volkswagen", "Škoda", "Audi SEAT Cupra Bentley VW");
+    }
 }

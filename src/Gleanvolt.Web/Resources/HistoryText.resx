@@ -358,4 +358,26 @@
   <data name="TodayStartsAt" xml:space="preserve">
     <value>Today starts at {0}.</value>
   </data>
+  <!-- Session chart marks -->
+  <data name="MarkModeChanged" xml:space="preserve">
+    <value>Mode changed</value>
+  </data>
+  <data name="MarkChargingStarted" xml:space="preserve">
+    <value>Charging started</value>
+  </data>
+  <data name="MarkChargingPaused" xml:space="preserve">
+    <value>Charging paused</value>
+  </data>
+  <data name="MarkPlanUnusable" xml:space="preserve">
+    <value>Plan unusable</value>
+  </data>
+  <data name="MarkPlanUsable" xml:space="preserve">
+    <value>Plan usable again</value>
+  </data>
+  <data name="MarkStoodDown" xml:space="preserve">
+    <value>Charger stood down</value>
+  </data>
+  <data name="MarkRearmed" xml:space="preserve">
+    <value>Charger switched back to Fast</value>
+  </data>
 </root>

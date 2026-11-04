@@ -85,6 +85,27 @@ public sealed partial class ResourceTests
     public void No_neutral_string_is_empty(string file) =>
         Assert.Empty(Read(file).Where(entry => string.IsNullOrWhiteSpace(entry.Value)).Select(entry => entry.Key));
 
+    // The enums the UI puts on screen through Localized.Name. A value with no name falls back to the
+    // enum's own spelling, which is English: so every value needs a key, in every language.
+    public static TheoryData<Type> ShownEnums() =>
+    [
+        typeof(Gleanvolt.Core.Enums.ChargeControlState),
+        typeof(Gleanvolt.Core.Enums.EvChargerStatus),
+        typeof(Gleanvolt.Core.Enums.VehicleChargeState),
+        typeof(Gleanvolt.Core.Enums.VehiclePlugState),
+        typeof(Gleanvolt.Core.Enums.VehicleSourceState),
+        typeof(Gleanvolt.Core.Enums.TargetedChargeStrategy),
+    ];
+
+    [Theory]
+    [MemberData(nameof(ShownEnums))]
+    public void Every_value_of_an_enum_the_ui_shows_has_a_name(Type type)
+    {
+        var keys = Read("SharedText.resx").Keys;
+
+        Assert.Empty(Enum.GetNames(type).Select(name => $"{type.Name}_{name}").Where(key => !keys.Contains(key)));
+    }
+
     private static IEnumerable<string> Files(bool translated) =>
         Directory.GetFiles(ResourcesDirectory, "*.resx")
             .Where(path => CultureOf(path) is not null == translated)

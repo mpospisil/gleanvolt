@@ -246,4 +246,12 @@ public class PvSystemEditorFormTests : BunitContext
         Assert.NotNull(form.Find("#pv-readonly"));
         Assert.Empty(form.FindAll("#pv-save"));
     }
+
+    [Fact]
+    public void Every_string_on_the_form_comes_from_a_resource()
+    {
+        var form = PseudoLocale.Render(() => Render<PvSystemEditorForm>());
+
+        PseudoLocale.AssertTranslated(form.Markup);
+    }
 }

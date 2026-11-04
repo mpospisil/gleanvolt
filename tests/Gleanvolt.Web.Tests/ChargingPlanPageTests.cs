@@ -325,4 +325,16 @@ public class ChargingPlanPageTests : PageTest
 
         Assert.Null(exception);
     }
+
+    [Theory]
+    [InlineData("solar")]
+    [InlineData("solar-grid")]
+    public void Every_string_on_a_tab_comes_from_a_resource(string tab)
+    {
+        _holder.Set(Statuses.Sample(_time.Now) with { BatteryHoldEnabled = true });
+
+        var page = PseudoLocale.Render(() => RenderTab(tab));
+
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
 }

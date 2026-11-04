@@ -43,7 +43,7 @@
                 <label class="seg-opt">
                     <input type="radio" name="tariff-provider" id="tariff-provider-@Slug(id)" disabled="@ReadOnly"
                            checked="@(_settings.Selects(id))" @onchange="() => Select(id)" />
-                    @provider.Name
+                    @ProviderName(provider)
                 </label>
             }
         </div>
@@ -68,7 +68,7 @@
         }
         else
         {
-            <p class="muted" id="tariff-no-panel">@Localized.Format(SettingsText.NothingToSet, selected.Name)</p>
+            <p class="muted" id="tariff-no-panel">@Localized.Format(SettingsText.NothingToSet, ProviderName(selected))</p>
         }
 
         <h3>@SettingsText.Prices</h3>
@@ -227,6 +227,11 @@
         _problems.Where(problem => problem.Field == field).OrderBy(problem => problem.IsWarning).FirstOrDefault();
 
     private static string Slug(string id) => id.ToLowerInvariant();
+
+    // A provider's name in the viewer's language where this build knows the provider (#290); one it
+    // does not -- a strategy added without a resource -- keeps the name it gives itself.
+    private static string ProviderName(ITariffProvider provider) =>
+        SettingsText.ResourceManager.GetString($"TariffProvider_{provider.Id}", CultureInfo.CurrentUICulture) ?? provider.Name;
 
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? string.Empty;
 

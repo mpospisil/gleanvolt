@@ -1,3 +1,4 @@
+using Gleanvolt.Web.Resources;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 
@@ -18,12 +19,10 @@ namespace Gleanvolt.Web;
 /// </summary>
 internal sealed class NoVehicleAccountSignIn : IVehicleAccountSignIn
 {
-    public string AccountName => "no manufacturer account";
+    public string AccountName => CarText.NoManufacturerAccount;
 
     public string Explanation =>
-        "No manufacturer account is wired up, so there is nothing to sign in to. A feed that needs one "
-        + "brings its own sign-in as soon as every field it requires is filled in and the controller "
-        + "has restarted into them.";
+        CarText.NoAccountExplanation;
 
     public bool IsConfigured => false;
 

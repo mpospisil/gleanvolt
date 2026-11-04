@@ -336,5 +336,12 @@ public class HealthPageTests : PageTest
         Assert.DoesNotContain("Portal session", page.Markup);
     }
 
+    [Fact]
+    public void Every_string_on_the_health_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => Render<Health>());
 
+        // The secret store describes itself (#290 leaves service text for its own step).
+        PseudoLocale.AssertTranslated(page.Markup, "Windows DPAPI, this user", "Europe/Prague");
+    }
 }

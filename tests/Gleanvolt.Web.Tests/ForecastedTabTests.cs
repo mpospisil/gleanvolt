@@ -322,4 +322,15 @@ public class ForecastedTabTests : PageTest
         Assert.Equal([(true, "Web UI")], _untilFull.Sets);
         Assert.Contains("day 2", page.Find("#until-full-state").TextContent);
     }
+
+    [Fact]
+    public void Every_string_on_the_forecasted_tab_comes_from_a_resource()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = TestPlans.Usable(_time.Now) });
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        // The plan's reason is the planner's own sentence: service text, a later step of #290.
+        PseudoLocale.AssertTranslated(page.Markup, TestPlans.Usable(_time.Now).Reason);
+    }
 }

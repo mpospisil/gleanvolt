@@ -739,4 +739,16 @@
   <data name="NoPeriodsWeekend" xml:space="preserve">
     <value>No periods: high tariff all day on Saturday and Sunday.</value>
   </data>
+  <data name="TariffProvider_None" xml:space="preserve">
+    <value>None</value>
+    <comment>The tariff provider that means there is no tariff.</comment>
+  </data>
+  <data name="TariffProvider_Table" xml:space="preserve">
+    <value>Table</value>
+    <comment>The tariff provider whose low-tariff times are typed in below.</comment>
+  </data>
+  <data name="KeyPlaceholder" xml:space="preserve">
+    <value>key</value>
+    <comment>Stands for an API key in an example command: curl -H "Authorization: Bearer &lt;key&gt;".</comment>
+  </data>
 </root>

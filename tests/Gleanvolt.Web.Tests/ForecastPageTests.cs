@@ -177,4 +177,15 @@ public class ForecastPageTests : PageTest
         // Tomorrow past the provider's horizon is a day nothing is known about, not a day with no sun.
         Assert.Contains("Nothing is held for this day", page.Markup);
     }
+
+    [Fact]
+    public void Every_string_on_the_forecast_page_comes_from_a_resource()
+    {
+        _forecasts.Days[Today] = TestForecasts.Run(Retrieved, Local(Today, 14), 3200, 2900);
+        _forecasts.Days[Tomorrow] = TestForecasts.Run(Retrieved, Local(Tomorrow, 10), 1500);
+
+        var page = PseudoLocale.Render(() => Render<Forecast>());
+
+        PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague");
+    }
 }

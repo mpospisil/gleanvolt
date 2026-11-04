@@ -114,4 +114,18 @@ public class SessionsPageTests : PageTest
             Assert.Equal($"/sessions/{session.Id}", link.GetAttribute("href"));
         });
     }
+
+    [Fact]
+    public void Every_string_on_the_sessions_page_comes_from_a_resource()
+    {
+        _store.Sessions.Add(TestSessions.Sample(
+            startedAt: _time.Now.AddHours(-2),
+            endedAt: null,
+            startMode: ChargeControlMode.Forecasted,
+            energyDeliveredWh: 6_000));
+
+        var page = PseudoLocale.Render(() => Render<Sessions>());
+
+        page.WaitForAssertion(() => PseudoLocale.AssertTranslated(page.Markup));
+    }
 }

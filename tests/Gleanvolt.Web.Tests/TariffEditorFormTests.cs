@@ -326,4 +326,12 @@ public class TariffEditorFormTests : BunitContext
 
         public TariffTimeline? Expand(TariffContext context) => null;
     }
+
+    [Fact]
+    public void Every_string_on_the_form_comes_from_a_resource()
+    {
+        var form = PseudoLocale.Render(() => RenderTable());
+
+        PseudoLocale.AssertTranslated(form.Markup, "CZK");
+    }
 }
