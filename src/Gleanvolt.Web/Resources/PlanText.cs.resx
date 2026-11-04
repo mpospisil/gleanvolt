@@ -13,7 +13,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="NoUsableForecast" xml:space="preserve">
-    <value>Není k dispozici použitelná předpověď, takže na dnešek není plán; režim místo toho nabíjí z aktuálního přebytku.</value>
+    <value>Solární energie dle předpovědi není k dispozici, takže na dnešek není plán; režim místo toho nabíjí z aktuálního přebytku.</value>
   </data>
   <data name="NoChargeableWindow" xml:space="preserve">
     <value>Dnes není žádné okno pro nabíjení: slunce nepřekročí minimum nabíječky dost dlouho, nebo všechnu výrobu potřebuje domácí baterie. Auto čeká.</value>
@@ -46,7 +46,7 @@
     <value>Domácí baterie má po celou dobu přednost: kdykoli auto odebírá víc, než vyrábí FVE, zapne se blokace vybíjení, takže baterie auto nikdy nenabíjí.</value>
   </data>
   <data name="NoUsableForecastTargeted" xml:space="preserve">
-    <value>Pro toto okno není použitelná předpověď, takže plán počítá s tím, že všechno dodá síť. Pokud se přebytek přesto objeví, použije se přednostně a plán se při příštím čtení přepočítá.</value>
+    <value>Pro toto okno není k dispozici solární energie dle předpovědi, takže plán počítá s tím, že všechno dodá síť. Pokud se přebytek přesto objeví, použije se přednostně a plán se při příštím čtení přepočítá.</value>
   </data>
   <data name="SunAndGrid" xml:space="preserve">
     <value>Slunce by mělo dodat {0} {1} a síť zbývajících {2}. Auto se nenabíjí naplno s brzkým koncem, ale rovnoměrně, zhruba {3} po celé okno. Nabíječka tak odebírá přibližně tolik, kolik FVE vyrábí, a ze sítě dokupuje jen rozdíl.</value>
@@ -250,7 +250,7 @@
     <value>Nabíjet podle předpovědi</value>
   </data>
   <data name="StartForecastedTip" xml:space="preserve">
-    <value>Když není k dispozici použitelná předpověď, nabíjí jednoduše z přebytku, místo aby nabíjení odmítl.</value>
+    <value>Když solární energie dle předpovědi není k dispozici, režim nabíjení neodmítne, ale nabíjí z aktuálního přebytku.</value>
   </data>
   <data name="WhereChargeStopsTopic" xml:space="preserve">
     <value>Kdy nabíjení skončí</value>
