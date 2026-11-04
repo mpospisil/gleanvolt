@@ -1,0 +1,742 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Health -->
+  <data name="SignInsSinceStart_One" xml:space="preserve">
+    <value>({0} sign-in since start)</value>
+  </data>
+  <data name="SignInsSinceStart_Few" xml:space="preserve">
+    <value>({0} sign-ins since start)</value>
+  </data>
+  <data name="SignInsSinceStart_Other" xml:space="preserve">
+    <value>({0} sign-ins since start)</value>
+  </data>
+  <data name="SignInsSinceStartExpiring" xml:space="preserve">
+    <value>({0} sign-ins since start — sessions are expiring)</value>
+  </data>
+  <data name="HealthPageTitle" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Build" xml:space="preserve">
+    <value>Build</value>
+  </data>
+  <data name="TimeZone" xml:space="preserve">
+    <value>Time zone</value>
+  </data>
+  <data name="LastPoll" xml:space="preserve">
+    <value>Last poll</value>
+  </data>
+  <data name="NoPollYet" xml:space="preserve">
+    <value>no poll has completed yet</value>
+  </data>
+  <data name="AgoParenthesised" xml:space="preserve">
+    <value>({0} ago)</value>
+  </data>
+  <data name="ChargeMode" xml:space="preserve">
+    <value>Charge mode</value>
+  </data>
+  <data name="Secrets" xml:space="preserve">
+    <value>Secrets</value>
+  </data>
+  <data name="BearerEquivalent" xml:space="preserve">
+    <value>— the data directory is bearer-equivalent; back it up accordingly</value>
+  </data>
+  <data name="CarFeed" xml:space="preserve">
+    <value>Car feed</value>
+  </data>
+  <data name="FeedReads" xml:space="preserve">
+    <value>Feed reads</value>
+  </data>
+  <data name="ReadingsOfAttempts" xml:space="preserve">
+    <value>{0} of {1}</value>
+  </data>
+  <data name="LastReadAgo" xml:space="preserve">
+    <value>— last {0} ago</value>
+  </data>
+  <data name="PortalSession" xml:space="preserve">
+    <value>Portal session</value>
+  </data>
+  <data name="NoSession" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="NextRead" xml:space="preserve">
+    <value>Next read</value>
+  </data>
+  <data name="FeedStopped" xml:space="preserve">
+    <value>never — the feed has stopped</value>
+  </data>
+  <data name="Service" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Stopping" xml:space="preserve">
+    <value>Stopping. The charger is being paused and the open session closed; this page will stop responding in a few seconds.</value>
+  </data>
+  <data name="StartAgain" xml:space="preserve">
+    <value>Start it again on the Pi with {0} in {1}. Nothing restarts it by itself — that is what makes this a stop rather than a restart.</value>
+  </data>
+  <data name="StopQuestion" xml:space="preserve">
+    <value>Stop the service?</value>
+  </data>
+  <data name="StopConfirm" xml:space="preserve">
+    <value>Yes, stop it</value>
+  </data>
+  <data name="StopConfirmHint" xml:space="preserve">
+    <value>Charging stops, this UI and the Home Assistant integration go offline, and the controller stays down until it is started again from a shell on the Pi.</value>
+  </data>
+  <data name="StopLabel" xml:space="preserve">
+    <value>Stop the service</value>
+  </data>
+  <data name="StopService" xml:space="preserve">
+    <value>Stop service</value>
+  </data>
+  <data name="StopHint" xml:space="preserve">
+    <value>The safe way to take the controller down: the charger is returned to its pause current, the open charging session is closed and written, and the session store is flushed — none of which happens if the process is killed instead. It does not come back on its own; Restart below is the same shutdown, for a controller that should.</value>
+  </data>
+  <data name="RestartHint" xml:space="preserve">
+    <value>The same graceful shutdown as Stop, ending with the exit code that tells Docker or systemd to start it again. The new process reads its configuration afresh, which is how a change saved in Settings is applied.</value>
+  </data>
+  <data name="Due" xml:space="preserve">
+    <value>due</value>
+  </data>
+  <data name="InDuration" xml:space="preserve">
+    <value>in {0}</value>
+  </data>
+  <!-- Settings: installation page -->
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="CarLink_0" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="CarLink" xml:space="preserve">
+    <value>The car's settings and charging limits are on the {0} page.</value>
+  </data>
+  <!-- MQTT -->
+  <data name="Mqtt" xml:space="preserve">
+    <value>MQTT</value>
+  </data>
+  <data name="MqttTopic" xml:space="preserve">
+    <value>MQTT</value>
+  </data>
+  <data name="MqttTip1_0" xml:space="preserve">
+    <value>control</value>
+  </data>
+  <data name="MqttTip1" xml:space="preserve">
+    <value>Home Assistant is a {0} surface: the topics ending {1} can start and stop charging. Vehicle telemetry only listens, and the worst a wrong setting there can do is leave the car's card empty.</value>
+  </data>
+  <data name="MqttTip2_0" xml:space="preserve">
+    <value>up</value>
+  </data>
+  <data name="MqttTip2_1" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="MqttTip2" xml:space="preserve">
+    <value>None of this says whether either link is {0}. Everything on this page was read once at startup; {1} reports the polling loop rather than the broker, so until it reports this too, the broker's own log — or Home Assistant showing the device as unavailable — is what answers that.</value>
+  </data>
+  <data name="HomeAssistant" xml:space="preserve">
+    <value>Home Assistant</value>
+  </data>
+  <data name="HomeAssistantTopic" xml:space="preserve">
+    <value>Home Assistant</value>
+  </data>
+  <data name="HaTip1" xml:space="preserve">
+    <value>The device id is the root of every entity's {0}, and it is the one value here that is expensive to change: Home Assistant keys an entity to its {1}, so a new one is a new entity, created beside the old one, and every graph starts again. The topics and the names can be changed freely. The status interval is how often the state topic is republished, which is usually the answer to "why is the Home Assistant dashboard behind?".</value>
+  </data>
+  <data name="HaTip2_3" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="HaTip2" xml:space="preserve">
+    <value>Every other entity — each number, select, text and button — follows the same pattern: {0} for what it reports and {1} for what it accepts. The retained discovery configs Home Assistant reads them from live under {2}. Anything marked {3} can change what the charger is doing.</value>
+  </data>
+  <data name="HaOff" xml:space="preserve">
+    <value>Off, which is the default: nothing is published and no command is accepted. Set {0} to {1}, give it {2} and {3} for the broker, and claim a {4} — the id is the topic segment two installations on one broker would otherwise overwrite each other on, so the controller refuses to start without it.</value>
+  </data>
+  <data name="DiscoveryPrefix" xml:space="preserve">
+    <value>Discovery prefix</value>
+  </data>
+  <data name="DeviceId" xml:space="preserve">
+    <value>Device id</value>
+  </data>
+  <data name="TopicPrefix" xml:space="preserve">
+    <value>Topic prefix</value>
+  </data>
+  <data name="StatusInterval" xml:space="preserve">
+    <value>Status interval</value>
+  </data>
+  <data name="Carries" xml:space="preserve">
+    <value>Carries</value>
+  </data>
+  <data name="TopicColumn" xml:space="preserve">
+    <value>Topic</value>
+  </data>
+  <data name="Direction" xml:space="preserve">
+    <value>Direction</value>
+  </data>
+  <data name="In" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="Out" xml:space="preserve">
+    <value>out</value>
+  </data>
+  <data name="VehicleTelemetry" xml:space="preserve">
+    <value>Vehicle telemetry</value>
+  </data>
+  <data name="VehicleTelemetryTopic" xml:space="preserve">
+    <value>vehicle telemetry</value>
+  </data>
+  <data name="VehicleTelemetryTip_1" xml:space="preserve">
+    <value>retained</value>
+  </data>
+  <data name="VehicleTelemetryTip" xml:space="preserve">
+    <value>One concrete topic, not a wildcard: this phase tracks one car, and a {0} across several would quietly let the newest message win whichever car it described. The messages are expected to be {1}, so a restart is handed the last reading straight away instead of waiting for a cloud-fed car's next update. Note that this client id is not namespaced by the system's id, so two controllers on one machine would collide on the broker.</value>
+  </data>
+  <data name="VehicleMqttOff" xml:space="preserve">
+    <value>Off, which is the default: the car's own state of charge is not read, and the Overview shows only what the charger can see. Set {0} to {1} and name the topic your publisher writes to under {2}.</value>
+  </data>
+  <data name="SubscribedTo" xml:space="preserve">
+    <value>Subscribed to</value>
+  </data>
+  <data name="Nothing" xml:space="preserve">
+    <value>nothing</value>
+  </data>
+  <data name="StaleAfter" xml:space="preserve">
+    <value>Stale after</value>
+  </data>
+  <data name="RetryEvery" xml:space="preserve">
+    <value>Retry every</value>
+  </data>
+  <data name="NoTopic" xml:space="preserve">
+    <value>The feed is on with nothing to subscribe to, so it connects to no broker and reads nothing — which from the Overview is indistinguishable from a car that never reports. Set {0} to the topic your publisher writes to.</value>
+  </data>
+  <data name="OneBroker" xml:space="preserve">
+    <value>Both links use the same broker, {0}. They are still two connections with two client ids, and either can be pointed elsewhere without touching the other.</value>
+  </data>
+  <!-- API -->
+  <data name="Api" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="ApiTopic" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="ApiTip" xml:space="preserve">
+    <value>The address is built from the one this page arrived on rather than from {0}: a hostname or a reverse proxy in front means the configured port is not necessarily the one that works, while the address that just delivered this page demonstrably does. Both links answer without a key by design — a browser cannot send one, and neither carries anything to act on — so opening either is the quickest proof that the API is up.</value>
+  </data>
+  <data name="ApiOff" xml:space="preserve">
+    <value>Off, which is the default: no route is mapped and no document is served, so there is nothing to find rather than something that answers 401. Two of its endpoints write to hardware, which is why it is switched on knowingly — with {0} and at least one key, {1}. Enabled with no key is a startup failure rather than an open control surface.</value>
+  </data>
+  <data name="BaseUrl" xml:space="preserve">
+    <value>Base URL</value>
+  </data>
+  <data name="DefaultPort" xml:space="preserve">
+    <value>— this page arrived on the default port, so the direct LAN address is {0} whatever is in front of it.</value>
+  </data>
+  <data name="Index" xml:space="preserve">
+    <value>Index</value>
+  </data>
+  <data name="OpenApiDocument" xml:space="preserve">
+    <value>OpenAPI document</value>
+  </data>
+  <data name="Keys" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="ApiKeysTopic" xml:space="preserve">
+    <value>API keys</value>
+  </data>
+  <data name="ApiKeysTip" xml:space="preserve">
+    <value>The name is not a credential — it is what reaches the log and the recorded charging session as the source of an action, so a charge started through this API is filed against the name that started it rather than anonymously. Which is the whole reason several clients get several keys.</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Key" xml:space="preserve">
+    <value>Key</value>
+  </data>
+  <data name="Configured" xml:space="preserve">
+    <value>configured</value>
+  </data>
+  <data name="KeysWithheld" xml:space="preserve">
+    <value>The keys themselves are not shown, because this UI has no login: anyone who can reach it could read them, and a key is bearer-equivalent to the stop button on the wallbox. Configure {0} ({1}) and they become readable here.</value>
+  </data>
+  <data name="CallingIt" xml:space="preserve">
+    <value>Calling it</value>
+  </data>
+  <data name="CallingTopic" xml:space="preserve">
+    <value>calling the API</value>
+  </data>
+  <data name="CallingTip" xml:space="preserve">
+    <value>The first key, this installation's own address and the endpoint worth trying first. Everything else is under the same base URL and takes the same header; the document above is the list.</value>
+  </data>
+  <data name="Retiring_0" xml:space="preserve">
+    <value>blanks</value>
+  </data>
+  <data name="Retiring" xml:space="preserve">
+    <value>On every connect this installation also {0} the retained messages left by a name it used to publish under:</value>
+  </data>
+  <data name="RetiringConfigs" xml:space="preserve">
+    <value>discovery configs for {0}.</value>
+    <comment>{0} is a list of old device ids.</comment>
+  </data>
+  <data name="RetiringConfigsAnd" xml:space="preserve">
+    <value>discovery configs for {0};</value>
+    <comment>Followed by RetiringState.</comment>
+  </data>
+  <data name="RetiringState" xml:space="preserve">
+    <value>retained state under {0}.</value>
+    <comment>{0} is a list of old topic prefixes.</comment>
+  </data>
+  <data name="RetiringNote" xml:space="preserve">
+    <value>Set after a rename, and safe to remove once it has run.</value>
+  </data>
+  <!-- Installation form -->
+  <data name="ChangesSaved_One" xml:space="preserve">
+    <value>{0} change saved</value>
+  </data>
+  <data name="ChangesSaved_Few" xml:space="preserve">
+    <value>{0} changes saved</value>
+  </data>
+  <data name="ChangesSaved_Other" xml:space="preserve">
+    <value>{0} changes saved</value>
+  </data>
+  <data name="Installation" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="SavingTopic" xml:space="preserve">
+    <value>saving installation settings</value>
+  </data>
+  <data name="SavingTip1" xml:space="preserve">
+    <value>A save is checked the way startup checks the configuration, and writes only what differs to {0}. That file wins over {1} key by key. Nothing changes until the controller restarts.</value>
+  </data>
+  <data name="SavingTip2" xml:space="preserve">
+    <value>Each field's (i) says where its current value comes from. After a save, a field whose value is not running yet says so under it.</value>
+  </data>
+  <data name="NotRunningUntilRestart" xml:space="preserve">
+    <value>— not running until the controller restarts.</value>
+  </data>
+  <data name="RestartOnHealth" xml:space="preserve">
+    <value>Restart on Health</value>
+  </data>
+  <data name="ReadOnlyNoLogin" xml:space="preserve">
+    <value>Read-only, because this UI has no login. These fields include the addresses the controller writes Modbus commands to, and without a login anyone on the LAN could point them somewhere else. Configure {0} ({1}) and they become editable here; until then, change them in {2} and restart.</value>
+  </data>
+  <data name="CurrentValueFrom" xml:space="preserve">
+    <value>Current value comes from {0}.</value>
+  </data>
+  <data name="RunningRestartToApply" xml:space="preserve">
+    <value>Running: {0} · restart to apply</value>
+  </data>
+  <data name="RevertTo" xml:space="preserve">
+    <value>Revert to {0}</value>
+  </data>
+  <data name="SaveAnyway" xml:space="preserve">
+    <value>Save anyway</value>
+  </data>
+  <data name="Checking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="SaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="DiscardChanges" xml:space="preserve">
+    <value>Discard changes</value>
+  </data>
+  <data name="SavedAnyway" xml:space="preserve">
+    <value>Saved anyway: a charger that is switched off answers nothing and is still the right address. Both devices answer Modbus on port 502, so a swapped pair shows up as a frozen battery and zero solar once running — check which is which before restarting.</value>
+  </data>
+  <data name="NotSaved" xml:space="preserve">
+    <value>Not saved — the controller would refuse to start with this:</value>
+  </data>
+  <data name="GroupIdentity" xml:space="preserve">
+    <value>Identity</value>
+  </data>
+  <data name="GroupLocation" xml:space="preserve">
+    <value>Location and orientation</value>
+  </data>
+  <data name="GroupCapacity" xml:space="preserve">
+    <value>Capacity</value>
+  </data>
+  <data name="Inverter" xml:space="preserve">
+    <value>Inverter</value>
+  </data>
+  <data name="Charger" xml:space="preserve">
+    <value>Charger</value>
+  </data>
+  <data name="FieldId" xml:space="preserve">
+    <value>Id</value>
+  </data>
+  <data name="FieldName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="FieldAddress" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="FieldCommissioned" xml:space="preserve">
+    <value>Commissioned</value>
+  </data>
+  <data name="FieldLatitude" xml:space="preserve">
+    <value>Latitude</value>
+  </data>
+  <data name="FieldLongitude" xml:space="preserve">
+    <value>Longitude</value>
+  </data>
+  <data name="FieldAzimuth" xml:space="preserve">
+    <value>Azimuth</value>
+  </data>
+  <data name="FieldTilt" xml:space="preserve">
+    <value>Tilt</value>
+  </data>
+  <data name="FieldCapacityKwp" xml:space="preserve">
+    <value>Peak DC capacity (kWp)</value>
+  </data>
+  <data name="FieldInverterCapacity" xml:space="preserve">
+    <value>Inverter capacity (kW)</value>
+  </data>
+  <data name="FieldLossFactor" xml:space="preserve">
+    <value>Loss factor</value>
+  </data>
+  <data name="FieldInverterModel" xml:space="preserve">
+    <value>Inverter model</value>
+  </data>
+  <data name="FieldInverterHost" xml:space="preserve">
+    <value>Inverter host</value>
+  </data>
+  <data name="FieldInverterPort" xml:space="preserve">
+    <value>Inverter port</value>
+  </data>
+  <data name="FieldInverterUnitId" xml:space="preserve">
+    <value>Inverter unit id</value>
+  </data>
+  <data name="FieldUnmeteredPhase" xml:space="preserve">
+    <value>Unmetered grid phase</value>
+  </data>
+  <data name="FieldChargerId" xml:space="preserve">
+    <value>Charger id</value>
+  </data>
+  <data name="FieldChargerModel" xml:space="preserve">
+    <value>Charger model</value>
+  </data>
+  <data name="FieldChargerHost" xml:space="preserve">
+    <value>Charger host</value>
+  </data>
+  <data name="FieldChargerPort" xml:space="preserve">
+    <value>Charger port</value>
+  </data>
+  <data name="FieldChargerUnitId" xml:space="preserve">
+    <value>Charger unit id</value>
+  </data>
+  <data name="HintId" xml:space="preserve">
+    <value>a-z, 0-9, - and _</value>
+  </data>
+  <data name="HintDecimalDegrees" xml:space="preserve">
+    <value>decimal degrees</value>
+  </data>
+  <data name="HintAzimuth" xml:space="preserve">
+    <value>degrees from north, 180 = south</value>
+  </data>
+  <data name="HintTilt" xml:space="preserve">
+    <value>degrees, 0 = flat</value>
+  </data>
+  <data name="HintLossFactor" xml:space="preserve">
+    <value>0 to 1</value>
+  </data>
+  <data name="HintPhase" xml:space="preserve">
+    <value>L1, L2, L3 (or R, S, T) or empty</value>
+  </data>
+  <data name="SavedRestart" xml:space="preserve">
+    <value>Saved. Restart the controller to apply it.</value>
+  </data>
+  <data name="SavedRunning" xml:space="preserve">
+    <value>Saved. The controller is already running with these values.</value>
+  </data>
+  <data name="IdWarning" xml:space="preserve">
+    <value>Changing the id moves every MQTT topic the controller publishes under, so Home Assistant sees new topics after the restart. See "Renaming what Home Assistant sees" in deploy/README.md and HA_RETIRE_TOPIC_PREFIX for clearing the old ones. The Home Assistant device id is set separately and does not move.</value>
+  </data>
+  <data name="CoordinatesWarning" xml:space="preserve">
+    <value>Clearing the coordinates turns off weather recording against charging sessions and the forecast site.</value>
+  </data>
+  <data name="SourceWebUi" xml:space="preserve">
+    <value>web UI</value>
+  </data>
+  <data name="SourceEnvironment" xml:space="preserve">
+    <value>environment</value>
+  </data>
+  <data name="SourceCommandLine" xml:space="preserve">
+    <value>command line</value>
+  </data>
+  <data name="SourceDefault" xml:space="preserve">
+    <value>default</value>
+  </data>
+  <data name="PhraseThisPage" xml:space="preserve">
+    <value>this page</value>
+  </data>
+  <data name="PhraseEnvironment" xml:space="preserve">
+    <value>the environment file</value>
+  </data>
+  <data name="PhraseCommandLine" xml:space="preserve">
+    <value>the command line</value>
+  </data>
+  <data name="PhraseDefault" xml:space="preserve">
+    <value>the built-in default</value>
+  </data>
+  <data name="Facing" xml:space="preserve">
+    <value>facing {0}</value>
+  </data>
+  <data name="BearingNormalised" xml:space="preserve">
+    <value>= {0}, {1}</value>
+  </data>
+  <data name="PhaseR" xml:space="preserve">
+    <value>= L1, in SolaX's naming</value>
+  </data>
+  <data name="PhaseS" xml:space="preserve">
+    <value>= L2, in SolaX's naming</value>
+  </data>
+  <data name="PhaseT" xml:space="preserve">
+    <value>= L3, in SolaX's naming</value>
+  </data>
+  <data name="North" xml:space="preserve">
+    <value>north</value>
+  </data>
+  <data name="NorthEast" xml:space="preserve">
+    <value>north-east</value>
+  </data>
+  <data name="East" xml:space="preserve">
+    <value>east</value>
+  </data>
+  <data name="SouthEast" xml:space="preserve">
+    <value>south-east</value>
+  </data>
+  <data name="South" xml:space="preserve">
+    <value>south</value>
+  </data>
+  <data name="SouthWest" xml:space="preserve">
+    <value>south-west</value>
+  </data>
+  <data name="West" xml:space="preserve">
+    <value>west</value>
+  </data>
+  <data name="NorthWest" xml:space="preserve">
+    <value>north-west</value>
+  </data>
+  <data name="TitleWebUi" xml:space="preserve">
+    <value>Saved from this page in {0}; overrides .env.</value>
+  </data>
+  <data name="TitleEnvironment" xml:space="preserve">
+    <value>{0}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.</value>
+  </data>
+  <data name="TitleCommandLine" xml:space="preserve">
+    <value>A command-line argument, which wins over this page.</value>
+  </data>
+  <data name="TitleAppSettings" xml:space="preserve">
+    <value>From {0} in the install directory.</value>
+  </data>
+  <data name="TitleDefault" xml:space="preserve">
+    <value>Set nowhere; the built-in default applies.</value>
+  </data>
+  <!-- Solcast account -->
+  <data name="SolarForecast" xml:space="preserve">
+    <value>Solar forecast</value>
+  </data>
+  <data name="SolcastTopic" xml:space="preserve">
+    <value>the Solcast account</value>
+  </data>
+  <data name="SolcastTip1" xml:space="preserve">
+    <value>The forecast comes from a free Solcast hobbyist account: the API key is in the account's settings on solcast.com, and the resource id is on the rooftop site's page. Without one the controller runs as well as ever, without a forecast to plan with.</value>
+  </data>
+  <data name="SolcastTip2_0" xml:space="preserve">
+    <value>every save here and every restart spends one</value>
+  </data>
+  <data name="SolcastTip2" xml:space="preserve">
+    <value>The free tier allows about ten calls a day. The controller spends about five in daylight and none at night, and {0} — so does a second copy of the controller, such as a {1} on a laptop, using the same account.</value>
+  </data>
+  <data name="SolcastTip3" xml:space="preserve">
+    <value>An account saved here wins over {0} and {1} in {2}. Remove it and the environment's is used again.</value>
+  </data>
+  <data name="SolcastIntro" xml:space="preserve">
+    <value>Solcast's forecast for this roof, which Forecasted and Targeted plan with. A save applies at once, and fetches the forecast once to check the account — one of the day's calls.</value>
+  </data>
+  <data name="SolcastReadOnly" xml:space="preserve">
+    <value>Read-only, because this UI has no login, and the key is a secret. Configure {0} ({1}) and the account becomes editable here; until then, set {2} and {3} in {4} and restart.</value>
+  </data>
+  <data name="ApiKey" xml:space="preserve">
+    <value>API key</value>
+  </data>
+  <data name="Unchanged" xml:space="preserve">
+    <value>unchanged</value>
+  </data>
+  <data name="NotSet" xml:space="preserve">
+    <value>not set</value>
+  </data>
+  <data name="KeptInSecretStore" xml:space="preserve">
+    <value>Kept in the secret store — {0}. Left empty, the key in use is kept.</value>
+  </data>
+  <data name="ResourceId" xml:space="preserve">
+    <value>Rooftop site resource id</value>
+  </data>
+  <data name="Fetching" xml:space="preserve">
+    <value>Fetching…</value>
+  </data>
+  <data name="SaveAndFetch" xml:space="preserve">
+    <value>Save and fetch</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="SavedInUse" xml:space="preserve">
+    <value>Saved, and in use now.</value>
+  </data>
+  <data name="InUseNotKept" xml:space="preserve">
+    <value>In use now, but the secret store would not keep it: a restart will forget it.</value>
+  </data>
+  <data name="RemovedEnvironment" xml:space="preserve">
+    <value>Removed. The account from the environment is in use from the next refresh.</value>
+  </data>
+  <data name="RemovedNone" xml:space="preserve">
+    <value>Removed. No forecast is held now.</value>
+  </data>
+  <data name="SourcePage" xml:space="preserve">
+    <value>Saved here</value>
+  </data>
+  <data name="SourceEnvironmentSolcast" xml:space="preserve">
+    <value>From the environment (SOLCAST_API_KEY, SOLCAST_RESOURCE_ID)</value>
+  </data>
+  <data name="NotConfigured" xml:space="preserve">
+    <value>Not configured</value>
+  </data>
+  <data name="NotConfiguredNoForecast" xml:space="preserve">
+    <value>Not configured — the controller runs without a forecast.</value>
+  </data>
+  <data name="StillInUse" xml:space="preserve">
+    <value>The forecast fetched {0} is still in use.</value>
+  </data>
+  <data name="KeyRefused" xml:space="preserve">
+    <value>Solcast refused the key ({0}) {1}. It is not asked again until a new one is saved.{2}</value>
+  </data>
+  <data name="SiteNotFound" xml:space="preserve">
+    <value>Solcast has no rooftop site {0} for this key ({1}) {2}. It is not asked again until the account is changed.{3}</value>
+  </data>
+  <data name="QuotaExhausted" xml:space="preserve">
+    <value>Today's calls are used up ({0}) {1}; the next scheduled refresh tries again.{2}</value>
+  </data>
+  <data name="FetchFailed" xml:space="preserve">
+    <value>The last fetch failed {0}; the next scheduled refresh tries again.{1}</value>
+  </data>
+  <data name="FetchedAt" xml:space="preserve">
+    <value>Forecast fetched {0}.</value>
+  </data>
+  <data name="NothingFetched" xml:space="preserve">
+    <value>Configured. Nothing has been fetched since the controller started.</value>
+  </data>
+  <data name="AtTime" xml:space="preserve">
+    <value>at {0:HH:mm}</value>
+  </data>
+  <data name="OnDayTime" xml:space="preserve">
+    <value>on {0}</value>
+  </data>
+  <!-- Tariff -->
+  <data name="Tariff" xml:space="preserve">
+    <value>Tariff</value>
+  </data>
+  <data name="TariffIntro" xml:space="preserve">
+    <value>When the grid is cheap, so charging can wait for it. Choose where the low-tariff times come from; every other minute is high tariff. A save applies at once.</value>
+  </data>
+  <data name="TariffReadOnly" xml:space="preserve">
+    <value>Read-only, because this UI has no login. Configure {0} ({1}) and the tariff becomes editable here.</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="UnknownProvider" xml:space="preserve">
+    <value>The saved provider, {0}, is not in this build. Choose another one.</value>
+  </data>
+  <data name="NoTariff" xml:space="preserve">
+    <value>No tariff: the grid costs the same at every hour.</value>
+  </data>
+  <data name="NothingToSet" xml:space="preserve">
+    <value>{0} has nothing to set here.</value>
+  </data>
+  <data name="Prices" xml:space="preserve">
+    <value>Prices</value>
+  </data>
+  <data name="LowPrice" xml:space="preserve">
+    <value>Low tariff price, {0}</value>
+  </data>
+  <data name="HighPrice" xml:space="preserve">
+    <value>High tariff price, {0}</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="NotAPrice" xml:space="preserve">
+    <value>Not a price.</value>
+  </data>
+  <data name="Weekdays" xml:space="preserve">
+    <value>Weekdays</value>
+  </data>
+  <data name="Weekend" xml:space="preserve">
+    <value>Weekend</value>
+  </data>
+  <data name="MonFri" xml:space="preserve">
+    <value>Mon–Fri</value>
+  </data>
+  <data name="SatSun" xml:space="preserve">
+    <value>Sat–Sun</value>
+  </data>
+  <data name="LowTariffFrom" xml:space="preserve">
+    <value>Low tariff from</value>
+  </data>
+  <data name="Until" xml:space="preserve">
+    <value>until</value>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="End" xml:space="preserve">
+    <value>End</value>
+  </data>
+  <data name="HhMmOr24" xml:space="preserve">
+    <value>HH:mm or 24:00</value>
+  </data>
+  <data name="AddPeriod" xml:space="preserve">
+    <value>Add period</value>
+  </data>
+  <data name="TodayAndTomorrow" xml:space="preserve">
+    <value>Today and tomorrow</value>
+  </data>
+  <data name="ShadedIsLow" xml:space="preserve">
+    <value>Shaded is low tariff.</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Tomorrow</value>
+  </data>
+  <data name="HighAllDay" xml:space="preserve">
+    <value>{0}: high tariff all day</value>
+  </data>
+  <data name="LowTariffAt" xml:space="preserve">
+    <value>{0}: low tariff {1}</value>
+  </data>
+  <data name="NoPeriodsWeekdays" xml:space="preserve">
+    <value>No periods: high tariff all day Monday to Friday.</value>
+  </data>
+  <data name="NoPeriodsWeekend" xml:space="preserve">
+    <value>No periods: high tariff all day on Saturday and Sunday.</value>
+  </data>
+</root>

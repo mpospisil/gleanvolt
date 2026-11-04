@@ -22,34 +22,34 @@
     the poll loop has stopped while the web host is fine.
 *@
 
-<SiteTitle Page="Health" />
+<SiteTitle Page="@SettingsText.HealthPageTitle" />
 
-<h1>Settings</h1>
+<h1>@SettingsText.SettingsTitle</h1>
 
 <SettingsTabs Current="SettingsTab.Health" />
 
 <dl class="facts">
-    <dt>Build</dt>
+    <dt>@SettingsText.Build</dt>
     <dd>@Build.Version</dd>
 
-    <dt>Time zone</dt>
+    <dt>@SettingsText.TimeZone</dt>
     <dd>@Time.LocalTimeZone.Id</dd>
 
-    <dt>Last poll</dt>
+    <dt>@SettingsText.LastPoll</dt>
     @if (_status is null)
     {
-        <dd class="muted">no poll has completed yet</dd>
+        <dd class="muted">@SettingsText.NoPollYet</dd>
     }
     else
     {
         <dd>
-            @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm:ss")
-            <span class="muted">(@Age(_status.Timestamp) ago)</span>
+            @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString(SharedText.DateTimeSecondsPattern, System.Globalization.CultureInfo.CurrentCulture)
+            <span class="muted">@Localized.Format(SettingsText.AgoParenthesised, Age(_status.Timestamp))</span>
         </dd>
     }
 
-    <dt>Charge mode</dt>
-    <dd>@(_status?.Mode.ToString() ?? Units.Missing)</dd>
+    <dt>@SettingsText.ChargeMode</dt>
+    <dd>@(_status is { } polled ? ChargeModeTabs.Label(polled.Mode) : Units.Missing)</dd>
 
     @*
         What protects the volkswagen.de session and the MyŠkoda key on disk (#215). Here rather than
@@ -57,10 +57,10 @@
         is asked by someone who is usually already copying it. The sentence is the store's own and
         deliberately never says "encrypted": nothing that a service restarts into unattended is.
     *@
-    <dt>Secrets</dt>
+    <dt>@SettingsText.Secrets</dt>
     <dd>
         @Secrets.Describe()
-        <span class="muted">— the data directory is bearer-equivalent; back it up accordingly</span>
+        <span class="muted">@SettingsText.BearerEquivalent</span>
     </dd>
 
     @*
@@ -70,12 +70,12 @@
     *@
     @if (_feed is not null)
     {
-        <dt>Car feed</dt>
+        <dt>@SettingsText.CarFeed</dt>
         <dd class="@(_feed.IsBlocked ? "error" : null)">
-            @_feed.State — @_feed.Message
+            @Localized.Name(_feed.State) — @_feed.Message
             @if (_feed.IsBlocked)
             {
-                <a href="/car">Sign in on the car page</a>
+                <a href="/car">@SharedText.SignInOnCarPage</a>
             }
         </dd>
     }
@@ -90,24 +90,28 @@
     *@
     @if (_diagnostics is { Attempts: > 0 } diagnostics)
     {
-        <dt>Feed reads</dt>
+        <dt>@SettingsText.FeedReads</dt>
         <dd>
-            @diagnostics.Readings of @diagnostics.Attempts
+            @Localized.Format(SettingsText.ReadingsOfAttempts, diagnostics.Readings, diagnostics.Attempts)
             @if (diagnostics.LastReadingAt is { } lastRead)
             {
-                <span class="muted">— last @Age(lastRead) ago</span>
+                <span class="muted">@Localized.Format(SettingsText.LastReadAgo, Age(lastRead))</span>
             }
         </dd>
 
-        <dt>Portal session</dt>
+        <dt>@SettingsText.PortalSession</dt>
         <dd>
-            @(diagnostics.SessionAge is { } age ? Units.Duration(age) : "none")
+            @(diagnostics.SessionAge is { } age ? Units.Duration(age) : SettingsText.NoSession)
             <span class="muted">
-                (@diagnostics.Sessions sign-in@(diagnostics.Sessions == 1 ? "" : "s") since start@(diagnostics.Sessions > 1 ? " — sessions are expiring" : ""))
+                @Localized.Format(
+                    diagnostics.Sessions > 1
+                        ? SettingsText.SignInsSinceStartExpiring
+                        : Localized.Plural(diagnostics.Sessions, SettingsText.SignInsSinceStart_One, SettingsText.SignInsSinceStart_Few, SettingsText.SignInsSinceStart_Other),
+                    diagnostics.Sessions)
             </span>
         </dd>
 
-        <dt>Next read</dt>
+        <dt>@SettingsText.NextRead</dt>
         <dd>
             @if (diagnostics.NextDueAt is { } due)
             {
@@ -116,7 +120,7 @@
             }
             else
             {
-                <span class="error">never — the feed has stopped</span>
+                <span class="error">@SettingsText.FeedStopped</span>
             }
         </dd>
     }
@@ -132,40 +136,33 @@
     was meant, and the text spells out what "stopped" costs.
 *@
 <section class="controls">
-    <h2>Service</h2>
+    <h2>@SettingsText.Service</h2>
 
     <div class="control">
         @if (_stopping)
         {
             <p class="stopping">
-                Stopping. The charger is being paused and the open session closed; this page will stop
-                responding in a few seconds.
+                @SettingsText.Stopping
             </p>
             <span class="hint">
-                Start it again on the Pi with <code>docker compose start gleanvolt-controller</code> in
-                <code>/opt/gleanvolt</code>. Nothing restarts it by itself — that is what makes this a stop
-                rather than a restart.
+                @Localized.Rich(SettingsText.StartAgain, @<code>docker compose start gleanvolt-controller</code>, @<code>/opt/gleanvolt</code>)
             </span>
         }
         else if (_confirming)
         {
-            <label>Stop the service?</label>
-            <button type="button" class="danger" @onclick="ConfirmStop">Yes, stop it</button>
-            <button type="button" class="secondary" @onclick="() => _confirming = false">Cancel</button>
+            <label>@SettingsText.StopQuestion</label>
+            <button type="button" class="danger" @onclick="ConfirmStop">@SettingsText.StopConfirm</button>
+            <button type="button" class="secondary" @onclick="() => _confirming = false">@SharedText.Cancel</button>
             <span class="hint">
-                Charging stops, this UI and the Home Assistant integration go offline, and the
-                controller stays down until it is started again from a shell on the Pi.
+                @SettingsText.StopConfirmHint
             </span>
         }
         else
         {
-            <label>Stop the service</label>
-            <button type="button" class="danger" @onclick="() => _confirming = true">Stop service</button>
+            <label>@SettingsText.StopLabel</label>
+            <button type="button" class="danger" @onclick="() => _confirming = true">@SettingsText.StopService</button>
             <span class="hint">
-                The safe way to take the controller down: the charger is returned to its pause current,
-                the open charging session is closed and written, and the session store is flushed —
-                none of which happens if the process is killed instead. It does not come back on its
-                own; Restart below is the same shutdown, for a controller that should.
+                @SettingsText.StopHint
             </span>
         }
     </div>
@@ -173,7 +170,7 @@
     @if (!_stopping)
     {
         <div class="control">
-            <RestartService Hint="The same graceful shutdown as Stop, ending with the exit code that tells Docker or systemd to start it again. The new process reads its configuration afresh, which is how a change saved in Settings is applied." />
+            <RestartService Hint="@SettingsText.RestartHint" />
         </div>
     }
 </section>
@@ -238,11 +235,11 @@
     // NTP must not read as a poll from the future.
     private string Age(DateTimeOffset timestamp) => Units.Duration(Time.GetUtcNow() - timestamp);
 
-    /// <summary>How long until a moment, or "due" once it has passed and the fetch has not landed.</summary>
+    /// <summary>How long until a moment, or that it is due once it has passed and the fetch has not landed.</summary>
     private string Until(DateTimeOffset moment)
     {
         var remaining = moment - Time.GetUtcNow();
 
-        return remaining <= TimeSpan.Zero ? "due" : $"in {Units.Duration(remaining)}";
+        return remaining <= TimeSpan.Zero ? SettingsText.Due : Localized.Format(SettingsText.InDuration, Units.Duration(remaining));
     }
 }

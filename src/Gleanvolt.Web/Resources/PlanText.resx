@@ -662,11 +662,8 @@
   <data name="PacingTopic" xml:space="preserve">
     <value>Pacing</value>
   </data>
-  <data name="Pacing_0" xml:space="preserve">
-    <value>Pacing</value>
-  </data>
   <data name="Pacing" xml:space="preserve">
-    <value>{0}</value>
+    <value>Pacing</value>
   </data>
   <data name="PacingTip_0" xml:space="preserve">
     <value>Cheapest</value>

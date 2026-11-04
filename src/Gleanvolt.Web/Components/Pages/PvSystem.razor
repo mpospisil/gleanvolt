@@ -21,9 +21,9 @@
     limits live on the Car page.
 *@
 
-<SiteTitle Page="Settings" />
+<SiteTitle Page="@SettingsText.SettingsPageTitle" />
 
-<h1>Settings</h1>
+<h1>@SettingsText.SettingsTitle</h1>
 
 <SettingsTabs Current="SettingsTab.Installation" />
 
@@ -33,21 +33,16 @@
 
 <TariffEditorForm />
 
-<p class="muted car-link">The car's settings and charging limits are on the <a href="/car">Car</a> page.</p>
+<p class="muted car-link">@Localized.Rich(SettingsText.CarLink, @<a href="/car">@SettingsText.CarLink_0</a>)</p>
 
 <div class="section-head tip-head">
-    <h2>MQTT</h2>
-    <InfoTip Topic="MQTT" Group="settings-info" Wide="true">
+    <h2>@SettingsText.Mqtt</h2>
+    <InfoTip Topic="@SettingsText.MqttTopic" Group="settings-info" Wide="true">
         <p>
-            Home Assistant is a <em>control</em> surface: the topics ending <code>/set</code> can start and
-            stop charging. Vehicle telemetry only listens, and the worst a wrong setting there can do is
-            leave the car's card empty.
+            @Localized.Rich(SettingsText.MqttTip1, @<em>@SettingsText.MqttTip1_0</em>, @<code>/set</code>)
         </p>
         <p>
-            None of this says whether either link is <em>up</em>. Everything on this page was read once at
-            startup; <a href="/settings/health">Health</a> reports the polling loop rather than the broker,
-            so until it reports this too, the broker's own log — or Home Assistant showing the device as
-            unavailable — is what answers that.
+            @Localized.Rich(SettingsText.MqttTip2, @<em>@SettingsText.MqttTip2_0</em>, @<a href="/settings/health">@SettingsText.MqttTip2_1</a>)
         </p>
     </InfoTip>
 </div>
@@ -64,24 +59,15 @@
 *@
 
 <div class="section-head tip-head minor">
-    <h3>Home Assistant</h3>
+    <h3>@SettingsText.HomeAssistant</h3>
     @if (Mqtt.HomeAssistant.Connection.Enabled)
     {
-        <InfoTip Topic="Home Assistant" Group="settings-info" Wide="true">
+        <InfoTip Topic="@SettingsText.HomeAssistantTopic" Group="settings-info" Wide="true">
             <p>
-                The device id is the root of every entity's <code>unique_id</code>, and it is the one value
-                here that is expensive to change: Home Assistant keys an entity to its <code>unique_id</code>,
-                so a new one is a new entity, created beside the old one, and every graph starts again. The
-                topics and the names can be changed freely. The status interval is how often the state topic
-                is republished, which is usually the answer to "why is the Home Assistant dashboard behind?".
+                @Localized.Rich(SettingsText.HaTip1, @<code>unique_id</code>, @<code>unique_id</code>)
             </p>
             <p>
-                Every other entity — each number, select, text and button — follows the same pattern:
-                <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code> for what it reports and
-                <code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code> for what it accepts. The
-                retained discovery configs Home Assistant reads them from live under
-                <code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>.
-                Anything marked <em>in</em> can change what the charger is doing.
+                @Localized.Rich(SettingsText.HaTip2, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code>, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code>, @<code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>, @<em>@SettingsText.HaTip2_3</em>)
             </p>
         </InfoTip>
     }
@@ -90,11 +76,7 @@
 @if (!Mqtt.HomeAssistant.Connection.Enabled)
 {
     <p class="muted" id="ha-mqtt-off">
-        Off, which is the default: nothing is published and no command is accepted. Set
-        <code>HomeAssistant__Enabled</code> to <code>true</code>, give it
-        <code>HomeAssistant__Username</code> and <code>HomeAssistant__Password</code> for the broker,
-        and claim a <code>Pv__Id</code> — the id is the topic segment two installations on one broker
-        would otherwise overwrite each other on, so the controller refuses to start without it.
+        @Localized.Rich(SettingsText.HaOff, @<code>HomeAssistant__Enabled</code>, @<code>true</code>, @<code>HomeAssistant__Username</code>, @<code>HomeAssistant__Password</code>, @<code>Pv__Id</code>)
     </p>
 }
 else
@@ -102,25 +84,25 @@ else
     <dl class="facts">
         <MqttConnection Connection="Mqtt.HomeAssistant.Connection" />
 
-        <dt>Discovery prefix</dt>
+        <dt>@SettingsText.DiscoveryPrefix</dt>
         <dd><code>@Mqtt.HomeAssistant.DiscoveryPrefix</code></dd>
 
-        <dt>Device id</dt>
+        <dt>@SettingsText.DeviceId</dt>
         <dd><code>@Mqtt.HomeAssistant.DeviceId</code></dd>
 
-        <dt>Topic prefix</dt>
+        <dt>@SettingsText.TopicPrefix</dt>
         <dd><code>@Mqtt.HomeAssistant.TopicPrefix</code></dd>
 
-        <dt>Status interval</dt>
+        <dt>@SettingsText.StatusInterval</dt>
         <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
     </dl>
 
     <table class="sessions topics">
         <thead>
             <tr>
-                <th>Carries</th>
-                <th>Topic</th>
-                <th>Direction</th>
+                <th>@SettingsText.Carries</th>
+                <th>@SettingsText.TopicColumn</th>
+                <th>@SettingsText.Direction</th>
             </tr>
         </thead>
         <tbody>
@@ -129,7 +111,7 @@ else
                 <tr>
                     <td>@topic.Purpose</td>
                     <td class="topic"><code>@topic.Topic</code></td>
-                    <td class="flow">@(topic.Inbound ? "in" : "out")</td>
+                    <td class="flow">@(topic.Inbound ? SettingsText.In : SettingsText.Out)</td>
                 </tr>
             }
         </tbody>
@@ -138,36 +120,29 @@ else
     @if (Mqtt.HomeAssistant.IsRetiringAnything)
     {
         <p class="table-note muted" id="ha-mqtt-retiring">
-            On every connect this installation also <strong>blanks</strong> the retained messages left
-            by a name it used to publish under:
+            @Localized.Rich(SettingsText.Retiring, @<strong>@SettingsText.Retiring_0</strong>)
             @if (Mqtt.HomeAssistant.RetiredDeviceIds.Count > 0)
             {
-                <text>discovery configs for
-                    @string.Join(", ", Mqtt.HomeAssistant.RetiredDeviceIds)</text>
-                @(Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? "; " : ". ")
+                @Localized.Format(
+                    Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? SettingsText.RetiringConfigsAnd : SettingsText.RetiringConfigs,
+                    string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredDeviceIds))
             }
             @if (Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0)
             {
-                <text>retained state under
-                    @string.Join(", ", Mqtt.HomeAssistant.RetiredTopicPrefixes). </text>
+                @Localized.Format(SettingsText.RetiringState, string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredTopicPrefixes))
             }
-            Set after a rename, and safe to remove once it has run.
+            @SettingsText.RetiringNote
         </p>
     }
 }
 
 <div class="section-head tip-head minor">
-    <h3>Vehicle telemetry</h3>
+    <h3>@SettingsText.VehicleTelemetry</h3>
     @if (Mqtt.Vehicle.Connection.Enabled)
     {
-        <InfoTip Topic="vehicle telemetry" Group="settings-info" Wide="true">
+        <InfoTip Topic="@SettingsText.VehicleTelemetryTopic" Group="settings-info" Wide="true">
             <p>
-                One concrete topic, not a wildcard: this phase tracks one car, and a <code>+</code> across
-                several would quietly let the newest message win whichever car it described. The messages
-                are expected to be <strong>retained</strong>, so a restart is handed the last reading
-                straight away instead of waiting for a cloud-fed car's next update. Note that this client id
-                is not namespaced by the system's id, so two controllers on one machine would collide on the
-                broker.
+                @Localized.Rich(SettingsText.VehicleTelemetryTip, @<code>+</code>, @<strong>@SettingsText.VehicleTelemetryTip_1</strong>)
             </p>
         </InfoTip>
     }
@@ -176,10 +151,7 @@ else
 @if (!Mqtt.Vehicle.Connection.Enabled)
 {
     <p class="muted" id="vehicle-mqtt-off">
-        Off, which is the default: the car's own state of charge is not read, and the Overview shows
-        only what the charger can see. Set <code>Vehicle__Enabled</code> to <code>true</code> and name
-        the topic your publisher writes to under
-        <code>Ev__Vehicles__0__Telemetry__Topic</code>.
+        @Localized.Rich(SettingsText.VehicleMqttOff, @<code>Vehicle__Enabled</code>, @<code>true</code>, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
     </p>
 }
 else
@@ -187,11 +159,11 @@ else
     <dl class="facts">
         <MqttConnection Connection="Mqtt.Vehicle.Connection" />
 
-        <dt>Subscribed to</dt>
+        <dt>@SettingsText.SubscribedTo</dt>
         <dd>
             @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
             {
-                <span class="muted">nothing</span>
+                <span class="muted">@SettingsText.Nothing</span>
             }
             else
             {
@@ -199,43 +171,35 @@ else
             }
         </dd>
 
-        <dt>Stale after</dt>
+        <dt>@SettingsText.StaleAfter</dt>
         <dd>@Interval(Mqtt.Vehicle.MaxAge)</dd>
 
-        <dt>Retry every</dt>
+        <dt>@SettingsText.RetryEvery</dt>
         <dd>@Interval(Mqtt.Vehicle.ReconnectInterval)</dd>
     </dl>
 
     @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
     {
         <p class="table-note muted" id="vehicle-mqtt-no-topic">
-            The feed is on with nothing to subscribe to, so it connects to no broker and reads nothing
-            — which from the Overview is indistinguishable from a car that never reports. Set
-            <code>Ev__Vehicles__0__Telemetry__Topic</code> to the topic your publisher writes to.
+            @Localized.Rich(SettingsText.NoTopic, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
         </p>
     }
 
     @if (Mqtt.SharesOneBroker)
     {
         <p class="table-note muted" id="mqtt-one-broker">
-            Both links use the same broker, <code>@Mqtt.Vehicle.Connection.Broker</code>. They are still
-            two connections with two client ids, and either can be pointed elsewhere without touching
-            the other.
+            @Localized.Rich(SettingsText.OneBroker, @<code>@Mqtt.Vehicle.Connection.Broker</code>)
         </p>
     }
 }
 
 <div class="section-head tip-head">
-    <h2>API</h2>
+    <h2>@SettingsText.Api</h2>
     @if (Api.Enabled)
     {
-        <InfoTip Topic="API" Group="settings-info" Wide="true">
+        <InfoTip Topic="@SettingsText.ApiTopic" Group="settings-info" Wide="true">
             <p>
-                The address is built from the one this page arrived on rather than from <code>Web:Port</code>:
-                a hostname or a reverse proxy in front means the configured port is not necessarily the one
-                that works, while the address that just delivered this page demonstrably does. Both links
-                answer without a key by design — a browser cannot send one, and neither carries anything to
-                act on — so opening either is the quickest proof that the API is up.
+                @Localized.Rich(SettingsText.ApiTip, @<code>Web:Port</code>)
             </p>
         </InfoTip>
     }
@@ -257,43 +221,35 @@ else
 @if (!Api.Enabled)
 {
     <p class="muted" id="api-off">
-        Off, which is the default: no route is mapped and no document is served, so there is nothing to
-        find rather than something that answers 401. Two of its endpoints write to hardware, which is
-        why it is switched on knowingly — with <code>Api__Enabled=true</code> and at least one key,
-        <code>Api__Keys__&lt;name&gt;=$(openssl rand -hex 32)</code>. Enabled with no key is a startup
-        failure rather than an open control surface.
+        @Localized.Rich(SettingsText.ApiOff, @<code>Api__Enabled=true</code>, @<code>Api__Keys__&lt;name&gt;=$(openssl rand -hex 32)</code>)
     </p>
 }
 else
 {
     <dl class="facts">
-        <dt>Base URL</dt>
+        <dt>@SettingsText.BaseUrl</dt>
         <dd>
             <code>@_api.BaseUrl</code>
             @if (_api.PortIsImplicit)
             {
                 <span class="muted">
-                    — this page arrived on the default port, so the direct LAN address is
-                    <code>host:@Api.Port</code> whatever is in front of it.
+                    @Localized.Rich(SettingsText.DefaultPort, @<code>host:@Api.Port</code>)
                 </span>
             }
         </dd>
 
-        <dt>Index</dt>
+        <dt>@SettingsText.Index</dt>
         <dd><a href="@_api.BaseUrl">@Api.BasePath</a></dd>
 
-        <dt>OpenAPI document</dt>
+        <dt>@SettingsText.OpenApiDocument</dt>
         <dd><a href="@_api.DocumentUrl">@Api.DocumentPath</a></dd>
     </dl>
 
     <div class="section-head tip-head minor">
-        <h3>Keys</h3>
-        <InfoTip Topic="API keys" Group="settings-info" Wide="true">
+        <h3>@SettingsText.Keys</h3>
+        <InfoTip Topic="@SettingsText.ApiKeysTopic" Group="settings-info" Wide="true">
             <p>
-                The name is not a credential — it is what reaches the log and the recorded charging session
-                as the source of an action, so a charge started through this API is filed against the name
-                that started it rather than anonymously. Which is the whole reason several clients get
-                several keys.
+                @SettingsText.ApiKeysTip
             </p>
         </InfoTip>
     </div>
@@ -301,8 +257,8 @@ else
     <table class="sessions">
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Key</th>
+                <th>@SettingsText.Name</th>
+                <th>@SettingsText.Key</th>
             </tr>
         </thead>
         <tbody>
@@ -317,7 +273,7 @@ else
                         }
                         else
                         {
-                            <span class="muted">configured</span>
+                            <span class="muted">@SettingsText.Configured</span>
                         }
                     </td>
                 </tr>
@@ -328,20 +284,15 @@ else
     @if (Api.SecretsWithheld)
     {
         <p class="table-note muted" id="api-keys-withheld">
-            The keys themselves are not shown, because this UI has no login: anyone who can reach it
-            could read them, and a key is bearer-equivalent to the stop button on the wallbox.
-            Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and they become
-            readable here.
+            @Localized.Rich(SettingsText.KeysWithheld, @<code>Web__PasswordHash</code>, @<code>hash-password</code>)
         </p>
     }
 
     <div class="section-head tip-head minor">
-        <h3>Calling it</h3>
-        <InfoTip Topic="calling the API" Group="settings-info" Wide="true">
+        <h3>@SettingsText.CallingIt</h3>
+        <InfoTip Topic="@SettingsText.CallingTopic" Group="settings-info" Wide="true">
             <p>
-                The first key, this installation's own address and the endpoint worth trying first.
-                Everything else is under the same base URL and takes the same header; the document above is
-                the list.
+                @SettingsText.CallingTip
             </p>
         </InfoTip>
     </div>

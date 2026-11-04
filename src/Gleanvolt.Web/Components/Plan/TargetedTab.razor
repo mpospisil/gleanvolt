@@ -140,7 +140,7 @@ else
 {
     <div class="control">
         <div class="control-head">
-            @Localized.Rich(PlanText.Pacing, @<span class="control-label" id="charge-priority-label">@PlanText.Pacing_0</span>)
+            <span class="control-label" id="charge-priority-label">@PlanText.Pacing</span>
             <InfoTip Topic="@PlanText.PacingTopic">
                 <p>
                     @Localized.Rich(PlanText.PacingTip, @<strong>@PlanText.PacingTip_0</strong>, @<strong>@PlanText.PacingTip_1</strong>)
@@ -289,7 +289,7 @@ else
             @if (CanTargetSoc)
             {
                 <div class="dialog-pacing">
-                    <span class="control-label" id="dialog-pacing-label">Pacing</span>
+                    <span class="control-label" id="dialog-pacing-label">@PlanText.Pacing</span>
                     <div class="seg" role="radiogroup" id="dialog-pacing" aria-labelledby="dialog-pacing-label">
                         <label class="seg-opt">
                             <input type="radio" name="dialog-pacing" id="dialog-pacing-cheapest"
