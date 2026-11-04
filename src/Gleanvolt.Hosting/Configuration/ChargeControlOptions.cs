@@ -102,4 +102,15 @@ public sealed class ChargeControlOptions
     /// can dip the battery slightly). Must not exceed <see cref="BatteryFullSocPercent"/>.
     /// </summary>
     public double BatteryReleaseSocPercent { get; init; } = 90;
+
+    /// <summary>
+    /// LiveSolar strategy only: how long a battery at or above <see cref="BatteryReleaseSocPercent"/> must
+    /// take less than <see cref="BatteryStallWatts"/>, with sun to start the car, before it counts as
+    /// full although it reads below <see cref="BatteryFullSocPercent"/>. An aging or unbalanced pack can
+    /// stop charging short of the full threshold, and the gate would otherwise wait all day.
+    /// </summary>
+    public TimeSpan BatteryStallDwell { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>LiveSolar strategy only: the charge power (W) below which the battery counts as having stopped taking charge.</summary>
+    public double BatteryStallWatts { get; init; } = 100;
 }

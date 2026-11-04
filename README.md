@@ -668,6 +668,8 @@ The threshold is **phase-aware** — the 6 A floor is ~1.4 kW single-phase but ~
 
 A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages only at/above `BatteryFullSocPercent` (so the car never competes with charging the home battery) and, once charging, keeps going until SOC falls below `BatteryReleaseSocPercent` — the band stops the car's own draw from flapping the gate.
 
+An aging or unbalanced pack may never read `BatteryFullSocPercent`: the BMS ends the charge when its highest cell reaches the limit, and its SOC estimate drifts until a real full charge corrects it. So a battery already inside the band (at/above `BatteryReleaseSocPercent`) that has taken less than `BatteryStallWatts` for `BatteryStallDwell`, with enough sun to start the car, **counts as full**. The log says so: *"Battery 93% has stopped taking charge; counted as full."* A healthy pack in the band is still charging, so this never fires for it. The real 100 %, which the BMS needs now and then to recalibrate, comes from the evening target in `Forecasted` and `Targeted`.
+
 ```jsonc
 "ChargeControl": {
   "DryRun": false,              // when Enabled: log intended writes but don't write (validation)
@@ -681,7 +683,9 @@ A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages 
   "CurrentChangeThresholdAmps": 1,     // min amp change before re-commanding the charger
   "ResumeHysteresisWatts": 200, // extra surplus needed to (re)start, to avoid flapping
   "BatteryFullSocPercent": 95,  // SOC at/above which charging engages
-  "BatteryReleaseSocPercent": 90 // SOC it must fall below to disengage
+  "BatteryReleaseSocPercent": 90, // SOC it must fall below to disengage
+  "BatteryStallDwell": "00:10:00", // a battery in the band taking < BatteryStallWatts this long counts as full
+  "BatteryStallWatts": 100
 }
 ```
 

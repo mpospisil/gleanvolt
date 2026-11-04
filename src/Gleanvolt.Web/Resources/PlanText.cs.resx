@@ -121,7 +121,7 @@
     <value>Nabíjí z přebytku, který dům nespotřebuje, až po plném nabití domácí baterie.</value>
   </data>
   <data name="SolarTip" xml:space="preserve">
-    <value>Nabíjí z výroby FVE, kterou dům právě nespotřebuje. Přednost má domácí baterie: režim čeká, až bude plná, pak sleduje přebytek nahoru i dolů. Když přebytek nestačí na minimální proud nabíječky, nabíjení pozastaví.</value>
+    <value>Nabíjí z výroby FVE, kterou dům právě nespotřebuje. Přednost má domácí baterie: režim čeká, až bude plná nebo se přestane nabíjet, pak sleduje přebytek nahoru i dolů. Když přebytek nestačí na minimální proud nabíječky, nabíjení pozastaví.</value>
   </data>
   <data name="StartSolarTopic" xml:space="preserve">
     <value>Nabíjet z přebytku</value>

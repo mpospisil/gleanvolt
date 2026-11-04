@@ -128,7 +128,7 @@
     <value>Charges from surplus the house isn’t using, once the home battery is full.</value>
   </data>
   <data name="SolarTip" xml:space="preserve">
-    <value>Charges from whatever the panels produce that the house is not using. The home battery comes first: this mode waits until it is full, then follows the surplus up and down, and pauses when there is not enough to hold the charger's minimum current.</value>
+    <value>Charges from whatever the panels produce that the house is not using. The home battery comes first: this mode waits until it is full, or has stopped taking charge, then follows the surplus up and down, and pauses when there is not enough to hold the charger's minimum current.</value>
   </data>
   <data name="StartSolarTopic" xml:space="preserve">
     <value>Charge from surplus</value>

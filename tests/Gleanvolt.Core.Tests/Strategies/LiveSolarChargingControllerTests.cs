@@ -165,4 +165,100 @@ public class LiveSolarChargingControllerTests
         Assert.Equal(ChargingControlAction.Charge, resumed.Action);
         Assert.Equal(17, resumed.ChargeCurrentAmps);
     }
+
+    // -- An aging pack that stops short of the gate: in the band, taking nothing, sun to spare.
+
+    private static readonly DateTimeOffset Noon = new(2026, 7, 1, 12, 0, 0, TimeSpan.Zero);
+
+    private static LiveSolarChargingController NewController() => new(
+        new ChargePowerConverter(nominalVoltage: 230, phases: 1),
+        minChargingCurrentAmps: 6, maxChargingCurrentAmps: 20, currentStepAmps: 1,
+        hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2),
+        stallDwell: TimeSpan.FromMinutes(10), stallWatts: 100);
+
+    private static ChargingControlInput At(TimeSpan sinceNoon, double soc, double batteryWatts, double surplus) =>
+        new(new EnergyState(Noon + sinceNoon, soc, batteryWatts, SolarPowerWatts: 6000, GridPowerWatts: -4000, EvChargerStatus.Charging, EvChargerPowerWatts: 0),
+            surplus, new EvChargerSettings(EvChargerMode.Fast, 6), Charging: false);
+
+    // Polls every 10 s from noon for the given span; returns the last decision.
+    private static ChargingControlDecision Run(
+        LiveSolarChargingController controller, TimeSpan span, double soc, double batteryWatts, double surplus, TimeSpan? from = null)
+    {
+        ChargingControlDecision last = null!;
+        for (var t = from ?? TimeSpan.Zero; t <= (from ?? TimeSpan.Zero) + span; t += TimeSpan.FromSeconds(10))
+        {
+            last = controller.Decide(At(t, soc, batteryWatts, surplus));
+        }
+
+        return last;
+    }
+
+    [Fact]
+    public void StalledInTheBand_ForTheDwell_CountsAsFull()
+    {
+        var result = Run(NewController(), TimeSpan.FromMinutes(10), soc: 93, batteryWatts: 0, surplus: 4000);
+
+        Assert.Equal(ChargingControlAction.Charge, result.Action);
+        Assert.Equal(17, result.ChargeCurrentAmps);
+        Assert.Contains("stopped taking charge", result.Reason);
+    }
+
+    [Fact]
+    public void StalledInTheBand_ShortOfTheDwell_StillWaits()
+    {
+        var result = Run(NewController(), TimeSpan.FromMinutes(9), soc: 93, batteryWatts: 0, surplus: 4000);
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
+
+    [Fact]
+    public void BatteryStillCharging_InTheBand_Waits()
+    {
+        // A healthy pack at 93% is still taking the sun: it will reach 95% on its own.
+        var result = Run(NewController(), TimeSpan.FromMinutes(30), soc: 93, batteryWatts: 2500, surplus: 4000);
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
+
+    [Fact]
+    public void BelowTheBand_NeverCountsAsFull()
+    {
+        // 85% taking nothing is not a stalled-full pack: it is a battery the inverter is not charging.
+        var result = Run(NewController(), TimeSpan.FromMinutes(30), soc: 85, batteryWatts: 0, surplus: 4000);
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
+
+    [Fact]
+    public void NoSunToStartTheCar_IsNotAStall()
+    {
+        // Battery at 0 W because there is nothing to charge it with -- the car could not start either.
+        var result = Run(NewController(), TimeSpan.FromMinutes(30), soc: 93, batteryWatts: 0, surplus: 1000);
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
+
+    [Fact]
+    public void BatteryTakingChargeAgain_RestartsTheDwell()
+    {
+        var controller = NewController();
+        Run(controller, TimeSpan.FromMinutes(8), soc: 93, batteryWatts: 0, surplus: 4000);
+        controller.Decide(At(TimeSpan.FromMinutes(8.5), soc: 93, batteryWatts: 1500, surplus: 4000));
+
+        var result = Run(controller, TimeSpan.FromMinutes(8), soc: 93, batteryWatts: 0, surplus: 4000, from: TimeSpan.FromMinutes(9));
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
+
+    [Fact]
+    public void AGapBetweenPolls_RestartsTheDwell()
+    {
+        // Eight minutes stalled, then the mode was not driving for an hour: the old run says nothing now.
+        var controller = NewController();
+        Run(controller, TimeSpan.FromMinutes(8), soc: 93, batteryWatts: 0, surplus: 4000);
+
+        var result = Run(controller, TimeSpan.FromMinutes(5), soc: 93, batteryWatts: 0, surplus: 4000, from: TimeSpan.FromMinutes(68));
+
+        Assert.Equal(ChargingControlAction.StandDown, result.Action);
+    }
 }
