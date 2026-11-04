@@ -411,8 +411,9 @@ textarea {
     border-color: var(--accent);
 }
 
-/* The language picker (#290): the last thing in the bar, beside Sign out or the Menu button, and on
-   the sign-in page pushed to the right edge on its own. Styled like Sign out, a quiet control. */
+/* The language picker (#290): the last thing in the bar, beside Sign out, and on the sign-in page
+   pushed to the right edge on its own. On a phone it folds into the menu (below). Styled like Sign
+   out, a quiet control. */
 .language {
     margin: 0 0 0 auto;
 }
@@ -577,6 +578,17 @@ textarea {
     }
 
     .signout button {
+        width: 100%;
+        padding: var(--space-2);
+        font-size: 1rem;
+    }
+
+    /* In the folded menu: last, under Sign out, as wide as the panel like it. */
+    .menu .language {
+        margin: var(--space-2) var(--space-5) 0;
+    }
+
+    .menu .language select {
         width: 100%;
         padding: var(--space-2);
         font-size: 1rem;

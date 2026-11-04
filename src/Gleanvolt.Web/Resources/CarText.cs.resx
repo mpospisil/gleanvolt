@@ -1,0 +1,621 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="CarPageTitle" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="CarTitle" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="CarIntro" xml:space="preserve">
+    <value>Vše pod formulářem je to, s čím řídicí jednotka běží, odvozené z konfigurace při startu. Formulář mění, co si přečte příští start; restart ho uplatní a účet níže je pak místo, kde se ověří.</value>
+  </data>
+  <data name="AskTheCarHeading" xml:space="preserve">
+    <value>Zeptat se auta</value>
+  </data>
+  <data name="PortalIntro_2" xml:space="preserve">
+    <value>Toto stisknutí</value>
+  </data>
+  <data name="PortalIntro" xml:space="preserve">
+    <value>Zeptá se {0} na {1}, jednou, když stisknete tlačítko. {2} neběží podle žádného plánu a to, co ukáže, se nikam nepředává — ani do karty na přehledu, ani do žádného rozhodnutí o nabíjení — takže tím ověříte, že přihlašovací údaje fungují a že pole portálu jsou správně pochopena, ať je zdroj se svým vlastním časováním zapnutý, nebo ne.</value>
+  </data>
+  <data name="NotConfiguredNeeds" xml:space="preserve">
+    <value>Nenastaveno: chybí {0}.</value>
+  </data>
+  <data name="PortalFieldsHint_0" xml:space="preserve">
+    <value>Značka</value>
+  </data>
+  <data name="PortalFieldsHint_1" xml:space="preserve">
+    <value>VW ID</value>
+  </data>
+  <data name="PortalFieldsHint_2" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="PortalFieldsHint_3" xml:space="preserve">
+    <value>VIN</value>
+  </data>
+  <data name="PortalFieldsHint_4" xml:space="preserve">
+    <value>průběžný požadavek na data</value>
+  </data>
+  <data name="PortalFieldsHint" xml:space="preserve">
+    <value>To jsou pole {0}, {1}, {2} a {3} ve formuláři výše; vyplňte je a restartujte. Portál navíc potřebuje ručně povolit {4}, než cokoli dodá — viz {5}.</value>
+  </data>
+  <data name="AskingTheCar" xml:space="preserve">
+    <value>Ptám se auta…</value>
+  </data>
+  <data name="AskTheCar" xml:space="preserve">
+    <value>Zeptat se auta</value>
+  </data>
+  <data name="SignsInAfresh" xml:space="preserve">
+    <value>Každé stisknutí se přihlašuje znovu. Ručně to nevadí a právě proto to není pravidelné čtení: opakované zkoušení hesla u skutečného poskytovatele identity je způsob, jak si zablokovat účet.</value>
+  </data>
+  <data name="FeedIntro_2" xml:space="preserve">
+    <value>se dostane</value>
+  </data>
+  <data name="FeedIntro" xml:space="preserve">
+    <value>Zeptá se {0} na {1}, jednou, teď — stejné volání, jaké zdroj dělá podle svého časování, jen proto, že jste se zeptali vy, ne hodiny. Na rozdíl od čtení přes Data Act to, co se vrátí, {2} i do karty na přehledu: majitel, který stiskne tlačítko, žádá celé rozhraní, ať to dožene, ne jen tuto stránku. Vlastní rytmus zdroje to nenaruší.</value>
+  </data>
+  <data name="FeedAskHint" xml:space="preserve">
+    <value>Pokud účet výše není přihlášený, tady se to ukáže: zdroj místo údaje odpoví tím, co mu brání.</value>
+  </data>
+  <data name="NothingToAskYet" xml:space="preserve">
+    <value>Zatím není koho se ptát: tento zdroj je zapnutý, ale nespustil se, takže pro něj řídicí jednotka nemá klienta. Vyplňte pole, která potřebuje, ve formuláři výše a restartujte.</value>
+  </data>
+  <data name="NothingToAskChargeOnly" xml:space="preserve">
+    <value>Není koho se ptát, protože toto auto nic nečte — a nic tady to nepotřebuje. Zda je kabel v zásuvce, říká nabíječka, ne auto, takže přehled na to odpoví tak jako tak; bez zdroje chybí jen stav nabití baterie auta a cíl se zadává v kWh.</value>
+  </data>
+  <data name="WorthRetrying" xml:space="preserve">
+    <value>Stojí za to stisknout znovu — tohle se čeká a obvykle samo odezní.</value>
+  </data>
+  <data name="NotWorthRetrying" xml:space="preserve">
+    <value>Opakované stisknutí nepomůže. Tohle chce něco změnit, nebo prohlížeč.</value>
+  </data>
+  <data name="NothingOnTheCard" xml:space="preserve">
+    <value>Do karty na přehledu se zatím nic nedostalo, takže není s čím to porovnat. Tak vypadá instalace bez zapnutého zdroje a není to chyba: toto stisknutí je celý údaj.</value>
+  </data>
+  <data name="CarDidNotAnswer" xml:space="preserve">
+    <value>Auto neodpovědělo — {0}</value>
+  </data>
+  <data name="FreshFrom" xml:space="preserve">
+    <value>Čerstvé, od {0}, a karta na přehledu ho teď ukazuje také.</value>
+  </data>
+  <data name="AlreadyHeld" xml:space="preserve">
+    <value>To je údaj, který zdroj už měl, ne nový.</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Běží</value>
+  </data>
+  <data name="NothingDescribed" xml:space="preserve">
+    <value>Zatím není nic popsáno, takže každý limit nabíjení je limitem instalace a cíl nejde zadat jako stav nabití. Je to podporovaná instalace — nabíjení i tak běží — a změnit to jde formulářem výše.</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Název</value>
+  </data>
+  <data name="Model" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="UsableBattery" xml:space="preserve">
+    <value>Využitelná baterie</value>
+  </data>
+  <data name="ChargeEfficiency" xml:space="preserve">
+    <value>Účinnost nabíjení</value>
+  </data>
+  <data name="TheCarColumn" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="TheInstallation" xml:space="preserve">
+    <value>Instalace</value>
+  </data>
+  <data name="InEffect" xml:space="preserve">
+    <value>Platí</value>
+  </data>
+  <data name="MinimumCurrent" xml:space="preserve">
+    <value>Minimální proud</value>
+  </data>
+  <data name="MaximumCurrent" xml:space="preserve">
+    <value>Maximální proud</value>
+  </data>
+  <data name="Phases" xml:space="preserve">
+    <value>Fáze</value>
+  </data>
+  <data name="NarrowerOfTwo_0" xml:space="preserve">
+    <value>snížit</value>
+  </data>
+  <data name="NarrowerOfTwo" xml:space="preserve">
+    <value>Řídicí jednotka se drží užšího z obou rozsahů. Auto může limit vždy jen {0} — maximum instalace je přípojka a vedení ve zdi, ne preference — a co auto neuvede, je prostě hodnota instalace.</value>
+  </data>
+  <data name="Feed" xml:space="preserve">
+    <value>Zdroj dat</value>
+  </data>
+  <data name="ReadingTheCar" xml:space="preserve">
+    <value>Čte auto</value>
+  </data>
+  <data name="For" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>Stav</value>
+  </data>
+  <data name="NoManufacturerFeed" xml:space="preserve">
+    <value>Neběží žádný zdroj od výrobce. Nabíjení to neovlivní; chybí jen stav nabití auta, takže cíl se zadává v kWh, ne v procentech.</value>
+  </data>
+  <data name="CarBattery" xml:space="preserve">
+    <value>Baterie auta</value>
+  </data>
+  <data name="CarBatteryPressHint" xml:space="preserve">
+    <value>Stav nabití auta, jak ho zdroj odpověděl na toto stisknutí. Ne domácí baterie.</value>
+  </data>
+  <data name="CarRange" xml:space="preserve">
+    <value>Dojezd auta</value>
+  </data>
+  <data name="CarRangeHint" xml:space="preserve">
+    <value>Kolik si auto myslí, že v něm zbývá, podle své nedávné spotřeby. Nic tady s ním neplánuje; říká, zda nabíjení, o které se chystáte požádat, bude stačit.</value>
+  </data>
+  <data name="CarReadingAge" xml:space="preserve">
+    <value>Stáří údaje z auta</value>
+  </data>
+  <data name="CarReadingAgeHint" xml:space="preserve">
+    <value>Kdy údaj vytvořilo samo auto — ne kdy jste stiskli tlačítko. Hodiny staré údaje jsou u zaparkovaného auta normální.</value>
+  </data>
+  <data name="CarChargeState" xml:space="preserve">
+    <value>Stav nabíjení auta</value>
+  </data>
+  <data name="CarChargeStateHint" xml:space="preserve">
+    <value>Co auto hlásí, že dělá: Nenabíjí, Nabíjí, Dokončeno, nebo Neznámý, když nic nehlásí.</value>
+  </data>
+  <data name="CarPlugState" xml:space="preserve">
+    <value>Připojení podle auta</value>
+  </data>
+  <data name="CarPlugStateHint" xml:space="preserve">
+    <value>Zda auto hlásí kabel v zásuvce. Samostatný údaj vedle stavu nabíječky a mnohem pomalejší.</value>
+  </data>
+  <data name="TargetSoc" xml:space="preserve">
+    <value>Cílové SOC</value>
+  </data>
+  <data name="TargetSocHint" xml:space="preserve">
+    <value>Vlastní limit nabití auta, nastavený v autě nebo jeho aplikaci. Nese ho portál Data Act a žádný živý zdroj: zatím ho nečte žádný plán (#101). Pomlčka znamená, že ho tento zdroj neměl.</value>
+  </data>
+  <data name="TimeLeft" xml:space="preserve">
+    <value>Zbývající čas</value>
+  </data>
+  <data name="TimeLeftHint" xml:space="preserve">
+    <value>Vlastní odhad auta, kolik ještě potřebuje, ne náš. Pomlčka znamená, že ho zdroj neměl — což je samo o sobě zjištění.</value>
+  </data>
+  <data name="CaptureTimeNote_0" xml:space="preserve">
+    <value>auta</value>
+  </data>
+  <data name="CaptureTimeNote" xml:space="preserve">
+    <value>Čas zachycení je čas {0}, ne této chvíle. Zaparkované auto, které hlásilo před hodinami, je normální a nejde o chybu — jeho stav nabití se nemění.</value>
+  </data>
+  <data name="SameSoc" xml:space="preserve">
+    <value>— stejný stav nabití</value>
+  </data>
+  <data name="TheCarFallback" xml:space="preserve">
+    <value>auto</value>
+  </data>
+  <data name="OwnTopicNothingToPress_Cars" xml:space="preserve">
+    <value>vlastním</value>
+  </data>
+  <data name="OwnTopicNothingToPress" xml:space="preserve">
+    <value>Není co stisknout, protože nic tady nic nestahuje: údaje tohoto auta publikujete sami do {0} — jeden objekt JSON na údaj, s {1} časem zachycení auta v {2} a {3}, {4}, {5} a {6}, pokud je váš zdroj má.</value>
+  </data>
+  <data name="TheTopicInTheForm" xml:space="preserve">
+    <value>tématu ve formuláři výše</value>
+  </data>
+  <data name="LastArrived" xml:space="preserve">
+    <value>Poslední přinesl {0}, zachycený před {1}.</value>
+  </data>
+  <data name="NothingArrived" xml:space="preserve">
+    <value>Zatím nic nepřišlo.</value>
+  </data>
+  <data name="TheFeed" xml:space="preserve">
+    <value>zdroje</value>
+  </data>
+  <data name="CardShowing" xml:space="preserve">
+    <value>Karta na přehledu ukazuje {0} ze {1}, zachycené před {2}{3}. To je jiná relace, ptající se v jinou chvíli, takže rozdíl sám o sobě není chyba.</value>
+  </data>
+  <data name="OwnTopicToo" xml:space="preserve">
+    <value>Toto auto má také vlastní téma, {0}. Může běžet vedle zdroje od výrobce — vyhrává nejčerstvější údaj.</value>
+  </data>
+  <data name="PointsBelow_One" xml:space="preserve">
+    <value>— o {0} bod níž než toto stisknutí</value>
+  </data>
+  <data name="PointsBelow_Few" xml:space="preserve">
+    <value>— o {0} body níž než toto stisknutí</value>
+  </data>
+  <data name="PointsBelow_Other" xml:space="preserve">
+    <value>— o {0} bodů níž než toto stisknutí</value>
+  </data>
+  <data name="PointsAbove_One" xml:space="preserve">
+    <value>— o {0} bod výš než toto stisknutí</value>
+  </data>
+  <data name="PointsAbove_Few" xml:space="preserve">
+    <value>— o {0} body výš než toto stisknutí</value>
+  </data>
+  <data name="PointsAbove_Other" xml:space="preserve">
+    <value>— o {0} bodů výš než toto stisknutí</value>
+  </data>
+  <data name="ChangesTakeEffect_One" xml:space="preserve">
+    <value>{0} změna se projeví po restartu.</value>
+  </data>
+  <data name="ChangesTakeEffect_Few" xml:space="preserve">
+    <value>{0} změny se projeví po restartu.</value>
+  </data>
+  <data name="ChangesTakeEffect_Other" xml:space="preserve">
+    <value>{0} změn se projeví po restartu.</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Úpravy</value>
+  </data>
+  <data name="SavedNotApplied" xml:space="preserve">
+    <value>Uloženo, neuplatněno</value>
+  </data>
+  <data name="FeedChange" xml:space="preserve">
+    <value>Zdroj: {0} → {1}</value>
+  </data>
+  <data name="SecretSet" xml:space="preserve">
+    <value>nastaveno</value>
+  </data>
+  <data name="SecretRemoved" xml:space="preserve">
+    <value>odstraněno</value>
+  </data>
+  <data name="ApplyThem" xml:space="preserve">
+    <value>Uplatnit je</value>
+  </data>
+  <data name="CarReadOnly" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Tato pole zahrnují heslo k účtu výrobce a bez přihlášení by kdokoli v LAN mohl číst auto nebo změnit, ze kterého účtu se čte. Nastavte {0} ({1}) a půjdou tu upravovat; do té doby je měňte v {2} a restartujte.</value>
+  </data>
+  <data name="CarSaveNote_2" xml:space="preserve">
+    <value>přihlaste se níže</value>
+  </data>
+  <data name="CarSaveNote" xml:space="preserve">
+    <value>Uložení se kontroluje stejně, jako start kontroluje konfiguraci, a do {0} se zapíše jen to, co se liší. Ten soubor má přednost před {1}, klíč po klíči, takže každé pole říká, odkud pochází jeho hodnota. Nic se nezmění, dokud se řídicí jednotka nerestartuje — a uložení účet ověřit nemůže, protože zdroj se sestavuje z těchto klíčů při startu. Restartujte, pak {2} a zeptejte se auta.</value>
+  </data>
+  <data name="Manufacturer" xml:space="preserve">
+    <value>Výrobce</value>
+  </data>
+  <data name="WhatReadsThisCar" xml:space="preserve">
+    <value>Co čte toto auto</value>
+  </data>
+  <data name="SignInIdChanged" xml:space="preserve">
+    <value>Přihlašovací ID značky se změnilo</value>
+  </data>
+  <data name="SignInIdChangedNote" xml:space="preserve">
+    <value>ID klientů portálu jsou zjištěná zpětným inženýrstvím, ne zveřejněná, takže některé může bez varování zastarat — příznakem je přihlášení, které selže, jako by bylo špatné heslo. ID zadané tady má přednost před značkou výše.</value>
+  </data>
+  <data name="TheCar" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="CarFieldsNote" xml:space="preserve">
+    <value>Tato pole zajišťují správné nabíjení a nezávisí na žádném zdroji. Instalace dovoluje {0}–{1} A; řídicí jednotka se drží užšího z obou rozsahů a auto může limit vždy jen snížit.</value>
+  </data>
+  <data name="Checking" xml:space="preserve">
+    <value>Kontroluje se…</value>
+  </data>
+  <data name="SaveButton" xml:space="preserve">
+    <value>Uložit</value>
+  </data>
+  <data name="DiscardChanges" xml:space="preserve">
+    <value>Zahodit změny</value>
+  </data>
+  <data name="NotSaved" xml:space="preserve">
+    <value>Neuloženo — s tímto by řídicí jednotka odmítla startovat:</value>
+  </data>
+  <data name="ProveIt" xml:space="preserve">
+    <value>Ověřte to níže</value>
+  </data>
+  <data name="FieldId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="FieldName" xml:space="preserve">
+    <value>Název</value>
+  </data>
+  <data name="FieldMake" xml:space="preserve">
+    <value>Značka</value>
+  </data>
+  <data name="FieldModel" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="FieldUsablePack" xml:space="preserve">
+    <value>Využitelná baterie (kWh)</value>
+  </data>
+  <data name="FieldChargeEfficiency" xml:space="preserve">
+    <value>Účinnost nabíjení</value>
+  </data>
+  <data name="FieldPhases" xml:space="preserve">
+    <value>Fáze</value>
+  </data>
+  <data name="FieldMinCurrent" xml:space="preserve">
+    <value>Minimální proud (A)</value>
+  </data>
+  <data name="FieldMaxCurrent" xml:space="preserve">
+    <value>Maximální proud (A)</value>
+  </data>
+  <data name="FieldVwId" xml:space="preserve">
+    <value>VW ID (e-mail)</value>
+  </data>
+  <data name="FieldPassword" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="FieldVin" xml:space="preserve">
+    <value>VIN</value>
+  </data>
+  <data name="FieldDataAct" xml:space="preserve">
+    <value>Portál Data Act</value>
+  </data>
+  <data name="FieldBrand" xml:space="preserve">
+    <value>Značka</value>
+  </data>
+  <data name="FieldClientId" xml:space="preserve">
+    <value>ID klienta</value>
+  </data>
+  <data name="FieldOwnTopic" xml:space="preserve">
+    <value>Vlastní téma</value>
+  </data>
+  <data name="HintId" xml:space="preserve">
+    <value>a-z, 0-9, - a _</value>
+  </data>
+  <data name="HintUsablePack" xml:space="preserve">
+    <value>využitelná, ne hrubá hodnota z prospektu</value>
+  </data>
+  <data name="HintEfficiency" xml:space="preserve">
+    <value>nad 0, nejvýš 1</value>
+  </data>
+  <data name="HintMinCurrent" xml:space="preserve">
+    <value>nejnižší proud, se kterým auto začne</value>
+  </data>
+  <data name="HintMaxCurrent" xml:space="preserve">
+    <value>strop palubní nabíječky</value>
+  </data>
+  <data name="Hint17Characters" xml:space="preserve">
+    <value>17 znaků</value>
+  </data>
+  <data name="SavedRestartSignIn" xml:space="preserve">
+    <value>Uloženo. Restartujte řídicí jednotku, aby se uplatnilo, a pak se přihlaste.</value>
+  </data>
+  <data name="SavedRunning" xml:space="preserve">
+    <value>Uloženo. Řídicí jednotka už s těmito hodnotami běží.</value>
+  </data>
+  <data name="Unchanged" xml:space="preserve">
+    <value>beze změny</value>
+  </data>
+  <data name="NotSet" xml:space="preserve">
+    <value>nenastaveno</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Odstranit</value>
+  </data>
+  <data name="KeptInSecretStore" xml:space="preserve">
+    <value>Uloženo v úložišti tajných údajů — {0}. Ponecháte-li prázdné, zůstane beze změny; Odstranit ho smaže.</value>
+  </data>
+  <data name="RevertTo" xml:space="preserve">
+    <value>Vrátit na {0}</value>
+  </data>
+  <data name="FeedDataAct" xml:space="preserve">
+    <value>Audi · SEAT · Cupra · Bentley · užitkové VW</value>
+  </data>
+  <data name="FeedOwnTopic" xml:space="preserve">
+    <value>Zdroj, který publikuji sám</value>
+  </data>
+  <data name="FeedNone" xml:space="preserve">
+    <value>Jiný výrobce — jen nabíjení</value>
+  </data>
+  <data name="FreshVolkswagen" xml:space="preserve">
+    <value>asi 20 s, stav připojení, živě během nabíjení</value>
+  </data>
+  <data name="FreshSkoda" xml:space="preserve">
+    <value>5–15 min, stav připojení</value>
+  </data>
+  <data name="FreshDataAct" xml:space="preserve">
+    <value>hodiny pozadu; bez stavu připojení</value>
+  </data>
+  <data name="FreshOwnTopic" xml:space="preserve">
+    <value>podle toho, kdo publikuje</value>
+  </data>
+  <data name="FreshNone" xml:space="preserve">
+    <value>žádné údaje z auta</value>
+  </data>
+  <data name="NoteVolkswagen" xml:space="preserve">
+    <value>volkswagen.de, čteno živě. První přihlášení vždy chce jednorázový kód zaslaný e-mailem na tento účet, takže se dělá v sekci Účet níže, po restartu.</value>
+  </data>
+  <data name="NoteSkoda" xml:space="preserve">
+    <value>MyŠkoda Public API. Nebere heslo: vytvořte klíč API v aplikaci MyŠkoda a vložte ho v sekci Účet níže. Klíče vypršují, a proto se obnovují tam, ne tady.</value>
+  </data>
+  <data name="NoteDataAct" xml:space="preserve">
+    <value>Portál EU Data Act — cesta pro značku koncernu bez vlastního živého zdroje. Dodává dávky, ne průběžné údaje, takže počítejte s tím, že stav nabití auta bude hodiny starý, a stav připojení vůbec.</value>
+  </data>
+  <data name="NoteOwnTopic" xml:space="preserve">
+    <value>Téma MQTT, do kterého publikujete sami. Broker a jeho přihlašovací údaje patří domácímu brokeru a zůstávají v sekci Vehicle; autu patří jen téma.</value>
+  </data>
+  <data name="NoteNone" xml:space="preserve">
+    <value>Bez zdroje, což je podporovaná instalace, ne nedokončený formulář: každé elektroauto se zásuvkou Type 2 se bez něj nabije. Stojí to přesně jednu věc — cíl se zadává v kWh, ne jako stav nabití, protože nic nehlásí, kolik už baterie má.</value>
+  </data>
+  <data name="SourceSecretStore" xml:space="preserve">
+    <value>úložiště tajných údajů</value>
+  </data>
+  <data name="SourceEnvironmentDetail" xml:space="preserve">
+    <value>prostředí ({0})</value>
+  </data>
+  <data name="SourceCommandLine" xml:space="preserve">
+    <value>příkazová řádka</value>
+  </data>
+  <data name="SourceWebUi" xml:space="preserve">
+    <value>webové rozhraní</value>
+  </data>
+  <data name="SourceEnvironment" xml:space="preserve">
+    <value>prostředí</value>
+  </data>
+  <data name="SourceDefault" xml:space="preserve">
+    <value>výchozí</value>
+  </data>
+  <data name="TitleWebUi" xml:space="preserve">
+    <value>Uloženo z této stránky v {0}; má přednost před .env.</value>
+  </data>
+  <data name="TitleEnvironment" xml:space="preserve">
+    <value>{0}, z .env pod Dockerem nebo /etc/gleanvolt/gleanvolt.env pod systemd.</value>
+  </data>
+  <data name="TitleCommandLine" xml:space="preserve">
+    <value>Argument příkazové řádky, který má přednost před touto stránkou.</value>
+  </data>
+  <data name="TitleAppSettings" xml:space="preserve">
+    <value>Z {0} v instalačním adresáři.</value>
+  </data>
+  <data name="TitleDefault" xml:space="preserve">
+    <value>Nikde nenastaveno; platí vestavěná výchozí hodnota.</value>
+  </data>
+  <data name="FieldsRecognised_One" xml:space="preserve">
+    <value>{0} pole, které tato verze rozpoznala</value>
+  </data>
+  <data name="FieldsRecognised_Few" xml:space="preserve">
+    <value>{0} pole, která tato verze rozpoznala</value>
+  </data>
+  <data name="FieldsRecognised_Other" xml:space="preserve">
+    <value>{0} polí, která tato verze rozpoznala</value>
+  </data>
+  <data name="FieldsUnread_One" xml:space="preserve">
+    <value>{0} pole, které tu nic nečte</value>
+  </data>
+  <data name="FieldsUnread_Few" xml:space="preserve">
+    <value>{0} pole, která tu nic nečte</value>
+  </data>
+  <data name="FieldsUnread_Other" xml:space="preserve">
+    <value>{0} polí, která tu nic nečte</value>
+  </data>
+  <data name="Empty" xml:space="preserve">
+    <value>(prázdné)</value>
+  </data>
+  <data name="Account" xml:space="preserve">
+    <value>Účet</value>
+  </data>
+  <data name="SignedIn" xml:space="preserve">
+    <value>Přihlášeno</value>
+  </data>
+  <data name="SignOut" xml:space="preserve">
+    <value>Odhlásit</value>
+  </data>
+  <data name="OneTimeCode" xml:space="preserve">
+    <value>Jednorázový kód</value>
+  </data>
+  <data name="SubmitCode" xml:space="preserve">
+    <value>Odeslat kód</value>
+  </data>
+  <data name="ApiKey" xml:space="preserve">
+    <value>Klíč API</value>
+  </data>
+  <data name="SaveKey" xml:space="preserve">
+    <value>Uložit klíč</value>
+  </data>
+  <data name="SigningIn" xml:space="preserve">
+    <value>Přihlašuji…</value>
+  </data>
+  <data name="SignIn" xml:space="preserve">
+    <value>Přihlásit</value>
+  </data>
+  <data name="AccountDataAct" xml:space="preserve">
+    <value>Tento portál se přihlašuje při každém čtení, takže tady není co navazovat. Účtem je VW ID a heslo ve formuláři výše a ověří je dotaz na auto níže.</value>
+  </data>
+  <data name="AccountOwnTopic" xml:space="preserve">
+    <value>Tady se nic nepřihlašuje: údaje publikujete sami, takže mezi tím není žádný účet výrobce. Přihlašovací údaje brokeru patří domácímu brokeru a zůstávají v sekci Vehicle.</value>
+  </data>
+  <data name="AccountChargeOnly" xml:space="preserve">
+    <value>Žádný účet, protože toto auto nic nečte. Nabíjení to neovlivní — cíl se zadává v kWh, ne jako stav nabití.</value>
+  </data>
+  <data name="NoAccountYet" xml:space="preserve">
+    <value>Zatím není účet, ke kterému se přihlásit.</value>
+  </data>
+  <data name="Diagnostics" xml:space="preserve">
+    <value>Diagnostika</value>
+  </data>
+  <data name="DiagnosticsIntro_0" xml:space="preserve">
+    <value>proč je u toho pole pomlčka</value>
+  </data>
+  <data name="DiagnosticsIntro" xml:space="preserve">
+    <value>Co portál dodal a kolik z toho tato verze rozumí. Tohle odpoví na otázku {0} — stojí za otevření, když nějaký údaj výše chybí, a za ignorování, když žádný nechybí.</value>
+  </data>
+  <data name="TheDelivery" xml:space="preserve">
+    <value>Dodávka</value>
+  </data>
+  <data name="Vehicle" xml:space="preserve">
+    <value>Vozidlo</value>
+  </data>
+  <data name="Snapshots" xml:space="preserve">
+    <value>Snímky</value>
+  </data>
+  <data name="Odometer" xml:space="preserve">
+    <value>Počítadlo km</value>
+  </data>
+  <data name="FieldMoments_0" xml:space="preserve">
+    <value>auto</value>
+  </data>
+  <data name="FieldMoments" xml:space="preserve">
+    <value>Každé s okamžikem, kdy ho {0} nahlásilo. Čtení slučuje několik dodávek, takže dva údaje tady můžou být hodiny od sebe — a porovnávat je bez toho je cesta, jak zaměnit hrubý údaj se zastaralým.</value>
+  </data>
+  <data name="NothingInVocabulary" xml:space="preserve">
+    <value>Ani jedno pole v balíku není ve slovníku — jde tedy o sadu názvů k doplnění, ne o auto, které hlásí prázdné hodnoty.</value>
+  </data>
+  <data name="NeverBecameReading" xml:space="preserve">
+    <value>Co balík obsahoval a nikdy se nestalo údajem</value>
+  </data>
+  <data name="UnmappedNote" xml:space="preserve">
+    <value>Pokud nějaká hodnota výše chybí, její skutečný název je nejspíš v tomto seznamu — slovník portálu vznikl z datového slovníku VW, ne z vašeho auta, takže při prvním běhu se to čeká a nejde o chybu. Opravou je doplnit správné názvy do {0}; vložit tento seznam do issue stačí, aby to mohl udělat někdo jiný.</value>
+  </data>
+  <data name="AllRecognised" xml:space="preserve">
+    <value>Každé pole v balíku bylo rozpoznáno.</value>
+  </data>
+  <data name="OdometerNote" xml:space="preserve">
+    <value>Stav počítadla se přenáší, ale nic ho nečte. Cílové SOC je to, které by plánu dovolilo odmítnout nemožný cíl baterie, odloženo v {0}.</value>
+  </data>
+  <data name="PhasesNotStated" xml:space="preserve">
+    <value>Neuvedeno — použije se počet instalace</value>
+  </data>
+  <data name="PhasesSingle" xml:space="preserve">
+    <value>1 — jednofázově</value>
+  </data>
+  <data name="PhasesThree" xml:space="preserve">
+    <value>3 — třífázově</value>
+  </data>
+  <data name="NoManufacturerAccount" xml:space="preserve">
+    <value>žádný účet výrobce</value>
+  </data>
+  <data name="NoAccountExplanation" xml:space="preserve">
+    <value>Není napojen žádný účet výrobce, takže není k čemu se přihlásit. Zdroj, který ho potřebuje, přinese vlastní přihlášení, jakmile budou vyplněna všechna pole, která vyžaduje, a řídicí jednotka se s nimi restartuje.</value>
+  </data>
+  <data name="PortalFailure_NotConfigured" xml:space="preserve">
+    <value>Nenastaveno</value>
+  </data>
+  <data name="PortalFailure_SessionExpired" xml:space="preserve">
+    <value>Relace vypršela</value>
+  </data>
+  <data name="PortalFailure_SignInRejected" xml:space="preserve">
+    <value>Přihlášení odmítnuto</value>
+  </data>
+  <data name="PortalFailure_OwnerActionRequired" xml:space="preserve">
+    <value>Čeká na vás</value>
+  </data>
+  <data name="PortalFailure_VehicleNotFound" xml:space="preserve">
+    <value>Auto nenalezeno</value>
+  </data>
+  <data name="PortalFailure_NoDataAvailable" xml:space="preserve">
+    <value>Zatím žádná data</value>
+  </data>
+  <data name="PortalFailure_NoDataRequest" xml:space="preserve">
+    <value>Chybí požadavek na data</value>
+  </data>
+  <data name="PortalFailure_UnusableData" xml:space="preserve">
+    <value>Nečitelná data</value>
+  </data>
+  <data name="PortalFailure_Transient" xml:space="preserve">
+    <value>Přechodné selhání</value>
+  </data>
+</root>
