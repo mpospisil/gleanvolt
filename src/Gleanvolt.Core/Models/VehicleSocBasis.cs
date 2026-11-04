@@ -86,6 +86,12 @@ public sealed record VehicleSocBasis(
                 + "ask in kilowatt-hours instead."
             : null;
 
+    /// <summary>The <see cref="StaleRefusal"/> for the web UI to say in the viewer's language (#290).</summary>
+    public Phrase? StaleRefusalPhrase =>
+        IsStale
+            ? Phrase.Of("Request.Stale", new PhraseArg.Percent(SocPercent ?? 0), new PhraseArg.Duration(Age!.Value), new PhraseArg.Duration(MaxAge))
+            : null;
+
     /// <summary>
     /// A duration in words, coarse on purpose: this one is measured in hours and days, and a reading
     /// "5 h" old says everything that "5 h 11 m 04 s" would.

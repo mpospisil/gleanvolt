@@ -664,7 +664,7 @@ else
             constraints: _sunOnly ? TargetedChargeConstraints.SunOnly : null);
 
         request = result.Request!;
-        error = result.Error;
+        error = result.Error is { } refused ? Localized.Say(result.ErrorPhrase, refused) : null;
 
         return result.Request is not null;
     }
@@ -793,7 +793,7 @@ else
         // underneath still promised a figure would be the page contradicting itself.
         if (basis.StaleRefusal is { } tooOld)
         {
-            return tooOld;
+            return Localized.Say(basis.StaleRefusalPhrase, tooOld);
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(

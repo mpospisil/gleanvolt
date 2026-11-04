@@ -229,19 +229,19 @@ public sealed class HaDiscovery
     /// — which is the difference between a topic that reports and one that can change what the charger
     /// is doing.
     /// </returns>
-    public IEnumerable<(string Purpose, string Topic, bool Inbound)> WellKnownTopics()
+    public IEnumerable<(string Purpose, string Topic, bool Inbound, Phrase PurposePhrase)> WellKnownTopics()
     {
-        yield return ("Availability", AvailabilityTopic, false);
-        yield return ("Status, as one JSON payload", StateTopic, false);
+        yield return ("Availability", AvailabilityTopic, false, Phrase.Of("Topic.Availability"));
+        yield return ("Status, as one JSON payload", StateTopic, false, Phrase.Of("Topic.State"));
 
         if (_batteryHoldEnabled)
         {
-            yield return ("Battery hold", BatteryHoldStateTopic, false);
-            yield return ("Battery hold, set", BatteryHoldCommandTopic, true);
+            yield return ("Battery hold", BatteryHoldStateTopic, false, Phrase.Of("Topic.BatteryHold"));
+            yield return ("Battery hold, set", BatteryHoldCommandTopic, true, Phrase.Of("Topic.BatteryHoldSet"));
         }
 
-        yield return ("Start a targeted charge", ActivateTargetCommandTopic, true);
-        yield return ("Stop the controller", StopServiceCommandTopic, true);
+        yield return ("Start a targeted charge", ActivateTargetCommandTopic, true, Phrase.Of("Topic.ActivateTarget"));
+        yield return ("Stop the controller", StopServiceCommandTopic, true, Phrase.Of("Topic.StopService"));
     }
 
     public const string PayloadOnline = "online";

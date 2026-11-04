@@ -48,19 +48,19 @@ public static class TariffRules
 
         if (low < 0)
         {
-            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "A price can't be negative."));
+            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "A price can't be negative.", Phrase: Phrase.Of("Tariff.NegativePrice")));
         }
 
         if (high < 0)
         {
-            problems.Add(new TariffProblem(TariffFields.HighPrice, null, "A price can't be negative."));
+            problems.Add(new TariffProblem(TariffFields.HighPrice, null, "A price can't be negative.", Phrase: Phrase.Of("Tariff.NegativePrice")));
         }
 
         // A warning, not a block: nothing in the controller acts on the prices yet, the times are what
         // matter, and a tariff this odd could exist. Wrong prices cost a wrong-looking figure.
         if (low is { } l && high is { } h && l >= 0 && l > h)
         {
-            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "Low tariff costs more than high.", IsWarning: true));
+            problems.Add(new TariffProblem(TariffFields.LowPrice, null, "Low tariff costs more than high.", IsWarning: true, Phrase: Phrase.Of("Tariff.LowAboveHigh")));
         }
 
         return problems;
@@ -77,7 +77,8 @@ public static class TariffRules
         if (table.Weekday.Count == 0 && table.Weekend.Count == 0)
         {
             problems.Add(new TariffProblem(
-                TariffFields.Table, null, "No low-tariff periods: everything would be high tariff.", IsWarning: true));
+                TariffFields.Table, null, "No low-tariff periods: everything would be high tariff.", IsWarning: true,
+                Phrase: Phrase.Of("Tariff.NoPeriods")));
         }
 
         return problems;
@@ -116,12 +117,12 @@ public static class TariffRules
 
             if (start is null || end is null)
             {
-                problems.Add(new TariffProblem(field, row, "Not a time."));
+                problems.Add(new TariffProblem(field, row, "Not a time.", Phrase: Phrase.Of("Tariff.NotATime")));
             }
             else if (start >= end)
             {
                 problems.Add(new TariffProblem(
-                    field, row, "Ends before it starts. Split a period over midnight into two rows."));
+                    field, row, "Ends before it starts. Split a period over midnight into two rows.", Phrase: Phrase.Of("Tariff.EndsBeforeStart")));
             }
             else
             {
@@ -143,7 +144,8 @@ public static class TariffRules
                 if (other != row && parsed[other] is { } theirs && mine.Start < theirs.End && theirs.Start < mine.End)
                 {
                     problems.Add(new TariffProblem(
-                        field, row, $"Overlaps {FormatMinutes(theirs.Start)}–{FormatMinutes(theirs.End)}."));
+                        field, row, $"Overlaps {FormatMinutes(theirs.Start)}–{FormatMinutes(theirs.End)}.",
+                        Phrase: Phrase.Of("Tariff.Overlaps", new PhraseArg.Text(FormatMinutes(theirs.Start)), new PhraseArg.Text(FormatMinutes(theirs.End)))));
                     break;
                 }
             }

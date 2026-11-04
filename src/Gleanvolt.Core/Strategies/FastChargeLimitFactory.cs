@@ -29,7 +29,7 @@ public static class FastChargeLimitFactory
     /// a limit rather than a limit of its own, so <see cref="Accepted"/> with a null
     /// <see cref="Limit"/> is a perfectly good answer and every caller has to handle it.</para>
     /// </summary>
-    public sealed record Result(FastChargeLimit? Limit, string? Error)
+    public sealed record Result(FastChargeLimit? Limit, string? Error, Phrase? ErrorPhrase = null)
     {
         /// <summary>Whether the request was accepted. A null <see cref="Limit"/> then means Full.</summary>
         public bool Accepted => Error is null;
@@ -38,7 +38,7 @@ public static class FastChargeLimitFactory
 
         internal static Result Ok(FastChargeLimit limit) => new(limit, null);
 
-        internal static Result Rejected(string error) => new(null, error);
+        internal static Result Rejected(string error, Phrase? phrase) => new(null, error, phrase);
     }
 
     /// <summary>
@@ -86,14 +86,14 @@ public static class FastChargeLimitFactory
         {
             if (departure <= now)
             {
-                return Result.Rejected("The departure time is in the past.");
+                return Result.Rejected("The departure time is in the past.", Phrase.Of("Request.DepartureInPast"));
             }
 
             if (maxHorizon is { } horizon && departure - now > horizon)
             {
                 return Result.Rejected(
                     Invariant($"A departure more than {horizon.TotalHours:F0} hours away is further than a charge ")
-                    + "that does not survive a restart can honestly promise.");
+                    + "that does not survive a restart can honestly promise.", Phrase.Of("Request.TooFarAhead", new PhraseArg.Duration(horizon)));
             }
 
             // The one combination that cannot be honoured: with no amount there is no duration to work
@@ -103,7 +103,7 @@ public static class FastChargeLimitFactory
             {
                 return Result.Rejected(
                     "A departure needs an amount to work back from — say how much energy, or what state "
-                    + "of charge, the car needs. Without one there is nothing to time.");
+                    + "of charge, the car needs. Without one there is nothing to time.", Phrase.Of("Request.DepartureNeedsAmount"));
             }
         }
 
@@ -118,7 +118,7 @@ public static class FastChargeLimitFactory
             case FastChargeBasis.Energy:
                 if (energyWh is not { } wh || double.IsNaN(wh) || wh <= 0)
                 {
-                    return Result.Rejected("Enter how much energy the car needs.");
+                    return Result.Rejected("Enter how much energy the car needs.", Phrase.Of("Request.EnterEnergy"));
                 }
 
                 return Result.Ok(new FastChargeLimit(wh, now, DepartBy: departBy));
@@ -126,14 +126,14 @@ public static class FastChargeLimitFactory
             case FastChargeBasis.Soc:
                 if (targetSocPercent is not { } target || double.IsNaN(target))
                 {
-                    return Result.Rejected("Enter the state of charge to stop at.");
+                    return Result.Rejected("Enter the state of charge to stop at.", Phrase.Of("Request.EnterSoc"));
                 }
 
                 if (!pack.CanTargetSoc)
                 {
                     return Result.Rejected(
                         "A target state of charge needs the car's usable capacity, which is not configured "
-                        + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.");
+                        + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.", Phrase.Of("Request.NoCapacity"));
                 }
 
                 // Before the conversion and in its own words, exactly as the targeted factory does it
@@ -141,7 +141,7 @@ public static class FastChargeLimitFactory
                 // hours-old percentage is a charge that ends at the wrong place.
                 if (vehicleSoc.StaleRefusal is { } tooOld)
                 {
-                    return Result.Rejected(tooOld);
+                    return Result.Rejected(tooOld, vehicleSoc.StaleRefusalPhrase);
                 }
 
                 var socNow = vehicleSoc.ConvertibleSocPercent;
@@ -152,7 +152,7 @@ public static class FastChargeLimitFactory
                 {
                     return Result.Rejected(
                         "The car has not reported a state of charge, so there is nothing to measure the gap "
-                        + "from. Ask in kilowatt-hours instead.");
+                        + "from. Ask in kilowatt-hours instead.", Phrase.Of("Request.NoSoc"));
                 }
 
                 // Rejected in words rather than started and instantly completed: a mode that switches
@@ -161,13 +161,13 @@ public static class FastChargeLimitFactory
                 if (requiredWh.Value <= 0)
                 {
                     return Result.Rejected(
-                        Invariant($"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for."));
+                        Invariant($"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for."), Phrase.Of("Request.AlreadyAt", new PhraseArg.Percent(socNow ?? 0), new PhraseArg.Percent(target)));
                 }
 
                 return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, socNow, departBy));
 
             default:
-                return Result.Rejected($"Unknown fast charge basis '{basis}'.");
+                return Result.Rejected($"Unknown fast charge basis '{basis}'.", Phrase.Of("Request.UnknownBasis", new PhraseArg.Text(basis.ToString())));
         }
     }
 }

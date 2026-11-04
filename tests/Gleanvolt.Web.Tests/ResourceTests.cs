@@ -95,6 +95,7 @@ public sealed partial class ResourceTests
         typeof(Gleanvolt.Core.Enums.VehiclePlugState),
         typeof(Gleanvolt.Core.Enums.VehicleSourceState),
         typeof(Gleanvolt.Core.Enums.TargetedChargeStrategy),
+        typeof(Gleanvolt.Core.Enums.ChargingSessionEndReason),
     ];
 
     [Theory]
@@ -104,6 +105,24 @@ public sealed partial class ResourceTests
         var keys = Read("SharedText.resx").Keys;
 
         Assert.Empty(Enum.GetNames(type).Select(name => $"{type.Name}_{name}").Where(key => !keys.Contains(key)));
+    }
+
+    // A phrase the UI has no template for still shows, in the service's English: so a missing key is a
+    // silent hole in a translation rather than an error anyone sees. Found by reading the sources.
+    [Fact]
+    public void Every_phrase_a_service_can_say_has_a_template()
+    {
+        var keys = Read("ServiceText.resx").Keys;
+        var source = Path.GetFullPath(Path.Combine(ResourcesDirectory, "..", ".."));
+
+        var missing = Directory.EnumerateFiles(source, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .SelectMany(path => PhraseKey().Matches(File.ReadAllText(path)).Select(match => match.Groups[1].Value))
+            .Distinct()
+            .Where(key => !keys.Contains(key.Replace('.', '_')))
+            .Order();
+
+        Assert.Empty(missing);
     }
 
     private static IEnumerable<string> Files(bool translated) =>
@@ -142,6 +161,9 @@ public sealed partial class ResourceTests
 
     [GeneratedRegex(@"\{(\d+)(?:[:,][^}]*)?\}")]
     private static partial Regex Placeholder();
+
+    [GeneratedRegex(@"Phrase\.Of\(""([A-Za-z.]+)""")]
+    private static partial Regex PhraseKey();
 
     [GeneratedRegex(@"^(?<stem>.+)_(One|Few|Other)$")]
     private static partial Regex PluralSuffix();

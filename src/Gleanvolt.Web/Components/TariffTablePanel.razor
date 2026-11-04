@@ -76,7 +76,7 @@
 
 @if (Problems.FirstOrDefault(problem => problem.Field == TariffFields.Table) is { } whole)
 {
-    <p class="@(whole.IsWarning ? "warning" : "error")" id="tariff-table-problem">@whole.Message</p>
+    <p class="@(whole.IsWarning ? "warning" : "error")" id="tariff-table-problem">@Localized.Say(whole.Phrase, whole.Message)</p>
 }
 
 <h3>@SettingsText.TodayAndTomorrow</h3>
@@ -143,7 +143,9 @@
     private string? RowProblem(TariffDays days, int row)
     {
         var field = days == TariffDays.Weekday ? TariffFields.TableWeekday : TariffFields.TableWeekend;
-        return Problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row)?.Message;
+        return Problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row) is { } problem
+            ? Localized.Say(problem.Phrase, problem.Message)
+            : null;
     }
 
     // Each local day as the share of its own length that is low tariff, so a 23-hour spring day is drawn

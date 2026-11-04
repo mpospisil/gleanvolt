@@ -21,7 +21,7 @@ public sealed class TableTariffProvider : ITariffProvider
     public IReadOnlyList<TariffProblem> Check(JsonElement settings) =>
         Read(settings) is { } table
             ? TariffRules.CheckTable(table)
-            : [new TariffProblem(TariffFields.Table, null, "The table could not be read.")];
+            : [new TariffProblem(TariffFields.Table, null, "The table could not be read.", Phrase: Phrase.Of("Tariff.Unreadable"))];
 
     public JsonElement Normalize(JsonElement settings) =>
         Read(settings) is { } table ? Write(TariffRules.Normalize(table)) : settings;

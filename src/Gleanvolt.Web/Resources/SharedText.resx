@@ -429,4 +429,31 @@
     <value>{WWW} {D} {MMM} {HH}:{mm}</value>
     <comment>The time under a chart's cursor, as a uPlot template ({WWW} short weekday, {HH}:{mm} 24-hour time).</comment>
   </data>
+  <data name="ChargingSessionEndReason_ModeOff" xml:space="preserve">
+    <value>Charge control returned to Off</value>
+  </data>
+  <data name="ChargingSessionEndReason_SessionComplete" xml:space="preserve">
+    <value>The car finished charging</value>
+  </data>
+  <data name="ChargingSessionEndReason_CarUnplugged" xml:space="preserve">
+    <value>The car was unplugged</value>
+  </data>
+  <data name="ChargingSessionEndReason_ServiceStopped" xml:space="preserve">
+    <value>The service stopped</value>
+  </data>
+  <data name="ChargingSessionEndReason_Interrupted" xml:space="preserve">
+    <value>The session was interrupted</value>
+  </data>
+  <data name="ChargingSessionEndReason_TargetReached" xml:space="preserve">
+    <value>The energy asked for was delivered</value>
+  </data>
+  <data name="ChargingSessionEndReason_DeparturePassed" xml:space="preserve">
+    <value>The departure time passed</value>
+  </data>
+  <data name="ChargingSessionEndReason_NoSunLeftToday" xml:space="preserve">
+    <value>No sun was left to charge on today</value>
+  </data>
+  <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
+    <value>The charger was switched out of Fast</value>
+  </data>
 </root>

@@ -9,9 +9,9 @@ namespace Gleanvolt.Core.Models;
 /// <param name="Message">
 /// Why it didn't, in words a dashboard can show. Null on success.
 /// </param>
-public sealed record ChargeActionResult(bool Succeeded, string? Message)
+public sealed record ChargeActionResult(bool Succeeded, string? Message, Phrase? MessagePhrase = null)
 {
     public static ChargeActionResult Success { get; } = new(true, null);
 
-    public static ChargeActionResult Failed(string message) => new(false, message);
+    public static ChargeActionResult Failed(string message, Phrase? phrase = null) => new(false, message, phrase);
 }

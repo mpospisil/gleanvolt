@@ -56,7 +56,8 @@ public sealed class ChargeActions : IChargeActions
         if (written is not null)
         {
             return ChargeActionResult.Failed(
-                $"The charger did not accept Fast, so {mode} was not started — it is still in its previous mode. {written}");
+                $"The charger did not accept Fast, so {mode} was not started — it is still in its previous mode. {written}",
+                Phrase.Of("Action.FastRefused", new PhraseArg.Text(written)));
         }
 
         // Only the fast mode, and only because its current is knowable before the first cycle: it is a
@@ -84,7 +85,9 @@ public sealed class ChargeActions : IChargeActions
 
         return written is null
             ? ChargeActionResult.Success
-            : ChargeActionResult.Failed($"Charge control was switched off, but the charger did not accept Stop. {written}");
+            : ChargeActionResult.Failed(
+                $"Charge control was switched off, but the charger did not accept Stop. {written}",
+                Phrase.Of("Action.StopRefused", new PhraseArg.Text(written)));
     }
 
     /// <summary>

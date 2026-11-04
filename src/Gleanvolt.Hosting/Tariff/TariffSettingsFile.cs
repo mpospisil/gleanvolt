@@ -77,7 +77,9 @@ public sealed class TariffSettingsFile : ITariffEditor
 
         if (Find(settings.Provider) is not { } provider)
         {
-            return [new TariffProblem(TariffFields.Provider, null, $"There is no tariff provider called {settings.Provider} in this build.")];
+            return [new TariffProblem(
+                TariffFields.Provider, null, $"There is no tariff provider called {settings.Provider} in this build.",
+                Phrase: Phrase.Of("Tariff.UnknownProvider", new PhraseArg.Text(settings.Provider)))];
         }
 
         return [.. TariffRules.CheckPrices(settings.LowPricePerKwh, settings.HighPricePerKwh), .. provider.Check(settings.SectionFor(provider.Id))];
@@ -107,7 +109,9 @@ public sealed class TariffSettingsFile : ITariffEditor
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 return new TariffSaveResult(
-                    false, [.. problems, new TariffProblem(TariffFields.Provider, null, $"Could not write {Path}: {ex.Message}")]);
+                    false, [.. problems, new TariffProblem(
+                        TariffFields.Provider, null, $"Could not write {Path}: {ex.Message}",
+                        Phrase: Phrase.Of("Tariff.NotWritten", new PhraseArg.Text(Path), new PhraseArg.Text(ex.Message)))]);
             }
 
             _current = normalized;

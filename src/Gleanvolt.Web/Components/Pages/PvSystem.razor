@@ -109,7 +109,7 @@ else
             @foreach (var topic in Mqtt.HomeAssistant.Topics)
             {
                 <tr>
-                    <td>@topic.Purpose</td>
+                    <td>@Localized.Say(topic.PurposePhrase, topic.Purpose)</td>
                     <td class="topic"><code>@topic.Topic</code></td>
                     <td class="flow">@(topic.Inbound ? SettingsText.In : SettingsText.Out)</td>
                 </tr>

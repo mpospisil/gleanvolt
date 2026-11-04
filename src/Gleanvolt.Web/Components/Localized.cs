@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
@@ -35,6 +36,42 @@ public static partial class Localized
             },
             _ => Math.Abs(count) == 1 ? one : other,
         };
+
+    /// <summary>
+    /// What a service said (#290): its <see cref="Phrase"/> in the viewer's language when there is one
+    /// and the UI knows its key, and otherwise the service's own English sentence. Each argument is
+    /// written here, in the viewer's numbers and the installation's <paramref name="zone"/>.
+    /// </summary>
+    public static string Say(Phrase? phrase, string english, TimeZoneInfo zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        if (phrase is null
+            || ServiceText.ResourceManager.GetString(phrase.Key.Replace('.', '_'), CultureInfo.CurrentUICulture) is not { } template)
+        {
+            return english;
+        }
+
+        return Format(template, [.. phrase.Args.Select(arg => Argument(arg, zone))]);
+    }
+
+    /// <summary>
+    /// <see cref="Say(Phrase?, string, TimeZoneInfo)"/> for what never carries a time of day: a
+    /// validation message about a form. A <see cref="PhraseArg.Clock"/> in one would read in UTC.
+    /// </summary>
+    public static string Say(Phrase? phrase, string english) => Say(phrase, english, TimeZoneInfo.Utc);
+
+    private static string Argument(PhraseArg arg, TimeZoneInfo zone) => arg switch
+    {
+        PhraseArg.Energy energy => Units.Energy(energy.WattHours),
+        PhraseArg.Power power => Units.Power(power.Watts),
+        PhraseArg.Percent percent => Units.Percent(percent.Value),
+        PhraseArg.Clock clock => TimeZoneInfo.ConvertTime(clock.At, zone).ToString("HH:mm", CultureInfo.CurrentCulture),
+        PhraseArg.Duration duration => Units.Duration(duration.Span),
+        PhraseArg.Number number => number.Value.ToString(CultureInfo.CurrentCulture),
+        PhraseArg.Text text => text.Value,
+        _ => arg.ToString(),
+    };
 
     /// <summary>
     /// An enum value as the UI shows it: the <c>{Type}_{Value}</c> key in <see cref="SharedText"/>,

@@ -147,19 +147,24 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
             return role == PvDeviceRole.Inverter
                 ? plausible
-                    ? new DeviceProbeResult(true, true, $"{address} answered: battery at {value} %.")
+                    ? new DeviceProbeResult(true, true, $"{address} answered: battery at {value} %.",
+                        Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
                     : new DeviceProbeResult(true, false,
                         $"{address} answered, but its battery register reads {value}, which is no state of "
-                        + "charge. Is this the charger's address?")
+                        + "charge. Is this the charger's address?",
+                        Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)))
                 : plausible
-                    ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.")
+                    ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
+                        Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
                     : new DeviceProbeResult(true, false,
                         $"{address} answered, but its run-mode register reads {value}, which no charger "
-                        + "reports. Is this the inverter's address?");
+                        + "reports. Is this the inverter's address?",
+                        Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).");
+            return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).",
+                Phrase.Of("Probe.NoAnswer", new PhraseArg.Text(address), new PhraseArg.Text(ex.Message)));
         }
     }
 

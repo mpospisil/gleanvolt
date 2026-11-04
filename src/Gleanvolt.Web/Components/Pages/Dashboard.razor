@@ -84,7 +84,7 @@ else
 
             @* Read on every render, which is every poll: the schedule is cached until midnight or a save,
                so a tariff saved on Settings shows here by the next poll. *@
-            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
+            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable is { } unavailable ? Localized.Say(Tariff.UnavailablePhrase, unavailable) : null, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
             {
                 <p class="tariff-line @(Tariff.Timeline is null ? "warning" : "muted")" id="overview-tariff">@tariff</p>
             }

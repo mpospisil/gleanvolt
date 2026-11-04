@@ -62,7 +62,7 @@
 
     @if (status.Mode == ChargeControlMode.SolarGrid && status.SolarGrid is { } outlook)
     {
-        <p class="muted">Forecast: @outlook.Reason.</p>
+        <p class="muted">@Localized.Format(PlanText.ForecastReason, Localized.Say(outlook.ReasonPhrase, outlook.Reason, Time.LocalTimeZone))</p>
     }
 }
 

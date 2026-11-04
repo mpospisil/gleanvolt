@@ -80,7 +80,7 @@
                        value="@_lowPrice" @oninput="e => Edit(() => _lowPrice = Text(e))" />
                 @if (FieldProblem(TariffFields.LowPrice) is { } low)
                 {
-                    <span class="hint @(low.IsWarning ? "warning" : "error")">@low.Message</span>
+                    <span class="hint @(low.IsWarning ? "warning" : "error")">@Localized.Say(low.Phrase, low.Message)</span>
                 }
             </div>
             <div class="pv-field">
@@ -89,7 +89,7 @@
                        value="@_highPrice" @oninput="e => Edit(() => _highPrice = Text(e))" />
                 @if (FieldProblem(TariffFields.HighPrice) is { } high)
                 {
-                    <span class="hint @(high.IsWarning ? "warning" : "error")">@high.Message</span>
+                    <span class="hint @(high.IsWarning ? "warning" : "error")">@Localized.Say(high.Phrase, high.Message)</span>
                 }
             </div>
         </div>
@@ -188,7 +188,7 @@
         if (!result.Saved)
         {
             _problems = result.Problems;
-            _saveErrors = [.. result.Errors.Where(error => error.Field == TariffFields.Provider).Select(error => error.Message)];
+            _saveErrors = [.. result.Errors.Where(error => error.Field == TariffFields.Provider).Select(error => Localized.Say(error.Phrase, error.Message))];
             return;
         }
 

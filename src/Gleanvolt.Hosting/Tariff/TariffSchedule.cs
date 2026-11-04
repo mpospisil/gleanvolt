@@ -40,6 +40,8 @@ public sealed class TariffSchedule : ITariffSchedule
 
     public string? Unavailable => Current().Unavailable;
 
+    public Phrase? UnavailablePhrase => Current().UnavailablePhrase;
+
     public string Currency => _settings.Currency;
 
     /// <summary>Drops the cached expansion, for the refresh worker after a strategy fetched something new.</summary>
@@ -77,7 +79,8 @@ public sealed class TariffSchedule : ITariffSchedule
         if (provider is null)
         {
             return new Expansion(today, null,
-                $"The selected tariff provider, {settings.Provider}, is not in this build, so there is no tariff restriction.");
+                $"The selected tariff provider, {settings.Provider}, is not in this build, so there is no tariff restriction.",
+                Phrase.Of("Tariff.ProviderMissing", new PhraseArg.Text(settings.Provider)));
         }
 
         TariffTimeline? timeline;
@@ -90,13 +93,15 @@ public sealed class TariffSchedule : ITariffSchedule
         catch (Exception ex)
         {
             return new Expansion(today, null,
-                $"The {provider.Name} tariff provider failed ({ex.Message}), so there is no tariff restriction.");
+                $"The {provider.Name} tariff provider failed ({ex.Message}), so there is no tariff restriction.",
+                Phrase.Of("Tariff.ProviderFailed", new PhraseArg.Text(provider.Name), new PhraseArg.Text(ex.Message)));
         }
 
         if (timeline is null && provider.Id != TariffProviderIds.None)
         {
             return new Expansion(today, null,
-                $"The {provider.Name} tariff provider has nothing to answer from yet, so there is no tariff restriction.");
+                $"The {provider.Name} tariff provider has nothing to answer from yet, so there is no tariff restriction.",
+                Phrase.Of("Tariff.ProviderEmpty", new PhraseArg.Text(provider.Name)));
         }
 
         return new Expansion(today, timeline is null ? null : timeline with { ProviderId = provider.Id }, null);
@@ -118,5 +123,5 @@ public sealed class TariffSchedule : ITariffSchedule
         }
     }
 
-    private sealed record Expansion(DateOnly Day, TariffTimeline? Timeline, string? Unavailable);
+    private sealed record Expansion(DateOnly Day, TariffTimeline? Timeline, string? Unavailable, Phrase? UnavailablePhrase = null);
 }

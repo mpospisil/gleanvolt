@@ -791,4 +791,8 @@
   <data name="PlugLine" xml:space="preserve">
     <value>{0}, {1} by the car</value>
   </data>
+  <data name="ForecastReason" xml:space="preserve">
+    <value>Forecast: {0}.</value>
+    <comment>{0} is why the forecast says what it says, in lower case.</comment>
+  </data>
 </root>

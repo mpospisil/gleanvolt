@@ -58,7 +58,7 @@ else
         @if (session.EndReason is { } reason)
         {
             <dt>@HistoryText.EndReason</dt>
-            <dd>@reason.DescribeSentence()</dd>
+            <dd>@Localized.Name(reason)</dd>
         }
 
         <dt>@HistoryText.BatterySoc</dt>

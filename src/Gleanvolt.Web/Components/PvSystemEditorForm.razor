@@ -119,7 +119,7 @@
         <ul class="probes" id="pv-probes">
             @foreach (var (role, probe) in _probes)
             {
-                <li class="@(probe.Answered && probe.Plausible ? null : "error")">@role: @probe.Message</li>
+                <li class="@(probe.Answered && probe.Plausible ? null : "error")">@role: @Localized.Say(probe.MessagePhrase, probe.Message)</li>
             }
         </ul>
         @if (_probes.Any(entry => !entry.Result.Answered || !entry.Result.Plausible))

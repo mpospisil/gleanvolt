@@ -231,7 +231,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 
         if (!composed.Accepted)
         {
-            _error = composed.Error;
+            _error = composed.Error is { } error ? Localized.Say(composed.ErrorPhrase, error) : null;
             return;
         }
 
@@ -297,7 +297,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         // exists to stop, and this mode draws the site's supply limit for hours on the answer.
         if (basis.StaleRefusal is { } tooOld)
         {
-            return tooOld;
+            return Localized.Say(basis.StaleRefusalPhrase, tooOld);
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(

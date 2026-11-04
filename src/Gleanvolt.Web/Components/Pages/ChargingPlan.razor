@@ -245,7 +245,7 @@
             return;
         }
 
-        _actionError = result.Message;
+        _actionError = result.Message is { } message ? Localized.Say(result.MessagePhrase, message) : null;
     }
 
     private string Now() =>

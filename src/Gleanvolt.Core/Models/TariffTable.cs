@@ -150,7 +150,16 @@ public static class TariffFields
 /// <param name="Row">The row, as an index into the list as given, for a field that is a list.</param>
 /// <param name="Message">What to show beside it.</param>
 /// <param name="IsWarning">True when saving is still allowed.</param>
-public sealed record TariffProblem(string Field, int? Row, string Message, bool IsWarning = false);
+/// <param name="Phrase">The same, for the web UI to say in the viewer's language (#290).</param>
+public sealed record TariffProblem(string Field, int? Row, string Message, bool IsWarning = false, Phrase? Phrase = null)
+{
+    // The phrase is the message again, for another reader; two problems that say the same thing are
+    // the same problem whether or not one of them came with it.
+    public bool Equals(TariffProblem? other) =>
+        other is not null && Field == other.Field && Row == other.Row && Message == other.Message && IsWarning == other.IsWarning;
+
+    public override int GetHashCode() => HashCode.Combine(Field, Row, Message, IsWarning);
+}
 
 /// <summary>The outcome of a tariff save: saved, or the problems that stopped it, with any warnings either way.</summary>
 public sealed record TariffSaveResult(bool Saved, IReadOnlyList<TariffProblem> Problems)

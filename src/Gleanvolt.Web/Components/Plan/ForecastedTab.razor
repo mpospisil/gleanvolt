@@ -112,7 +112,7 @@ else
     </p>
 
     <section class="stat-grid">
-        <Stat Label="@PlanText.PlanState" Value="@plan.Reason"
+        <Stat Label="@PlanText.PlanState" Value="@Localized.Say(plan.ReasonPhrase, plan.Reason, Time.LocalTimeZone)"
               Hint="@PlanText.PlanStateHint" />
         <Stat Label="@PlanText.ChargeWindow" Value="@FormatWindow(plan.NextFeasibleWindow)"
               Hint="@PlanText.ChargeWindowHint" />
