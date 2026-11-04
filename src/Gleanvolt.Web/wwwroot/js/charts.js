@@ -19,12 +19,46 @@ window.solaxCharts = (function () {
         return "12px " + cssVar("--font-body", "serif");
     }
 
+    // The viewer's language (#290), handed in by every render call as its last argument: the series'
+    // names, the locale numbers are written in, and the month and day names the time axis uses.
+    // Without it (an older caller) everything stays as it was: English names, the browser's locale.
+    function label(text, key, fallback) {
+        return (text && text.series && text.series[key]) || fallback;
+    }
+
+    function locale(text) {
+        return (text && text.locale) || undefined;
+    }
+
+    // uPlot's own time axis, kept for its choice of ticks, with its US defaults ("11/4", "2pm")
+    // replaced by the viewer's day-and-month order and the 24-hour clock every other time on these
+    // pages uses. Rows: tick increment, then the template for a tick, and for the first tick of a new
+    // year / month / day / hour / minute / second; the last column is uPlot's "mode".
+    function localize(opts, text) {
+        if (!text || !text.dateNames) {
+            return opts;
+        }
+
+        const dm = text.dayMonth;
+        opts.fmtDate = (tpl) => uPlot.fmtDate(tpl, text.dateNames);
+        opts.series[0] = Object.assign({}, opts.series[0], { value: text.legendTime });
+        opts.axes[0].values = [
+            [3600 * 24 * 365, "{YYYY}", null, null, null, null, null, null, 1],
+            [3600 * 24 * 28, "{MMM}", "\n{YYYY}", null, null, null, null, null, 1],
+            [3600 * 24, dm, "\n{YYYY}", null, null, null, null, null, 1],
+            [3600, "{HH}:{mm}", "\n" + dm + " {YYYY}", null, "\n" + dm, null, null, null, 1],
+            [60, "{HH}:{mm}", "\n" + dm + " {YYYY}", null, "\n" + dm, null, null, null, 1],
+            [1, "{HH}:{mm}:{ss}", "\n" + dm + " {YYYY}", null, "\n" + dm, null, null, null, 1],
+        ];
+        return opts;
+    }
+
     // The forecast plan timeline (issue #50): forecast surplus against the charge window, with the
     // required-SOC-floor projection overlaid on a second axis -- one picture for what the entity list
     // on its own can't communicate. Recreated (not patched via setData) on every poll like the rest of
     // the plan page's live figures; a plan updates every few seconds, so a brief redraw is the honest
     // cost of staying current rather than a defect to work around.
-    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec, nowSec, lowTariffWindows) {
+    function renderTimelineChart(elementId, timestampsUnixSeconds, surplusWatts, floorPercent, windowStartSec, windowEndSec, nowSec, lowTariffWindows, text) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -50,15 +84,15 @@ window.solaxCharts = (function () {
             series: [
                 {},
                 {
-                    label: "Forecast surplus",
+                    label: label(text, "forecastSurplus", "Forecast surplus"),
                     scale: "w",
                     stroke: accent,
                     width: 2,
                     fill: accent + "26",
-                    value: (u, v) => (v == null ? "-" : Math.round(v) + " W"),
+                    value: (u, v) => (v == null ? "-" : Math.round(v).toLocaleString(locale(text)) + " W"),
                 },
                 {
-                    label: "Required SOC floor",
+                    label: label(text, "requiredFloor", "Required SOC floor"),
                     scale: "p",
                     stroke: amber,
                     width: 2,
@@ -70,7 +104,7 @@ window.solaxCharts = (function () {
                 { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Explicit size: uPlot's auto-sizing left a 4-digit "6000 W" label clipped against the
                 // canvas edge at the default gutter width.
-                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 64, values: (u, vals) => vals.map((v) => v + " W") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 64, values: (u, vals) => vals.map((v) => v.toLocaleString(locale(text)) + " W") },
                 { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
@@ -143,7 +177,7 @@ window.solaxCharts = (function () {
             },
         };
 
-        const chart = new uPlot(opts, [timestampsUnixSeconds, surplusWatts, floorPercent], el);
+        const chart = new uPlot(localize(opts, text), [timestampsUnixSeconds, surplusWatts, floorPercent], el);
 
         const resize = () => chart.setSize({ width: el.clientWidth || 600, height: 280 });
         window.addEventListener("resize", resize);
@@ -160,7 +194,7 @@ window.solaxCharts = (function () {
     // One payload object rather than a dozen positional arguments; the field names are what
     // EnergyChartSeries serialises to. All the arithmetic lives there, on purpose: this function
     // decides colours and shapes and nothing else.
-    function renderEnergyDayChart(elementId, day) {
+    function renderEnergyDayChart(elementId, day, text) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -180,7 +214,7 @@ window.solaxCharts = (function () {
         // A bucket is a rectangle over a quarter hour, not a point in the middle of one. Stepped
         // paths draw what was recorded; a linear interpolation would draw slopes nothing did.
         const stepped = uPlot.paths.stepped({ align: 1 });
-        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
+        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString(locale(text)) + " W");
 
         // Points off on every series: ninety-six buckets a day, seven lines, and a marker on each one
         // is a chart made of dots. The cursor still reads every series into the legend.
@@ -195,7 +229,7 @@ window.solaxCharts = (function () {
             value: watts,
         });
 
-        const series = [{}, power("Solar", solar)];
+        const series = [{}, power(label(text, "solar", "Solar"), solar)];
         const data = [day.timestamps, day.solar];
 
         if (day.hasForecast) {
@@ -203,7 +237,7 @@ window.solaxCharts = (function () {
             // line*, and two grey series (this and the meter) would be two grey series. Where the day
             // went as predicted the dashes disappear into the solar line, which is the right picture.
             series.push({
-                label: "Forecast",
+                label: label(text, "forecast", "Forecast"),
                 scale: "w",
                 stroke: solar,
                 width: 1,
@@ -216,12 +250,12 @@ window.solaxCharts = (function () {
         }
 
         series.push(
-            power("Grid", gridColour, false),
-            power("Battery", battery, false),
-            power("EV charger", ev),
-            power("House", house, false),
+            power(label(text, "grid", "Grid"), gridColour, false),
+            power(label(text, "battery", "Battery"), battery, false),
+            power(label(text, "ev", "EV charger"), ev),
+            power(label(text, "house", "House"), house, false),
             {
-                label: "Battery SOC",
+                label: label(text, "batterySoc", "Battery SOC"),
                 scale: "p",
                 stroke: battery,
                 width: 1,
@@ -248,7 +282,7 @@ window.solaxCharts = (function () {
                 { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Wider than the plan chart's gutter: this axis goes below zero, and a "-4,000 W" label
                 // that does not fit loses its minus sign against the canvas edge rather than wrapping.
-                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString(locale(text)) + " W") },
                 { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
@@ -297,7 +331,7 @@ window.solaxCharts = (function () {
             // Left to uPlot's default, which is the browser's local time.
         }
 
-        const chart = new uPlot(opts, data, el);
+        const chart = new uPlot(localize(opts, text), data, el);
 
         const resize = () => chart.setSize({ width: el.clientWidth || 600, height: 320 });
         window.addEventListener("resize", resize);
@@ -314,7 +348,7 @@ window.solaxCharts = (function () {
     // One payload object, the field names being what SessionChartSeries serialises to. Straight lines,
     // not stepped: a sample is a reading at an instant, where an energy bucket is a rectangle over a
     // quarter hour. All the arithmetic is on the C# side; this decides colours and shapes only.
-    function renderSessionChart(elementId, session) {
+    function renderSessionChart(elementId, session, text) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -333,7 +367,7 @@ window.solaxCharts = (function () {
         const surplus = cssVar("--surplus", "#1f8a8f");
         const socFloor = cssVar("--soc-floor", "#a3447c");
 
-        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
+        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString(locale(text)) + " W");
         const percent = (u, v) => (v == null ? "-" : Math.round(v) + "%");
 
         // Points left to uPlot: a three-hour charge at a 30-second cadence is a chart made of dots if
@@ -348,15 +382,15 @@ window.solaxCharts = (function () {
             value: watts,
         });
 
-        const series = [{}, power("Solar", solar)];
+        const series = [{}, power(label(text, "solar", "Solar"), solar)];
         const data = [session.timestamps, session.solar];
 
         if (session.hasForecast) {
-            series.push({ label: "Forecast", scale: "w", stroke: solar, width: 1, dash: [4, 4], value: watts });
+            series.push({ label: label(text, "forecast", "Forecast"), scale: "w", stroke: solar, width: 1, dash: [4, 4], value: watts });
             data.push(session.forecast);
         }
 
-        series.push(power("Grid", gridColour, false), power("Battery", battery, false), power("EV charger", ev));
+        series.push(power(label(text, "grid", "Grid"), gridColour, false), power(label(text, "battery", "Battery"), battery, false), power(label(text, "ev", "EV charger"), ev));
         data.push(session.grid, session.battery, session.ev);
 
         // The surplus the controller decided on, and under it the part of the charge the pack was
@@ -364,16 +398,16 @@ window.solaxCharts = (function () {
         // is the gap between a surplus too thin for the charger's floor and the floor, so it is drawn as
         // a filled band under the line it was bridging from rather than as a fifth power trace.
         if (session.hasSurplus) {
-            series.push({ label: "Surplus", scale: "w", stroke: surplus, width: 1, dash: [6, 3], value: watts });
+            series.push({ label: label(text, "surplus", "Surplus"), scale: "w", stroke: surplus, width: 1, dash: [6, 3], value: watts });
             data.push(session.surplus);
         }
 
         if (session.hasLoan) {
-            series.push({ label: "Battery loan", scale: "w", stroke: battery, width: 1, fill: battery + "33", value: watts });
+            series.push({ label: label(text, "batteryLoan", "Battery loan"), scale: "w", stroke: battery, width: 1, fill: battery + "33", value: watts });
             data.push(session.loan);
         }
 
-        series.push({ label: "Battery SOC", scale: "p", stroke: battery, width: 1, dash: [2, 3], value: percent });
+        series.push({ label: label(text, "batterySoc", "Battery SOC"), scale: "p", stroke: battery, width: 1, dash: [2, 3], value: percent });
         data.push(session.soc);
 
         if (session.hasPlanFloor) {
@@ -381,7 +415,7 @@ window.solaxCharts = (function () {
             // thinner: a chart that shows SOC without it cannot distinguish "the pack was below the
             // floor" from "the pack was full and the car was refused anyway", which are the two
             // explanations a paused session on a sunny afternoon has.
-            series.push({ label: "SOC floor", scale: "p", stroke: socFloor, width: 1, dash: [5, 4], value: percent });
+            series.push({ label: label(text, "socFloor", "SOC floor"), scale: "p", stroke: socFloor, width: 1, dash: [5, 4], value: percent });
             data.push(session.socFloor);
         }
 
@@ -390,7 +424,7 @@ window.solaxCharts = (function () {
             // of its own choosing and then says nothing for hours. A sloped line between two of those
             // would draw a charge curve the car never sent.
             series.push({
-                label: "Car SOC",
+                label: label(text, "carSoc", "Car SOC"),
                 scale: "p",
                 stroke: vehicle,
                 width: 2,
@@ -416,7 +450,7 @@ window.solaxCharts = (function () {
                 { stroke: ink, font: axisFont(), grid: { stroke: line } },
                 // Wide gutter, as on the day chart: this axis goes below zero, and a "-4,000 W" label
                 // that does not fit loses its minus sign against the canvas edge rather than wrapping.
-                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 78, values: (u, vals) => vals.map((v) => v.toLocaleString(locale(text)) + " W") },
                 { scale: "p", side: 1, stroke: ink, font: axisFont(), grid: { show: false }, size: 50, values: (u, vals) => vals.map((v) => v + "%") },
             ],
             hooks: {
@@ -483,7 +517,7 @@ window.solaxCharts = (function () {
             // Left to uPlot's default, which is the browser's local time.
         }
 
-        const chart = new uPlot(opts, data, el);
+        const chart = new uPlot(localize(opts, text), data, el);
 
         const resize = () => chart.setSize({ width: el.clientWidth || 600, height: 320 });
         window.addEventListener("resize", resize);
@@ -501,7 +535,7 @@ window.solaxCharts = (function () {
     //
     // One payload object, the field names being what ForecastChartSeries serialises to. All the
     // arithmetic is on the C# side; this decides colours and shapes only.
-    function renderForecastChart(elementId, forecast) {
+    function renderForecastChart(elementId, forecast, text) {
         const el = document.getElementById(elementId);
         if (!el || typeof uPlot === "undefined") {
             return;
@@ -515,7 +549,7 @@ window.solaxCharts = (function () {
         const solar = cssVar("--solar", "#d9a514");
 
         const stepped = uPlot.paths.stepped({ align: 1 });
-        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString() + " W");
+        const watts = (u, v) => (v == null ? "-" : Math.round(v).toLocaleString(locale(text)) + " W");
 
         // The two edges are series of their own rather than only a shape: the cursor then reads all
         // three figures into the legend at once, which is the question the table below answers row by
@@ -545,7 +579,7 @@ window.solaxCharts = (function () {
             series: [
                 {},
                 {
-                    label: "Expected",
+                    label: label(text, "expected", "Expected"),
                     scale: "w",
                     stroke: solar,
                     width: 2,
@@ -553,12 +587,12 @@ window.solaxCharts = (function () {
                     points: { show: false },
                     value: watts,
                 },
-                edge("Low (p10)"),
-                edge("High (p90)"),
+                edge(label(text, "low", "Low (p10)")),
+                edge(label(text, "high", "High (p90)")),
             ],
             axes: [
                 { stroke: ink, font: axisFont(), grid: { stroke: line } },
-                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 70, values: (u, vals) => vals.map((v) => v.toLocaleString() + " W") },
+                { scale: "w", stroke: ink, font: axisFont(), grid: { stroke: line }, size: 70, values: (u, vals) => vals.map((v) => v.toLocaleString(locale(text)) + " W") },
             ],
             hooks: {
                 // Behind the series, not over them: the median line has to stay readable inside its
@@ -659,7 +693,7 @@ window.solaxCharts = (function () {
             // Left to uPlot's default, which is the browser's local time.
         }
 
-        const chart = new uPlot(opts, [forecast.timestamps, forecast.expected, forecast.low, forecast.high], el);
+        const chart = new uPlot(localize(opts, text), [forecast.timestamps, forecast.expected, forecast.low, forecast.high], el);
 
         const resize = () => chart.setSize({ width: el.clientWidth || 600, height: 320 });
         window.addEventListener("resize", resize);

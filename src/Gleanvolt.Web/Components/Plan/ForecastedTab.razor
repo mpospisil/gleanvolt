@@ -215,7 +215,7 @@ else
         _chartCreated = true;
 
         await JS.InvokeVoidAsync(
-            "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd);
+            "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd, null, null, ChartText.Current());
     }
 
     // Runs when the owner switches tabs as well as when the page is left: the chart belongs to this

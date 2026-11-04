@@ -421,4 +421,12 @@
   <data name="TargetedChargeStrategy_Maximum" xml:space="preserve">
     <value>Maximum</value>
   </data>
+  <data name="ChartDayMonthTemplate" xml:space="preserve">
+    <value>{D} {MMM}</value>
+    <comment>A chart's tick on a new day, as a uPlot template ({D} day, {MMM} short month). Czech: "{D}. {MMM}".</comment>
+  </data>
+  <data name="ChartLegendTimeTemplate" xml:space="preserve">
+    <value>{WWW} {D} {MMM} {HH}:{mm}</value>
+    <comment>The time under a chart's cursor, as a uPlot template ({WWW} short weekday, {HH}:{mm} 24-hour time).</comment>
+  </data>
 </root>

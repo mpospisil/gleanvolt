@@ -695,7 +695,8 @@ else
             _status.Timestamp.ToUnixTimeSeconds(),
             Tariff.Timeline?.LowWindows
                 .Select(window => new[] { window.Start.ToUnixTimeSeconds(), window.End.ToUnixTimeSeconds() })
-                .ToArray());
+                .ToArray(),
+            ChartText.Current());
     }
 
     /// <summary>The day so far, summed from the energy monitor's quarter hours.</summary>

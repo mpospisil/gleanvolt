@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Session detail -->
+  <data name="DeliveredOnly" xml:space="preserve">
+    <value>{0} delivered</value>
+  </data>
+  <data name="DeliveredWithLoan" xml:space="preserve">
+    <value>{0} delivered — of which {1} was loaned from the battery</value>
+  </data>
+  <data name="ChartNote" xml:space="preserve">
+    <value>Every meter as it was sampled, in watts. {0} is import above the line and export below it; {1} is charging above and discharging below. Click a name in the legend to take that series out. A shaded band marks the stretches the battery hold was armed for, and a stretch with no samples in it is a hole rather than a line drawn across it.</value>
+    <comment>{0} and {1} are the chart series' names, SeriesGrid and SeriesBattery.</comment>
+  </data>
+  <data name="ChartNoteFloor" xml:space="preserve">
+    <value>{0} is the line the home battery's SOC is judged against: above it the pack may lend to the car, below it the sun belongs to the pack.</value>
+  </data>
+  <data name="ChartNoteLoan" xml:space="preserve">
+    <value>The shaded {0} under the surplus is how much of the charge the pack was funding so a surplus below the charger's floor could still reach the car.</value>
+  </data>
+  <data name="ChartNoteCarSoc" xml:space="preserve">
+    <value>{0} steps at the time the car captured each reading, which is routinely hours before the sample that carried it.</value>
+  </data>
+  <!-- Chart series, as their legends name them -->
+  <data name="SeriesSolar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="SeriesGrid" xml:space="preserve">
+    <value>Grid</value>
+  </data>
+  <data name="SeriesBattery" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+  <data name="SeriesEv" xml:space="preserve">
+    <value>EV charger</value>
+  </data>
+  <data name="SeriesHouse" xml:space="preserve">
+    <value>House</value>
+  </data>
+  <data name="SeriesForecast" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="SeriesSurplus" xml:space="preserve">
+    <value>Surplus</value>
+  </data>
+  <data name="SeriesBatteryLoan" xml:space="preserve">
+    <value>Battery loan</value>
+  </data>
+  <data name="SeriesBatterySoc" xml:space="preserve">
+    <value>Battery SOC</value>
+  </data>
+  <data name="SeriesSocFloor" xml:space="preserve">
+    <value>SOC floor</value>
+  </data>
+  <data name="SeriesCarSoc" xml:space="preserve">
+    <value>Car SOC</value>
+  </data>
+  <data name="SeriesExpected" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="SeriesLow" xml:space="preserve">
+    <value>Low (p10)</value>
+  </data>
+  <data name="SeriesHigh" xml:space="preserve">
+    <value>High (p90)</value>
+  </data>
+  <data name="SeriesForecastSurplus" xml:space="preserve">
+    <value>Forecast surplus</value>
+  </data>
+  <data name="SeriesRequiredFloor" xml:space="preserve">
+    <value>Required SOC floor</value>
+  </data>
+  <!-- Sessions -->
+  <data name="SessionsPageTitle" xml:space="preserve">
+    <value>Charging sessions</value>
+  </data>
+  <data name="SessionsTitle" xml:space="preserve">
+    <value>Charging sessions</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>Last 7 days</value>
+  </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>Last 30 days</value>
+  </data>
+  <data name="Last90Days" xml:space="preserve">
+    <value>Last 90 days</value>
+  </data>
+  <data name="LastYear" xml:space="preserve">
+    <value>Last year</value>
+  </data>
+  <data name="HistoryUnavailable" xml:space="preserve">
+    <value>Charging session history isn't available right now.</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>Loading…</value>
+  </data>
+  <data name="NoSessions" xml:space="preserve">
+    <value>No sessions in this range.</value>
+  </data>
+  <data name="Started" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="Duration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="Strategy" xml:space="preserve">
+    <value>Strategy</value>
+  </data>
+  <data name="Delivered" xml:space="preserve">
+    <value>Delivered</value>
+  </data>
+  <data name="SolarShare" xml:space="preserve">
+    <value>Solar share</value>
+  </data>
+  <data name="InProgressParenthesised" xml:space="preserve">
+    <value>(in progress)</value>
+  </data>
+  <data name="SessionPageTitle" xml:space="preserve">
+    <value>Session</value>
+  </data>
+  <data name="AllSessions" xml:space="preserve">
+    <value>← All sessions</value>
+  </data>
+  <data name="NoSuchSession" xml:space="preserve">
+    <value>No such session.</value>
+  </data>
+  <data name="Session" xml:space="preserve">
+    <value>Session</value>
+  </data>
+  <data name="Ended" xml:space="preserve">
+    <value>Ended</value>
+  </data>
+  <data name="InProgress" xml:space="preserve">
+    <value>in progress</value>
+  </data>
+  <data name="EndReason" xml:space="preserve">
+    <value>End reason</value>
+  </data>
+  <data name="BatterySoc" xml:space="preserve">
+    <value>Battery SOC</value>
+  </data>
+  <data name="PeakPower" xml:space="preserve">
+    <value>Peak charging power</value>
+  </data>
+  <data name="DayForecast" xml:space="preserve">
+    <value>Forecast for the day</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="Daylight" xml:space="preserve">
+    <value>Daylight</value>
+  </data>
+  <data name="EnergySplit" xml:space="preserve">
+    <value>Energy source split</value>
+  </data>
+  <data name="SplitSolar" xml:space="preserve">
+    <value>Solar: {0}</value>
+  </data>
+  <data name="SplitGrid" xml:space="preserve">
+    <value>Grid: {0}</value>
+  </data>
+  <data name="SplitBattery" xml:space="preserve">
+    <value>Battery: {0}</value>
+  </data>
+  <data name="NoEnergy" xml:space="preserve">
+    <value>No energy was delivered.</value>
+  </data>
+  <data name="TheSession" xml:space="preserve">
+    <value>The session</value>
+  </data>
+  <data name="NoSamples" xml:space="preserve">
+    <value>No samples were recorded for this session.</value>
+  </data>
+  <!-- Energy -->
+  <data name="Rows_One" xml:space="preserve">
+    <value>{0} row</value>
+  </data>
+  <data name="Rows_Few" xml:space="preserve">
+    <value>{0} rows</value>
+  </data>
+  <data name="Rows_Other" xml:space="preserve">
+    <value>{0} rows</value>
+  </data>
+  <data name="PartialRowsNote_One" xml:space="preserve">
+    <value>{0} covers less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on that row is short by the same fraction.</value>
+    <comment>{0} is Rows ("1 row"), in bold.</comment>
+  </data>
+  <data name="PartialRowsNote_Few" xml:space="preserve">
+    <value>{0} cover less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on those rows is short by the same fraction.</value>
+  </data>
+  <data name="PartialRowsNote_Other" xml:space="preserve">
+    <value>{0} cover less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on those rows is short by the same fraction.</value>
+  </data>
+  <data name="EnergyPageTitle" xml:space="preserve">
+    <value>Energy</value>
+  </data>
+  <data name="EnergyTitle" xml:space="preserve">
+    <value>Energy</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>Day</value>
+  </data>
+  <data name="PreviousDay" xml:space="preserve">
+    <value>Previous day</value>
+  </data>
+  <data name="NextDay" xml:space="preserve">
+    <value>Next day</value>
+  </data>
+  <data name="EnergyUnavailable" xml:space="preserve">
+    <value>The energy history isn't available right now.</value>
+  </data>
+  <data name="NothingRecorded" xml:space="preserve">
+    <value>Nothing was recorded on this day.</value>
+  </data>
+  <data name="TheDay" xml:space="preserve">
+    <value>The day</value>
+  </data>
+  <data name="EnergyChartNote" xml:space="preserve">
+    <value>Power, averaged over each quarter hour that was observed — the store keeps energy, and a bucket the service only saw part of is divided by the part it saw, so a restart is a gap rather than a dip the sun never took. {0} is import above the line and export below it; {1} is charging above and discharging below. Click a name in the legend to take that series out. A bar along the bottom marks the windows that were only partly observed — the same ones the table below shows in italics.</value>
+  </data>
+  <data name="From" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="ColSolar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="ColForecast" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="ColImport" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="ColExport" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="ColToCar" xml:space="preserve">
+    <value>To car</value>
+  </data>
+  <data name="ColBattIn" xml:space="preserve">
+    <value>Batt in</value>
+  </data>
+  <data name="ColBattOut" xml:space="preserve">
+    <value>Batt out</value>
+  </data>
+  <data name="ColHouse" xml:space="preserve">
+    <value>House</value>
+  </data>
+  <data name="ColSoc" xml:space="preserve">
+    <value>SOC</value>
+  </data>
+  <data name="ColCovered" xml:space="preserve">
+    <value>Covered</value>
+  </data>
+  <data name="DayRow" xml:space="preserve">
+    <value>Day</value>
+  </data>
+  <data name="EnergyTableNote" xml:space="preserve">
+    <value>Every figure is kWh over that interval, in {0} time. Import and export are kept apart, and so are the battery's two directions — a net figure could not tell an idle quarter hour from a busy one that happened to balance. {1} is the residual of the others (the car included), not a separate measurement.</value>
+  </data>
+  <!-- Forecast -->
+  <data name="ForecastPageTitle" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="ForecastTitle" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="NoForecastHeld_0" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="NoForecastHeld" xml:space="preserve">
+    <value>No forecast is held yet. Either no Solcast account is configured for this installation, or nothing has been fetched since the controller started — {0} says which, and is where the account is entered. The forecast is refreshed on its own schedule in daylight; this page shows whatever was last fetched and never asks for one itself.</value>
+  </data>
+  <data name="TheTwoDays" xml:space="preserve">
+    <value>The two days</value>
+  </data>
+  <data name="ForecastChartNote_1" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="ForecastChartNote_2" xml:space="preserve">
+    <value>p10 to p90</value>
+  </data>
+  <data name="ForecastChartNote" xml:space="preserve">
+    <value>Expected PV power against time, 30-minute periods, in {0} time. The line is {1} — the median, as likely to be beaten as missed — and the band behind it is {2}: the width of that gap is how sure the sky is, and it is the reason this is a picture rather than four numbers. The solid rule is the midnight between the two days; the dashed one is now. Click a name in the legend to take that series out.</value>
+  </data>
+  <data name="NoRangeNote_0" xml:space="preserve">
+    <value>Some periods carry no range of their own</value>
+  </data>
+  <data name="NoRangeNote" xml:space="preserve">
+    <value>{0} — the provider sent only a median for them, and the band collapses onto the line there. A band no wider than the line is not a promise; the table below shows a dash in those rows.</value>
+  </data>
+  <data name="MorningMissing" xml:space="preserve">
+    <value>{0} A forecast provider only ever answers what is still to come, so the controller can say what this morning was expected to bring only if it was running through it — and this one has nothing retained before then. The empty stretch on the left of the chart is a gap in what is known, not a dark morning.</value>
+  </data>
+  <data name="Period" xml:space="preserve">
+    <value>Period</value>
+  </data>
+  <data name="ColExpected" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="ColLow" xml:space="preserve">
+    <value>Low (p10)</value>
+  </data>
+  <data name="ColHigh" xml:space="preserve">
+    <value>High (p90)</value>
+  </data>
+  <data name="ColEnergy" xml:space="preserve">
+    <value>Energy</value>
+  </data>
+  <data name="DayTotals" xml:space="preserve">
+    <value>{0} expected ({1}–{2} at p10–p90), peak {3}</value>
+  </data>
+  <data name="NothingHeld" xml:space="preserve">
+    <value>Nothing is held for this day.</value>
+  </data>
+  <data name="ForecastTableNote_1" xml:space="preserve">
+    <value>is</value>
+  </data>
+  <data name="ForecastTableNote_2" xml:space="preserve">
+    <value>ends</value>
+  </data>
+  <data name="ForecastTableNote_3" xml:space="preserve">
+    <value>Tomorrow's figures keep moving</value>
+  </data>
+  <data name="ForecastTableNote" xml:space="preserve">
+    <value>Power in W, energy in kWh, times in {0} time. Each row is the half hour it names, and every figure on it is the average power the provider expects across that half hour — so the energy column is simply that power over thirty minutes. The night rows are kept: a 0 W row at 02:00 {1} the forecast, and a table that drops rows is one you have to learn the rules of before you can trust a gap in it. A period is counted under the day it {2} on, which is how the dashboard and the day plan count it too, so each day opens with the half hour that ends at its own midnight. {3} — every refresh re-forecasts them until the day arrives.</value>
+  </data>
+  <data name="LastFetched" xml:space="preserve">
+    <value>Last fetched {0} on {1}.</value>
+  </data>
+  <data name="ForecastHorizonNote_0" xml:space="preserve">
+    <value>Solar forecast</value>
+  </data>
+  <data name="ForecastHorizonNote" xml:space="preserve">
+    <value>The horizon is about 48 hours, which is why this is two days and not a week. The dashboard's {0} table is the same two days in four numbers each.</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Tomorrow</value>
+  </data>
+  <data name="TodayStartsAt" xml:space="preserve">
+    <value>Today starts at {0}.</value>
+  </data>
+</root>

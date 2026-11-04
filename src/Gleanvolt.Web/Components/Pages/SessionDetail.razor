@@ -20,57 +20,57 @@
     tested; this page only hands it over and prints the list of marked moments beside it.
 *@
 
-<SiteTitle Page="Session" />
+<SiteTitle Page="@HistoryText.SessionPageTitle" />
 
-<p><a href="/sessions">← All sessions</a></p>
+<p><a href="/sessions">@HistoryText.AllSessions</a></p>
 
 @if (_error)
 {
-    <p class="muted">Charging session history isn't available right now.</p>
+    <p class="muted">@HistoryText.HistoryUnavailable</p>
 }
 else if (!_loaded)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">@HistoryText.Loading</p>
 }
 else if (_document is null)
 {
-    <p class="muted">No such session.</p>
+    <p class="muted">@HistoryText.NoSuchSession</p>
 }
 else
 {
     var session = _document.Session;
 
-    <h1>Session</h1>
+    <h1>@HistoryText.Session</h1>
 
     <dl class="facts">
-        <dt>Started</dt>
+        <dt>@HistoryText.Started</dt>
         <dd>@Local(session.StartedAt)</dd>
 
-        <dt>Ended</dt>
-        <dd>@(session.EndedAt is { } ended ? Local(ended) : "in progress")</dd>
+        <dt>@HistoryText.Ended</dt>
+        <dd>@(session.EndedAt is { } ended ? Local(ended) : HistoryText.InProgress)</dd>
 
-        <dt>Duration</dt>
+        <dt>@HistoryText.Duration</dt>
         <dd>@Units.Duration(session.Duration(Time.GetUtcNow()))</dd>
 
-        <dt>Strategy</dt>
+        <dt>@HistoryText.Strategy</dt>
         <dd>@session.FormatStrategy()</dd>
 
         @if (session.EndReason is { } reason)
         {
-            <dt>End reason</dt>
+            <dt>@HistoryText.EndReason</dt>
             <dd>@reason.DescribeSentence()</dd>
         }
 
-        <dt>Battery SOC</dt>
+        <dt>@HistoryText.BatterySoc</dt>
         <dd>@Units.Percent(session.StartBatterySocPercent) → @Units.Percent(session.EndBatterySocPercent)</dd>
 
-        <dt>Peak charging power</dt>
+        <dt>@HistoryText.PeakPower</dt>
         <dd>@Units.Power(session.PeakChargingPowerWatts)</dd>
 
         @if (session.DayForecast is { Periods.Count: > 0 } dayForecast)
         {
             @* The whole day, not the session: what the roof was expected to make around this car. *@
-            <dt>Forecast for the day</dt>
+            <dt>@HistoryText.DayForecast</dt>
             <dd>@SessionFormatting.FormatDayForecast(dayForecast)</dd>
         }
 
@@ -80,7 +80,7 @@ else
                 What the sky actually did, against what the forecast above expected of it. Both
                 readings when they differ; one line when the session ended in the weather it started in.
             *@
-            <dt>Weather</dt>
+            <dt>@HistoryText.Weather</dt>
             <dd>
                 @SessionFormatting.FormatWeather(weatherAtStart)
                 @if (session.WeatherAtEnd is { } weatherAtEnd)
@@ -92,7 +92,7 @@ else
 
         @if (session.Sunrise is { } sunrise && session.Sunset is { } sunset)
         {
-            <dt>Daylight</dt>
+            <dt>@HistoryText.Daylight</dt>
             <dd>
                 @Local(sunrise, "HH:mm") – @Local(sunset, "HH:mm")
                 @if (session.DaylightLength is { } daylight)
@@ -104,13 +104,11 @@ else
     </dl>
 
     <section class="split">
-        <h2>Energy source split</h2>
+        <h2>@HistoryText.EnergySplit</h2>
         <p class="muted">
-            @Units.Kwh(session.EnergyDeliveredWh, 2) delivered
-            @if (session.LoanedWh > 0)
-            {
-                @: — of which @Units.Kwh(session.LoanedWh, 2) was loaned from the battery
-            }
+            @(session.LoanedWh > 0
+                ? Localized.Format(HistoryText.DeliveredWithLoan, Units.Kwh(session.EnergyDeliveredWh, 2), Units.Kwh(session.LoanedWh, 2))
+                : Localized.Format(HistoryText.DeliveredOnly, Units.Kwh(session.EnergyDeliveredWh, 2)))
         </p>
 
         @if (session.EnergyDeliveredWh > 0)
@@ -121,47 +119,39 @@ else
                 <span class="battery" style="width:@Share(session.FromBatteryWh, session.EnergyDeliveredWh)"></span>
             </div>
             <ul class="split-legend">
-                <li><span class="swatch solar"></span>Solar: @Units.Kwh(session.FromSolarWh, 2)</li>
-                <li><span class="swatch grid"></span>Grid: @Units.Kwh(session.FromGridWh, 2)</li>
-                <li><span class="swatch battery"></span>Battery: @Units.Kwh(session.FromBatteryWh, 2)</li>
+                <li><span class="swatch solar"></span>@Localized.Format(HistoryText.SplitSolar, Units.Kwh(session.FromSolarWh, 2))</li>
+                <li><span class="swatch grid"></span>@Localized.Format(HistoryText.SplitGrid, Units.Kwh(session.FromGridWh, 2))</li>
+                <li><span class="swatch battery"></span>@Localized.Format(HistoryText.SplitBattery, Units.Kwh(session.FromBatteryWh, 2))</li>
             </ul>
         }
         else
         {
-            <p class="muted">No energy was delivered.</p>
+            <p class="muted">@HistoryText.NoEnergy</p>
         }
     </section>
 
     <section class="chart-section">
-        <h2>The session</h2>
+        <h2>@HistoryText.TheSession</h2>
         @if (_chart is null)
         {
-            <p class="muted">No samples were recorded for this session.</p>
+            <p class="muted">@HistoryText.NoSamples</p>
         }
         else
         {
             <div id="session-chart" class="chart session"></div>
             <p class="muted chart-note">
-                Every meter as it was sampled, in watts. <strong>Grid</strong> is import above the line
-                and export below it; <strong>Battery</strong> is charging above and discharging below.
-                Click a name in the legend to take that series out. A shaded band marks the stretches
-                the battery hold was armed for, and a stretch with no samples in it is a hole rather
-                than a line drawn across it.
+                @Localized.Rich(HistoryText.ChartNote, @<strong>@HistoryText.SeriesGrid</strong>, @<strong>@HistoryText.SeriesBattery</strong>)
                 @if (_chart.HasPlanFloor)
                 {
-                    @:<strong>SOC floor</strong> is the line the home battery's SOC is judged against:
-                    @:above it the pack may lend to the car, below it the sun belongs to the pack.
+                    @Localized.Rich(HistoryText.ChartNoteFloor, @<strong>@HistoryText.SeriesSocFloor</strong>)
                 }
                 @if (_chart.HasLoan)
                 {
-                    @:The shaded <strong>Battery loan</strong> under the surplus is how much of the
-                    @:charge the pack was funding so a surplus below the charger's floor could still
-                    @:reach the car.
+                    @Localized.Rich(HistoryText.ChartNoteLoan, @<strong>@HistoryText.SeriesBatteryLoan</strong>)
                 }
                 @if (_chart.HasVehicleSoc)
                 {
-                    @:<strong>Car SOC</strong> steps at the time the car captured each reading, which
-                    @:is routinely hours before the sample that carried it.
+                    @Localized.Rich(HistoryText.ChartNoteCarSoc, @<strong>@HistoryText.SeriesCarSoc</strong>)
                 }
             </p>
 
@@ -233,7 +223,7 @@ else
         _chartRendered = true;
         _chartCreated = true;
 
-        await JS.InvokeVoidAsync("solaxCharts.renderSessionChart", "session-chart", _chart);
+        await JS.InvokeVoidAsync("solaxCharts.renderSessionChart", "session-chart", _chart, ChartText.Current());
     }
 
     public async ValueTask DisposeAsync()
@@ -253,7 +243,7 @@ else
         }
     }
 
-    private string Local(DateTimeOffset value) => Local(value, "yyyy-MM-dd HH:mm");
+    private string Local(DateTimeOffset value) => Local(value, SharedText.DateTimePattern);
 
     private string Local(DateTimeOffset value, string format) =>
         TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString(format);
