@@ -187,7 +187,7 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab();
 
         _mode.Set(ChargeControlMode.FastNoBattery, "the polling loop");
-        page.WaitForAssertion(() => Assert.Equal("FastNoBattery", page.Find("#mode-state .mode").TextContent));
+        page.WaitForAssertion(() => Assert.Equal("Fast (no battery)", page.Find("#mode-state .mode").TextContent));
 
         _mode.Set(ChargeControlMode.Off, "the polling loop (charging finished)");
 

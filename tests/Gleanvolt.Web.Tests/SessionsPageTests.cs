@@ -72,7 +72,7 @@ public class SessionsPageTests : PageTest
 
         var page = Render<Sessions>();
 
-        page.WaitForAssertion(() => Assert.Contains("Forecasted → FastNoBattery", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("Forecasted → Fast (no battery)", page.Markup));
     }
 
     [Fact]

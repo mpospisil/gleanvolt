@@ -1,4 +1,5 @@
 using System.Globalization;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -122,7 +123,7 @@ internal static class Units
             return m == 0 ? $"{h} h" : $"{h} h {m:00} min";
         }
 
-        return $"{Trimmed(value.TotalDays, "0.#")} days";
+        return Days(value.TotalDays);
     }
 
     /// <summary>
@@ -132,11 +133,11 @@ internal static class Units
     /// </summary>
     public static string Age(TimeSpan age) => age switch
     {
-        _ when age < TimeSpan.Zero => "just now",
-        _ when age < TimeSpan.FromMinutes(1) => "under a minute",
+        _ when age < TimeSpan.Zero => SharedText.JustNow,
+        _ when age < TimeSpan.FromMinutes(1) => SharedText.UnderAMinute,
         _ when age < TimeSpan.FromHours(1) => $"{Number(age.TotalMinutes, 0)} min",
         _ when age < TimeSpan.FromDays(1) => $"{Number(age.TotalHours, 1)} h",
-        _ => $"{Number(age.TotalDays, 1)} days",
+        _ => Days(age.TotalDays, "0.0"),
     };
 
     /// <summary>A span in whole hours, for limits configured in hours: "48 h".</summary>
@@ -146,7 +147,7 @@ internal static class Units
 
     /// <summary>A percentage given as 0–100: "64%".</summary>
     public static string Percent(double? percent, int decimals = 0) =>
-        percent is { } value ? $"{Number(value, decimals)}%" : Missing;
+        percent is { } value ? Localized.Format(SharedText.Percent, Number(value, decimals)) : Missing;
 
     /// <summary>A fraction given as 0–1, shown as a percentage: 0.92 reads "92%".</summary>
     public static string Fraction(double? fraction, int decimals = 0) =>
@@ -215,6 +216,18 @@ internal static class Units
         var text = $"{Sign(rounded, signed)}{Number(rounded, decimals)}";
 
         return unit is null ? text : $"{text} {unit}";
+    }
+
+    // A number of days in words, to the tenth: the one place a unit is a word, not a symbol, and so
+    // counted in the viewer's language. A fraction, or a whole number written with a decimal ("1.0"),
+    // takes the general form, as it does in English.
+    private static string Days(double days, string format = "0.#")
+    {
+        var rounded = Round(days, 1);
+        var whole = rounded == Math.Floor(rounded) && !format.Contains(".0", StringComparison.Ordinal);
+        var count = whole ? (long)rounded : long.MaxValue;
+        var form = Localized.Plural(count, SharedText.Days_One, SharedText.Days_Few, SharedText.Days_Other);
+        return Localized.Format(form, rounded.ToString(format, CultureInfo.CurrentCulture));
     }
 
     private static string Sign(double rounded, bool signed) => signed && rounded > 0 ? "+" : "";

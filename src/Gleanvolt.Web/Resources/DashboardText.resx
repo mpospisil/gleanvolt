@@ -1,0 +1,550 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Overview header and figures -->
+  <data name="PageTitle" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Live" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="Updated" xml:space="preserve">
+    <value>Updated {0}</value>
+  </data>
+  <data name="NoPollYet" xml:space="preserve">
+    <value>No poll has completed yet.</value>
+  </data>
+  <data name="FiguresLabel" xml:space="preserve">
+    <value>Power now and energy today</value>
+  </data>
+  <data name="Solar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="SolarTopic" xml:space="preserve">
+    <value>solar</value>
+  </data>
+  <data name="SolarTip1" xml:space="preserve">
+    <value>PV production measured at the inverter, before the house, the battery or the car take any of it.</value>
+  </data>
+  <data name="SolarTip2_0" xml:space="preserve">
+    <value>Forecast:</value>
+  </data>
+  <data name="SolarTip2" xml:space="preserve">
+    <value>{0} what the forecast expected the roof to be making right now, to read against the measured figure. 0 when no forecast covers this moment.</value>
+  </data>
+  <data name="SolarTip3_0" xml:space="preserve">
+    <value>Surplus:</value>
+  </data>
+  <data name="SolarTip3" xml:space="preserve">
+    <value>{0} PV left after household consumption — the smoothed 3-minute average the solar modes decide on. Shown only while the selected mode decides on surplus.</value>
+  </data>
+  <data name="ForecastNow" xml:space="preserve">
+    <value>forecast {0}</value>
+  </data>
+  <data name="SurplusNow" xml:space="preserve">
+    <value>surplus {0}</value>
+  </data>
+  <data name="House" xml:space="preserve">
+    <value>House</value>
+  </data>
+  <data name="HouseTopic" xml:space="preserve">
+    <value>house</value>
+  </data>
+  <data name="HouseTip1" xml:space="preserve">
+    <value>What the house is drawing apart from the car: solar plus grid import, less what the battery takes and the car draws. The same residual the Energy page calls House.</value>
+  </data>
+  <data name="HouseTip2" xml:space="preserve">
+    <value>A dash when the sum comes out below zero: the grid meter does not see every phase, so while the car charges part of its load can be missing from it.</value>
+  </data>
+  <data name="WithoutCar" xml:space="preserve">
+    <value>without the car</value>
+  </data>
+  <data name="NotMeasurable" xml:space="preserve">
+    <value>not measurable</value>
+  </data>
+  <data name="Battery" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+  <data name="BatteryTopic" xml:space="preserve">
+    <value>battery</value>
+  </data>
+  <data name="BatteryTip1" xml:space="preserve">
+    <value>Home battery power: positive while the battery charges, negative while it discharges.</value>
+  </data>
+  <data name="BatteryTip2" xml:space="preserve">
+    <value>The percentage is the home battery's state of charge as the inverter reports it.</value>
+  </data>
+  <data name="BatteryCharging" xml:space="preserve">
+    <value>charging</value>
+  </data>
+  <data name="BatterySupplying" xml:space="preserve">
+    <value>supplying</value>
+  </data>
+  <data name="BatteryIdle" xml:space="preserve">
+    <value>idle</value>
+  </data>
+  <data name="In" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="Out" xml:space="preserve">
+    <value>out</value>
+  </data>
+  <data name="Car" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="CarTopic" xml:space="preserve">
+    <value>car power</value>
+  </data>
+  <data name="CarTip" xml:space="preserve">
+    <value>What the charger reports the car actually drawing right now — not a setpoint. Plugged in is the charger's own view of whether a vehicle is connected.</value>
+  </data>
+  <data name="PluggedInTopic" xml:space="preserve">
+    <value>plugged in</value>
+  </data>
+  <data name="PluggedIn" xml:space="preserve">
+    <value>plugged in</value>
+  </data>
+  <data name="NotPluggedIn" xml:space="preserve">
+    <value>not plugged in</value>
+  </data>
+  <data name="Grid" xml:space="preserve">
+    <value>Grid</value>
+  </data>
+  <data name="GridTopic" xml:space="preserve">
+    <value>grid</value>
+  </data>
+  <data name="GridTip" xml:space="preserve">
+    <value>Grid power: positive while importing from the grid, negative while exporting.</value>
+  </data>
+  <data name="Importing" xml:space="preserve">
+    <value>importing</value>
+  </data>
+  <data name="Exporting" xml:space="preserve">
+    <value>exporting</value>
+  </data>
+  <data name="Balanced" xml:space="preserve">
+    <value>balanced</value>
+  </data>
+  <data name="FiguresNote" xml:space="preserve">
+    <value>Power now; under it, energy since midnight.</value>
+  </data>
+  <data name="FiguresNoteTopic" xml:space="preserve">
+    <value>today's figures</value>
+  </data>
+  <data name="FiguresNoteTip" xml:space="preserve">
+    <value>Energy since local midnight, as the energy monitor recorded it in quarter hours: a stretch the service was not running is missing from it, not estimated.</value>
+  </data>
+  <data name="NoEnergyMonitor" xml:space="preserve">
+    <value>Today's energy needs the energy monitor, which is off on this installation; the figures above are power now only.</value>
+  </data>
+  <!-- Charge mode strip -->
+  <data name="ChargeMode" xml:space="preserve">
+    <value>Charge mode</value>
+  </data>
+  <data name="ChargeModesLabel" xml:space="preserve">
+    <value>Charge modes</value>
+  </data>
+  <data name="NoSession_0" xml:space="preserve">
+    <value>Charging plan</value>
+  </data>
+  <data name="NoSession" xml:space="preserve">
+    <value>No controlled charging session is running. Pick a mode to set it up and start it on the {0} page.</value>
+  </data>
+  <!-- Plan and session cards -->
+  <data name="TodaysPlan" xml:space="preserve">
+    <value>Today's plan</value>
+  </data>
+  <data name="LowTariffBar" xml:space="preserve">
+    <value>The bar along the bottom is low tariff.</value>
+  </data>
+  <data name="Window" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="CarEnergy" xml:space="preserve">
+    <value>Car energy</value>
+  </data>
+  <data name="BatteryFloor" xml:space="preserve">
+    <value>Battery floor</value>
+  </data>
+  <data name="Shortfall" xml:space="preserve">
+    <value>Shortfall</value>
+  </data>
+  <data name="WholePlan" xml:space="preserve">
+    <value>The whole plan</value>
+  </data>
+  <data name="ThePlan" xml:space="preserve">
+    <value>The plan</value>
+  </data>
+  <data name="ThisSession" xml:space="preserve">
+    <value>This session</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="NoModeDriving" xml:space="preserve">
+    <value>No mode is driving the charger, but the car is drawing: the charger reports {0}.</value>
+  </data>
+  <data name="HoldLabel" xml:space="preserve">
+    <value>Battery discharge hold</value>
+  </data>
+  <data name="On" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="ChangeOrStop" xml:space="preserve">
+    <value>Change or stop on Charging plan</value>
+  </data>
+  <data name="DrawingNow" xml:space="preserve">
+    <value>drawing now; no session energy counted yet</value>
+  </data>
+  <data name="ControlState" xml:space="preserve">
+    <value>Control state</value>
+  </data>
+  <data name="ControlStateTopic" xml:space="preserve">
+    <value>control state</value>
+  </data>
+  <data name="ControlStateTip" xml:space="preserve">
+    <value>What charge control is doing right now: Disabled (nothing running), Idle (running but not acting, usually because the charger is no longer in Fast), Charging, or Paused.</value>
+  </data>
+  <data name="ChargerStatus" xml:space="preserve">
+    <value>Charger status</value>
+  </data>
+  <data name="ChargerStatusTopic" xml:space="preserve">
+    <value>charger status</value>
+  </data>
+  <data name="ChargerStatusTip" xml:space="preserve">
+    <value>The charger's own reported state, straight from its register.</value>
+  </data>
+  <data name="SessionEnergy" xml:space="preserve">
+    <value>Session energy</value>
+  </data>
+  <data name="SessionEnergyTopic" xml:space="preserve">
+    <value>session energy</value>
+  </data>
+  <data name="SessionEnergyTip" xml:space="preserve">
+    <value>Energy delivered to the car since it was plugged in. Starts afresh when it's unplugged.</value>
+  </data>
+  <data name="EvPower" xml:space="preserve">
+    <value>EV charging power</value>
+  </data>
+  <data name="EvCurrent" xml:space="preserve">
+    <value>EV charging current</value>
+  </data>
+  <data name="EvCurrentTopic" xml:space="preserve">
+    <value>EV charging current</value>
+  </data>
+  <data name="EvCurrentTip" xml:space="preserve">
+    <value>Charging current derived from the charger's measured power: what the car really takes.</value>
+  </data>
+  <data name="TargetCurrent" xml:space="preserve">
+    <value>Target current</value>
+  </data>
+  <data name="TargetCurrentTopic" xml:space="preserve">
+    <value>target current</value>
+  </data>
+  <data name="TargetCurrentTip" xml:space="preserve">
+    <value>The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging.</value>
+  </data>
+  <data name="ActiveCurrent" xml:space="preserve">
+    <value>Active current</value>
+  </data>
+  <data name="ActiveCurrentTopic" xml:space="preserve">
+    <value>active current</value>
+  </data>
+  <data name="ActiveCurrentTip" xml:space="preserve">
+    <value>The charger's setpoint read back from the hardware: what it was actually left at.</value>
+  </data>
+  <data name="LoanPower" xml:space="preserve">
+    <value>Battery loan power</value>
+  </data>
+  <data name="LoanPowerTopic" xml:space="preserve">
+    <value>battery loan power</value>
+  </data>
+  <data name="LoanPowerTip" xml:space="preserve">
+    <value>How much of what the car is drawing right now is covered by the home battery rather than by live sun. Zero outside the Forecasted mode.</value>
+  </data>
+  <!-- Vehicle -->
+  <data name="Vehicle" xml:space="preserve">
+    <value>Vehicle</value>
+  </data>
+  <data name="StaleOlderThan" xml:space="preserve">
+    <value>— stale, older than {0}</value>
+  </data>
+  <data name="ReadingTopic" xml:space="preserve">
+    <value>the car reading</value>
+  </data>
+  <data name="ReadingTip" xml:space="preserve">
+    <value>The age is how long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died.</value>
+  </data>
+  <data name="NoReadingYet" xml:space="preserve">
+    <value>{0} has not delivered a reading yet — {1}</value>
+  </data>
+  <data name="NoFeed" xml:space="preserve">
+    <value>No feed is configured for this car, so there is no reading — nothing is wrong. Charging works in kilowatt-hours either way; a feed only adds the car's own view of itself.</value>
+  </data>
+  <data name="AskingTheCar" xml:space="preserve">
+    <value>Asking the car…</value>
+  </data>
+  <data name="AskTheCar" xml:space="preserve">
+    <value>Ask the car</value>
+  </data>
+  <data name="NothingToAsk" xml:space="preserve">
+    <value>No feed is configured for this car, so there is nothing to ask.</value>
+  </data>
+  <data name="CarDidNotAnswer" xml:space="preserve">
+    <value>The car did not answer — {0}</value>
+  </data>
+  <data name="NotAskedYet" xml:space="preserve">
+    <value>The battery and range are not shown until you ask for them. A reading can be hours behind the car, and a figure nobody requested is a figure nobody checked the age of.</value>
+  </data>
+  <data name="CarBattery" xml:space="preserve">
+    <value>Car battery</value>
+  </data>
+  <data name="CarBatteryTopic" xml:space="preserve">
+    <value>car battery</value>
+  </data>
+  <data name="CarBatteryTip1" xml:space="preserve">
+    <value>The car's own state of charge, as its cloud integration last reported it. Not the home battery.</value>
+  </data>
+  <data name="CarBatteryTip2" xml:space="preserve">
+    <value>Range is what the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it says whether the charge you are about to ask for is enough.</value>
+  </data>
+  <data name="Range" xml:space="preserve">
+    <value>{0} range</value>
+  </data>
+  <data name="PluggedInLabel" xml:space="preserve">
+    <value>Plugged in</value>
+  </data>
+  <data name="PluggedInTip1_0" xml:space="preserve">
+    <value>Charger:</value>
+  </data>
+  <data name="PluggedInTip1" xml:space="preserve">
+    <value>{0} whether a vehicle is plugged in, as the charger sees it. Says nothing about whether it is drawing power.</value>
+  </data>
+  <data name="PluggedInTip2_0" xml:space="preserve">
+    <value>Car:</value>
+  </data>
+  <data name="PluggedInTip2" xml:space="preserve">
+    <value>{0} whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one.</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="ChargeState" xml:space="preserve">
+    <value>Charge state</value>
+  </data>
+  <data name="ChargeStateTopic" xml:space="preserve">
+    <value>charge state</value>
+  </data>
+  <data name="ChargeStateTip" xml:space="preserve">
+    <value>What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report.</value>
+  </data>
+  <data name="AsReportedByCar" xml:space="preserve">
+    <value>as reported by the car</value>
+  </data>
+  <!-- Solar forecast -->
+  <data name="SolarForecast" xml:space="preserve">
+    <value>Solar forecast</value>
+  </data>
+  <data name="SolarForecastTopic" xml:space="preserve">
+    <value>the solar forecast</value>
+  </data>
+  <data name="ForecastTip1" xml:space="preserve">
+    <value>Energy in kWh, peak power in kW. Each row is a whole day, midnight to midnight in {0} time. Today's includes the hours already gone, as last forecast before they happened, so it is what the day was expected to bring rather than what is still to come.</value>
+  </data>
+  <data name="ForecastTip2_0" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="ForecastTip2" xml:space="preserve">
+    <value>{0} is Solcast's median: as likely to be beaten as missed.</value>
+  </data>
+  <data name="ForecastTip3_0" xml:space="preserve">
+    <value>Low (p10)</value>
+  </data>
+  <data name="ForecastTip3" xml:space="preserve">
+    <value>{0} is the cautious figure, one the day should beat about nine times in ten — the Forecasted mode plans on this band by default.</value>
+  </data>
+  <data name="ForecastTip4_0" xml:space="preserve">
+    <value>High (p90)</value>
+  </data>
+  <data name="ForecastTip4" xml:space="preserve">
+    <value>{0} is the hopeful one, beaten only about one time in ten; the wider the gap between the two, the less sure the sky.</value>
+  </data>
+  <data name="ForecastTip5_0" xml:space="preserve">
+    <value>Peak</value>
+  </data>
+  <data name="ForecastTip5" xml:space="preserve">
+    <value>{0} is the strongest half hour the median expects, before the house takes its share — a quick check on whether the roof will make enough to charge the car at all.</value>
+  </data>
+  <data name="ForecastTip6" xml:space="preserve">
+    <value>Solcast is asked again every few hours in daylight, so tomorrow's figures keep moving until the day arrives. A dash means no forecast is held for that day yet.</value>
+  </data>
+  <data name="ForecastTip7_0" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="ForecastTip7" xml:space="preserve">
+    <value>{0} has the same two days period by period — a day total and a day's shape are different things, and this is the total.</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>Day</value>
+  </data>
+  <data name="Expected" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="Low" xml:space="preserve">
+    <value>Low (p10)</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>High (p90)</value>
+  </data>
+  <data name="Peak" xml:space="preserve">
+    <value>Peak</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Tomorrow</value>
+  </data>
+  <!-- Code -->
+  <data name="HoldArmedAt" xml:space="preserve">
+    <value>armed on the inverter, holding at {0}</value>
+  </data>
+  <data name="HoldArmed" xml:space="preserve">
+    <value>armed on the inverter</value>
+  </data>
+  <data name="HoldRequested" xml:space="preserve">
+    <value>requested, not yet armed</value>
+  </data>
+  <data name="HoldOff" xml:space="preserve">
+    <value>the battery serves the house as usual</value>
+  </data>
+  <data name="UntilFullDay" xml:space="preserve">
+    <value>· until full · day {0}</value>
+  </data>
+  <data name="TheFeed" xml:space="preserve">
+    <value>The feed</value>
+  </data>
+  <data name="TheCar" xml:space="preserve">
+    <value>The car</value>
+  </data>
+  <data name="Usable" xml:space="preserve">
+    <value>{0}, {1} usable</value>
+  </data>
+  <data name="AsChargerSees" xml:space="preserve">
+    <value>as the charger sees it</value>
+  </data>
+  <data name="CarDoesNotSay" xml:space="preserve">
+    <value>the car doesn't say</value>
+  </data>
+  <data name="Agree" xml:space="preserve">
+    <value>charger and car agree</value>
+  </data>
+  <data name="CarSaysIs" xml:space="preserve">
+    <value>the car says it is</value>
+  </data>
+  <data name="CarSaysIsNot" xml:space="preserve">
+    <value>the car says it is not</value>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Off</value>
+    <comment>The battery discharge hold is off.</comment>
+  </data>
+  <data name="NoWindow" xml:space="preserve">
+    <value>none</value>
+    <comment>No charging window in today's plan.</comment>
+  </data>
+  <data name="IntoCar" xml:space="preserve">
+    <value>into the car since it was plugged in</value>
+  </data>
+  <data name="IntoCarWithSoc" xml:space="preserve">
+    <value>into the car since it was plugged in; the car last said {0}</value>
+    <comment>{0} is the car's own state of charge, a percentage.</comment>
+  </data>
+  <data name="UpdatedAgo" xml:space="preserve">
+    <value>updated {0} ago</value>
+    <comment>{0} is how old the car's reading is ("12 min", "3.5 h").</comment>
+  </data>
+  <data name="UpdatedAgoVia" xml:space="preserve">
+    <value>updated {0} ago via {1}</value>
+    <comment>{1} is the name of the feed the reading came from.</comment>
+  </data>
+  <!-- The overview's headline (OverviewNarrative) -->
+  <data name="DryRun" xml:space="preserve">
+    <value>Dry run: decisions are logged, nothing is written to the charger.</value>
+  </data>
+  <data name="ModeNamedUntilFull" xml:space="preserve">
+    <value>{0} mode (until full, day {1})</value>
+    <comment>{0} is a charge mode's name, {1} which day of a multi-day charge it is.</comment>
+  </data>
+  <data name="ModeNamed" xml:space="preserve">
+    <value>{0} mode</value>
+    <comment>{0} is a charge mode's name.</comment>
+  </data>
+  <data name="DrawingNoMode" xml:space="preserve">
+    <value>The car is drawing {0} with no mode driving the charger — the charger started it on its own.</value>
+  </data>
+  <data name="LentByBattery" xml:space="preserve">
+    <value>, {0} of it lent by the home battery</value>
+    <comment>Appended to ChargingInMode as its {2}; starts with a comma.</comment>
+  </data>
+  <data name="ChargingInMode" xml:space="preserve">
+    <value>Charging the car at {0} in {1}{2}.</value>
+    <comment>{1} is ModeNamed, {2} is LentByBattery or nothing.</comment>
+  </data>
+  <data name="PluggedNotCharging" xml:space="preserve">
+    <value>A car is plugged in, but nothing is charging: no mode is driving the charger.</value>
+  </data>
+  <data name="NothingCharging" xml:space="preserve">
+    <value>Nothing is charging, and no car is plugged in.</value>
+  </data>
+  <data name="WaitingForCar" xml:space="preserve">
+    <value>{0} is on, waiting for a car to be plugged in.</value>
+  </data>
+  <data name="StoodDownUntil" xml:space="preserve">
+    <value>{0} is on and has stood the charger down until {1}.</value>
+  </data>
+  <data name="StoodDownTomorrow" xml:space="preserve">
+    <value>{0} is on and has stood the charger down until tomorrow's sun.</value>
+  </data>
+  <data name="StoodDownUntilCan" xml:space="preserve">
+    <value>{0} is on and has stood the charger down until it can charge.</value>
+  </data>
+  <data name="PausedCar" xml:space="preserve">
+    <value>{0} is on and has paused the car.</value>
+  </data>
+  <data name="NotActing" xml:space="preserve">
+    <value>{0} is on but not acting on the charger.</value>
+  </data>
+  <data name="NotDrawing" xml:space="preserve">
+    <value>{0} is on; the car is not drawing power.</value>
+  </data>
+  <data name="TomorrowsFirstWindow" xml:space="preserve">
+    <value>~{0:HH:mm} (tomorrow's first window)</value>
+  </data>
+  <data name="HighTariffUntil" xml:space="preserve">
+    <value>High tariff until {0:HH:mm}; it is waiting for low tariff (low tariff only).</value>
+  </data>
+  <data name="HighTariffWaiting" xml:space="preserve">
+    <value>High tariff; it is waiting for low tariff (low tariff only).</value>
+  </data>
+  <data name="LowTariffIgnored" xml:space="preserve">
+    <value>Low tariff only is set, but there is no tariff to wait for, so it charges whatever the hour.</value>
+  </data>
+</root>

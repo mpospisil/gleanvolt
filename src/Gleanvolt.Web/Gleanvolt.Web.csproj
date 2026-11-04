@@ -47,6 +47,8 @@
       <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
       <StronglyTypedNamespace>$(RootNamespace).Resources</StronglyTypedNamespace>
       <StronglyTypedClassName>%(Filename)</StronglyTypedClassName>
+      <!-- Public, because DataAnnotations only reads a message from a public property. -->
+      <PublicClass>true</PublicClass>
       <StronglyTypedFileName>$(IntermediateOutputPath)%(Filename).Resources.g.cs</StronglyTypedFileName>
     </EmbeddedResource>
   </ItemGroup>

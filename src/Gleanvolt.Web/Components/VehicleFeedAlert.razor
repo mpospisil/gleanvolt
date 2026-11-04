@@ -18,8 +18,8 @@
 @if (_blocked is not null)
 {
     <div class="alert" role="alert">
-        <strong>Sign-in required</strong> — @(VehicleFeed.Service?.OwnerAction ?? _blocked.Message)
-        <a href="/car">Sign in on the car page</a>
+        <strong>@SharedText.SignInRequired</strong> — @(VehicleFeed.Service?.OwnerAction ?? _blocked.Message)
+        <a href="/car">@SharedText.SignInOnCarPage</a>
     </div>
 }
 

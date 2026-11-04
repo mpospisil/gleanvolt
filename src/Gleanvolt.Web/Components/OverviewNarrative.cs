@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -28,7 +29,7 @@ public static class OverviewNarrative
 
         if (status.DryRun)
         {
-            sentences.Add("Dry run: decisions are logged, nothing is written to the charger.");
+            sentences.Add(DashboardText.DryRun);
         }
 
         sentences.Add(Charging(status, zone));
@@ -50,7 +51,7 @@ public static class OverviewNarrative
         var mode = ChargeModeTabs.Label(status.Mode);
 
         // Until full (#279): one session over several days, so which day it is belongs with the mode.
-        var named = status.UntilFull is { Day: var day } ? $"{mode} mode (until full, day {day})" : $"{mode} mode";
+        var named = status.UntilFull is { Day: var day } ? Localized.Format(DashboardText.ModeNamedUntilFull, mode, day) : Localized.Format(DashboardText.ModeNamed, mode);
 
         if (status.EvChargerPowerWatts > 0)
         {
@@ -58,27 +59,26 @@ public static class OverviewNarrative
             {
                 // The charger starts a car in Fast the moment it is plugged in, before any mode is
                 // picked; this is that, and it must not read as a mode the owner chose.
-                return $"The car is drawing {Units.Power(status.EvChargerPowerWatts)} with no mode driving the charger — "
-                    + "the charger started it on its own.";
+                return Localized.Format(DashboardText.DrawingNoMode, Units.Power(status.EvChargerPowerWatts));
             }
 
             var loan = status.LoanPowerWatts > 0
-                ? $", {Units.Power(status.LoanPowerWatts)} of it lent by the home battery"
+                ? Localized.Format(DashboardText.LentByBattery, Units.Power(status.LoanPowerWatts))
                 : "";
 
-            return $"Charging the car at {Units.Power(status.EvChargerPowerWatts)} in {named}{loan}.";
+            return Localized.Format(DashboardText.ChargingInMode, Units.Power(status.EvChargerPowerWatts), named, loan);
         }
 
         if (status.Mode == ChargeControlMode.Off)
         {
             return status.CarConnected
-                ? "A car is plugged in, but nothing is charging: no mode is driving the charger."
-                : "Nothing is charging, and no car is plugged in.";
+                ? DashboardText.PluggedNotCharging
+                : DashboardText.NothingCharging;
         }
 
         if (!status.CarConnected)
         {
-            return $"{named} is on, waiting for a car to be plugged in.";
+            return Localized.Format(DashboardText.WaitingForCar, named);
         }
 
         return status.State switch
@@ -86,13 +86,13 @@ public static class OverviewNarrative
             // Stood down (#280): the charger is in Stop for a wait, which the owner would otherwise
             // read as the charger having been taken off the mode.
             ChargeControlState.Paused when status.ChargerStoodDown => status.WaitUntil is { } until
-                ? $"{named} is on and has stood the charger down until {StoodDownUntil(status, until, zone)}."
+                ? Localized.Format(DashboardText.StoodDownUntil, named, StoodDownUntil(status, until, zone))
                 : status.UntilFull is not null
-                    ? $"{named} is on and has stood the charger down until tomorrow's sun."
-                    : $"{named} is on and has stood the charger down until it can charge.",
-            ChargeControlState.Paused => $"{named} is on and has paused the car.",
-            ChargeControlState.Idle => $"{named} is on but not acting on the charger.",
-            _ => $"{named} is on; the car is not drawing power.",
+                    ? Localized.Format(DashboardText.StoodDownTomorrow, named)
+                    : Localized.Format(DashboardText.StoodDownUntilCan, named),
+            ChargeControlState.Paused => Localized.Format(DashboardText.PausedCar, named),
+            ChargeControlState.Idle => Localized.Format(DashboardText.NotActing, named),
+            _ => Localized.Format(DashboardText.NotDrawing, named),
         };
     }
 
@@ -103,7 +103,7 @@ public static class OverviewNarrative
         var local = TimeZoneInfo.ConvertTime(until, zone);
         var tomorrow = local.Date > TimeZoneInfo.ConvertTime(status.Timestamp, zone).Date;
 
-        return status.UntilFull is not null && tomorrow ? $"~{local:HH:mm} (tomorrow's first window)" : $"{local:HH:mm}";
+        return status.UntilFull is not null && tomorrow ? Localized.Format(DashboardText.TomorrowsFirstWindow, local) : $"{local:HH:mm}";
     }
 
     // The reason, where the mode published one. Forecasted's day plan and Targeted's plan are the two
@@ -125,10 +125,10 @@ public static class OverviewNarrative
         return status.LowTariff switch
         {
             { Waiting: true, Until: { } until } =>
-                $"High tariff until {TimeZoneInfo.ConvertTime(until, zone):HH:mm}; it is waiting for low tariff (low tariff only).",
-            { Waiting: true } => "High tariff; it is waiting for low tariff (low tariff only).",
+                Localized.Format(DashboardText.HighTariffUntil, TimeZoneInfo.ConvertTime(until, zone)),
+            { Waiting: true } => DashboardText.HighTariffWaiting,
             { Ignored: true } =>
-                "Low tariff only is set, but there is no tariff to wait for, so it charges whatever the hour.",
+                DashboardText.LowTariffIgnored,
             _ => null,
         };
     }

@@ -35,31 +35,27 @@
     Assistant can change anything at any time.
 *@
 
-<SiteTitle Page="Charging plan" />
+<SiteTitle Page="@PlanText.PageTitle" />
 
-<h1>Charging plan</h1>
+<h1>@PlanText.Title</h1>
 
 <section class="controls">
     <div class="control">
         <div id="mode-state" class="mode-state">
-            Charge mode: <span class="mode">@_currentMode</span>@if (_actionNote is not null)
+            @PlanText.ChargeModeLabel <span class="mode">@ChargeModeTabs.Label(_currentMode)</span>@if (_actionNote is not null)
             {
                 <span class="muted"> (@_actionNote)</span>
             }
-            <InfoTip Topic="charge mode">
+            <InfoTip Topic="@PlanText.ChargeModeTopic">
                 <p>
-                    Starting any mode below puts the charger into Fast; Off stops the car, whichever mode
-                    was running. Nothing survives a restart — the service boots in Off and writes nothing
-                    until something here is pressed. Fast (no battery) and Targeted switch themselves off
-                    once the car finishes, Solar + grid once the day's useful sun is over, and the line
-                    above follows them without this page's help.
+                    @PlanText.ChargeModeTip
                 </p>
             </InfoTip>
         </div>
 
         <div class="actions">
             <button type="button" class="secondary off" id="charge-off" disabled="@_busy"
-                    @onclick="StopAsync">Off</button>
+                    @onclick="StopAsync">@SharedText.ModeOff</button>
         </div>
 
         @if (_actionError is not null)
@@ -74,14 +70,11 @@
             <div class="control-head">
                 <label>
                     <input type="checkbox" @bind="_batteryHoldDisplay" @bind:after="OnBatteryHoldSelected" />
-                    Battery discharge hold
+                    @PlanText.HoldCheckbox
                 </label>
-                <InfoTip Topic="Battery discharge hold">
+                <InfoTip Topic="@PlanText.HoldTopic">
                     <p>
-                        Common to every mode, which is why it sits above them: it stops the home battery
-                        serving household load, so the car charges from PV and grid while the battery can
-                        still charge from surplus. Shows the last command written successfully, not a
-                        device read-back — a failed write shows this switching back off on its own.
+                        @PlanText.HoldTip
                     </p>
                 </InfoTip>
             </div>
@@ -89,7 +82,7 @@
     }
 </section>
 
-<nav class="tabs" role="tablist" aria-label="Charging modes">
+<nav class="tabs" role="tablist" aria-label="@PlanText.ModesLabel">
     @foreach (var tab in Tabs)
     {
         <a role="tab" id="@($"tab-{tab.Slug}")" href="@($"/charging-plan/{tab.Slug}")"
@@ -98,7 +91,7 @@
             @tab.Label
             @if (tab.Mode == _currentMode)
             {
-                <span class="running" title="Driving the charger right now">●</span>
+                <span class="running" title="@PlanText.DrivingNow">●</span>
             }
         </a>
     }
@@ -137,8 +130,9 @@
     private const string TargetedSlug = ChargeModeTabs.TargetedSlug;
 
     // Shared with the overview's mode strip (#255), which links into these tabs.
-    private static readonly (string Slug, string Label, ChargeControlMode Mode)[] Tabs =
-        [.. ChargeModeTabs.All.Select(entry => (entry.Slug, entry.Label, entry.Mode))];
+    // The entries themselves rather than a copy of their labels: a label is read in the viewer's
+    // language at render time (#290).
+    private static IReadOnlyList<ChargeModeTabs.Entry> Tabs => ChargeModeTabs.All;
 
     /// <summary>Which mode's tab to show, from the route. Null opens on whatever is driving.</summary>
     [Parameter] public string? Tab { get; set; }
@@ -165,10 +159,10 @@
     // Only navigation sets parameters, so a mode that changes under the page cannot pull the tab out
     // from under the reader -- the running-mode default applies on the way in and nowhere else.
     protected override void OnParametersSet() =>
-        _tab = Tabs.FirstOrDefault(t => t.Slug == Tab).Slug ?? SlugFor(_currentMode);
+        _tab = Tabs.FirstOrDefault(t => t.Slug == Tab)?.Slug ?? SlugFor(_currentMode);
 
     private static string SlugFor(ChargeControlMode mode) =>
-        Tabs.FirstOrDefault(t => t.Mode == mode).Slug ?? SolarSlug;
+        Tabs.FirstOrDefault(t => t.Mode == mode)?.Slug ?? SolarSlug;
 
     private void OnStatusUpdated(ChargeControlStatus status)
     {
@@ -212,7 +206,7 @@
         try
         {
             var result = await Actions.StartAsync(mode, "Web UI");
-            Apply(result, $"started from the Web UI at {Now()}");
+            Apply(result, Localized.Format(PlanText.StartedAt, Now()));
             return result;
         }
         finally
@@ -231,7 +225,7 @@
         try
         {
             var result = await Actions.StopAsync("Web UI");
-            Apply(result, $"stopped from the Web UI at {Now()}");
+            Apply(result, Localized.Format(PlanText.StoppedAt, Now()));
             return result;
         }
         finally

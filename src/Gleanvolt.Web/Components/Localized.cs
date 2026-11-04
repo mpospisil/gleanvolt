@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -34,6 +35,15 @@ public static partial class Localized
             },
             _ => Math.Abs(count) == 1 ? one : other,
         };
+
+    /// <summary>
+    /// An enum value as the UI shows it: the <c>{Type}_{Value}</c> key in <see cref="SharedText"/>,
+    /// or the value's own name when there is none. The fallback is for robustness, not a habit:
+    /// ResourceTests checks that every enum the UI shows has all of its names.
+    /// </summary>
+    public static string Name<TEnum>(TEnum value) where TEnum : struct, Enum =>
+        SharedText.ResourceManager.GetString($"{typeof(TEnum).Name}_{value}", CultureInfo.CurrentUICulture)
+        ?? value.ToString();
 
     /// <summary>
     /// A template whose placeholders are markup rather than text: "<c>Ready by {0}</c>" with

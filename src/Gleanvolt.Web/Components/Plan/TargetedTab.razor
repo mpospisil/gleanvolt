@@ -33,12 +33,10 @@
 *@
 
 <div class="muted intro-line">
-    Say how much and by when; forecast sun goes first, the grid covers the rest as late as possible.
-    <InfoTip Topic="this mode">
+    @PlanText.TargetedIntro
+    <InfoTip Topic="@PlanText.ThisModeTopic">
         <p>
-            Say how much the car needs and when it has to be there, then look at the plan before it starts.
-            The plan takes every kilowatt-hour of forecast surplus the home battery has not already
-            claimed, and buys the rest from the grid as late as it can and still finish in time.
+            @PlanText.TargetedTip
         </p>
     </InfoTip>
 </div>
@@ -51,28 +49,29 @@
         would be a worse answer than no card.
     *@
     <section class="plan" id="vehicle-card">
-        <h2>The car</h2>
+        <h2>@PlanText.TheCar</h2>
 
         <p class="muted">
-            Reported by the car @VehicleAge(_vehicle) ago@(_vehicle.SourceId is null ? "" : $" via {_vehicle.SourceId}").
+            @(_vehicle.SourceId is null
+                ? Localized.Format(PlanText.ReportedByCar, VehicleAge(_vehicle))
+                : Localized.Format(PlanText.ReportedByCarVia, VehicleAge(_vehicle), _vehicle.SourceId))
             @if (_vehicleStale)
             {
                 <strong>
-                    Stale — older than @Units.Hours(VehicleDisplay.MaxAge), so the feed may
-                    have died. Check the figures against the car before planning from them.
+                    @Localized.Format(PlanText.StaleCheck, Units.Hours(VehicleDisplay.MaxAge))
                 </strong>
             }
         </p>
 
         <section class="stat-grid">
-            <Stat Label="Car battery" Value="@Units.Percent(_vehicle.SocPercent)"
-                  Hint="The car's own state of charge, as its cloud integration last reported it. Not the home battery." />
-            <Stat Label="Range" Value="@Units.Distance(_vehicle.RangeMetres)"
-                  Hint="What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip." />
-            <Stat Label="Plugged in" Value="@PluggedIn()"
-                  Hint="What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours." />
-            <Stat Label="Car charge state" Value="@_vehicle.ChargeState.ToString()" End="true"
-                  Hint="What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report." />
+            <Stat Label="@PlanText.CarBattery" Value="@Units.Percent(_vehicle.SocPercent)"
+                  Hint="@PlanText.CarBatteryHint" />
+            <Stat Label="@PlanText.Range" Value="@Units.Distance(_vehicle.RangeMetres)"
+                  Hint="@PlanText.RangeHint" />
+            <Stat Label="@PlanText.PluggedIn" Value="@PluggedIn()"
+                  Hint="@PlanText.PluggedInHint" />
+            <Stat Label="@PlanText.CarChargeState" Value="@Localized.Name(_vehicle.ChargeState)" End="true"
+                  Hint="@PlanText.CarChargeStateHint" />
         </section>
     </section>
 }
@@ -87,12 +86,10 @@
     @* A segmented control on native radios (#255): two answers to one question, both visible. *@
     <div class="control">
         <div class="control-head">
-            <span class="control-label" id="target-basis-label">What are you aiming at?</span>
-            <InfoTip Topic="What are you aiming at?">
+            <span class="control-label" id="target-basis-label">@PlanText.AimingAt</span>
+            <InfoTip Topic="@PlanText.AimingAtTopic">
                 <p>
-                    Either way the promise is metered in kilowatt-hours at the charger. A battery target is
-                    converted once, when you start it — a later reading from the car does not move a target
-                    that is already part delivered.
+                    @PlanText.AimingAtTip
                 </p>
             </InfoTip>
         </div>
@@ -100,12 +97,12 @@
             <label class="seg-opt">
                 <input type="radio" name="target-basis" id="target-basis-energy"
                        checked="@(_basis == TargetBasis.Energy)" @onchange="() => SetBasis(TargetBasis.Energy)" />
-                Energy to add (kWh)
+                @PlanText.EnergyToAdd
             </label>
             <label class="seg-opt">
                 <input type="radio" name="target-basis" id="target-basis-soc"
                        checked="@(_basis == TargetBasis.Soc)" @onchange="() => SetBasis(TargetBasis.Soc)" />
-                Battery target (%)
+                @PlanText.BatteryTarget
             </label>
         </div>
     </div>
@@ -114,7 +111,7 @@
 @if (_basis == TargetBasis.Soc && CanTargetSoc)
 {
     <div class="control">
-        <label for="target-soc">Charge to (%)</label>
+        <label for="target-soc">@PlanText.ChargeTo</label>
         <input id="target-soc" type="number" step="5" min="0" max="100"
                @bind="_targetSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
         <span class="hint">@SocConversionHint()</span>
@@ -124,9 +121,9 @@ else
 {
     <div class="control">
         <div class="control-head">
-            <label for="target-energy">Energy needed (kWh)</label>
-            <InfoTip Topic="Energy needed (kWh)">
-                <p>Measured at the charger, from the moment you press Start.</p>
+            <label for="target-energy">@PlanText.EnergyNeeded</label>
+            <InfoTip Topic="@PlanText.EnergyNeededTopic">
+                <p>@PlanText.EnergyNeededStartTip</p>
             </InfoTip>
         </div>
         <input id="target-energy" type="number" step="0.5" min="0"
@@ -143,14 +140,10 @@ else
 {
     <div class="control">
         <div class="control-head">
-            <span class="control-label" id="charge-priority-label">Pacing</span>
-            <InfoTip Topic="Pacing">
+            @Localized.Rich(PlanText.Pacing, @<span class="control-label" id="charge-priority-label">@PlanText.Pacing_0</span>)
+            <InfoTip Topic="@PlanText.PacingTopic">
                 <p>
-                    Both meet the departure. <strong>Cheapest</strong> paces the charge across the window and
-                    takes every watt of sun above that pace, so the target is usually met well before you
-                    leave. <strong>Just in time</strong> delivers everything up to the rest level the same
-                    way, then holds the last stretch back so the car is not sitting full overnight — which
-                    costs grid, because the sun is turned down while it waits.
+                    @Localized.Rich(PlanText.PacingTip, @<strong>@PlanText.PacingTip_0</strong>, @<strong>@PlanText.PacingTip_1</strong>)
                 </p>
             </InfoTip>
         </div>
@@ -159,13 +152,13 @@ else
                 <input type="radio" name="charge-priority" id="charge-priority-cheapest"
                        checked="@(_priority == TargetedChargePriority.Cheapest)"
                        @onchange="() => SetPriority(TargetedChargePriority.Cheapest)" />
-                Cheapest
+                @PlanText.Cheapest
             </label>
             <label class="seg-opt">
                 <input type="radio" name="charge-priority" id="charge-priority-justintime"
                        checked="@(_priority == TargetedChargePriority.JustInTime)" disabled="@_sunOnly"
                        @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
-                Just in time
+                @PlanText.JustInTime
             </label>
         </div>
     </div>
@@ -179,14 +172,11 @@ else
     <div class="control-head">
         <label>
             <input type="checkbox" id="sun-only" checked="@_sunOnly" @onchange="OnSunOnlyChanged" />
-            Sun only
+            @PlanText.SunOnly
         </label>
-        <InfoTip Topic="Sun only">
+        <InfoTip Topic="@PlanText.SunOnlyTopic">
             <p>
-                Nothing is bought from the grid. Whatever the sun can't deliver by the departure is reported
-                as shortfall, not imported — the preview shows how much before you start. A cloud the
-                3-minute average hasn't caught up with can still draw a little from the grid while the car
-                runs at its minimum, so expect close to none rather than exactly none.
+                @PlanText.SunOnlyTip
             </p>
         </InfoTip>
     </div>
@@ -194,8 +184,7 @@ else
     @if (_sunOnly && CanTargetSoc)
     {
         <span class="hint">
-            Just in time is off while this is ticked: holding the last stretch back with no grid to make up a
-            cloudy hour can only lose sun.
+            @PlanText.SunOnlyNoJustInTime
         </span>
     }
 </div>
@@ -204,8 +193,8 @@ else
 {
     <div class="control">
         <div class="control-head">
-            <label for="rest-soc">Rest at (%)</label>
-            <InfoTip Topic="Rest at (%)">
+            <label for="rest-soc">@PlanText.RestAt</label>
+            <InfoTip Topic="@PlanText.RestAtTopic">
                 <p>@RestHint()</p>
             </InfoTip>
         </div>
@@ -216,11 +205,10 @@ else
 
 <div class="control">
     <div class="control-head">
-        <label for="target-departure">Ready by</label>
-        <InfoTip Topic="Ready by">
+        <label for="target-departure">@PlanText.ReadyBy</label>
+        <InfoTip Topic="@PlanText.ReadyByTopic">
             <p>
-                Charging finishes a few minutes before this, so the car is ready rather than still drawing.
-                At most @Units.Hours(Display.MaxHorizon) ahead.
+                @Localized.Format(PlanText.ReadyByTargetTip, Units.Hours(Display.MaxHorizon))
             </p>
         </InfoTip>
     </div>
@@ -230,14 +218,10 @@ else
 
 <div class="control">
     <div class="control-head">
-        <label for="min-battery-soc">Minimum battery SOC (%)</label>
-        <InfoTip Topic="Minimum battery SOC (%)">
+        <label for="min-battery-soc">@PlanText.MinBatterySoc</label>
+        <InfoTip Topic="@PlanText.MinBatterySocTopic">
             <p>
-                Below this level the home battery comes first: the sun charges it, and the car gets only
-                what it needs to be ready on time, from the grid. At or above it, the car also takes the
-                solar surplus. The home battery never charges the car in this mode. On a poor-sun day the
-                plan may keep a higher floor so the battery can still refill. Shared with the Forecasted
-                mode, so changing it here changes it there too. Doesn't persist across restarts.
+                @PlanText.MinBatterySocTargetedTip
             </p>
         </InfoTip>
     </div>
@@ -246,13 +230,11 @@ else
 </div>
 
 <div class="control">
-    <button type="button" class="primary" id="preview-target" disabled="@Busy" @onclick="BuildPreview">Preview plan</button>
-    <button type="button" class="secondary" id="cancel-target" disabled="@Busy" @onclick="Cancel">Cancel</button>
-    <InfoTip Topic="Preview plan">
+    <button type="button" class="primary" id="preview-target" disabled="@Busy" @onclick="BuildPreview">@PlanText.PreviewPlan</button>
+    <button type="button" class="secondary" id="cancel-target" disabled="@Busy" @onclick="Cancel">@PlanText.Cancel</button>
+    <InfoTip Topic="@PlanText.PreviewTopic">
         <p>
-            Preview writes to nothing — it is the same planner the poll loop runs, asked what would happen
-            if you started now. The request does not survive a restart of the service: if it restarts
-            overnight the car stops charging, and nothing will have told you.
+            @PlanText.PreviewTip
         </p>
     </InfoTip>
 
@@ -274,7 +256,7 @@ else
 @if (_previewed)
 {
     <dialog class="dialog targeted-dialog" id="target-preview" aria-labelledby="target-preview-title">
-        <h2 id="target-preview-title">@(_previewRequest is { } titled ? Title(titled) : "The plan, if you start now")</h2>
+        <h2 id="target-preview-title">@(_previewRequest is { } titled ? Title(titled) : PlanText.IfYouStartNow)</h2>
 
         @if (_previewRequest is { } asked)
         {
@@ -293,8 +275,8 @@ else
                         <span class="grid" style="width:@Share(preview.GridEnergyWh, preview)"></span>
                     </div>
                     <ul class="split-legend">
-                        <li><span class="swatch solar"></span>Sun @Units.Energy(preview.SolarEnergyWh)</li>
-                        <li><span class="swatch grid"></span>Grid @Units.Energy(preview.GridEnergyWh)</li>
+                        <li><span class="swatch solar"></span>@Localized.Format(PlanText.Sun, Units.Energy(preview.SolarEnergyWh))</li>
+                        <li><span class="swatch grid"></span>@Localized.Format(PlanText.Grid, Units.Energy(preview.GridEnergyWh))</li>
                     </ul>
                 </div>
             }
@@ -313,13 +295,13 @@ else
                             <input type="radio" name="dialog-pacing" id="dialog-pacing-cheapest"
                                    checked="@(_priority == TargetedChargePriority.Cheapest)"
                                    @onchange="() => SetPriority(TargetedChargePriority.Cheapest)" />
-                            Cheapest
+                            @PlanText.Cheapest
                         </label>
                         <label class="seg-opt">
                             <input type="radio" name="dialog-pacing" id="dialog-pacing-justintime"
                                    checked="@(_priority == TargetedChargePriority.JustInTime)" disabled="@_sunOnly"
                                    @onchange="() => SetPriority(TargetedChargePriority.JustInTime)" />
-                            Just in time@(JustInTimeExtraWh() is { } extra ? $" · {Units.Energy(extra, signed: true)} grid" : "")
+                            @(JustInTimeExtraWh() is { } extra ? Localized.Format(PlanText.JustInTimeExtra, Units.Energy(extra, signed: true)) : PlanText.JustInTime)
                         </label>
                     </div>
                 </div>
@@ -335,22 +317,20 @@ else
             }
 
             <details class="dialog-figures">
-                <summary>Every figure</summary>
+                <summary>@PlanText.EveryFigure</summary>
                 <TargetedPlanView Plan="preview" ShowNarrative="false" />
             </details>
         }
         else
         {
             <p class="muted">
-                No poll has completed yet, so there is nothing to build a plan from — no battery SOC,
-                no house load, no forecast anchored to an instant. You can still start the target and
-                the plan will appear on the first poll.
+                @PlanText.NoPollForPlan
             </p>
         }
 
         <div class="dialog-actions">
-            <button type="button" class="btn" id="discard-preview" data-dialog-cancel disabled="@Busy" @onclick="DiscardPreview">Back to the form</button>
-            <button type="button" class="btn btn-primary" id="activate-target" disabled="@Busy" @onclick="Activate">Start this plan</button>
+            <button type="button" class="btn" id="discard-preview" data-dialog-cancel disabled="@Busy" @onclick="DiscardPreview">@PlanText.BackToForm</button>
+            <button type="button" class="btn btn-primary" id="activate-target" disabled="@Busy" @onclick="Activate">@PlanText.StartThisPlan</button>
         </div>
     </dialog>
 }
@@ -358,7 +338,7 @@ else
 @if (Status?.TargetedPlan is { } plan)
 {
     <section class="plan">
-        <h2>The plan</h2>
+        <h2>@PlanText.ThePlan</h2>
 
         @if (Target.Request is { } running && running.IsSocBased)
         {
@@ -370,13 +350,12 @@ else
 }
 else if (Status is null)
 {
-    <p class="muted">No poll has completed yet.</p>
+    <p class="muted">@PlanText.NoPollYet</p>
 }
 else
 {
     <p class="muted">
-        The plan is only shown while <strong>Targeted</strong> is the active charge mode.
-        Current mode: @Status.Mode.
+        @Localized.Rich(PlanText.PlanOnlyWhileTargeted, @<strong>@SharedText.ModeTargeted</strong>, @<text>@ChargeModeTabs.Label(Status.Mode)</text>)
     </p>
 }
 
@@ -700,9 +679,8 @@ else
     /// <summary>The request in the terms it was asked in, which for a SOC target is not kilowatt-hours.</summary>
     private static string Asking(TargetedChargeRequest request) =>
         request.TargetSocPercent is { } target
-            ? $"Charging to {Units.Percent(target)}, from the {Units.Percent(request.VehicleSocPercentAtRequest)} the car last "
-                + $"reported: {Units.Energy(request.RequiredEnergyWh)} at the charger, charge losses included."
-            : $"{Units.Energy(request.RequiredEnergyWh)} at the charger.";
+            ? Localized.Format(PlanText.AskingSoc, Units.Percent(target), Units.Percent(request.VehicleSocPercentAtRequest), Units.Energy(request.RequiredEnergyWh))
+            : Localized.Format(PlanText.AskingEnergy, Units.Energy(request.RequiredEnergyWh));
 
     /// <summary>
     /// What the hold will actually amount to, in the terms the owner set it in. The interesting case is
@@ -713,13 +691,12 @@ else
     {
         if (_vehicle?.SocPercent is not { } socNow)
         {
-            return "No usable SOC reading to measure the rest point from.";
+            return PlanText.NoSocForRest;
         }
 
         if (socNow >= _restSocPercent)
         {
-            return $"The car is already at {Units.Percent(socNow)}, at or above the {Units.Percent(_restSocPercent)} rest level, so "
-                + "the whole charge is the held stretch and none of it will start until the release time.";
+            return Localized.Format(PlanText.AlreadyAboveRest, Units.Percent(socNow), Units.Percent(_restSocPercent));
         }
 
         var endSoc = _basis == TargetBasis.Soc && CanTargetSoc
@@ -729,26 +706,23 @@ else
 
         if (endSoc <= _restSocPercent)
         {
-            return $"This target finishes at about {Units.Percent(endSoc)}, at or below the {Units.Percent(_restSocPercent)} rest level, so "
-                + "there is nothing above it to hold and the charge runs as it would under Cheapest.";
+            return Localized.Format(PlanText.FinishesBelowRest, Units.Percent(endSoc), Units.Percent(_restSocPercent));
         }
 
         var tailWh = VehicleTargetEnergy.TailAboveRestWh(
             socNow, endSoc, _restSocPercent, VehicleDisplay.BatteryCapacityWh, VehicleDisplay.ChargeEfficiency);
 
-        return $"The car charges on the sun up to {Units.Percent(_restSocPercent)} whenever the sun is there, then waits. "
-            + $"The last {Units.Energy(tailWh ?? 0)} — about {Units.Percent(_restSocPercent)} to {Units.Percent(endSoc)} — is scheduled "
-            + "to land just before you leave.";
+        return Localized.Format(PlanText.RestExplained, Units.Percent(_restSocPercent), Units.Energy(tailWh ?? 0), Units.Percent(_restSocPercent), Units.Percent(endSoc));
     }
 
     /// <summary>The request as the dialog's title: what, by when -- "80% by Thu 17:00".</summary>
     private string Title(TargetedChargeRequest request)
     {
-        var by = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).ToString("ddd HH:mm");
+        var by = TimeZoneInfo.ConvertTime(request.DepartBy, Time.LocalTimeZone).ToString(SharedText.DayTimePattern, System.Globalization.CultureInfo.CurrentCulture);
 
         return request.TargetSocPercent is { } target
-            ? $"{Units.Percent(target)} by {by}"
-            : $"{Units.Energy(request.RequiredEnergyWh)} by {by}";
+            ? Localized.Format(PlanText.TitleSoc, Units.Percent(target), by)
+            : Localized.Format(PlanText.TitleEnergy, Units.Energy(request.RequiredEnergyWh), by);
     }
 
     /// <summary>
@@ -795,12 +769,10 @@ else
         var extraWh = held.GridEnergyWh - cheap.GridEnergyWh;
         if (extraWh <= 100)
         {
-            return "Holding the last stretch costs nothing here — the forecast has no sun to give it up.";
+            return PlanText.HoldCostsNothing;
         }
 
-        return $"Just in time buys about {Units.Energy(extraWh)} more from the grid than charging as cheaply as "
-            + $"possible would, because the sun is turned down while the tail waits. That is the trade: the car "
-            + $"sits at {Units.Percent(_restSocPercent)} overnight instead of at its target.";
+        return Localized.Format(PlanText.HoldCost, Units.Energy(extraWh), Units.Percent(_restSocPercent));
     }
 
     /// <summary>
@@ -829,11 +801,9 @@ else
 
         return requiredWh switch
         {
-            null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
-            _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
-                + $"charger: {Units.Capacity(VehicleDisplay.BatteryCapacityWh)} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
-                + "of what the charger meters reaching the cells.",
+            null => PlanText.NoUsableSoc,
+            <= 0 => Localized.Format(PlanText.AlreadyAt, Units.Percent(basis.SocPercent)),
+            _ => Localized.Format(PlanText.SocConversion, Units.Percent(basis.SocPercent), Units.Energy(requiredWh.Value), Units.Capacity(VehicleDisplay.BatteryCapacityWh), Units.Fraction(VehicleDisplay.ChargeEfficiency)),
         };
     }
 
@@ -851,16 +821,16 @@ else
         // Three answers at the socket, not two: before the first poll the charger has not been read at
         // all, and reporting that as "no" would be a claim about hardware nobody has asked yet.
         var charger = Status is null
-            ? "Not polled yet"
-            : Status.CarConnected ? "Yes at the charger" : "No at the charger";
+            ? PlanText.NotPolledYet
+            : Status.CarConnected ? PlanText.YesAtCharger : PlanText.NoAtCharger;
         var car = _vehicle?.PlugState switch
         {
-            VehiclePlugState.Connected => "connected",
-            VehiclePlugState.Disconnected => "disconnected",
-            _ => "not reported",
+            VehiclePlugState.Connected => PlanText.CarConnected,
+            VehiclePlugState.Disconnected => PlanText.CarDisconnected,
+            _ => PlanText.NotReported,
         };
 
-        return $"{charger}, {car} by the car";
+        return Localized.Format(PlanText.PlugLine, charger, car);
     }
 
     // Coarse on purpose, and the dashboard's own rendering: this data is hours old routinely, so

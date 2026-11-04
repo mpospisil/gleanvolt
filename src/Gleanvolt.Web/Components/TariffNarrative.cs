@@ -1,5 +1,6 @@
 using System.Globalization;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -29,16 +30,16 @@ public static class TariffNarrative
             return unavailable;
         }
 
-        var parts = new List<string> { window.Rate == TariffRate.Low ? "Low tariff" : "High tariff" };
+        var parts = new List<string> { window.Rate == TariffRate.Low ? SharedText.LowTariff : SharedText.HighTariff };
 
         if (timeline.PriceAt(now) is { } price)
         {
             parts.Add(Units.PricePerKwh(price, currency));
         }
 
-        var line = string.Join(", ", parts);
+        var line = string.Join(SharedText.ListSeparator, parts);
 
-        return timeline.NextChangeAfter(now) is { } change ? $"{line}, until {When(change, now, zone)}" : line;
+        return timeline.NextChangeAfter(now) is { } change ? Localized.Format(SharedText.TariffUntil, line, When(change, now, zone)) : line;
     }
 
     // Today's change by its time alone; a later one with the day, since "until 06:00" said on a
@@ -48,10 +49,10 @@ public static class TariffNarrative
         var local = TimeZoneInfo.ConvertTime(change, zone);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
         var day = DateOnly.FromDateTime(local.DateTime);
-        var time = local.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var time = local.ToString("HH:mm", CultureInfo.CurrentCulture);
 
         return day == today ? time
-            : day == today.AddDays(1) ? $"tomorrow {time}"
-            : $"{local.ToString("dddd", CultureInfo.InvariantCulture)} {time}";
+            : day == today.AddDays(1) ? Localized.Format(SharedText.TomorrowAt, time)
+            : Localized.Format(SharedText.WeekdayAt, local.ToString("dddd", CultureInfo.CurrentCulture), time);
     }
 }

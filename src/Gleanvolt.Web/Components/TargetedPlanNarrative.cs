@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -29,47 +30,41 @@ public static class TargetedPlanNarrative
         if (plan.Strategy == TargetedChargeStrategy.Complete)
         {
             paragraphs.Add(
-                $"Target met: {Units.Energy(plan.DeliveredEnergyWh)} of the {Units.Energy(plan.RequiredEnergyWh)} asked for has "
-                + $"reached the car. The charger has been released.");
+                Localized.Format(PlanText.TargetMet, Units.Energy(plan.DeliveredEnergyWh), Units.Energy(plan.RequiredEnergyWh)));
 
             return paragraphs;
         }
 
-        var headline = $"{Units.Energy(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)}.";
+        var headline = Localized.Format(PlanText.Headline, Units.Energy(plan.RemainingEnergyWh), At(plan.DepartBy, plan.Now, zone));
         if (plan.DeliveredEnergyWh > 0)
         {
-            headline += $" {Units.Energy(plan.DeliveredEnergyWh)} of the {Units.Energy(plan.RequiredEnergyWh)} asked for is already in the car.";
+            headline += " " + Localized.Format(PlanText.AlreadyInCar, Units.Energy(plan.DeliveredEnergyWh), Units.Energy(plan.RequiredEnergyWh));
         }
 
         switch (plan.Strategy)
         {
             case TargetedChargeStrategy.Maximum:
                 paragraphs.Add(
-                    $"{Units.Energy(plan.RemainingEnergyWh)} by {At(plan.DepartBy, plan.Now, zone)} is more than the "
-                    + $"{Duration(plan.TimeRemaining)} left can deliver. Charging flat out from now, the car will have "
-                    + $"about {Units.Energy(plan.ExpectedEnergyWh)} — {Units.Energy(plan.ShortfallWh)} short."
+                    Localized.Format(PlanText.MoreThanCanDeliver, Units.Energy(plan.RemainingEnergyWh), At(plan.DepartBy, plan.Now, zone), Duration(plan.TimeRemaining), Units.Energy(plan.ExpectedEnergyWh), Units.Energy(plan.ShortfallWh))
                     + (plan.FeasibleDeparture is { } later
-                        ? $" Leaving at {At(later, plan.Now, zone)} instead would cover the full amount."
+                        ? " " + Localized.Format(PlanText.LeavingInstead, At(later, plan.Now, zone))
                         : string.Empty));
 
                 paragraphs.Add(
-                    "The home battery is held out of it while the grid tops the car up, so the pack is not "
-                    + "emptied into a charge that was already going to fall short.");
+                    PlanText.BatteryHeldOut);
                 break;
 
             case TargetedChargeStrategy.Solar:
                 paragraphs.Add(headline);
                 paragraphs.Add(
-                    $"The forecast covers all of it: {Units.Energy(plan.SolarEnergyWh)} from surplus "
-                    + $"{Between(plan, zone)}, and no grid import is planned at all.");
+                    Localized.Format(PlanText.ForecastCoversAll, Units.Energy(plan.SolarEnergyWh), Between(plan, zone)));
                 break;
 
             default:
                 paragraphs.Add(headline);
                 paragraphs.Add(SolarPlusGrid(plan, zone));
                 paragraphs.Add(
-                    "The home battery keeps its priority throughout: the discharge hold arms whenever the car is "
-                    + "drawing more than the roof is giving, so the pack never feeds it.");
+                    PlanText.BatteryKeepsPriority);
                 break;
         }
 
@@ -81,8 +76,7 @@ public static class TargetedPlanNarrative
         if (!plan.IsUsable)
         {
             paragraphs.Add(
-                "There is no usable forecast for this window, so the plan assumes the grid will supply all of "
-                + "it. Any surplus that does appear is used first, and the plan is rebuilt on the next poll.");
+                PlanText.NoUsableForecastTargeted);
         }
 
         return paragraphs;
@@ -104,23 +98,15 @@ public static class TargetedPlanNarrative
 
         if (plan.SolarEnergyWh > 0 && plan.GridEnergyWh > 0)
         {
-            return $"The sun should carry {Units.Energy(plan.SolarEnergyWh)} of it {Between(plan, zone)}, and the grid the "
-                + $"remaining {Units.Energy(plan.GridEnergyWh)}. Rather than charge flat out and finish early, the car is "
-                + $"paced at about {pace} across the window, so the charger draws close to what the roof is "
-                + "producing and buys only the shortfall.";
+            return Localized.Format(PlanText.SunAndGrid, Units.Energy(plan.SolarEnergyWh), Between(plan, zone), Units.Energy(plan.GridEnergyWh), pace);
         }
 
         if (plan.HasUnusableSurplus)
         {
-            return $"{Units.Energy(plan.ForecastSurplusWh)} of surplus is forecast for this window, but it never climbs past "
-                + "the charger's 6 A minimum, so the car cannot run on it unaided. It is still worth having: the "
-                + $"charger is held at that minimum while the sun is up, the roof supplies what it has, and only the "
-                + $"difference is bought — about {pace} of grid on average.";
+            return Localized.Format(PlanText.UnusableSurplus, Units.Energy(plan.ForecastSurplusWh), pace);
         }
 
-        return $"No surplus at all is forecast before then, so the whole {Units.Energy(plan.RemainingEnergyWh)} still needed "
-            + $"comes from the grid, paced at about {pace} across the window. With no sun to wait for there is "
-            + "nothing to be gained by putting it off, and spreading it leaves room to recover if anything drops out.";
+        return Localized.Format(PlanText.AllFromGrid, Units.Energy(plan.RemainingEnergyWh), pace);
     }
 
     /// <summary>
@@ -142,19 +128,14 @@ public static class TargetedPlanNarrative
         var tail = Units.Energy(plan.TailEnergyWh);
 
         return plan.IsHoldingAt(plan.Now)
-            ? $"Everything below the rest level is in the car, and the last {tail} is being held back until "
-                + $"{At(release, plan.Now, zone)}. Nothing is wrong — the charger is idle on purpose, so the car "
-                + "reaches its target shortly before you leave rather than sitting full all night. Sun arriving "
-                + "before then is deliberately turned down; that is what this priority costs."
-            : $"The last {tail} of it is held back until {At(release, plan.Now, zone)}, so the car finishes just "
-                + "before departure rather than hours early. Everything below the rest level is charged normally "
-                + "until then, on the sun wherever the sun is there.";
+            ? Localized.Format(PlanText.HoldingNow, tail, At(release, plan.Now, zone))
+            : Localized.Format(PlanText.HoldingLater, tail, At(release, plan.Now, zone));
     }
 
     private static string Between(TargetedChargePlan plan, TimeZoneInfo zone) =>
         plan.SolarStart is { } from && plan.SolarEnd is { } to
-            ? $"between {At(from, plan.Now, zone)} and {At(to, plan.Now, zone)}"
-            : "later today";
+            ? Localized.Format(PlanText.Between, At(from, plan.Now, zone), At(to, plan.Now, zone))
+            : PlanText.LaterToday;
 
     /// <summary>
     /// A time the way somebody standing in the kitchen would say it: the clock alone today, "tomorrow"
@@ -169,11 +150,11 @@ public static class TargetedPlanNarrative
         return days switch
         {
             <= 0 => $"{local:HH:mm}",
-            1 => $"{local:HH:mm} tomorrow",
-            _ => $"{local:ddd HH:mm}",
+            1 => Localized.Format(PlanText.AtTomorrow, local),
+            _ => Localized.Format(PlanText.AtDay, local),
         };
     }
 
     private static string Duration(TimeSpan span) =>
-        span < TimeSpan.FromMinutes(1) ? "no time" : Units.Duration(span);
+        span < TimeSpan.FromMinutes(1) ? PlanText.NoTime : Units.Duration(span);
 }
