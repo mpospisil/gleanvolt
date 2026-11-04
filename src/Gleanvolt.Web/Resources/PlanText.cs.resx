@@ -58,10 +58,10 @@
     <value>Do té doby se nepředpovídá žádný přebytek, takže celých {0}, které ještě chybí, dodá síť, rovnoměrně zhruba {1} po celé okno. Když není na co čekat, odkládání nic nepřinese, a rozložení nabíjení nechává rezervu, kdyby něco vypadlo.</value>
   </data>
   <data name="HoldingNow" xml:space="preserve">
-    <value>Vše do úrovně čekání už je v autě a posledních {0} se odkládá do {1}. Nic není špatně — nabíječka stojí záměrně, aby auto dosáhlo cíle krátce před odjezdem a nestálo celou noc plně nabité. Slunce, které přijde dřív, se záměrně nevyužije; to je cena této volby.</value>
+    <value>Vše do klidové úrovně už je v autě a posledních {0} se odkládá do {1}. Nic není špatně — nabíječka stojí záměrně, aby auto dosáhlo cíle krátce před odjezdem a nestálo celou noc plně nabité. Slunce, které přijde dřív, se záměrně nevyužije; to je cena této volby.</value>
   </data>
   <data name="HoldingLater" xml:space="preserve">
-    <value>Posledních {0} se odloží do {1}, aby auto skončilo těsně před odjezdem, ne o hodiny dřív. Do té doby se vše do úrovně čekání nabíjí normálně, ze slunce, kdykoli svítí.</value>
+    <value>Posledních {0} se odloží do {1}, aby auto skončilo těsně před odjezdem, ne o hodiny dřív. Do té doby se vše do klidové úrovně nabíjí normálně, ze slunce, kdykoli svítí.</value>
   </data>
   <data name="Between" xml:space="preserve">
     <value>mezi {0} a {1}</value>
@@ -310,7 +310,7 @@
     <value>Okno nabíjení</value>
   </data>
   <data name="ChargeWindowHint" xml:space="preserve">
-    <value>Nejbližší úsek dneška, ve kterém má podle předpovědi výroba překračovat minimální výkon nabíječky dost dlouho, aby se vyplatilo začít. „žádné“, když dnes takové okno není.</value>
+    <value>Nejbližší úsek dneška, ve kterém má solární energie dle předpovědi překračovat minimální výkon nabíječky dost dlouho, aby se vyplatilo začít. „žádné“, když dnes takové okno není.</value>
   </data>
   <data name="EvBudget" xml:space="preserve">
     <value>Energie pro auto</value>
@@ -346,13 +346,13 @@
     <value>Zbývající předpověď na dnes</value>
   </data>
   <data name="ForecastRemainingHint" xml:space="preserve">
-    <value>Předpovězená výroba FVE, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
+    <value>Solární energie dle předpovědi, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
   </data>
   <data name="TomorrowForecast" xml:space="preserve">
     <value>Předpověď na zítra</value>
   </data>
   <data name="TomorrowForecastHint" xml:space="preserve">
-    <value>Předpověď výroby na zítřek. Jen pro informaci: pomůže posoudit, zda se vyplatí dnešní deficit přečkat.</value>
+    <value>Předpověď solární energie na zítřek. Jen pro informaci: pomůže posoudit, zda se vyplatí dnešní deficit přečkat.</value>
   </data>
   <data name="ForecastAccuracy" xml:space="preserve">
     <value>Přesnost předpovědi</value>
@@ -622,7 +622,7 @@
     <value>Připojeno</value>
   </data>
   <data name="PluggedInHint" xml:space="preserve">
-    <value>Co vidí nabíječka na svém konektoru a co o své zásuvce hlásí auto. Nabíječka hlásí změny rychleji a řídicí jednotka se řídí podle ní; auto může být o hodiny pozadu.</value>
+    <value>Co vidí nabíječka na svém konektoru a co o své zásuvce hlásí auto. Nabíječka hlásí změny rychleji a správce nabíjení se řídí podle ní; auto může být o hodiny pozadu.</value>
   </data>
   <data name="CarChargeState" xml:space="preserve">
     <value>Stav nabíjení auta</value>
@@ -655,7 +655,7 @@
     <value>Na poslední chvíli</value>
   </data>
   <data name="PacingTip" xml:space="preserve">
-    <value>Obě volby stihnou odjezd. {0} rozloží nabíjení přes celé okno a navíc využije každý watt slunce nad tímto tempem, takže cíl je obvykle splněn dlouho před odjezdem. {1} nabíjí stejně až do úrovně čekání, poslední část pak odloží, aby auto nestálo přes noc plně nabité. Stojí to víc energie ze sítě, protože slunce se během čekání nevyužije.</value>
+    <value>Obě volby stihnou odjezd. {0} rozloží nabíjení přes celé okno a navíc využije každý watt slunce nad tímto tempem, takže cíl je obvykle splněn dlouho před odjezdem. {1} nabíjí stejně až do klidové úrovně, poslední část pak odloží, aby auto nestálo přes noc plně nabité. Stojí to víc energie ze sítě, protože slunce se během čekání nevyužije.</value>
   </data>
   <data name="Cheapest" xml:space="preserve">
     <value>Nejlevněji</value>
@@ -676,10 +676,10 @@
     <value>Volba Na poslední chvíli je vypnutá, dokud je zaškrtnuto Jen slunce: odkládání poslední části bez sítě, která by pokryla zamračenou hodinu, by mohlo jen přijít o slunce.</value>
   </data>
   <data name="RestAtTopic" xml:space="preserve">
-    <value>Úroveň čekání (%)</value>
+    <value>Klidová úroveň (%)</value>
   </data>
   <data name="RestAt" xml:space="preserve">
-    <value>Úroveň čekání (%)</value>
+    <value>Klidová úroveň (%)</value>
   </data>
   <data name="ReadyByTargetTip" xml:space="preserve">
     <value>Nabíjení skončí několik minut před tímto časem, aby bylo auto nabité a už neodebíralo. Nejvýš {0} dopředu.</value>
@@ -730,13 +730,13 @@
     <value>{0} na nabíječce.</value>
   </data>
   <data name="NoSocForRest" xml:space="preserve">
-    <value>Chybí použitelný údaj o SOC auta, podle kterého by šla určit úroveň čekání.</value>
+    <value>Chybí použitelný údaj o SOC auta, podle kterého by šla určit klidovou úroveň.</value>
   </data>
   <data name="AlreadyAboveRest" xml:space="preserve">
-    <value>Auto už je na {0}, tedy na úrovni čekání {1} nebo výš. Celé nabíjení je proto odložená část a nezačne dřív než v čase uvolnění.</value>
+    <value>Auto už je na {0}, tedy na klidové úrovni {1} nebo výš. Celé nabíjení je proto odložená část a nezačne dřív než v čase uvolnění.</value>
   </data>
   <data name="FinishesBelowRest" xml:space="preserve">
-    <value>Tento cíl skončí zhruba na {0}, tedy na úrovni čekání {1} nebo pod ní. Není tedy co odkládat a nabíjení poběží stejně jako u volby Nejlevněji.</value>
+    <value>Tento cíl skončí zhruba na {0}, tedy na klidové úrovni {1} nebo pod ní. Není tedy co odkládat a nabíjení poběží stejně jako u volby Nejlevněji.</value>
   </data>
   <data name="RestExplained" xml:space="preserve">
     <value>Auto se nabíjí ze slunce až na {0}, kdykoli slunce svítí, a pak čeká. Posledních {1} — zhruba z {2} na {3} — je naplánováno těsně před váš odjezd.</value>

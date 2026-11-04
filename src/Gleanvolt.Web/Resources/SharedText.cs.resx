@@ -148,25 +148,25 @@
     <value>Restartovat</value>
   </data>
   <data name="RestartQuestion" xml:space="preserve">
-    <value>Restartovat řídicí jednotku?</value>
+    <value>Restartovat správce nabíjení?</value>
   </data>
   <data name="RestartConfirm" xml:space="preserve">
     <value>Ano, restartovat</value>
   </data>
   <data name="RestartProgress" xml:space="preserve">
-    <value>Restartuje se… Nabíjení se pozastavuje a otevřený záznam nabíjení se uzavírá. Stránka se sama znovu načte, až řídicí jednotka znovu poběží.</value>
+    <value>Restartuje se… Nabíjení se pozastavuje a otevřený záznam nabíjení se uzavírá. Stránka se sama znovu načte, až správce nabíjení znovu poběží.</value>
   </data>
   <data name="RestartNotBack" xml:space="preserve">
-    <value>Pokud se do minuty nebo dvou nespustí, nic ji automaticky nerestartuje. Podívejte se na {0} nebo {1}, případně ji spusťte ručně.</value>
+    <value>Pokud se do minuty nebo dvou nespustí, nic ho automaticky nerestartuje. Podívejte se na {0} nebo {1}, případně ho spusťte ručně.</value>
   </data>
   <data name="RestartCost" xml:space="preserve">
-    <value>Probíhající nabíjení se pozastaví a řídicí jednotka se jako po každém startu spustí v režimu Off. Režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, proto je po restartu nastavte znovu. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď výroby, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se řídicí jednotka spustí znovu sama. Pokud ji spouštíte jinak — {1}, prostý {2}, zip pro Windows — jen se ukončí a musíte ji spustit znovu ručně.</value>
+    <value>Probíhající nabíjení se pozastaví a správce nabíjení se jako po každém startu spustí v režimu Off. Režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, proto je po restartu nastavte znovu. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď solární energie, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se správce nabíjení spustí znovu sám. Pokud ho spouštíte jinak — {1}, prostý {2}, zip pro Windows — jen se ukončí a musíte ho spustit znovu ručně.</value>
   </data>
   <data name="MqttBroker" xml:space="preserve">
     <value>Broker</value>
   </data>
   <data name="MqttBrokerNote" xml:space="preserve">
-    <value>— adresa, ke které se připojuje řídicí jednotka; odsud nemusí být dosažitelná.</value>
+    <value>— adresa, ke které se připojuje správce nabíjení; odsud nemusí být dosažitelná.</value>
   </data>
   <data name="MqttUsername" xml:space="preserve">
     <value>Uživatelské jméno</value>

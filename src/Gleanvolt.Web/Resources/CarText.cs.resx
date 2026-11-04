@@ -19,7 +19,7 @@
     <value>Auto</value>
   </data>
   <data name="CarIntro" xml:space="preserve">
-    <value>Vše pod formulářem ukazuje, s čím řídicí jednotka právě běží — hodnoty načtené z konfigurace při startu. Formulář mění to, co se načte při příštím startu. Změny se projeví po restartu a účet níže pak ověří, že fungují.</value>
+    <value>Vše pod formulářem ukazuje, s čím správce nabíjení právě běží — hodnoty načtené z konfigurace při startu. Formulář mění to, co se načte při příštím startu. Změny se projeví po restartu a účet níže pak ověří, že fungují.</value>
   </data>
   <data name="AskTheCarHeading" xml:space="preserve">
     <value>Zeptat se auta</value>
@@ -70,7 +70,7 @@
     <value>Pokud účet výše není přihlášený, ukáže se to tady: zdroj místo údaje odpoví, co mu brání.</value>
   </data>
   <data name="NothingToAskYet" xml:space="preserve">
-    <value>Zatím není koho se zeptat: zdroj je zapnutý, ale nespustil se, takže řídicí jednotka pro něj nemá klienta. Vyplňte ve formuláři výše potřebná pole a restartujte.</value>
+    <value>Zatím není koho se zeptat: zdroj je zapnutý, ale nespustil se, takže správce nabíjení pro něj nemá klienta. Vyplňte ve formuláři výše potřebná pole a restartujte.</value>
   </data>
   <data name="NothingToAskChargeOnly" xml:space="preserve">
     <value>Není koho se zeptat, protože z tohoto auta se nic nečte — a není to potřeba. Zda je kabel zapojený, hlásí nabíječka, ne auto, takže přehled to ukáže i tak. Bez zdroje chybí jen stav nabití baterie auta, a proto se cíl zadává v kWh.</value>
@@ -133,7 +133,7 @@
     <value>snížit</value>
   </data>
   <data name="NarrowerOfTwo" xml:space="preserve">
-    <value>Řídicí jednotka použije užší z obou rozsahů. Auto může limit instalace jen {0}: maximum instalace určuje přípojka a elektroinstalace, ne volba uživatele. Co auto neuvádí, převezme se z instalace.</value>
+    <value>Správce nabíjení použije užší z obou rozsahů. Auto může limit instalace jen {0}: maximum instalace určuje přípojka a elektroinstalace, ne volba uživatele. Co auto neuvádí, převezme se z instalace.</value>
   </data>
   <data name="Feed" xml:space="preserve">
     <value>Zdroj dat</value>
@@ -280,7 +280,7 @@
     <value>se přihlaste níže</value>
   </data>
   <data name="CarSaveNote" xml:space="preserve">
-    <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči), takže u každého pole je vidět, odkud pochází jeho hodnota. Nic se nezmění, dokud se řídicí jednotka nerestartuje. Uložení také neověří účet, protože zdroj se z těchto klíčů sestavuje až při startu. Restartujte, pak {2} a zeptejte se auta.</value>
+    <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči), takže u každého pole je vidět, odkud pochází jeho hodnota. Nic se nezmění, dokud se správce nabíjení nerestartuje. Uložení také neověří účet, protože zdroj se z těchto klíčů sestavuje až při startu. Restartujte, pak {2} a zeptejte se auta.</value>
   </data>
   <data name="Manufacturer" xml:space="preserve">
     <value>Výrobce</value>
@@ -298,7 +298,7 @@
     <value>Auto</value>
   </data>
   <data name="CarFieldsNote" xml:space="preserve">
-    <value>Tato pole určují, jak se auto správně nabíjí, a nezávisí na žádném zdroji dat. Instalace dovoluje {0}–{1} A; řídicí jednotka použije užší z obou rozsahů a auto může limit jen snížit.</value>
+    <value>Tato pole určují, jak se auto správně nabíjí, a nezávisí na žádném zdroji dat. Instalace dovoluje {0}–{1} A; správce nabíjení použije užší z obou rozsahů a auto může limit jen snížit.</value>
   </data>
   <data name="Checking" xml:space="preserve">
     <value>Kontroluje se…</value>
@@ -310,7 +310,7 @@
     <value>Zahodit změny</value>
   </data>
   <data name="NotSaved" xml:space="preserve">
-    <value>Neuloženo — s tímto nastavením by řídicí jednotka nenastartovala:</value>
+    <value>Neuloženo — s tímto nastavením by správce nabíjení nenastartoval:</value>
   </data>
   <data name="ProveIt" xml:space="preserve">
     <value>Ověřte níže</value>
@@ -382,10 +382,10 @@
     <value>17 znaků</value>
   </data>
   <data name="SavedRestartSignIn" xml:space="preserve">
-    <value>Uloženo. Změny se projeví po restartu řídicí jednotky; potom se přihlaste.</value>
+    <value>Uloženo. Změny se projeví po restartu správce nabíjení; potom se přihlaste.</value>
   </data>
   <data name="SavedRunning" xml:space="preserve">
-    <value>Uloženo. Řídicí jednotka už s těmito hodnotami běží.</value>
+    <value>Uloženo. Správce nabíjení už s těmito hodnotami běží.</value>
   </data>
   <data name="Unchanged" xml:space="preserve">
     <value>beze změny</value>
@@ -589,7 +589,7 @@
     <value>žádný účet výrobce</value>
   </data>
   <data name="NoAccountExplanation" xml:space="preserve">
-    <value>Není napojen žádný účet výrobce, takže není k čemu se přihlásit. Zdroj, který účet potřebuje, nabídne přihlášení, jakmile vyplníte všechna povinná pole a řídicí jednotku restartujete.</value>
+    <value>Není napojen žádný účet výrobce, takže není k čemu se přihlásit. Zdroj, který účet potřebuje, nabídne přihlášení, jakmile vyplníte všechna povinná pole a správce nabíjení restartujete.</value>
   </data>
   <data name="PortalFailure_NotConfigured" xml:space="preserve">
     <value>Nenastaveno</value>

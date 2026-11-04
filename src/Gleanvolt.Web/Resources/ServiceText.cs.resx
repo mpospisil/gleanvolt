@@ -136,7 +136,7 @@
     <value>Spustit cílené nabíjení</value>
   </data>
   <data name="Topic_StopService" xml:space="preserve">
-    <value>Zastavit řídicí jednotku</value>
+    <value>Zastavit správce nabíjení</value>
   </data>
   <data name="Tariff_ProviderMissing" xml:space="preserve">
     <value>Zvolený zdroj tarifu {0} v této verzi není, takže se tarif nebere v úvahu.</value>
@@ -193,19 +193,19 @@
     <value>Vložte klíč API z aplikace MySkoda.</value>
   </data>
   <data name="SignIn_SkodaSignedOut" xml:space="preserve">
-    <value>Odhlášeno: klíč je z této řídicí jednotky smazán, ale u Škody platí, dokud ho nezrušíte v aplikaci MySkoda. Pro nové přihlášení sem vložte klíč.</value>
+    <value>Odhlášeno: klíč byl ze správce nabíjení smazán, ale u Škody platí, dokud ho nezrušíte v aplikaci MySkoda. Pro nové přihlášení sem vložte klíč.</value>
   </data>
   <data name="SignIn_SkodaValidUntil" xml:space="preserve">
     <value>Klíč platí do {0}{1}</value>
   </data>
   <data name="SignIn_SkodaValidUntilUnsaved" xml:space="preserve">
-    <value>Klíč platí do {0}{1}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu ho bude potřeba zadat znovu.</value>
+    <value>Klíč platí do {0}{1}. Nepodařilo se ho uložit do datového adresáře správce nabíjení, takže po restartu ho bude potřeba zadat znovu.</value>
   </data>
   <data name="SignIn_SkodaAccepted" xml:space="preserve">
     <value>Klíč přijat{0}</value>
   </data>
   <data name="SignIn_SkodaAcceptedUnsaved" xml:space="preserve">
-    <value>Klíč přijat{0}. Nepodařilo se ho uložit do datového adresáře této řídicí jednotky, takže po restartu ho bude potřeba zadat znovu.</value>
+    <value>Klíč přijat{0}. Nepodařilo se ho uložit do datového adresáře správce nabíjení, takže po restartu ho bude potřeba zadat znovu.</value>
   </data>
   <data name="Skoda_KeyExpired" xml:space="preserve">
     <value>Tento klíč vypršel — vytvořte v aplikaci nový.</value>
@@ -295,7 +295,7 @@
     <value>Živý zdroj údajů o autu. Přihlášením tady umožníte auto sledovat; pokud Volkswagen znovu požádá o kód, zdroj se zastaví, dokud se tu znovu nepřihlásíte. Kód, který Volkswagen posílá e-mailem, můžete zadat jen vy, proto je to tato stránka, a ne úloha na pozadí.</value>
   </data>
   <data name="Account_Skoda" xml:space="preserve">
-    <value>Živý zdroj údajů o této Škodě, čtený mezi nabíjeními i během nich. Škoda místo hesla používá klíč API: vytvoříte ho v aplikaci MySkoda pro toto auto a jednou ho sem vložíte. Klíč se ověří u Škody, uloží se jen v této řídicí jednotce a už se nikdy nezobrazí.</value>
+    <value>Živý zdroj údajů o této Škodě, čtený mezi nabíjeními i během nich. Škoda místo hesla používá klíč API: vytvoříte ho v aplikaci MySkoda pro toto auto a jednou ho sem vložíte. Klíč se ověří u Škody, uloží se jen ve správci nabíjení a už se nikdy nezobrazí.</value>
   </data>
   <data name="Portal_Missing" xml:space="preserve">
     <value>{0}</value>
