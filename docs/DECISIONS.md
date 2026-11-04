@@ -4,6 +4,29 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-04 — A phrase is stored, and a configuration problem carries one
+
+**Context.** [Issue #292](https://github.com/mpospisil/gleanvolt/issues/292), the rest of the service
+text the web UI shows: the car's feeds and sign-in, the secret store, settings validation, and the
+marks on a session's chart.
+
+**A phrase is persisted, so it is tagged.** `PhraseArg` is a `[JsonPolymorphic]` type with a `type`
+discriminator. Untagged, an abstract argument wrote as `{}` and could not be read back: since #290 a
+session's opening plan carries a phrase, and every session read would have thrown. A plan written that
+way is read without its phrase. Session events keep theirs in `session_events.detail_phrase_json`
+(store schema v5), and the published document's schema is 5. An event recorded before keeps its
+English, which is what was said at the time.
+
+**Validation problems are `ConfigurationProblems`**, a `List<string>` that can also carry a phrase per
+problem, so the startup refusal and every caller that only wanted sentences read it as before. The
+resolvers throw `ConfigurationRefusedException`, an `InvalidOperationException` with the same message
+that keeps the problems: a settings page used to split that message back into lines and would have
+lost the phrases doing it.
+
+**What stays English is quoted, not translated**: a manufacturer's or portal's own answer, an
+operating system's error, the VW Group portal client's diagnostic detail. Each is an argument of a
+translated sentence (`PhraseArg.Text`), never the sentence.
+
 ## 2026-11-04 — The web UI is translatable; everything below it stays invariant English
 
 **Context.** [Issue #290](https://github.com/mpospisil/gleanvolt/issues/290). The UI was English

@@ -992,6 +992,6 @@ public class TargetedTabTests : PageTest
 
         var page = PseudoLocale.Render(() => RenderTab());
 
-        PseudoLocale.AssertTranslated(page.Markup, TestTargetedPlans.SolarPlusGrid(Now).Reason);
+        PseudoLocale.AssertTranslated(page.Markup);
     }
 }

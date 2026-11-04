@@ -14,4 +14,12 @@ public sealed record ChargingSessionEvent(
     Guid SessionId,
     DateTimeOffset Timestamp,
     ChargingSessionEventKind Kind,
-    string Detail);
+    string Detail,
+    Phrase? DetailPhrase = null)
+{
+    // The phrase restates the detail for the web UI (#292); an event is the same event without it.
+    public bool Equals(ChargingSessionEvent? other) =>
+        other is not null && SessionId == other.SessionId && Timestamp == other.Timestamp && Kind == other.Kind && Detail == other.Detail;
+
+    public override int GetHashCode() => HashCode.Combine(SessionId, Timestamp, Kind, Detail);
+}

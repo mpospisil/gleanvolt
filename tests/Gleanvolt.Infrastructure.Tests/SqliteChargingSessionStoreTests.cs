@@ -260,6 +260,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
             ALTER TABLE sessions DROP COLUMN weather_end_condition_desc;
             ALTER TABLE sessions DROP COLUMN sunrise;
             ALTER TABLE sessions DROP COLUMN sunset;
+            ALTER TABLE session_events DROP COLUMN detail_phrase_json;
             PRAGMA user_version = 1;
             """;
         await command.ExecuteNonQueryAsync(Ct);
@@ -686,6 +687,31 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         PlanRemainingPvWh: null,
         PlanFeasibleEvEnergyWh: null,
         PlanRequiredSocFloorPercent: null);
+
+    [Fact]
+    public async Task AnEventKeepsItsPhrase()
+    {
+        // What a mark on the session's chart says in the viewer's language (#292); the English beside
+        // it is what the log and the API keep.
+        using var store = NewStore();
+        await store.InitializeAsync(Ct);
+        var session = OpenSession();
+        await store.StartSessionAsync(session, Ct);
+
+        var phrase = Phrase.Of("Event.ModeChanged", new PhraseArg.Mode(ChargeControlMode.Solar), new PhraseArg.Mode(ChargeControlMode.Forecasted));
+        await store.AppendAsync(
+            [],
+            [
+                new ChargingSessionEvent(session.Id, Noon, ChargingSessionEventKind.ModeChanged, "Solar → Forecasted.", phrase),
+                new ChargingSessionEvent(session.Id, Noon.AddMinutes(1), ChargingSessionEventKind.ChargingPaused, "Charging paused."),
+            ],
+            Ct);
+
+        var events = (await store.ExportAsync(session.Id, Ct))!.Events;
+
+        Assert.Equal(phrase, events[0].DetailPhrase);
+        Assert.Null(events[1].DetailPhrase);
+    }
 
     [Fact]
     public async Task AnOpeningPlanThatCarriesAPhraseStillReadsBack()

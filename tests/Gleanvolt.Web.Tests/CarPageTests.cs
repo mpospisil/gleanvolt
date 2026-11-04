@@ -1045,7 +1045,7 @@ public class CarPageTests : PageTest
             ? DataActPage()
             : Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, feed));
 
-        // The account and portal null objects describe themselves: service text, a later step of #290.
+        // Only names: the car's, the feeds', the brands' and the JSON fields a publisher writes.
         PseudoLocale.AssertTranslated(
             page.Markup,
             "The ID.4", "Volkswagen ID.4 Pro", "id4", "gleanvolt vehicle state", "volkswagen.de", "MyŠkoda", "Škoda",

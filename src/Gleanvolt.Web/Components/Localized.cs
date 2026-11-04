@@ -78,6 +78,7 @@ public static partial class Localized
         PhraseArg.Duration duration => Units.Duration(duration.Span),
         PhraseArg.Number number => number.Value.ToString(CultureInfo.CurrentCulture),
         PhraseArg.Text text => text.Value,
+        PhraseArg.Mode mode => ChargeModeTabs.Label(mode.Value),
         PhraseArg.Said said => Say(said.Phrase, said.English, zone),
         PhraseArg.List list => string.Join(SharedText.ListSeparator, list.Items.Select(item => Argument(item, zone))),
         _ => arg.ToString(),

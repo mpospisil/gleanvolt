@@ -254,4 +254,25 @@ public class PvSystemEditorFormTests : BunitContext
 
         PseudoLocale.AssertTranslated(form.Markup);
     }
+
+    [Fact]
+    public void A_refused_save_is_said_in_the_viewers_language()
+    {
+        // What the startup resolver refuses, carried with its phrase (#292) rather than split back out
+        // of the startup message.
+        _editor.Refuse = new Gleanvolt.Core.Configuration.ConfigurationProblems(
+            "Pv:LossFactor (2) must be a fraction in (0, 1].",
+            Phrase.Of("Config.Fraction", new PhraseArg.Text("Pv:LossFactor"), new PhraseArg.Text("2")));
+
+        var form = PseudoLocale.Render(() =>
+        {
+            var rendered = Render<PvSystemEditorForm>();
+            rendered.Find(Field(PvSystemSettingKeys.LossFactor)).Input("2");
+            rendered.Find("#pv-save").Click();
+            return rendered;
+        });
+
+        Assert.Contains("Pv:LossFactor (2)", form.Find("#pv-problems").TextContent);
+        PseudoLocale.AssertTranslated(form.Find("#pv-problems").OuterHtml, "LossFactor");
+    }
 }

@@ -326,11 +326,13 @@ public class ForecastedTabTests : PageTest
     [Fact]
     public void Every_string_on_the_forecasted_tab_comes_from_a_resource()
     {
-        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with { Plan = TestPlans.Usable(_time.Now) });
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
+        {
+            Plan = TestPlans.Usable(_time.Now) with { ReasonPhrase = Phrase.Of("DayPlan.NoWindow", new PhraseArg.Percent(40)) },
+        });
 
         var page = PseudoLocale.Render(() => RenderTab());
 
-        // The plan's reason is the planner's own sentence: service text, a later step of #290.
-        PseudoLocale.AssertTranslated(page.Markup, TestPlans.Usable(_time.Now).Reason);
+        PseudoLocale.AssertTranslated(page.Markup);
     }
 }

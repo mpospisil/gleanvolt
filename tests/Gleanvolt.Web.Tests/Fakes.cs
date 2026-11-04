@@ -1037,6 +1037,9 @@ internal sealed class FakeSecretStore : ISecretStore
     public bool Delete(string name) => throw new NotSupportedException("A render must never delete a secret.");
 
     public string Describe() => Protection;
+
+    // As the real DPAPI store says it; a test that sets its own words gets them back untranslated.
+    public Phrase? DescribePhrase() => Protection == "Windows DPAPI, this user" ? Phrase.Of("Secrets.Dpapi") : null;
 }
 
 /// <summary>

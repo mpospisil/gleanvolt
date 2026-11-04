@@ -259,7 +259,11 @@ public sealed class ChargingSessionTracker
 
         if (status.Mode != _lastMode)
         {
-            events.Add(Event(now, ChargingSessionEventKind.ModeChanged, $"{_lastMode} → {status.Mode}."));
+            events.Add(Event(
+                now,
+                ChargingSessionEventKind.ModeChanged,
+                $"{_lastMode} → {status.Mode}.",
+                Phrase.Of("Event.ModeChanged", new PhraseArg.Mode(_lastMode), new PhraseArg.Mode(status.Mode))));
             _lastMode = status.Mode;
         }
 
@@ -267,11 +271,17 @@ public sealed class ChargingSessionTracker
         {
             if (status.State == ChargeControlState.Charging)
             {
-                events.Add(Event(now, ChargingSessionEventKind.ChargingStarted, $"Charging at {Describe(status.TargetCurrentAmps)}."));
+                events.Add(Event(
+                    now,
+                    ChargingSessionEventKind.ChargingStarted,
+                    $"Charging at {Describe(status.TargetCurrentAmps)}.",
+                    status.TargetCurrentAmps is { } amps
+                        ? Phrase.Of("Event.ChargingAt", new PhraseArg.Number(amps))
+                        : Phrase.Of("Event.ChargingStarted")));
             }
             else if (status.State == ChargeControlState.Paused)
             {
-                events.Add(Event(now, ChargingSessionEventKind.ChargingPaused, "Charging paused."));
+                events.Add(Event(now, ChargingSessionEventKind.ChargingPaused, "Charging paused.", Phrase.Of("Event.ChargingPaused")));
             }
 
             _lastState = status.State;
@@ -302,8 +312,9 @@ public sealed class ChargingSessionTracker
                 ? Event(
                     now,
                     ChargingSessionEventKind.ChargerStoodDown,
-                    status.WaitUntil is { } until ? $"Charger stood down until {until.LocalDateTime:HH:mm}." : "Charger stood down.")
-                : Event(now, ChargingSessionEventKind.ChargerRearmed, "Charger switched back to Fast."));
+                    status.WaitUntil is { } until ? $"Charger stood down until {until.LocalDateTime:HH:mm}." : "Charger stood down.",
+                    status.WaitUntil is { } wait ? Phrase.Of("Event.StoodDownUntil", new PhraseArg.Clock(wait)) : Phrase.Of("Event.StoodDown"))
+                : Event(now, ChargingSessionEventKind.ChargerRearmed, "Charger switched back to Fast.", Phrase.Of("Event.Rearmed")));
             _lastStoodDown = status.ChargerStoodDown;
         }
 
@@ -314,8 +325,8 @@ public sealed class ChargingSessionTracker
             if (planUsable != _lastPlanUsable)
             {
                 events.Add(planUsable.Value
-                    ? Event(now, ChargingSessionEventKind.PlanUsable, status.Plan!.Reason)
-                    : Event(now, ChargingSessionEventKind.PlanUnusable, status.Plan!.Reason));
+                    ? Event(now, ChargingSessionEventKind.PlanUsable, status.Plan!.Reason, status.Plan.ReasonPhrase)
+                    : Event(now, ChargingSessionEventKind.PlanUnusable, status.Plan!.Reason, status.Plan.ReasonPhrase));
             }
 
             _lastPlanUsable = planUsable;
@@ -448,8 +459,8 @@ public sealed class ChargingSessionTracker
 
     private static string Describe(int? amps) => amps is { } value ? $"{value}A" : "off";
 
-    private ChargingSessionEvent Event(DateTimeOffset at, ChargingSessionEventKind kind, string detail) =>
-        new(_open!.Id, at, kind, detail);
+    private ChargingSessionEvent Event(DateTimeOffset at, ChargingSessionEventKind kind, string detail, Phrase? phrase = null) =>
+        new(_open!.Id, at, kind, detail, phrase);
 
     private void Reset()
     {

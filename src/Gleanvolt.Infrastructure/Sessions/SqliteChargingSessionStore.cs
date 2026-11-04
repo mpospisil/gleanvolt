@@ -29,7 +29,7 @@ namespace Gleanvolt.Infrastructure.Sessions;
 public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposable
 {
     /// <summary>The schema this build writes, tracked in SQLite's own <c>user_version</c>.</summary>
-    public const int SchemaVersion = 4;
+    public const int SchemaVersion = 5;
 
     // One writer at a time. SQLite would serialise these itself and hand back SQLITE_BUSY; taking the
     // lock in-process turns a retry-and-hope into a wait, and the only writer is the recording worker.
@@ -250,8 +250,8 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 await using var command = connection.CreateCommand();
                 command.Transaction = (SqliteTransaction)transaction;
                 command.CommandText = """
-                    INSERT INTO session_events (session_id, timestamp, kind, detail)
-                    VALUES ($session_id, $timestamp, $kind, $detail);
+                    INSERT INTO session_events (session_id, timestamp, kind, detail, detail_phrase_json)
+                    VALUES ($session_id, $timestamp, $kind, $detail, $detail_phrase_json);
                     """;
 
                 var p = command.Parameters;
@@ -259,6 +259,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 p.Add("$timestamp", SqliteType.Text);
                 p.Add("$kind", SqliteType.Text);
                 p.Add("$detail", SqliteType.Text);
+                p.Add("$detail_phrase_json", SqliteType.Text);
 
                 foreach (var sessionEvent in events)
                 {
@@ -266,6 +267,9 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                     p["$timestamp"].Value = Utc(sessionEvent.Timestamp);
                     p["$kind"].Value = sessionEvent.Kind.ToString();
                     p["$detail"].Value = sessionEvent.Detail;
+                    p["$detail_phrase_json"].Value = sessionEvent.DetailPhrase is { } phrase
+                        ? JsonSerializer.Serialize(phrase, ChargingSessionJson.Options)
+                        : DBNull.Value;
 
                     await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 }
@@ -641,7 +645,7 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT timestamp, kind, detail FROM session_events
+            SELECT timestamp, kind, detail, detail_phrase_json FROM session_events
             WHERE session_id = $id ORDER BY timestamp, rowid;
             """;
         command.Parameters.AddWithValue("$id", sessionId.ToString());
@@ -654,7 +658,8 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
                 sessionId,
                 Instant(reader.GetString(0)),
                 Enum.Parse<ChargingSessionEventKind>(reader.GetString(1)),
-                reader.GetString(2)));
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : DeserializePhrase(reader.GetString(3))));
         }
 
         return events;
@@ -761,6 +766,20 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
 
     private static string? SerializeForecast(SolarForecast? forecast) =>
         forecast is null ? null : JsonSerializer.Serialize(forecast, ChargingSessionJson.Options);
+
+    // A phrase is the detail again, for the web UI; one this build cannot read is dropped and the
+    // stored English shown instead, rather than failing the whole session over a mark on its chart.
+    private static Phrase? DeserializePhrase(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Phrase>(json, ChargingSessionJson.Options);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        {
+            return null;
+        }
+    }
 
     private static SolarForecast? DeserializeForecast(string json) =>
         JsonSerializer.Deserialize<SolarForecast>(json, ChargingSessionJson.Options);
@@ -895,6 +914,12 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             -- The day's daylight bounds, stored once: they belong to the day, not to either reading.
             ALTER TABLE sessions ADD COLUMN sunrise TEXT NULL;
             ALTER TABLE sessions ADD COLUMN sunset  TEXT NULL;
+            """),
+        (5, """
+            -- What an event says, as a key and arguments the web UI can put in its viewer's language
+            -- (#292), beside the English detail the log and the API keep. Rows from before stay NULL
+            -- and show their stored English, which is what was said at the time.
+            ALTER TABLE session_events ADD COLUMN detail_phrase_json TEXT NULL;
             """),
     ];
 }

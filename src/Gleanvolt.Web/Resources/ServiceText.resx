@@ -459,4 +459,26 @@
   <data name="Solcast_EnterSite" xml:space="preserve">
     <value>Enter the rooftop site's resource id.</value>
   </data>
+  <!-- Marks on a session's chart -->
+  <data name="Event_ModeChanged" xml:space="preserve">
+    <value>{0} → {1}.</value>
+  </data>
+  <data name="Event_ChargingAt" xml:space="preserve">
+    <value>Charging at {0} A.</value>
+  </data>
+  <data name="Event_ChargingStarted" xml:space="preserve">
+    <value>Charging started.</value>
+  </data>
+  <data name="Event_ChargingPaused" xml:space="preserve">
+    <value>Charging paused.</value>
+  </data>
+  <data name="Event_StoodDownUntil" xml:space="preserve">
+    <value>Charger stood down until {0}.</value>
+  </data>
+  <data name="Event_StoodDown" xml:space="preserve">
+    <value>Charger stood down.</value>
+  </data>
+  <data name="Event_Rearmed" xml:space="preserve">
+    <value>Charger switched back to Fast.</value>
+  </data>
 </root>

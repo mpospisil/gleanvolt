@@ -342,7 +342,7 @@ public class HealthPageTests : PageTest
         var page = PseudoLocale.Render(() => Render<Health>());
 
         // The secret store describes itself (#290 leaves service text for its own step).
-        PseudoLocale.AssertTranslated(page.Markup, "Windows DPAPI, this user", "Europe/Prague");
+        PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague");
     }
 
     [Fact]
@@ -361,6 +361,19 @@ public class HealthPageTests : PageTest
         });
 
         page.WaitForState(() => page.RenderCount > first);
-        PseudoLocale.AssertTranslated(page.Markup, "Windows DPAPI, this user", "Europe/Prague");
+        PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague");
+    }
+
+    [Fact]
+    public void A_feed_that_needs_the_owner_says_so_in_the_viewers_language()
+    {
+        Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
+            VehicleSourceHealth.NeedsOwner(
+                "Škoda no longer recognises the stored API key — paste a new one on the Car page.",
+                Phrase.Of("Skoda.FeedKeyUnknown"))));
+
+        var page = PseudoLocale.Render(() => Render<Health>());
+
+        PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague");
     }
 }

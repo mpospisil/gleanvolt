@@ -930,4 +930,19 @@ public class DashboardPageTests : PageTest
 
         PseudoLocale.AssertTranslated(page.Markup, "Home Roof", "Europe/Prague");
     }
+
+    [Fact]
+    public void A_feed_that_needs_the_owner_is_said_in_the_viewers_language()
+    {
+        _car = Id4();
+        Feed(VehicleSourceHealth.NeedsOwner(
+            "Škoda no longer recognises the stored API key — paste a new one on the Car page.",
+            Phrase.Of("Skoda.FeedKeyUnknown")));
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off));
+
+        var page = PseudoLocale.Render(() => Render<Dashboard>());
+
+        Assert.NotEmpty(page.FindAll("#vehicle-feed-blocked"));
+        PseudoLocale.AssertTranslated(page.Markup, "Home Roof", "The ID.4", "Volkswagen ID.4 Pro", "Europe/Prague");
+    }
 }
