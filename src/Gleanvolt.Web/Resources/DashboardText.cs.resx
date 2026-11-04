@@ -253,7 +253,7 @@
     <value>cílový proud</value>
   </data>
   <data name="TargetCurrentTip" xml:space="preserve">
-    <value>Proud, který řídicí jednotka zvolila v tomto cyklu, ještě než ho zapsala do nabíječky. Když se nenabíjí, je prázdný.</value>
+    <value>Proud, který správce nabíjení zvolil v tomto cyklu, ještě než ho zapsal do nabíječky. Když se nenabíjí, je prázdný.</value>
   </data>
   <data name="ActiveCurrent" xml:space="preserve">
     <value>Aktivní proud</value>

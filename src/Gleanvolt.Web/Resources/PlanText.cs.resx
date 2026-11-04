@@ -622,7 +622,7 @@
     <value>Připojeno</value>
   </data>
   <data name="PluggedInHint" xml:space="preserve">
-    <value>Co vidí nabíječka na svém konektoru a co o své zásuvce hlásí auto. Nabíječka hlásí změny rychleji a řídicí jednotka se řídí podle ní; auto může být o hodiny pozadu.</value>
+    <value>Co vidí nabíječka na svém konektoru a co o své zásuvce hlásí auto. Nabíječka hlásí změny rychleji a správce nabíjení se řídí podle ní; auto může být o hodiny pozadu.</value>
   </data>
   <data name="CarChargeState" xml:space="preserve">
     <value>Stav nabíjení auta</value>

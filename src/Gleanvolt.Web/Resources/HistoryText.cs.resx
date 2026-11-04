@@ -277,7 +277,7 @@
     <value>Nastavení</value>
   </data>
   <data name="NoForecastHeld" xml:space="preserve">
-    <value>Zatím není k dispozici žádná předpověď. Buď pro tuto instalaci není nastaven účet Solcast, nebo se od startu řídicí jednotky ještě nic nestáhlo. Co z toho platí, zjistíte v sekci {0}, kde se účet také zadává. Předpověď se přes den obnovuje automaticky; tato stránka ukazuje poslední staženou a sama o novou nežádá.</value>
+    <value>Zatím není k dispozici žádná předpověď. Buď pro tuto instalaci není nastaven účet Solcast, nebo se od startu správce nabíjení ještě nic nestáhlo. Co z toho platí, zjistíte v sekci {0}, kde se účet také zadává. Předpověď se přes den obnovuje automaticky; tato stránka ukazuje poslední staženou a sama o novou nežádá.</value>
   </data>
   <data name="TheTwoDays" xml:space="preserve">
     <value>Dnes a zítra</value>
@@ -298,7 +298,7 @@
     <value>{0} — poskytovatel pro ně poslal jen medián, takže pás tam splývá s čárou. Pás stejně úzký jako čára neznamená jistotu; tabulka níže má v těchto řádcích pomlčku.</value>
   </data>
   <data name="MorningMissing" xml:space="preserve">
-    <value>{0} Poskytovatel předpovídá jen dopředu. Co mělo přinést dnešní dopoledne, proto řídicí jednotka ví, jen pokud během něj běžela — a z doby před tímto časem nic uloženo nemá. Prázdný úsek vlevo v grafu znamená chybějící data, ne dopoledne bez slunce.</value>
+    <value>{0} Poskytovatel předpovídá jen dopředu. Co mělo přinést dnešní dopoledne, proto správce nabíjení ví, jen pokud během něj běžel — a z doby před tímto časem nic uloženo nemá. Prázdný úsek vlevo v grafu znamená chybějící data, ne dopoledne bez slunce.</value>
   </data>
   <data name="Period" xml:space="preserve">
     <value>Období</value>

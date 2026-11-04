@@ -85,7 +85,7 @@
     <value>Zastavuje se. Nabíjení se pozastavuje a otevřený záznam nabíjení se uzavírá; tato stránka za několik sekund přestane odpovídat.</value>
   </data>
   <data name="StartAgain" xml:space="preserve">
-    <value>Znovu ji spustíte na Pi příkazem {0} v adresáři {1}. Sama se znovu nespustí — tím se zastavení liší od restartu.</value>
+    <value>Znovu ho spustíte na Pi příkazem {0} v adresáři {1}. Sám se znovu nespustí — tím se zastavení liší od restartu.</value>
   </data>
   <data name="StopQuestion" xml:space="preserve">
     <value>Zastavit službu?</value>
@@ -94,7 +94,7 @@
     <value>Ano, zastavit</value>
   </data>
   <data name="StopConfirmHint" xml:space="preserve">
-    <value>Nabíjení se zastaví, toto rozhraní i integrace s Home Assistant přestanou být dostupné a řídicí jednotka zůstane vypnutá, dokud ji znovu nespustíte z příkazové řádky na Pi.</value>
+    <value>Nabíjení se zastaví, toto rozhraní i integrace s Home Assistant přestanou být dostupné a správce nabíjení zůstane vypnutý, dokud ho znovu nespustíte z příkazové řádky na Pi.</value>
   </data>
   <data name="StopLabel" xml:space="preserve">
     <value>Zastavit službu</value>
@@ -103,10 +103,10 @@
     <value>Zastavit službu</value>
   </data>
   <data name="StopHint" xml:space="preserve">
-    <value>Bezpečný způsob, jak řídicí jednotku vypnout: nabíječka se přepne na proud pro pozastavení, otevřený záznam nabíjení se uzavře a uloží a úložiště se zapíše na disk. Nic z toho se nestane, když se proces jen násilně ukončí. Po zastavení se sama znovu nespustí; tlačítko Restartovat níže provede stejné vypnutí a pak ji spustí znovu.</value>
+    <value>Bezpečný způsob, jak správce nabíjení vypnout: nabíječka se přepne na proud pro pozastavení, otevřený záznam nabíjení se uzavře a uloží a úložiště se zapíše na disk. Nic z toho se nestane, když se proces jen násilně ukončí. Po zastavení se sám znovu nespustí; tlačítko Restartovat níže provede stejné vypnutí a pak ho spustí znovu.</value>
   </data>
   <data name="RestartHint" xml:space="preserve">
-    <value>Stejně šetrné vypnutí jako Zastavit, ale s návratovým kódem, podle kterého ji Docker nebo systemd spustí znovu. Nový proces znovu načte konfiguraci, a tak se uplatní změny uložené v Nastavení.</value>
+    <value>Stejně šetrné vypnutí jako Zastavit, ale s návratovým kódem, podle kterého ho Docker nebo systemd spustí znovu. Nový proces znovu načte konfiguraci, a tak se uplatní změny uložené v Nastavení.</value>
   </data>
   <data name="Due" xml:space="preserve">
     <value>nyní</value>
@@ -160,7 +160,7 @@
     <value>Ostatní entity — čísla, výběry, texty a tlačítka — mají stejný vzor: {0} pro to, co hlásí, a {1} pro to, co přijímají. Uchované konfigurace discovery, ze kterých je Home Assistant čte, jsou pod {2}. Cokoli označené jako {3} může změnit, co nabíječka dělá.</value>
   </data>
   <data name="HaOff" xml:space="preserve">
-    <value>Vypnuto (výchozí stav): nic se nepublikuje a žádné příkazy se nepřijímají. Nastavte {0} na {1}, zadejte {2} a {3} pro broker a zvolte {4}. ID odlišuje témata dvou instalací na jednom brokeru, které by se jinak navzájem přepisovaly; bez něj proto řídicí jednotka nenastartuje.</value>
+    <value>Vypnuto (výchozí stav): nic se nepublikuje a žádné příkazy se nepřijímají. Nastavte {0} na {1}, zadejte {2} a {3} pro broker a zvolte {4}. ID odlišuje témata dvou instalací na jednom brokeru, které by se jinak navzájem přepisovaly; bez něj proto správce nabíjení nenastartuje.</value>
   </data>
   <data name="DiscoveryPrefix" xml:space="preserve">
     <value>Prefix discovery</value>
@@ -199,7 +199,7 @@
     <value>uchované (retained)</value>
   </data>
   <data name="VehicleTelemetryTip" xml:space="preserve">
-    <value>Jedno konkrétní téma, ne zástupný znak: aplikace zatím sleduje jen jedno auto a {0} přes několik aut by potichu nechal platit nejnovější zprávu, ať by popisovala kterékoli auto. Zprávy mají být {1}, takže po restartu se hned načte poslední údaj a nemusí se čekat na další aktualizaci auta z cloudu. Pozor: toto ID klienta neobsahuje ID systému, takže dvě řídicí jednotky na jednom stroji by se na brokeru střetly.</value>
+    <value>Jedno konkrétní téma, ne zástupný znak: aplikace zatím sleduje jen jedno auto a {0} přes několik aut by potichu nechal platit nejnovější zprávu, ať by popisovala kterékoli auto. Zprávy mají být {1}, takže po restartu se hned načte poslední údaj a nemusí se čekat na další aktualizaci auta z cloudu. Pozor: toto ID klienta neobsahuje ID systému, takže dva správci nabíjení na jednom stroji by se na brokeru střetli.</value>
   </data>
   <data name="VehicleMqttOff" xml:space="preserve">
     <value>Vypnuto (výchozí stav): stav nabití auta se nečte a Přehled ukazuje jen to, co vidí nabíječka. Nastavte {0} na {1} a v {2} zadejte téma, do kterého váš zdroj publikuje.</value>
@@ -310,19 +310,19 @@
     <value>ukládání nastavení instalace</value>
   </data>
   <data name="SavingTip1" xml:space="preserve">
-    <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči). Nic se nezmění, dokud se řídicí jednotka nerestartuje.</value>
+    <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči). Nic se nezmění, dokud se správce nabíjení nerestartuje.</value>
   </data>
   <data name="SavingTip2" xml:space="preserve">
     <value>Ikona (i) u každého pole ukazuje, odkud pochází jeho aktuální hodnota. Pokud po uložení hodnota pole ještě neplatí, je to pod polem uvedeno.</value>
   </data>
   <data name="NotRunningUntilRestart" xml:space="preserve">
-    <value>— začne platit po restartu řídicí jednotky.</value>
+    <value>— začne platit po restartu správce nabíjení.</value>
   </data>
   <data name="RestartOnHealth" xml:space="preserve">
     <value>Restartovat na stránce Stav</value>
   </data>
   <data name="ReadOnlyNoLogin" xml:space="preserve">
-    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Pole obsahují i adresy, na které řídicí jednotka posílá příkazy Modbus, a bez přihlášení by je kdokoli v místní síti mohl přesměrovat jinam. Nastavte {0} ({1}) a pole půjde upravovat tady; do té doby je měňte v {2} a restartujte.</value>
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Pole obsahují i adresy, na které správce nabíjení posílá příkazy Modbus, a bez přihlášení by je kdokoli v místní síti mohl přesměrovat jinam. Nastavte {0} ({1}) a pole půjde upravovat tady; do té doby je měňte v {2} a restartujte.</value>
   </data>
   <data name="CurrentValueFrom" xml:space="preserve">
     <value>Aktuální hodnota pochází z: {0}.</value>
@@ -349,7 +349,7 @@
     <value>Přesto uloženo: vypnutá nabíječka neodpovídá, a přesto to může být správná adresa. Obě zařízení odpovídají na Modbus na portu 502, takže prohozené adresy se po spuštění projeví jako zamrzlá baterie a nulová výroba — před restartem ověřte, která adresa patří kterému zařízení.</value>
   </data>
   <data name="NotSaved" xml:space="preserve">
-    <value>Neuloženo — s tímto nastavením by řídicí jednotka nenastartovala:</value>
+    <value>Neuloženo — s tímto nastavením by správce nabíjení nenastartoval:</value>
   </data>
   <data name="GroupIdentity" xml:space="preserve">
     <value>Identita</value>
@@ -448,13 +448,13 @@
     <value>L1, L2, L3 (nebo R, S, T), nebo prázdné</value>
   </data>
   <data name="SavedRestart" xml:space="preserve">
-    <value>Uloženo. Projeví se po restartu řídicí jednotky.</value>
+    <value>Uloženo. Projeví se po restartu správce nabíjení.</value>
   </data>
   <data name="SavedRunning" xml:space="preserve">
-    <value>Uloženo. Řídicí jednotka už s těmito hodnotami běží.</value>
+    <value>Uloženo. Správce nabíjení už s těmito hodnotami běží.</value>
   </data>
   <data name="IdWarning" xml:space="preserve">
-    <value>Změna ID přesune všechna témata MQTT, pod kterými řídicí jednotka publikuje, takže Home Assistant po restartu uvidí nová témata. Jak vyčistit stará, popisuje kapitola „Renaming what Home Assistant sees“ v deploy/README.md a proměnná HA_RETIRE_TOPIC_PREFIX. ID zařízení v Home Assistant se nastavuje zvlášť a nemění se.</value>
+    <value>Změna ID přesune všechna témata MQTT, pod kterými správce nabíjení publikuje, takže Home Assistant po restartu uvidí nová témata. Jak vyčistit stará, popisuje kapitola „Renaming what Home Assistant sees“ v deploy/README.md a proměnná HA_RETIRE_TOPIC_PREFIX. ID zařízení v Home Assistant se nastavuje zvlášť a nemění se.</value>
   </data>
   <data name="CoordinatesWarning" xml:space="preserve">
     <value>Vymazáním souřadnic se vypne zaznamenávání počasí k nabíjení a zruší se poloha pro předpověď.</value>
@@ -544,13 +544,13 @@
     <value>účet Solcast</value>
   </data>
   <data name="SolcastTip1" xml:space="preserve">
-    <value>Předpověď pochází z bezplatného účtu Solcast (hobbyist): klíč API najdete v nastavení účtu na solcast.com a ID zdroje (resource id) na stránce střešní instalace (rooftop site). Bez účtu řídicí jednotka funguje normálně, jen nemá předpověď pro plánování.</value>
+    <value>Předpověď pochází z bezplatného účtu Solcast (hobbyist): klíč API najdete v nastavení účtu na solcast.com a ID zdroje (resource id) na stránce střešní instalace (rooftop site). Bez účtu správce nabíjení funguje normálně, jen nemá předpověď pro plánování.</value>
   </data>
   <data name="SolcastTip2_0" xml:space="preserve">
     <value>každé uložení tady i každý restart spotřebuje jedno</value>
   </data>
   <data name="SolcastTip2" xml:space="preserve">
-    <value>Bezplatný účet dovoluje zhruba deset volání denně. Řídicí jednotka jich přes den spotřebuje asi pět, v noci žádné, a {0}. Stejně tak je spotřebovává druhá kopie řídicí jednotky se stejným účtem, například {1} na notebooku.</value>
+    <value>Bezplatný účet dovoluje zhruba deset volání denně. Správce nabíjení jich přes den spotřebuje asi pět, v noci žádné, a {0}. Stejně tak je spotřebovává druhá kopie správce nabíjení se stejným účtem, například {1} na notebooku.</value>
   </data>
   <data name="SolcastTip3" xml:space="preserve">
     <value>Účet uložený tady má přednost před {0} a {1} v {2}. Když ho odstraníte, znovu se použije účet z prostředí.</value>
@@ -607,7 +607,7 @@
     <value>Nenastaveno</value>
   </data>
   <data name="NotConfiguredNoForecast" xml:space="preserve">
-    <value>Nenastaveno — řídicí jednotka běží bez předpovědi.</value>
+    <value>Nenastaveno — správce nabíjení běží bez předpovědi.</value>
   </data>
   <data name="StillInUse" xml:space="preserve">
     <value>Předpověď stažená {0} se stále používá.</value>
@@ -628,7 +628,7 @@
     <value>Předpověď stažena {0}.</value>
   </data>
   <data name="NothingFetched" xml:space="preserve">
-    <value>Nastaveno. Od startu řídicí jednotky se nic nestáhlo.</value>
+    <value>Nastaveno. Od startu správce nabíjení se nic nestáhlo.</value>
   </data>
   <data name="AtTime" xml:space="preserve">
     <value>v {0:HH:mm}</value>
