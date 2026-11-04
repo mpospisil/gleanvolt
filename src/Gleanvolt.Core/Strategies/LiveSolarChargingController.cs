@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -94,7 +95,7 @@ public sealed class LiveSolarChargingController : IChargingController
         {
             // Not known for how long: the battery fills at whatever rate the sun and the house allow.
             var threshold = charging ? _releaseSocPercent : _fullSocPercent;
-            return Wait(input, null, $"Battery {soc:F0}% below {threshold:F0}% full-battery gate.");
+            return Wait(input, null, Invariant($"Battery {soc:F0}% below {threshold:F0}% full-battery gate."));
         }
 
         // The smoothed (moving-average) surplus, so a passing cloud doesn't interrupt the session.
@@ -109,18 +110,18 @@ public sealed class LiveSolarChargingController : IChargingController
             return Wait(
                 input,
                 ChargerWait.NextSun(input),
-                $"Live surplus {availableWatts:F0}W below {(charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
+                Invariant($"Live surplus {availableWatts:F0}W below {(charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W."));
         }
 
         var targetAmps = ToHardwareCurrent(availableWatts);
         if (targetAmps < _minChargingCurrentAmps)
         {
             return Wait(
-                input, ChargerWait.NextSun(input), $"Live surplus {availableWatts:F0}W quantises below minimum {_minChargingCurrentAmps}A.");
+                input, ChargerWait.NextSun(input), Invariant($"Live surplus {availableWatts:F0}W quantises below minimum {_minChargingCurrentAmps}A."));
         }
 
         return new ChargingControlDecision(
-            ChargingControlAction.Charge, targetAmps, $"Live surplus {availableWatts:F0}W -> charge at {targetAmps}A.");
+            ChargingControlAction.Charge, targetAmps, Invariant($"Live surplus {availableWatts:F0}W -> charge at {targetAmps}A."));
     }
 
     // Not now: over for the day once the forecast has no sun left, otherwise paused or stood down.

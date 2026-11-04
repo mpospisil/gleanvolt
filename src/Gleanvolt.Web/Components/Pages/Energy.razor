@@ -21,60 +21,55 @@
     be tested; this page only hands it over.
 *@
 
-<SiteTitle Page="Energy" />
+<SiteTitle Page="@HistoryText.EnergyPageTitle" />
 
-<h1>Energy</h1>
+<h1>@HistoryText.EnergyTitle</h1>
 
 <div class="control range-control">
-    <label for="day">Day</label>
-    <button type="button" class="day-step" @onclick="() => StepAsync(-1)" aria-label="Previous day">‹</button>
-    <input id="day" type="date" max="@_today.ToString("yyyy-MM-dd")" @bind="_day" @bind:after="LoadAsync" />
+    <label for="day">@HistoryText.Day</label>
+    <button type="button" class="day-step" @onclick="() => StepAsync(-1)" aria-label="@HistoryText.PreviousDay">‹</button>
+    <input id="day" type="date" max="@_today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" @bind="_day" @bind:after="LoadAsync" />
     @* Disabled rather than hidden past today: the control keeps its place, and a day with no data
        reads as an empty day rather than as a missing button. *@
-    <button type="button" class="day-step" disabled="@(_day >= _today)" @onclick="() => StepAsync(1)" aria-label="Next day">›</button>
+    <button type="button" class="day-step" disabled="@(_day >= _today)" @onclick="() => StepAsync(1)" aria-label="@HistoryText.NextDay">›</button>
 </div>
 
 @if (_error)
 {
-    <p class="muted">The energy history isn't available right now.</p>
+    <p class="muted">@HistoryText.EnergyUnavailable</p>
 }
 else if (_intervals is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">@HistoryText.Loading</p>
 }
 else if (_intervals.Count == 0)
 {
-    <p class="muted">Nothing was recorded on this day.</p>
+    <p class="muted">@HistoryText.NothingRecorded</p>
 }
 else
 {
     <section class="chart-section">
-        <h2>The day</h2>
+        <h2>@HistoryText.TheDay</h2>
         <div id="energy-chart" class="chart day"></div>
         <p class="muted chart-note">
-            Power, averaged over each quarter hour that was observed — the store keeps energy, and a
-            bucket the service only saw part of is divided by the part it saw, so a restart is a gap
-            rather than a dip the sun never took. <strong>Grid</strong> is import above the line and
-            export below it; <strong>Battery</strong> is charging above and discharging below. Click a
-            name in the legend to take that series out. A bar along the bottom marks the windows that
-            were only partly observed — the same ones the table below shows in italics.
+            @Localized.Rich(HistoryText.EnergyChartNote, @<strong>@HistoryText.SeriesGrid</strong>, @<strong>@HistoryText.SeriesBattery</strong>)
         </p>
     </section>
 
     <table class="sessions energy">
         <thead>
             <tr>
-                <th>From</th>
-                <th class="num">Solar</th>
-                <th class="num">Forecast</th>
-                <th class="num">Import</th>
-                <th class="num">Export</th>
-                <th class="num">To car</th>
-                <th class="num">Batt in</th>
-                <th class="num">Batt out</th>
-                <th class="num">House</th>
-                <th class="num">SOC</th>
-                <th class="num">Covered</th>
+                <th>@HistoryText.From</th>
+                <th class="num">@HistoryText.ColSolar</th>
+                <th class="num">@HistoryText.ColForecast</th>
+                <th class="num">@HistoryText.ColImport</th>
+                <th class="num">@HistoryText.ColExport</th>
+                <th class="num">@HistoryText.ColToCar</th>
+                <th class="num">@HistoryText.ColBattIn</th>
+                <th class="num">@HistoryText.ColBattOut</th>
+                <th class="num">@HistoryText.ColHouse</th>
+                <th class="num">@HistoryText.ColSoc</th>
+                <th class="num">@HistoryText.ColCovered</th>
             </tr>
         </thead>
         <tbody>
@@ -101,7 +96,7 @@ else
         </tbody>
         <tfoot>
             <tr>
-                <th>Day</th>
+                <th>@HistoryText.DayRow</th>
                 <td class="num">@Kwh(_intervals.Sum(i => i.SolarKwh))</td>
                 <td class="num">@(_intervals.Any(i => i.ForecastSolarKwh is not null)
                                     ? Kwh(_intervals.Sum(i => i.ForecastSolarKwh ?? 0))
@@ -113,23 +108,19 @@ else
                 <td class="num">@Kwh(_intervals.Sum(i => i.BatteryDischargeKwh))</td>
                 <td class="num">@Kwh(_intervals.Sum(i => i.HouseLoadKwh))</td>
                 <td class="num">@($"{Units.Percent(_intervals[0].SocStartPercent)} → {Units.Percent(_intervals[^1].SocEndPercent)}")</td>
-                <td class="num">@_intervals.Count rows</td>
+                <td class="num">@Localized.Format(Localized.Plural(_intervals.Count, HistoryText.Rows_One, HistoryText.Rows_Few, HistoryText.Rows_Other), _intervals.Count)</td>
             </tr>
         </tfoot>
     </table>
 
     <p class="muted table-note">
-        Every figure is kWh over that interval, in @Time.LocalTimeZone.Id time. Import and export are
-        kept apart, and so are the battery's two directions — a net figure could not tell an idle
-        quarter hour from a busy one that happened to balance. <strong>House</strong> is the residual
-        of the others (the car included), not a separate measurement.
+        @Localized.Rich(HistoryText.EnergyTableNote, @<text>@(Time.LocalTimeZone.Id)</text>, @<strong>@HistoryText.SeriesHouse</strong>)
         @if (_partialCount > 0)
         {
             <text>
-                <strong>@_partialCount row@(_partialCount == 1 ? "" : "s")</strong> cover@(_partialCount == 1 ? "s" : "") less
-                than the full interval — the service was starting, stopping, or had lost the inverter —
-                so every energy figure on @(_partialCount == 1 ? "that row is" : "those rows are") short
-                by the same fraction.
+                @Localized.Rich(
+                    Localized.Plural(_partialCount, HistoryText.PartialRowsNote_One, HistoryText.PartialRowsNote_Few, HistoryText.PartialRowsNote_Other),
+                    @<strong>@Localized.Format(Localized.Plural(_partialCount, HistoryText.Rows_One, HistoryText.Rows_Few, HistoryText.Rows_Other), _partialCount)</strong>)
             </text>
         }
     </p>
@@ -210,7 +201,7 @@ else
         // exist on the other side, and disposing one that isn't there is a no-op anyway.
         _chartCreated = true;
 
-        await JS.InvokeVoidAsync("solaxCharts.renderEnergyDayChart", "energy-chart", _chart);
+        await JS.InvokeVoidAsync("solaxCharts.renderEnergyDayChart", "energy-chart", _chart, ChartText.Current());
     }
 
     public async ValueTask DisposeAsync()

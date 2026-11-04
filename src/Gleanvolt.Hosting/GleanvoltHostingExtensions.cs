@@ -1073,7 +1073,7 @@ public static class GleanvoltHostingExtensions
                         discovery.DeviceId,
                         discovery.TopicPrefix,
                         [.. discovery.WellKnownTopics().Select(topic =>
-                            new MqttTopicDisplay(topic.Purpose, topic.Topic, topic.Inbound))],
+                            new MqttTopicDisplay(topic.Purpose, topic.Topic, topic.Inbound, topic.PurposePhrase))],
                         ha.StatusInterval,
                         ha.RetireDeviceIds,
                         ha.RetireTopicPrefixes),

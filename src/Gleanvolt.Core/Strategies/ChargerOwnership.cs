@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -87,7 +88,7 @@ public static class ChargerOwnership
         {
             return End(
                 ChargingSessionEndReason.SessionComplete,
-                $"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){finishedDetail}");
+                Invariant($"Car stopped drawing for {input.EvIdleFor.TotalMinutes:F0} min (charge limit reached){finishedDetail}"));
         }
 
         return null;
@@ -133,7 +134,7 @@ public static class ChargerOwnership
                 ChargingControlAction.None,
                 null,
                 $"The charger has been in {input.CurrentSettings.Mode} rather than Fast for "
-                + $"{input.ChargerNotFastFor.TotalMinutes:F0} min, so it is no longer ours to drive; returning to Off.",
+                + Invariant($"{input.ChargerNotFastFor.TotalMinutes:F0} min, so it is no longer ours to drive; returning to Off."),
                 EndsSession: ChargingSessionEndReason.ChargerTakenOver);
         }
 

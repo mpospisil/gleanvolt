@@ -336,5 +336,31 @@ public class HealthPageTests : PageTest
         Assert.DoesNotContain("Portal session", page.Markup);
     }
 
+    [Fact]
+    public void Every_string_on_the_health_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => Render<Health>());
 
+        // The secret store describes itself (#290 leaves service text for its own step).
+        PseudoLocale.AssertTranslated(page.Markup, "Windows DPAPI, this user", "Europe/Prague");
+    }
+
+    [Fact]
+    public async Task Stays_in_the_viewers_language_when_a_poll_lands_from_another_thread()
+    {
+        // The poll is raised on the polling loop's thread, which is invariant (#290). Measured on a live
+        // circuit before this was fixed: the page turned English with the first poll after it opened.
+        var page = PseudoLocale.Render(() => Render<Health>());
+        var first = page.RenderCount;
+
+        await Task.Run(() =>
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+            System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+            _holder.Set(Statuses.Sample(_time.Now));
+        });
+
+        page.WaitForState(() => page.RenderCount > first);
+        PseudoLocale.AssertTranslated(page.Markup, "Windows DPAPI, this user", "Europe/Prague");
+    }
 }

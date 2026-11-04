@@ -10,4 +10,9 @@
     <Description>Domain models, control strategies and hardware abstractions for the Gleanvolt. No hardware, hosting or framework dependencies -- the decision logic on its own.</Description>
   </PropertyGroup>
 
+  <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
 </Project>

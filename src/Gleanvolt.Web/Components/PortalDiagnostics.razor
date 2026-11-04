@@ -15,12 +15,10 @@
 @if (Reading is not null && HasContent)
 {
     <details class="diagnostics" id="diagnostics" open="@(!Reading.Succeeded)">
-        <summary>Diagnostics</summary>
+        <summary>@CarText.Diagnostics</summary>
 
         <p class="muted">
-            What the portal delivered and how much of it this build understands. This is what answers
-            <em>why is that field a dash</em> — worth opening when a figure above is missing, and
-            worth ignoring when none is.
+            @Localized.Rich(CarText.DiagnosticsIntro, @<em>@CarText.DiagnosticsIntro_0</em>)
         </p>
 
         @*
@@ -31,13 +29,13 @@
         *@
         @if (Reading is { SnapshotCount: > 0 })
         {
-            <h3>The delivery</h3>
+            <h3>@CarText.TheDelivery</h3>
 
             <dl class="facts">
-                <dt>Vehicle</dt>
+                <dt>@CarText.Vehicle</dt>
                 <dd>@Reading.Vehicle</dd>
 
-                <dt>Snapshots</dt>
+                <dt>@CarText.Snapshots</dt>
                 <dd>
                     @Reading.SnapshotCount
                     @if (Reading.OldestSnapshot is { } oldest && Reading.NewestSnapshot is { } newest)
@@ -52,17 +50,15 @@
 
                 @* Repeated from the card above rather than moved out of it: on a failed read there is
                    no card, and this is then the only place the bundle's own figures can appear. *@
-                <dt>Target SOC</dt>
+                <dt>@CarText.TargetSoc</dt>
                 <dd>@Units.Percent(Reading.TargetSocPercent)</dd>
 
-                <dt>Odometer</dt>
+                <dt>@CarText.Odometer</dt>
                 <dd>@Units.Distance(Reading.OdometerMetres)</dd>
             </dl>
 
             <p class="muted table-note">
-                The odometer is carried but nothing reads it. Target SOC is the one that would let a
-                plan refuse an impossible battery target, deferred on
-                <a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>.
+                @Localized.Rich(CarText.OdometerNote, @<a href="https://github.com/mpospisil/gleanvolt/issues/101">#101</a>)
             </p>
         }
 
@@ -78,12 +74,10 @@
         *@
         @if (Reading.Matched.Count > 0)
         {
-            <h3>@Reading.Matched.Count field(s) this build recognised</h3>
+            <h3>@Localized.Format(Localized.Plural(Reading.Matched.Count, CarText.FieldsRecognised_One, CarText.FieldsRecognised_Few, CarText.FieldsRecognised_Other), Reading.Matched.Count)</h3>
 
             <p class="muted">
-                Each with the moment the <em>car</em> reported it. A read merges several deliveries, so
-                two figures here can be hours apart — and comparing them without that is how a coarse
-                reading and a stale one get mistaken for each other.
+                @Localized.Rich(CarText.FieldMoments, @<em>@CarText.FieldMoments_0</em>)
             </p>
 
             @* .fields, not .facts: the name is the data here, and a fifty-character dotted path overruns a
@@ -94,9 +88,9 @@
                     <dt><code>@Breakable(field)</code></dt>
                     <dd>
                         @(string.IsNullOrWhiteSpace(reading.Value)
-                            ? (MarkupString)"(empty)"
+                            ? (MarkupString)System.Net.WebUtility.HtmlEncode(CarText.Empty)
                             : Breakable($"\"{reading.Value}\""))
-                        <span class="muted">@reading.At.ToString("yyyy-MM-dd HH:mm")</span>
+                        <span class="muted">@reading.At.ToString(SharedText.DateTimePattern, System.Globalization.CultureInfo.CurrentCulture)</span>
                     </dd>
                 }
             </dl>
@@ -104,14 +98,13 @@
         else if (Reading.Succeeded || Reading.Unmapped.Count > 0)
         {
             <p class="muted">
-                Not one field in the bundle is in the vocabulary at all — so this is a set of names to
-                add rather than a car reporting empty values.
+                @CarText.NothingInVocabulary
             </p>
         }
 
         @if (Reading.Notes.Count > 0)
         {
-            <h3>What the bundle held that never became a reading</h3>
+            <h3>@CarText.NeverBecameReading</h3>
 
             @foreach (var note in Reading.Notes)
             {
@@ -138,14 +131,10 @@
         *@
         @if (Reading.Unmapped.Count > 0)
         {
-            <h3>@Reading.Unmapped.Count field(s) nothing here reads</h3>
+            <h3>@Localized.Format(Localized.Plural(Reading.Unmapped.Count, CarText.FieldsUnread_One, CarText.FieldsUnread_Few, CarText.FieldsUnread_Other), Reading.Unmapped.Count)</h3>
 
             <p class="muted">
-                If a value above is missing, its real name is probably in this list — the portal's
-                vocabulary was written down from VW's data dictionary rather than from your car, so
-                this is expected on a first run rather than a fault. Adding the right names to
-                <code>VwGroupFieldNames</code> is the fix; pasting this list into an issue is enough
-                for somebody else to do it.
+                @Localized.Rich(CarText.UnmappedNote, @<code>VwGroupFieldNames</code>)
             </p>
 
             <ul class="sessions">
@@ -157,7 +146,7 @@
         }
         else if (Reading.Succeeded)
         {
-            <p class="muted">Every field in the bundle was recognised.</p>
+            <p class="muted">@CarText.AllRecognised</p>
         }
     </details>
 }

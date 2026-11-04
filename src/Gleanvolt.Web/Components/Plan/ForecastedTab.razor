@@ -27,26 +27,21 @@
 *@
 
 <div class="muted intro-line">
-    Charges from surplus, guided by the forecast so the home battery still fills by evening.
-    <InfoTip Topic="this mode">
+    @PlanText.ForecastedIntro
+    <InfoTip Topic="@PlanText.ThisModeTopic">
         <p>
-            Charge from surplus like <a href="/charging-plan/solar">Solar</a>, but with the fixed
-            battery-full gate replaced by the Solcast forecast: the plan decides how much of today's
-            remaining sun the car may have, so the home battery still reaches 100% by the evening
-            deadline. The midday plateau goes to the car, the shoulders stay with the house and the
-            battery.
+            @Localized.Rich(PlanText.ForecastedTip, @<a href="/charging-plan/solar">@PlanText.ForecastedTip_0</a>)
         </p>
     </InfoTip>
 </div>
 
 <div class="control">
     <button type="button" class="primary" id="start-forecasted" disabled="@Busy" @onclick="StartForecasted">
-        Charge to the forecast
+        @PlanText.StartForecasted
     </button>
-    <InfoTip Topic="Charge to the forecast">
+    <InfoTip Topic="@PlanText.StartForecastedTopic">
         <p>
-            Falls back to plain surplus behaviour whenever no usable forecast is available, rather than
-            refusing to charge.
+            @PlanText.StartForecastedTip
         </p>
     </InfoTip>
 </div>
@@ -55,14 +50,10 @@
 
 <section class="plan" id="ev-energy">
     <div class="plan-head">
-        <h2>Where a charge stops</h2>
-        <InfoTip Topic="Where a charge stops">
+        <h2>@PlanText.WhereChargeStops</h2>
+        <InfoTip Topic="@PlanText.WhereChargeStopsTopic">
             <p>
-                This mode takes no amount: it charges the car from whatever surplus the forecast says the
-                home battery will not need, until the car's own charge limit stops it. To keep the car
-                below full, set that limit in the car. To <em>ask</em> for an amount by a time, use
-                <a href="/charging-plan/targeted">Targeted</a>: when the forecast covers it in time, it
-                charges from the sun alone, and it buys grid only if the sun falls short.
+                @Localized.Rich(PlanText.WhereChargeStopsTip, @<em>@PlanText.WhereChargeStopsTip_0</em>, @<a href="/charging-plan/targeted">@PlanText.WhereChargeStopsTip_1</a>)
             </p>
         </InfoTip>
     </div>
@@ -71,18 +62,14 @@
 </section>
 
 <section class="plan" id="battery-floor">
-    <h2>What the home battery keeps</h2>
+    <h2>@PlanText.BatteryKeeps</h2>
 
     <div class="control">
         <div class="control-head">
-            <label for="min-battery-soc">Minimum battery SOC (%)</label>
-            <InfoTip Topic="Minimum battery SOC (%)">
+            <label for="min-battery-soc">@PlanText.MinBatterySoc</label>
+            <InfoTip Topic="@PlanText.MinBatterySocTopic">
                 <p>
-                    The lowest the home battery may go while it helps charge the car. When it gets there the
-                    car pauses until the battery has recovered by the resume margin below. The plan may keep
-                    a higher floor when the forecast says the battery needs it to be full by the plan's
-                    deadline. Shared with the Targeted mode, so changing it here changes it there too.
-                    Doesn't persist across restarts.
+                    @PlanText.MinBatterySocTip
                 </p>
             </InfoTip>
         </div>
@@ -92,12 +79,10 @@
 
     <div class="control">
         <div class="control-head">
-            <label for="resume-margin">SOC resume margin (%)</label>
-            <InfoTip Topic="SOC resume margin (%)">
+            <label for="resume-margin">@PlanText.ResumeMargin</label>
+            <InfoTip Topic="@PlanText.ResumeMarginTopic">
                 <p>
-                    How far above the floor the battery must recover before a paused session restarts. Raise
-                    it if the car starts and stops repeatedly on a marginal day. Doesn't persist across
-                    restarts.
+                    @PlanText.ResumeMarginTip
                 </p>
             </InfoTip>
         </div>
@@ -108,55 +93,54 @@
 
 @if (Status is null)
 {
-    <p class="muted">No poll has completed yet.</p>
+    <p class="muted">@PlanText.NoPollYet</p>
 }
 else if (Status.Plan is not { } plan)
 {
     <p class="muted">
-        The day plan is only shown while <strong>Forecasted</strong> is the active charge mode.
-        Current mode: @Status.Mode.
+        @Localized.Rich(PlanText.PlanOnlyWhileForecasted, @<strong>@SharedText.ModeForecasted</strong>, @<text>@ChargeModeTabs.Label(Status.Mode)</text>)
     </p>
 }
 else
 {
-    <h2>The plan</h2>
+    <h2>@PlanText.ThePlan</h2>
 
     <p><strong>@SolarDayPlanNarrative.Headline(plan, Time.LocalTimeZone)</strong></p>
 
     <p class="muted">
-        Updated @TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+        @Localized.Format(PlanText.Updated, TimeZoneInfo.ConvertTime(Status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss"))
     </p>
 
     <section class="stat-grid">
-        <Stat Label="Plan state" Value="@plan.Reason"
-              Hint="Why the plan decided what it decided -- the same line the log carries." />
-        <Stat Label="Charge window" Value="@FormatWindow(plan.NextFeasibleWindow)"
-              Hint="The next stretch of today forecast to clear the charger's minimum power for long enough to be worth starting. 'none' when today offers no such window." />
-        <Stat Label="EV energy budget" Value="@Units.Energy(plan.FeasibleEvEnergyWh)"
-              Hint="How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power." />
-        <Stat Label="Projected shortfall" Value="@Units.Energy(plan.ShortfallWh)"
-              Hint="How far today's forecast falls short of the house plus a full home battery. Above zero, the evening 100% is at risk. The car is not in this sum — it only ever gets what is left over." />
-        <Stat Label="Surplus spill" Value="@Units.Energy(plan.SpillWh)"
-              Hint="Remaining surplus the home battery has no room for — what is still coming less what it can absorb. At 100% it is all of it, and every watt leaves the house unless the car takes it, which is what lets the battery lend against a much thinner surplus." />
-        <Stat Label="Loan headroom" Value="@Units.Energy(plan.LoanHeadroomWh)"
-              Hint="How much the pack may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, or when every remaining watt has a home in the pack." />
-        <Stat Label="Required SOC floor" Value="@Units.Percent(plan.RequiredSocFloorPercent)"
-              Hint="The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what pauses the car." />
-        <Stat Label="Forecast remaining today" Value="@Units.Energy(plan.RemainingPvWh)"
-              Hint="Forecast PV still to come today, at the configured confidence band and already scaled by forecast accuracy." />
-        <Stat Label="Tomorrow forecast" Value="@Units.Energy(Status.TomorrowForecastWh)"
-              Hint="Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out." />
-        <Stat Label="Forecast accuracy" Value="@Units.Fraction(plan.BiasFactor)"
-              Hint="Actual production against forecast so far today. 100% is on the nose; the rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted." />
-        <Stat Label="Battery loaned today" Value="@Units.Energy(Status.LoanedTodayWh)"
-              Hint="Energy the home battery has lent the car today so a surplus below the charger's floor could still reach it. Resets at local midnight." />
+        <Stat Label="@PlanText.PlanState" Value="@Localized.Say(plan.ReasonPhrase, plan.Reason, Time.LocalTimeZone)"
+              Hint="@PlanText.PlanStateHint" />
+        <Stat Label="@PlanText.ChargeWindow" Value="@FormatWindow(plan.NextFeasibleWindow)"
+              Hint="@PlanText.ChargeWindowHint" />
+        <Stat Label="@PlanText.EvBudget" Value="@Units.Energy(plan.FeasibleEvEnergyWh)"
+              Hint="@PlanText.EvBudgetHint" />
+        <Stat Label="@PlanText.ProjectedShortfall" Value="@Units.Energy(plan.ShortfallWh)"
+              Hint="@PlanText.ProjectedShortfallHint" />
+        <Stat Label="@PlanText.SurplusSpill" Value="@Units.Energy(plan.SpillWh)"
+              Hint="@PlanText.SurplusSpillHint" />
+        <Stat Label="@PlanText.LoanHeadroom" Value="@Units.Energy(plan.LoanHeadroomWh)"
+              Hint="@PlanText.LoanHeadroomHint" />
+        <Stat Label="@PlanText.RequiredFloor" Value="@Units.Percent(plan.RequiredSocFloorPercent)"
+              Hint="@PlanText.RequiredFloorHint" />
+        <Stat Label="@PlanText.ForecastRemaining" Value="@Units.Energy(plan.RemainingPvWh)"
+              Hint="@PlanText.ForecastRemainingHint" />
+        <Stat Label="@PlanText.TomorrowForecast" Value="@Units.Energy(Status.TomorrowForecastWh)"
+              Hint="@PlanText.TomorrowForecastHint" />
+        <Stat Label="@PlanText.ForecastAccuracy" Value="@Units.Fraction(plan.BiasFactor)"
+              Hint="@PlanText.ForecastAccuracyHint" />
+        <Stat Label="@PlanText.LoanedToday" Value="@Units.Energy(Status.LoanedTodayWh)"
+              Hint="@PlanText.LoanedTodayHint" />
     </section>
 
     <section class="chart-section">
-        <h2>Charge window against forecast surplus</h2>
+        <h2>@PlanText.ChartTitle</h2>
         @if (plan.Timeline.Count == 0)
         {
-            <p class="muted">No forecast data yet.</p>
+            <p class="muted">@PlanText.NoForecastData</p>
         }
         else
         {
@@ -231,7 +215,7 @@ else
         _chartCreated = true;
 
         await JS.InvokeVoidAsync(
-            "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd);
+            "solaxCharts.renderTimelineChart", "plan-chart", timestamps, surplus, floor, windowStart, windowEnd, null, null, ChartText.Current());
     }
 
     // Runs when the owner switches tabs as well as when the page is left: the chart belongs to this
@@ -269,11 +253,11 @@ else
 
     private string SessionProgress() =>
         Status is null
-            ? "No poll has completed yet."
-            : $"{Units.Energy(Status.SessionEnergyWh)} into the car since it was plugged in.";
+            ? PlanText.NoPollYet
+            : Localized.Format(PlanText.IntoCarSincePlugged, Units.Energy(Status.SessionEnergyWh));
 
     private string FormatWindow((DateTimeOffset Start, DateTimeOffset End)? window) =>
         window is { } w
             ? $"{TimeZoneInfo.ConvertTime(w.Start, Time.LocalTimeZone):HH:mm}–{TimeZoneInfo.ConvertTime(w.End, Time.LocalTimeZone):HH:mm}"
-            : "none";
+            : PlanText.NoWindow;
 }

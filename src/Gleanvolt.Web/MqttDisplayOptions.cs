@@ -1,3 +1,5 @@
+using Gleanvolt.Core.Models;
+
 namespace Gleanvolt.Web;
 
 /// <summary>
@@ -91,7 +93,8 @@ public sealed record MqttConnectionDisplay(
 /// Whether the controller <em>subscribes</em> to it. True means a message on it can change what the
 /// charger is doing, which is the difference between a reporting topic and a control one.
 /// </param>
-public sealed record MqttTopicDisplay(string Purpose, string Topic, bool Inbound);
+/// <param name="PurposePhrase">The purpose for the page to say in the viewer's language (#290).</param>
+public sealed record MqttTopicDisplay(string Purpose, string Topic, bool Inbound, Phrase? PurposePhrase = null);
 
 /// <summary>The Home Assistant link: what it publishes under, as what device, and how often.</summary>
 /// <param name="Connection">Broker, credentials and client id.</param>

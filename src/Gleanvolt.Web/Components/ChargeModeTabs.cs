@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -9,8 +10,25 @@ namespace Gleanvolt.Web.Components;
 /// </summary>
 public static class ChargeModeTabs
 {
-    /// <summary>One mode: its tab's URL slug, its label, and what it does in one sentence.</summary>
-    public sealed record Entry(string Slug, string Label, ChargeControlMode Mode, string Summary);
+    /// <summary>
+    /// One mode: its tab's URL slug, its label, and what it does in one sentence. The label and the
+    /// summary are read in the viewer's language each time (#290), which is why they are properties
+    /// rather than values captured when the table was built.
+    /// </summary>
+    public sealed record Entry(string Slug, ChargeControlMode Mode)
+    {
+        public string Label => Label(Mode);
+
+        public string Summary => Mode switch
+        {
+            ChargeControlMode.Solar => SharedText.ModeSolarSummary,
+            ChargeControlMode.Forecasted => SharedText.ModeForecastedSummary,
+            ChargeControlMode.SolarGrid => SharedText.ModeSolarGridSummary,
+            ChargeControlMode.FastNoBattery => SharedText.ModeFastSummary,
+            ChargeControlMode.Targeted => SharedText.ModeTargetedSummary,
+            _ => string.Empty,
+        };
+    }
 
     public const string SolarSlug = "solar";
     public const string ForecastedSlug = "forecasted";
@@ -25,21 +43,25 @@ public static class ChargeModeTabs
     /// </summary>
     public static IReadOnlyList<Entry> All { get; } =
     [
-        new(SolarSlug, "Solar", ChargeControlMode.Solar,
-            "Charges from the sun the house isn't using, once the home battery is full."),
-        new(ForecastedSlug, "Forecasted", ChargeControlMode.Forecasted,
-            "Charges from surplus like Solar, but the forecast decides how much of today's sun the car may have, so the home battery still reaches 100% by the evening."),
-        new(SolarGridSlug, "Solar + grid", ChargeControlMode.SolarGrid,
-            "Follows the sun, and lets the grid top the charger up to its minimum when the surplus alone is too small."),
-        new(FastSlug, "Fast (no battery)", ChargeControlMode.FastNoBattery,
-            "Charges as fast as the installation allows, from the sun and the grid, with the home battery kept out of it."),
-        new(TargetedSlug, "Targeted", ChargeControlMode.Targeted,
-            "Delivers a set amount by a set time: forecast surplus first, the rest bought from the grid as late as it can."),
+        new(SolarSlug, ChargeControlMode.Solar),
+        new(ForecastedSlug, ChargeControlMode.Forecasted),
+        new(SolarGridSlug, ChargeControlMode.SolarGrid),
+        new(FastSlug, ChargeControlMode.FastNoBattery),
+        new(TargetedSlug, ChargeControlMode.Targeted),
     ];
 
     /// <summary>The entry for <paramref name="mode"/>, or null for Off, which has no tab.</summary>
     public static Entry? For(ChargeControlMode mode) => All.FirstOrDefault(entry => entry.Mode == mode);
 
-    /// <summary>The mode's name as the UI shows it; "Off" for Off.</summary>
-    public static string Label(ChargeControlMode mode) => For(mode)?.Label ?? mode.ToString();
+    /// <summary>The mode's name as the UI shows it, in the viewer's language.</summary>
+    public static string Label(ChargeControlMode mode) => mode switch
+    {
+        ChargeControlMode.Off => SharedText.ModeOff,
+        ChargeControlMode.Solar => SharedText.ModeSolar,
+        ChargeControlMode.Forecasted => SharedText.ModeForecasted,
+        ChargeControlMode.SolarGrid => SharedText.ModeSolarGrid,
+        ChargeControlMode.FastNoBattery => SharedText.ModeFast,
+        ChargeControlMode.Targeted => SharedText.ModeTargeted,
+        _ => mode.ToString(),
+    };
 }

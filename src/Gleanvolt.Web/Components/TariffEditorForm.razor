@@ -20,23 +20,21 @@
 *@
 
 <section class="controls pv-editor tariff-editor" id="tariff-editor">
-    <h2>Tariff</h2>
+    <h2>@SettingsText.Tariff</h2>
 
     <p class="muted">
-        When the grid is cheap, so charging can wait for it. Choose where the low-tariff times come
-        from; every other minute is high tariff. A save applies at once.
+        @SettingsText.TariffIntro
     </p>
 
     @if (ReadOnly)
     {
         <p class="muted" id="tariff-readonly">
-            Read-only, because this UI has no login. Configure <code>Web__PasswordHash</code>
-            (<code>hash-password</code>) and the tariff becomes editable here.
+            @Localized.Rich(SettingsText.TariffReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>)
         </p>
     }
 
     <div class="control">
-        <span class="control-label" id="tariff-provider-label">Provider</span>
+        <span class="control-label" id="tariff-provider-label">@SettingsText.Provider</span>
         <div class="seg" role="radiogroup" id="tariff-provider" aria-labelledby="tariff-provider-label">
             @foreach (var provider in Editor.Providers)
             {
@@ -45,19 +43,19 @@
                 <label class="seg-opt">
                     <input type="radio" name="tariff-provider" id="tariff-provider-@Slug(id)" disabled="@ReadOnly"
                            checked="@(_settings.Selects(id))" @onchange="() => Select(id)" />
-                    @provider.Name
+                    @ProviderName(provider)
                 </label>
             }
         </div>
         @if (Selected is null)
         {
             <span class="hint error" id="tariff-provider-unknown">
-                The saved provider, @_settings.Provider, is not in this build. Choose another one.
+                @Localized.Format(SettingsText.UnknownProvider, _settings.Provider)
             </span>
         }
         else if (IsNone)
         {
-            <span class="hint">No tariff: the grid costs the same at every hour.</span>
+            <span class="hint">@SettingsText.NoTariff</span>
         }
     </div>
 
@@ -70,28 +68,28 @@
         }
         else
         {
-            <p class="muted" id="tariff-no-panel">@selected.Name has nothing to set here.</p>
+            <p class="muted" id="tariff-no-panel">@Localized.Format(SettingsText.NothingToSet, ProviderName(selected))</p>
         }
 
-        <h3>Prices</h3>
+        <h3>@SettingsText.Prices</h3>
 
         <div class="pv-fields">
             <div class="pv-field">
-                <label for="tariff-low-price">Low tariff price, @Units.PriceUnit(Editor.Currency)</label>
+                <label for="tariff-low-price">@Localized.Format(SettingsText.LowPrice, Units.PriceUnit(Editor.Currency))</label>
                 <input id="tariff-low-price" type="text" inputmode="decimal" autocomplete="off" disabled="@ReadOnly"
                        value="@_lowPrice" @oninput="e => Edit(() => _lowPrice = Text(e))" />
                 @if (FieldProblem(TariffFields.LowPrice) is { } low)
                 {
-                    <span class="hint @(low.IsWarning ? "warning" : "error")">@low.Message</span>
+                    <span class="hint @(low.IsWarning ? "warning" : "error")">@Localized.Say(low.Phrase, low.Message)</span>
                 }
             </div>
             <div class="pv-field">
-                <label for="tariff-high-price">High tariff price, @Units.PriceUnit(Editor.Currency)</label>
+                <label for="tariff-high-price">@Localized.Format(SettingsText.HighPrice, Units.PriceUnit(Editor.Currency))</label>
                 <input id="tariff-high-price" type="text" inputmode="decimal" autocomplete="off" disabled="@ReadOnly"
                        value="@_highPrice" @oninput="e => Edit(() => _highPrice = Text(e))" />
                 @if (FieldProblem(TariffFields.HighPrice) is { } high)
                 {
-                    <span class="hint @(high.IsWarning ? "warning" : "error")">@high.Message</span>
+                    <span class="hint @(high.IsWarning ? "warning" : "error")">@Localized.Say(high.Phrase, high.Message)</span>
                 }
             </div>
         </div>
@@ -100,8 +98,8 @@
     @if (!ReadOnly)
     {
         <div class="control actions">
-            <button type="button" class="primary" id="tariff-save" disabled="@(!_dirty || HasErrors)" @onclick="Save">Save</button>
-            <button type="button" class="secondary" id="tariff-cancel" disabled="@(!_dirty)" @onclick="Reload">Cancel</button>
+            <button type="button" class="primary" id="tariff-save" disabled="@(!_dirty || HasErrors)" @onclick="Save">@SettingsText.Save</button>
+            <button type="button" class="secondary" id="tariff-cancel" disabled="@(!_dirty)" @onclick="Reload">@SettingsText.Cancel</button>
         </div>
     }
 
@@ -190,7 +188,7 @@
         if (!result.Saved)
         {
             _problems = result.Problems;
-            _saveErrors = [.. result.Errors.Where(error => error.Field == TariffFields.Provider).Select(error => error.Message)];
+            _saveErrors = [.. result.Errors.Where(error => error.Field == TariffFields.Provider).Select(error => Localized.Say(error.Phrase, error.Message))];
             return;
         }
 
@@ -215,12 +213,12 @@
 
         if (_lowPrice.Trim().Length > 0 && ParsePrice(_lowPrice) is null)
         {
-            yield return new TariffProblem(TariffFields.LowPrice, null, "Not a price.");
+            yield return new TariffProblem(TariffFields.LowPrice, null, SettingsText.NotAPrice);
         }
 
         if (_highPrice.Trim().Length > 0 && ParsePrice(_highPrice) is null)
         {
-            yield return new TariffProblem(TariffFields.HighPrice, null, "Not a price.");
+            yield return new TariffProblem(TariffFields.HighPrice, null, SettingsText.NotAPrice);
         }
     }
 
@@ -230,9 +228,15 @@
 
     private static string Slug(string id) => id.ToLowerInvariant();
 
+    // A provider's name in the viewer's language where this build knows the provider (#290); one it
+    // does not -- a strategy added without a resource -- keeps the name it gives itself.
+    private static string ProviderName(ITariffProvider provider) =>
+        SettingsText.ResourceManager.GetString($"TariffProvider_{provider.Id}", CultureInfo.CurrentUICulture) ?? provider.Name;
+
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? string.Empty;
 
-    private static string Price(decimal? value) => value?.ToString("0.00##", CultureInfo.InvariantCulture) ?? string.Empty;
+    // Shown in the viewer's culture (#290), so a Czech page offers "2,10": ParsePrice reads either back.
+    private static string Price(decimal? value) => value?.ToString("0.00##", CultureInfo.CurrentCulture) ?? string.Empty;
 
     // A comma is accepted as the decimal point too: it is what a Czech keyboard types.
     private static decimal? ParsePrice(string text) =>

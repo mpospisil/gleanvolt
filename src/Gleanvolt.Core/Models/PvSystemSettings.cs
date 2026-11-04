@@ -87,4 +87,5 @@ public enum PvDeviceRole
 /// <param name="Answered">Something replied to the read at all.</param>
 /// <param name="Plausible">What replied looks like the device it was meant to be.</param>
 /// <param name="Message">What to tell the operator.</param>
-public sealed record DeviceProbeResult(bool Answered, bool Plausible, string Message);
+/// <param name="MessagePhrase">The same, for the web UI to say in the viewer's language (#290).</param>
+public sealed record DeviceProbeResult(bool Answered, bool Plausible, string Message, Phrase? MessagePhrase = null);

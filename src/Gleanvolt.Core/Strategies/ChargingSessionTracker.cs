@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -288,7 +289,7 @@ public sealed class ChargingSessionTracker
         if (status.BatteryHoldActive != _lastHoldActive)
         {
             events.Add(status.BatteryHoldActive
-                ? Event(now, ChargingSessionEventKind.BatteryHoldArmed, $"Hold armed at {status.BatteryHoldTargetWatts:F0}W.")
+                ? Event(now, ChargingSessionEventKind.BatteryHoldArmed, Invariant($"Hold armed at {status.BatteryHoldTargetWatts:F0}W."))
                 : Event(now, ChargingSessionEventKind.BatteryHoldReleased, "Hold released."));
             _lastHoldActive = status.BatteryHoldActive;
         }
@@ -443,7 +444,7 @@ public sealed class ChargingSessionTracker
     };
 
     private static string DescribeEnd(ChargingSessionEndReason reason, ChargingSession session) =>
-        $"{reason.DescribeSentence()}; {session.EnergyDeliveredWh / 1000:F2}kWh delivered.";
+        Invariant($"{reason.DescribeSentence()}; {session.EnergyDeliveredWh / 1000:F2}kWh delivered.");
 
     private static string Describe(int? amps) => amps is { } value ? $"{value}A" : "off";
 

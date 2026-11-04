@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -117,7 +118,7 @@ public sealed class ForecastedChargingController : IChargingController
             && state.Timestamp <= plan.Deadline
             && soc < 100 - FullSocEpsilon)
         {
-            return Wait(input, plan.Deadline, $"Final guard before {plan.Deadline.LocalDateTime:HH:mm}: battery at {soc:F0}%, everything goes to it.");
+            return Wait(input, plan.Deadline, Invariant($"Final guard before {plan.Deadline.LocalDateTime:HH:mm}: battery at {soc:F0}%, everything goes to it."));
         }
 
         // The floor gate, asymmetric in the same way as the surplus threshold below: charging continues
@@ -131,8 +132,8 @@ public sealed class ForecastedChargingController : IChargingController
         if (soc < floorToClear)
         {
             var reason = input.Charging
-                ? $"Battery {soc:F0}% below the {plan.RequiredSocFloorPercent:F0}% floor the forecast requires for 100% by {plan.Deadline.LocalDateTime:HH:mm}."
-                : $"Battery {soc:F0}% has not recovered to the {floorToClear:F0}% needed to restart (floor {plan.RequiredSocFloorPercent:F0}% + {FloorResumeMarginPercent:F0}% margin).";
+                ? Invariant($"Battery {soc:F0}% below the {plan.RequiredSocFloorPercent:F0}% floor the forecast requires for 100% by {plan.Deadline.LocalDateTime:HH:mm}.")
+                : Invariant($"Battery {soc:F0}% has not recovered to the {floorToClear:F0}% needed to restart (floor {plan.RequiredSocFloorPercent:F0}% + {FloorResumeMarginPercent:F0}% margin).");
 
             // Which floor was breached decides how hard the stop is. Falling through the *trajectory*
             // costs the evening 100% and ends the session at once. Falling through the owner's *clamp*
@@ -192,7 +193,7 @@ public sealed class ForecastedChargingController : IChargingController
         var availableWatts = Math.Max(0, surplusWatts + loanWatts - reserveWatts);
 
         var reserveText = reserveWatts > 0
-            ? $" − {reserveWatts:F0}W reserved for the battery inside the {FloorResumeMarginPercent:F0}% guard band"
+            ? Invariant($" − {reserveWatts:F0}W reserved for the battery inside the {FloorResumeMarginPercent:F0}% guard band")
             : string.Empty;
 
         if (availableWatts < startThresholdWatts)
@@ -200,23 +201,23 @@ public sealed class ForecastedChargingController : IChargingController
             return SoftPause(
                 input,
                 ChargerWait.NextSun(input),
-                $"Available {availableWatts:F0}W (surplus {surplusWatts:F0}W + loan {loanWatts:F0}W{reserveText}) below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W.");
+                Invariant($"Available {availableWatts:F0}W (surplus {surplusWatts:F0}W + loan {loanWatts:F0}W{reserveText}) below the {(input.Charging ? "minimum" : "start")} threshold {startThresholdWatts:F0}W."));
         }
 
         var targetAmps = ToHardwareCurrent(availableWatts);
         if (targetAmps < _minAmps)
         {
-            return SoftPause(input, ChargerWait.NextSun(input), $"Available {availableWatts:F0}W quantises below the minimum {_minAmps}A.");
+            return SoftPause(input, ChargerWait.NextSun(input), Invariant($"Available {availableWatts:F0}W quantises below the minimum {_minAmps}A."));
         }
 
         var loanText = loanWatts > 0
-            ? $" (loan +{loanWatts:F0}W bridging {surplusWatts:F0}W to {startThresholdWatts:F0}W{(plan.WillSpill ? $", spill {plan.SpillWh / 1000:F1}kWh" : string.Empty)})"
+            ? Invariant($" (loan +{loanWatts:F0}W bridging {surplusWatts:F0}W to {startThresholdWatts:F0}W{(plan.WillSpill ? $", spill {plan.SpillWh / 1000:F1}kWh" : string.Empty)})")
             : reserveText;
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             targetAmps,
-            $"Plan: {plan.FeasibleEvEnergyWh / 1000:F1}kWh budget, floor {plan.RequiredSocFloorPercent:F0}%, SOC {soc:F0}%. Available {availableWatts:F0}W -> charge at {targetAmps}A{loanText}.",
+            Invariant($"Plan: {plan.FeasibleEvEnergyWh / 1000:F1}kWh budget, floor {plan.RequiredSocFloorPercent:F0}%, SOC {soc:F0}%. Available {availableWatts:F0}W -> charge at {targetAmps}A{loanText}."),
             loanWatts);
     }
 
@@ -293,7 +294,7 @@ public sealed class ForecastedChargingController : IChargingController
             return new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 _minAmps,
-                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.");
+                Invariant($"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time."));
         }
 
         return Wait(input, until, reason);

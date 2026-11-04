@@ -3,6 +3,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Forecasting;
 
@@ -166,7 +167,7 @@ public sealed class DayPlanProvider
         var age = state.Timestamp - todaysForecast.RetrievedAt;
         if (age > _options.StaleForecastAfter)
         {
-            return SolarDayPlan.Unavailable(deadline, $"forecast is {age.TotalHours:F1}h old (stale after {_options.StaleForecastAfter.TotalHours:F0}h)");
+            return SolarDayPlan.Unavailable(deadline, Invariant($"forecast is {age.TotalHours:F1}h old (stale after {_options.StaleForecastAfter.TotalHours:F0}h)"));
         }
 
         // A forecast this far from reality is not a basis for lending the battery out or for releasing
@@ -174,7 +175,7 @@ public sealed class DayPlanProvider
         if (_accuracy.TrustBreached)
         {
             return SolarDayPlan.Unavailable(
-                deadline, $"forecast accuracy {_accuracy.BiasFactor:F2} outside the trust band for {_options.TrustBreachPeriods} periods");
+                deadline, Invariant($"forecast accuracy {_accuracy.BiasFactor:F2} outside the trust band for {_options.TrustBreachPeriods} periods"));
         }
 
         var plannerOptions = new SolarDayPlannerOptions(
@@ -354,5 +355,5 @@ public sealed class DayPlanProvider
             "House profile ({Learned}, mean {MeanWatts:F0}W): {Hourly}",
             _houseLoad.IsFullyLearned ? "learned" : "still learning; unobserved hours use the configured seed",
             _houseLoad.DailyMeanWatts,
-            string.Join(" ", _houseLoad.HourlyWatts.Select((w, h) => $"{h:00}:{w:F0}W")));
+            string.Join(" ", _houseLoad.HourlyWatts.Select((w, h) => Invariant($"{h:00}:{w:F0}W"))));
 }

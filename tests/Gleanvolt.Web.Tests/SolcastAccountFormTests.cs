@@ -170,4 +170,14 @@ public class SolcastAccountFormTests : BunitContext
         Assert.Empty(form.FindAll("#solcast-save"));
         Assert.DoesNotContain("the-key", form.Markup);
     }
+
+    [Fact]
+    public void Every_string_on_the_form_comes_from_a_resource()
+    {
+        _editor.Settings = Account(status: new SolcastFetchStatus(Now.AddDays(-1), Now, SolcastFetchFailure.QuotaExhausted, 429));
+
+        var form = PseudoLocale.Render(() => Render<SolcastAccountForm>());
+
+        PseudoLocale.AssertTranslated(form.Markup);
+    }
 }

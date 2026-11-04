@@ -194,7 +194,7 @@ public class TargetedTabTests : PageTest
         page.Find("#target-departure").Change("2026-08-14T07:00:00");   // three days out
         Activate(page);
 
-        Assert.Contains("36 hours away", page.Markup);
+        Assert.Contains("more than 36 h away", page.Markup);
         Assert.Empty(_target.Sets);
     }
 
@@ -376,7 +376,7 @@ public class TargetedTabTests : PageTest
         page.Find("#target-soc").Change("80");
         Activate(page);
 
-        Assert.Contains("13.0 h", page.Find("p.error").TextContent);
+        Assert.Contains("42% 13 h ago", page.Find("p.error").TextContent);
         Assert.Empty(_target.Sets);
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
     }
@@ -397,7 +397,7 @@ public class TargetedTabTests : PageTest
         page.Find("#target-soc").Change("80");
 
         Assert.DoesNotContain("that is about", page.Markup);
-        Assert.Contains("13.0 h", page.Markup);
+        Assert.Contains("42% 13 h ago", page.Markup);
         Assert.Contains("Vehicle:MaxAge", page.Markup);
     }
 
@@ -980,5 +980,18 @@ public class TargetedTabTests : PageTest
                 ? plan with { GridEnergyWh = plan.GridEnergyWh + 1_200 }
                 : plan;
         }
+    }
+
+    [Fact]
+    public void Every_string_on_the_targeted_tab_comes_from_a_resource()
+    {
+        _holder.Set(Statuses.Sample(Now, ChargeControlMode.Targeted) with
+        {
+            TargetedPlan = TestTargetedPlans.SolarPlusGrid(Now),
+        });
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        PseudoLocale.AssertTranslated(page.Markup, TestTargetedPlans.SolarPlusGrid(Now).Reason);
     }
 }

@@ -33,7 +33,7 @@
     then pushed a new value down the circuit on every completed poll.
 *@
 
-<SiteTitle Page="Overview" />
+<SiteTitle Page="@DashboardText.PageTitle" />
 
 @*
     The overview (#255, direction 1a with 1b's prose status). One question per block, in the order
@@ -57,19 +57,19 @@
 *@
 
 <header class="overview-head">
-    <h1>Overview</h1>
+    <h1>@DashboardText.Title</h1>
     @if (_status is not null)
     {
-        <span class="tag accent">Live</span>
+        <span class="tag accent">@DashboardText.Live</span>
         <span class="muted">
-            Updated @TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss")
+            @Localized.Format(DashboardText.Updated, TimeZoneInfo.ConvertTime(_status.Timestamp, Time.LocalTimeZone).ToString("HH:mm:ss"))
         </span>
     }
 </header>
 
 @if (_status is null)
 {
-    <p class="muted">No poll has completed yet.</p>
+    <p class="muted">@DashboardText.NoPollYet</p>
 }
 else
 {
@@ -84,35 +84,35 @@ else
 
             @* Read on every render, which is every poll: the schedule is cached until midnight or a save,
                so a tariff saved on Settings shows here by the next poll. *@
-            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
+            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable is { } unavailable ? Localized.Say(Tariff.UnavailablePhrase, unavailable) : null, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
             {
                 <p class="tariff-line @(Tariff.Timeline is null ? "warning" : "muted")" id="overview-tariff">@tariff</p>
             }
 
-            <section class="figures" aria-label="Power now and energy today">
+            <section class="figures" aria-label="@DashboardText.FiguresLabel">
                 <div class="figure solar">
                     <div class="figure-label">
-                        Solar
-                        <InfoTip Topic="solar">
-                            <p>PV production measured at the inverter, before the house, the battery or the car take any of it.</p>
-                            <p><strong>Forecast:</strong> what the forecast expected the roof to be making right now, to read against the measured figure. 0 when no forecast covers this moment.</p>
-                            <p><strong>Surplus:</strong> PV left after household consumption — the smoothed 3-minute average the solar modes decide on. Shown only while the selected mode decides on surplus.</p>
+                        @DashboardText.Solar
+                        <InfoTip Topic="@DashboardText.SolarTopic">
+                            <p>@DashboardText.SolarTip1</p>
+                            <p>@Localized.Rich(DashboardText.SolarTip2, @<strong>@DashboardText.SolarTip2_0</strong>)</p>
+                            <p>@Localized.Rich(DashboardText.SolarTip3, @<strong>@DashboardText.SolarTip3_0</strong>)</p>
                         </InfoTip>
                     </div>
                     <div class="figure-now">@Flow(_status.SolarPowerWatts)</div>
-                    <div class="figure-sub">forecast @Flow(_status.ForecastSolarPowerWatts)</div>
+                    <div class="figure-sub">@Localized.Format(DashboardText.ForecastNow, Flow(_status.ForecastSolarPowerWatts))</div>
                     @if (_status.SurplusWatts is { } surplus)
                     {
-                        <div class="figure-sub">surplus @Flow(surplus)</div>
+                        <div class="figure-sub">@Localized.Format(DashboardText.SurplusNow, Flow(surplus))</div>
                     }
                     <div class="figure-today">@Today(t => t.SolarKwh)</div>
                 </div>
                 <div class="figure house">
                     <div class="figure-label">
-                        House
-                        <InfoTip Topic="house">
-                            <p>What the house is drawing apart from the car: solar plus grid import, less what the battery takes and the car draws. The same residual the Energy page calls House.</p>
-                            <p>A dash when the sum comes out below zero: the grid meter does not see every phase, so while the car charges part of its load can be missing from it.</p>
+                        @DashboardText.House
+                        <InfoTip Topic="@DashboardText.HouseTopic">
+                            <p>@DashboardText.HouseTip1</p>
+                            <p>@DashboardText.HouseTip2</p>
                         </InfoTip>
                     </div>
                     @* Below zero is not a house exporting: the grid meter cannot see one phase, so while the
@@ -120,84 +120,82 @@ else
                     @if (house >= 0)
                     {
                         <div class="figure-now">@Flow(house)</div>
-                        <div class="figure-sub">without the car</div>
+                        <div class="figure-sub">@DashboardText.WithoutCar</div>
                     }
                     else
                     {
                         <div class="figure-now">@Units.Missing</div>
-                        <div class="figure-sub">not measurable</div>
+                        <div class="figure-sub">@DashboardText.NotMeasurable</div>
                     }
                     <div class="figure-today">@Today(t => t.HouseKwh)</div>
                 </div>
                 <div class="figure battery">
                     <div class="figure-label">
-                        Battery
-                        <InfoTip Topic="battery">
-                            <p>Home battery power: positive while the battery charges, negative while it discharges.</p>
-                            <p>The percentage is the home battery's state of charge as the inverter reports it.</p>
+                        @DashboardText.Battery
+                        <InfoTip Topic="@DashboardText.BatteryTopic">
+                            <p>@DashboardText.BatteryTip1</p>
+                            <p>@DashboardText.BatteryTip2</p>
                         </InfoTip>
                     </div>
                     <div class="figure-now">@Flow(_status.BatteryPowerWatts)</div>
-                    <div class="figure-sub">@(_status.BatteryPowerWatts switch { > 0 => "charging", < 0 => "supplying", _ => "idle" }) · @Units.Percent(_status.BatterySocPercent)</div>
-                    <div class="figure-today">@TodayInOut(t => t.BatteryInKwh, t => t.BatteryOutKwh, "in", "out")</div>
+                    <div class="figure-sub">@(_status.BatteryPowerWatts switch { > 0 => DashboardText.BatteryCharging, < 0 => DashboardText.BatterySupplying, _ => DashboardText.BatteryIdle }) · @Units.Percent(_status.BatterySocPercent)</div>
+                    <div class="figure-today">@TodayInOut(t => t.BatteryInKwh, t => t.BatteryOutKwh, DashboardText.In, DashboardText.Out)</div>
                 </div>
                 <div class="figure ev">
                     <div class="figure-label">
-                        Car
-                        <InfoTip Topic="car power" End="true">
-                            <p>What the charger reports the car actually drawing right now — not a setpoint. Plugged in is the charger's own view of whether a vehicle is connected.</p>
+                        @DashboardText.Car
+                        <InfoTip Topic="@DashboardText.CarTopic" End="true">
+                            <p>@DashboardText.CarTip</p>
                         </InfoTip>
                     </div>
                     <div class="figure-now">@Flow(_status.EvChargerPowerWatts)</div>
-                    <div class="figure-sub">@(_status.CarConnected ? "plugged in" : "not plugged in")</div>
+                    <div class="figure-sub">@(_status.CarConnected ? DashboardText.PluggedIn : DashboardText.NotPluggedIn)</div>
                     <div class="figure-today">@Today(t => t.EvKwh)</div>
                 </div>
                 <div class="figure grid-flow">
                     <div class="figure-label">
-                        Grid
-                        <InfoTip Topic="grid" End="true">
-                            <p>Grid power: positive while importing from the grid, negative while exporting.</p>
+                        @DashboardText.Grid
+                        <InfoTip Topic="@DashboardText.GridTopic" End="true">
+                            <p>@DashboardText.GridTip</p>
                         </InfoTip>
                     </div>
                     <div class="figure-now">@Flow(_status.GridPowerWatts)</div>
-                    <div class="figure-sub">@(_status.GridPowerWatts switch { > 0 => "importing", < 0 => "exporting", _ => "balanced" })</div>
-                    <div class="figure-today">@TodayInOut(t => t.ImportKwh, t => t.ExportKwh, "in", "out")</div>
+                    <div class="figure-sub">@(_status.GridPowerWatts switch { > 0 => DashboardText.Importing, < 0 => DashboardText.Exporting, _ => DashboardText.Balanced })</div>
+                    <div class="figure-today">@TodayInOut(t => t.ImportKwh, t => t.ExportKwh, DashboardText.In, DashboardText.Out)</div>
                 </div>
             </section>
 
             @if (_today is { Count: > 0 })
             {
                 <p class="muted figures-note">
-                    Power now; under it, energy since midnight.
-                    <InfoTip Topic="today's figures">
-                        <p>Energy since local midnight, as the energy monitor recorded it in quarter hours: a stretch the service was not running is missing from it, not estimated.</p>
+                    @DashboardText.FiguresNote
+                    <InfoTip Topic="@DashboardText.FiguresNoteTopic">
+                        <p>@DashboardText.FiguresNoteTip</p>
                     </InfoTip>
                 </p>
             }
             else if (_today is null)
             {
                 <p class="muted figures-note">
-                    Today's energy needs the energy monitor, which is off on this installation; the figures
-                    above are power now only.
+                    @DashboardText.NoEnergyMonitor
                 </p>
             }
 
             @if (_status.Mode == ChargeControlMode.Off)
             {
                 <section class="mode" aria-labelledby="mode-heading">
-                    <h2 id="mode-heading">Charge mode</h2>
+                    <h2 id="mode-heading">@DashboardText.ChargeMode</h2>
                     @* Links, not radios: each goes to that mode's tab, where it is started and where its
                        settings are. Off is marked as the current one; it has no tab of its own. *@
-                    <nav class="seg mode-seg" aria-label="Charge modes">
-                        <span class="seg-opt" aria-current="true">Off</span>
+                    <nav class="seg mode-seg" aria-label="@DashboardText.ChargeModesLabel">
+                        <span class="seg-opt" aria-current="true">@SharedText.ModeOff</span>
                         @foreach (var entry in ChargeModeTabs.All)
                         {
                             <a class="seg-opt" href="@($"/charging-plan/{entry.Slug}")">@entry.Label</a>
                         }
                     </nav>
                     <p class="mode-summary">
-                        No controlled charging session is running. Pick a mode to set it up and start it on
-                        the <a href="/charging-plan">Charging plan</a> page.
+                        @Localized.Rich(DashboardText.NoSession, @<a href="/charging-plan">@DashboardText.NoSession_0</a>)
                     </p>
                 </section>
             }
@@ -207,7 +205,7 @@ else
             @if (_status.Mode == ChargeControlMode.Forecasted && _status.Plan is { } plan)
             {
                 <section class="card plan-card" id="todays-plan">
-                    <h2>Today's plan</h2>
+                    <h2>@DashboardText.TodaysPlan</h2>
                     @* The plan's sentence is the headline's second one already; the card is the picture
                        and the four figures behind it. *@
                     @if (plan.Timeline.Count > 0)
@@ -215,29 +213,29 @@ else
                         <div id="overview-plan-chart" class="chart"></div>
                         @if (Tariff.Timeline is { } tariffTimeline && tariffTimeline.LowWindows.Any())
                         {
-                            <p class="table-note muted" id="overview-plan-tariff">The bar along the bottom is low tariff.</p>
+                            <p class="table-note muted" id="overview-plan-tariff">@DashboardText.LowTariffBar</p>
                         }
                     }
                     <table class="sessions plan-table">
                         <tbody>
-                            <tr><th scope="row">Window</th><td class="num">@Window(plan.NextFeasibleWindow)</td></tr>
-                            <tr><th scope="row">Car energy</th><td class="num">@Units.Energy(plan.FeasibleEvEnergyWh)</td></tr>
-                            <tr><th scope="row">Battery floor</th><td class="num">@Units.Percent(plan.RequiredSocFloorPercent)</td></tr>
-                            <tr><th scope="row">Shortfall</th><td class="num">@Units.Energy(plan.ShortfallWh)</td></tr>
+                            <tr><th scope="row">@DashboardText.Window</th><td class="num">@Window(plan.NextFeasibleWindow)</td></tr>
+                            <tr><th scope="row">@DashboardText.CarEnergy</th><td class="num">@Units.Energy(plan.FeasibleEvEnergyWh)</td></tr>
+                            <tr><th scope="row">@DashboardText.BatteryFloor</th><td class="num">@Units.Percent(plan.RequiredSocFloorPercent)</td></tr>
+                            <tr><th scope="row">@DashboardText.Shortfall</th><td class="num">@Units.Energy(plan.ShortfallWh)</td></tr>
                         </tbody>
                     </table>
-                    <p class="card-link"><a href="/charging-plan/forecasted">The whole plan</a></p>
+                    <p class="card-link"><a href="/charging-plan/forecasted">@DashboardText.WholePlan</a></p>
                 </section>
             }
             else if (_status.Mode == ChargeControlMode.Targeted && _status.TargetedPlan is { } targeted)
             {
                 <section class="card plan-card" id="todays-plan">
-                    <h2>The plan</h2>
+                    <h2>@DashboardText.ThePlan</h2>
                     @foreach (var paragraph in TargetedPlanNarrative.Describe(targeted, Time.LocalTimeZone))
                     {
                         <p>@paragraph</p>
                     }
-                    <p class="card-link"><a href="/charging-plan/targeted">The whole plan</a></p>
+                    <p class="card-link"><a href="/charging-plan/targeted">@DashboardText.WholePlan</a></p>
                 </section>
             }
 
@@ -247,7 +245,7 @@ else
             @if (IsCharging(_status))
             {
                 <section class="card session-card" id="this-session">
-                    <h2>This session</h2>
+                    <h2>@DashboardText.ThisSession</h2>
 
                     @* The mode first, since it is what the rest of the card answers to: the one driving, what
                        it does, its discharge hold, and the way back to where it is changed or stopped. *@
@@ -256,7 +254,7 @@ else
                             <span class="session-mode-name">@ChargeModeTabs.Label(_status.Mode)@UntilFullSuffix(_status)</span>
                             @if (tab is not null)
                             {
-                                <span class="tag accent">Running</span>
+                                <span class="tag accent">@DashboardText.Running</span>
                             }
                         </div>
                         <p class="muted session-mode-summary">
@@ -266,15 +264,15 @@ else
                             }
                             else
                             {
-                                <text>No mode is driving the charger, but the car is drawing: the charger reports @_status.ChargerStatus.</text>
+                                <text>@Localized.Format(DashboardText.NoModeDriving, Localized.Name(_status.ChargerStatus))</text>
                             }
                         </p>
 
                         @if (_status.BatteryHoldEnabled)
                         {
                             <p class="hold" id="battery-hold">
-                                <span class="hold-label">Battery discharge hold</span>
-                                <span class="tag @(_status.BatteryHoldActive ? "accent" : null)">@(_status.BatteryHoldActive ? "On" : "Off")</span>
+                                <span class="hold-label">@DashboardText.HoldLabel</span>
+                                <span class="tag @(_status.BatteryHoldActive ? "accent" : null)">@(_status.BatteryHoldActive ? DashboardText.On : DashboardText.Off)</span>
                                 <span class="muted">@HoldDetail(_status)</span>
                             </p>
                         }
@@ -282,7 +280,7 @@ else
                         @if (tab is not null)
                         {
                             <a class="session-mode-link" href="@($"/charging-plan/{tab.Slug}")">
-                                Change or stop on Charging plan
+                                @DashboardText.ChangeOrStop
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                      stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>
@@ -296,64 +294,66 @@ else
                     @if (_status.SessionEnergyWh <= 0 && _status.EvChargerPowerWatts > 0)
                     {
                         <div class="session-energy">@Flow(_status.EvChargerPowerWatts)</div>
-                        <p class="muted session-energy-note">drawing now; no session energy counted yet</p>
+                        <p class="muted session-energy-note">@DashboardText.DrawingNow</p>
                     }
                     else
                     {
                         <div class="session-energy">@Units.Energy(_status.SessionEnergyWh)</div>
                         <p class="muted session-energy-note">
-                            into the car since it was plugged in@(Showing is { SocPercent: { } carSoc } ? $"; the car last said {Units.Percent(carSoc)}" : "")
+                            @(Showing is { SocPercent: { } carSoc }
+                                ? Localized.Format(DashboardText.IntoCarWithSoc, Units.Percent(carSoc))
+                                : DashboardText.IntoCar)
                         </p>
                     }
                     <dl class="session-facts">
                         <dt>
-                            Control state
-                            <InfoTip Topic="control state">
-                                <p>What charge control is doing right now: Disabled (nothing running), Idle (running but not acting, usually because the charger is no longer in Fast), Charging, or Paused.</p>
+                            @DashboardText.ControlState
+                            <InfoTip Topic="@DashboardText.ControlStateTopic">
+                                <p>@DashboardText.ControlStateTip</p>
                             </InfoTip>
                         </dt>
-                        <dd>@_status.State</dd>
+                        <dd>@Localized.Name(_status.State)</dd>
                         <dt>
-                            Charger status
-                            <InfoTip Topic="charger status">
-                                <p>The charger's own reported state, straight from its register.</p>
+                            @DashboardText.ChargerStatus
+                            <InfoTip Topic="@DashboardText.ChargerStatusTopic">
+                                <p>@DashboardText.ChargerStatusTip</p>
                             </InfoTip>
                         </dt>
-                        <dd>@_status.ChargerStatus</dd>
+                        <dd>@Localized.Name(_status.ChargerStatus)</dd>
                         <dt>
-                            Session energy
-                            <InfoTip Topic="session energy">
-                                <p>Energy delivered to the car since it was plugged in. Starts afresh when it's unplugged.</p>
+                            @DashboardText.SessionEnergy
+                            <InfoTip Topic="@DashboardText.SessionEnergyTopic">
+                                <p>@DashboardText.SessionEnergyTip</p>
                             </InfoTip>
                         </dt>
                         <dd>@Units.Energy(_status.SessionEnergyWh)</dd>
-                        <dt>EV charging power</dt>
+                        <dt>@DashboardText.EvPower</dt>
                         <dd>@Units.Watts(_status.EvChargerPowerWatts)</dd>
                         <dt>
-                            EV charging current
-                            <InfoTip Topic="EV charging current">
-                                <p>Charging current derived from the charger's measured power: what the car really takes.</p>
+                            @DashboardText.EvCurrent
+                            <InfoTip Topic="@DashboardText.EvCurrentTopic">
+                                <p>@DashboardText.EvCurrentTip</p>
                             </InfoTip>
                         </dt>
                         <dd>@Units.Current(_status.EvChargingCurrentAmps)</dd>
                         <dt>
-                            Target current
-                            <InfoTip Topic="target current">
-                                <p>The current the controller decided on this cycle, before it was written. Blank whenever it isn't charging.</p>
+                            @DashboardText.TargetCurrent
+                            <InfoTip Topic="@DashboardText.TargetCurrentTopic">
+                                <p>@DashboardText.TargetCurrentTip</p>
                             </InfoTip>
                         </dt>
                         <dd>@Units.Current(_status.TargetCurrentAmps)</dd>
                         <dt>
-                            Active current
-                            <InfoTip Topic="active current">
-                                <p>The charger's setpoint read back from the hardware: what it was actually left at.</p>
+                            @DashboardText.ActiveCurrent
+                            <InfoTip Topic="@DashboardText.ActiveCurrentTopic">
+                                <p>@DashboardText.ActiveCurrentTip</p>
                             </InfoTip>
                         </dt>
                         <dd>@Units.Current(_status.ActiveCurrentAmps)</dd>
                         <dt>
-                            Battery loan power
-                            <InfoTip Topic="battery loan power">
-                                <p>How much of what the car is drawing right now is covered by the home battery rather than by live sun. Zero outside the Forecasted mode.</p>
+                            @DashboardText.LoanPower
+                            <InfoTip Topic="@DashboardText.LoanPowerTopic">
+                                <p>@DashboardText.LoanPowerTip</p>
                             </InfoTip>
                         </dt>
                         <dd>@Units.Watts(_status.LoanPowerWatts)</dd>
@@ -390,7 +390,7 @@ else
         it, and a blocked feed says what fixes it with a link to where that is done.
     *@
     <div class="section-head">
-        <h2>Vehicle</h2>
+        <h2>@DashboardText.Vehicle</h2>
         @if (Car.IsConfigured)
         {
             <span class="muted">@CarDescription()</span>
@@ -398,14 +398,16 @@ else
         @if (Showing is not null)
         {
             <span class="muted" id="vehicle-reading-age">
-                updated @VehicleAge(Showing) ago@(Via(Showing) is { } via ? $" via {via}" : "")
+                @(Via(Showing) is { } via
+                    ? Localized.Format(DashboardText.UpdatedAgoVia, VehicleAge(Showing), via)
+                    : Localized.Format(DashboardText.UpdatedAgo, VehicleAge(Showing)))
                 @if (IsStale(Showing))
                 {
-                    <strong> — stale, older than @Units.Hours(VehicleDisplay.MaxAge)</strong>
+                    <strong> @Localized.Format(DashboardText.StaleOlderThan, Units.Hours(VehicleDisplay.MaxAge))</strong>
                 }
             </span>
-            <InfoTip Topic="the car reading">
-                <p>The age is how long ago the car itself produced this reading — not when we received it. Hours old is normal for a parked car; days old means the feed has died.</p>
+            <InfoTip Topic="@DashboardText.ReadingTopic">
+                <p>@DashboardText.ReadingTip</p>
             </InfoTip>
         }
     </div>
@@ -413,19 +415,18 @@ else
     @if (_feed is { IsBlocked: true } blocked)
     {
         <p class="error" id="vehicle-feed-blocked">
-            <strong>Sign-in required</strong> — @(_service?.OwnerAction ?? blocked.Message)
+            <strong>Sign-in required</strong> — @(_service?.OwnerAction is { } action ? Localized.Say(_service.OwnerActionPhrase, action) : blocked.Message)
             <a href="/car">Sign in on the car page</a>
         </p>
     }
     else if (_vehicle is null && _feed is not null)
     {
-        <p class="muted">@FeedName has not delivered a reading yet — @_feed.Message</p>
+        <p class="muted">@Localized.Format(DashboardText.NoReadingYet, FeedName, _feed.Message)</p>
     }
     else if (_vehicle is null && Car.IsConfigured)
     {
         <p class="muted">
-            No feed is configured for this car, so there is no reading — nothing is wrong. Charging
-            works in kilowatt-hours either way; a feed only adds the car's own view of itself.
+            @DashboardText.NoFeed
         </p>
     }
 
@@ -440,23 +441,22 @@ else
         <div class="actions">
             <button type="button" class="secondary" id="vehicle-ask"
                     disabled="@(_asking || !VehicleRefresh.CanRefresh)" @onclick="AskAsync">
-                @(_asking ? "Asking the car…" : "Ask the car")
+                @(_asking ? DashboardText.AskingTheCar : DashboardText.AskTheCar)
             </button>
         </div>
 
         @if (!VehicleRefresh.CanRefresh)
         {
-            <p class="muted">No feed is configured for this car, so there is nothing to ask.</p>
+            <p class="muted">@DashboardText.NothingToAsk</p>
         }
         else if (_askError is { Length: > 0 })
         {
-            <p class="error">The car did not answer — @_askError</p>
+            <p class="error">@Localized.Format(DashboardText.CarDidNotAnswer, _askError)</p>
         }
         else if (_asked is null)
         {
             <p class="muted">
-                The battery and range are not shown until you ask for them. A reading can be hours
-                behind the car, and a figure nobody requested is a figure nobody checked the age of.
+                @DashboardText.NotAskedYet
             </p>
         }
     }
@@ -468,29 +468,29 @@ else
         {
             <div class="stat">
                 <div class="label">
-                    Car battery
-                    <InfoTip Topic="car battery">
-                        <p>The car's own state of charge, as its cloud integration last reported it. Not the home battery.</p>
-                        <p>Range is what the car reckons is left in it, off its own recent consumption. Nothing here plans on it; it says whether the charge you are about to ask for is enough.</p>
+                    @DashboardText.CarBattery
+                    <InfoTip Topic="@DashboardText.CarBatteryTopic">
+                        <p>@DashboardText.CarBatteryTip1</p>
+                        <p>@DashboardText.CarBatteryTip2</p>
                     </InfoTip>
                 </div>
                 <div class="value">@Units.Percent(shown.SocPercent)</div>
                 @if (shown.RangeMetres is not null)
                 {
-                    <div class="value-sub">@Units.Distance(shown.RangeMetres) range</div>
+                    <div class="value-sub">@Localized.Format(DashboardText.Range, Units.Distance(shown.RangeMetres))</div>
                 }
             </div>
         }
 
         <div class="stat">
             <div class="label">
-                Plugged in
-                <InfoTip Topic="plugged in">
-                    <p><strong>Charger:</strong> whether a vehicle is plugged in, as the charger sees it. Says nothing about whether it is drawing power.</p>
-                    <p><strong>Car:</strong> whether the car says a cable is in its socket. A separate reading from the charger's own status, and a much slower one.</p>
+                @DashboardText.PluggedInLabel
+                <InfoTip Topic="@DashboardText.PluggedInTopic">
+                    <p>@Localized.Rich(DashboardText.PluggedInTip1, @<strong>@DashboardText.PluggedInTip1_0</strong>)</p>
+                    <p>@Localized.Rich(DashboardText.PluggedInTip2, @<strong>@DashboardText.PluggedInTip2_0</strong>)</p>
                 </InfoTip>
             </div>
-            <div class="value">@(_status.CarConnected ? "Yes" : "No")</div>
+            <div class="value">@(_status.CarConnected ? DashboardText.Yes : DashboardText.No)</div>
             <div class="value-sub">@PlugAgreement(_status.CarConnected)</div>
         </div>
 
@@ -498,45 +498,38 @@ else
         {
             <div class="stat">
                 <div class="label">
-                    Charge state
-                    <InfoTip Topic="charge state">
-                        <p>What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report.</p>
+                    @DashboardText.ChargeState
+                    <InfoTip Topic="@DashboardText.ChargeStateTopic">
+                        <p>@DashboardText.ChargeStateTip</p>
                     </InfoTip>
                 </div>
-                <div class="value">@reported.ChargeState</div>
-                <div class="value-sub">as reported by the car</div>
+                <div class="value">@Localized.Name(reported.ChargeState)</div>
+                <div class="value-sub">@DashboardText.AsReportedByCar</div>
             </div>
         }
     </section>
 
     <div class="section-head">
-        <h2>Solar forecast</h2>
-        <InfoTip Topic="the solar forecast" Wide="true">
+        <h2>@DashboardText.SolarForecast</h2>
+        <InfoTip Topic="@DashboardText.SolarForecastTopic" Wide="true">
             <p>
-                Energy in kWh, peak power in kW. Each row is a whole day, midnight to midnight in
-                @Time.LocalTimeZone.Id time. Today's includes the hours already gone, as last forecast before they
-                happened, so it is what the day was expected to bring rather than what is still to come.
+                @Localized.Format(DashboardText.ForecastTip1, Time.LocalTimeZone.Id)
             </p>
-            <p><strong>Expected</strong> is Solcast's median: as likely to be beaten as missed.</p>
+            <p>@Localized.Rich(DashboardText.ForecastTip2, @<strong>@DashboardText.ForecastTip2_0</strong>)</p>
             <p>
-                <strong>Low (p10)</strong> is the cautious figure, one the day should beat about nine times in ten —
-                the Forecasted mode plans on this band by default.
+                @Localized.Rich(DashboardText.ForecastTip3, @<strong>@DashboardText.ForecastTip3_0</strong>)
             </p>
             <p>
-                <strong>High (p90)</strong> is the hopeful one, beaten only about one time in ten; the wider the gap
-                between the two, the less sure the sky.
+                @Localized.Rich(DashboardText.ForecastTip4, @<strong>@DashboardText.ForecastTip4_0</strong>)
             </p>
             <p>
-                <strong>Peak</strong> is the strongest half hour the median expects, before the house takes its
-                share — a quick check on whether the roof will make enough to charge the car at all.
+                @Localized.Rich(DashboardText.ForecastTip5, @<strong>@DashboardText.ForecastTip5_0</strong>)
             </p>
             <p>
-                Solcast is asked again every few hours in daylight, so tomorrow's figures keep moving until the
-                day arrives. A dash means no forecast is held for that day yet.
+                @DashboardText.ForecastTip6
             </p>
             <p>
-                <a href="/forecast">Forecast</a> has the same two days period by period — a day total and a
-                day's shape are different things, and this is the total.
+                @Localized.Rich(DashboardText.ForecastTip7, @<a href="/forecast">@DashboardText.ForecastTip7_0</a>)
             </p>
         </InfoTip>
     </div>
@@ -546,18 +539,18 @@ else
     <table class="sessions energy forecast-days" id="solar-forecast">
         <thead>
             <tr>
-                <th>Day</th>
-                <th class="num">Expected</th>
-                <th class="num">Low (p10)</th>
-                <th class="num">High (p90)</th>
-                <th class="num">Peak</th>
+                <th>@DashboardText.Day</th>
+                <th class="num">@DashboardText.Expected</th>
+                <th class="num">@DashboardText.Low</th>
+                <th class="num">@DashboardText.High</th>
+                <th class="num">@DashboardText.Peak</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var (label, date, day) in _forecastDays)
             {
                 <tr>
-                    <td>@label <span class="muted forecast-date">@date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span></td>
+                    <td>@label <span class="muted forecast-date">@date.ToString(SharedText.DayMonthPattern, System.Globalization.CultureInfo.CurrentCulture)</span></td>
                     <td class="num">@Units.Kwh(day?.ExpectedWh, unit: false)</td>
                     <td class="num">@Units.Kwh(day?.LowWh, unit: false)</td>
                     <td class="num">@Units.Kwh(day?.HighWh, unit: false)</td>
@@ -572,6 +565,9 @@ else
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     private ChargeControlStatus? _status;
     private VehicleState? _vehicle;
 
@@ -637,11 +633,11 @@ else
         // the Forecasted tab makes.
         _chartRendered = false;
 
-        InvokeAsync(async () =>
+        InvokeAsync(_viewer.Wrap(async () =>
         {
             await ReadTodayAsync();
             StateHasChanged();
-        });
+        }));
     }
 
     /// <summary>
@@ -702,7 +698,8 @@ else
             _status.Timestamp.ToUnixTimeSeconds(),
             Tariff.Timeline?.LowWindows
                 .Select(window => new[] { window.Start.ToUnixTimeSeconds(), window.End.ToUnixTimeSeconds() })
-                .ToArray());
+                .ToArray(),
+            ChartText.Current());
     }
 
     /// <summary>The day so far, summed from the energy monitor's quarter hours.</summary>
@@ -741,16 +738,16 @@ else
     // requested is the owner's intent -- they differ while a mode is waiting to arm it.
     private static string HoldDetail(ChargeControlStatus status) => status switch
     {
-        { BatteryHoldActive: true, BatteryHoldTargetWatts: { } target } => $"armed on the inverter, holding at {Units.Power(target)}",
-        { BatteryHoldActive: true } => "armed on the inverter",
-        { BatteryHoldRequested: true } => "requested, not yet armed",
-        _ => "the battery serves the house as usual",
+        { BatteryHoldActive: true, BatteryHoldTargetWatts: { } target } => Localized.Format(DashboardText.HoldArmedAt, Units.Power(target)),
+        { BatteryHoldActive: true } => DashboardText.HoldArmed,
+        { BatteryHoldRequested: true } => DashboardText.HoldRequested,
+        _ => DashboardText.HoldOff,
     };
 
     private string Window((DateTimeOffset Start, DateTimeOffset End)? window) =>
         window is { } w
             ? $"{TimeZoneInfo.ConvertTime(w.Start, Time.LocalTimeZone):HH:mm}–{TimeZoneInfo.ConvertTime(w.End, Time.LocalTimeZone):HH:mm}"
-            : "none";
+            : DashboardText.NoWindow;
 
     // A lookup, not a sum: the forecast source works the day totals out when a forecast lands, so this
     // is cheap enough for every poll. Reading it on the poll's cadence is also what picks up a refresh
@@ -761,8 +758,8 @@ else
         var localTomorrow = localToday.AddDays(1);
         _forecastDays =
         [
-            ("Today", localToday, Forecasts.GetDaySummary(localToday)),
-            ("Tomorrow", localTomorrow, Forecasts.GetDaySummary(localTomorrow)),
+            (DashboardText.Today, localToday, Forecasts.GetDaySummary(localToday)),
+            (DashboardText.Tomorrow, localTomorrow, Forecasts.GetDaySummary(localTomorrow)),
         ];
     }
 
@@ -793,7 +790,7 @@ else
 
     // Until full (#279): one session over several days, so the mode's name says which day it is.
     private static string UntilFullSuffix(ChargeControlStatus status) =>
-        status.UntilFull is { Day: var day } ? $" · until full · day {day}" : string.Empty;
+        status.UntilFull is { Day: var day } ? Localized.Format(DashboardText.UntilFullDay, day) : string.Empty;
 
     private void RefreshVehicle()
     {
@@ -807,7 +804,7 @@ else
     }
 
     /// <summary>Which feed is being waited on, named the way its log lines name it.</summary>
-    private string FeedName => _service is null ? "The feed" : _service.DisplayName;
+    private string FeedName => _service is null ? DashboardText.TheFeed : _service.DisplayName;
 
     // The car, because it is configured -- shown whether or not anything reports on it. Name first
     // (an owner's own word for it), then what it is, then the pack, since the pack is what decides
@@ -822,11 +819,11 @@ else
         // the Ev section is optional, so this must not render as a leading comma.
         if (described.Length == 0)
         {
-            described = "The car";
+            described = DashboardText.TheCar;
         }
 
         return Car.BatteryCapacityWh > 0
-            ? $"{described}, {Units.Capacity(Car.BatteryCapacityWh)} usable"
+            ? Localized.Format(DashboardText.Usable, described, Units.Capacity(Car.BatteryCapacityWh))
             : described;
     }
 
@@ -848,12 +845,12 @@ else
     // says whether it agrees. Separate devices, and the car's is the slower one.
     private string PlugAgreement(bool charger) => Showing?.PlugState switch
     {
-        null => "as the charger sees it",
-        VehiclePlugState.Unknown => "the car doesn't say",
-        VehiclePlugState.Connected when charger => "charger and car agree",
-        VehiclePlugState.Disconnected when !charger => "charger and car agree",
-        VehiclePlugState.Connected => "the car says it is",
-        _ => "the car says it is not",
+        null => DashboardText.AsChargerSees,
+        VehiclePlugState.Unknown => DashboardText.CarDoesNotSay,
+        VehiclePlugState.Connected when charger => DashboardText.Agree,
+        VehiclePlugState.Disconnected when !charger => DashboardText.Agree,
+        VehiclePlugState.Connected => DashboardText.CarSaysIs,
+        _ => DashboardText.CarSaysIsNot,
     };
 
     private bool IsStale(VehicleState state) =>

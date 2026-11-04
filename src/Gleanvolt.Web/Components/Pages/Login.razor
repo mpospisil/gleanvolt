@@ -20,7 +20,7 @@
 
 @* The product, not the system: this page is reached before anyone has signed in, and the tab of a
    sign-in prompt is the one place naming the installation buys nothing. *@
-<PageTitle>Sign in — Gleanvolt</PageTitle>
+<PageTitle>@SharedText.SignInTitle</PageTitle>
 
 @*
     The card is the page (#255, direction 2a): the sun mark, the product and the installation's name,
@@ -33,7 +33,7 @@
 *@
 <div class="login-card sign-in">
     <div class="sign-in-mark"><SunMark /></div>
-    <h1>Gleanvolt</h1>
+    <h1>@SharedText.ProductName</h1>
     @if (!string.IsNullOrWhiteSpace(Site.Name))
     {
         <p class="sign-in-site">@Site.Name</p>
@@ -42,7 +42,7 @@
     <EditForm EditContext="_form" method="post" FormName="login" OnValidSubmit="SignInAsync">
         <DataAnnotationsValidator />
 
-        <label for="password">Password</label>
+        <label for="password">@SharedText.PasswordLabel</label>
         @* InputText sets aria-invalid and the "invalid" class itself, from the message SignInAsync
            records against the field; only the link to the words is this page's to add. *@
         <InputText id="password" type="password" @bind-Value="Input!.Password" autofocus
@@ -51,19 +51,17 @@
 
         @if (_failed)
         {
-            <p class="error field-error" id="password-error">Wrong password.</p>
+            <p class="error field-error" id="password-error">@SharedText.WrongPassword</p>
         }
 
-        <button type="submit" class="btn btn-primary">Sign in</button>
+        <button type="submit" class="btn btn-primary">@SharedText.SignIn</button>
     </EditForm>
 
     @* Where the password comes from, both ways it can -- the Setup page (which writes it to the
        overrides file) or Web__PasswordHash set by hand. No file is named: which one holds it depends on
        which way it was set. There is no reset link because there is nothing behind one. *@
     <p class="sign-in-hint">
-        One password for this installation, chosen on its Setup page the first time it ran or set as
-        <code>Web__PasswordHash</code>. There is no reset from here: a forgotten one is replaced in the
-        settings on the machine itself.
+        @Localized.Rich(SharedText.SignInHint, @<code>Web__PasswordHash</code>)
     </p>
 </div>
 
@@ -100,7 +98,7 @@
         if (!WebPasswordHasher.Verify(Password.Hash, Input?.Password ?? ""))
         {
             _failed = true;
-            _messages.Add(() => Input!.Password, "Wrong password.");
+            _messages.Add(() => Input!.Password, SharedText.WrongPassword);
             _form.NotifyValidationStateChanged();
             return;
         }
@@ -128,7 +126,7 @@
 
     private sealed class LoginInput
     {
-        [Required]
+        [Required(ErrorMessageResourceType = typeof(SharedText), ErrorMessageResourceName = nameof(SharedText.EnterPassword))]
         public string Password { get; set; } = "";
     }
 }

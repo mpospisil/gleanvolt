@@ -24,6 +24,9 @@ public interface ITariffSchedule
     /// </summary>
     string? Unavailable { get; }
 
+    /// <summary><see cref="Unavailable"/> for the web UI to say in the viewer's language (#290).</summary>
+    Phrase? UnavailablePhrase => null;
+
     /// <summary>
     /// What every price on the timeline is in, <c>Tariff:Currency</c>: also a window's own price, which
     /// a strategy may set when the owner has entered no shared prices.

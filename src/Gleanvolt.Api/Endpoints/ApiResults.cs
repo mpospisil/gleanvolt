@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using static System.FormattableString;
 
 namespace Gleanvolt.Api.Endpoints;
 
@@ -69,8 +70,8 @@ internal static class ApiResults
         if (resolvedTo - resolvedFrom > maxRange)
         {
             error = BadRequest(
-                $"That range is {(resolvedTo - resolvedFrom).TotalDays:F0} days; the most one query may "
-                + $"ask for is {maxRange.TotalDays:F0}. Ask for it in several requests.");
+                Invariant($"That range is {(resolvedTo - resolvedFrom).TotalDays:F0} days; the most one query may ")
+                + Invariant($"ask for is {maxRange.TotalDays:F0}. Ask for it in several requests."));
             return false;
         }
 

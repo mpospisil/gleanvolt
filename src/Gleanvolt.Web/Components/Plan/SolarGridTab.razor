@@ -12,40 +12,31 @@
 *@
 
 <div class="muted intro-line">
-    Follows the sun; the grid tops up to the charger’s minimum when surplus is small.
-    <InfoTip Topic="this mode">
+    @PlanText.SolarGridIntro
+    <InfoTip Topic="@PlanText.ThisModeTopic">
         <p>
-            Charge from the sun, and let the grid help. While the surplus the house isn't using stays above
-            your minimum, the car follows it; when that surplus is too small for the charger's minimum
-            current on its own, the grid tops it up to that minimum, with the home battery held out of it.
-            There is no full-battery gate. When the surplus drops below your minimum the car pauses —
-            smoothed over a few minutes, so a passing cloud doesn't stop it — and once the forecast has no
-            sun left today that clears the minimum, the mode switches itself off.
+            @PlanText.SolarGridTip
         </p>
     </InfoTip>
 </div>
 
 <div class="control">
     <button type="button" class="primary" id="start-solar-grid" disabled="@Busy" @onclick="StartSolarGrid">
-        Charge from sun + grid
+        @PlanText.StartSolarGrid
     </button>
-    <InfoTip Topic="Charge from sun + grid">
+    <InfoTip Topic="@PlanText.StartSolarGridTopic">
         <p>
-            Puts the charger into Fast and hands it to the surplus. Ends by itself at the end of the day's
-            useful sun, when the car stops drawing, or when it is unplugged.
+            @PlanText.StartSolarGridTip
         </p>
     </InfoTip>
 </div>
 
 <div class="control">
     <div class="control-head">
-        <label for="min-solar-surplus">Minimum solar surplus (W)</label>
-        <InfoTip Topic="Minimum solar surplus (W)">
+        <label for="min-solar-surplus">@PlanText.MinSurplus</label>
+        <InfoTip Topic="@PlanText.MinSurplusTopic">
             <p>
-                Below this the car pauses instead of taking grid. The most the grid ever adds is the
-                charger's minimum power (about 4.1 kW at 6 A on three phases) less this figure; set it at
-                or above that and the grid never helps at all. Also the line the rest of today's forecast
-                has to clear. Doesn't persist across restarts.
+                @PlanText.MinSurplusTip
             </p>
         </InfoTip>
     </div>
@@ -54,24 +45,24 @@
 </div>
 
 <LowTariffOption Mode="ChargeControlMode.SolarGrid" Status="Status"
-                 Hint="In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends with the day's useful sun, so a low tariff that starts after dark charges nothing here. Doesn't persist across restarts." />
+                 Hint="@PlanText.SolarGridLowTariffHint" />
 
 @if (Status is { } status)
 {
     <section class="stat-grid">
-        <Stat Label="Solar surplus" Value="@Units.Power(status.SurplusWatts)"
-              Hint="PV left after household consumption — the smoothed 3-minute average this mode decides on. Blank while a mode that doesn't decide on surplus is driving." />
-        <Stat Label="Sun until" Value="@SunUntil(status)"
-              Hint="When the forecast says the surplus stops clearing your minimum today — when this mode will switch itself off if the live surplus agrees. Only shown while this mode is driving." />
-        <Stat Label="Target current" Value="@Units.Current(status.TargetCurrentAmps)"
-              Hint="The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging." />
-        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)" End="true"
-              Hint="Positive while importing. While the grid is topping up a small surplus, this is roughly that top-up." />
+        <Stat Label="@PlanText.SolarSurplus" Value="@Units.Power(status.SurplusWatts)"
+              Hint="@PlanText.SolarSurplusHint" />
+        <Stat Label="@PlanText.SunUntil" Value="@SunUntil(status)"
+              Hint="@PlanText.SunUntilHint" />
+        <Stat Label="@PlanText.TargetCurrent" Value="@Units.Current(status.TargetCurrentAmps)"
+              Hint="@PlanText.TargetCurrentHint" />
+        <Stat Label="@PlanText.GridPower" Value="@Units.Power(status.GridPowerWatts)" End="true"
+              Hint="@PlanText.GridPowerTopUpHint" />
     </section>
 
     @if (status.Mode == ChargeControlMode.SolarGrid && status.SolarGrid is { } outlook)
     {
-        <p class="muted">Forecast: @outlook.Reason.</p>
+        <p class="muted">@Localized.Format(PlanText.ForecastReason, Localized.Say(outlook.ReasonPhrase, outlook.Reason, Time.LocalTimeZone))</p>
     }
 }
 
@@ -108,8 +99,8 @@
     private string SunUntil(ChargeControlStatus status) => status.SolarGrid switch
     {
         null => Units.Missing,
-        { ForecastUsable: false } => "no forecast",
+        { ForecastUsable: false } => PlanText.NoForecast,
         { SunUntil: { } until } => TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone).ToString("HH:mm"),
-        _ => "none left today",
+        _ => PlanText.NoneLeftToday,
     };
 }

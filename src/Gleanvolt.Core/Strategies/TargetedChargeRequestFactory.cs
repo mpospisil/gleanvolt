@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -33,11 +34,11 @@ public static class TargetedChargeRequestFactory
     /// The composed request, or the message to put in front of whoever asked. Exactly one of the two
     /// is non-null.
     /// </summary>
-    public sealed record Result(TargetedChargeRequest? Request, string? Error)
+    public sealed record Result(TargetedChargeRequest? Request, string? Error, Phrase? ErrorPhrase = null)
     {
         internal static Result Ok(TargetedChargeRequest request) => new(request, null);
 
-        internal static Result Rejected(string error) => new(null, error);
+        internal static Result Rejected(string error, Phrase? phrase) => new(null, error, phrase);
     }
 
     /// <summary>
@@ -89,14 +90,14 @@ public static class TargetedChargeRequestFactory
         {
             if (energyWh is not null)
             {
-                return Result.Rejected("Ask for energy or for a state of charge, not both.");
+                return Result.Rejected("Ask for energy or for a state of charge, not both.", Phrase.Of("Request.EnergyOrSoc"));
             }
 
             if (!limits.CanTargetSoc)
             {
                 return Result.Rejected(
                     "A target state of charge needs the car's usable capacity, which is not configured "
-                    + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.");
+                    + "(Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.", Phrase.Of("Request.NoCapacity"));
             }
 
             // Asked before the conversion, and in its own words: a reading too old to trust and a
@@ -105,7 +106,7 @@ public static class TargetedChargeRequestFactory
             // is fixed at this moment and nothing downstream revisits it.
             if (vehicleSoc.StaleRefusal is { } tooOld)
             {
-                return Result.Rejected(tooOld);
+                return Result.Rejected(tooOld, vehicleSoc.StaleRefusalPhrase);
             }
 
             socNow = vehicleSoc.ConvertibleSocPercent;
@@ -116,13 +117,13 @@ public static class TargetedChargeRequestFactory
             {
                 return Result.Rejected(
                     "The car has not reported a state of charge, so there is nothing to measure the gap "
-                    + "from. Ask in kilowatt-hours instead.");
+                    + "from. Ask in kilowatt-hours instead.", Phrase.Of("Request.NoSoc"));
             }
 
             if (requiredWh.Value <= 0)
             {
                 return Result.Rejected(
-                    $"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for.");
+                    Invariant($"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for."), Phrase.Of("Request.AlreadyAt", new PhraseArg.Percent(socNow ?? 0), new PhraseArg.Percent(target)));
             }
 
             askedWh = requiredWh.Value;
@@ -132,7 +133,7 @@ public static class TargetedChargeRequestFactory
         {
             if (energyWh is not { } wh || wh <= 0)
             {
-                return Result.Rejected("Enter how much energy the car needs.");
+                return Result.Rejected("Enter how much energy the car needs.", Phrase.Of("Request.EnterEnergy"));
             }
 
             askedWh = wh;
@@ -140,14 +141,14 @@ public static class TargetedChargeRequestFactory
 
         if (departBy <= now)
         {
-            return Result.Rejected("The departure time is in the past.");
+            return Result.Rejected("The departure time is in the past.", Phrase.Of("Request.DepartureInPast"));
         }
 
         if (departBy - now > limits.MaxHorizon)
         {
             return Result.Rejected(
-                $"A departure more than {limits.MaxHorizon.TotalHours:F0} hours away is further than "
-                + "the forecast — or a request that does not survive a restart — can honestly promise.");
+                Invariant($"A departure more than {limits.MaxHorizon.TotalHours:F0} hours away is further than ")
+                + "the forecast — or a request that does not survive a restart — can honestly promise.", Phrase.Of("Request.TooFarAheadForecast", new PhraseArg.Duration(limits.MaxHorizon)));
         }
 
         var request = new TargetedChargeRequest(askedWh, departBy, now, soc, socNow) with

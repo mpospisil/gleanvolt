@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Web.Components;
@@ -54,6 +55,10 @@ public static class WebUiHost
         // lands without a REST API in between -- WebAssembly would need one, and this project needs
         // it for nothing else.
         services.AddRazorComponents().AddInteractiveServerComponents();
+
+        // The viewer's language (#290): which ones are offered depends on the environment, since the
+        // pseudo-locale is a development tool.
+        services.AddOptions<RequestLocalizationOptions>().Configure<IHostEnvironment>(WebUiCultures.Configure);
 
         // A null object for a host with no feeds registered, so a page that asks the car can still be
         // constructed where nothing can answer. TryAdd, so Gleanvolt.Hosting's real one wins whenever
@@ -127,6 +132,9 @@ public static class WebUiHost
     /// </summary>
     public static void MapGleanvoltWebUi(this WebApplication app, WebOptions web)
     {
+        // First, so the setup page and the sign-in page are in the viewer's language too.
+        app.UseWebUiCultures();
+
         // Before authentication, deliberately: with no password set there is nothing to authenticate
         // against, so the login page would be a dead end and the gate has to answer first.
         app.UseGleanvoltSetupGate(web);
@@ -141,6 +149,8 @@ public static class WebUiHost
         // A plain endpoint rather than a Blazor component: MainLayout's sign-out form has to work
         // from both the interactive and the static pages it's rendered on (see MainLayout.razor),
         // which a normal HTML form post gives for free and a component event handler would not.
+        app.MapWebUiCultures();
+
         app.MapPost("/logout", async context =>
         {
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

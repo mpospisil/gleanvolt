@@ -19,19 +19,19 @@
 *@
 
 <section class="controls pv-editor car-editor" id="car-editor">
-    <h2>Edit</h2>
+    <h2>@CarText.Edit</h2>
 
     @if (_pending.Count > 0 || _pendingSecrets.Count > 0 || _settings.FeedIsPending)
     {
         <div class="alert pending" id="car-pending">
             <p>
-                <strong>Saved, not applied</strong> —
-                @($"{PendingCount} {(PendingCount == 1 ? "change takes" : "changes take")} effect on restart.")
+                <strong>@CarText.SavedNotApplied</strong> —
+                @Localized.Format(Localized.Plural(PendingCount, CarText.ChangesTakeEffect_One, CarText.ChangesTakeEffect_Few, CarText.ChangesTakeEffect_Other), PendingCount)
             </p>
             <ul>
                 @if (_settings.FeedIsPending)
                 {
-                    <li>Feed: @FeedName(_settings.RunningFeed) → @FeedName(_settings.Feed)</li>
+                    <li>@Localized.Format(CarText.FeedChange, FeedName(_settings.RunningFeed), FeedName(_settings.Feed))</li>
                 }
                 @foreach (var setting in _pending)
                 {
@@ -43,11 +43,11 @@
                 *@
                 @foreach (var secret in _pendingSecrets)
                 {
-                    <li>@Label(secret.Key): @(secret.Stored ? "set" : "removed")</li>
+                    <li>@Label(secret.Key): @(secret.Stored ? CarText.SecretSet : CarText.SecretRemoved)</li>
                 }
             </ul>
             <div class="control">
-                <RestartService Label="Apply them" />
+                <RestartService Label="@CarText.ApplyThem" />
             </div>
         </div>
     }
@@ -59,28 +59,21 @@
     else if (ReadOnly)
     {
         <p class="muted" id="car-readonly">
-            Read-only, because this UI has no login. These fields include a manufacturer account's
-            password, and without a login anyone on the LAN could read the car or change which account
-            it is read from. Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and
-            they become editable here; until then, change them in <code>.env</code> and restart.
+            @Localized.Rich(CarText.CarReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>.env</code>)
         </p>
     }
     else
     {
         <p class="muted">
-            A save is checked the way startup checks the configuration, and writes only what differs to
-            <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key, so
-            each field says where its value comes from. Nothing changes until the controller restarts —
-            and a save cannot prove an account, because the feed is built at startup from these keys.
-            Restart, then <a href="#account">sign in below</a> and ask the car.
+            @Localized.Rich(CarText.CarSaveNote, @<code>@_settings.OverridesPath</code>, @<code>.env</code>, @<a href="#account">@CarText.CarSaveNote_2</a>)
         </p>
     }
 
-    <h3>Manufacturer</h3>
+    <h3>@CarText.Manufacturer</h3>
 
     <div class="pv-fields">
         <div class="pv-field">
-            <label for="car-feed">What reads this car</label>
+            <label for="car-feed">@CarText.WhatReadsThisCar</label>
             <select id="car-feed" disabled="@(!Editable)"
                     value="@_feed.ToString()"
                     @onchange="e => Choose(e.Value?.ToString())">
@@ -127,11 +120,9 @@
                 brand's sign-in id, and this is what to do on the day one of them changes.
             *@
             <details class="car-escape-hatch">
-                <summary>The brand's sign-in id has changed</summary>
+                <summary>@CarText.SignInIdChanged</summary>
                 <p class="muted">
-                    The portal's client ids are reverse-engineered rather than published, so one can go
-                    stale without warning — the symptom is a sign-in that fails as though the password
-                    were wrong. Stating an id here overrides the brand above.
+                    @CarText.SignInIdChangedNote
                 </p>
                 <div class="pv-fields">
                     @Field(EvSettingKeys.DataActClientId)
@@ -140,12 +131,10 @@
         }
     }
 
-    <h3>The car</h3>
+    <h3>@CarText.TheCar</h3>
 
     <p class="muted">
-        These are the fields that make charging correct, and they are independent of any feed. The
-        installation allows @_settings.ChargerMinAmps–@_settings.ChargerMaxAmps A; the controller works
-        to the narrower of the two, and a car can only ever lower a limit.
+        @Localized.Format(CarText.CarFieldsNote, _settings.ChargerMinAmps, _settings.ChargerMaxAmps)
     </p>
 
     <div class="pv-fields">
@@ -163,11 +152,11 @@
     @if (Editable)
     {
         <div class="control actions">
-            <button type="button" class="primary" id="car-save" disabled="@(_busy || !HasChanges)" @onclick="Save">
-                @(_busy ? "Checking…" : "Save")
+            <button type="button" class="primary" id="car-save" disabled="@(_busy || !HasChanges)" @onclick="@Save">
+                @(_busy ? CarText.Checking : CarText.SaveButton)
             </button>
             <button type="button" class="secondary" disabled="@(_busy || !HasChanges)" @onclick="Discard">
-                Discard changes
+                @CarText.DiscardChanges
             </button>
         </div>
     }
@@ -175,7 +164,7 @@
     @if (_problems.Count > 0)
     {
         <div id="car-problems">
-            <p class="error">Not saved — the controller would refuse to start with this:</p>
+            <p class="error">@CarText.NotSaved</p>
             <ul class="error">
                 @foreach (var problem in _problems)
                 {
@@ -189,7 +178,7 @@
     {
         <p class="muted" id="car-message">
             @message
-            <a href="#account">Prove it below</a>.
+            <a href="#account">@CarText.ProveIt</a>.
         </p>
     }
 </section>
@@ -197,44 +186,44 @@
 @code {
     private const string Missing = Units.Missing;
 
-    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, string> Labels => new(StringComparer.OrdinalIgnoreCase)
     {
-        [EvSettingKeys.Id] = "Id",
-        [EvSettingKeys.Name] = "Name",
-        [EvSettingKeys.Make] = "Make",
-        [EvSettingKeys.Model] = "Model",
-        [EvSettingKeys.BatteryCapacityKWh] = "Usable pack (kWh)",
-        [EvSettingKeys.ChargeEfficiency] = "Charge efficiency",
-        [EvSettingKeys.Phases] = "Phases",
-        [EvSettingKeys.MinChargingCurrentAmps] = "Minimum current (A)",
-        [EvSettingKeys.MaxChargingCurrentAmps] = "Maximum current (A)",
+        [EvSettingKeys.Id] = CarText.FieldId,
+        [EvSettingKeys.Name] = CarText.FieldName,
+        [EvSettingKeys.Make] = CarText.FieldMake,
+        [EvSettingKeys.Model] = CarText.FieldModel,
+        [EvSettingKeys.BatteryCapacityKWh] = CarText.FieldUsablePack,
+        [EvSettingKeys.ChargeEfficiency] = CarText.FieldChargeEfficiency,
+        [EvSettingKeys.Phases] = CarText.FieldPhases,
+        [EvSettingKeys.MinChargingCurrentAmps] = CarText.FieldMinCurrent,
+        [EvSettingKeys.MaxChargingCurrentAmps] = CarText.FieldMaxCurrent,
         [EvSettingKeys.TelemetryTopic] = "Topic",
         [EvSettingKeys.WebsiteEnabled] = "volkswagen.de",
-        [EvSettingKeys.WebsiteUsername] = "VW ID (e-mail)",
-        [EvSettingKeys.WebsitePassword] = "Password",
-        [EvSettingKeys.WebsiteVin] = "VIN",
+        [EvSettingKeys.WebsiteUsername] = CarText.FieldVwId,
+        [EvSettingKeys.WebsitePassword] = CarText.FieldPassword,
+        [EvSettingKeys.WebsiteVin] = CarText.FieldVin,
         [EvSettingKeys.SkodaEnabled] = "MyŠkoda",
-        [EvSettingKeys.SkodaVin] = "VIN",
-        [EvSettingKeys.DataActEnabled] = "Data Act portal",
-        [EvSettingKeys.DataActBrand] = "Brand",
-        [EvSettingKeys.DataActClientId] = "Client id",
-        [EvSettingKeys.DataActUsername] = "VW ID (e-mail)",
-        [EvSettingKeys.DataActPassword] = "Password",
-        [EvSettingKeys.DataActVin] = "VIN",
-        [EvSettingKeys.MqttEnabled] = "Own topic",
+        [EvSettingKeys.SkodaVin] = CarText.FieldVin,
+        [EvSettingKeys.DataActEnabled] = CarText.FieldDataAct,
+        [EvSettingKeys.DataActBrand] = CarText.FieldBrand,
+        [EvSettingKeys.DataActClientId] = CarText.FieldClientId,
+        [EvSettingKeys.DataActUsername] = CarText.FieldVwId,
+        [EvSettingKeys.DataActPassword] = CarText.FieldPassword,
+        [EvSettingKeys.DataActVin] = CarText.FieldVin,
+        [EvSettingKeys.MqttEnabled] = CarText.FieldOwnTopic,
     };
 
-    private static readonly Dictionary<string, string> Hints = new(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, string> Hints => new(StringComparer.OrdinalIgnoreCase)
     {
-        [EvSettingKeys.Id] = "a-z, 0-9, - and _",
-        [EvSettingKeys.BatteryCapacityKWh] = "usable, not the brochure's gross figure",
-        [EvSettingKeys.ChargeEfficiency] = "above 0, at most 1",
-        [EvSettingKeys.MinChargingCurrentAmps] = "the lowest the car will start on",
-        [EvSettingKeys.MaxChargingCurrentAmps] = "the on-board charger's ceiling",
+        [EvSettingKeys.Id] = CarText.HintId,
+        [EvSettingKeys.BatteryCapacityKWh] = CarText.HintUsablePack,
+        [EvSettingKeys.ChargeEfficiency] = CarText.HintEfficiency,
+        [EvSettingKeys.MinChargingCurrentAmps] = CarText.HintMinCurrent,
+        [EvSettingKeys.MaxChargingCurrentAmps] = CarText.HintMaxCurrent,
         [EvSettingKeys.TelemetryTopic] = "one concrete topic, no wildcards",
-        [EvSettingKeys.WebsiteVin] = "17 characters",
-        [EvSettingKeys.SkodaVin] = "17 characters",
-        [EvSettingKeys.DataActVin] = "17 characters",
+        [EvSettingKeys.WebsiteVin] = CarText.Hint17Characters,
+        [EvSettingKeys.SkodaVin] = CarText.Hint17Characters,
+        [EvSettingKeys.DataActVin] = CarText.Hint17Characters,
         [EvSettingKeys.DataActClientId] = "…@apps_vw-dilab_com",
     };
 
@@ -339,8 +328,8 @@
 
             Reload();
             _message = PendingCount > 0
-                ? "Saved. Restart the controller to apply it, then sign in."
-                : "Saved. The controller is already running with these values.";
+                ? CarText.SavedRestartSignIn
+                : CarText.SavedRunning;
         }
         finally
         {
@@ -422,10 +411,10 @@
         <select id="@Id(EvSettingKeys.Phases)" disabled="@(!Editable || _busy)"
                 value="@_values[EvSettingKeys.Phases]"
                 @onchange="e => _values[EvSettingKeys.Phases] = e.Value?.ToString() ?? string.Empty">
-            <option value="">Not stated — the installation's count is used</option>
-            <option value="1">1 — single-phase</option>
+            <option value="">@CarText.PhasesNotStated</option>
+            <option value="1">@CarText.PhasesSingle</option>
             <option value="2">2</option>
-            <option value="3">3 — three-phase</option>
+            <option value="3">@CarText.PhasesThree</option>
         </select>
         @Provenance(EvSettingKeys.Phases)
     </div>;
@@ -433,7 +422,7 @@
     private RenderFragment Password(string key) => @<div class="pv-field">
         <label for="@Id(key)">@Label(key)</label>
         <input id="@Id(key)" type="password" autocomplete="new-password" spellcheck="false"
-               placeholder="@(_settings.Secret(key).Stored ? "unchanged" : "not set")"
+               placeholder="@(_settings.Secret(key).Stored ? CarText.Unchanged : CarText.NotSet)"
                disabled="@(!Editable || _busy)"
                value="@_passwords[key]"
                @oninput="e => _passwords[key] = e.Value?.ToString() ?? string.Empty" />
@@ -441,7 +430,7 @@
         @if (_settings.Secret(key).IsEdited && Editable)
         {
             <button type="button" class="link revert" id="@(Id(key))-remove" disabled="@_busy" @onclick="() => RemoveSecret(key)">
-                Remove
+                @CarText.Remove
             </button>
         }
         @*
@@ -449,8 +438,7 @@
             taken from the store itself so this cannot drift into claiming more than is true.
         *@
         <span class="hint">
-            Kept in the secret store — @_settings.SecretProtection. Left empty it is unchanged; Remove
-            clears it.
+            @Localized.Format(CarText.KeptInSecretStore, _settings.SecretProtection)
         </span>
     </div>;
 
@@ -461,7 +449,7 @@
         @if (_settings[key].IsEdited && Editable)
         {
             <button type="button" class="link revert" id="@(Id(key))-revert" disabled="@_busy" @onclick="() => Revert(key)">
-                Revert to @Show(_settings[key].Underlying)
+                @Localized.Format(CarText.RevertTo, Show(_settings[key].Underlying))
             </button>
         }
     </text>;
@@ -476,68 +464,60 @@
     {
         VehicleFeed.Volkswagen => "Volkswagen",
         VehicleFeed.Skoda => "Škoda",
-        VehicleFeed.DataAct => "Audi · SEAT · Cupra · Bentley · VW commercial",
-        VehicleFeed.OwnTopic => "A feed I publish myself",
-        _ => "Another manufacturer — charge only",
+        VehicleFeed.DataAct => CarText.FeedDataAct,
+        VehicleFeed.OwnTopic => CarText.FeedOwnTopic,
+        _ => CarText.FeedNone,
     };
 
     private static string FeedFreshness(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.Volkswagen => "about 20 s, plug state, live while charging",
-        VehicleFeed.Skoda => "5–15 min, plug state",
-        VehicleFeed.DataAct => "hours behind; no plug state",
-        VehicleFeed.OwnTopic => "whatever publishes it",
-        _ => "no reading from the car",
+        VehicleFeed.Volkswagen => CarText.FreshVolkswagen,
+        VehicleFeed.Skoda => CarText.FreshSkoda,
+        VehicleFeed.DataAct => CarText.FreshDataAct,
+        VehicleFeed.OwnTopic => CarText.FreshOwnTopic,
+        _ => CarText.FreshNone,
     };
 
     private static string FeedNote(VehicleFeed feed) => feed switch
     {
         VehicleFeed.Volkswagen =>
-            "volkswagen.de, read live. The first sign-in always wants a one-time code e-mailed to this "
-            + "account, so it is done under Account below, after the restart.",
+            CarText.NoteVolkswagen,
         VehicleFeed.Skoda =>
-            "The MyŠkoda Public API. It takes no password: create an API key in the MyŠkoda app and paste "
-            + "it under Account below. Keys expire, which is why they are renewed there rather than "
-            + "here.",
+            CarText.NoteSkoda,
         VehicleFeed.DataAct =>
-            "The EU Data Act portal — the route for a Group brand with no live feed of its own. It "
-            + "delivers batches rather than readings, so expect the car's state of charge to be hours "
-            + "old, and no plug state at all.",
+            CarText.NoteDataAct,
         VehicleFeed.OwnTopic =>
-            "An MQTT topic you publish to yourself. The broker and its credentials are the house "
-            + "broker's and stay in the Vehicle section; only the topic is the car's.",
+            CarText.NoteOwnTopic,
         _ =>
-            "No feed, which is a supported installation and not an unfinished form: every EV with a "
-            + "Type 2 inlet charges without one. It costs exactly one thing — a target is asked for in "
-            + "kWh rather than as a state of charge, because nothing reports what the pack already holds.",
+            CarText.NoteNone,
     };
 
     private static string SecretSource(EvSecret secret) => secret.Source switch
     {
-        SettingSource.SecretStore => "secret store",
-        SettingSource.Environment => $"environment ({secret.SourceDetail})",
-        SettingSource.CommandLine => "command line",
+        SettingSource.SecretStore => CarText.SourceSecretStore,
+        SettingSource.Environment => Localized.Format(CarText.SourceEnvironmentDetail, secret.SourceDetail),
+        SettingSource.CommandLine => CarText.SourceCommandLine,
         SettingSource.AppSettings => "appsettings.json",
-        _ => "not set",
+        _ => CarText.NotSet,
     };
 
     private static string SourceName(ConfiguredSetting setting) => setting.Source switch
     {
-        SettingSource.WebUi => "web UI",
-        SettingSource.SecretStore => "secret store",
-        SettingSource.Environment => "environment",
-        SettingSource.CommandLine => "command line",
+        SettingSource.WebUi => CarText.SourceWebUi,
+        SettingSource.SecretStore => CarText.SourceSecretStore,
+        SettingSource.Environment => CarText.SourceEnvironment,
+        SettingSource.CommandLine => CarText.SourceCommandLine,
         SettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
-        _ => "default",
+        _ => CarText.SourceDefault,
     };
 
     private static string SourceTitle(ConfiguredSetting setting) => setting.Source switch
     {
-        SettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
+        SettingSource.WebUi => Localized.Format(CarText.TitleWebUi, setting.SourceDetail),
         SettingSource.Environment =>
-            $"{setting.SourceDetail}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.",
-        SettingSource.CommandLine => "A command-line argument, which wins over this page.",
-        SettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
-        _ => "Set nowhere; the built-in default applies.",
+            Localized.Format(CarText.TitleEnvironment, setting.SourceDetail),
+        SettingSource.CommandLine => CarText.TitleCommandLine,
+        SettingSource.AppSettings => Localized.Format(CarText.TitleAppSettings, SourceName(setting)),
+        _ => CarText.TitleDefault,
     };
 }

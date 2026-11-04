@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Layout -->
+  <data name="Menu" xml:space="preserve">
+    <value>Menu</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="NavChargingPlan" xml:space="preserve">
+    <value>Charging plan</value>
+  </data>
+  <data name="NavSessions" xml:space="preserve">
+    <value>Sessions</value>
+  </data>
+  <data name="NavEnergy" xml:space="preserve">
+    <value>Energy</value>
+  </data>
+  <data name="NavForecast" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="NavCar" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SignOut" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+    <comment>The label of the language picker, read by screen readers.</comment>
+  </data>
+  <data name="NotFound" xml:space="preserve">
+    <value>No such page. Go back to the {0}.</value>
+    <comment>{0} is a link to the overview page, with NavOverview as its text.</comment>
+  </data>
+  <!-- Units: the symbols (W, kWh, A, °C, km) are SI and stay as they are in every language -->
+  <data name="Days_One" xml:space="preserve">
+    <value>{0} day</value>
+  </data>
+  <data name="Days_Few" xml:space="preserve">
+    <value>{0} days</value>
+  </data>
+  <data name="Days_Other" xml:space="preserve">
+    <value>{0} days</value>
+    <comment>A span of days, possibly with one decimal ("2.5 days").</comment>
+  </data>
+  <data name="JustNow" xml:space="preserve">
+    <value>just now</value>
+    <comment>How old a reading is, when the source's clock is ahead of ours.</comment>
+  </data>
+  <data name="UnderAMinute" xml:space="preserve">
+    <value>under a minute</value>
+    <comment>How old a reading is.</comment>
+  </data>
+  <data name="Percent" xml:space="preserve">
+    <value>{0}%</value>
+    <comment>A percentage; {0} is the number. Some languages put a space before the sign.</comment>
+  </data>
+  <!-- Charge modes: one name per mode everywhere in the UI -->
+  <data name="ModeOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="ModeSolar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="ModeForecasted" xml:space="preserve">
+    <value>Forecasted</value>
+  </data>
+  <data name="ModeSolarGrid" xml:space="preserve">
+    <value>Solar + grid</value>
+  </data>
+  <data name="ModeFast" xml:space="preserve">
+    <value>Fast (no battery)</value>
+  </data>
+  <data name="ModeTargeted" xml:space="preserve">
+    <value>Targeted</value>
+  </data>
+  <data name="ModeSolarSummary" xml:space="preserve">
+    <value>Charges from the sun the house isn't using, once the home battery is full.</value>
+  </data>
+  <data name="ModeForecastedSummary" xml:space="preserve">
+    <value>Charges from surplus like Solar, but the forecast decides how much of today's sun the car may have, so the home battery still reaches 100% by the evening.</value>
+  </data>
+  <data name="ModeSolarGridSummary" xml:space="preserve">
+    <value>Follows the sun, and lets the grid top the charger up to its minimum when the surplus alone is too small.</value>
+  </data>
+  <data name="ModeFastSummary" xml:space="preserve">
+    <value>Charges as fast as the installation allows, from the sun and the grid, with the home battery kept out of it.</value>
+  </data>
+  <data name="ModeTargetedSummary" xml:space="preserve">
+    <value>Delivers a set amount by a set time: forecast surplus first, the rest bought from the grid as late as it can.</value>
+  </data>
+  <data name="ModeChange" xml:space="preserve">
+    <value>{0} → {1}</value>
+    <comment>A session that started in one charge mode and ended in another.</comment>
+  </data>
+  <!-- Sessions -->
+  <data name="WeatherLine" xml:space="preserve">
+    <value>{0}, {1} cloud</value>
+    <comment>{0} is a temperature, {1} a percentage of sky covered by cloud.</comment>
+  </data>
+  <data name="WeatherLineWithCondition" xml:space="preserve">
+    <value>{0}, {1}, {2} cloud</value>
+    <comment>{0} is the weather provider's own description (not translated), {1} a temperature, {2} the cloud percentage.</comment>
+  </data>
+  <data name="DayForecastLine" xml:space="preserve">
+    <value>{0} (p10 {1} – p90 {2})</value>
+    <comment>A day's expected solar energy, with its pessimistic (p10) and optimistic (p90) bounds.</comment>
+  </data>
+  <!-- Common controls -->
+  <data name="AboutTopic" xml:space="preserve">
+    <value>About {0}</value>
+    <comment>The accessible name of an (i) button that explains a figure; {0} is the figure's label.</comment>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Hide</value>
+  </data>
+  <data name="Reveal" xml:space="preserve">
+    <value>Reveal</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="SiteTitleFallback" xml:space="preserve">
+    <value>Gleanvolt</value>
+  </data>
+  <data name="SignInRequired" xml:space="preserve">
+    <value>Sign-in required</value>
+  </data>
+  <data name="SignInOnCarPage" xml:space="preserve">
+    <value>Sign in on the car page</value>
+  </data>
+  <!-- Restart -->
+  <data name="RestartLabel" xml:space="preserve">
+    <value>Restart the service</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>Restart</value>
+  </data>
+  <data name="RestartQuestion" xml:space="preserve">
+    <value>Restart the controller?</value>
+  </data>
+  <data name="RestartConfirm" xml:space="preserve">
+    <value>Yes, restart it</value>
+  </data>
+  <data name="RestartProgress" xml:space="preserve">
+    <value>Restarting… The charger is being paused and the open session closed. This page reloads by itself once the controller is back.</value>
+  </data>
+  <data name="RestartNotBack" xml:space="preserve">
+    <value>If it does not come back within a minute or two, nothing is restarting it: see {0} or {1}, or start it again by hand.</value>
+    <comment>{0} and {1} are shell commands, shown as code.</comment>
+  </data>
+  <data name="RestartCost" xml:space="preserve">
+    <value>A charge in progress is paused, and the controller comes back in Off, as it does after any start — the charging mode, a Targeted request and a Fast limit are not kept, so choose them again afterwards. This UI and Home Assistant are unreachable for roughly half a minute. Starting up fetches the solar forecast, so a restart spends one of the day's Solcast calls when a key is configured. It comes back by itself under Docker's {0} and the .deb's systemd unit; run any other way — {1}, a plain {2}, the Windows zip — it simply exits and has to be started again.</value>
+    <comment>{0}, {1} and {2} are configuration and commands, shown as code.</comment>
+  </data>
+  <!-- MQTT connection -->
+  <data name="MqttBroker" xml:space="preserve">
+    <value>Broker</value>
+  </data>
+  <data name="MqttBrokerNote" xml:space="preserve">
+    <value>— what the controller dials, which is not necessarily reachable from here.</value>
+  </data>
+  <data name="MqttUsername" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="MqttAnonymous" xml:space="preserve">
+    <value>none (anonymous)</value>
+  </data>
+  <data name="MqttPassword" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="MqttPasswordWithheld" xml:space="preserve">
+    <value>set, and not shown here — this UI has no login, so anyone on the network could read it. Configure {0} ({1}) to make it readable.</value>
+    <comment>{0} is an environment variable and {1} a command, shown as code.</comment>
+  </data>
+  <data name="MqttClientId" xml:space="preserve">
+    <value>Client id</value>
+  </data>
+  <!-- Settings -->
+  <data name="SettingsTabsLabel" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsInstallation" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="SettingsHealth" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <!-- Sign-in and setup -->
+  <data name="SignInTitle" xml:space="preserve">
+    <value>Sign in — Gleanvolt</value>
+    <comment>The browser tab of the sign-in page.</comment>
+  </data>
+  <data name="ProductName" xml:space="preserve">
+    <value>Gleanvolt</value>
+  </data>
+  <data name="PasswordLabel" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="WrongPassword" xml:space="preserve">
+    <value>Wrong password.</value>
+  </data>
+  <data name="EnterPassword" xml:space="preserve">
+    <value>Enter the password.</value>
+  </data>
+  <data name="SignIn" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="SignInHint" xml:space="preserve">
+    <value>One password for this installation, chosen on its Setup page the first time it ran or set as {0}. There is no reset from here: a forgotten one is replaced in the settings on the machine itself.</value>
+    <comment>{0} is an environment variable, shown as code.</comment>
+  </data>
+  <data name="SetupTitle" xml:space="preserve">
+    <value>Set a password — Gleanvolt</value>
+    <comment>The browser tab of the setup page.</comment>
+  </data>
+  <data name="AlreadySetUp" xml:space="preserve">
+    <value>Already set up</value>
+  </data>
+  <data name="AlreadySetUpText" xml:space="preserve">
+    <value>This installation already has a password. {0}.</value>
+    <comment>{0} is a link whose text is SignIn.</comment>
+  </data>
+  <data name="SetPassword" xml:space="preserve">
+    <value>Set a password</value>
+  </data>
+  <data name="SetupIntro" xml:space="preserve">
+    <value>Gleanvolt can show this installation's energy and charging history, and change how the charger is driven. It is reachable by anything on this network, so it needs a password before it will show any of that.</value>
+  </data>
+  <data name="RepeatPassword" xml:space="preserve">
+    <value>Repeat it</value>
+  </data>
+  <data name="SetThePassword" xml:space="preserve">
+    <value>Set the password</value>
+  </data>
+  <data name="SetupNote" xml:space="preserve">
+    <value>One password for this installation, not an account per person. Keep it somewhere you can find it: there is no reset from inside the UI, only editing the settings file on the machine itself.</value>
+  </data>
+  <data name="PasswordsDiffer" xml:space="preserve">
+    <value>The two passwords are not the same.</value>
+  </data>
+  <data name="PasswordNotSaved" xml:space="preserve">
+    <value>The password could not be saved on this installation, so it has not been set. Set Web__PasswordHash in the configuration instead.</value>
+  </data>
+  <data name="PasswordTooShort" xml:space="preserve">
+    <value>Use at least 8 characters.</value>
+  </data>
+  <data name="RepeatThePassword" xml:space="preserve">
+    <value>Repeat the password.</value>
+  </data>
+  <!-- Date and time patterns (.NET custom format strings; not translated word for word, but adapted) -->
+  <data name="DayMonthPattern" xml:space="preserve">
+    <value>ddd d MMM</value>
+    <comment>A short day and date: "Wed 4 Nov". Czech would be "ddd d. MMM".</comment>
+  </data>
+  <data name="DayTimePattern" xml:space="preserve">
+    <value>ddd HH:mm</value>
+    <comment>A weekday and time: "Wed 14:30".</comment>
+  </data>
+  <data name="DateTimePattern" xml:space="preserve">
+    <value>yyyy-MM-dd HH:mm</value>
+    <comment>A full date and time, for history and diagnostics.</comment>
+  </data>
+  <data name="DateTimeSecondsPattern" xml:space="preserve">
+    <value>yyyy-MM-dd HH:mm:ss</value>
+  </data>
+  <data name="DayDateTimePattern" xml:space="preserve">
+    <value>ddd d MMM HH:mm</value>
+    <comment>A short day, date and time: "Wed 4 Nov 14:30".</comment>
+  </data>
+  <!-- Enum names, read by Localized.Name: Type_Value -->
+  <data name="ChargeControlState_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="ChargeControlState_Idle" xml:space="preserve">
+    <value>Idle</value>
+  </data>
+  <data name="ChargeControlState_Charging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="ChargeControlState_Paused" xml:space="preserve">
+    <value>Paused</value>
+  </data>
+  <data name="EvChargerStatus_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="EvChargerStatus_Available" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="EvChargerStatus_Preparing" xml:space="preserve">
+    <value>Preparing</value>
+  </data>
+  <data name="EvChargerStatus_Charging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="EvChargerStatus_Finishing" xml:space="preserve">
+    <value>Finishing</value>
+  </data>
+  <data name="EvChargerStatus_Faulted" xml:space="preserve">
+    <value>Faulted</value>
+  </data>
+  <data name="EvChargerStatus_Unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="EvChargerStatus_Reserved" xml:space="preserve">
+    <value>Reserved</value>
+  </data>
+  <data name="EvChargerStatus_SuspendedEv" xml:space="preserve">
+    <value>SuspendedEv</value>
+    <comment>The car has suspended charging.</comment>
+  </data>
+  <data name="EvChargerStatus_SuspendedEvse" xml:space="preserve">
+    <value>SuspendedEvse</value>
+    <comment>The charger has suspended charging.</comment>
+  </data>
+  <data name="EvChargerStatus_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="EvChargerStatus_CardActivation" xml:space="preserve">
+    <value>CardActivation</value>
+  </data>
+  <data name="EvChargerStatus_StartDelay" xml:space="preserve">
+    <value>StartDelay</value>
+  </data>
+  <data name="EvChargerStatus_ChargePaused" xml:space="preserve">
+    <value>ChargePaused</value>
+  </data>
+  <data name="EvChargerStatus_Stopping" xml:space="preserve">
+    <value>Stopping</value>
+  </data>
+  <data name="VehicleChargeState_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="VehicleChargeState_Idle" xml:space="preserve">
+    <value>Idle</value>
+  </data>
+  <data name="VehicleChargeState_Charging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="VehicleChargeState_Complete" xml:space="preserve">
+    <value>Complete</value>
+  </data>
+  <data name="VehiclePlugState_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="VehiclePlugState_Disconnected" xml:space="preserve">
+    <value>Disconnected</value>
+  </data>
+  <data name="VehiclePlugState_Connected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="VehicleSourceState_Ok" xml:space="preserve">
+    <value>Ok</value>
+  </data>
+  <data name="VehicleSourceState_Degraded" xml:space="preserve">
+    <value>Degraded</value>
+  </data>
+  <data name="VehicleSourceState_NeedsOwner" xml:space="preserve">
+    <value>NeedsOwner</value>
+    <comment>The car's feed has stopped until the owner signs in again.</comment>
+  </data>
+  <data name="ListSeparator" xml:space="preserve">
+    <value>, </value>
+    <comment>Between the parts of a short list on one line. Keep the trailing space.</comment>
+  </data>
+  <!-- The tariff now (TariffNarrative) -->
+  <data name="LowTariff" xml:space="preserve">
+    <value>Low tariff</value>
+  </data>
+  <data name="HighTariff" xml:space="preserve">
+    <value>High tariff</value>
+  </data>
+  <data name="TariffUntil" xml:space="preserve">
+    <value>{0}, until {1}</value>
+    <comment>{0} is the tariff and its price, {1} when it changes.</comment>
+  </data>
+  <data name="TomorrowAt" xml:space="preserve">
+    <value>tomorrow {0}</value>
+  </data>
+  <data name="WeekdayAt" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is a day of the week, {1} a time.</comment>
+  </data>
+  <data name="TargetedChargeStrategy_Complete" xml:space="preserve">
+    <value>Complete</value>
+  </data>
+  <data name="TargetedChargeStrategy_Solar" xml:space="preserve">
+    <value>Solar</value>
+  </data>
+  <data name="TargetedChargeStrategy_SolarPlusGrid" xml:space="preserve">
+    <value>SolarPlusGrid</value>
+  </data>
+  <data name="TargetedChargeStrategy_Maximum" xml:space="preserve">
+    <value>Maximum</value>
+  </data>
+  <data name="ChartDayMonthTemplate" xml:space="preserve">
+    <value>{D} {MMM}</value>
+    <comment>A chart's tick on a new day, as a uPlot template ({D} day, {MMM} short month). Czech: "{D}. {MMM}".</comment>
+  </data>
+  <data name="ChartLegendTimeTemplate" xml:space="preserve">
+    <value>{WWW} {D} {MMM} {HH}:{mm}</value>
+    <comment>The time under a chart's cursor, as a uPlot template ({WWW} short weekday, {HH}:{mm} 24-hour time).</comment>
+  </data>
+  <data name="ChargingSessionEndReason_ModeOff" xml:space="preserve">
+    <value>Charge control returned to Off</value>
+  </data>
+  <data name="ChargingSessionEndReason_SessionComplete" xml:space="preserve">
+    <value>The car finished charging</value>
+  </data>
+  <data name="ChargingSessionEndReason_CarUnplugged" xml:space="preserve">
+    <value>The car was unplugged</value>
+  </data>
+  <data name="ChargingSessionEndReason_ServiceStopped" xml:space="preserve">
+    <value>The service stopped</value>
+  </data>
+  <data name="ChargingSessionEndReason_Interrupted" xml:space="preserve">
+    <value>The session was interrupted</value>
+  </data>
+  <data name="ChargingSessionEndReason_TargetReached" xml:space="preserve">
+    <value>The energy asked for was delivered</value>
+  </data>
+  <data name="ChargingSessionEndReason_DeparturePassed" xml:space="preserve">
+    <value>The departure time passed</value>
+  </data>
+  <data name="ChargingSessionEndReason_NoSunLeftToday" xml:space="preserve">
+    <value>No sun was left to charge on today</value>
+  </data>
+  <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
+    <value>The charger was switched out of Fast</value>
+  </data>
+</root>

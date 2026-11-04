@@ -10,42 +10,42 @@
     ExportAsync) already existed for this, so nothing here reaches past the interface into SQLite.
 *@
 
-<SiteTitle Page="Charging sessions" />
+<SiteTitle Page="@HistoryText.SessionsPageTitle" />
 
-<h1>Charging sessions</h1>
+<h1>@HistoryText.SessionsTitle</h1>
 
 <div class="control range-control">
-    <label for="range">Show</label>
+    <label for="range">@HistoryText.Show</label>
     <select id="range" @bind="_rangeDays" @bind:after="LoadAsync">
-        <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="90">Last 90 days</option>
-        <option value="365">Last year</option>
+        <option value="7">@HistoryText.Last7Days</option>
+        <option value="30">@HistoryText.Last30Days</option>
+        <option value="90">@HistoryText.Last90Days</option>
+        <option value="365">@HistoryText.LastYear</option>
     </select>
 </div>
 
 @if (_error)
 {
-    <p class="muted">Charging session history isn't available right now.</p>
+    <p class="muted">@HistoryText.HistoryUnavailable</p>
 }
 else if (_sessions is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">@HistoryText.Loading</p>
 }
 else if (_sessions.Count == 0)
 {
-    <p class="muted">No sessions in this range.</p>
+    <p class="muted">@HistoryText.NoSessions</p>
 }
 else
 {
     <table class="sessions">
         <thead>
             <tr>
-                <th>Started</th>
-                <th>Duration</th>
-                <th>Strategy</th>
-                <th>Delivered</th>
-                <th>Solar share</th>
+                <th>@HistoryText.Started</th>
+                <th>@HistoryText.Duration</th>
+                <th>@HistoryText.Strategy</th>
+                <th>@HistoryText.Delivered</th>
+                <th>@HistoryText.SolarShare</th>
             </tr>
         </thead>
         <tbody>
@@ -56,7 +56,7 @@ else
                         <a href="@($"/sessions/{session.Id}")">@Local(session.StartedAt)</a>
                         @if (session.IsOpen)
                         {
-                            <span class="muted">&nbsp;(in progress)</span>
+                            <span class="muted">&nbsp;@HistoryText.InProgressParenthesised</span>
                         }
                     </td>
                     <td>@Units.Duration(session.Duration(Time.GetUtcNow()))</td>
@@ -96,5 +96,5 @@ else
     }
 
     private string Local(DateTimeOffset value) =>
-        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+        TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString(SharedText.DateTimePattern, System.Globalization.CultureInfo.CurrentCulture);
 }

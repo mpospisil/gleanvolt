@@ -4,6 +4,46 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-04 — The web UI is translatable; everything below it stays invariant English
+
+**Context.** [Issue #290](https://github.com/mpospisil/gleanvolt/issues/290). The UI was English
+literals, and the process was pinned invariant by a module initializer that happened to live in
+`Gleanvolt.Web`: services were culture-free by accident of which assembly loaded first.
+
+**Decision — localization is the web UI's alone.** `Gleanvolt.Worker` pins the process to the
+invariant culture as its first lines. Request localization runs for every path except `/api`, so a
+page and the circuit it opens are in the viewer's culture and nothing the API, MQTT, Home Assistant
+or the logs say ever is. CA1305 is an error in Core, Infrastructure, Api and Hosting, and every
+formatted interpolation there is `FormattableString.Invariant`: a service method a page calls runs on
+that page's circuit, in its viewer's culture, and an `{x:F1}` there used to write "6,0kWh".
+
+**Per browser, by cookie, then `Accept-Language`, then English.** Two people on one roof may read
+different languages. The picker appears only when there is more than one language to pick.
+
+**`.resx` with generated, public, typed accessors** (`DashboardText.Title`), one file per area,
+rather than `IStringLocalizer` by key: a missing key is a compile error, and the narratives — static
+classes with nothing to inject a localizer into — read text the same way the pages do. Public only
+because DataAnnotations reads messages from public properties.
+
+**Whole sentences with numbered placeholders**, never fragments glued around a value; markup inside
+a sentence is a placeholder too (`Localized.Rich`), so a translator can reorder it and cannot break
+it. Counted phrases carry one/few/other forms, because Czech is the first language after English.
+
+**A service says things as a `Phrase` beside its English** — a key and typed arguments (an energy in
+Wh, a moment, a span) — and the UI writes the numbers. The English stays what the log and the API
+carry; a key the UI does not know shows that English rather than nothing, so a phrase can ship before
+its translation. A phrase is excluded from a record's equality where it restates a string field.
+
+**A render the poll asks for runs in the poll thread's culture.** Found on a live circuit, not in a
+test host: a pseudo-localized page turned English with the first poll. Components that follow an
+event capture the viewer's culture on their circuit (`ViewerCulture`) and apply it inside the
+dispatched work, never on the calling thread.
+
+**Guards.** A pseudo-locale (`qps-ploc`) generated from the English, built in every configuration but offered only in Development, which each page's
+fixture renders once and fails on any plain English outside a translated string; key, placeholder and
+plural-form parity for every translation; every enum the UI names has every value named; every phrase
+key a service uses has a template.
+
 ## 2026-11-02 — The Pi's containers run on the host's network, and the broker can be anywhere
 
 **Context.** The 2026-08-02 record below put the three services on a compose network and kept the

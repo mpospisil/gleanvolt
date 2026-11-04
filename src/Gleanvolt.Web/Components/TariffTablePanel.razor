@@ -17,19 +17,19 @@
     var rows = Rows(days);
     var key = days.ToString().ToLowerInvariant();
 
-    <h3>@(days == TariffDays.Weekday ? "Weekdays" : "Weekend") <span class="muted">@(days == TariffDays.Weekday ? "Mon–Fri" : "Sat–Sun")</span></h3>
+    <h3>@(days == TariffDays.Weekday ? SettingsText.Weekdays : SettingsText.Weekend) <span class="muted">@(days == TariffDays.Weekday ? SettingsText.MonFri : SettingsText.SatSun)</span></h3>
 
     @if (rows.Count == 0)
     {
         <p class="muted tariff-empty" id="tariff-@key-empty">
-            No periods: high tariff all day @(days == TariffDays.Weekday ? "Monday to Friday" : "on Saturday and Sunday").
+            @(days == TariffDays.Weekday ? SettingsText.NoPeriodsWeekdays : SettingsText.NoPeriodsWeekend)
         </p>
     }
     else
     {
         <table class="sessions tariff-periods" id="tariff-@key">
             <thead>
-                <tr><th>Low tariff from</th><th>until</th><th></th></tr>
+                <tr><th>@SettingsText.LowTariffFrom</th><th>@SettingsText.Until</th><th></th></tr>
             </thead>
             <tbody>
                 @for (var i = 0; i < rows.Count; i++)
@@ -41,19 +41,19 @@
                     <tr class="@(problem is null ? null : "invalid")">
                         <td>
                             <input class="tariff-time" id="tariff-@key-@index-start" type="text" inputmode="numeric"
-                                   spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="Start" disabled="@ReadOnly"
+                                   spellcheck="false" autocomplete="off" placeholder="HH:mm" aria-label="@SettingsText.Start" disabled="@ReadOnly"
                                    value="@row.Start" @oninput="e => Edit(() => row.Start = Text(e))" />
                         </td>
                         <td>
                             <input class="tariff-time" id="tariff-@key-@index-end" type="text" inputmode="numeric"
-                                   spellcheck="false" autocomplete="off" placeholder="HH:mm or 24:00" aria-label="End" disabled="@ReadOnly"
+                                   spellcheck="false" autocomplete="off" placeholder="@SettingsText.HhMmOr24" aria-label="@SettingsText.End" disabled="@ReadOnly"
                                    value="@row.End" @oninput="e => Edit(() => row.End = Text(e))" />
                         </td>
                         <td>
                             @if (!ReadOnly)
                             {
                                 <button type="button" class="link" id="tariff-@key-@index-remove"
-                                        @onclick="() => Edit(() => rows.RemoveAt(index))">Remove</button>
+                                        @onclick="() => Edit(() => rows.RemoveAt(index))">@SettingsText.Remove</button>
                             }
                         </td>
                     </tr>
@@ -69,17 +69,17 @@
     @if (!ReadOnly)
     {
         <div class="tariff-add">
-            <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">Add period</button>
+            <button type="button" class="secondary" id="tariff-@key-add" @onclick="() => Add(rows)">@SettingsText.AddPeriod</button>
         </div>
     }
 }
 
 @if (Problems.FirstOrDefault(problem => problem.Field == TariffFields.Table) is { } whole)
 {
-    <p class="@(whole.IsWarning ? "warning" : "error")" id="tariff-table-problem">@whole.Message</p>
+    <p class="@(whole.IsWarning ? "warning" : "error")" id="tariff-table-problem">@Localized.Say(whole.Phrase, whole.Message)</p>
 }
 
-<h3>Today and tomorrow</h3>
+<h3>@SettingsText.TodayAndTomorrow</h3>
 
 <div class="tariff-preview" id="tariff-preview">
     @foreach (var day in PreviewDays())
@@ -97,7 +97,7 @@
     <div class="tariff-axis" aria-hidden="true">
         <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
     </div>
-    <p class="table-note muted">Shaded is low tariff.</p>
+    <p class="table-note muted">@SettingsText.ShadedIsLow</p>
 </div>
 
 @code {
@@ -143,7 +143,9 @@
     private string? RowProblem(TariffDays days, int row)
     {
         var field = days == TariffDays.Weekday ? TariffFields.TableWeekday : TariffFields.TableWeekend;
-        return Problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row)?.Message;
+        return Problems.FirstOrDefault(problem => problem.Field == field && problem.Row == row) is { } problem
+            ? Localized.Say(problem.Phrase, problem.Message)
+            : null;
     }
 
     // Each local day as the share of its own length that is low tariff, so a 23-hour spring day is drawn
@@ -178,12 +180,12 @@
                 spoken.Add($"{Clock(from, zone, start)}–{Clock(to, zone, start)}");
             }
 
-            var name = offset == 0 ? "Today" : "Tomorrow";
+            var name = offset == 0 ? SettingsText.Today : SettingsText.Tomorrow;
             var label = spoken.Count == 0
-                ? $"{name}: high tariff all day"
-                : $"{name}: low tariff {string.Join(", ", spoken)}";
+                ? Localized.Format(SettingsText.HighAllDay, name)
+                : Localized.Format(SettingsText.LowTariffAt, name, string.Join(", ", spoken));
 
-            days.Add(new PreviewDay($"{name} ({date.DayOfWeek.ToString()[..3]})", label, low));
+            days.Add(new PreviewDay($"{name} ({CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(date.DayOfWeek)})", label, low));
         }
 
         return days;

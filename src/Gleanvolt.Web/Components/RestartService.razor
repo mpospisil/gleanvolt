@@ -15,32 +15,25 @@
 @if (_restarting)
 {
     <p class="stopping" id="restart-progress">
-        Restarting… The charger is being paused and the open session closed. This page reloads by itself
-        once the controller is back.
+        @SharedText.RestartProgress
     </p>
     <span class="hint">
-        If it does not come back within a minute or two, nothing is restarting it: see
-        <code>docker ps -a</code> or <code>systemctl status gleanvolt</code>, or start it again by hand.
+        @Localized.Rich(SharedText.RestartNotBack, @<code>docker ps -a</code>, @<code>systemctl status gleanvolt</code>)
     </span>
 }
 else if (_confirming)
 {
-    <label>Restart the controller?</label>
-    <button type="button" class="danger" id="restart-confirm" @onclick="ConfirmAsync">Yes, restart it</button>
-    <button type="button" class="secondary" @onclick="() => _confirming = false">Cancel</button>
+    <label>@SharedText.RestartQuestion</label>
+    <button type="button" class="danger" id="restart-confirm" @onclick="ConfirmAsync">@SharedText.RestartConfirm</button>
+    <button type="button" class="secondary" @onclick="() => _confirming = false">@SharedText.Cancel</button>
     <span class="hint">
-        A charge in progress is paused, and the controller comes back in Off, as it does after any
-        start — the charging mode, a Targeted request and a Fast limit are not kept, so choose them
-        again afterwards. This UI and Home Assistant are unreachable for roughly half a minute. Starting up fetches the solar forecast, so a restart spends
-        one of the day's Solcast calls when a key is configured. It comes back by itself under Docker's
-        <code>restart: on-failure</code> and the .deb's systemd unit; run any other way — <code>dotnet run</code>,
-        a plain <code>docker run</code>, the Windows zip — it simply exits and has to be started again.
+        @Localized.Rich(SharedText.RestartCost, @<code>restart: on-failure</code>, @<code>dotnet run</code>, @<code>docker run</code>)
     </span>
 }
 else
 {
-    <label>@Label</label>
-    <button type="button" class="secondary restart" id="restart" @onclick="() => _confirming = true">Restart</button>
+    <label>@(Label ?? SharedText.RestartLabel)</label>
+    <button type="button" class="secondary restart" id="restart" @onclick="() => _confirming = true">@SharedText.Restart</button>
     @if (!string.IsNullOrWhiteSpace(Hint))
     {
         <span class="hint">@Hint</span>
@@ -50,7 +43,7 @@ else
 @code {
     /// <summary>What the button's line is called where it sits.</summary>
     [Parameter]
-    public string Label { get; set; } = "Restart the service";
+    public string? Label { get; set; }
 
     /// <summary>A line under the button before it is pressed; none when empty.</summary>
     [Parameter]

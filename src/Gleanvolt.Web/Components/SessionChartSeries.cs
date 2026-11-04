@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -335,13 +336,13 @@ internal sealed record SessionChartSeries(
     /// <summary>The kind in words, for the events whose detail line is empty.</summary>
     private static string Describe(ChargingSessionEventKind kind) => kind switch
     {
-        ChargingSessionEventKind.ModeChanged => "Mode changed",
-        ChargingSessionEventKind.ChargingStarted => "Charging started",
-        ChargingSessionEventKind.ChargingPaused => "Charging paused",
-        ChargingSessionEventKind.PlanUnusable => "Plan unusable",
-        ChargingSessionEventKind.PlanUsable => "Plan usable again",
-        ChargingSessionEventKind.ChargerStoodDown => "Charger stood down",
-        ChargingSessionEventKind.ChargerRearmed => "Charger switched back to Fast",
+        ChargingSessionEventKind.ModeChanged => HistoryText.MarkModeChanged,
+        ChargingSessionEventKind.ChargingStarted => HistoryText.MarkChargingStarted,
+        ChargingSessionEventKind.ChargingPaused => HistoryText.MarkChargingPaused,
+        ChargingSessionEventKind.PlanUnusable => HistoryText.MarkPlanUnusable,
+        ChargingSessionEventKind.PlanUsable => HistoryText.MarkPlanUsable,
+        ChargingSessionEventKind.ChargerStoodDown => HistoryText.MarkStoodDown,
+        ChargingSessionEventKind.ChargerRearmed => HistoryText.MarkRearmed,
         _ => kind.ToString(),
     };
 }

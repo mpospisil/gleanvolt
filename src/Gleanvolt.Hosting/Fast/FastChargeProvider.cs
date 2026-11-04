@@ -1,9 +1,11 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Fast;
 
@@ -159,7 +161,7 @@ public sealed class FastChargeProvider
                 + "The mode will pause the charger and return to Off.",
                 progress.DeliveredWh / 1000,
                 limit.RequiredEnergyWh / 1000,
-                limit.IsSocBased ? $" ({limit.TargetSocPercent:F0}%)" : string.Empty);
+                limit.IsSocBased ? Invariant($" ({limit.TargetSocPercent:F0}%)") : string.Empty);
         }
 
         return progress;
@@ -191,15 +193,15 @@ public sealed class FastChargeProvider
         _logger.LogInformation(
             "Fast charge plan: start by {StartAt}, ready by {ReadyBy}, leaving {DepartBy}. "
             + "{RemainingKWh:F1}kWh at {PowerKW:F1}kW ({PowerSource}) takes {Hours:F1}h.{Shortfall}",
-            plan.StartNoLaterThan.LocalDateTime.ToString("HH:mm"),
-            plan.ReadyBy.LocalDateTime.ToString("HH:mm"),
-            plan.DepartBy.LocalDateTime.ToString("HH:mm"),
+            plan.StartNoLaterThan.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+            plan.ReadyBy.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+            plan.DepartBy.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture),
             plan.RemainingEnergyWh / 1000,
             plan.ChargePowerWatts / 1000,
             plan.PowerObserved ? "measured at the car" : "the installation's maximum, not yet measured",
             plan.Duration.TotalHours,
             plan.IsFeasible
                 ? string.Empty
-                : $" Not enough time: about {plan.ShortfallWh / 1000:F1}kWh will not fit.");
+                : Invariant($" Not enough time: about {plan.ShortfallWh / 1000:F1}kWh will not fit."));
     }
 }

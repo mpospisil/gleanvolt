@@ -1,3 +1,4 @@
+using static System.FormattableString;
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -96,7 +97,7 @@ public sealed record EvInfo(
         var what = string.Join(" ", new[] { Make, Model }.Where(part => !string.IsNullOrWhiteSpace(part)));
         var name = string.IsNullOrWhiteSpace(Name) ? (string.IsNullOrWhiteSpace(Id) ? "unnamed" : Id) : Name;
 
-        var pack = CanTargetSoc ? $"{BatteryCapacityWh / 1000:0.#}kWh usable" : "capacity not configured";
+        var pack = CanTargetSoc ? Invariant($"{BatteryCapacityWh / 1000:0.#}kWh usable") : "capacity not configured";
 
         var accepts = (MinChargingCurrentAmps, MaxChargingCurrentAmps, Phases) switch
         {

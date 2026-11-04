@@ -1,3 +1,4 @@
+using static System.FormattableString;
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -57,7 +58,7 @@ public sealed record PvSystemInfo(
     {
         var name = string.IsNullOrWhiteSpace(Name) ? "unnamed" : Name;
         var id = string.IsNullOrWhiteSpace(Id) ? "no id" : Id;
-        var where = HasLocation ? $"{Latitude:0.####},{Longitude:0.####}" : "no coordinates";
+        var where = HasLocation ? Invariant($"{Latitude:0.####},{Longitude:0.####}") : "no coordinates";
         var chargers = Chargers.Count == 0
             ? "no charger"
             : string.Join(", ", Chargers.Select(charger => charger.Describe()));

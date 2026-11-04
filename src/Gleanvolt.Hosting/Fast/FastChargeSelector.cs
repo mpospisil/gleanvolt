@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Fast;
 
@@ -48,7 +49,7 @@ public sealed class FastChargeSelector : IFastChargeSelector
             source,
             limit.RequiredEnergyWh / 1000,
             limit.IsSocBased
-                ? $" ({limit.VehicleSocPercentAtRequest:F0}% -> {limit.TargetSocPercent:F0}%)"
+                ? Invariant($" ({limit.VehicleSocPercentAtRequest:F0}% -> {limit.TargetSocPercent:F0}%)")
                 : string.Empty);
 
         Changed?.Invoke(limit);

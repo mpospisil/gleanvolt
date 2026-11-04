@@ -27,7 +27,7 @@
 *@
 
 <section id="account">
-    <h2>Account</h2>
+    <h2>@CarText.Account</h2>
 
     @if (Account.IsConfigured)
     {
@@ -37,9 +37,9 @@
 
         @if (_signIn.IsSignedIn)
         {
-            <p class="muted"><strong>Signed in</strong> — @_signIn.Message</p>
+            <p class="muted"><strong>@CarText.SignedIn</strong> — @_signIn.Message</p>
             <div class="actions">
-                <button type="button" class="secondary" id="account-signout" @onclick="SignOutAsync">Sign out</button>
+                <button type="button" class="secondary" id="account-signout" @onclick="SignOutAsync">@CarText.SignOut</button>
             </div>
         }
         else
@@ -52,7 +52,7 @@
             @if (_signIn.WantsCode)
             {
                 <div class="control">
-                    <label for="account-code">One-time code</label>
+                    <label for="account-code">@CarText.OneTimeCode</label>
                     <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code"
                            @bind="_answer" @bind:event="oninput" />
                 </div>
@@ -60,14 +60,14 @@
                 <div class="actions">
                     <button type="button" class="secondary" id="account-code-submit"
                             disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
-                        @(_busy ? "Checking…" : "Submit code")
+                        @(_busy ? CarText.Checking : CarText.SubmitCode)
                     </button>
                 </div>
             }
             else if (_signIn.WantsKey)
             {
                 <div class="control">
-                    <label for="account-key">API key</label>
+                    <label for="account-key">@CarText.ApiKey</label>
                     <input id="account-key" type="password" autocomplete="off" spellcheck="false"
                            @bind="_answer" @bind:event="oninput" />
                 </div>
@@ -75,7 +75,7 @@
                 <div class="actions">
                     <button type="button" class="secondary" id="account-key-submit"
                             disabled="@(_busy || string.IsNullOrWhiteSpace(_answer))" @onclick="SubmitAsync">
-                        @(_busy ? "Checking…" : "Save key")
+                        @(_busy ? CarText.Checking : CarText.SaveKey)
                     </button>
                 </div>
             }
@@ -84,7 +84,7 @@
                 <div class="actions">
                     <button type="button" class="secondary" id="account-signin"
                             disabled="@_busy" @onclick="SignInAsync">
-                        @(_busy ? "Signing in…" : "Sign in")
+                        @(_busy ? CarText.SigningIn : CarText.SignIn)
                     </button>
                 </div>
             }
@@ -122,18 +122,13 @@
     private string NoAccount => Feed switch
     {
         VehicleFeed.DataAct =>
-            "This portal signs in on each read, so there is no session to establish here. The account "
-            + "is the VW ID and password in the form above, and asking the car below is what proves "
-            + "them.",
+            CarText.AccountDataAct,
         VehicleFeed.OwnTopic =>
-            "Nothing here signs in: you publish the readings yourself, so there is no manufacturer "
-            + "account in between. The broker's own credentials are the house broker's and stay in the "
-            + "Vehicle section.",
+            CarText.AccountOwnTopic,
         VehicleFeed.ChargeOnly =>
-            "No account, because nothing reads this car. Charging is unaffected — a target is asked for "
-            + "in kWh rather than as a state of charge.",
+            CarText.AccountChargeOnly,
         _ => string.IsNullOrWhiteSpace(Account.Explanation)
-            ? "There is no account to sign in to yet."
+            ? CarText.NoAccountYet
             : Account.Explanation,
     };
 

@@ -65,6 +65,7 @@ public static class SetupGate
 
     private static bool IsAllowedWhileUnconfigured(PathString path) =>
         path.StartsWithSegments(Path)
+        || path.StartsWithSegments(WebUiCultures.Path)
         // Blazor's own script and the static assets the page is rendered with.
         || path.StartsWithSegments("/_framework")
         || path.StartsWithSegments("/_content")

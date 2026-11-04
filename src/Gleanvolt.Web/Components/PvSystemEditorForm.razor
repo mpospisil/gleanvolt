@@ -15,16 +15,13 @@
 
 <section class="controls pv-editor" id="pv-editor">
     <div class="section-head tip-head">
-        <h2>Installation</h2>
-        <InfoTip Topic="saving installation settings" Group="settings-info">
+        <h2>@SettingsText.Installation</h2>
+        <InfoTip Topic="@SettingsText.SavingTopic" Group="settings-info">
             <p>
-                A save is checked the way startup checks the configuration, and writes only what differs to
-                <code>@_settings.OverridesPath</code>. That file wins over <code>.env</code> key by key.
-                Nothing changes until the controller restarts.
+                @Localized.Rich(SettingsText.SavingTip1, @<code>@_settings.OverridesPath</code>, @<code>.env</code>)
             </p>
             <p>
-                Each field's (i) says where its current value comes from. After a save, a field whose value
-                is not running yet says so under it.
+                @SettingsText.SavingTip2
             </p>
         </InfoTip>
     </div>
@@ -33,10 +30,10 @@
     {
         <div class="restart-banner" id="pv-pending" role="status">
             <span>
-                <strong>@($"{_pending.Count} {(_pending.Count == 1 ? "change" : "changes")} saved")</strong>
-                — not running until the controller restarts.
+                <strong>@Localized.Format(Localized.Plural(_pending.Count, SettingsText.ChangesSaved_One, SettingsText.ChangesSaved_Few, SettingsText.ChangesSaved_Other), _pending.Count)</strong>
+                @SettingsText.NotRunningUntilRestart
             </span>
-            <a class="button-link" href="/settings/health">Restart on Health</a>
+            <a class="button-link" href="/settings/health">@SettingsText.RestartOnHealth</a>
         </div>
     }
 
@@ -47,10 +44,7 @@
     else if (ReadOnly)
     {
         <p class="muted" id="pv-readonly">
-            Read-only, because this UI has no login. These fields include the addresses the controller
-            writes Modbus commands to, and without a login anyone on the LAN could point them somewhere
-            else. Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) and they become
-            editable here; until then, change them in <code>.env</code> and restart.
+            @Localized.Rich(SettingsText.ReadOnlyNoLogin, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>.env</code>)
         </p>
     }
 
@@ -68,7 +62,7 @@
                     <div class="field-head">
                         <label for="@id">@Labels[key]</label>
                         <InfoTip Topic="@Labels[key]" Group="settings-info">
-                            <p>Current value comes from @SourcePhrase(setting).</p>
+                            <p>@Localized.Format(SettingsText.CurrentValueFrom, SourcePhrase(setting))</p>
                             <p>@SourceTitle(setting)</p>
                         </InfoTip>
                     </div>
@@ -83,12 +77,12 @@
                     }
                     @if (setting.IsPending)
                     {
-                        <span class="field-pending">Running: @Show(setting.Running) · restart to apply</span>
+                        <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(setting.Running))</span>
                     }
                     @if (setting.IsEdited && Editable)
                     {
                         <button type="button" class="link revert" disabled="@_busy" @onclick="() => Revert(key)">
-                            Revert to @Show(setting.Underlying)
+                            @Localized.Format(SettingsText.RevertTo, Show(setting.Underlying))
                         </button>
                     }
                 </div>
@@ -103,7 +97,7 @@
             {
                 <p class="error">@warning</p>
             }
-            <button type="button" class="danger" id="pv-save-anyway" @onclick="() => SaveAsync(confirmed: true)">Save anyway</button>
+            <button type="button" class="danger" id="pv-save-anyway" @onclick="() => SaveAsync(confirmed: true)">@SettingsText.SaveAnyway</button>
             <button type="button" class="secondary" @onclick="() => _warnings = []">Cancel</button>
         </div>
     }
@@ -112,10 +106,10 @@
         <div class="control actions">
             <button type="button" class="primary" id="pv-save" disabled="@(_busy || Edits().Count == 0)"
                     @onclick="() => SaveAsync(confirmed: false)">
-                @(_busy ? "Checking…" : "Save")
+                @(_busy ? SettingsText.Checking : SettingsText.SaveButton)
             </button>
             <button type="button" class="secondary" disabled="@(_busy || Edits().Count == 0)" @onclick="Discard">
-                Discard changes
+                @SettingsText.DiscardChanges
             </button>
         </div>
     }
@@ -125,15 +119,13 @@
         <ul class="probes" id="pv-probes">
             @foreach (var (role, probe) in _probes)
             {
-                <li class="@(probe.Answered && probe.Plausible ? null : "error")">@role: @probe.Message</li>
+                <li class="@(probe.Answered && probe.Plausible ? null : "error")">@role: @Localized.Say(probe.MessagePhrase, probe.Message)</li>
             }
         </ul>
         @if (_probes.Any(entry => !entry.Result.Answered || !entry.Result.Plausible))
         {
             <p class="table-note muted">
-                Saved anyway: a charger that is switched off answers nothing and is still the right address.
-                Both devices answer Modbus on port 502, so a swapped pair shows up as a frozen battery and
-                zero solar once running — check which is which before restarting.
+                @SettingsText.SavedAnyway
             </p>
         }
     }
@@ -141,7 +133,7 @@
     @if (_problems.Count > 0)
     {
         <div id="pv-problems">
-            <p class="error">Not saved — the controller would refuse to start with this:</p>
+            <p class="error">@SettingsText.NotSaved</p>
             <ul class="error">
                 @foreach (var problem in _problems)
                 {
@@ -160,50 +152,50 @@
 @code {
     private const string Missing = Units.Missing;
 
-    private static readonly (string Group, string[] Keys)[] Groups =
+    private static (string Group, string[] Keys)[] Groups =>
     [
-        ("Identity", [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
-        ("Location and orientation", [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
-        ("Capacity", [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
-        ("Inverter", [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
-        ("Charger", [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
+        (SettingsText.GroupIdentity, [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
+        (SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
+        (SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
+        (SettingsText.Inverter, [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
+        (SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
-    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, string> Labels => new(StringComparer.OrdinalIgnoreCase)
     {
-        [PvSystemSettingKeys.Id] = "Id",
-        [PvSystemSettingKeys.Name] = "Name",
-        [PvSystemSettingKeys.Address] = "Address",
-        [PvSystemSettingKeys.InstallDate] = "Commissioned",
-        [PvSystemSettingKeys.Latitude] = "Latitude",
-        [PvSystemSettingKeys.Longitude] = "Longitude",
-        [PvSystemSettingKeys.AzimuthDegrees] = "Azimuth",
-        [PvSystemSettingKeys.TiltDegrees] = "Tilt",
-        [PvSystemSettingKeys.CapacityKwp] = "Peak DC capacity (kWp)",
-        [PvSystemSettingKeys.InverterCapacityKw] = "Inverter capacity (kW)",
-        [PvSystemSettingKeys.LossFactor] = "Loss factor",
-        [PvSystemSettingKeys.InverterModel] = "Inverter model",
-        [PvSystemSettingKeys.InverterHost] = "Inverter host",
-        [PvSystemSettingKeys.InverterPort] = "Inverter port",
-        [PvSystemSettingKeys.InverterUnitId] = "Inverter unit id",
-        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "Unmetered grid phase",
-        [PvSystemSettingKeys.ChargerId] = "Charger id",
-        [PvSystemSettingKeys.ChargerModel] = "Charger model",
-        [PvSystemSettingKeys.ChargerHost] = "Charger host",
-        [PvSystemSettingKeys.ChargerPort] = "Charger port",
-        [PvSystemSettingKeys.ChargerUnitId] = "Charger unit id",
+        [PvSystemSettingKeys.Id] = SettingsText.FieldId,
+        [PvSystemSettingKeys.Name] = SettingsText.FieldName,
+        [PvSystemSettingKeys.Address] = SettingsText.FieldAddress,
+        [PvSystemSettingKeys.InstallDate] = SettingsText.FieldCommissioned,
+        [PvSystemSettingKeys.Latitude] = SettingsText.FieldLatitude,
+        [PvSystemSettingKeys.Longitude] = SettingsText.FieldLongitude,
+        [PvSystemSettingKeys.AzimuthDegrees] = SettingsText.FieldAzimuth,
+        [PvSystemSettingKeys.TiltDegrees] = SettingsText.FieldTilt,
+        [PvSystemSettingKeys.CapacityKwp] = SettingsText.FieldCapacityKwp,
+        [PvSystemSettingKeys.InverterCapacityKw] = SettingsText.FieldInverterCapacity,
+        [PvSystemSettingKeys.LossFactor] = SettingsText.FieldLossFactor,
+        [PvSystemSettingKeys.InverterModel] = SettingsText.FieldInverterModel,
+        [PvSystemSettingKeys.InverterHost] = SettingsText.FieldInverterHost,
+        [PvSystemSettingKeys.InverterPort] = SettingsText.FieldInverterPort,
+        [PvSystemSettingKeys.InverterUnitId] = SettingsText.FieldInverterUnitId,
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.FieldUnmeteredPhase,
+        [PvSystemSettingKeys.ChargerId] = SettingsText.FieldChargerId,
+        [PvSystemSettingKeys.ChargerModel] = SettingsText.FieldChargerModel,
+        [PvSystemSettingKeys.ChargerHost] = SettingsText.FieldChargerHost,
+        [PvSystemSettingKeys.ChargerPort] = SettingsText.FieldChargerPort,
+        [PvSystemSettingKeys.ChargerUnitId] = SettingsText.FieldChargerUnitId,
     };
 
-    private static readonly Dictionary<string, string> Hints = new(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, string> Hints => new(StringComparer.OrdinalIgnoreCase)
     {
-        [PvSystemSettingKeys.Id] = "a-z, 0-9, - and _",
+        [PvSystemSettingKeys.Id] = SettingsText.HintId,
         [PvSystemSettingKeys.InstallDate] = "yyyy-MM-dd",
-        [PvSystemSettingKeys.Latitude] = "decimal degrees",
-        [PvSystemSettingKeys.Longitude] = "decimal degrees",
-        [PvSystemSettingKeys.AzimuthDegrees] = "degrees from north, 180 = south",
-        [PvSystemSettingKeys.TiltDegrees] = "degrees, 0 = flat",
-        [PvSystemSettingKeys.LossFactor] = "0 to 1",
-        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = "L1, L2, L3 (or R, S, T) or empty",
+        [PvSystemSettingKeys.Latitude] = SettingsText.HintDecimalDegrees,
+        [PvSystemSettingKeys.Longitude] = SettingsText.HintDecimalDegrees,
+        [PvSystemSettingKeys.AzimuthDegrees] = SettingsText.HintAzimuth,
+        [PvSystemSettingKeys.TiltDegrees] = SettingsText.HintTilt,
+        [PvSystemSettingKeys.LossFactor] = SettingsText.HintLossFactor,
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HintPhase,
         [PvSystemSettingKeys.InverterPort] = "502",
         [PvSystemSettingKeys.ChargerPort] = "502",
         [PvSystemSettingKeys.InverterUnitId] = "1",
@@ -289,8 +281,8 @@
 
             Reload();
             _message = _pending.Count > 0
-                ? "Saved. Restart the controller to apply it."
-                : "Saved. The controller is already running with these values.";
+                ? SettingsText.SavedRestart
+                : SettingsText.SavedRunning;
         }
         finally
         {
@@ -331,18 +323,14 @@
         if (edits.ContainsKey(PvSystemSettingKeys.Id))
         {
             warnings.Add(
-                "Changing the id moves every MQTT topic the controller publishes under, so Home Assistant "
-                + "sees new topics after the restart. See \"Renaming what Home Assistant sees\" in deploy/README.md "
-                + "and HA_RETIRE_TOPIC_PREFIX for clearing the old ones. The Home Assistant device id is "
-                + "set separately and does not move.");
+                SettingsText.IdWarning);
         }
 
         if ((edits.TryGetValue(PvSystemSettingKeys.Latitude, out var latitude) && latitude.Length == 0)
             || (edits.TryGetValue(PvSystemSettingKeys.Longitude, out var longitude) && longitude.Length == 0))
         {
             warnings.Add(
-                "Clearing the coordinates turns off weather recording against charging sessions and the "
-                + "forecast site.");
+                SettingsText.CoordinatesWarning);
         }
 
         return warnings;
@@ -356,12 +344,12 @@
 
         if (InverterAddress.Any(edits.ContainsKey) && Address(InverterAddress) is { } inverter)
         {
-            probes.Add(("Inverter", await Editor.ProbeAsync(PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId)));
+            probes.Add((SettingsText.Inverter, await Editor.ProbeAsync(PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId)));
         }
 
         if (ChargerAddress.Any(edits.ContainsKey) && Address(ChargerAddress) is { } charger)
         {
-            probes.Add(("Charger", await Editor.ProbeAsync(PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId)));
+            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId)));
         }
 
         return probes;
@@ -396,20 +384,20 @@
 
     private static string SourceName(ConfiguredSetting setting) => setting.Source switch
     {
-        SettingSource.WebUi => "web UI",
-        SettingSource.Environment => "environment",
-        SettingSource.CommandLine => "command line",
+        SettingSource.WebUi => SettingsText.SourceWebUi,
+        SettingSource.Environment => SettingsText.SourceEnvironment,
+        SettingSource.CommandLine => SettingsText.SourceCommandLine,
         SettingSource.AppSettings => string.IsNullOrEmpty(setting.SourceDetail) ? "appsettings.json" : setting.SourceDetail,
-        _ => "default",
+        _ => SettingsText.SourceDefault,
     };
 
     private static string SourcePhrase(ConfiguredSetting setting) => setting.Source switch
     {
-        SettingSource.WebUi => "this page",
-        SettingSource.Environment => "the environment file",
-        SettingSource.CommandLine => "the command line",
+        SettingSource.WebUi => SettingsText.PhraseThisPage,
+        SettingSource.Environment => SettingsText.PhraseEnvironment,
+        SettingSource.CommandLine => SettingsText.PhraseCommandLine,
         SettingSource.AppSettings => SourceName(setting),
-        _ => "the built-in default",
+        _ => SettingsText.PhraseDefault,
     };
 
     // What a typed value means where it does not say so itself: a bearing outside 0-360, or SolaX's
@@ -423,17 +411,17 @@
             && double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var bearing))
         {
             var normalised = ((bearing % 360) + 360) % 360;
-            var facing = $"facing {Compass[(int)Math.Round(normalised / 45) % Compass.Length]}";
-            return normalised == bearing ? facing : $"= {Units.Angle(normalised)}, {facing}";
+            var facing = Localized.Format(SettingsText.Facing, Compass[(int)Math.Round(normalised / 45) % Compass.Length]);
+            return normalised == bearing ? facing : Localized.Format(SettingsText.BearingNormalised, Units.Angle(normalised), facing);
         }
 
         if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
         {
             return value.ToUpperInvariant() switch
             {
-                "R" => "= L1, in SolaX's naming",
-                "S" => "= L2, in SolaX's naming",
-                "T" => "= L3, in SolaX's naming",
+                "R" => SettingsText.PhaseR,
+                "S" => SettingsText.PhaseS,
+                "T" => SettingsText.PhaseT,
                 _ => null,
             };
         }
@@ -441,16 +429,16 @@
         return null;
     }
 
-    private static readonly string[] Compass =
-        ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+    private static string[] Compass =>
+        [SettingsText.North, SettingsText.NorthEast, SettingsText.East, SettingsText.SouthEast, SettingsText.South, SettingsText.SouthWest, SettingsText.West, SettingsText.NorthWest];
 
     private static string SourceTitle(ConfiguredSetting setting) => setting.Source switch
     {
-        SettingSource.WebUi => $"Saved from this page in {setting.SourceDetail}; overrides .env.",
+        SettingSource.WebUi => Localized.Format(SettingsText.TitleWebUi, setting.SourceDetail),
         SettingSource.Environment =>
-            $"{setting.SourceDetail}, from .env under Docker or /etc/gleanvolt/gleanvolt.env under systemd.",
-        SettingSource.CommandLine => "A command-line argument, which wins over this page.",
-        SettingSource.AppSettings => $"From {SourceName(setting)} in the install directory.",
-        _ => "Set nowhere; the built-in default applies.",
+            Localized.Format(SettingsText.TitleEnvironment, setting.SourceDetail),
+        SettingSource.CommandLine => SettingsText.TitleCommandLine,
+        SettingSource.AppSettings => Localized.Format(SettingsText.TitleAppSettings, SourceName(setting)),
+        _ => SettingsText.TitleDefault,
     };
 }

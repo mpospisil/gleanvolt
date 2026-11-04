@@ -187,7 +187,7 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab();
 
         _mode.Set(ChargeControlMode.FastNoBattery, "the polling loop");
-        page.WaitForAssertion(() => Assert.Equal("FastNoBattery", page.Find("#mode-state .mode").TextContent));
+        page.WaitForAssertion(() => Assert.Equal("Fast (no battery)", page.Find("#mode-state .mode").TextContent));
 
         _mode.Set(ChargeControlMode.Off, "the polling loop (charging finished)");
 
@@ -324,5 +324,17 @@ public class ChargingPlanPageTests : PageTest
         var exception = Record.Exception(() => _holder.Set(Statuses.Sample(_time.Now)));
 
         Assert.Null(exception);
+    }
+
+    [Theory]
+    [InlineData("solar")]
+    [InlineData("solar-grid")]
+    public void Every_string_on_a_tab_comes_from_a_resource(string tab)
+    {
+        _holder.Set(Statuses.Sample(_time.Now) with { BatteryHoldEnabled = true });
+
+        var page = PseudoLocale.Render(() => RenderTab(tab));
+
+        PseudoLocale.AssertTranslated(page.Markup);
     }
 }

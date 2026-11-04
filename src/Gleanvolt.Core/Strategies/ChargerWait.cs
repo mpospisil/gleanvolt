@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -74,7 +75,7 @@ public static class ChargerWait
         if (!input.Charging && input.TimeInCurrentState >= MaxPause)
         {
             return StandDown(
-                $"{reason} Paused {input.TimeInCurrentState.TotalMinutes:F0} min already, so standing the charger down "
+                Invariant($"{reason} Paused {input.TimeInCurrentState.TotalMinutes:F0} min already, so standing the charger down ")
                 + "before the wallbox gives up on the session.",
                 until);
         }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
@@ -660,7 +661,7 @@ public sealed class VwGroupPortalClient
                 VwGroupFailure.Transient,
                 $"{VwGroupSignIn.Where(url)} answered 429 (too many requests)"
                 + (after is { } wait and { TotalSeconds: > 0 }
-                    ? $" and asked for {wait.TotalSeconds:F0} s before the next one"
+                    ? Invariant($" and asked for {wait.TotalSeconds:F0} s before the next one")
                     : "; it is rate-limiting, so the fix is to ask for less, less often"));
         }
 

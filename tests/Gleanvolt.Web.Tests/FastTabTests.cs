@@ -414,7 +414,7 @@ public class FastTabTests : PageTest
         page.Find("#fast-soc").Change("60");
         page.Find("#start-fast-no-battery").Click();
 
-        Assert.Contains("13.0 h", page.Find("p.error").TextContent);
+        Assert.Contains("42% 13 h ago", page.Find("p.error").TextContent);
         Assert.Empty(_fast.Sets);
     }
 
@@ -430,7 +430,7 @@ public class FastTabTests : PageTest
         page.Find("#fast-soc").Change("60");
 
         Assert.DoesNotContain("that is about", page.Markup);
-        Assert.Contains("13.0 h", page.Markup);
+        Assert.Contains("42% 13 h ago", page.Markup);
     }
 
     /// <summary>
@@ -449,5 +449,15 @@ public class FastTabTests : PageTest
 
         Assert.Empty(page.FindAll("p.error"));
         Assert.Contains(_actions.Starts, start => start.Mode == ChargeControlMode.FastNoBattery);
+    }
+
+    [Fact]
+    public void Every_string_on_the_fast_tab_comes_from_a_resource()
+    {
+        _holder.Set(Status(Deferred(departIn: TimeSpan.FromHours(1))));
+
+        var page = PseudoLocale.Render(() => RenderTab());
+
+        PseudoLocale.AssertTranslated(page.Markup);
     }
 }

@@ -18,12 +18,15 @@
 @if (_blocked is not null)
 {
     <div class="alert" role="alert">
-        <strong>Sign-in required</strong> — @(VehicleFeed.Service?.OwnerAction ?? _blocked.Message)
-        <a href="/car">Sign in on the car page</a>
+        <strong>@SharedText.SignInRequired</strong> — @(VehicleFeed.Service?.OwnerAction is { } action ? Localized.Say(VehicleFeed.Service.OwnerActionPhrase, action) : _blocked.Message)
+        <a href="/car">@SharedText.SignInOnCarPage</a>
     </div>
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     private VehicleSourceHealth? _blocked;
 
     protected override void OnInitialized()
@@ -42,7 +45,7 @@
         // changes about once a month, and nothing else in it moves.
         if (!Equals(was, _blocked))
         {
-            InvokeAsync(StateHasChanged);
+            InvokeAsync(_viewer.Wrap(StateHasChanged));
         }
     }
 

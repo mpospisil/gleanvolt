@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -8,8 +9,8 @@ internal static class SessionFormatting
 {
     public static string FormatStrategy(this ChargingSession session) =>
         session.StartMode == session.EndMode
-            ? session.StartMode.ToString()
-            : $"{session.StartMode} → {session.EndMode}";
+            ? ChargeModeTabs.Label(session.StartMode)
+            : Localized.Format(SharedText.ModeChange, ChargeModeTabs.Label(session.StartMode), ChargeModeTabs.Label(session.EndMode));
 
     /// <summary>
     /// One weather reading in a line: what it was like, how warm, and how much cloud. Cloud is the
@@ -21,8 +22,12 @@ internal static class SessionFormatting
             ? weather.Condition
             : weather.ConditionDescription;
 
-        var text = $"{Units.Temperature(weather.TemperatureCelsius)}, {Units.Percent(weather.CloudsPercent)} cloud";
-        return string.IsNullOrWhiteSpace(condition) ? text : $"{condition}, {text}";
+        // The condition is the weather provider's own words, and stays in its language.
+        var temperature = Units.Temperature(weather.TemperatureCelsius);
+        var clouds = Units.Percent(weather.CloudsPercent);
+        return string.IsNullOrWhiteSpace(condition)
+            ? Localized.Format(SharedText.WeatherLine, temperature, clouds)
+            : Localized.Format(SharedText.WeatherLineWithCondition, condition, temperature, clouds);
     }
 
     /// <summary>
@@ -30,7 +35,9 @@ internal static class SessionFormatting
     /// behind it. The band is the point — it says whether a thin day was always going to be thin.
     /// </summary>
     public static string FormatDayForecast(SolarForecast forecast) =>
-        $"{Units.Kwh(forecast.ExpectedEnergyWattHours)} "
-        + $"(p10 {Units.Kwh(forecast.EnergyWattHoursAt(ForecastConfidence.P10), unit: false)} – "
-        + $"p90 {Units.Kwh(forecast.EnergyWattHoursAt(ForecastConfidence.P90), unit: false)})";
+        Localized.Format(
+            SharedText.DayForecastLine,
+            Units.Kwh(forecast.ExpectedEnergyWattHours),
+            Units.Kwh(forecast.EnergyWattHoursAt(ForecastConfidence.P10), unit: false),
+            Units.Kwh(forecast.EnergyWattHoursAt(ForecastConfidence.P90), unit: false));
 }

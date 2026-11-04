@@ -36,21 +36,21 @@
     *@
     <AuthorizeView Context="viewer">
         <Authorized>
-            <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="Menu" />
+            <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="@SharedText.Menu" />
             <label for="menu-toggle" class="menu-button" aria-hidden="true">
-                <span class="menu-icon"></span>Menu
+                <span class="menu-icon"></span>@SharedText.Menu
             </label>
             <div class="menu">
                 <nav>
-                    <NavLink href="/" Match="NavLinkMatch.All">Overview</NavLink>
-                    <NavLink href="/charging-plan">Charging plan</NavLink>
-                    <NavLink href="/sessions">Sessions</NavLink>
-                    <NavLink href="/energy">Energy</NavLink>
-                    <NavLink href="/forecast">Forecast</NavLink>
-                    <NavLink href="/car">Car</NavLink>
+                    <NavLink href="/" Match="NavLinkMatch.All">@SharedText.NavOverview</NavLink>
+                    <NavLink href="/charging-plan">@SharedText.NavChargingPlan</NavLink>
+                    <NavLink href="/sessions">@SharedText.NavSessions</NavLink>
+                    <NavLink href="/energy">@SharedText.NavEnergy</NavLink>
+                    <NavLink href="/forecast">@SharedText.NavForecast</NavLink>
+                    <NavLink href="/car">@SharedText.NavCar</NavLink>
                     @* The installation and the controller's health, behind one link (#255): the two pages
                        an owner opens least, and the reason seven links fit beside the name. *@
-                    <NavLink href="/settings">Settings</NavLink>
+                    <NavLink href="/settings">@SharedText.NavSettings</NavLink>
                 </nav>
                 @* A named policy rather than AuthorizeView's default: "is somebody actually signed in" has to
                    stay true regardless of Web:RequireAuthentication, or this control would show for an
@@ -58,13 +58,14 @@
                 <AuthorizeView Policy="Authenticated">
                     <Authorized>
                         <form method="post" action="/logout" class="signout">
-                            <button type="submit">Sign out</button>
+                            <button type="submit">@SharedText.SignOut</button>
                         </form>
                     </Authorized>
                 </AuthorizeView>
             </div>
         </Authorized>
     </AuthorizeView>
+    <LanguagePicker />
 </header>
 
 <main class="content">

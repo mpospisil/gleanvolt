@@ -33,4 +33,42 @@
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    The UI's text (#290). One .resx per area of the UI under Resources/, English in the neutral file
+    and each translation beside it (PlanText.cs.resx). The neutral file also gets a generated class
+    (Resources.PlanText.SomeKey) rather than being read through IStringLocalizer by key: a key that
+    does not exist is then a compile error instead of a page that quietly shows the key, and the
+    narratives, static classes with no DI to inject a localizer into, read text the same way the
+    pages do. The class reads CurrentUICulture on every access, so it follows the circuit's culture.
+  -->
+  <ItemGroup>
+    <NeutralResx Include="Resources\*.resx" Exclude="Resources\*.*.resx" />
+    <EmbeddedResource Update="@(NeutralResx)">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>$(RootNamespace).Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>%(Filename)</StronglyTypedClassName>
+      <!-- Public, because DataAnnotations only reads a message from a public property. -->
+      <PublicClass>true</PublicClass>
+      <StronglyTypedFileName>$(IntermediateOutputPath)%(Filename).Resources.g.cs</StronglyTypedFileName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!--
+    The pseudo-locale (qps-ploc): every neutral string with its vowels accented and in brackets,
+    generated from the English rather than checked in, so it can never fall behind. Text on a page
+    that does not look like "[Óvéřvíéw]" under it was never moved into a resource. Built in every
+    configuration, because CI tests a Release build and the page checks need it there; it ships as one
+    small satellite that WebUiCultures offers only in Development, so production never shows it.
+  -->
+  <Target Name="GeneratePseudoLocale" BeforeTargets="PrepareForBuild">
+    <MakeDir Directories="$(IntermediateOutputPath)pseudo" />
+    <XslTransformation XmlInputPaths="%(NeutralResx.FullPath)" XslInputPath="Resources\pseudo-locale.xslt"
+                       OutputPaths="$(IntermediateOutputPath)pseudo\%(NeutralResx.Filename).qps-ploc.resx" />
+    <ItemGroup>
+      <_PseudoResx Include="@(NeutralResx->'$(IntermediateOutputPath)pseudo\%(Filename).qps-ploc.resx')" />
+      <EmbeddedResource Include="@(_PseudoResx)" ManifestResourceName="$(RootNamespace).Resources.%(_PseudoResx.Filename)"
+                        WithCulture="true" Culture="qps-ploc" />
+    </ItemGroup>
+  </Target>
+
 </Project>

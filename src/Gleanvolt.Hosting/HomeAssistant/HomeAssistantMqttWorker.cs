@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
@@ -380,7 +381,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private Task PublishTextStatesAsync(CancellationToken cancellationToken)
     {
         var text = _target.Request is { } request
-            ? TimeZoneInfo.ConvertTime(request.DepartBy, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm")
+            ? TimeZoneInfo.ConvertTime(request.DepartBy, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
             : _pendingDepartureText;
 
         return PublishTextStatesAsync(text, cancellationToken);
@@ -395,7 +396,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         // A running limit outranks whatever was last typed, like the numbers and the basis: it says what
         // the charge is actually waiting for.
         var fast = _fast.Limit?.DepartBy is { } departure
-            ? TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm")
+            ? TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
             : _pendingFastDepartureText;
 
         await PublishAsync(
@@ -818,7 +819,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         _pendingDeparture = departure;
-        _pendingDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+        _pendingDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
         // Echoed as the resolved timestamp rather than what was typed: "07:00" and "tomorrow 07:00" are
         // the same request, and only one of them can be read back a day later without ambiguity.
@@ -845,7 +846,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         _pendingFastDeparture = departure;
-        _pendingFastDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm");
+        _pendingFastDepartureText = TimeZoneInfo.ConvertTime(departure, _timeProvider.LocalTimeZone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
         return PublishTextStatesAsync(CancellationToken.None);
     }

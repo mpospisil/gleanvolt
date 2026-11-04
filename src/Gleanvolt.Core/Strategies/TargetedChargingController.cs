@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -65,15 +66,15 @@ public sealed class TargetedChargingController : IChargingController
         {
             return Complete(
                 ChargingSessionEndReason.DeparturePassed,
-                $"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with {plan.DeliveredEnergyWh / 1000:F1}kWh "
-                + $"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
+                Invariant($"Departure {plan.DepartBy.LocalDateTime:HH:mm} has passed with {plan.DeliveredEnergyWh / 1000:F1}kWh ")
+                + Invariant($"of {plan.RequiredEnergyWh / 1000:F1}kWh delivered"));
         }
 
         // Before the car-full rule, so a car that stops at the very moment it reaches the number is
         // reported as having reached it.
         if (plan is { IsComplete: true })
         {
-            return Complete(ChargingSessionEndReason.TargetReached, $"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered");
+            return Complete(ChargingSessionEndReason.TargetReached, Invariant($"Target reached: {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh delivered"));
         }
 
         // Precondition, unchanged from every other mode: the charger is in Fast (activating the target
@@ -82,7 +83,7 @@ public sealed class TargetedChargingController : IChargingController
         // read as a full car.
         var shortfall = plan is null
             ? null
-            : $" at {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh, short of the target";
+            : Invariant($" at {plan.DeliveredEnergyWh / 1000:F1}kWh of {plan.RequiredEnergyWh / 1000:F1}kWh, short of the target");
 
         if (ChargerOwnership.Check(input, _options.CompletionDwell, shortfall) is { } ended)
         {
@@ -103,8 +104,8 @@ public sealed class TargetedChargingController : IChargingController
             return new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 _maxAmps,
-                $"Not enough time for {plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:HH:mm} -> "
-                + $"charge at the maximum {_maxAmps}A; expect {plan.ExpectedEnergyWh / 1000:F1}kWh ({plan.ShortfallWh / 1000:F1}kWh short).");
+                Invariant($"Not enough time for {plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:HH:mm} -> ")
+                + Invariant($"charge at the maximum {_maxAmps}A; expect {plan.ExpectedEnergyWh / 1000:F1}kWh ({plan.ShortfallWh / 1000:F1}kWh short)."));
         }
 
         // Deliberately idle, and the one place in this mode where a real surplus is turned down. Under
@@ -126,7 +127,7 @@ public sealed class TargetedChargingController : IChargingController
             return HoldTail(
                 input,
                 plan.HoldUntil,
-                $"Holding the last {plan.TailEnergyWh / 1000:F1}kWh until "
+                Invariant($"Holding the last {plan.TailEnergyWh / 1000:F1}kWh until ")
                 + $"{plan.HoldUntil?.LocalDateTime:HH:mm} so the car reaches its target just before "
                 + $"{plan.DepartBy.LocalDateTime:HH:mm} rather than sitting full overnight. "
                 + "Not waiting for sun -- this is the plan working.");
@@ -194,9 +195,9 @@ public sealed class TargetedChargingController : IChargingController
                 return new ChargingControlDecision(
                     ChargingControlAction.Charge,
                     _minAmps,
-                    $"A {paceWatts:F0}W pace is under the {MinChargePowerWatts:F0}W the charger can run at, and it is "
+                    Invariant($"A {paceWatts:F0}W pace is under the {MinChargePowerWatts:F0}W the charger can run at, and it is ")
                     + $"energy the sun is not forecast to cover -> hold the {_minAmps}A floor rather than defer "
-                    + $"{plan.RemainingEnergyWh / 1000:F1}kWh to the last minutes before {plan.Deadline.LocalDateTime:HH:mm}.",
+                    + Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh to the last minutes before {plan.Deadline.LocalDateTime:HH:mm}."),
                     GridBridgeWatts: bridged);
             }
 
@@ -223,15 +224,15 @@ public sealed class TargetedChargingController : IChargingController
         var fromGridWatts = Math.Max(0, commandedWatts - usableSurplusWatts);
 
         var how = !aboveFloor
-            ? $"battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun and the grid funds the pace"
+            ? Invariant($"battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun and the grid funds the pace")
             : paceWatts <= 0
-                ? $"surplus {surplusWatts:F0}W and nothing owed to the grid, so the sun sets the rate"
-                : $"surplus {surplusWatts:F0}W plus a {paceWatts:F0}W pace, so the grid covers {fromGridWatts:F0}W of it";
+                ? Invariant($"surplus {surplusWatts:F0}W and nothing owed to the grid, so the sun sets the rate")
+                : Invariant($"surplus {surplusWatts:F0}W plus a {paceWatts:F0}W pace, so the grid covers {fromGridWatts:F0}W of it");
 
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             targetAmps,
-            $"{plan.RemainingEnergyWh / 1000:F1}kWh still needed by {plan.Deadline.LocalDateTime:HH:mm} -> "
+            Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh still needed by {plan.Deadline.LocalDateTime:HH:mm} -> ")
             + $"charge at {targetAmps}A: {how}.",
             GridBridgeWatts: fromGridWatts);
     }
@@ -297,9 +298,9 @@ public sealed class TargetedChargingController : IChargingController
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             _minAmps,
-            $"Grid bridge: surplus {surplusWatts:F0}W is under the {MinChargePowerWatts:F0}W floor, so +{gapWatts:F0}W "
+            Invariant($"Grid bridge: surplus {surplusWatts:F0}W is under the {MinChargePowerWatts:F0}W floor, so +{gapWatts:F0}W ")
             + $"from the grid takes it there rather than exporting it -> charge at {_minAmps}A. "
-            + $"Comes straight off the {plan.GridEnergyWh / 1000:F1}kWh already planned for import.",
+            + Invariant($"Comes straight off the {plan.GridEnergyWh / 1000:F1}kWh already planned for import."),
             GridBridgeWatts: gapWatts);
     }
 
@@ -319,15 +320,15 @@ public sealed class TargetedChargingController : IChargingController
         // Two different reasons to be idle, and the owner needs to be able to tell them apart: the sun
         // has not turned up, or it has and the pack is keeping it.
         var why = aboveFloor
-            ? $"Surplus {surplusWatts:F0}W and a {paceWatts:F0}W pace are both under the {MinChargePowerWatts:F0}W the charger needs."
-            : $"Battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun, and the "
-                + $"{paceWatts:F0}W pace alone is under the {MinChargePowerWatts:F0}W the charger needs.";
+            ? Invariant($"Surplus {surplusWatts:F0}W and a {paceWatts:F0}W pace are both under the {MinChargePowerWatts:F0}W the charger needs.")
+            : Invariant($"Battery {soc:F0}% is under the plan's {plan.SocFloorPercent:F0}% floor, so the pack keeps the sun, and the ")
+                + Invariant($"{paceWatts:F0}W pace alone is under the {MinChargePowerWatts:F0}W the charger needs.");
 
         // Until the plan next expects to charge. An idle car at 22:00 with a 07:00 departure is a wait
         // of hours, and is stood down for it (#280): paused, the wallbox would give up on the session
         // after about seven minutes and the mode would lose its charger.
         var reason = $"{why} Waiting for sun; there is still time for the pace to carry "
-            + $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.";
+            + Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.Deadline.LocalDateTime:HH:mm}.");
 
         return HoldForMinRunTime(input, reason)
             ?? ChargerWait.For(input, plan.NextBlockAt(input.State.Timestamp), reason);
@@ -352,7 +353,7 @@ public sealed class TargetedChargingController : IChargingController
             ? new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 _minAmps,
-                $"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time.")
+                Invariant($"{reason} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time."))
             : null;
 
     /// <summary>

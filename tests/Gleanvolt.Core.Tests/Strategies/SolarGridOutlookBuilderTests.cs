@@ -116,6 +116,26 @@ public class SolarGridOutlookBuilderTests
     }
 
     [Fact]
+    public void TheReasonIsInvariantWhateverCultureTheCallerRunsIn()
+    {
+        // A web page's circuit runs in its viewer's culture, and asks the same code for previews (#290).
+        // What a service writes stays the log's and the API's: "5.5h", never "5,5h".
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("cs");
+        try
+        {
+            var outlook = Build(Day(Morning.AddHours(-5.5)), Morning);
+
+            Assert.Contains("5.5h old", outlook.Reason);
+            Assert.Equal(Phrase.Of("SolarGrid.Stale", new PhraseArg.Duration(TimeSpan.FromHours(5.5)), new PhraseArg.Duration(StaleAfter)), outlook.ReasonPhrase);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+    }
+
+    [Fact]
     public void AStaleForecastWithNoPvLeft_StillSaysTheSunHasSet()
     {
         // The evening case: the forecast stops being refreshed once there is no sun worth a provider

@@ -23,14 +23,10 @@
 *@
 
 <div class="muted intro-line">
-    As fast as the installation allows, with the home battery kept out — expect grid import.
-    <InfoTip Topic="this mode">
+    @PlanText.FastIntro
+    <InfoTip Topic="@PlanText.ThisModeTopic">
         <p>
-            Charge as fast as the installation allows and keep the home battery out of it. The setpoint is
-            pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid
-            covers the rest, so expect to import. The discharge hold is armed when the charge starts and
-            released when it ends — you can switch it off in between if you would rather the battery
-            helped.
+            @PlanText.FastTip
         </p>
     </InfoTip>
 </div>
@@ -44,17 +40,17 @@
 *@
 <div class="control">
     <div class="control-head">
-        <label for="fast-basis">How much?</label>
-        <InfoTip Topic="How much?">
+        <label for="fast-basis">@PlanText.HowMuch</label>
+        <InfoTip Topic="@PlanText.HowMuchTopic">
             <p>@BasisHint()</p>
         </InfoTip>
     </div>
     <select id="fast-basis" @bind="_basis" @bind:event="onchange" @bind:after="OnFormEdited">
-        <option value="@FastChargeBasis.Full">Until the car stops</option>
-        <option value="@FastChargeBasis.Energy">Energy to add (kWh)</option>
+        <option value="@FastChargeBasis.Full">@PlanText.UntilCarStops</option>
+        <option value="@FastChargeBasis.Energy">@PlanText.EnergyToAdd</option>
         @if (CanTargetSoc)
         {
-            <option value="@FastChargeBasis.Soc">Battery target (%)</option>
+            <option value="@FastChargeBasis.Soc">@PlanText.BatteryTarget</option>
         }
     </select>
 </div>
@@ -63,9 +59,9 @@
 {
     <div class="control">
         <div class="control-head">
-            <label for="fast-energy">Energy needed (kWh)</label>
-            <InfoTip Topic="Energy needed (kWh)">
-                <p>Measured at the charger, from the moment you press the button.</p>
+            <label for="fast-energy">@PlanText.EnergyNeeded</label>
+            <InfoTip Topic="@PlanText.EnergyNeededTopic">
+                <p>@PlanText.EnergyNeededTip</p>
             </InfoTip>
         </div>
         <input id="fast-energy" type="number" step="0.5" min="0"
@@ -75,7 +71,7 @@
 else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 {
     <div class="control">
-        <label for="fast-soc">Charge to (%)</label>
+        <label for="fast-soc">@PlanText.ChargeTo</label>
         <input id="fast-soc" type="number" step="5" min="0" max="100"
                @bind="_targetSocPercent" @bind:event="onchange" @bind:after="OnFormEdited" />
         <span class="hint">@SocConversionHint()</span>
@@ -91,14 +87,10 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 {
     <div class="control">
         <div class="control-head">
-            <label for="fast-departure">Ready by (optional)</label>
-            <InfoTip Topic="Ready by">
+            <label for="fast-departure">@PlanText.ReadyByOptional</label>
+            <InfoTip Topic="@PlanText.ReadyByTopic">
                 <p>
-                    No time set: the charge starts straight away. With a time, the charge is held back and
-                    starts as late as it can while still finishing before you go — so a car asked to go above
-                    80% spends minutes there rather than the whole night, which is what actually ages the
-                    pack. It still charges flat out when it runs; only the start moves. To remove a time you
-                    have set, open the calendar and press its Clear button.
+                    @PlanText.ReadyByTip
                 </p>
             </InfoTip>
         </div>
@@ -108,13 +100,13 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 }
 
 <LowTariffOption Mode="ChargeControlMode.FastNoBattery" Status="Status"
-                 Hint="In high tariff the car waits, and it charges flat out once low tariff starts. The charger starts a car on its own when it is plugged in, so one plugged in during high tariff draws for a moment until the next poll stops it. Doesn't persist across restarts." />
+                 Hint="@PlanText.FastLowTariffHint" />
 
 <div class="control">
     <button type="button" class="primary" id="start-fast-no-battery" disabled="@Busy" @onclick="StartFast">
-        Charge at maximum
+        @PlanText.StartFast
     </button>
-    <InfoTip Topic="Charge at maximum">
+    <InfoTip Topic="@PlanText.StartFastTopic">
         <p>@EndsHint()</p>
     </InfoTip>
 </div>
@@ -127,14 +119,14 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 @if (Status is { } status)
 {
     <section class="stat-grid">
-        <Stat Label="EV charging power" Value="@Units.Power(status.EvChargerPowerWatts)"
-              Hint="What the charger reports the car actually drawing right now — not a setpoint. This is what falls away when the car decides it is full." />
-        <Stat Label="EV charging current" Value="@Units.Current(status.EvChargingCurrentAmps)"
-              Hint="Charging current derived from the charger's measured power: what the car really takes, which can be below the maximum if the car itself limits it." />
-        <Stat Label="Active current" Value="@Units.Current(status.ActiveCurrentAmps)"
-              Hint="The charger's setpoint read back from the hardware: what it was actually left at." />
-        <Stat Label="Grid power" Value="@Units.Power(status.GridPowerWatts)" End="true"
-              Hint="Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed." />
+        <Stat Label="@PlanText.EvPower" Value="@Units.Power(status.EvChargerPowerWatts)"
+              Hint="@PlanText.FastEvPowerHint" />
+        <Stat Label="@PlanText.EvCurrent" Value="@Units.Current(status.EvChargingCurrentAmps)"
+              Hint="@PlanText.FastEvCurrentHint" />
+        <Stat Label="@PlanText.ActiveCurrent" Value="@Units.Current(status.ActiveCurrentAmps)"
+              Hint="@PlanText.ActiveCurrentHint" />
+        <Stat Label="@PlanText.GridPower" Value="@Units.Power(status.GridPowerWatts)" End="true"
+              Hint="@PlanText.FastGridPowerHint" />
 
         @*
             The fifth stat exists only while there is an amount to count towards. On a Full charge there
@@ -143,8 +135,8 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         *@
         @if (status.FastCharge is { } progress)
         {
-            <Stat Label="Delivered" Value="@Delivered(progress)"
-                  Hint="Energy delivered against the amount asked for, metered at the charger from the moment this charge was started. The mode stops itself when it gets there." />
+            <Stat Label="@PlanText.Delivered" Value="@Delivered(progress)"
+                  Hint="@PlanText.DeliveredHint" />
         }
     </section>
 
@@ -160,6 +152,9 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 }
 
 @code {
+    // The viewer's culture, for the renders the poll and other threads ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+
     [Parameter] public ChargeControlStatus? Status { get; set; }
 
     [Parameter] public bool Busy { get; set; }
@@ -184,11 +179,11 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     public void Dispose() => Fast.Changed -= OnLimitChanged;
 
     private void OnLimitChanged(FastChargeLimit? limit) =>
-        InvokeAsync(() =>
+        InvokeAsync(_viewer.Wrap(() =>
         {
             AdoptRunningLimit(limit);
             StateHasChanged();
-        });
+        }));
 
     // A limit set from Home Assistant or the API is what this charge is actually stopping at, so the
     // form shows it rather than whatever was last typed here. Clearing does not reset the boxes: the
@@ -239,7 +234,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 
         if (!composed.Accepted)
         {
-            _error = composed.Error;
+            _error = composed.Error is { } error ? Localized.Say(composed.ErrorPhrase, error) : null;
             return;
         }
 
@@ -277,23 +272,17 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     private string BasisHint() => _basis switch
     {
         FastChargeBasis.Energy =>
-            "The charge stops when that much has been delivered, or when the car stops first — "
-            + "whichever comes first.",
+            PlanText.BasisEnergyHint,
         FastChargeBasis.Soc =>
-            "Converted to kilowatt-hours once, when you press the button. A later reading from the car "
-            + "does not move a charge that is already part delivered.",
+            PlanText.BasisSocHint,
         _ => CanTargetSoc
-            ? "The car decides: the charge runs until it reaches its own charge limit and stops drawing."
-            : "The car decides: the charge runs until it reaches its own charge limit and stops drawing. "
-              + "A battery target needs the car's capacity in Vehicle:BatteryCapacityKWh and a reading "
-              + "from the car.",
+            ? PlanText.BasisFullHint
+            : PlanText.BasisFullNoSocHint,
     };
 
     private string EndsHint() => _basis == FastChargeBasis.Full
-        ? "Ends itself: when the car stops drawing because it has reached its own charge limit, the "
-          + "setpoint drops to the pause current and the mode returns to Off, which releases the hold."
-        : "Ends itself: at the amount above, or when the car stops drawing first. Either way the "
-          + "setpoint drops to the pause current and the mode returns to Off, which releases the hold.";
+        ? PlanText.EndsFullHint
+        : PlanText.EndsAmountHint;
 
     /// <summary>
     /// What the car last reported, and whether it is still worth converting from (#179). One
@@ -311,7 +300,7 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
         // exists to stop, and this mode draws the site's supply limit for hours on the answer.
         if (basis.StaleRefusal is { } tooOld)
         {
-            return tooOld;
+            return Localized.Say(basis.StaleRefusalPhrase, tooOld);
         }
 
         var requiredWh = VehicleTargetEnergy.RequiredWh(
@@ -319,11 +308,9 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
 
         return requiredWh switch
         {
-            null => "No usable SOC reading to measure the gap from.",
-            <= 0 => $"The car is already at {Units.Percent(basis.SocPercent)} — nothing to do.",
-            _ => $"From {Units.Percent(basis.SocPercent)} now, that is about {Units.Energy(requiredWh.Value)} at the "
-                + $"charger: {Units.Capacity(VehicleDisplay.BatteryCapacityWh)} usable, {Units.Fraction(VehicleDisplay.ChargeEfficiency)} "
-                + "of what the charger meters reaching the cells.",
+            null => PlanText.NoUsableSoc,
+            <= 0 => Localized.Format(PlanText.AlreadyAt, Units.Percent(basis.SocPercent)),
+            _ => Localized.Format(PlanText.SocConversion, Units.Percent(basis.SocPercent), Units.Energy(requiredWh.Value), Units.Capacity(VehicleDisplay.BatteryCapacityWh), Units.Fraction(VehicleDisplay.ChargeEfficiency)),
         };
     }
 
@@ -331,36 +318,30 @@ else if (_basis == FastChargeBasis.Soc && CanTargetSoc)
     {
         if (progress.IsMet)
         {
-            return $"The {Units.Energy(progress.Limit.RequiredEnergyWh)} asked for has been delivered; "
-                + "the charge is stopping.";
+            return Localized.Format(PlanText.FastDelivered, Units.Energy(progress.Limit.RequiredEnergyWh));
         }
 
         var asked = progress.Limit.TargetSocPercent is { } soc
-            ? $"{Units.Energy(progress.Limit.RequiredEnergyWh)}, which is the {Units.Percent(soc)} asked for"
+            ? Localized.Format(PlanText.AskedSoc, Units.Energy(progress.Limit.RequiredEnergyWh), Units.Percent(soc))
             : Units.Energy(progress.Limit.RequiredEnergyWh);
 
-        return $"{Units.Energy(progress.DeliveredWh)} of {asked} is in the car; "
-            + $"{Units.Energy(progress.RemainingWh)} to go before this stops itself.";
+        return Localized.Format(PlanText.FastProgress, Units.Energy(progress.DeliveredWh), asked, Units.Energy(progress.RemainingWh));
     }
 
     private static string ScheduleNarrative(FastChargePlan plan, DateTimeOffset now)
     {
         var power = plan.PowerObserved
-            ? $"{Units.Power(plan.ChargePowerWatts)} (what the car is taking)"
-            : $"{Units.Power(plan.ChargePowerWatts)} (the installation's maximum — the car has not drawn yet)";
+            ? Localized.Format(PlanText.PowerObserved, Units.Power(plan.ChargePowerWatts))
+            : Localized.Format(PlanText.PowerMaximum, Units.Power(plan.ChargePowerWatts));
 
         if (!plan.IsFeasible)
         {
-            return $"Not enough time: about {Units.Energy(plan.ShortfallWh)} of this will not fit before "
-                + $"{plan.ReadyBy.LocalDateTime:HH:mm}. Charging flat out from now at {power}.";
+            return Localized.Format(PlanText.NotEnoughTime, Units.Energy(plan.ShortfallWh), plan.ReadyBy.LocalDateTime, power);
         }
 
         return plan.IsWaitingAt(now)
-            ? $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm}, then charging flat out: "
-              + $"{Units.Energy(plan.RemainingEnergyWh)} at {power} takes about "
-              + $"{Units.Duration(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}."
-            : $"Charging flat out to be ready by {plan.ReadyBy.LocalDateTime:HH:mm}: "
-              + $"{Units.Energy(plan.RemainingEnergyWh)} to go at {power}.";
+            ? Localized.Format(PlanText.WaitingUntil, plan.StartNoLaterThan.LocalDateTime, Units.Energy(plan.RemainingEnergyWh), power, Units.Duration(plan.Duration), plan.ReadyBy.LocalDateTime)
+            : Localized.Format(PlanText.ChargingToBeReady, plan.ReadyBy.LocalDateTime, Units.Energy(plan.RemainingEnergyWh), power);
     }
 
     // Composed through the app's own zone rather than DateTime.Now, so "07:00" means seven o'clock here

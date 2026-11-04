@@ -1,0 +1,40 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Builder
+@inject IOptions<RequestLocalizationOptions> Localization
+@inject NavigationManager Navigation
+
+@*
+    The viewer's language (#290). A plain form posting to WebUiCultures' endpoint, for the same reason
+    the sign-out control is one: this layout also wraps static pages, and the cookie it sets has to be
+    written on an HTTP response. Changing the selection submits it; the button is for a browser with
+    scripts off. Only shown when there is a choice to make.
+*@
+@if (_offered.Count > 1)
+{
+    <form method="post" action="@WebUiCultures.Path" class="language">
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+        <select name="culture" aria-label="@SharedText.Language" onchange="this.form.submit()">
+            @foreach (var culture in _offered)
+            {
+                <option value="@culture.Name" selected="@(culture.Name == CultureInfo.CurrentUICulture.Name)" lang="@culture.Name">@Name(culture)</option>
+            }
+        </select>
+        <noscript><button type="submit">@SharedText.Language</button></noscript>
+    </form>
+}
+
+@code {
+    private IList<CultureInfo> _offered = [];
+
+    // The path and query of the page the picker is on, which is where the endpoint sends the browser back to.
+    private string ReturnUrl => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    protected override void OnInitialized() =>
+        _offered = Localization.Value.SupportedUICultures ?? [];
+
+    // Each language in its own words ("čeština", not "Czech"), since the reader may not know the current one.
+    private static string Name(CultureInfo culture) =>
+        string.Equals(culture.Name, WebUiCultures.Pseudo, StringComparison.OrdinalIgnoreCase)
+            ? "Pseudo"
+            : culture.TextInfo.ToTitleCase(culture.NativeName);
+}

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- What the services say, by the key of the Phrase they hand the UI (Gleanvolt.Core.Models.Phrase). The key's dots are underscores here. -->
+  <data name="DayPlan_NoWindow" xml:space="preserve">
+    <value>No chargeable window today; the battery has priority. SOC floor {0}.</value>
+  </data>
+  <data name="DayPlan_Window" xml:space="preserve">
+    <value>{0} available for the car, window {1}–{2}, SOC floor {3}.</value>
+  </data>
+  <data name="DayPlan_WindowShort" xml:space="preserve">
+    <value>{0} available for the car, window {1}–{2}, SOC floor {3}. The day is {4} short of a full battery by the deadline.</value>
+  </data>
+  <data name="SolarGrid_NoForecast" xml:space="preserve">
+    <value>no forecast fetched yet</value>
+  </data>
+  <data name="SolarGrid_NoPvLeft" xml:space="preserve">
+    <value>no PV left in today's forecast (fetched {0} ago)</value>
+  </data>
+  <data name="SolarGrid_Stale" xml:space="preserve">
+    <value>forecast is {0} old (stale after {1})</value>
+  </data>
+  <data name="SolarGrid_NoneClears" xml:space="preserve">
+    <value>no forecast period left today clears {0} of surplus</value>
+  </data>
+  <data name="SolarGrid_Clears" xml:space="preserve">
+    <value>forecast surplus clears {0} from {1} until {2}</value>
+  </data>
+  <!-- Tariff -->
+  <data name="Tariff_NegativePrice" xml:space="preserve">
+    <value>A price can't be negative.</value>
+  </data>
+  <data name="Tariff_LowAboveHigh" xml:space="preserve">
+    <value>Low tariff costs more than high.</value>
+  </data>
+  <data name="Tariff_NoPeriods" xml:space="preserve">
+    <value>No low-tariff periods: everything would be high tariff.</value>
+  </data>
+  <data name="Tariff_NotATime" xml:space="preserve">
+    <value>Not a time.</value>
+  </data>
+  <data name="Tariff_EndsBeforeStart" xml:space="preserve">
+    <value>Ends before it starts. Split a period over midnight into two rows.</value>
+  </data>
+  <data name="Tariff_Overlaps" xml:space="preserve">
+    <value>Overlaps {0}–{1}.</value>
+  </data>
+  <data name="Tariff_Unreadable" xml:space="preserve">
+    <value>The table could not be read.</value>
+  </data>
+  <data name="Tariff_UnknownProvider" xml:space="preserve">
+    <value>There is no tariff provider called {0} in this build.</value>
+  </data>
+  <data name="Tariff_NotWritten" xml:space="preserve">
+    <value>Could not write {0}: {1}</value>
+    <comment>{1} is the operating system's own error, in its language.</comment>
+  </data>
+  <!-- A charge request the planner will not take -->
+  <data name="Request_DepartureInPast" xml:space="preserve">
+    <value>The departure time is in the past.</value>
+  </data>
+  <data name="Request_TooFarAhead" xml:space="preserve">
+    <value>A departure more than {0} away is further than a charge that does not survive a restart can honestly promise.</value>
+  </data>
+  <data name="Request_TooFarAheadForecast" xml:space="preserve">
+    <value>A departure more than {0} away is further than the forecast — or a request that does not survive a restart — can honestly promise.</value>
+  </data>
+  <data name="Request_DepartureNeedsAmount" xml:space="preserve">
+    <value>A departure needs an amount to work back from — say how much energy, or what state of charge, the car needs. Without one there is nothing to time.</value>
+  </data>
+  <data name="Request_EnterEnergy" xml:space="preserve">
+    <value>Enter how much energy the car needs.</value>
+  </data>
+  <data name="Request_EnterSoc" xml:space="preserve">
+    <value>Enter the state of charge to stop at.</value>
+  </data>
+  <data name="Request_NoCapacity" xml:space="preserve">
+    <value>A target state of charge needs the car's usable capacity, which is not configured (Vehicle:BatteryCapacityKWh). Ask in kilowatt-hours instead.</value>
+  </data>
+  <data name="Request_NoSoc" xml:space="preserve">
+    <value>The car has not reported a state of charge, so there is nothing to measure the gap from. Ask in kilowatt-hours instead.</value>
+  </data>
+  <data name="Request_AlreadyAt" xml:space="preserve">
+    <value>The car is already at {0}, at or above the {1} asked for.</value>
+  </data>
+  <data name="Request_UnknownBasis" xml:space="preserve">
+    <value>Unknown fast charge basis '{0}'.</value>
+  </data>
+  <data name="Request_EnergyOrSoc" xml:space="preserve">
+    <value>Ask for energy or for a state of charge, not both.</value>
+  </data>
+  <data name="Request_Stale" xml:space="preserve">
+    <value>The car last reported {0} {1} ago, past the {2} this installation treats as current (Vehicle:MaxAge), so there is no honest way to say what that target is in kilowatt-hours. Read the car again, or ask in kilowatt-hours instead.</value>
+  </data>
+  <!-- Starting and stopping -->
+  <data name="Action_FastRefused" xml:space="preserve">
+    <value>The charger did not accept Fast, so the mode was not started — it is still in its previous mode. {0}</value>
+    <comment>{0} is the error the charger's connection reported, in its own words.</comment>
+  </data>
+  <data name="Action_StopRefused" xml:space="preserve">
+    <value>Charge control was switched off, but the charger did not accept Stop. {0}</value>
+  </data>
+  <!-- Checking a device address -->
+  <data name="Probe_InverterOk" xml:space="preserve">
+    <value>{0} answered: battery at {1} %.</value>
+  </data>
+  <data name="Probe_InverterImplausible" xml:space="preserve">
+    <value>{0} answered, but its battery register reads {1}, which is no state of charge. Is this the charger's address?</value>
+  </data>
+  <data name="Probe_ChargerOk" xml:space="preserve">
+    <value>{0} answered: charger run mode {1}.</value>
+  </data>
+  <data name="Probe_ChargerImplausible" xml:space="preserve">
+    <value>{0} answered, but its run-mode register reads {1}, which no charger reports. Is this the inverter's address?</value>
+  </data>
+  <data name="Probe_NoAnswer" xml:space="preserve">
+    <value>{0} did not answer ({1}).</value>
+    <comment>{1} is the network error, in the operating system's words.</comment>
+  </data>
+  <!-- Home Assistant's MQTT topics, as the Settings page lists them -->
+  <data name="Topic_Availability" xml:space="preserve">
+    <value>Availability</value>
+  </data>
+  <data name="Topic_State" xml:space="preserve">
+    <value>Status, as one JSON payload</value>
+  </data>
+  <data name="Topic_BatteryHold" xml:space="preserve">
+    <value>Battery hold</value>
+  </data>
+  <data name="Topic_BatteryHoldSet" xml:space="preserve">
+    <value>Battery hold, set</value>
+  </data>
+  <data name="Topic_ActivateTarget" xml:space="preserve">
+    <value>Start a targeted charge</value>
+  </data>
+  <data name="Topic_StopService" xml:space="preserve">
+    <value>Stop the controller</value>
+  </data>
+  <data name="Tariff_ProviderMissing" xml:space="preserve">
+    <value>The selected tariff provider, {0}, is not in this build, so there is no tariff restriction.</value>
+  </data>
+  <data name="Tariff_ProviderFailed" xml:space="preserve">
+    <value>The {0} tariff provider failed ({1}), so there is no tariff restriction.</value>
+  </data>
+  <data name="Tariff_ProviderEmpty" xml:space="preserve">
+    <value>The {0} tariff provider has nothing to answer from yet, so there is no tariff restriction.</value>
+  </data>
+  <!-- The car's feed, when it needs its owner -->
+  <data name="Feed_VolkswagenWantsCode" xml:space="preserve">
+    <value>volkswagen.de wants a one-time code — sign in again on the Car page.</value>
+  </data>
+  <data name="Feed_SkodaNeedsKey" xml:space="preserve">
+    <value>No MyŠkoda API key yet, or it has expired — paste one on the Car page.</value>
+  </data>
+</root>

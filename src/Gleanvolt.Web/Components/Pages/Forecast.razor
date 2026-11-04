@@ -22,39 +22,29 @@
     surplus after the house and the battery. A day total and a day's shape are different objects.
 *@
 
-<SiteTitle Page="Forecast" />
+<SiteTitle Page="@HistoryText.ForecastPageTitle" />
 
-<h1>Forecast</h1>
+<h1>@HistoryText.ForecastTitle</h1>
 
 @if (!_anything)
 {
     @* Not an error: a controller with no Solcast key is a supported installation, and so is one that
        started a minute ago. Both look identical from here, so the sentence names both. *@
     <p class="muted">
-        No forecast is held yet. Either no Solcast account is configured for this installation, or
-        nothing has been fetched since the controller started — <a href="/settings#solcast-editor">Settings</a>
-        says which, and is where the account is entered. The forecast is refreshed on its own schedule
-        in daylight; this page shows whatever was last fetched and never asks for one itself.
+        @Localized.Rich(HistoryText.NoForecastHeld, @<a href="/settings#solcast-editor">@HistoryText.NoForecastHeld_0</a>)
     </p>
 }
 else
 {
     <section class="chart-section">
-        <h2>The two days</h2>
+        <h2>@HistoryText.TheTwoDays</h2>
         <div id="forecast-chart" class="chart forecast"></div>
         <p class="muted chart-note">
-            Expected PV power against time, 30-minute periods, in @Time.LocalTimeZone.Id time.
-            The line is <strong>Expected</strong> — the median, as likely to be beaten as missed — and
-            the band behind it is <strong>p10 to p90</strong>: the width of that gap is how sure the
-            sky is, and it is the reason this is a picture rather than four numbers. The solid rule is
-            the midnight between the two days; the dashed one is now. Click a name in the legend to
-            take that series out.
+            @Localized.Rich(HistoryText.ForecastChartNote, @<text>@(Time.LocalTimeZone.Id)</text>, @<strong>@HistoryText.ForecastChartNote_1</strong>, @<strong>@HistoryText.ForecastChartNote_2</strong>)
             @if (!_fullBand)
             {
                 <text>
-                    <strong>Some periods carry no range of their own</strong> — the provider sent only
-                    a median for them, and the band collapses onto the line there. A band no wider
-                    than the line is not a promise; the table below shows a dash in those rows.
+                    @Localized.Rich(HistoryText.NoRangeNote, @<strong>@HistoryText.NoRangeNote_0</strong>)
                 </text>
             }
         </p>
@@ -63,21 +53,18 @@ else
     @if (_morningMissing is { } from)
     {
         <p class="muted table-note">
-            <strong>Today starts at @Local(from).</strong> A forecast provider only ever answers what
-            is still to come, so the controller can say what this morning was expected to bring only
-            if it was running through it — and this one has nothing retained before then. The empty
-            stretch on the left of the chart is a gap in what is known, not a dark morning.
+            @Localized.Rich(HistoryText.MorningMissing, @<strong>@Localized.Format(HistoryText.TodayStartsAt, Local(from))</strong>)
         </p>
     }
 
     <table class="sessions energy forecast-periods">
         <thead>
             <tr>
-                <th>Period</th>
-                <th class="num">Expected</th>
-                <th class="num">Low (p10)</th>
-                <th class="num">High (p90)</th>
-                <th class="num">Energy</th>
+                <th>@HistoryText.Period</th>
+                <th class="num">@HistoryText.ColExpected</th>
+                <th class="num">@HistoryText.ColLow</th>
+                <th class="num">@HistoryText.ColHigh</th>
+                <th class="num">@HistoryText.ColEnergy</th>
             </tr>
         </thead>
         @foreach (var day in _days)
@@ -92,13 +79,11 @@ else
                 <tr class="day-heading">
                     <th colspan="5">
                         @day.Label
-                        <span class="muted forecast-date">@day.Date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
+                        <span class="muted forecast-date">@day.Date.ToString(SharedText.DayMonthPattern, System.Globalization.CultureInfo.CurrentCulture)</span>
                         @if (day.Summary is { } summary)
                         {
                             <span class="day-totals">
-                                @Units.Kwh(summary.ExpectedWh, 2) expected
-                                (@Units.Kwh(summary.LowWh, 2, unit: false)–@Units.Kwh(summary.HighWh, 2, unit: false) at p10–p90), peak
-                                @Units.Kw(summary.PeakWatts, 2)
+                                @Localized.Format(HistoryText.DayTotals, Units.Kwh(summary.ExpectedWh, 2), Units.Kwh(summary.LowWh, 2, unit: false), Units.Kwh(summary.HighWh, 2, unit: false), Units.Kw(summary.PeakWatts, 2))
                             </span>
                         }
                     </th>
@@ -106,7 +91,7 @@ else
                 @if (day.Periods.Count == 0)
                 {
                     <tr class="empty-day">
-                        <td colspan="5" class="muted">Nothing is held for this day.</td>
+                        <td colspan="5" class="muted">@HistoryText.NothingHeld</td>
                     </tr>
                 }
                 @foreach (var period in day.Periods)
@@ -126,22 +111,12 @@ else
     </table>
 
     <p class="muted table-note">
-        Power in W, energy in kWh, times in @Time.LocalTimeZone.Id time. Each row is the half hour it
-        names, and every figure on it is the average power the provider expects across that half hour —
-        so the energy column is simply that power over thirty minutes. The night rows are kept: a 0 W
-        row at 02:00 <em>is</em> the forecast, and a table that drops rows is one you have to learn the
-        rules of before you can trust a gap in it.
-        A period is counted under the day it <strong>ends</strong> on, which is how the dashboard and
-        the day plan count it too, so each day opens with the half hour that ends at its own midnight.
-        <strong>Tomorrow's figures keep moving</strong> — every refresh re-forecasts them until the day
-        arrives.
+        @Localized.Rich(HistoryText.ForecastTableNote, @<text>@(Time.LocalTimeZone.Id)</text>, @<em>@HistoryText.ForecastTableNote_1</em>, @<strong>@HistoryText.ForecastTableNote_2</strong>, @<strong>@HistoryText.ForecastTableNote_3</strong>)
         @if (_retrievedAt is { } retrieved)
         {
-            <text> Last fetched <strong>@Local(retrieved)</strong> on @retrieved.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture).</text>
+            <text> @Localized.Rich(HistoryText.LastFetched, @<strong>@Local(retrieved)</strong>, @<text>@(TimeZoneInfo.ConvertTime(retrieved, Time.LocalTimeZone).ToString(SharedText.DayMonthPattern, System.Globalization.CultureInfo.CurrentCulture))</text>)</text>
         }
-        The horizon is about 48 hours, which is why this is two days and not a week.
-        The dashboard's <a href="/#solar-forecast">Solar forecast</a> table is the same two days in four
-        numbers each.
+        @Localized.Rich(HistoryText.ForecastHorizonNote, @<a href="/#solar-forecast">@HistoryText.ForecastHorizonNote_0</a>)
     </p>
 }
 
@@ -181,8 +156,8 @@ else
 
         _days =
         [
-            new Day("Today", today, todayForecast?.Periods ?? [], Forecasts.GetDaySummary(today)),
-            new Day("Tomorrow", tomorrow, tomorrowForecast?.Periods ?? [], Forecasts.GetDaySummary(tomorrow)),
+            new Day(HistoryText.Today, today, todayForecast?.Periods ?? [], Forecasts.GetDaySummary(today)),
+            new Day(HistoryText.Tomorrow, tomorrow, tomorrowForecast?.Periods ?? [], Forecasts.GetDaySummary(tomorrow)),
         ];
 
         _retrievedAt = todayForecast?.RetrievedAt ?? tomorrowForecast?.RetrievedAt;
@@ -219,7 +194,7 @@ else
         // exist on the other side, and disposing one that isn't there is a no-op anyway.
         _chartCreated = true;
 
-        await JS.InvokeVoidAsync("solaxCharts.renderForecastChart", "forecast-chart", _chart);
+        await JS.InvokeVoidAsync("solaxCharts.renderForecastChart", "forecast-chart", _chart, ChartText.Current());
     }
 
     public async ValueTask DisposeAsync()

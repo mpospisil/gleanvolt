@@ -17,16 +17,16 @@
         <label class="@(HasTariff ? null : "muted")">
             <input type="checkbox" id="@($"low-tariff-{Slug}")"
                    checked="@_on" disabled="@(!HasTariff && !_on)" @onchange="OnChanged" />
-            Low tariff only
+            @PlanText.LowTariffOnly
         </label>
-        <InfoTip Topic="Low tariff only">
+        <InfoTip Topic="@PlanText.LowTariffOnlyTopic">
             <p>@Hint</p>
         </InfoTip>
     </div>
     @* Said out loud, not in the tip: it is why the box is greyed out, not what it means. *@
     @if (!HasTariff)
     {
-        <span class="hint">Set up a tariff in <a href="/settings#tariff-editor">Settings</a> first; until then this has nothing to wait for.</span>
+        <span class="hint">@Localized.Rich(PlanText.NoTariffYet, @<a href="/settings#tariff-editor">@PlanText.NoTariffYet_0</a>)</span>
     }
     @if (Note() is { } note)
     {
@@ -75,9 +75,9 @@
     private string? Note() => Status is { } status && status.Mode == Mode
         ? status.LowTariff switch
         {
-            { Ignored: true } => "Set, but ignored: there is no tariff to wait for, so it charges whatever the hour.",
-            { Waiting: true, Until: { } until } => $"Waiting for low tariff, from {TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone):HH:mm}.",
-            { Waiting: true } => "Waiting for low tariff.",
+            { Ignored: true } => PlanText.LowTariffIgnoredNote,
+            { Waiting: true, Until: { } until } => Localized.Format(PlanText.WaitingForLowTariffFrom, TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone)),
+            { Waiting: true } => PlanText.WaitingForLowTariff,
             _ => null,
         }
         : null;

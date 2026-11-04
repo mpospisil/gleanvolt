@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Settings.Configuration;
@@ -9,6 +10,15 @@ using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Web;
 using Gleanvolt.Web.Auth;
 using Gleanvolt.Worker;
+
+// The controller is culture-invariant: what it logs, publishes to MQTT and answers on the API must
+// not depend on the locale of the machine it happens to run on (a cs-CZ host once turned "6.00 kWh"
+// into "6,00 kWh"). Pinned here, first, for every thread the process will ever start. The web UI is
+// the one exception and opts out per request -- see WebUiCultures (#290).
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 
 // A tiny offline tool rather than a whole second entry point: the password is a secret that must
 // never live in appsettings.json, and this is the only way to produce the hash that belongs in

@@ -7,17 +7,17 @@
     which withholds it unless a login is enforced, so there is no policy here to get wrong.
 *@
 
-<dt>Broker</dt>
+<dt>@SharedText.MqttBroker</dt>
 <dd>
     <code>@Connection.Broker</code>
-    <span class="muted">— what the controller dials, which is not necessarily reachable from here.</span>
+    <span class="muted">@SharedText.MqttBrokerNote</span>
 </dd>
 
-<dt>Username</dt>
+<dt>@SharedText.MqttUsername</dt>
 <dd>
     @if (string.IsNullOrWhiteSpace(Connection.Username))
     {
-        <span class="muted">none (anonymous)</span>
+        <span class="muted">@SharedText.MqttAnonymous</span>
     }
     else
     {
@@ -25,7 +25,7 @@
     }
 </dd>
 
-<dt>Password</dt>
+<dt>@SharedText.MqttPassword</dt>
 <dd>
     @if (Connection.Password is { } secret)
     {
@@ -34,17 +34,16 @@
     else if (Connection.PasswordWithheld)
     {
         <span class="muted">
-            set, and not shown here — this UI has no login, so anyone on the network could read it.
-            Configure <code>Web__PasswordHash</code> (<code>hash-password</code>) to make it readable.
+            @Localized.Rich(SharedText.MqttPasswordWithheld, @<code>Web__PasswordHash</code>, @<code>hash-password</code>)
         </span>
     }
     else
     {
-        <span class="muted">none</span>
+        <span class="muted">@SharedText.None</span>
     }
 </dd>
 
-<dt>Client id</dt>
+<dt>@SharedText.MqttClientId</dt>
 <dd><code>@Connection.ClientId</code></dd>
 
 @code {

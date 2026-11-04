@@ -5,11 +5,11 @@
     a form. Links, like the Charging plan tabs, so each half is a real URL. The old /pv-system and
     /health addresses still answer, for bookmarks.
 *@
-<nav class="tabs settings-tabs" aria-label="Settings">
+<nav class="tabs settings-tabs" aria-label="@SharedText.SettingsTabsLabel">
     <a class="tab @(Current == SettingsTab.Installation ? "active" : null)" href="/settings"
-       aria-current="@(Current == SettingsTab.Installation ? "page" : null)">Installation</a>
+       aria-current="@(Current == SettingsTab.Installation ? "page" : null)">@SharedText.SettingsInstallation</a>
     <a class="tab @(Current == SettingsTab.Health ? "active" : null)" href="/settings/health"
-       aria-current="@(Current == SettingsTab.Health ? "page" : null)">Health</a>
+       aria-current="@(Current == SettingsTab.Health ? "page" : null)">@SharedText.SettingsHealth</a>
 </nav>
 
 @code {

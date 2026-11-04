@@ -1,3 +1,4 @@
+using static System.FormattableString;
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -79,10 +80,16 @@ public sealed record VehicleSocBasis(
     /// </summary>
     public string? StaleRefusal =>
         IsStale
-            ? $"The car last reported {SocPercent:F0}% {Describe(Age!.Value)} ago, past the "
+            ? Invariant($"The car last reported {SocPercent:F0}% {Describe(Age!.Value)} ago, past the ")
                 + $"{Describe(MaxAge)} this installation treats as current (Vehicle:MaxAge), so there is "
                 + "no honest way to say what that target is in kilowatt-hours. Read the car again, or "
                 + "ask in kilowatt-hours instead."
+            : null;
+
+    /// <summary>The <see cref="StaleRefusal"/> for the web UI to say in the viewer's language (#290).</summary>
+    public Phrase? StaleRefusalPhrase =>
+        IsStale
+            ? Phrase.Of("Request.Stale", new PhraseArg.Percent(SocPercent ?? 0), new PhraseArg.Duration(Age!.Value), new PhraseArg.Duration(MaxAge))
             : null;
 
     /// <summary>
@@ -91,8 +98,8 @@ public sealed record VehicleSocBasis(
     /// </summary>
     private static string Describe(TimeSpan span) =>
         span < TimeSpan.FromHours(1)
-            ? $"{span.TotalMinutes:F0} min"
+            ? Invariant($"{span.TotalMinutes:F0} min")
             : span < TimeSpan.FromDays(1)
-                ? $"{span.TotalHours:F1} h"
-                : $"{span.TotalDays:F1} days";
+                ? Invariant($"{span.TotalHours:F1} h")
+                : Invariant($"{span.TotalDays:F1} days");
 }

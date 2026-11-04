@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Models;
+using Gleanvolt.Web.Resources;
 
 namespace Gleanvolt.Web.Components;
 
@@ -23,13 +24,12 @@ public static class SolarDayPlanNarrative
 
         if (!plan.IsUsable)
         {
-            return "No usable forecast, so no plan for today; the mode is charging on live surplus instead.";
+            return PlanText.NoUsableForecast;
         }
 
         if (plan.NextFeasibleWindow is not { } window || plan.FeasibleEvEnergyWh <= 0)
         {
-            return "Today has no chargeable window: the sun never clears the charger's floor for long enough, "
-                + "or the home battery needs all of it. The car waits.";
+            return PlanText.NoChargeableWindow;
         }
 
         // "from 10:20 to 15:40" rather than the tile's "10:20–15:40": this is a sentence, and a dash
@@ -37,6 +37,6 @@ public static class SolarDayPlanNarrative
         var start = TimeZoneInfo.ConvertTime(window.Start, zone);
         var end = TimeZoneInfo.ConvertTime(window.End, zone);
 
-        return $"Today gives the car about {Units.Energy(plan.FeasibleEvEnergyWh)}, in a window from {start:HH:mm} to {end:HH:mm}.";
+        return Localized.Format(PlanText.TodayGives, Units.Energy(plan.FeasibleEvEnergyWh), start, end);
     }
 }

@@ -892,4 +892,42 @@ public class DashboardPageTests : PageTest
         Assert.Contains("via Data Act portal", System.Text.RegularExpressions.Regex.Replace(age, @"\s+", " "));
         Assert.Contains("stale", age);
     }
+
+    [Fact]
+    public void Every_string_on_the_overview_comes_from_a_resource()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        _car = Id4();
+        Feed(new VehicleSourceHealth(VehicleSourceState.Ok, "Reading."));
+        _forecast.Days[new DateOnly(2026, 8, 12)] = new(ExpectedWh: 18_400, LowWh: 14_100, HighWh: 21_900, PeakWatts: 5_300);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Forecasted) with
+        {
+            Plan = TestPlans.Usable(_time.Now),
+            CarConnected = true,
+            EvChargerPowerWatts = 4_200,
+            SessionEnergyWh = 3_000,
+            BatteryHoldEnabled = true,
+            BatteryHoldRequested = true,
+        });
+        _vehicle.Set(new VehicleState(
+            _time.Now.AddHours(-3.5),
+            SocPercent: 28,
+            ChargeState: VehicleChargeState.Charging,
+            PlugState: VehiclePlugState.Connected,
+            SourceId: "vw-group-id4"));
+
+        var page = PseudoLocale.Render(() => Render<Dashboard>());
+
+        PseudoLocale.AssertTranslated(page.Markup, "Home Roof", "The ID.4", "Volkswagen ID.4 Pro", "vw-group-id4", "Data Act portal", "Reading.", "Europe/Prague");
+    }
+
+    [Fact]
+    public void Every_string_on_the_idle_overview_comes_from_a_resource()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off) with { CarConnected = true });
+
+        var page = PseudoLocale.Render(() => Render<Dashboard>());
+
+        PseudoLocale.AssertTranslated(page.Markup, "Home Roof", "Europe/Prague");
+    }
 }
