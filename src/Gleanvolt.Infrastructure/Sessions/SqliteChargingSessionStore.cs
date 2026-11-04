@@ -742,8 +742,22 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
     private static string? SerializePlan(SolarDayPlan? plan) =>
         plan is null ? null : JsonSerializer.Serialize(plan, ChargingSessionJson.Options);
 
-    private static SolarDayPlan? DeserializePlan(string json) =>
-        JsonSerializer.Deserialize<SolarDayPlan>(json, ChargingSessionJson.Options);
+    private static SolarDayPlan? DeserializePlan(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<SolarDayPlan>(json, ChargingSessionJson.Options);
+        }
+        catch (NotSupportedException)
+        {
+            // A plan written by a build between #290 and #292 carries its phrase's arguments untagged,
+            // as {}, which cannot be read back. The phrase is the reason again for the web UI; the plan
+            // is worth more than it, so it is read without.
+            var node = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+            node.Remove("reasonPhrase");
+            return node.Deserialize<SolarDayPlan>(ChargingSessionJson.Options);
+        }
+    }
 
     private static string? SerializeForecast(SolarForecast? forecast) =>
         forecast is null ? null : JsonSerializer.Serialize(forecast, ChargingSessionJson.Options);

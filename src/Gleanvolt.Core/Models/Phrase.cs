@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -30,6 +32,21 @@ public sealed record Phrase(string Key, IReadOnlyList<PhraseArg> Args)
 }
 
 /// <summary>One argument of a <see cref="Phrase"/>, in its base unit; the UI decides how it reads.</summary>
+/// <remarks>
+/// Tagged in JSON, because a phrase is stored: a session's opening plan and its events keep theirs, and
+/// an untagged abstract argument writes as <c>{}</c> and cannot be read back at all.
+/// </remarks>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(Energy), "energy")]
+[JsonDerivedType(typeof(Power), "power")]
+[JsonDerivedType(typeof(Percent), "percent")]
+[JsonDerivedType(typeof(Clock), "clock")]
+[JsonDerivedType(typeof(Date), "date")]
+[JsonDerivedType(typeof(Duration), "duration")]
+[JsonDerivedType(typeof(Number), "number")]
+[JsonDerivedType(typeof(Text), "text")]
+[JsonDerivedType(typeof(Said), "said")]
+[JsonDerivedType(typeof(List), "list")]
 public abstract record PhraseArg
 {
     private PhraseArg()
