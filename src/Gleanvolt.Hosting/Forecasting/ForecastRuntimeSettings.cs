@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Hosting.Configuration;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Forecasting;
 
@@ -37,10 +38,10 @@ public sealed class ForecastRuntimeSettings : IForecastRuntimeSettings
     }
 
     public void SetMinBatterySocFloorPercent(double percent, string source) =>
-        Set(ref _minBatterySocFloorPercent, Math.Clamp(percent, 0, 100), "Minimum battery SOC", $"{percent:F0}%", source);
+        Set(ref _minBatterySocFloorPercent, Math.Clamp(percent, 0, 100), "Minimum battery SOC", Invariant($"{percent:F0}%"), source);
 
     public void SetFloorResumeMarginPercent(double percent, string source) =>
-        Set(ref _floorResumeMarginPercent, Math.Clamp(percent, 0, 100), "SOC floor resume margin", $"{percent:F0}%", source);
+        Set(ref _floorResumeMarginPercent, Math.Clamp(percent, 0, 100), "SOC floor resume margin", Invariant($"{percent:F0}%"), source);
 
     private void Set(ref double field, double value, string name, string display, string source)
     {

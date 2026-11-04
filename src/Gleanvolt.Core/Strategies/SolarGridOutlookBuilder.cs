@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -36,7 +37,7 @@ public static class SolarGridOutlookBuilder
 
         if (forecast is null || forecast.Periods.Count == 0)
         {
-            return SolarGridOutlook.Unavailable(minimum, now, "no forecast fetched yet");
+            return SolarGridOutlook.Unavailable(minimum, now, "no forecast fetched yet", Phrase.Of("SolarGrid.NoForecast"));
         }
 
         var age = now - forecast.RetrievedAt;
@@ -51,11 +52,13 @@ public static class SolarGridOutlookBuilder
             {
                 return new SolarGridOutlook(
                     minimum, now, ForecastUsable: true, NextSunAt: null, SunUntil: null,
-                    $"no PV left in today's forecast (fetched {age.TotalHours:F1}h ago)");
+                    Invariant($"no PV left in today's forecast (fetched {age.TotalHours:F1}h ago)"),
+                    ReasonPhrase: Phrase.Of("SolarGrid.NoPvLeft", new PhraseArg.Duration(age)));
             }
 
             return SolarGridOutlook.Unavailable(
-                minimum, now, $"forecast is {age.TotalHours:F1}h old (stale after {staleAfter.TotalHours:F0}h)");
+                minimum, now, Invariant($"forecast is {age.TotalHours:F1}h old (stale after {staleAfter.TotalHours:F0}h)"),
+                Phrase.Of("SolarGrid.Stale", new PhraseArg.Duration(age), new PhraseArg.Duration(staleAfter)));
         }
 
         // Positive as well as at-or-above: with a minimum of zero, a dark period over an idle house
@@ -69,7 +72,8 @@ public static class SolarGridOutlookBuilder
         {
             return new SolarGridOutlook(
                 minimum, now, ForecastUsable: true, NextSunAt: null, SunUntil: null,
-                $"no forecast period left today clears {minimum:F0}W of surplus");
+                Invariant($"no forecast period left today clears {minimum:F0}W of surplus"),
+                ReasonPhrase: Phrase.Of("SolarGrid.NoneClears", new PhraseArg.Power(minimum)));
         }
 
         var from = useful[0].Start;
@@ -77,7 +81,8 @@ public static class SolarGridOutlookBuilder
 
         return new SolarGridOutlook(
             minimum, now, ForecastUsable: true, from, until,
-            $"forecast surplus clears {minimum:F0}W from {from.LocalDateTime:HH:mm} until {until.LocalDateTime:HH:mm}");
+            Invariant($"forecast surplus clears {minimum:F0}W from {from.LocalDateTime:HH:mm} until {until.LocalDateTime:HH:mm}"),
+            ReasonPhrase: Phrase.Of("SolarGrid.Clears", new PhraseArg.Power(minimum), new PhraseArg.Clock(from), new PhraseArg.Clock(until)));
     }
 
     /// <summary>

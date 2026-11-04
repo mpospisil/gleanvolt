@@ -101,7 +101,8 @@ public sealed record SolarDayPlan(
     DateTimeOffset? ForecastAsOf,
     bool IsUsable,
     string Reason,
-    IReadOnlyList<SolarDayPlanTimelinePoint> Timeline)
+    IReadOnlyList<SolarDayPlanTimelinePoint> Timeline,
+    Phrase? ReasonPhrase = null)
 {
     /// <summary>
     /// Whether the day cannot cover the house and the battery to 100% together. A reading for the log

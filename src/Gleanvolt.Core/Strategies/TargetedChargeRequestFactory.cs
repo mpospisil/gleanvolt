@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -122,7 +123,7 @@ public static class TargetedChargeRequestFactory
             if (requiredWh.Value <= 0)
             {
                 return Result.Rejected(
-                    $"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for.");
+                    Invariant($"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for."));
             }
 
             askedWh = requiredWh.Value;
@@ -146,7 +147,7 @@ public static class TargetedChargeRequestFactory
         if (departBy - now > limits.MaxHorizon)
         {
             return Result.Rejected(
-                $"A departure more than {limits.MaxHorizon.TotalHours:F0} hours away is further than "
+                Invariant($"A departure more than {limits.MaxHorizon.TotalHours:F0} hours away is further than ")
                 + "the forecast — or a request that does not survive a restart — can honestly promise.");
         }
 

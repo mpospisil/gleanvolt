@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -707,7 +708,7 @@ public static class TargetedChargePlanner
             IsUsable: true,
             TailEnergyWh: 0,
             HoldUntil: null,
-            Reason: $"Target met: {Math.Max(0, deliveredWh) / 1000:F1}kWh of {request.RequiredEnergyWh / 1000:F1}kWh delivered.");
+            Reason: Invariant($"Target met: {Math.Max(0, deliveredWh) / 1000:F1}kWh of {request.RequiredEnergyWh / 1000:F1}kWh delivered."));
 
     private static string Describe(TargetedChargePlan plan, bool usable)
     {
@@ -716,7 +717,7 @@ public static class TargetedChargePlanner
         // Said first, because it is the sentence that answers the question an idle charger provokes. A
         // plan holding 6kWh back until 04:10 looks identical to a broken one until this is read.
         var held = plan.HoldUntil is { } release
-            ? $" Holding the last {plan.TailEnergyWh / 1000:F1}kWh until {release.LocalDateTime:HH:mm} so the car is "
+            ? Invariant($" Holding the last {plan.TailEnergyWh / 1000:F1}kWh until {release.LocalDateTime:HH:mm} so the car is ")
                 + "full just before departure."
             : string.Empty;
 
@@ -724,26 +725,26 @@ public static class TargetedChargePlanner
         {
             TargetedChargeStrategy.Maximum =>
                 $"Not enough time: charging flat out until {plan.Deadline.LocalDateTime:HH:mm} delivers "
-                + $"{plan.ExpectedEnergyWh / 1000:F1}kWh of the {plan.RemainingEnergyWh / 1000:F1}kWh still needed "
-                + $"({plan.ShortfallWh / 1000:F1}kWh short); leaving at "
+                + Invariant($"{plan.ExpectedEnergyWh / 1000:F1}kWh of the {plan.RemainingEnergyWh / 1000:F1}kWh still needed ")
+                + Invariant($"({plan.ShortfallWh / 1000:F1}kWh short); leaving at ")
                 + $"{plan.FeasibleDeparture?.LocalDateTime:HH:mm} would cover it.{blind}",
 
             TargetedChargeStrategy.Solar =>
-                $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm} from forecast surplus alone; "
+                Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm} from forecast surplus alone; ")
                 + $"no grid import planned.{held}{blind}",
 
             // Named explicitly, because "0.0kWh from sun" on a day with 6kWh of forecast surplus reads
             // as a broken plan rather than as the weak-sun case the placement is answering.
             _ when plan.HasUnusableSurplus =>
-                $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: "
-                + $"{plan.ForecastSurplusWh / 1000:F1}kWh of surplus is forecast but none of it clears the charger's "
-                + $"minimum, so the grid covers up to {plan.GridEnergyWh / 1000:F1}kWh from "
+                Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: ")
+                + Invariant($"{plan.ForecastSurplusWh / 1000:F1}kWh of surplus is forecast but none of it clears the charger's ")
+                + Invariant($"minimum, so the grid covers up to {plan.GridEnergyWh / 1000:F1}kWh from ")
                 + $"{plan.GridStart?.LocalDateTime:HH:mm} — placed over the best of that sun, which pays for part "
                 + $"of it.{held}{blind}",
 
             _ =>
-                $"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: "
-                + $"{plan.SolarEnergyWh / 1000:F1}kWh from sun, {plan.GridEnergyWh / 1000:F1}kWh from the grid "
+                Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh by {plan.DepartBy.LocalDateTime:ddd HH:mm}: ")
+                + Invariant($"{plan.SolarEnergyWh / 1000:F1}kWh from sun, {plan.GridEnergyWh / 1000:F1}kWh from the grid ")
                 + $"starting {plan.GridStart?.LocalDateTime:HH:mm}.{held}{blind}",
         };
     }

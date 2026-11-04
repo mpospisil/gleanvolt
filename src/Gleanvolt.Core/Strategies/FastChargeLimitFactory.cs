@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -91,7 +92,7 @@ public static class FastChargeLimitFactory
             if (maxHorizon is { } horizon && departure - now > horizon)
             {
                 return Result.Rejected(
-                    $"A departure more than {horizon.TotalHours:F0} hours away is further than a charge "
+                    Invariant($"A departure more than {horizon.TotalHours:F0} hours away is further than a charge ")
                     + "that does not survive a restart can honestly promise.");
             }
 
@@ -160,7 +161,7 @@ public static class FastChargeLimitFactory
                 if (requiredWh.Value <= 0)
                 {
                     return Result.Rejected(
-                        $"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for.");
+                        Invariant($"The car is already at {socNow:F0}%, at or above the {target:F0}% asked for."));
                 }
 
                 return Result.Ok(new FastChargeLimit(requiredWh.Value, now, target, socNow, departBy));

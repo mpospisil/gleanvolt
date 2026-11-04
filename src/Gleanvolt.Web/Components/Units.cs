@@ -16,8 +16,8 @@ namespace Gleanvolt.Web.Components;
 /// from there in kW/kWh to one decimal. The switch is decided on the rounded figure, so 999.6 W
 /// reads "1.0 kW", never "1000 W". A missing value is always <see cref="Missing"/>, never a zero:
 /// absent and zero are different facts. A rounded zero never carries a sign. Numbers are formatted
-/// by <see cref="CultureInfo.CurrentCulture"/>, which <see cref="CultureConfiguration"/> pins to
-/// invariant, so a locale switch later is one change there.</para>
+/// by <see cref="CultureInfo.CurrentCulture"/>, which is the viewer's (see <see cref="WebUiCultures"/>):
+/// "6.00 kWh" in English, "6,00 kWh" in Czech.</para>
 ///
 /// <para>Where a table states the unit in its header, the fixed-unit forms (<see cref="Kwh"/>,
 /// <see cref="Kw"/>, <see cref="Watts"/>) take <c>unit: false</c> and a precision of the table's

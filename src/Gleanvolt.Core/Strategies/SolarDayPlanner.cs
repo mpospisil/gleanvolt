@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -108,6 +109,8 @@ public static class SolarDayPlanner
         // neither cause this shortfall nor be measured against it.
         var shortfallWh = Math.Max(0, expectedHouseWh + batteryToFullWh - remainingPvWh);
 
+        var (reason, reasonPhrase) = Describe(usableEvWh, shortfallWh, socFloor, window);
+
         return new SolarDayPlan(
             RemainingPvWh: remainingPvWh,
             ShoulderEnergyWh: shoulderWh,
@@ -127,8 +130,9 @@ public static class SolarDayPlanner
             Deadline: deadline,
             ForecastAsOf: forecast.RetrievedAt,
             IsUsable: true,
-            Reason: Describe(usableEvWh, shortfallWh, socFloor, window),
-            Timeline: BuildTimeline(slices, options));
+            Reason: reason,
+            Timeline: BuildTimeline(slices, options),
+            ReasonPhrase: reasonPhrase);
     }
 
     /// <summary>
@@ -226,7 +230,9 @@ public static class SolarDayPlanner
         return RunIsViable() ? (runStart!.Value, runEnd) : null;
     }
 
-    private static string Describe(
+    // The sentence for the log and the API, invariant whatever thread builds it -- a preview runs on a
+    // web page's circuit, in the viewer's culture -- and the same thing as a phrase for the web UI (#290).
+    private static (string Reason, Phrase Phrase) Describe(
         double usableEvWh,
         double shortfallWh,
         double socFloorPercent,
@@ -234,15 +240,29 @@ public static class SolarDayPlanner
     {
         if (window is null || usableEvWh <= 0)
         {
-            return $"No chargeable window today; the battery has priority. SOC floor {socFloorPercent:F0}%.";
+            return (
+                Invariant($"No chargeable window today; the battery has priority. SOC floor {socFloorPercent:F0}%."),
+                Phrase.Of("DayPlan.NoWindow", new PhraseArg.Percent(socFloorPercent)));
         }
 
-        var windowText = $"window {window.Value.Start.LocalDateTime:HH:mm}-{window.Value.End.LocalDateTime:HH:mm}";
+        var windowText = Invariant($"window {window.Value.Start.LocalDateTime:HH:mm}-{window.Value.End.LocalDateTime:HH:mm}");
         var shortfallText = shortfallWh > 0
-            ? $" The day is {shortfallWh / 1000:F1}kWh short of a full battery by the deadline."
+            ? Invariant($" The day is {shortfallWh / 1000:F1}kWh short of a full battery by the deadline.")
             : string.Empty;
 
-        return $"{usableEvWh / 1000:F1}kWh available for the car, {windowText}, SOC floor {socFloorPercent:F0}%.{shortfallText}";
+        var available = new PhraseArg[]
+        {
+            new PhraseArg.Energy(usableEvWh),
+            new PhraseArg.Clock(window.Value.Start),
+            new PhraseArg.Clock(window.Value.End),
+            new PhraseArg.Percent(socFloorPercent),
+        };
+
+        return (
+            Invariant($"{usableEvWh / 1000:F1}kWh available for the car, {windowText}, SOC floor {socFloorPercent:F0}%.{shortfallText}"),
+            shortfallWh > 0
+                ? Phrase.Of("DayPlan.WindowShort", [.. available, new PhraseArg.Energy(shortfallWh)])
+                : Phrase.Of("DayPlan.Window", available));
     }
 
     /// <summary>

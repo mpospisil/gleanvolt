@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Targeting;
 
@@ -236,7 +237,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
             plan.ShortfallWh / 1000,
             plan.DepartBy.LocalDateTime,
             plan.SocFloorPercent,
-            plan.HoldUntil is { } hold ? $"{plan.TailEnergyWh / 1000:F1}kWh->{hold.LocalDateTime:HH:mm}" : "none",
+            plan.HoldUntil is { } hold ? Invariant($"{plan.TailEnergyWh / 1000:F1}kWh->{hold.LocalDateTime:HH:mm}") : "none",
             plan.Reason);
     }
 }

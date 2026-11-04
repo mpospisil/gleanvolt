@@ -39,7 +39,8 @@ public sealed record SolarGridOutlook(
     DateTimeOffset? NextSunAt,
     DateTimeOffset? SunUntil,
     string Reason,
-    DateTimeOffset? TomorrowFirstSunAt = null)
+    DateTimeOffset? TomorrowFirstSunAt = null,
+    Phrase? ReasonPhrase = null)
 {
     /// <summary>
     /// The forecast is usable and nothing left of today clears the minimum: the mode's cue to end
@@ -48,6 +49,6 @@ public sealed record SolarGridOutlook(
     public bool NoSunLeftToday => ForecastUsable && SunUntil is null;
 
     /// <summary>An outlook with no forecast behind it: the mode waits on live surplus and never ends itself on it.</summary>
-    public static SolarGridOutlook Unavailable(double minSurplusWatts, DateTimeOffset timestamp, string reason) =>
-        new(minSurplusWatts, timestamp, ForecastUsable: false, NextSunAt: null, SunUntil: null, reason);
+    public static SolarGridOutlook Unavailable(double minSurplusWatts, DateTimeOffset timestamp, string reason, Phrase? reasonPhrase = null) =>
+        new(minSurplusWatts, timestamp, ForecastUsable: false, NextSunAt: null, SunUntil: null, reason, ReasonPhrase: reasonPhrase);
 }

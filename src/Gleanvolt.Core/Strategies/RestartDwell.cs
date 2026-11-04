@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -45,6 +46,6 @@ public static class RestartDwell
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        return $"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {minPauseTime.TotalMinutes:F0}min minimum before restarting.";
+        return Invariant($"Paused {input.TimeInCurrentState.TotalMinutes:F0}min of the {minPauseTime.TotalMinutes:F0}min minimum before restarting.");
     }
 }

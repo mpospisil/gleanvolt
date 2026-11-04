@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.RegisterMaps;
+using static System.FormattableString;
 
 namespace Gleanvolt.Infrastructure;
 
@@ -107,7 +108,7 @@ public sealed class BatteryDischargeControl : IBatteryDischargeControl
         var movedWatts = Math.Abs(targetWatts - armedTarget);
         if (movedWatts >= _targetChangeThresholdWatts)
         {
-            return $"Target moved {movedWatts:F0}W (from {armedTarget}W).";
+            return Invariant($"Target moved {movedWatts:F0}W (from {armedTarget}W).");
         }
 
         // Clock going backwards (NTP step, telemetry timestamp jitter) must not defer the renewal

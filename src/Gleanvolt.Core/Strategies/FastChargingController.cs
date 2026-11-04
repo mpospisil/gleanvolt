@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -78,8 +79,8 @@ public sealed class FastChargingController : IChargingController
         {
             return Complete(
                 ChargingSessionEndReason.TargetReached,
-                $"Fast target reached: {progress.DeliveredWh / 1000:F1}kWh of "
-                + $"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
+                Invariant($"Fast target reached: {progress.DeliveredWh / 1000:F1}kWh of ")
+                + Invariant($"{progress.Limit.RequiredEnergyWh / 1000:F1}kWh delivered"));
         }
 
         // After the target check above, so a charge that lands exactly on the deadline is reported as
@@ -89,7 +90,7 @@ public sealed class FastChargingController : IChargingController
             return Complete(
                 ChargingSessionEndReason.DeparturePassed,
                 $"Departure {departure.DepartBy.LocalDateTime:HH:mm} has passed with "
-                + $"{limited.DeliveredWh / 1000:F1}kWh of {limited.Limit.RequiredEnergyWh / 1000:F1}kWh delivered");
+                + Invariant($"{limited.DeliveredWh / 1000:F1}kWh of {limited.Limit.RequiredEnergyWh / 1000:F1}kWh delivered"));
         }
 
         // The car finished or went away, or the charger is no longer ours to drive. "Finished" is only
@@ -104,7 +105,7 @@ public sealed class FastChargingController : IChargingController
         // A full car is said in the terms it happened in: it reached *its* limit before ours, and how far
         // short of the asked-for amount that left things is the first thing anyone will want to know.
         var shortfall = input.FastCharge is { } asked
-            ? $" at {asked.DeliveredWh / 1000:F1}kWh of the {asked.Limit.RequiredEnergyWh / 1000:F1}kWh asked for"
+            ? Invariant($" at {asked.DeliveredWh / 1000:F1}kWh of the {asked.Limit.RequiredEnergyWh / 1000:F1}kWh asked for")
             : null;
 
         if (ChargerOwnership.Check(input, _completionDwell, shortfall) is { } ended)
@@ -129,7 +130,7 @@ public sealed class FastChargingController : IChargingController
                     ChargingControlAction.StandDown,
                     null,
                     $"Waiting until {plan.StartNoLaterThan.LocalDateTime:HH:mm} to start: "
-                    + $"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs "
+                    + Invariant($"{plan.RemainingEnergyWh / 1000:F1}kWh at {plan.ChargePowerWatts / 1000:F1}kW needs ")
                     + $"{Describe(plan.Duration)}, and the car is wanted by {plan.ReadyBy.LocalDateTime:HH:mm}.",
                     WaitUntil: plan.StartNoLaterThan,
                     Appointment: true);
@@ -145,8 +146,8 @@ public sealed class FastChargingController : IChargingController
         }
 
         var towards = input.FastCharge is { } left
-            ? $" {left.DeliveredWh / 1000:F1}kWh of {left.Limit.RequiredEnergyWh / 1000:F1}kWh delivered, "
-              + $"{left.RemainingWh / 1000:F1}kWh to go."
+            ? Invariant($" {left.DeliveredWh / 1000:F1}kWh of {left.Limit.RequiredEnergyWh / 1000:F1}kWh delivered, ")
+              + Invariant($"{left.RemainingWh / 1000:F1}kWh to go.")
             : string.Empty;
 
         // Said while it charges rather than only when the plan is made: a shortfall that appears
@@ -154,7 +155,7 @@ public sealed class FastChargingController : IChargingController
         // is watching for, and it is exactly the case this mode has no slack for.
         if (input.FastCharge?.Plan is { IsFeasible: false } tight)
         {
-            towards += $" Not enough time: about {tight.ShortfallWh / 1000:F1}kWh of it will not fit before "
+            towards += Invariant($" Not enough time: about {tight.ShortfallWh / 1000:F1}kWh of it will not fit before ")
                 + $"{tight.ReadyBy.LocalDateTime:HH:mm}.";
         }
 

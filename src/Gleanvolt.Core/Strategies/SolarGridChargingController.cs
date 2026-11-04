@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
 
@@ -73,7 +74,7 @@ public sealed class SolarGridChargingController : IChargingController
         // a hysteresis margin above it.
         var threshold = input.Charging ? minimum : minimum + _options.ResumeHysteresisWatts;
         var thresholdName = input.Charging ? "minimum" : "start threshold";
-        var below = $"Surplus {surplus:F0}W is under the {threshold:F0}W {thresholdName}.";
+        var below = Invariant($"Surplus {surplus:F0}W is under the {threshold:F0}W {thresholdName}.");
 
         // Low tariff only (#274), decided as (a): high tariff pauses the car, sun or not -- the owner's
         // choice over following free surplus, so the mode charges in low tariff and nowhere else. The
@@ -93,8 +94,8 @@ public sealed class SolarGridChargingController : IChargingController
                 return ChargerWait.For(
                     input,
                     ChargerWait.DwellEnds(input, _options.MinPauseTime),
-                    $"Surplus {surplus:F0}W is back over the {threshold:F0}W {thresholdName}, but paused "
-                    + $"{input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting.");
+                    Invariant($"Surplus {surplus:F0}W is back over the {threshold:F0}W {thresholdName}, but paused ")
+                    + Invariant($"{input.TimeInCurrentState.TotalMinutes:F0}min of the {_options.MinPauseTime.TotalMinutes:F0}min minimum before restarting."));
             }
 
             return ChargeFromSurplus(surplus, minimum);
@@ -123,13 +124,13 @@ public sealed class SolarGridChargingController : IChargingController
         if (outlook.NextSunAt is { } next && next > input.State.Timestamp)
         {
             return ChargerWait.For(
-                input, next, $"{below} The forecast has the surplus clearing {minimum:F0}W from {next.LocalDateTime:HH:mm}.");
+                input, next, Invariant($"{below} The forecast has the surplus clearing {minimum:F0}W from {next.LocalDateTime:HH:mm}."));
         }
 
         return ChargerWait.For(
             input,
             input.State.Timestamp,
-            $"{below} The forecast still has it clearing {minimum:F0}W until {outlook.SunUntil?.LocalDateTime:HH:mm}; "
+            Invariant($"{below} The forecast still has it clearing {minimum:F0}W until {outlook.SunUntil?.LocalDateTime:HH:mm}; ")
             + "waiting for this dip to pass.");
     }
 
@@ -148,13 +149,13 @@ public sealed class SolarGridChargingController : IChargingController
             ? new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 amps,
-                $"Surplus {surplus:F0}W clears the {minimum:F0}W minimum but not the {MinChargePowerWatts:F0}W the charger needs "
-                + $"-> charge at {amps}A, +{bridge:F0}W from the grid.",
+                Invariant($"Surplus {surplus:F0}W clears the {minimum:F0}W minimum but not the {MinChargePowerWatts:F0}W the charger needs ")
+                + Invariant($"-> charge at {amps}A, +{bridge:F0}W from the grid."),
                 GridBridgeWatts: bridge)
             : new ChargingControlDecision(
                 ChargingControlAction.Charge,
                 amps,
-                $"Surplus {surplus:F0}W clears the {minimum:F0}W minimum -> charge at {amps}A from the sun.");
+                Invariant($"Surplus {surplus:F0}W clears the {minimum:F0}W minimum -> charge at {amps}A from the sun."));
     }
 
     /// <summary>
@@ -169,7 +170,7 @@ public sealed class SolarGridChargingController : IChargingController
         return new ChargingControlDecision(
             ChargingControlAction.Charge,
             _minAmps,
-            $"{why} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time, +{bridge:F0}W from the grid.",
+            Invariant($"{why} Holding at {_minAmps}A for the {_options.MinRunTime.TotalMinutes:F0}min minimum run time, +{bridge:F0}W from the grid."),
             GridBridgeWatts: bridge);
     }
 

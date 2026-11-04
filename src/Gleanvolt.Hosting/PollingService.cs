@@ -8,6 +8,7 @@ using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting;
 
@@ -191,7 +192,7 @@ public sealed class PollingService : BackgroundService
                     state.GridPowerWatts,
                     // While a blind meter phase is being estimated, the meter's own figure beside it: the
                     // correction is only as trustworthy as it is easy to read against what it replaced.
-                    state.MeteredGridPowerWatts is { } metered ? $" (meter {metered:F0}W)" : string.Empty,
+                    state.MeteredGridPowerWatts is { } metered ? Invariant($" (meter {metered:F0}W)") : string.Empty,
                     state.EvChargerStatus,
                     (object?)state.ChargeMode ?? "n/a",
                     state.ChargeCurrentAmps is null ? "n/a" : $"{state.ChargeCurrentAmps}A",
@@ -710,17 +711,17 @@ public sealed class PollingService : BackgroundService
         if (shortfall > _batteryHoldOptions.BridgeShortfallWatts)
         {
             _bridgeHoldNeededAt = state.Timestamp;
-            return (true, $"the car is drawing {shortfall:F0}W more than the sun gives in {mode}");
+            return (true, Invariant($"the car is drawing {shortfall:F0}W more than the sun gives in {mode}"));
         }
 
         if (_bridgeHoldNeededAt is { } neededAt && state.Timestamp - neededAt < _batteryHoldOptions.BridgeReleaseDwell)
         {
-            return (true, $"{mode} needed it {(state.Timestamp - neededAt).TotalSeconds:F0}s ago");
+            return (true, Invariant($"{mode} needed it {(state.Timestamp - neededAt).TotalSeconds:F0}s ago"));
         }
 
         _bridgeHoldNeededAt = null;
         return (false,
-            $"{mode} has had no grid bridge and no shortfall for {_batteryHoldOptions.BridgeReleaseDwell.TotalMinutes:F0} min");
+            Invariant($"{mode} has had no grid bridge and no shortfall for {_batteryHoldOptions.BridgeReleaseDwell.TotalMinutes:F0} min"));
     }
 
     /// <summary>

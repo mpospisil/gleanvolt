@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Monitoring;
 
@@ -222,7 +223,7 @@ public sealed class EnergyMonitorWorker : BackgroundService
                 interval.PeriodStart,
                 interval.PeriodEnd,
                 interval.SolarKwh,
-                interval.ForecastSolarKwh is { } forecast ? $"{forecast:F2} kWh" : "none",
+                interval.ForecastSolarKwh is { } forecast ? Invariant($"{forecast:F2} kWh") : "none",
                 interval.GridImportKwh,
                 interval.GridExportKwh,
                 interval.EvKwh,
