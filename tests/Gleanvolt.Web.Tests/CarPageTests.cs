@@ -151,7 +151,7 @@ public class CarPageTests : PageTest
     {
         var page = Page(EvInfo.Unknown);
 
-        Assert.Contains("supported installation", page.Find("#car-unconfigured").TextContent);
+        Assert.Contains("supported setup", page.Find("#car-unconfigured").TextContent);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public class CarPageTests : PageTest
 
         var page = Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, VehicleFeed.Volkswagen);
 
-        Assert.Contains("freshest reading wins", page.Find("#own-topic").TextContent);
+        Assert.Contains("the newest reading wins", page.Find("#own-topic").TextContent);
     }
 
     // -------------------------------------------------------------------- one page, one outline (#227)
@@ -466,7 +466,7 @@ public class CarPageTests : PageTest
     /// and must not read as an unfinished form.
     /// </summary>
     [Theory]
-    [InlineData(VehicleFeed.DataAct, "signs in on each read")]
+    [InlineData(VehicleFeed.DataAct, "signs in on every read")]
     [InlineData(VehicleFeed.OwnTopic, "you publish the readings yourself")]
     [InlineData(VehicleFeed.ChargeOnly, "nothing reads this car")]
     public void A_feed_with_no_session_says_so_in_its_own_terms(VehicleFeed feed, string expected)
@@ -527,7 +527,7 @@ public class CarPageTests : PageTest
         Assert.Contains("does", page.Markup);
         page.Find("#car-ask").Click();
 
-        Assert.Contains("dashboard's card is now showing it", page.Find("#car-ask-source").TextContent);
+        Assert.Contains("the dashboard card now shows it too", page.Find("#car-ask-source").TextContent);
     }
 
     /// <summary>
@@ -547,7 +547,7 @@ public class CarPageTests : PageTest
 
         Assert.Contains("the session is gone", page.Find("#car-ask-failed").TextContent);
         Assert.Contains("61%", page.Find("#car").TextContent);
-        Assert.Contains("already holding", page.Find("#car-ask-source").TextContent);
+        Assert.Contains("already had this reading", page.Find("#car-ask-source").TextContent);
     }
 
     /// <summary>
@@ -584,7 +584,7 @@ public class CarPageTests : PageTest
     {
         var page = Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, VehicleFeed.OwnTopic);
 
-        Assert.Contains("Nothing has arrived on it yet", page.Find("#car-ask-own-topic").TextContent);
+        Assert.Contains("No message has arrived yet", page.Find("#car-ask-own-topic").TextContent);
     }
 
     /// <summary>Charge-only: nothing to press, and nothing that reads as an unfinished form.</summary>
@@ -665,7 +665,7 @@ public class CarPageTests : PageTest
 
         Assert.Contains("Needs you", page.Markup);
         Assert.Contains("will not help", page.Markup);
-        Assert.DoesNotContain("Worth pressing again", page.Markup);
+        Assert.DoesNotContain("Try again", page.Markup);
     }
 
     /// <summary>The other half: ordinary, self-clearing, and the button is the fix.</summary>
@@ -678,7 +678,7 @@ public class CarPageTests : PageTest
         page.Find("#car-ask").Click();
 
         Assert.Contains("Session expired", page.Markup);
-        Assert.Contains("Worth pressing again", page.Markup);
+        Assert.Contains("Try again", page.Markup);
         Assert.DoesNotContain("will not help", page.Markup);
     }
 
@@ -1004,7 +1004,7 @@ public class CarPageTests : PageTest
 
         Assert.Contains("61%", against);
         Assert.Contains("vw-group …1234", against);
-        Assert.Contains("3 points below this press", against);
+        Assert.Contains("3 points below this check", against);
     }
 
     /// <summary>Two sources agreeing is a finding too, and must not read as a disagreement of zero.</summary>
@@ -1031,7 +1031,7 @@ public class CarPageTests : PageTest
 
         var against = page.Find("#against-the-feed").TextContent;
 
-        Assert.Contains("Nothing has reached the dashboard's card yet", against);
+        Assert.Contains("Nothing has reached the dashboard card yet", against);
         Assert.DoesNotContain("below this press", against);
     }
 

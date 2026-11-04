@@ -18,7 +18,7 @@ public sealed class LocalizedTests
             new PhraseArg.Clock(new DateTimeOffset(2026, 8, 12, 8, 30, 0, TimeSpan.Zero)),
             new PhraseArg.Clock(new DateTimeOffset(2026, 8, 12, 15, 0, 0, TimeSpan.Zero)));
 
-        Assert.Equal("forecast surplus clears 1.5 kW from 10:30 until 17:00", Localized.Say(phrase, "the service's own", Prague));
+        Assert.Equal("forecast surplus is above 1.5 kW from 10:30 until 17:00", Localized.Say(phrase, "the service's own", Prague));
     }
 
     [Fact]

@@ -91,19 +91,19 @@
     <value>Targeted</value>
   </data>
   <data name="ModeSolarSummary" xml:space="preserve">
-    <value>Charges from the sun the house isn't using, once the home battery is full.</value>
+    <value>Charges from solar surplus the house isn't using, but only once the home battery is full.</value>
   </data>
   <data name="ModeForecastedSummary" xml:space="preserve">
-    <value>Charges from surplus like Solar, but the forecast decides how much of today's sun the car may have, so the home battery still reaches 100% by the evening.</value>
+    <value>Charges from surplus like Solar, but the forecast decides how much of today's sun the car may take, so the home battery still reaches 100% by evening.</value>
   </data>
   <data name="ModeSolarGridSummary" xml:space="preserve">
-    <value>Follows the sun, and lets the grid top the charger up to its minimum when the surplus alone is too small.</value>
+    <value>Charges from the sun. When the surplus is too small for the charger's minimum, the grid makes up the difference.</value>
   </data>
   <data name="ModeFastSummary" xml:space="preserve">
-    <value>Charges as fast as the installation allows, from the sun and the grid, with the home battery kept out of it.</value>
+    <value>Charges as fast as the installation allows, from the sun and the grid. The home battery is not used.</value>
   </data>
   <data name="ModeTargetedSummary" xml:space="preserve">
-    <value>Delivers a set amount by a set time: forecast surplus first, the rest bought from the grid as late as it can.</value>
+    <value>Delivers a set amount of energy by a set time. Forecast surplus is used first; the rest is bought from the grid as late as possible.</value>
   </data>
   <data name="ModeChange" xml:space="preserve">
     <value>{0} → {1}</value>
@@ -171,14 +171,14 @@
     <value>Yes, restart it</value>
   </data>
   <data name="RestartProgress" xml:space="preserve">
-    <value>Restarting… The charger is being paused and the open session closed. This page reloads by itself once the controller is back.</value>
+    <value>Restarting… Charging is paused and the open session is closed. This page reloads by itself once the controller is back.</value>
   </data>
   <data name="RestartNotBack" xml:space="preserve">
-    <value>If it does not come back within a minute or two, nothing is restarting it: see {0} or {1}, or start it again by hand.</value>
+    <value>If it is not back within a minute or two, nothing is restarting it. Check {0} or {1}, or start it by hand.</value>
     <comment>{0} and {1} are shell commands, shown as code.</comment>
   </data>
   <data name="RestartCost" xml:space="preserve">
-    <value>A charge in progress is paused, and the controller comes back in Off, as it does after any start — the charging mode, a Targeted request and a Fast limit are not kept, so choose them again afterwards. This UI and Home Assistant are unreachable for roughly half a minute. Starting up fetches the solar forecast, so a restart spends one of the day's Solcast calls when a key is configured. It comes back by itself under Docker's {0} and the .deb's systemd unit; run any other way — {1}, a plain {2}, the Windows zip — it simply exits and has to be started again.</value>
+    <value>A charge in progress is paused, and the controller starts again in Off, as after any start. The charging mode, a Targeted request and a Fast limit are not kept, so set them again afterwards. This UI and Home Assistant are unreachable for about half a minute. Starting up fetches the solar forecast, so a restart uses one of the day's Solcast calls when a key is configured. It restarts by itself under Docker's {0} and under the .deb's systemd unit. Run any other way — {1}, a plain {2}, the Windows zip — it just exits and must be started again by hand.</value>
     <comment>{0}, {1} and {2} are configuration and commands, shown as code.</comment>
   </data>
   <!-- MQTT connection -->
@@ -186,7 +186,7 @@
     <value>Broker</value>
   </data>
   <data name="MqttBrokerNote" xml:space="preserve">
-    <value>— what the controller dials, which is not necessarily reachable from here.</value>
+    <value>— the address the controller connects to; it may not be reachable from here.</value>
   </data>
   <data name="MqttUsername" xml:space="preserve">
     <value>Username</value>
@@ -198,7 +198,7 @@
     <value>Password</value>
   </data>
   <data name="MqttPasswordWithheld" xml:space="preserve">
-    <value>set, and not shown here — this UI has no login, so anyone on the network could read it. Configure {0} ({1}) to make it readable.</value>
+    <value>set, but not shown — this UI has no login, so anyone on the network could read it. Configure {0} ({1}) to show it.</value>
     <comment>{0} is an environment variable and {1} a command, shown as code.</comment>
   </data>
   <data name="MqttClientId" xml:space="preserve">
@@ -235,7 +235,7 @@
     <value>Sign in</value>
   </data>
   <data name="SignInHint" xml:space="preserve">
-    <value>One password for this installation, chosen on its Setup page the first time it ran or set as {0}. There is no reset from here: a forgotten one is replaced in the settings on the machine itself.</value>
+    <value>One password for this installation, chosen on the Setup page the first time it ran, or set as {0}. It cannot be reset from here: change a forgotten password in the settings on the machine itself.</value>
     <comment>{0} is an environment variable, shown as code.</comment>
   </data>
   <data name="SetupTitle" xml:space="preserve">
@@ -253,7 +253,7 @@
     <value>Set a password</value>
   </data>
   <data name="SetupIntro" xml:space="preserve">
-    <value>Gleanvolt can show this installation's energy and charging history, and change how the charger is driven. It is reachable by anything on this network, so it needs a password before it will show any of that.</value>
+    <value>Gleanvolt shows this installation's energy and charging history and can change how the charger is driven. Anyone on this network can reach it, so set a password first.</value>
   </data>
   <data name="RepeatPassword" xml:space="preserve">
     <value>Repeat it</value>
@@ -262,7 +262,7 @@
     <value>Set the password</value>
   </data>
   <data name="SetupNote" xml:space="preserve">
-    <value>One password for this installation, not an account per person. Keep it somewhere you can find it: there is no reset from inside the UI, only editing the settings file on the machine itself.</value>
+    <value>One password for the whole installation, not an account per person. Keep it somewhere safe: it cannot be reset from the UI, only by editing the settings file on the machine itself.</value>
   </data>
   <data name="PasswordsDiffer" xml:space="preserve">
     <value>The two passwords are not the same.</value>
@@ -334,24 +334,24 @@
     <value>Reserved</value>
   </data>
   <data name="EvChargerStatus_SuspendedEv" xml:space="preserve">
-    <value>SuspendedEv</value>
+    <value>Suspended by car</value>
     <comment>The car has suspended charging.</comment>
   </data>
   <data name="EvChargerStatus_SuspendedEvse" xml:space="preserve">
-    <value>SuspendedEvse</value>
+    <value>Suspended by charger</value>
     <comment>The charger has suspended charging.</comment>
   </data>
   <data name="EvChargerStatus_Update" xml:space="preserve">
     <value>Update</value>
   </data>
   <data name="EvChargerStatus_CardActivation" xml:space="preserve">
-    <value>CardActivation</value>
+    <value>Card activation</value>
   </data>
   <data name="EvChargerStatus_StartDelay" xml:space="preserve">
-    <value>StartDelay</value>
+    <value>Delayed start</value>
   </data>
   <data name="EvChargerStatus_ChargePaused" xml:space="preserve">
-    <value>ChargePaused</value>
+    <value>Charge paused</value>
   </data>
   <data name="EvChargerStatus_Stopping" xml:space="preserve">
     <value>Stopping</value>
@@ -384,7 +384,7 @@
     <value>Degraded</value>
   </data>
   <data name="VehicleSourceState_NeedsOwner" xml:space="preserve">
-    <value>NeedsOwner</value>
+    <value>Needs you</value>
     <comment>The car's feed has stopped until the owner signs in again.</comment>
   </data>
   <data name="ListSeparator" xml:space="preserve">
@@ -416,7 +416,7 @@
     <value>Solar</value>
   </data>
   <data name="TargetedChargeStrategy_SolarPlusGrid" xml:space="preserve">
-    <value>SolarPlusGrid</value>
+    <value>Solar + grid</value>
   </data>
   <data name="TargetedChargeStrategy_Maximum" xml:space="preserve">
     <value>Maximum</value>
@@ -430,7 +430,7 @@
     <comment>The time under a chart's cursor, as a uPlot template ({WWW} short weekday, {HH}:{mm} 24-hour time).</comment>
   </data>
   <data name="ChargingSessionEndReason_ModeOff" xml:space="preserve">
-    <value>Charge control returned to Off</value>
+    <value>Charge control was switched to Off</value>
   </data>
   <data name="ChargingSessionEndReason_SessionComplete" xml:space="preserve">
     <value>The car finished charging</value>
@@ -451,7 +451,7 @@
     <value>The departure time passed</value>
   </data>
   <data name="ChargingSessionEndReason_NoSunLeftToday" xml:space="preserve">
-    <value>No sun was left to charge on today</value>
+    <value>No sun was left to charge from today</value>
   </data>
   <data name="ChargingSessionEndReason_ChargerTakenOver" xml:space="preserve">
     <value>The charger was switched out of Fast</value>

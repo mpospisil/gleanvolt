@@ -187,7 +187,7 @@ public class TariffEditorFormTests : BunitContext
 
         form.Find("#tariff-low-price").Input("5,20");
 
-        Assert.Contains("Low tariff costs more than high.", form.Find("#tariff-low-price").ParentElement!.TextContent);
+        Assert.Contains("The low tariff costs more than the high tariff.", form.Find("#tariff-low-price").ParentElement!.TextContent);
         Assert.False(SaveDisabled(form));
 
         form.Find("#tariff-save").Click();
@@ -204,7 +204,7 @@ public class TariffEditorFormTests : BunitContext
         form.Find("#tariff-weekday-1-remove").Click();
         form.Find("#tariff-weekday-0-remove").Click();
 
-        Assert.Contains("everything would be high tariff", form.Find("#tariff-table-problem").TextContent);
+        Assert.Contains("every hour would be high tariff", form.Find("#tariff-table-problem").TextContent);
 
         form.Find("#tariff-save").Click();
 

@@ -13,13 +13,13 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="NoUsableForecast" xml:space="preserve">
-    <value>Žádná použitelná předpověď, takže na dnešek není plán; režim místo toho nabíjí z živého přebytku.</value>
+    <value>Solární energie dle předpovědi není k dispozici, takže na dnešek není plán; režim se proto chová jako Solar: auto nabíjí z aktuálního přebytku až po plném nabití domácí baterie.</value>
   </data>
   <data name="NoChargeableWindow" xml:space="preserve">
-    <value>Dnes není okno pro nabíjení: slunce nepřekročí minimum nabíječky dost dlouho, nebo ho celé potřebuje domácí baterie. Auto čeká.</value>
+    <value>Dnes není žádné okno pro nabíjení: slunce nepřekročí minimum nabíječky dost dlouho, nebo všechnu výrobu potřebuje domácí baterie. Auto čeká.</value>
   </data>
   <data name="TodayGives" xml:space="preserve">
-    <value>Dnešek dá autu zhruba {0} v okně od {1:HH:mm} do {2:HH:mm}.</value>
+    <value>Dnes auto dostane zhruba {0}, v okně od {1:HH:mm} do {2:HH:mm}.</value>
   </data>
   <data name="TargetMet" xml:space="preserve">
     <value>Cíl splněn: z požadovaných {1} se do auta dostalo {0}. Nabíječka byla uvolněna.</value>
@@ -31,37 +31,37 @@
     <value>Z požadovaných {1} už je v autě {0}.</value>
   </data>
   <data name="MoreThanCanDeliver" xml:space="preserve">
-    <value>{0} do {1} je víc, než zbývajících {2} stihne dodat. Při nabíjení naplno od teď bude mít auto zhruba {3} — o {4} méně.</value>
+    <value>{0} do {1} se za zbývající {2} nestihne. Při nabíjení naplno od teď bude mít auto zhruba {3} — o {4} méně.</value>
   </data>
   <data name="LeavingInstead" xml:space="preserve">
-    <value>Odjezd v {0} by pokryl celé množství.</value>
+    <value>Při odjezdu v {0} by se nabilo celé množství.</value>
   </data>
   <data name="BatteryHeldOut" xml:space="preserve">
-    <value>Domácí baterie zůstává stranou, zatímco síť auto dobíjí, aby se nevybila do nabíjení, které by stejně nestačilo.</value>
+    <value>Domácí baterie se nepoužívá, zatímco auto dobíjí síť, aby se nevybila do nabíjení, které stejně nestačí.</value>
   </data>
   <data name="ForecastCoversAll" xml:space="preserve">
-    <value>Předpověď pokryje všechno: {0} z přebytku {1} a import ze sítě se neplánuje vůbec.</value>
+    <value>Předpověď pokryje všechno: {0} z přebytku {1}; import ze sítě se neplánuje.</value>
   </data>
   <data name="BatteryKeepsPriority" xml:space="preserve">
-    <value>Domácí baterie má po celou dobu přednost: blokace vybíjení se zapne, kdykoli auto odebírá víc, než dává střecha, takže ho baterie nikdy nenapájí.</value>
+    <value>Domácí baterie má po celou dobu přednost: kdykoli auto odebírá víc, než vyrábí FVE, zapne se blokace vybíjení, takže baterie auto nikdy nenabíjí.</value>
   </data>
   <data name="NoUsableForecastTargeted" xml:space="preserve">
-    <value>Pro toto okno není použitelná předpověď, takže plán počítá s tím, že vše dodá síť. Přebytek, který se přesto objeví, se použije přednostně a plán se při příštím čtení přepočítá.</value>
+    <value>Pro toto okno není k dispozici solární energie dle předpovědi, takže plán počítá s tím, že všechno dodá síť. Pokud se přebytek přesto objeví, použije se přednostně a plán se při příštím čtení přepočítá.</value>
   </data>
   <data name="SunAndGrid" xml:space="preserve">
-    <value>Slunce by mělo pokrýt {0} z toho {1} a síť zbývajících {2}. Místo nabíjení naplno a brzkého konce se auto nabíjí rovnoměrně zhruba {3} po celé okno, takže nabíječka odebírá blízko tomu, co střecha vyrábí, a dokupuje jen rozdíl.</value>
+    <value>Slunce by mělo dodat {0} {1} a síť zbývajících {2}. Auto se nenabíjí naplno s brzkým koncem, ale rovnoměrně, zhruba {3} po celé okno. Nabíječka tak odebírá přibližně tolik, kolik FVE vyrábí, a ze sítě dokupuje jen rozdíl.</value>
   </data>
   <data name="UnusableSurplus" xml:space="preserve">
-    <value>Na toto okno se předpovídá {0} přebytku, ale nikdy nepřekročí minimum nabíječky 6 A, takže na něm auto samo běžet nemůže. Pořád se vyplatí: nabíječka se drží na tomto minimu, dokud svítí slunce, střecha dodá, co má, a dokoupí se jen rozdíl — v průměru zhruba {1} ze sítě.</value>
+    <value>Na toto okno se předpovídá {0} přebytku, ale nikdy nepřekročí minimum nabíječky 6 A, takže na něj auto samo nabíjet nemůže. Přesto se vyplatí: dokud svítí slunce, drží se nabíječka na minimu, FVE dodá, co může, a dokoupí se jen rozdíl — v průměru zhruba {1} ze sítě.</value>
   </data>
   <data name="AllFromGrid" xml:space="preserve">
-    <value>Do té doby se nepředpovídá žádný přebytek, takže celých {0}, které ještě chybí, přijde ze sítě, rovnoměrně zhruba {1} po celé okno. Bez slunce, na které by stálo za to čekat, odkládání nic nepřinese a rozložení nechává rezervu, kdyby něco vypadlo.</value>
+    <value>Do té doby se nepředpovídá žádný přebytek, takže celých {0}, které ještě chybí, dodá síť, rovnoměrně zhruba {1} po celé okno. Když není na co čekat, odkládání nic nepřinese, a rozložení nabíjení nechává rezervu, kdyby něco vypadlo.</value>
   </data>
   <data name="HoldingNow" xml:space="preserve">
-    <value>Vše pod klidovou úrovní už je v autě a posledních {0} se drží do {1}. Nic není špatně — nabíječka stojí záměrně, aby auto dosáhlo cíle krátce před odjezdem, místo aby celou noc stálo plné. Slunce, které přijde dřív, se záměrně nevyužije; to je cena této volby.</value>
+    <value>Vše do úrovně čekání už je v autě a posledních {0} se odkládá do {1}. Nic není špatně — nabíječka stojí záměrně, aby auto dosáhlo cíle krátce před odjezdem a nestálo celou noc plně nabité. Slunce, které přijde dřív, se záměrně nevyužije; to je cena této volby.</value>
   </data>
   <data name="HoldingLater" xml:space="preserve">
-    <value>Posledních {0} se drží do {1}, aby auto skončilo těsně před odjezdem, ne o hodiny dřív. Vše pod klidovou úrovní se do té doby nabíjí normálně, ze slunce, kdekoli je.</value>
+    <value>Posledních {0} se odloží do {1}, aby auto skončilo těsně před odjezdem, ne o hodiny dřív. Do té doby se vše do úrovně čekání nabíjí normálně, ze slunce, kdykoli svítí.</value>
   </data>
   <data name="Between" xml:space="preserve">
     <value>mezi {0} a {1}</value>
@@ -91,7 +91,7 @@
     <value>režim nabíjení</value>
   </data>
   <data name="ChargeModeTip" xml:space="preserve">
-    <value>Spuštění kteréhokoli režimu níže přepne nabíječku do Fast; Off auto zastaví, ať běžel jakýkoli režim. Restart nic nepřežije — služba startuje v Off a nic nezapíše, dokud se tady něco nestiskne. Fast (no battery) a Targeted se samy vypnou, jakmile auto skončí, Solar + grid po skončení využitelného slunce, a řádek výše je sleduje bez pomoci této stránky.</value>
+    <value>Spuštěním kteréhokoli režimu níže se nabíječka přepne do režimu Fast; Off nabíjení zastaví, ať běží jakýkoli režim. Po restartu se nic nezachová — služba nastartuje v režimu Off a nic nezapíše, dokud tady něco nestisknete. Fast (no battery) a Targeted se samy vypnou, jakmile auto dobije, Solar + grid po skončení využitelného slunce. Řádek výše to ukáže sám.</value>
   </data>
   <data name="HoldTopic" xml:space="preserve">
     <value>Blokace vybíjení baterie</value>
@@ -100,7 +100,7 @@
     <value>Blokace vybíjení baterie</value>
   </data>
   <data name="HoldTip" xml:space="preserve">
-    <value>Společná pro všechny režimy, proto je nad nimi: domácí baterie přestane napájet dům, takže auto se nabíjí z FV a sítě, zatímco baterie se stále může nabíjet z přebytku. Ukazuje poslední úspěšně zapsaný příkaz, ne zpětné čtení ze zařízení — po neúspěšném zápisu se sama vrátí do vypnuto.</value>
+    <value>Platí pro všechny režimy, proto je nad nimi: domácí baterie přestane napájet dům, takže auto se nabíjí z FVE a ze sítě, zatímco baterie se dál může nabíjet z přebytku. Ukazuje poslední úspěšně zapsaný příkaz, ne stav přečtený ze zařízení — po neúspěšném zápisu se přepínač sám vrátí do vypnuté polohy.</value>
   </data>
   <data name="ModesLabel" xml:space="preserve">
     <value>Režimy nabíjení</value>
@@ -118,10 +118,10 @@
     <value>tento režim</value>
   </data>
   <data name="SolarIntro" xml:space="preserve">
-    <value>Nabíjí z přebytku, který dům nespotřebuje, jakmile je domácí baterie plná.</value>
+    <value>Nabíjí z přebytku, který dům nespotřebuje, až po plném nabití domácí baterie.</value>
   </data>
   <data name="SolarTip" xml:space="preserve">
-    <value>Nabíjí z toho, co střecha vyrábí a dům zrovna nespotřebuje. Domácí baterie má přednost: tento režim čeká, než je baterie plná, pak sleduje přebytek nahoru i dolů a pozastaví se, když ho není dost na minimální proud nabíječky.</value>
+    <value>Nabíjí z výroby FVE, kterou dům právě nespotřebuje. Přednost má domácí baterie: režim čeká, až bude plná, pak sleduje přebytek nahoru i dolů. Když přebytek nestačí na minimální proud nabíječky, nabíjení pozastaví.</value>
   </data>
   <data name="StartSolarTopic" xml:space="preserve">
     <value>Nabíjet z přebytku</value>
@@ -130,37 +130,37 @@
     <value>Nabíjet z přebytku</value>
   </data>
   <data name="StartSolarTip" xml:space="preserve">
-    <value>Přepne nabíječku do Fast a předá ji přebytku. Nic dalšího se nenastavuje — proud je to, co slunce nechá, a rozhoduje se znovu při každém čtení.</value>
+    <value>Přepne nabíječku do režimu Fast a řídí ji podle přebytku. Nic dalšího se nenastavuje — proud odpovídá tomu, co zbude ze slunce, a přepočítává se při každém čtení.</value>
   </data>
   <data name="SolarSurplus" xml:space="preserve">
     <value>Solární přebytek</value>
   </data>
   <data name="SolarSurplusHint" xml:space="preserve">
-    <value>FV, která zbude po spotřebě domu — vyhlazený tříminutový průměr, podle kterého se tento režim rozhoduje. Prázdné, když řídí režim, který se podle přebytku nerozhoduje.</value>
+    <value>Výroba FVE, která zbývá po pokrytí spotřeby domu — vyhlazený tříminutový průměr, podle kterého se tento režim řídí. Prázdné, když řídí režim, který se přebytkem neřídí.</value>
   </data>
   <data name="BatterySoc" xml:space="preserve">
     <value>SOC baterie</value>
   </data>
   <data name="BatterySocGateHint" xml:space="preserve">
-    <value>Podmínka tohoto režimu: auto nedostane nic, dokud není domácí baterie plná.</value>
+    <value>Podmínka tohoto režimu: auto nedostane nic, dokud domácí baterie není plná.</value>
   </data>
   <data name="EvPower" xml:space="preserve">
     <value>Nabíjecí výkon auta</value>
   </data>
   <data name="EvPowerHint" xml:space="preserve">
-    <value>Co podle nabíječky auto právě skutečně odebírá — ne nastavená hodnota.</value>
+    <value>Výkon, který auto podle nabíječky právě skutečně odebírá (ne nastavená hodnota).</value>
   </data>
   <data name="TargetCurrent" xml:space="preserve">
     <value>Cílový proud</value>
   </data>
   <data name="TargetCurrentHint" xml:space="preserve">
-    <value>Proud, na kterém se tento režim v tomto cyklu rozhodl, ještě před zápisem. Prázdné, kdykoli nenabíjí.</value>
+    <value>Proud, který tento režim zvolil v tomto cyklu, ještě než ho zapsal do nabíječky. Když se nenabíjí, je prázdný.</value>
   </data>
   <data name="SolarGridIntro" xml:space="preserve">
-    <value>Sleduje slunce; když je přebytek malý, síť dorovná na minimum nabíječky.</value>
+    <value>Nabíjí ze slunce; když je přebytek malý, síť ho doplní na minimum nabíječky.</value>
   </data>
   <data name="SolarGridTip" xml:space="preserve">
-    <value>Nabíjí ze slunce a nechá síť pomoct. Dokud přebytek, který dům nespotřebuje, zůstává nad vaším minimem, auto ho sleduje; když je na minimální proud nabíječky sám příliš malý, síť ho na toto minimum dorovná a domácí baterie zůstává stranou. Podmínka plné baterie tu není. Když přebytek klesne pod vaše minimum, auto se pozastaví — vyhlazeně přes pár minut, takže ho přechodný mrak nezastaví — a jakmile předpověď na dnešek nemá žádné slunce nad minimem, režim se sám vypne.</value>
+    <value>Nabíjí ze slunce s pomocí sítě. Dokud přebytek zůstává nad vaším minimem, auto ho sleduje. Když je přebytek sám na minimální proud nabíječky příliš malý, síť ho na toto minimum doplní; domácí baterie se přitom nepoužívá. Plná domácí baterie tu není podmínkou. Když přebytek klesne pod vaše minimum, nabíjení se pozastaví (s vyhlazením přes několik minut, aby ho nezastavil přechodný mrak). Jakmile podle předpovědi dnes už žádný přebytek nepřekročí minimum, režim se sám vypne.</value>
   </data>
   <data name="StartSolarGridTopic" xml:space="preserve">
     <value>Nabíjet ze slunce + sítě</value>
@@ -169,7 +169,7 @@
     <value>Nabíjet ze slunce + sítě</value>
   </data>
   <data name="StartSolarGridTip" xml:space="preserve">
-    <value>Přepne nabíječku do Fast a předá ji přebytku. Skončí sám na konci využitelného slunce, když auto přestane odebírat nebo když ho odpojíte.</value>
+    <value>Přepne nabíječku do režimu Fast a řídí ji podle přebytku. Režim skončí sám, když skončí využitelné slunce, když auto přestane odebírat, nebo když auto odpojíte.</value>
   </data>
   <data name="MinSurplusTopic" xml:space="preserve">
     <value>Minimální solární přebytek (W)</value>
@@ -178,22 +178,22 @@
     <value>Minimální solární přebytek (W)</value>
   </data>
   <data name="MinSurplusTip" xml:space="preserve">
-    <value>Pod touto hodnotou se auto pozastaví místo odběru ze sítě. Síť přidá nanejvýš minimální výkon nabíječky (asi 4,1 kW při 6 A na třech fázích) minus tuto hodnotu; nastavte ji na tuto úroveň nebo výš a síť nepomůže nikdy. Je to také hranice, kterou musí zbytek dnešní předpovědi překročit. Nepřežije restart.</value>
+    <value>Pod touto hodnotou se nabíjení pozastaví, místo aby se odebíralo ze sítě. Síť přidá nanejvýš minimální výkon nabíječky (asi 4,1 kW při 6 A na třech fázích) minus tuto hodnotu; když ji nastavíte na tento výkon nebo výš, síť nepomůže nikdy. Je to také hranice, kterou musí překročit zbytek dnešní předpovědi. Po restartu se nezachová.</value>
   </data>
   <data name="SolarGridLowTariffHint" xml:space="preserve">
-    <value>Ve vysokém tarifu auto čeká, se sluncem i bez něj, a nabíjí jako výše, jakmile začne nízký tarif. Režim přesto končí s koncem využitelného slunce, takže nízký tarif, který začne po setmění, tady nic nenabije. Nepřežije restart.</value>
+    <value>Ve vysokém tarifu auto čeká, ať svítí, nebo ne, a jakmile začne nízký tarif, nabíjí jako výše. Režim ale i tak končí s koncem využitelného slunce, takže nízký tarif, který začne po setmění, tu nic nenabije. Po restartu se nezachová.</value>
   </data>
   <data name="SunUntil" xml:space="preserve">
     <value>Slunce do</value>
   </data>
   <data name="SunUntilHint" xml:space="preserve">
-    <value>Kdy podle předpovědi přebytek dnes přestane překračovat vaše minimum — kdy se tento režim sám vypne, pokud s tím bude živý přebytek souhlasit. Zobrazuje se jen, když tento režim řídí.</value>
+    <value>Kdy podle předpovědi dnes přebytek přestane překračovat vaše minimum, tedy kdy se tento režim sám vypne, pokud to potvrdí i aktuální přebytek. Zobrazuje se, jen když tento režim řídí nabíjení.</value>
   </data>
   <data name="GridPower" xml:space="preserve">
     <value>Výkon sítě</value>
   </data>
   <data name="GridPowerTopUpHint" xml:space="preserve">
-    <value>Kladný při importu. Když síť dorovnává malý přebytek, je to zhruba to dorovnání.</value>
+    <value>Kladný při importu. Když síť doplňuje malý přebytek, odpovídá zhruba tomuto doplnění.</value>
   </data>
   <data name="NoForecast" xml:space="preserve">
     <value>žádná předpověď</value>
@@ -208,10 +208,10 @@
     <value>Do plna</value>
   </data>
   <data name="UntilFullTip" xml:space="preserve">
-    <value>Udrží jedno nabíjení přes několik dní, pro auto, které stojí doma přes víkend nebo týden: jedno slunečné odpoledne ho málokdy naplní, tři obvykle ano. Přes den se nic nemění. Tam, kde by režim na den skončil, místo toho odstaví nabíječku na noc a začne znovu s dalším slunečným dnem. Skončí, když je auto plné, je odpojeno nebo stisknete Off. Nabíjení, které s tímto běží, se po restartu obnoví.</value>
+    <value>Udrží jedno nabíjení po několik dní, pro auto, které stojí doma přes víkend nebo týden: jedno slunečné odpoledne ho málokdy nabije, tři obvykle ano. Přes den se nic nemění. Když by režim jinak na konci dne skončil, místo toho nabíječku přes noc pozastaví a další den se sluncem začne znovu. Skončí, když je auto nabité, když ho odpojíte, nebo když stisknete Off. Nabíjení s touto volbou pokračuje i po restartu.</value>
   </data>
   <data name="UntilFullDay" xml:space="preserve">
-    <value>Běží do plna: {0}. den tohoto nabíjení.</value>
+    <value>Do plna: {0}. den tohoto nabíjení.</value>
   </data>
   <data name="LowTariffOnlyTopic" xml:space="preserve">
     <value>Jen nízký tarif</value>
@@ -223,25 +223,25 @@
     <value>Nastavení</value>
   </data>
   <data name="NoTariffYet" xml:space="preserve">
-    <value>Nejdřív nastavte tarif v sekci {0}; do té doby tu není na co čekat.</value>
+    <value>Nejdřív nastavte tarif v sekci {0}; do té doby není na co čekat.</value>
   </data>
   <data name="LowTariffIgnoredNote" xml:space="preserve">
-    <value>Nastaveno, ale ignorováno: není tarif, na který by šlo čekat, takže nabíjí bez ohledu na hodinu.</value>
+    <value>Zapnuto, ale nepoužije se: žádný tarif není nastaven, takže se nabíjí kdykoli.</value>
   </data>
   <data name="WaitingForLowTariffFrom" xml:space="preserve">
-    <value>Čeká na nízký tarif, od {0:HH:mm}.</value>
+    <value>Čeká na nízký tarif od {0:HH:mm}.</value>
   </data>
   <data name="WaitingForLowTariff" xml:space="preserve">
     <value>Čeká na nízký tarif.</value>
   </data>
   <data name="ForecastedIntro" xml:space="preserve">
-    <value>Nabíjí z přebytku podle předpovědi, aby se domácí baterie do večera přesto naplnila.</value>
+    <value>Nabíjí z přebytku podle předpovědi tak, aby se domácí baterie do večera přesto nabila.</value>
   </data>
   <data name="ForecastedTip_0" xml:space="preserve">
     <value>Solar</value>
   </data>
   <data name="ForecastedTip" xml:space="preserve">
-    <value>Nabíjí z přebytku jako {0}, ale pevnou podmínku plné baterie nahrazuje předpověď Solcastu: plán rozhoduje, kolik ze zbývajícího dnešního slunce smí dostat auto, aby domácí baterie do večerního termínu přesto dosáhla 100 %. Polední vrchol jde autu, náběh a dobíhání zůstávají domu a baterii.</value>
+    <value>Nabíjí z přebytku jako {0}, ale místo pevné podmínky plné baterie se řídí předpovědí Solcastu. Plán určuje, kolik ze zbývajícího dnešního slunce smí dostat auto, aby se domácí baterie do večerního termínu přesto nabila na 100 %. Polední špička výroby jde do auta, ranní a večerní výroba zůstává domu a baterii.</value>
   </data>
   <data name="StartForecastedTopic" xml:space="preserve">
     <value>Nabíjet podle předpovědi</value>
@@ -250,13 +250,13 @@
     <value>Nabíjet podle předpovědi</value>
   </data>
   <data name="StartForecastedTip" xml:space="preserve">
-    <value>Kdykoli není k dispozici použitelná předpověď, vrátí se k obyčejnému nabíjení z přebytku, místo aby nabíjení odmítl.</value>
+    <value>Když solární energie dle předpovědi není k dispozici, režim nabíjení neodmítne, ale chová se jako Solar: auto nabíjí z aktuálního přebytku až po plném nabití domácí baterie.</value>
   </data>
   <data name="WhereChargeStopsTopic" xml:space="preserve">
-    <value>Kde nabíjení skončí</value>
+    <value>Kdy nabíjení skončí</value>
   </data>
   <data name="WhereChargeStops" xml:space="preserve">
-    <value>Kde nabíjení skončí</value>
+    <value>Kdy nabíjení skončí</value>
   </data>
   <data name="WhereChargeStopsTip_0" xml:space="preserve">
     <value>požádat</value>
@@ -265,7 +265,7 @@
     <value>Targeted</value>
   </data>
   <data name="WhereChargeStopsTip" xml:space="preserve">
-    <value>Tento režim nebere žádné množství: nabíjí auto z přebytku, který podle předpovědi domácí baterie nebude potřebovat, dokud ho nezastaví vlastní limit nabití auta. Chcete-li auto držet pod plnou, nastavte ten limit v autě. Chcete-li {0} o množství do určitého času, použijte {1}: když to předpověď včas pokryje, nabíjí jen ze slunce a ze sítě dokupuje jen tehdy, když slunce nestačí.</value>
+    <value>Tomuto režimu nezadáváte množství energie. Nabíjí auto z přebytku, který podle předpovědi nebude potřebovat domácí baterie, dokud nabíjení nezastaví limit nabití nastavený v autě. Pokud nechcete auto nabít do plna, nastavte tento limit v autě. Chcete-li {0} o určité množství energie do určitého času, použijte režim {1}. Pokud to předpověď včas pokryje, nabíjí jen ze slunce; ze sítě dokupuje jen tehdy, když slunce nestačí.</value>
   </data>
   <data name="BatteryKeeps" xml:space="preserve">
     <value>Co si nechá domácí baterie</value>
@@ -277,7 +277,7 @@
     <value>Minimální SOC baterie (%)</value>
   </data>
   <data name="MinBatterySocTip" xml:space="preserve">
-    <value>Nejnižší úroveň, na kterou smí domácí baterie klesnout, když pomáhá nabíjet auto. Jakmile ji dosáhne, auto se pozastaví, dokud se baterie nezotaví o rezervu pro obnovení níže. Plán může držet vyšší mez, když předpověď říká, že baterie ji potřebuje, aby byla k termínu plánu plná. Sdíleno s režimem Targeted, takže změna tady se projeví i tam. Nepřežije restart.</value>
+    <value>Nejnižší úroveň, na kterou smí domácí baterie klesnout, když pomáhá nabíjet auto. Když ji dosáhne, nabíjení se pozastaví, dokud se baterie nenabije zpět o rezervu pro obnovení (níže). Plán může držet vyšší mez, pokud podle předpovědi baterie potřebuje víc, aby byla do termínu plánu plná. Hodnota je společná s režimem Targeted, takže změna tady platí i tam. Po restartu se nezachová.</value>
   </data>
   <data name="ResumeMarginTopic" xml:space="preserve">
     <value>Rezerva SOC pro obnovení (%)</value>
@@ -286,13 +286,13 @@
     <value>Rezerva SOC pro obnovení (%)</value>
   </data>
   <data name="ResumeMarginTip" xml:space="preserve">
-    <value>O kolik nad mez se baterie musí zotavit, než se pozastavené nabíjení obnoví. Zvyšte ji, pokud se auto v hraničním dni opakovaně spouští a zastavuje. Nepřežije restart.</value>
+    <value>O kolik nad mez se musí baterie znovu nabít, než se pozastavené nabíjení obnoví. Zvyšte ji, pokud se nabíjení v hraničních dnech opakovaně spouští a zastavuje. Po restartu se nezachová.</value>
   </data>
   <data name="NoPollYet" xml:space="preserve">
     <value>Zatím neproběhlo žádné čtení.</value>
   </data>
   <data name="PlanOnlyWhileForecasted" xml:space="preserve">
-    <value>Denní plán se zobrazuje, jen když je aktivním režimem nabíjení {0}. Aktuální režim: {1}.</value>
+    <value>Denní plán se zobrazuje, jen když je aktivní režim {0}. Aktuální režim: {1}.</value>
   </data>
   <data name="ThePlan" xml:space="preserve">
     <value>Plán</value>
@@ -304,70 +304,70 @@
     <value>Stav plánu</value>
   </data>
   <data name="PlanStateHint" xml:space="preserve">
-    <value>Proč plán rozhodl, jak rozhodl — tentýž řádek, jaký je v logu.</value>
+    <value>Proč plán rozhodl tak, jak rozhodl — stejný řádek, jaký je v logu.</value>
   </data>
   <data name="ChargeWindow" xml:space="preserve">
     <value>Okno nabíjení</value>
   </data>
   <data name="ChargeWindowHint" xml:space="preserve">
-    <value>Další úsek dneška, ve kterém má předpověď překročit minimální výkon nabíječky dost dlouho, aby stálo za to začít. „žádné“, když dnešek takové okno nenabízí.</value>
+    <value>Nejbližší úsek dneška, ve kterém má podle předpovědi výroba překračovat minimální výkon nabíječky dost dlouho, aby se vyplatilo začít. „žádné“, když dnes takové okno není.</value>
   </data>
   <data name="EvBudget" xml:space="preserve">
-    <value>Energetický rozpočet auta</value>
+    <value>Energie pro auto</value>
   </data>
   <data name="EvBudgetHint" xml:space="preserve">
-    <value>Kolik ze zbývajícího dnešního slunce smí auto dostat, jen v obdobích, kdy přebytek skutečně překročí minimální výkon nabíječky.</value>
+    <value>Kolik ze zbývajícího dnešního slunce smí auto dostat; počítají se jen úseky, kdy přebytek skutečně překračuje minimální výkon nabíječky.</value>
   </data>
   <data name="ProjectedShortfall" xml:space="preserve">
     <value>Předpokládaný deficit</value>
   </data>
   <data name="ProjectedShortfallHint" xml:space="preserve">
-    <value>O kolik dnešní předpověď nestačí na dům plus plnou domácí baterii. Nad nulou je večerních 100 % ohroženo. Auto v tomto součtu není — dostane jen to, co zbude.</value>
+    <value>O kolik dnešní předpověď nestačí na spotřebu domu a nabití domácí baterie do plna. Nad nulou je ohroženo nabití na 100 % do večera. Auto v tomto součtu není — dostane jen to, co zbude.</value>
   </data>
   <data name="SurplusSpill" xml:space="preserve">
-    <value>Přetok přebytku</value>
+    <value>Přebytek nad kapacitu baterie</value>
   </data>
   <data name="SurplusSpillHint" xml:space="preserve">
-    <value>Zbývající přebytek, pro který domácí baterie nemá místo — co ještě přijde minus co dokáže pojmout. Při 100 % je to všechno a každý watt odteče z domu, pokud ho nevezme auto; právě to baterii dovoluje půjčovat i proti mnohem tenčímu přebytku.</value>
+    <value>Zbývající přebytek, pro který už domácí baterie nemá místo — co ještě přijde, minus co baterie pojme. Při 100 % je to celý přebytek a každý watt odteče do sítě, pokud ho nevezme auto. Proto může baterie půjčovat autu, i když je přebytek mnohem menší.</value>
   </data>
   <data name="LoanHeadroom" xml:space="preserve">
     <value>Prostor pro výpůjčku</value>
   </data>
   <data name="LoanHeadroomHint" xml:space="preserve">
-    <value>Kolik smí baterie právě teď půjčit: prostor mezi jejím SOC a mezí, omezený přetokem. Nula, když SOC sedí na mezi, nebo když každý zbývající watt má v baterii místo.</value>
+    <value>Kolik smí baterie právě teď půjčit: rozdíl mezi jejím SOC a mezí, omezený přebytkem nad kapacitu baterie. Nulový, když je SOC na mezi, nebo když se každý zbývající watt do baterie ještě vejde.</value>
   </data>
   <data name="RequiredFloor" xml:space="preserve">
     <value>Požadovaná mez SOC</value>
   </data>
   <data name="RequiredFloorHint" xml:space="preserve">
-    <value>SOC, pod které baterie teď nesmí klesnout, aby ji slunce, které ještě přijde, do termínu vrátilo na 100 %. Pokles SOC baterie na tuto čáru je to, co auto pozastaví.</value>
+    <value>SOC, pod které baterie teď nesmí klesnout, aby ji zbývající slunce do termínu znovu nabilo na 100 %. Když SOC baterie klesne na tuto čáru, nabíjení auta se pozastaví.</value>
   </data>
   <data name="ForecastRemaining" xml:space="preserve">
     <value>Zbývající předpověď na dnes</value>
   </data>
   <data name="ForecastRemainingHint" xml:space="preserve">
-    <value>Předpovězená FV, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
+    <value>Předpovězená výroba FVE, která dnes ještě přijde, v nastaveném pásmu jistoty a už upravená podle přesnosti předpovědi.</value>
   </data>
   <data name="TomorrowForecast" xml:space="preserve">
     <value>Předpověď na zítra</value>
   </data>
   <data name="TomorrowForecastHint" xml:space="preserve">
-    <value>Zítřejší předpovězená výroba. Čistě informativní: kontext pro to, zda se vyplatí dnešní deficit přečkat.</value>
+    <value>Předpověď výroby na zítřek. Jen pro informaci: pomůže posoudit, zda se vyplatí dnešní deficit přečkat.</value>
   </data>
   <data name="ForecastAccuracy" xml:space="preserve">
     <value>Přesnost předpovědi</value>
   </data>
   <data name="ForecastAccuracyHint" xml:space="preserve">
-    <value>Skutečná výroba proti předpovědi za dnešek. 100 % je přesně; zbytek dnešní předpovědi se tímto násobí a trvale velká odchylka způsobí, že plánu se přestane věřit.</value>
+    <value>Skutečná dnešní výroba ve srovnání s předpovědí. 100 % znamená přesný zásah; zbytek dnešní předpovědi se touto hodnotou násobí a dlouhodobě velká odchylka způsobí, že plán přestane být důvěryhodný.</value>
   </data>
   <data name="LoanedToday" xml:space="preserve">
     <value>Dnes půjčeno z baterie</value>
   </data>
   <data name="LoanedTodayHint" xml:space="preserve">
-    <value>Energie, kterou domácí baterie dnes půjčila autu, aby se k němu dostal i přebytek pod minimem nabíječky. Nuluje se o místní půlnoci.</value>
+    <value>Energie, kterou domácí baterie dnes půjčila autu, aby se k němu dostal i přebytek menší než minimum nabíječky. Nuluje se o půlnoci místního času.</value>
   </data>
   <data name="ChartTitle" xml:space="preserve">
-    <value>Okno nabíjení proti předpovězenému přebytku</value>
+    <value>Okno nabíjení a předpovězený přebytek</value>
   </data>
   <data name="NoForecastData" xml:space="preserve">
     <value>Zatím žádná data předpovědi.</value>
@@ -379,10 +379,10 @@
     <value>žádné</value>
   </data>
   <data name="FastIntro" xml:space="preserve">
-    <value>Tak rychle, jak instalace dovolí, s domácí baterií stranou — počítejte s importem ze sítě.</value>
+    <value>Tak rychle, jak instalace dovolí, bez domácí baterie — počítejte s importem ze sítě.</value>
   </data>
   <data name="FastTip" xml:space="preserve">
-    <value>Nabíjí tak rychle, jak instalace dovolí, a domácí baterii z toho vynechává. Nastavená hodnota je pevně na nastaveném maximu, ať dělá slunce cokoli: FV pokryje, co může, a síť zbytek, takže počítejte s importem. Blokace vybíjení se zapne se začátkem nabíjení a uvolní s jeho koncem — mezitím ji můžete vypnout, pokud chcete, aby baterie pomohla.</value>
+    <value>Nabíjí tak rychle, jak instalace dovolí, a domácí baterii nepoužívá. Proud je pevně nastaven na maximum, ať svítí slunce, nebo ne: FVE pokryje, co může, a zbytek dodá síť, takže počítejte s importem. Blokace vybíjení se zapne se začátkem nabíjení a vypne s jeho koncem. Pokud chcete, aby baterie pomáhala, můžete ji mezitím vypnout.</value>
   </data>
   <data name="HowMuchTopic" xml:space="preserve">
     <value>Kolik?</value>
@@ -391,13 +391,13 @@
     <value>Kolik?</value>
   </data>
   <data name="UntilCarStops" xml:space="preserve">
-    <value>Dokud auto nepřestane</value>
+    <value>Dokud auto nepřestane nabíjet</value>
   </data>
   <data name="EnergyToAdd" xml:space="preserve">
     <value>Energie k dobití (kWh)</value>
   </data>
   <data name="BatteryTarget" xml:space="preserve">
-    <value>Cíl baterie (%)</value>
+    <value>Cílový stav nabití (%)</value>
   </data>
   <data name="EnergyNeededTopic" xml:space="preserve">
     <value>Potřebná energie (kWh)</value>
@@ -418,10 +418,10 @@
     <value>Hotovo do (nepovinné)</value>
   </data>
   <data name="ReadyByTip" xml:space="preserve">
-    <value>Bez času začne nabíjení hned. S časem se nabíjení odloží a začne co nejpozději, aby přesto skončilo před vaším odjezdem — auto, které má jít nad 80 %, tam pak stráví minuty, ne celou noc, a právě to baterii skutečně stárne. Když běží, nabíjí pořád naplno; posouvá se jen začátek. Nastavený čas odstraníte tak, že otevřete kalendář a stisknete jeho tlačítko Vymazat.</value>
+    <value>Bez času nabíjení začne hned. S časem se nabíjení odloží a začne co nejpozději tak, aby skončilo před vaším odjezdem. Auto nabíjené nad 80 % tak na vysokém stavu nabití stráví minuty, ne celou noc — a právě dlouhé stání na vysokém nabití baterii opotřebovává. Nabíjí se stále naplno; posouvá se jen začátek. Nastavený čas odstraníte tlačítkem Vymazat v kalendáři.</value>
   </data>
   <data name="FastLowTariffHint" xml:space="preserve">
-    <value>Ve vysokém tarifu auto čeká a naplno nabíjí, jakmile začne nízký tarif. Nabíječka po připojení auto sama spustí, takže auto připojené ve vysokém tarifu chvíli odebírá, než ho další čtení zastaví. Nepřežije restart.</value>
+    <value>Ve vysokém tarifu auto čeká a nabíjí naplno, jakmile začne nízký tarif. Nabíječka po připojení auta sama spustí nabíjení, takže auto připojené ve vysokém tarifu chvíli odebírá, než ho další čtení zastaví. Po restartu se nezachová.</value>
   </data>
   <data name="StartFastTopic" xml:space="preserve">
     <value>Nabíjet naplno</value>
@@ -430,205 +430,205 @@
     <value>Nabíjet naplno</value>
   </data>
   <data name="FastEvPowerHint" xml:space="preserve">
-    <value>Co podle nabíječky auto právě skutečně odebírá — ne nastavená hodnota. Právě to opadne, když auto usoudí, že je plné.</value>
+    <value>Výkon, který auto podle nabíječky právě skutečně odebírá (ne nastavená hodnota). Když auto usoudí, že je nabité, tento výkon klesne.</value>
   </data>
   <data name="EvCurrent" xml:space="preserve">
     <value>Nabíjecí proud auta</value>
   </data>
   <data name="FastEvCurrentHint" xml:space="preserve">
-    <value>Nabíjecí proud odvozený z naměřeného výkonu nabíječky: co auto opravdu bere, a to může být pod maximem, když ho auto samo omezuje.</value>
+    <value>Nabíjecí proud vypočtený z naměřeného výkonu nabíječky, tedy proud, který auto skutečně odebírá. Může být nižší než maximum, pokud ho omezuje samo auto.</value>
   </data>
   <data name="ActiveCurrent" xml:space="preserve">
     <value>Aktivní proud</value>
   </data>
   <data name="ActiveCurrentHint" xml:space="preserve">
-    <value>Nastavená hodnota nabíječky přečtená zpět z hardwaru: na čem opravdu zůstala.</value>
+    <value>Proud nastavený v nabíječce, přečtený zpět z hardwaru. Ukazuje, co v nabíječce skutečně zůstalo nastaveno.</value>
   </data>
   <data name="FastGridPowerHint" xml:space="preserve">
-    <value>Kladný při importu ze sítě, záporný při exportu. V tomto režimu je to cena za rychlost.</value>
+    <value>Kladný při importu ze sítě, záporný při exportu. V tomto režimu je import cenou za rychlost.</value>
   </data>
   <data name="Delivered" xml:space="preserve">
     <value>Dodáno</value>
   </data>
   <data name="DeliveredHint" xml:space="preserve">
-    <value>Dodaná energie proti požadovanému množství, měřená na nabíječce od spuštění tohoto nabíjení. Když ho dosáhne, režim se sám zastaví.</value>
+    <value>Dodaná energie oproti požadovanému množství, měřená na nabíječce od spuštění tohoto nabíjení. Po dosažení množství se režim sám zastaví.</value>
   </data>
   <data name="BasisEnergyHint" xml:space="preserve">
-    <value>Nabíjení skončí, až se dodá tolik energie, nebo až auto přestane dřív — podle toho, co nastane první.</value>
+    <value>Nabíjení skončí po dodání tohoto množství energie, nebo dřív, pokud auto přestane nabíjet samo.</value>
   </data>
   <data name="BasisSocHint" xml:space="preserve">
-    <value>Převede se na kilowatthodiny jednou, při stisknutí tlačítka. Pozdější údaj z auta už rozběhnuté nabíjení nezmění.</value>
+    <value>Převede se na kilowatthodiny jen jednou, při stisknutí tlačítka. Pozdější údaj z auta už rozběhnuté nabíjení nezmění.</value>
   </data>
   <data name="BasisFullHint" xml:space="preserve">
-    <value>Rozhoduje auto: nabíjení běží, dokud auto nedosáhne vlastního limitu nabití a nepřestane odebírat.</value>
+    <value>Rozhoduje auto: nabíjení běží, dokud auto nedosáhne svého limitu nabití a nepřestane odebírat.</value>
   </data>
   <data name="BasisFullNoSocHint" xml:space="preserve">
-    <value>Rozhoduje auto: nabíjení běží, dokud auto nedosáhne vlastního limitu nabití a nepřestane odebírat. Cíl baterie potřebuje kapacitu auta ve Vehicle:BatteryCapacityKWh a údaj z auta.</value>
+    <value>Rozhoduje auto: nabíjení běží, dokud auto nedosáhne svého limitu nabití a nepřestane odebírat. Cíl v procentech vyžaduje kapacitu baterie auta ve Vehicle:BatteryCapacityKWh a údaj z auta.</value>
   </data>
   <data name="EndsFullHint" xml:space="preserve">
-    <value>Skončí samo: když auto přestane odebírat, protože dosáhlo vlastního limitu nabití, nastavená hodnota klesne na proud pro pauzu a režim se vrátí do Off, čímž se uvolní blokace.</value>
+    <value>Skončí samo: když auto dosáhne svého limitu nabití a přestane odebírat, proud klesne na hodnotu pro pozastavení a režim se přepne do Off. Tím se uvolní i blokace vybíjení.</value>
   </data>
   <data name="EndsAmountHint" xml:space="preserve">
-    <value>Skončí samo: při množství výše, nebo když auto přestane odebírat dřív. Tak či tak nastavená hodnota klesne na proud pro pauzu a režim se vrátí do Off, čímž se uvolní blokace.</value>
+    <value>Skončí samo: po dodání zadaného množství, nebo dřív, když auto přestane odebírat. V obou případech proud klesne na hodnotu pro pozastavení a režim se přepne do Off. Tím se uvolní i blokace vybíjení.</value>
   </data>
   <data name="NoUsableSoc" xml:space="preserve">
-    <value>Není použitelný údaj o SOC, od kterého by šel rozdíl změřit.</value>
+    <value>Chybí použitelný údaj o SOC auta, ze kterého by šel rozdíl spočítat.</value>
   </data>
   <data name="AlreadyAt" xml:space="preserve">
-    <value>Auto už je na {0} — není co dělat.</value>
+    <value>Auto už je na {0} — není co nabíjet.</value>
   </data>
   <data name="SocConversion" xml:space="preserve">
-    <value>Z dnešních {0} je to zhruba {1} na nabíječce: využitelných {2}, do článků se dostane {3} toho, co nabíječka naměří.</value>
+    <value>Z aktuálních {0} je to zhruba {1} na nabíječce: využitelná kapacita {2}, do článků se dostane {3} energie naměřené nabíječkou.</value>
   </data>
   <data name="FastDelivered" xml:space="preserve">
-    <value>Požadovaných {0} bylo dodáno; nabíjení se zastavuje.</value>
+    <value>Požadovaných {0} bylo dodáno; nabíjení se ukončuje.</value>
   </data>
   <data name="AskedSoc" xml:space="preserve">
     <value>{0}, což odpovídá požadovaným {1}</value>
   </data>
   <data name="FastProgress" xml:space="preserve">
-    <value>{0} z {1} je v autě; ještě {2}, než se to samo zastaví.</value>
+    <value>V autě je {0} z {1}; zbývá {2}, pak se nabíjení samo zastaví.</value>
   </data>
   <data name="PowerObserved" xml:space="preserve">
-    <value>{0} (co auto bere)</value>
+    <value>{0} (co auto odebírá)</value>
   </data>
   <data name="PowerMaximum" xml:space="preserve">
     <value>{0} (maximum instalace — auto zatím neodebíralo)</value>
   </data>
   <data name="NotEnoughTime" xml:space="preserve">
-    <value>Nedostatek času: zhruba {0} se do {1:HH:mm} nevejde. Nabíjí se naplno od teď výkonem {2}.</value>
+    <value>Nedostatek času: zhruba {0} se do {1:HH:mm} nestihne. Nabíjí se naplno od teď výkonem {2}.</value>
   </data>
   <data name="WaitingUntil" xml:space="preserve">
-    <value>Čeká do {0:HH:mm}, pak nabíjí naplno: {1} při {2} trvá zhruba {3} a auto má být hotové v {4:HH:mm}.</value>
+    <value>Čeká do {0:HH:mm}, pak nabíjí naplno: {1} při {2} trvá zhruba {3} a auto má být nabité v {4:HH:mm}.</value>
   </data>
   <data name="ChargingToBeReady" xml:space="preserve">
-    <value>Nabíjí naplno, aby bylo hotovo v {0:HH:mm}: ještě {1} při {2}.</value>
+    <value>Nabíjí naplno, aby bylo auto nabité v {0:HH:mm}: zbývá {1} při {2}.</value>
   </data>
   <data name="TargetedPlanStateHint" xml:space="preserve">
-    <value>Splněno: cíl je dosažen. Slunce: předpověď ho pokryje bez jakéhokoli importu. Slunce + síť: slunce pokryje, co může, a zbytek rovnoměrně dodá síť. Naplno: času není dost, takže se bere všechno, co je k dispozici.</value>
+    <value>Splněno: cíl je dosažen. Slunce: předpověď ho pokryje úplně bez importu. Slunce + síť: slunce pokryje, co může, a zbytek rovnoměrně dodá síť. Naplno: není dost času, takže se využije všechno, co je k dispozici.</value>
   </data>
   <data name="StillNeeded" xml:space="preserve">
     <value>Ještě chybí</value>
   </data>
   <data name="StillNeededHint" xml:space="preserve">
-    <value>Požadavek minus to, co nabíječka od aktivace prokazatelně dodala.</value>
+    <value>Požadované množství minus to, co nabíječka od spuštění prokazatelně dodala.</value>
   </data>
   <data name="DeliveredSoFar" xml:space="preserve">
     <value>Zatím dodáno</value>
   </data>
   <data name="DeliveredSoFarHint" xml:space="preserve">
-    <value>Měřeno na nabíječce, takže auto, které se samo omezí pod požadavek, prostě při dalším čtení dostane delší blok ze sítě.</value>
+    <value>Měřeno na nabíječce. Pokud auto samo odebírá méně, než jsme požadovali, při dalším čtení se jednoduše prodlouží nabíjení ze sítě.</value>
   </data>
   <data name="ForecastSurplus" xml:space="preserve">
     <value>Předpovězený přebytek</value>
   </data>
   <data name="ForecastSurplusHint" xml:space="preserve">
-    <value>Veškerý přebytek, který má toto okno podle předpovědi mít, po odečtení domu a rezervace domácí baterie — ať na něm auto samo nabíjet může, nebo ne.</value>
+    <value>Celý přebytek, který má podle předpovědi toto okno přinést, po odečtení spotřeby domu a podílu vyhrazeného domácí baterii — bez ohledu na to, zda na něj auto může nabíjet samo.</value>
   </data>
   <data name="FromSun" xml:space="preserve">
     <value>Ze slunce</value>
   </data>
   <data name="FromSunHint" xml:space="preserve">
-    <value>Část přebytku výše, na které auto skutečně může běžet samo. Nula neznamená, že nesvítí: znamená, že žádná půlhodina nepřekročí minimum nabíječky 6 A, a proto je blok ze sítě položen přes nejslunečnější hodiny, ne po nich.</value>
+    <value>Část přebytku výše, na kterou auto skutečně může nabíjet samo. Nula neznamená, že nesvítí: znamená, že žádná půlhodina nepřekročí minimum nabíječky 6 A. I takové slunce se využije, zatímco nabíječka běží na minimu, a ze sítě se dokoupí jen rozdíl.</value>
   </data>
   <data name="FromGrid" xml:space="preserve">
     <value>Ze sítě</value>
   </data>
   <data name="FromGridHint" xml:space="preserve">
-    <value>Co slunce nepokryje. Přepočítává se při každém čtení, takže lepší den, než předpovídal, to zmenší dřív, než se zbytek dokoupí.</value>
+    <value>Co slunce nepokryje. Přepočítává se při každém čtení, takže když je den lepší než předpověď, tato hodnota klesne dřív, než se zbytek dokoupí.</value>
   </data>
   <data name="ChargePace" xml:space="preserve">
     <value>Tempo nabíjení</value>
   </data>
   <data name="ChargePaceHint" xml:space="preserve">
-    <value>Průměr, který musí síť udržet, aby slib platil: co ještě chybí, minus slunce, které se má do auta dostat, za zbývající čas. Nabíječka běží tímto plus tím, co dává střecha, takže slunce nad ním je zdarma a pozdější tempo snižuje. Nula znamená, že předpověď cíl pokryje celý.</value>
+    <value>Průměrný výkon, který musí dodávat síť, aby se cíl stihl: co ještě chybí, minus slunce, které má podle předpovědi do auta dorazit, rozpočítané na zbývající čas. Nabíječka běží tímto výkonem plus tím, co dodává FVE. Slunce navíc je tedy zdarma a snižuje potřebné tempo pro zbytek. Nula znamená, že předpověď cíl pokryje celý.</value>
   </data>
   <data name="ChargingFrom" xml:space="preserve">
-    <value>Nabíjí od</value>
+    <value>Začátek nabíjení</value>
   </data>
   <data name="ChargingFromHint" xml:space="preserve">
-    <value>Kdy začne první nabíjení placené ze sítě. Nabíjení se rozkládá přes okno místo běhu naplno, protože nabíječka umí využít jen slunce, které svítí, když běží.</value>
+    <value>Kdy začne první nabíjení ze sítě. Nabíjení je rozložené přes celé okno, ne naplno, protože nabíječka může využít jen slunce, které svítí, zatímco nabíjí.</value>
   </data>
   <data name="ExpectedByDeparture" xml:space="preserve">
     <value>Očekáváno do odjezdu</value>
   </data>
   <data name="ExpectedByDepartureHint" xml:space="preserve">
-    <value>Co se do auta skutečně dostane. Méně, než bylo požadováno, jen když nezbývá dost času.</value>
+    <value>Kolik se do auta skutečně dostane. Méně, než bylo požadováno, jen pokud nezbývá dost času.</value>
   </data>
   <data name="Shortfall" xml:space="preserve">
     <value>Chybí</value>
   </data>
   <data name="ShortfallHint" xml:space="preserve">
-    <value>O kolik plán nedosáhne požadavku. Cokoli nad nulou znamená, že odjezd je na požadované množství příliš brzy.</value>
+    <value>O kolik plán nedosáhne požadavku. Cokoli nad nulou znamená, že do odjezdu nezbývá dost času na požadované množství.</value>
   </data>
   <data name="HeldBack" xml:space="preserve">
     <value>Odloženo</value>
   </data>
   <data name="HeldBackHint" xml:space="preserve">
-    <value>Poslední úsek cíle, naplánovaný těsně před odjezd místo kdykoli, kdy ho nabídne slunce — aby auto celou noc nestálo na vysokém stavu nabití. Vše pod ním se nabíjí normálně.</value>
+    <value>Poslední část cíle, naplánovaná těsně před odjezd místo kdykoli, kdy svítí slunce — aby auto nestálo celou noc s vysokým stavem nabití. Vše pod touto částí se nabíjí normálně.</value>
   </data>
   <data name="ReleasedAt" xml:space="preserve">
     <value>Uvolní se v</value>
   </data>
   <data name="ReleasedAtHint" xml:space="preserve">
-    <value>Kdy začne odložený úsek. Spočítáno z maximálního výkonu nabíječky plus rezervy; pokud ho auto bere pomaleji, tempo při dalším čtení vzroste a údaj Chybí to ukáže, pokud nestačí ani to.</value>
+    <value>Kdy začne odložená část. Počítá se z maximálního výkonu nabíječky s časovou rezervou. Pokud auto nabíjí pomaleji, tempo se při dalším čtení zvýší; pokud nestačí ani to, ukáže to údaj Chybí.</value>
   </data>
   <data name="BatterySocFloor" xml:space="preserve">
     <value>Mez SOC baterie</value>
   </data>
   <data name="BatterySocFloorHint" xml:space="preserve">
-    <value>Pod touto mezí jde slunce do domácí baterie a auto dostane jen to, co potřebuje k termínu, ze sítě. Nikdy níž než vaše Minimální SOC baterie; výš, když předpověď nechá baterii příliš málo slunce na dobití.</value>
+    <value>Pod touto mezí jde slunce do domácí baterie a auto dostane ze sítě jen to, co potřebuje do termínu. Nikdy není nižší než vaše Minimální SOC baterie; je vyšší, když podle předpovědi baterii nezbude dost slunce na dobití.</value>
   </data>
   <data name="ReadyBy" xml:space="preserve">
     <value>Hotovo do</value>
   </data>
   <data name="ReadyByHint" xml:space="preserve">
-    <value>Cílová čára, ke které plán pracuje: váš odjezd minus bezpečnostní rezerva.</value>
+    <value>Čas, ke kterému plán směřuje: váš odjezd minus bezpečnostní rezerva.</value>
   </data>
   <data name="ReportedByCar" xml:space="preserve">
-    <value>Nahlásilo auto před {0}.</value>
+    <value>Auto hlásilo před {0}.</value>
   </data>
   <data name="ReportedByCarVia" xml:space="preserve">
-    <value>Nahlásilo auto před {0} přes {1}.</value>
+    <value>Auto hlásilo před {0} přes {1}.</value>
   </data>
   <data name="JustInTimeExtra" xml:space="preserve">
     <value>Na poslední chvíli · {0} ze sítě</value>
   </data>
   <data name="TargetedIntro" xml:space="preserve">
-    <value>Řekněte kolik a do kdy; přednost má předpovězené slunce, zbytek co nejpozději dodá síť.</value>
+    <value>Zadejte kolik a do kdy; přednost má předpovězené slunce, zbytek co nejpozději dodá síť.</value>
   </data>
   <data name="TargetedTip" xml:space="preserve">
-    <value>Řekněte, kolik auto potřebuje a kdy musí být hotové, a před spuštěním se podívejte na plán. Plán vezme každou kilowatthodinu předpovězeného přebytku, kterou si ještě nezabrala domácí baterie, a zbytek dokoupí ze sítě co nejpozději, aby přesto skončil včas.</value>
+    <value>Zadejte, kolik energie auto potřebuje a kdy má být nabité, a před spuštěním si prohlédněte plán. Plán využije každou kilowatthodinu předpovězeného přebytku, kterou si ještě nevyhradila domácí baterie, a zbytek dokoupí ze sítě co nejpozději tak, aby nabíjení skončilo včas.</value>
   </data>
   <data name="TheCar" xml:space="preserve">
     <value>Auto</value>
   </data>
   <data name="StaleCheck" xml:space="preserve">
-    <value>Zastaralé — starší než {0}, takže zdroj možná přestal fungovat. Než podle těchto čísel naplánujete, ověřte je v autě.</value>
+    <value>Zastaralé — starší než {0}, zdroj dat možná přestal fungovat. Než podle těchto čísel začnete plánovat, ověřte je v autě.</value>
   </data>
   <data name="CarBattery" xml:space="preserve">
     <value>Baterie auta</value>
   </data>
   <data name="CarBatteryHint" xml:space="preserve">
-    <value>Stav nabití auta, jak ho naposledy nahlásila jeho cloudová služba. Ne domácí baterie.</value>
+    <value>Stav nabití auta, jak ho naposledy nahlásila jeho cloudová služba. Nejde o domácí baterii.</value>
   </data>
   <data name="Range" xml:space="preserve">
     <value>Dojezd</value>
   </data>
   <data name="RangeHint" xml:space="preserve">
-    <value>Kolik si auto myslí, že v něm zbývá, podle své nedávné spotřeby. Jen k zobrazení — žádný plán ho nečte — ale je to údaj, který odpoví, zda cíl, který se chystáte nastavit, na cestu stačí.</value>
+    <value>Dojezd je odhad auta podle jeho nedávné spotřeby. Jen pro zobrazení — plán ho nepoužívá — ale pomůže vám posoudit, zda cíl, který nastavujete, na cestu stačí.</value>
   </data>
   <data name="PluggedIn" xml:space="preserve">
     <value>Připojeno</value>
   </data>
   <data name="PluggedInHint" xml:space="preserve">
-    <value>Co nabíječka vidí v zásuvce a co o své říká auto. Nabíječka je z nich rychlejší a řídicí jednotka se řídí jí; auto může být o hodiny pozadu.</value>
+    <value>Co vidí nabíječka na svém konektoru a co o své zásuvce hlásí auto. Nabíječka hlásí změny rychleji a řídicí jednotka se řídí podle ní; auto může být o hodiny pozadu.</value>
   </data>
   <data name="CarChargeState" xml:space="preserve">
     <value>Stav nabíjení auta</value>
   </data>
   <data name="CarChargeStateHint" xml:space="preserve">
-    <value>Co auto hlásí, že dělá: Nenabíjí, Nabíjí, Dokončeno, nebo Neznámý, když nic nehlásí.</value>
+    <value>Co podle auta právě probíhá: Nenabíjí, Nabíjí, Dokončeno, nebo Neznámý, když auto nic nehlásí.</value>
   </data>
   <data name="AimingAtTopic" xml:space="preserve">
     <value>Čeho chcete dosáhnout?</value>
@@ -637,7 +637,7 @@
     <value>Čeho chcete dosáhnout?</value>
   </data>
   <data name="AimingAtTip" xml:space="preserve">
-    <value>Tak či tak se slib měří v kilowatthodinách na nabíječce. Cíl baterie se převede jednou, při spuštění — pozdější údaj z auta už rozběhnutý cíl nezmění.</value>
+    <value>V obou případech se cíl měří v kilowatthodinách na nabíječce. Cíl v procentech se převede jen jednou, při spuštění — pozdější údaj z auta už rozběhnuté nabíjení nezmění.</value>
   </data>
   <data name="EnergyNeededStartTip" xml:space="preserve">
     <value>Měřeno na nabíječce od chvíle, kdy stisknete Spustit.</value>
@@ -655,7 +655,7 @@
     <value>Na poslední chvíli</value>
   </data>
   <data name="PacingTip" xml:space="preserve">
-    <value>Obě stihnou odjezd. {0} rozloží nabíjení přes celé okno a vezme každý watt slunce nad tímto tempem, takže cíl je obvykle splněn dlouho před odjezdem. {1} dodá vše až po klidovou úroveň stejně, pak poslední úsek odloží, aby auto přes noc nestálo plné — to stojí energii ze sítě, protože slunce se během čekání nevyužije.</value>
+    <value>Obě volby stihnou odjezd. {0} rozloží nabíjení přes celé okno a navíc využije každý watt slunce nad tímto tempem, takže cíl je obvykle splněn dlouho před odjezdem. {1} nabíjí stejně až do úrovně čekání, poslední část pak odloží, aby auto nestálo přes noc plně nabité. Stojí to víc energie ze sítě, protože slunce se během čekání nevyužije.</value>
   </data>
   <data name="Cheapest" xml:space="preserve">
     <value>Nejlevněji</value>
@@ -670,22 +670,22 @@
     <value>Jen slunce</value>
   </data>
   <data name="SunOnlyTip" xml:space="preserve">
-    <value>Nic se nekupuje ze sítě. Co slunce do odjezdu nedodá, se ukáže jako deficit, ne jako import — náhled před spuštěním ukáže kolik. Mrak, na který tříminutový průměr ještě nezareagoval, může ze sítě trochu vzít, zatímco auto běží na minimu, takže počítejte s téměř nulou, ne s přesnou nulou.</value>
+    <value>Ze sítě se nic nekupuje. Co slunce do odjezdu nedodá, se ukáže jako deficit, ne jako import — náhled to ukáže ještě před spuštěním. Mrak, na který tříminutový průměr ještě nezareagoval, může krátce odebrat trochu ze sítě, zatímco auto nabíjí minimálním proudem. Počítejte tedy s téměř nulovým, ne přesně nulovým odběrem.</value>
   </data>
   <data name="SunOnlyNoJustInTime" xml:space="preserve">
-    <value>Na poslední chvíli je vypnuto, dokud je toto zaškrtnuto: odkládat poslední úsek bez sítě, která by zakryla zamračenou hodinu, může slunce jen ztratit.</value>
+    <value>Volba Na poslední chvíli je vypnutá, dokud je zaškrtnuto Jen slunce: odkládání poslední části bez sítě, která by pokryla zamračenou hodinu, by mohlo jen přijít o slunce.</value>
   </data>
   <data name="RestAtTopic" xml:space="preserve">
-    <value>Klidová úroveň (%)</value>
+    <value>Úroveň čekání (%)</value>
   </data>
   <data name="RestAt" xml:space="preserve">
-    <value>Klidová úroveň (%)</value>
+    <value>Úroveň čekání (%)</value>
   </data>
   <data name="ReadyByTargetTip" xml:space="preserve">
-    <value>Nabíjení skončí pár minut před tímto časem, aby bylo auto hotové a ne pořád odebíralo. Nejvýš {0} dopředu.</value>
+    <value>Nabíjení skončí několik minut před tímto časem, aby bylo auto nabité a už neodebíralo. Nejvýš {0} dopředu.</value>
   </data>
   <data name="MinBatterySocTargetedTip" xml:space="preserve">
-    <value>Pod touto úrovní má přednost domácí baterie: slunce nabíjí ji a auto dostane ze sítě jen to, co potřebuje, aby bylo včas hotové. Na této úrovni a výš bere auto i solární přebytek. Domácí baterie v tomto režimu auto nikdy nenabíjí. Za slabého slunce může plán držet vyšší mez, aby se baterie stihla dobít. Sdíleno s režimem Forecasted, takže změna tady se projeví i tam. Nepřežije restart.</value>
+    <value>Pod touto úrovní má přednost domácí baterie: slunce nabíjí ji a auto dostane ze sítě jen to, co potřebuje, aby bylo včas nabité. Na této úrovni a nad ní bere auto i solární přebytek. Domácí baterie v tomto režimu auto nikdy nenabíjí. Za slabého slunce může plán držet vyšší mez, aby se baterie stihla dobít. Hodnota je společná s režimem Forecasted, takže změna tady platí i tam. Po restartu se nezachová.</value>
   </data>
   <data name="PreviewTopic" xml:space="preserve">
     <value>Náhled plánu</value>
@@ -697,7 +697,7 @@
     <value>Zrušit</value>
   </data>
   <data name="PreviewTip" xml:space="preserve">
-    <value>Náhled nic nezapisuje — je to tentýž plánovač, který běží při čtení, dotázaný, co by se stalo, kdybyste začali teď. Požadavek nepřežije restart služby: pokud se přes noc restartuje, auto přestane nabíjet a nic vám o tom neřekne.</value>
+    <value>Náhled nic nezapisuje — je to stejný plánovač, který běží při každém čtení, jen se ptá, co by se stalo, kdybyste začali teď. Požadavek se při restartu služby nezachová: pokud se služba v noci restartuje, auto přestane nabíjet a nic vás na to neupozorní.</value>
   </data>
   <data name="IfYouStartNow" xml:space="preserve">
     <value>Plán, pokud začnete teď</value>
@@ -712,7 +712,7 @@
     <value>Všechny údaje</value>
   </data>
   <data name="NoPollForPlan" xml:space="preserve">
-    <value>Zatím neproběhlo žádné čtení, takže není z čeho plán sestavit — žádné SOC baterie, žádná spotřeba domu, žádná předpověď ukotvená v čase. Cíl přesto spustit můžete a plán se objeví při prvním čtení.</value>
+    <value>Zatím neproběhlo žádné čtení, takže není z čeho plán sestavit — chybí SOC baterie, spotřeba domu i předpověď vztažená k aktuálnímu času. Cíl přesto můžete spustit a plán se objeví po prvním čtení.</value>
   </data>
   <data name="BackToForm" xml:space="preserve">
     <value>Zpět k formuláři</value>
@@ -721,22 +721,22 @@
     <value>Spustit tento plán</value>
   </data>
   <data name="PlanOnlyWhileTargeted" xml:space="preserve">
-    <value>Plán se zobrazuje, jen když je aktivním režimem nabíjení {0}. Aktuální režim: {1}.</value>
+    <value>Plán se zobrazuje, jen když je aktivní režim {0}. Aktuální režim: {1}.</value>
   </data>
   <data name="AskingSoc" xml:space="preserve">
-    <value>Nabíjení na {0} z {1}, které auto naposledy hlásilo: {2} na nabíječce včetně ztrát.</value>
+    <value>Nabití na {0} z {1}, které auto naposledy hlásilo: {2} na nabíječce včetně ztrát.</value>
   </data>
   <data name="AskingEnergy" xml:space="preserve">
     <value>{0} na nabíječce.</value>
   </data>
   <data name="NoSocForRest" xml:space="preserve">
-    <value>Není použitelný údaj o SOC, od kterého by šla klidová úroveň změřit.</value>
+    <value>Chybí použitelný údaj o SOC auta, podle kterého by šla určit úroveň čekání.</value>
   </data>
   <data name="AlreadyAboveRest" xml:space="preserve">
-    <value>Auto už je na {0}, tedy na klidové úrovni {1} nebo výš, takže celé nabíjení je odložený úsek a nic z něj nezačne před časem uvolnění.</value>
+    <value>Auto už je na {0}, tedy na úrovni čekání {1} nebo výš. Celé nabíjení je proto odložená část a nezačne dřív než v čase uvolnění.</value>
   </data>
   <data name="FinishesBelowRest" xml:space="preserve">
-    <value>Tento cíl skončí zhruba na {0}, tedy na klidové úrovni {1} nebo níž, takže nad ní není co odkládat a nabíjení poběží jako u volby Nejlevněji.</value>
+    <value>Tento cíl skončí zhruba na {0}, tedy na úrovni čekání {1} nebo pod ní. Není tedy co odkládat a nabíjení poběží stejně jako u volby Nejlevněji.</value>
   </data>
   <data name="RestExplained" xml:space="preserve">
     <value>Auto se nabíjí ze slunce až na {0}, kdykoli slunce svítí, a pak čeká. Posledních {1} — zhruba z {2} na {3} — je naplánováno těsně před váš odjezd.</value>
@@ -748,19 +748,19 @@
     <value>{0} do {1}</value>
   </data>
   <data name="HoldCostsNothing" xml:space="preserve">
-    <value>Odložení posledního úseku tu nic nestojí — předpověď nemá žádné slunce, o které by přišel.</value>
+    <value>Odložení poslední části tu nic nestojí — podle předpovědi by se stejně nevyužilo žádné slunce.</value>
   </data>
   <data name="HoldCost" xml:space="preserve">
-    <value>Na poslední chvíli dokoupí ze sítě zhruba o {0} víc než nejlevnější nabíjení, protože slunce se během čekání nevyužije. To je ten obchod: auto stojí přes noc na {1} místo na svém cíli.</value>
+    <value>Na poslední chvíli dokoupí ze sítě zhruba o {0} víc než nejlevnější nabíjení, protože slunce se během čekání nevyužije. Výměnou auto stojí přes noc na {1}, ne na svém cíli.</value>
   </data>
   <data name="NotPolledYet" xml:space="preserve">
     <value>Zatím nečteno</value>
   </data>
   <data name="YesAtCharger" xml:space="preserve">
-    <value>Ano na nabíječce</value>
+    <value>Ano (nabíječka)</value>
   </data>
   <data name="NoAtCharger" xml:space="preserve">
-    <value>Ne na nabíječce</value>
+    <value>Ne (nabíječka)</value>
   </data>
   <data name="CarConnected" xml:space="preserve">
     <value>připojeno</value>
@@ -772,7 +772,7 @@
     <value>nehlášeno</value>
   </data>
   <data name="PlugLine" xml:space="preserve">
-    <value>{0}, {1} podle auta</value>
+    <value>{0}, auto: {1}</value>
   </data>
   <data name="ForecastReason" xml:space="preserve">
     <value>Předpověď: {0}.</value>

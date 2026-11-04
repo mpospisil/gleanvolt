@@ -55,7 +55,7 @@ public class OverviewNarrativeTests
             Plan = TestPlans.Usable(Now),
         });
 
-        Assert.Contains("Forecasted mode is on and has paused the car.", text);
+        Assert.Contains("Forecasted mode is on and has paused charging.", text);
         Assert.Contains("Today gives the car about 4.5 kWh, in a window from 13:00 to 15:00.", text);
     }
 
@@ -97,7 +97,7 @@ public class OverviewNarrativeTests
             WaitUntil = new DateTimeOffset(2026, 8, 12, 7, 40, 0, TimeSpan.Zero),
         });
 
-        Assert.Contains("mode is on and has stood the charger down until 09:40.", text);
+        Assert.Contains("mode is on and has paused the charger until 09:40.", text);
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class OverviewNarrativeTests
             UntilFull = new Core.Models.UntilFullStatus(Now.AddDays(-1), Day: 2),
         });
 
-        Assert.Contains("(until full, day 2) is on and has stood the charger down until ~09:40 (tomorrow's first window).", text);
+        Assert.Contains("(until full, day 2) is on and has paused the charger until ~09:40 (tomorrow's first window).", text);
     }
 
         [Fact]
@@ -127,7 +127,7 @@ public class OverviewNarrativeTests
             ChargerStoodDown = true,
         });
 
-        Assert.Contains("has stood the charger down until it can charge.", text);
+        Assert.Contains("has paused the charger until it can charge.", text);
     }
 
     [Fact]
@@ -140,8 +140,8 @@ public class OverviewNarrativeTests
             LowTariff = new Gleanvolt.Core.Models.LowTariffStatus(Waiting: true, Until: new DateTimeOffset(2026, 10, 21, 20, 0, 0, TimeSpan.Zero), Ignored: false),
         });
 
-        Assert.Contains("has paused the car", text);
-        Assert.Contains("High tariff until 22:00; it is waiting for low tariff (low tariff only).", text);
+        Assert.Contains("has paused charging", text);
+        Assert.Contains("High tariff until 22:00; charging waits for low tariff (Low tariff only is on).", text);
     }
 
     [Fact]
@@ -152,6 +152,6 @@ public class OverviewNarrativeTests
             LowTariff = new Gleanvolt.Core.Models.LowTariffStatus(Waiting: false, Until: null, Ignored: true),
         });
 
-        Assert.Contains("no tariff to wait for, so it charges whatever the hour", text);
+        Assert.Contains("no tariff is configured, so it charges at any hour", text);
     }
 }

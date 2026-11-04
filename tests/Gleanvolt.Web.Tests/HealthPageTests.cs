@@ -41,7 +41,7 @@ public class HealthPageTests : PageTest
         var page = Render<Health>();
 
         Assert.Contains("Windows DPAPI, this user", page.Markup);
-        Assert.Contains("bearer-equivalent", page.Markup);
+        Assert.Contains("has full access", page.Markup);
         Assert.DoesNotContain("encrypt", page.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -76,7 +76,7 @@ public class HealthPageTests : PageTest
         var page = Render<Health>();
 
         Assert.Contains("Car feed", page.Markup);
-        Assert.Contains("NeedsOwner", page.Markup);
+        Assert.Contains("Needs you", page.Markup);
         Assert.Contains("consent screen", page.Markup);
         Assert.Contains("/car", page.Markup);
     }

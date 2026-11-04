@@ -20,17 +20,17 @@
     <value>{0} delivered — of which {1} was loaned from the battery</value>
   </data>
   <data name="ChartNote" xml:space="preserve">
-    <value>Every meter as it was sampled, in watts. {0} is import above the line and export below it; {1} is charging above and discharging below. Click a name in the legend to take that series out. A shaded band marks the stretches the battery hold was armed for, and a stretch with no samples in it is a hole rather than a line drawn across it.</value>
+    <value>Every meter as sampled, in watts. For {0}, import is above the line and export below; for {1}, charging is above and discharging below. Click a name in the legend to hide that series. A shaded band marks when the battery hold was on. A stretch with no samples is left as a gap, not bridged with a line.</value>
     <comment>{0} and {1} are the chart series' names, SeriesGrid and SeriesBattery.</comment>
   </data>
   <data name="ChartNoteFloor" xml:space="preserve">
-    <value>{0} is the line the home battery's SOC is judged against: above it the pack may lend to the car, below it the sun belongs to the pack.</value>
+    <value>{0} is the level the home battery's SOC is compared with: above it, the battery may lend to the car; below it, the sun goes to the battery.</value>
   </data>
   <data name="ChartNoteLoan" xml:space="preserve">
-    <value>The shaded {0} under the surplus is how much of the charge the pack was funding so a surplus below the charger's floor could still reach the car.</value>
+    <value>The shaded {0} under the surplus shows how much of the charge the battery covered, so that a surplus below the charger's minimum could still reach the car.</value>
   </data>
   <data name="ChartNoteCarSoc" xml:space="preserve">
-    <value>{0} steps at the time the car captured each reading, which is routinely hours before the sample that carried it.</value>
+    <value>{0} changes at the time the car took each reading, which is often hours before the reading arrived.</value>
   </data>
   <!-- Chart series, as their legends name them -->
   <data name="SeriesSolar" xml:space="preserve">
@@ -110,7 +110,7 @@
     <value>Loading…</value>
   </data>
   <data name="NoSessions" xml:space="preserve">
-    <value>No sessions in this range.</value>
+    <value>No sessions in this period.</value>
   </data>
   <data name="Started" xml:space="preserve">
     <value>Started</value>
@@ -198,14 +198,14 @@
     <value>{0} rows</value>
   </data>
   <data name="PartialRowsNote_One" xml:space="preserve">
-    <value>{0} covers less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on that row is short by the same fraction.</value>
+    <value>{0} covers only part of the interval (the service was starting, stopping, or had lost the inverter), so every energy figure on that row is lower by the same fraction.</value>
     <comment>{0} is Rows ("1 row"), in bold.</comment>
   </data>
   <data name="PartialRowsNote_Few" xml:space="preserve">
-    <value>{0} cover less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on those rows is short by the same fraction.</value>
+    <value>{0} cover only part of the interval (the service was starting, stopping, or had lost the inverter), so every energy figure on those rows is lower by the same fraction.</value>
   </data>
   <data name="PartialRowsNote_Other" xml:space="preserve">
-    <value>{0} cover less than the full interval — the service was starting, stopping, or had lost the inverter — so every energy figure on those rows is short by the same fraction.</value>
+    <value>{0} cover only part of the interval (the service was starting, stopping, or had lost the inverter), so every energy figure on those rows is lower by the same fraction.</value>
   </data>
   <data name="EnergyPageTitle" xml:space="preserve">
     <value>Energy</value>
@@ -232,7 +232,7 @@
     <value>The day</value>
   </data>
   <data name="EnergyChartNote" xml:space="preserve">
-    <value>Power, averaged over each quarter hour that was observed — the store keeps energy, and a bucket the service only saw part of is divided by the part it saw, so a restart is a gap rather than a dip the sun never took. {0} is import above the line and export below it; {1} is charging above and discharging below. Click a name in the legend to take that series out. A bar along the bottom marks the windows that were only partly observed — the same ones the table below shows in italics.</value>
+    <value>Average power for each quarter hour that was recorded. A quarter hour the service saw only partly is averaged over the part it saw, so a restart shows as a gap, not as a false dip in production. For {0}, import is above the line and export below; for {1}, charging is above and discharging below. Click a name in the legend to hide that series. A bar along the bottom marks quarter hours that were only partly recorded — the same ones shown in italics in the table below.</value>
   </data>
   <data name="From" xml:space="preserve">
     <value>From</value>
@@ -253,10 +253,10 @@
     <value>To car</value>
   </data>
   <data name="ColBattIn" xml:space="preserve">
-    <value>Batt in</value>
+    <value>Battery in</value>
   </data>
   <data name="ColBattOut" xml:space="preserve">
-    <value>Batt out</value>
+    <value>Battery out</value>
   </data>
   <data name="ColHouse" xml:space="preserve">
     <value>House</value>
@@ -265,13 +265,13 @@
     <value>SOC</value>
   </data>
   <data name="ColCovered" xml:space="preserve">
-    <value>Covered</value>
+    <value>Coverage</value>
   </data>
   <data name="DayRow" xml:space="preserve">
     <value>Day</value>
   </data>
   <data name="EnergyTableNote" xml:space="preserve">
-    <value>Every figure is kWh over that interval, in {0} time. Import and export are kept apart, and so are the battery's two directions — a net figure could not tell an idle quarter hour from a busy one that happened to balance. {1} is the residual of the others (the car included), not a separate measurement.</value>
+    <value>Every figure is kWh for that interval, in {0} time. Import and export are shown separately, and so are battery charge and discharge: a net figure could not tell a quiet quarter hour from a busy one that happened to balance. {1} is calculated from the other figures (car included), not measured separately.</value>
   </data>
   <!-- Forecast -->
   <data name="ForecastPageTitle" xml:space="preserve">
@@ -284,7 +284,7 @@
     <value>Settings</value>
   </data>
   <data name="NoForecastHeld" xml:space="preserve">
-    <value>No forecast is held yet. Either no Solcast account is configured for this installation, or nothing has been fetched since the controller started — {0} says which, and is where the account is entered. The forecast is refreshed on its own schedule in daylight; this page shows whatever was last fetched and never asks for one itself.</value>
+    <value>No forecast is available yet. Either no Solcast account is configured, or nothing has been fetched since the controller started — {0} shows which, and is where the account is entered. The forecast is refreshed automatically in daylight; this page shows the last one fetched and never fetches one itself.</value>
   </data>
   <data name="TheTwoDays" xml:space="preserve">
     <value>The two days</value>
@@ -296,16 +296,16 @@
     <value>p10 to p90</value>
   </data>
   <data name="ForecastChartNote" xml:space="preserve">
-    <value>Expected PV power against time, 30-minute periods, in {0} time. The line is {1} — the median, as likely to be beaten as missed — and the band behind it is {2}: the width of that gap is how sure the sky is, and it is the reason this is a picture rather than four numbers. The solid rule is the midnight between the two days; the dashed one is now. Click a name in the legend to take that series out.</value>
+    <value>Expected PV power in 30-minute periods, in {0} time. The line is {1} — the median, equally likely to be beaten or missed. The band behind it is {2}: the wider it is, the less certain the weather. The solid vertical line is midnight between the two days; the dashed one is now. Click a name in the legend to hide that series.</value>
   </data>
   <data name="NoRangeNote_0" xml:space="preserve">
     <value>Some periods carry no range of their own</value>
   </data>
   <data name="NoRangeNote" xml:space="preserve">
-    <value>{0} — the provider sent only a median for them, and the band collapses onto the line there. A band no wider than the line is not a promise; the table below shows a dash in those rows.</value>
+    <value>{0} — the provider sent only a median for them, so the band shrinks to the line there. That does not mean the forecast is certain; the table below shows a dash in those rows.</value>
   </data>
   <data name="MorningMissing" xml:space="preserve">
-    <value>{0} A forecast provider only ever answers what is still to come, so the controller can say what this morning was expected to bring only if it was running through it — and this one has nothing retained before then. The empty stretch on the left of the chart is a gap in what is known, not a dark morning.</value>
+    <value>{0} A forecast provider only forecasts what is still to come, so the controller knows what this morning was expected to bring only if it was running then — and it has nothing saved from before that time. The empty stretch on the left of the chart is missing data, not a morning without sun.</value>
   </data>
   <data name="Period" xml:space="preserve">
     <value>Period</value>
@@ -326,7 +326,7 @@
     <value>{0} expected ({1}–{2} at p10–p90), peak {3}</value>
   </data>
   <data name="NothingHeld" xml:space="preserve">
-    <value>Nothing is held for this day.</value>
+    <value>No forecast for this day.</value>
   </data>
   <data name="ForecastTableNote_1" xml:space="preserve">
     <value>is</value>
@@ -338,7 +338,7 @@
     <value>Tomorrow's figures keep moving</value>
   </data>
   <data name="ForecastTableNote" xml:space="preserve">
-    <value>Power in W, energy in kWh, times in {0} time. Each row is the half hour it names, and every figure on it is the average power the provider expects across that half hour — so the energy column is simply that power over thirty minutes. The night rows are kept: a 0 W row at 02:00 {1} the forecast, and a table that drops rows is one you have to learn the rules of before you can trust a gap in it. A period is counted under the day it {2} on, which is how the dashboard and the day plan count it too, so each day opens with the half hour that ends at its own midnight. {3} — every refresh re-forecasts them until the day arrives.</value>
+    <value>Power in W, energy in kWh, times in {0} time. Each row is the half hour it names, and its power is the average the provider expects across that half hour, so the energy column is that power over thirty minutes. Night rows are kept: a 0 W row at 02:00 {1} the forecast, and a table that never drops rows needs no rules to read. A period counts towards the day it {2} on, as on the dashboard and in the day plan, so each day starts with the half hour that ends at its own midnight. {3} — every refresh forecasts them again until the day arrives.</value>
   </data>
   <data name="LastFetched" xml:space="preserve">
     <value>Last fetched {0} on {1}.</value>
@@ -347,7 +347,7 @@
     <value>Solar forecast</value>
   </data>
   <data name="ForecastHorizonNote" xml:space="preserve">
-    <value>The horizon is about 48 hours, which is why this is two days and not a week. The dashboard's {0} table is the same two days in four numbers each.</value>
+    <value>The forecast covers about 48 hours, so this page shows two days, not a week. The {0} table on the dashboard shows the same two days as four numbers each.</value>
   </data>
   <data name="Today" xml:space="preserve">
     <value>Today</value>
@@ -356,7 +356,7 @@
     <value>Tomorrow</value>
   </data>
   <data name="TodayStartsAt" xml:space="preserve">
-    <value>Today starts at {0}.</value>
+    <value>Data for today starts at {0}.</value>
   </data>
   <!-- Session chart marks -->
   <data name="MarkModeChanged" xml:space="preserve">
@@ -375,7 +375,7 @@
     <value>Plan usable again</value>
   </data>
   <data name="MarkStoodDown" xml:space="preserve">
-    <value>Charger stood down</value>
+    <value>Charger paused</value>
   </data>
   <data name="MarkRearmed" xml:space="preserve">
     <value>Charger switched back to Fast</value>

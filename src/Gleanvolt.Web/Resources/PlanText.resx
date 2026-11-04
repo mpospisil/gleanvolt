@@ -14,10 +14,10 @@
   </resheader>
   <!-- Forecasted's day plan in a sentence (SolarDayPlanNarrative) -->
   <data name="NoUsableForecast" xml:space="preserve">
-    <value>No usable forecast, so no plan for today; the mode is charging on live surplus instead.</value>
+    <value>No usable forecast, so there is no plan for today. The mode works like Solar instead: it charges from live surplus only once the home battery is full.</value>
   </data>
   <data name="NoChargeableWindow" xml:space="preserve">
-    <value>Today has no chargeable window: the sun never clears the charger's floor for long enough, or the home battery needs all of it. The car waits.</value>
+    <value>Today has no charging window: the sun never stays above the charger's minimum for long enough, or the home battery needs all of it. The car waits.</value>
   </data>
   <data name="TodayGives" xml:space="preserve">
     <value>Today gives the car about {0}, in a window from {1:HH:mm} to {2:HH:mm}.</value>
@@ -35,38 +35,38 @@
     <comment>Appended to Headline, after a space.</comment>
   </data>
   <data name="MoreThanCanDeliver" xml:space="preserve">
-    <value>{0} by {1} is more than the {2} left can deliver. Charging flat out from now, the car will have about {3} — {4} short.</value>
+    <value>{0} by {1} is more than the {2} left can deliver. Charging at full power from now, the car will get about {3} — {4} short.</value>
   </data>
   <data name="LeavingInstead" xml:space="preserve">
-    <value>Leaving at {0} instead would cover the full amount.</value>
+    <value>Leaving at {0} instead would allow the full amount.</value>
     <comment>Appended to MoreThanCanDeliver, after a space.</comment>
   </data>
   <data name="BatteryHeldOut" xml:space="preserve">
-    <value>The home battery is held out of it while the grid tops the car up, so the pack is not emptied into a charge that was already going to fall short.</value>
+    <value>The home battery is kept out while the grid charges the car, so it is not drained into a charge that will fall short anyway.</value>
   </data>
   <data name="ForecastCoversAll" xml:space="preserve">
-    <value>The forecast covers all of it: {0} from surplus {1}, and no grid import is planned at all.</value>
+    <value>The forecast covers all of it: {0} from surplus {1}. No grid import is planned.</value>
   </data>
   <data name="BatteryKeepsPriority" xml:space="preserve">
-    <value>The home battery keeps its priority throughout: the discharge hold arms whenever the car is drawing more than the roof is giving, so the pack never feeds it.</value>
+    <value>The home battery keeps priority throughout: whenever the car draws more than the panels produce, the discharge hold turns on, so the battery never feeds the car.</value>
   </data>
   <data name="NoUsableForecastTargeted" xml:space="preserve">
-    <value>There is no usable forecast for this window, so the plan assumes the grid will supply all of it. Any surplus that does appear is used first, and the plan is rebuilt on the next poll.</value>
+    <value>There is no usable forecast for this window, so the plan assumes the grid supplies all of it. Any surplus that does appear is used first, and the plan is recalculated on the next poll.</value>
   </data>
   <data name="SunAndGrid" xml:space="preserve">
-    <value>The sun should carry {0} of it {1}, and the grid the remaining {2}. Rather than charge flat out and finish early, the car is paced at about {3} across the window, so the charger draws close to what the roof is producing and buys only the shortfall.</value>
+    <value>The sun should cover {0} of it {1}, and the grid the remaining {2}. Instead of charging at full power and finishing early, the car charges at about {3} across the window, so the charger draws close to what the panels produce and only the difference is bought.</value>
   </data>
   <data name="UnusableSurplus" xml:space="preserve">
-    <value>{0} of surplus is forecast for this window, but it never climbs past the charger's 6 A minimum, so the car cannot run on it unaided. It is still worth having: the charger is held at that minimum while the sun is up, the roof supplies what it has, and only the difference is bought — about {1} of grid on average.</value>
+    <value>{0} of surplus is forecast for this window, but it never exceeds the charger's 6 A minimum, so the car cannot charge on it alone. It is still useful: while the sun is up the charger stays at that minimum, the panels supply what they can, and only the difference is bought — about {1} from the grid on average.</value>
   </data>
   <data name="AllFromGrid" xml:space="preserve">
-    <value>No surplus at all is forecast before then, so the whole {0} still needed comes from the grid, paced at about {1} across the window. With no sun to wait for there is nothing to be gained by putting it off, and spreading it leaves room to recover if anything drops out.</value>
+    <value>No surplus is forecast before then, so the {0} still needed all comes from the grid, at about {1} across the window. With no sun to wait for, there is nothing to gain by delaying, and spreading the charge leaves time to recover if something drops out.</value>
   </data>
   <data name="HoldingNow" xml:space="preserve">
-    <value>Everything below the rest level is in the car, and the last {0} is being held back until {1}. Nothing is wrong — the charger is idle on purpose, so the car reaches its target shortly before you leave rather than sitting full all night. Sun arriving before then is deliberately turned down; that is what this priority costs.</value>
+    <value>Everything up to the rest level is in the car, and the last {0} is held back until {1}. Nothing is wrong — the charger is idle on purpose, so the car reaches its target shortly before you leave instead of sitting full all night. Sun arriving before then is not used; that is the cost of this choice.</value>
   </data>
   <data name="HoldingLater" xml:space="preserve">
-    <value>The last {0} of it is held back until {1}, so the car finishes just before departure rather than hours early. Everything below the rest level is charged normally until then, on the sun wherever the sun is there.</value>
+    <value>The last {0} is held back until {1}, so the car finishes just before you leave rather than hours early. Until then, everything up to the rest level charges normally, from the sun whenever there is sun.</value>
   </data>
   <data name="Between" xml:space="preserve">
     <value>between {0} and {1}</value>
@@ -97,7 +97,7 @@
     <value>charge mode</value>
   </data>
   <data name="ChargeModeTip" xml:space="preserve">
-    <value>Starting any mode below puts the charger into Fast; Off stops the car, whichever mode was running. Nothing survives a restart — the service boots in Off and writes nothing until something here is pressed. Fast (no battery) and Targeted switch themselves off once the car finishes, Solar + grid once the day's useful sun is over, and the line above follows them without this page's help.</value>
+    <value>Starting any mode below switches the charger to Fast; Off stops the car, whatever mode was running. Nothing survives a restart — the service starts in Off and writes nothing until you press something here. Fast (no battery) and Targeted switch off by themselves when the car is done, and Solar + grid when the day's useful sun is over; the line above updates by itself.</value>
   </data>
   <data name="HoldTopic" xml:space="preserve">
     <value>Battery discharge hold</value>
@@ -106,7 +106,7 @@
     <value>Battery discharge hold</value>
   </data>
   <data name="HoldTip" xml:space="preserve">
-    <value>Common to every mode, which is why it sits above them: it stops the home battery serving household load, so the car charges from PV and grid while the battery can still charge from surplus. Shows the last command written successfully, not a device read-back — a failed write shows this switching back off on its own.</value>
+    <value>Applies to every mode, which is why it sits above them: it stops the home battery supplying the house, so the car charges from PV and the grid while the battery can still charge from surplus. It shows the last command written successfully, not a reading from the device — if a write fails, it switches back off by itself.</value>
   </data>
   <data name="ModesLabel" xml:space="preserve">
     <value>Charging modes</value>
@@ -128,7 +128,7 @@
     <value>Charges from surplus the house isn’t using, once the home battery is full.</value>
   </data>
   <data name="SolarTip" xml:space="preserve">
-    <value>Charge from whatever the roof is making that the house is not already using. The home battery keeps first claim: this mode waits until the battery is full, then follows the surplus up and down, and pauses when there is not enough of it to hold the charger's minimum current.</value>
+    <value>Charges from whatever the panels produce that the house is not using. The home battery comes first: this mode waits until it is full, then follows the surplus up and down, and pauses when there is not enough to hold the charger's minimum current.</value>
   </data>
   <data name="StartSolarTopic" xml:space="preserve">
     <value>Charge from surplus</value>
@@ -137,13 +137,13 @@
     <value>Charge from surplus</value>
   </data>
   <data name="StartSolarTip" xml:space="preserve">
-    <value>Puts the charger into Fast and hands it to the surplus. Nothing else to set — the current is whatever the sun leaves over, decided again every poll.</value>
+    <value>Switches the charger to Fast and lets the surplus drive it. Nothing else to set — the current is whatever the sun leaves over, recalculated every poll.</value>
   </data>
   <data name="SolarSurplus" xml:space="preserve">
     <value>Solar surplus</value>
   </data>
   <data name="SolarSurplusHint" xml:space="preserve">
-    <value>PV left after household consumption — the smoothed 3-minute average this mode decides on. Blank while a mode that doesn't decide on surplus is driving.</value>
+    <value>PV left after household consumption — the 3-minute average this mode acts on. Blank while a mode that does not use surplus is running.</value>
   </data>
   <data name="BatterySoc" xml:space="preserve">
     <value>Battery SOC</value>
@@ -161,14 +161,14 @@
     <value>Target current</value>
   </data>
   <data name="TargetCurrentHint" xml:space="preserve">
-    <value>The current this mode decided on this cycle, before it was written. Blank whenever it isn't charging.</value>
+    <value>The current this mode chose this cycle, before writing it. Blank when not charging.</value>
   </data>
   <!-- Solar + grid tab -->
   <data name="SolarGridIntro" xml:space="preserve">
-    <value>Follows the sun; the grid tops up to the charger’s minimum when surplus is small.</value>
+    <value>Follows the sun; when the surplus is small, the grid tops it up to the charger’s minimum.</value>
   </data>
   <data name="SolarGridTip" xml:space="preserve">
-    <value>Charge from the sun, and let the grid help. While the surplus the house isn't using stays above your minimum, the car follows it; when that surplus is too small for the charger's minimum current on its own, the grid tops it up to that minimum, with the home battery held out of it. There is no full-battery gate. When the surplus drops below your minimum the car pauses — smoothed over a few minutes, so a passing cloud doesn't stop it — and once the forecast has no sun left today that clears the minimum, the mode switches itself off.</value>
+    <value>Charges from the sun, with help from the grid. While the surplus stays above your minimum, the car follows it. When the surplus alone is too small for the charger's minimum current, the grid tops it up to that minimum, and the home battery is not used. The home battery does not need to be full. When the surplus drops below your minimum, the car pauses — averaged over a few minutes, so a passing cloud does not stop it — and once the forecast shows no more sun today above the minimum, the mode switches itself off.</value>
   </data>
   <data name="StartSolarGridTopic" xml:space="preserve">
     <value>Charge from sun + grid</value>
@@ -177,7 +177,7 @@
     <value>Charge from sun + grid</value>
   </data>
   <data name="StartSolarGridTip" xml:space="preserve">
-    <value>Puts the charger into Fast and hands it to the surplus. Ends by itself at the end of the day's useful sun, when the car stops drawing, or when it is unplugged.</value>
+    <value>Switches the charger to Fast and lets the surplus drive it. Ends by itself when the day's useful sun is over, when the car stops drawing, or when it is unplugged.</value>
   </data>
   <data name="MinSurplusTopic" xml:space="preserve">
     <value>Minimum solar surplus (W)</value>
@@ -186,22 +186,22 @@
     <value>Minimum solar surplus (W)</value>
   </data>
   <data name="MinSurplusTip" xml:space="preserve">
-    <value>Below this the car pauses instead of taking grid. The most the grid ever adds is the charger's minimum power (about 4.1 kW at 6 A on three phases) less this figure; set it at or above that and the grid never helps at all. Also the line the rest of today's forecast has to clear. Doesn't persist across restarts.</value>
+    <value>Below this, the car pauses instead of using the grid. The grid adds at most the charger's minimum power (about 4.1 kW at 6 A on three phases) minus this value; set it at or above that and the grid never helps. The rest of today's forecast must also exceed this value for the mode to keep running. Not kept after a restart.</value>
   </data>
   <data name="SolarGridLowTariffHint" xml:space="preserve">
-    <value>In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends with the day's useful sun, so a low tariff that starts after dark charges nothing here. Doesn't persist across restarts.</value>
+    <value>In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends when the day's useful sun is over, so a low tariff that starts after dark charges nothing here. Not kept after a restart.</value>
   </data>
   <data name="SunUntil" xml:space="preserve">
     <value>Sun until</value>
   </data>
   <data name="SunUntilHint" xml:space="preserve">
-    <value>When the forecast says the surplus stops clearing your minimum today — when this mode will switch itself off if the live surplus agrees. Only shown while this mode is driving.</value>
+    <value>When the forecast says the surplus stops exceeding your minimum today — the time this mode switches itself off, if the live surplus agrees. Shown only while this mode is running.</value>
   </data>
   <data name="GridPower" xml:space="preserve">
     <value>Grid power</value>
   </data>
   <data name="GridPowerTopUpHint" xml:space="preserve">
-    <value>Positive while importing. While the grid is topping up a small surplus, this is roughly that top-up.</value>
+    <value>Positive while importing. While the grid tops up a small surplus, this is roughly the top-up.</value>
   </data>
   <data name="NoForecast" xml:space="preserve">
     <value>no forecast</value>
@@ -217,7 +217,7 @@
     <value>Until full</value>
   </data>
   <data name="UntilFullTip" xml:space="preserve">
-    <value>Keeps one session going over several days, for a car left at home over a weekend or a week: one sunny afternoon rarely fills it, three usually do. By day nothing changes. Where the mode would end for the day, it stands the charger down for the night instead and starts again on the next day's sun. It ends when the car is full, is unplugged, or you press Off. A session running with it on is resumed after a restart.</value>
+    <value>Keeps one session going over several days, for a car left at home over a weekend or a week: one sunny afternoon rarely fills it, three usually do. Daytime charging is unchanged. When the mode would end for the day, it pauses the charger overnight instead and starts again with the next day's sun. It ends when the car is full, when it is unplugged, or when you press Off. A session with this on is resumed after a restart.</value>
   </data>
   <data name="UntilFullDay" xml:space="preserve">
     <value>Running until full: day {0} of this session.</value>
@@ -233,10 +233,10 @@
     <value>Settings</value>
   </data>
   <data name="NoTariffYet" xml:space="preserve">
-    <value>Set up a tariff in {0} first; until then this has nothing to wait for.</value>
+    <value>Set up a tariff in {0} first; until then there is nothing to wait for.</value>
   </data>
   <data name="LowTariffIgnoredNote" xml:space="preserve">
-    <value>Set, but ignored: there is no tariff to wait for, so it charges whatever the hour.</value>
+    <value>On, but ignored: no tariff is configured, so it charges at any hour.</value>
   </data>
   <data name="WaitingForLowTariffFrom" xml:space="preserve">
     <value>Waiting for low tariff, from {0:HH:mm}.</value>
@@ -252,7 +252,7 @@
     <value>Solar</value>
   </data>
   <data name="ForecastedTip" xml:space="preserve">
-    <value>Charge from surplus like {0}, but with the fixed battery-full gate replaced by the Solcast forecast: the plan decides how much of today's remaining sun the car may have, so the home battery still reaches 100% by the evening deadline. The midday plateau goes to the car, the shoulders stay with the house and the battery.</value>
+    <value>Charges from surplus like {0}, but replaces the fixed battery-full rule with the Solcast forecast: the plan decides how much of today's remaining sun the car may take, so the home battery still reaches 100% by the evening deadline. The midday peak goes to the car; the morning and evening sun stays with the house and the battery.</value>
   </data>
   <data name="StartForecastedTopic" xml:space="preserve">
     <value>Charge to the forecast</value>
@@ -261,13 +261,13 @@
     <value>Charge to the forecast</value>
   </data>
   <data name="StartForecastedTip" xml:space="preserve">
-    <value>Falls back to plain surplus behaviour whenever no usable forecast is available, rather than refusing to charge.</value>
+    <value>When no usable forecast is available, it does not refuse to charge: it works like Solar and charges from live surplus only once the home battery is full.</value>
   </data>
   <data name="WhereChargeStopsTopic" xml:space="preserve">
-    <value>Where a charge stops</value>
+    <value>When a charge stops</value>
   </data>
   <data name="WhereChargeStops" xml:space="preserve">
-    <value>Where a charge stops</value>
+    <value>When a charge stops</value>
   </data>
   <data name="WhereChargeStopsTip_0" xml:space="preserve">
     <value>ask</value>
@@ -276,7 +276,7 @@
     <value>Targeted</value>
   </data>
   <data name="WhereChargeStopsTip" xml:space="preserve">
-    <value>This mode takes no amount: it charges the car from whatever surplus the forecast says the home battery will not need, until the car's own charge limit stops it. To keep the car below full, set that limit in the car. To {0} for an amount by a time, use {1}: when the forecast covers it in time, it charges from the sun alone, and it buys grid only if the sun falls short.</value>
+    <value>This mode does not take an amount: it charges the car from the surplus the forecast says the home battery will not need, until the car's own charge limit stops it. To keep the car below full, set that limit in the car. To {0} for an amount by a set time, use {1}: when the forecast covers it in time, it charges from the sun only, and buys from the grid only if the sun falls short.</value>
   </data>
   <data name="BatteryKeeps" xml:space="preserve">
     <value>What the home battery keeps</value>
@@ -288,7 +288,7 @@
     <value>Minimum battery SOC (%)</value>
   </data>
   <data name="MinBatterySocTip" xml:space="preserve">
-    <value>The lowest the home battery may go while it helps charge the car. When it gets there the car pauses until the battery has recovered by the resume margin below. The plan may keep a higher floor when the forecast says the battery needs it to be full by the plan's deadline. Shared with the Targeted mode, so changing it here changes it there too. Doesn't persist across restarts.</value>
+    <value>The lowest the home battery may go while it helps charge the car. When it gets there, the car pauses until the battery has recovered by the resume margin below. The plan may keep a higher floor when the forecast says the battery needs it to be full by the deadline. Shared with the Targeted mode, so a change here applies there too. Not kept after a restart.</value>
   </data>
   <data name="ResumeMarginTopic" xml:space="preserve">
     <value>SOC resume margin (%)</value>
@@ -297,13 +297,13 @@
     <value>SOC resume margin (%)</value>
   </data>
   <data name="ResumeMarginTip" xml:space="preserve">
-    <value>How far above the floor the battery must recover before a paused session restarts. Raise it if the car starts and stops repeatedly on a marginal day. Doesn't persist across restarts.</value>
+    <value>How far above the floor the battery must recover before a paused session restarts. Raise it if the car starts and stops repeatedly on a borderline day. Not kept after a restart.</value>
   </data>
   <data name="NoPollYet" xml:space="preserve">
     <value>No poll has completed yet.</value>
   </data>
   <data name="PlanOnlyWhileForecasted" xml:space="preserve">
-    <value>The day plan is only shown while {0} is the active charge mode. Current mode: {1}.</value>
+    <value>The day plan is shown only while {0} is the active charge mode. Current mode: {1}.</value>
   </data>
   <data name="ThePlan" xml:space="preserve">
     <value>The plan</value>
@@ -315,67 +315,67 @@
     <value>Plan state</value>
   </data>
   <data name="PlanStateHint" xml:space="preserve">
-    <value>Why the plan decided what it decided -- the same line the log carries.</value>
+    <value>Why the plan decided what it did — the same line as in the log.</value>
   </data>
   <data name="ChargeWindow" xml:space="preserve">
     <value>Charge window</value>
   </data>
   <data name="ChargeWindowHint" xml:space="preserve">
-    <value>The next stretch of today forecast to clear the charger's minimum power for long enough to be worth starting. 'none' when today offers no such window.</value>
+    <value>The next part of today forecast to stay above the charger's minimum power long enough to be worth starting. 'none' when today has no such window.</value>
   </data>
   <data name="EvBudget" xml:space="preserve">
     <value>EV energy budget</value>
   </data>
   <data name="EvBudgetHint" xml:space="preserve">
-    <value>How much of today's remaining sun the car may have, restricted to periods where the surplus actually clears the charger's minimum power.</value>
+    <value>How much of today's remaining sun the car may take, counting only periods when the surplus is above the charger's minimum power.</value>
   </data>
   <data name="ProjectedShortfall" xml:space="preserve">
     <value>Projected shortfall</value>
   </data>
   <data name="ProjectedShortfallHint" xml:space="preserve">
-    <value>How far today's forecast falls short of the house plus a full home battery. Above zero, the evening 100% is at risk. The car is not in this sum — it only ever gets what is left over.</value>
+    <value>How far today's forecast falls short of covering the house and filling the home battery. Above zero, reaching 100% by evening is at risk. The car is not included — it only gets what is left over.</value>
   </data>
   <data name="SurplusSpill" xml:space="preserve">
     <value>Surplus spill</value>
   </data>
   <data name="SurplusSpillHint" xml:space="preserve">
-    <value>Remaining surplus the home battery has no room for — what is still coming less what it can absorb. At 100% it is all of it, and every watt leaves the house unless the car takes it, which is what lets the battery lend against a much thinner surplus.</value>
+    <value>Remaining surplus the home battery has no room for — what is still to come minus what it can absorb. At 100% that is all of it, and every watt is exported unless the car takes it. That is why the battery may lend to the car against a much smaller surplus.</value>
   </data>
   <data name="LoanHeadroom" xml:space="preserve">
     <value>Loan headroom</value>
   </data>
   <data name="LoanHeadroomHint" xml:space="preserve">
-    <value>How much the pack may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC sits on the floor, or when every remaining watt has a home in the pack.</value>
+    <value>How much the battery may lend right now: the room between its SOC and the floor, capped by the spill. Zero when SOC is at the floor, or when the battery can still absorb all the remaining sun.</value>
   </data>
   <data name="RequiredFloor" xml:space="preserve">
     <value>Required SOC floor</value>
   </data>
   <data name="RequiredFloorHint" xml:space="preserve">
-    <value>The SOC the battery must not fall below right now for the sun still to come to return it to 100% by the deadline. Battery SOC dropping to this line is what pauses the car.</value>
+    <value>The SOC the battery must not drop below right now, so the remaining sun can still bring it back to 100% by the deadline. When battery SOC falls to this line, the car pauses.</value>
   </data>
   <data name="ForecastRemaining" xml:space="preserve">
     <value>Forecast remaining today</value>
   </data>
   <data name="ForecastRemainingHint" xml:space="preserve">
-    <value>Forecast PV still to come today, at the configured confidence band and already scaled by forecast accuracy.</value>
+    <value>PV still forecast for today, at the configured confidence band and already adjusted for forecast accuracy.</value>
   </data>
   <data name="TomorrowForecast" xml:space="preserve">
     <value>Tomorrow forecast</value>
   </data>
   <data name="TomorrowForecastHint" xml:space="preserve">
-    <value>Tomorrow's forecast production. Purely informational: context for whether a shortfall today is worth waiting out.</value>
+    <value>Tomorrow's forecast production. For information only: it helps judge whether today's shortfall is worth waiting out.</value>
   </data>
   <data name="ForecastAccuracy" xml:space="preserve">
     <value>Forecast accuracy</value>
   </data>
   <data name="ForecastAccuracyHint" xml:space="preserve">
-    <value>Actual production against forecast so far today. 100% is on the nose; the rest of the day's forecast is scaled by this, and a sustained large miss makes the plan untrusted.</value>
+    <value>Actual production compared with the forecast so far today. 100% means exactly on target. The rest of today's forecast is scaled by this, and a large miss that persists makes the plan untrusted.</value>
   </data>
   <data name="LoanedToday" xml:space="preserve">
     <value>Battery loaned today</value>
   </data>
   <data name="LoanedTodayHint" xml:space="preserve">
-    <value>Energy the home battery has lent the car today so a surplus below the charger's floor could still reach it. Resets at local midnight.</value>
+    <value>Energy the home battery has lent the car today, so a surplus below the charger's minimum could still reach it. Resets at local midnight.</value>
   </data>
   <data name="ChartTitle" xml:space="preserve">
     <value>Charge window against forecast surplus</value>
@@ -394,7 +394,7 @@
     <value>As fast as the installation allows, with the home battery kept out — expect grid import.</value>
   </data>
   <data name="FastTip" xml:space="preserve">
-    <value>Charge as fast as the installation allows and keep the home battery out of it. The setpoint is pinned at the configured maximum whatever the sun is doing: PV covers what it can and the grid covers the rest, so expect to import. The discharge hold is armed when the charge starts and released when it ends — you can switch it off in between if you would rather the battery helped.</value>
+    <value>Charges as fast as the installation allows and keeps the home battery out of it. The current is fixed at the configured maximum whatever the sun is doing: PV covers what it can and the grid covers the rest, so expect to import. The discharge hold turns on when the charge starts and off when it ends — you can switch it off in between if you want the battery to help.</value>
   </data>
   <data name="HowMuchTopic" xml:space="preserve">
     <value>How much?</value>
@@ -430,10 +430,10 @@
     <value>Ready by (optional)</value>
   </data>
   <data name="ReadyByTip" xml:space="preserve">
-    <value>No time set: the charge starts straight away. With a time, the charge is held back and starts as late as it can while still finishing before you go — so a car asked to go above 80% spends minutes there rather than the whole night, which is what actually ages the pack. It still charges flat out when it runs; only the start moves. To remove a time you have set, open the calendar and press its Clear button.</value>
+    <value>With no time set, the charge starts straight away. With a time, the charge is delayed and starts as late as possible while still finishing before you leave — so a car charged above 80% spends minutes there instead of the whole night, which is what actually wears the battery. It still charges at full power; only the start moves. To remove a time, open the calendar and press Clear.</value>
   </data>
   <data name="FastLowTariffHint" xml:space="preserve">
-    <value>In high tariff the car waits, and it charges flat out once low tariff starts. The charger starts a car on its own when it is plugged in, so one plugged in during high tariff draws for a moment until the next poll stops it. Doesn't persist across restarts.</value>
+    <value>In high tariff the car waits, and it charges at full power once low tariff starts. The charger starts a car by itself when it is plugged in, so a car plugged in during high tariff draws power briefly until the next poll stops it. Not kept after a restart.</value>
   </data>
   <data name="StartFastTopic" xml:space="preserve">
     <value>Charge at maximum</value>
@@ -442,19 +442,19 @@
     <value>Charge at maximum</value>
   </data>
   <data name="FastEvPowerHint" xml:space="preserve">
-    <value>What the charger reports the car actually drawing right now — not a setpoint. This is what falls away when the car decides it is full.</value>
+    <value>What the car is actually drawing right now, as reported by the charger — not a setpoint. This drops when the car decides it is full.</value>
   </data>
   <data name="EvCurrent" xml:space="preserve">
     <value>EV charging current</value>
   </data>
   <data name="FastEvCurrentHint" xml:space="preserve">
-    <value>Charging current derived from the charger's measured power: what the car really takes, which can be below the maximum if the car itself limits it.</value>
+    <value>Charging current calculated from the charger's measured power: what the car really takes. It can be below the maximum if the car limits it.</value>
   </data>
   <data name="ActiveCurrent" xml:space="preserve">
     <value>Active current</value>
   </data>
   <data name="ActiveCurrentHint" xml:space="preserve">
-    <value>The charger's setpoint read back from the hardware: what it was actually left at.</value>
+    <value>The charger's setpoint read back from the hardware: what it is actually set to.</value>
   </data>
   <data name="FastGridPowerHint" xml:space="preserve">
     <value>Positive while importing from the grid, negative while exporting. In this mode it is the price of the speed.</value>
@@ -463,13 +463,13 @@
     <value>Delivered</value>
   </data>
   <data name="DeliveredHint" xml:space="preserve">
-    <value>Energy delivered against the amount asked for, metered at the charger from the moment this charge was started. The mode stops itself when it gets there.</value>
+    <value>Energy delivered so far against the amount requested, metered at the charger since this charge started. The mode stops itself when it gets there.</value>
   </data>
   <data name="BasisEnergyHint" xml:space="preserve">
-    <value>The charge stops when that much has been delivered, or when the car stops first — whichever comes first.</value>
+    <value>The charge stops when that much has been delivered, or earlier if the car stops first.</value>
   </data>
   <data name="BasisSocHint" xml:space="preserve">
-    <value>Converted to kilowatt-hours once, when you press the button. A later reading from the car does not move a charge that is already part delivered.</value>
+    <value>Converted to kilowatt-hours once, when you press the button. A later reading from the car does not change a charge already in progress.</value>
   </data>
   <data name="BasisFullHint" xml:space="preserve">
     <value>The car decides: the charge runs until it reaches its own charge limit and stops drawing.</value>
@@ -478,28 +478,28 @@
     <value>The car decides: the charge runs until it reaches its own charge limit and stops drawing. A battery target needs the car's capacity in Vehicle:BatteryCapacityKWh and a reading from the car.</value>
   </data>
   <data name="EndsFullHint" xml:space="preserve">
-    <value>Ends itself: when the car stops drawing because it has reached its own charge limit, the setpoint drops to the pause current and the mode returns to Off, which releases the hold.</value>
+    <value>Ends by itself: when the car stops drawing because it has reached its own charge limit, the current drops to the pause level and the mode returns to Off, which releases the hold.</value>
   </data>
   <data name="EndsAmountHint" xml:space="preserve">
-    <value>Ends itself: at the amount above, or when the car stops drawing first. Either way the setpoint drops to the pause current and the mode returns to Off, which releases the hold.</value>
+    <value>Ends by itself: at the amount above, or earlier if the car stops drawing. Either way the current drops to the pause level and the mode returns to Off, which releases the hold.</value>
   </data>
   <data name="NoUsableSoc" xml:space="preserve">
-    <value>No usable SOC reading to measure the gap from.</value>
+    <value>No usable SOC reading to calculate the difference from.</value>
   </data>
   <data name="AlreadyAt" xml:space="preserve">
     <value>The car is already at {0} — nothing to do.</value>
   </data>
   <data name="SocConversion" xml:space="preserve">
-    <value>From {0} now, that is about {1} at the charger: {2} usable, {3} of what the charger meters reaching the cells.</value>
+    <value>From {0} now, that is about {1} at the charger: {2} usable capacity, with {3} of the energy metered at the charger reaching the cells.</value>
   </data>
   <data name="FastDelivered" xml:space="preserve">
-    <value>The {0} asked for has been delivered; the charge is stopping.</value>
+    <value>The {0} requested has been delivered; the charge is stopping.</value>
   </data>
   <data name="AskedSoc" xml:space="preserve">
     <value>{0}, which is the {1} asked for</value>
   </data>
   <data name="FastProgress" xml:space="preserve">
-    <value>{0} of {1} is in the car; {2} to go before this stops itself.</value>
+    <value>{0} of {1} is in the car; {2} to go before it stops by itself.</value>
   </data>
   <data name="PowerObserved" xml:space="preserve">
     <value>{0} (what the car is taking)</value>
@@ -508,95 +508,95 @@
     <value>{0} (the installation's maximum — the car has not drawn yet)</value>
   </data>
   <data name="NotEnoughTime" xml:space="preserve">
-    <value>Not enough time: about {0} of this will not fit before {1:HH:mm}. Charging flat out from now at {2}.</value>
+    <value>Not enough time: about {0} of this will not fit before {1:HH:mm}. Charging at full power from now, at {2}.</value>
   </data>
   <data name="WaitingUntil" xml:space="preserve">
-    <value>Waiting until {0:HH:mm}, then charging flat out: {1} at {2} takes about {3}, and the car is wanted by {4:HH:mm}.</value>
+    <value>Waiting until {0:HH:mm}, then charging at full power: {1} at {2} takes about {3}, and the car is needed by {4:HH:mm}.</value>
   </data>
   <data name="ChargingToBeReady" xml:space="preserve">
-    <value>Charging flat out to be ready by {0:HH:mm}: {1} to go at {2}.</value>
+    <value>Charging at full power to be ready by {0:HH:mm}: {1} to go at {2}.</value>
   </data>
   <!-- Targeted plan figures (TargetedPlanView) -->
   <data name="TargetedPlanStateHint" xml:space="preserve">
-    <value>Complete: the target is met. Solar: the forecast covers it with no import at all. SolarPlusGrid: the sun carries what it can and the grid paces the rest. Maximum: there is not enough time, so everything available is taken.</value>
+    <value>Complete: the target is met. Solar: the forecast covers it with no import. Solar + grid: the sun covers what it can and the grid supplies the rest at a steady pace. Maximum: there is not enough time, so everything available is used.</value>
   </data>
   <data name="StillNeeded" xml:space="preserve">
     <value>Still needed</value>
   </data>
   <data name="StillNeededHint" xml:space="preserve">
-    <value>The request less what the charger has measurably delivered since it was activated.</value>
+    <value>The requested amount minus what the charger has measured as delivered since it started.</value>
   </data>
   <data name="DeliveredSoFar" xml:space="preserve">
     <value>Delivered so far</value>
   </data>
   <data name="DeliveredSoFarHint" xml:space="preserve">
-    <value>Measured at the charger, so a car that limits itself to less than we asked for simply gets a longer grid block on the next poll.</value>
+    <value>Measured at the charger, so if the car takes less than requested, the next poll simply schedules more grid charging.</value>
   </data>
   <data name="ForecastSurplus" xml:space="preserve">
     <value>Forecast surplus</value>
   </data>
   <data name="ForecastSurplusHint" xml:space="preserve">
-    <value>All the surplus this window is forecast to hold, after the house and the home battery's booking — whether or not the car can charge on it unaided.</value>
+    <value>All the surplus forecast for this window, after the house and the home battery's share — whether or not the car can charge on it alone.</value>
   </data>
   <data name="FromSun" xml:space="preserve">
     <value>From sun</value>
   </data>
   <data name="FromSunHint" xml:space="preserve">
-    <value>The part of the surplus above that the car can actually run on alone. Zero does not mean no sun: it means no half-hour clears the charger's 6 A minimum, which is why the grid block is placed over the sunniest hours rather than after them.</value>
+    <value>The part of the surplus above that the car can actually charge on alone. Zero does not mean no sun: it means no half hour exceeds the charger's 6 A minimum. That sun is still used while the charger runs at its minimum, and only the difference is bought from the grid.</value>
   </data>
   <data name="FromGrid" xml:space="preserve">
     <value>From grid</value>
   </data>
   <data name="FromGridHint" xml:space="preserve">
-    <value>What the sun cannot cover. Rebuilt every poll, so a better day than forecast shrinks this before the rest of it is bought.</value>
+    <value>What the sun cannot cover. Recalculated every poll, so a better day than forecast reduces this before the rest is bought.</value>
   </data>
   <data name="ChargePace" xml:space="preserve">
     <value>Charge pace</value>
   </data>
   <data name="ChargePaceHint" xml:space="preserve">
-    <value>The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this plus whatever the roof is giving, so sun above it is free and lowers it for later. Zero means the forecast covers the target outright.</value>
+    <value>The average power the grid must supply to meet the target: what is still needed, minus the sun forecast to reach the car, spread over the time left. The charger runs at this plus whatever the panels produce, so extra sun is free and lowers the pace later. Zero means the forecast covers the whole target.</value>
   </data>
   <data name="ChargingFrom" xml:space="preserve">
     <value>Charging from</value>
   </data>
   <data name="ChargingFromHint" xml:space="preserve">
-    <value>When the first grid-funded charging starts. The charge is spread across the window rather than run flat out, because the charger can only use the sun that shines while it runs.</value>
+    <value>When grid-supplied charging starts. The charge is spread across the window instead of running at full power, because the charger can only use the sun that shines while it is running.</value>
   </data>
   <data name="ExpectedByDeparture" xml:space="preserve">
     <value>Expected by departure</value>
   </data>
   <data name="ExpectedByDepartureHint" xml:space="preserve">
-    <value>What will actually reach the car. Below what was asked for only when there is not enough time left.</value>
+    <value>What will actually reach the car. Less than requested only when there is not enough time left.</value>
   </data>
   <data name="Shortfall" xml:space="preserve">
     <value>Shortfall</value>
   </data>
   <data name="ShortfallHint" xml:space="preserve">
-    <value>How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount asked for.</value>
+    <value>How far the plan falls short of the request. Anything above zero means the departure is too soon for the amount requested.</value>
   </data>
   <data name="HeldBack" xml:space="preserve">
     <value>Held back</value>
   </data>
   <data name="HeldBackHint" xml:space="preserve">
-    <value>The last stretch of the target, scheduled to land just before departure instead of whenever the sun offers it — so the car does not sit at a high state of charge all night. Everything below it is charged normally.</value>
+    <value>The last part of the target, scheduled to finish just before departure instead of whenever the sun allows — so the car does not sit at a high state of charge all night. Everything below it charges normally.</value>
   </data>
   <data name="ReleasedAt" xml:space="preserve">
     <value>Released at</value>
   </data>
   <data name="ReleasedAtHint" xml:space="preserve">
-    <value>When the held stretch starts. Worked out from the charger's maximum power plus a slack margin; if the car takes it more slowly than that, the pace rises on the next poll and the shortfall figure reports it if even that will not do it.</value>
+    <value>When the held-back part starts. Calculated from the charger's maximum power plus a safety margin; if the car charges more slowly, the pace rises on the next poll, and Shortfall shows it if even that is not enough.</value>
   </data>
   <data name="BatterySocFloor" xml:space="preserve">
     <value>Battery SOC floor</value>
   </data>
   <data name="BatterySocFloorHint" xml:space="preserve">
-    <value>Below this, the sun goes to the home battery and the car gets only what the deadline needs, from the grid. Never lower than your Minimum battery SOC; higher when the forecast leaves the battery too little sun to refill.</value>
+    <value>Below this, the sun goes to the home battery and the car gets only what it needs for the deadline, from the grid. Never lower than your Minimum battery SOC; higher when the forecast leaves the battery too little sun to refill.</value>
   </data>
   <data name="ReadyBy" xml:space="preserve">
     <value>Ready by</value>
   </data>
   <data name="ReadyByHint" xml:space="preserve">
-    <value>The finish line the plan works to: your departure less the safety margin.</value>
+    <value>The time the plan aims for: your departure minus a safety margin.</value>
   </data>
   <!-- Targeted tab -->
   <data name="ReportedByCar" xml:space="preserve">
@@ -615,37 +615,37 @@
     <value>Say how much and by when; forecast sun goes first, the grid covers the rest as late as possible.</value>
   </data>
   <data name="TargetedTip" xml:space="preserve">
-    <value>Say how much the car needs and when it has to be there, then look at the plan before it starts. The plan takes every kilowatt-hour of forecast surplus the home battery has not already claimed, and buys the rest from the grid as late as it can and still finish in time.</value>
+    <value>Say how much the car needs and by when, then check the plan before starting. The plan uses every kilowatt-hour of forecast surplus the home battery has not already claimed, and buys the rest from the grid as late as possible while still finishing in time.</value>
   </data>
   <data name="TheCar" xml:space="preserve">
     <value>The car</value>
   </data>
   <data name="StaleCheck" xml:space="preserve">
-    <value>Stale — older than {0}, so the feed may have died. Check the figures against the car before planning from them.</value>
+    <value>Stale — older than {0}, so the feed may have stopped. Check these figures against the car before planning with them.</value>
   </data>
   <data name="CarBattery" xml:space="preserve">
     <value>Car battery</value>
   </data>
   <data name="CarBatteryHint" xml:space="preserve">
-    <value>The car's own state of charge, as its cloud integration last reported it. Not the home battery.</value>
+    <value>The car's own state of charge, as its cloud service last reported it. Not the home battery.</value>
   </data>
   <data name="Range" xml:space="preserve">
     <value>Range</value>
   </data>
   <data name="RangeHint" xml:space="preserve">
-    <value>What the car reckons is left in it, off its own recent consumption. Display only — no plan reads it — but it is the figure that answers whether the target you are about to set is enough for the trip.</value>
+    <value>The car's own estimate of its remaining range, based on its recent consumption. Display only — no plan uses it — but it tells you whether the target you are about to set is enough for the trip.</value>
   </data>
   <data name="PluggedIn" xml:space="preserve">
     <value>Plugged in</value>
   </data>
   <data name="PluggedInHint" xml:space="preserve">
-    <value>What the charger sees at the socket, and what the car says about its own. The charger is the faster of the two and the one the controller acts on; the car can lag it by hours.</value>
+    <value>What the charger sees at its connector, and what the car reports about its socket. The charger is faster and is what the controller acts on; the car can be hours behind.</value>
   </data>
   <data name="CarChargeState" xml:space="preserve">
     <value>Car charge state</value>
   </data>
   <data name="CarChargeStateHint" xml:space="preserve">
-    <value>What the car says it is doing: Idle, Charging, Complete, or Unknown when it doesn't report.</value>
+    <value>What the car reports it is doing: Idle, Charging, Complete, or Unknown when it does not report.</value>
   </data>
   <data name="AimingAtTopic" xml:space="preserve">
     <value>What are you aiming at?</value>
@@ -654,7 +654,7 @@
     <value>What are you aiming at?</value>
   </data>
   <data name="AimingAtTip" xml:space="preserve">
-    <value>Either way the promise is metered in kilowatt-hours at the charger. A battery target is converted once, when you start it — a later reading from the car does not move a target that is already part delivered.</value>
+    <value>Either way, the target is measured in kilowatt-hours at the charger. A battery target is converted once, when you start — a later reading from the car does not change a target already in progress.</value>
   </data>
   <data name="EnergyNeededStartTip" xml:space="preserve">
     <value>Measured at the charger, from the moment you press Start.</value>
@@ -672,7 +672,7 @@
     <value>Just in time</value>
   </data>
   <data name="PacingTip" xml:space="preserve">
-    <value>Both meet the departure. {0} paces the charge across the window and takes every watt of sun above that pace, so the target is usually met well before you leave. {1} delivers everything up to the rest level the same way, then holds the last stretch back so the car is not sitting full overnight — which costs grid, because the sun is turned down while it waits.</value>
+    <value>Both finish by the departure. {0} spreads the charge across the window and also takes every watt of sun above that pace, so the target is usually met well before you leave. {1} charges up to the rest level the same way, then holds the last part back so the car does not sit full overnight — this costs grid energy, because sun is not used while it waits.</value>
   </data>
   <data name="Cheapest" xml:space="preserve">
     <value>Cheapest</value>
@@ -687,10 +687,10 @@
     <value>Sun only</value>
   </data>
   <data name="SunOnlyTip" xml:space="preserve">
-    <value>Nothing is bought from the grid. Whatever the sun can't deliver by the departure is reported as shortfall, not imported — the preview shows how much before you start. A cloud the 3-minute average hasn't caught up with can still draw a little from the grid while the car runs at its minimum, so expect close to none rather than exactly none.</value>
+    <value>Nothing is bought from the grid. Whatever the sun cannot deliver by the departure is shown as a shortfall, not imported — the preview shows how much before you start. A cloud the 3-minute average has not caught up with can still draw a little from the grid while the car runs at its minimum, so expect close to zero, not exactly zero.</value>
   </data>
   <data name="SunOnlyNoJustInTime" xml:space="preserve">
-    <value>Just in time is off while this is ticked: holding the last stretch back with no grid to make up a cloudy hour can only lose sun.</value>
+    <value>Just in time is off while this is ticked: holding the last part back with no grid to cover a cloudy hour can only lose sun.</value>
   </data>
   <data name="RestAtTopic" xml:space="preserve">
     <value>Rest at (%)</value>
@@ -699,10 +699,10 @@
     <value>Rest at (%)</value>
   </data>
   <data name="ReadyByTargetTip" xml:space="preserve">
-    <value>Charging finishes a few minutes before this, so the car is ready rather than still drawing. At most {0} ahead.</value>
+    <value>Charging finishes a few minutes before this time, so the car is ready and no longer drawing. At most {0} ahead.</value>
   </data>
   <data name="MinBatterySocTargetedTip" xml:space="preserve">
-    <value>Below this level the home battery comes first: the sun charges it, and the car gets only what it needs to be ready on time, from the grid. At or above it, the car also takes the solar surplus. The home battery never charges the car in this mode. On a poor-sun day the plan may keep a higher floor so the battery can still refill. Shared with the Forecasted mode, so changing it here changes it there too. Doesn't persist across restarts.</value>
+    <value>Below this level the home battery comes first: the sun charges it, and the car gets only what it needs from the grid to be ready on time. At or above it, the car also takes the solar surplus. The home battery never charges the car in this mode. On a poor-sun day the plan may keep a higher floor so the battery can still refill. Shared with the Forecasted mode, so a change here applies there too. Not kept after a restart.</value>
   </data>
   <data name="PreviewTopic" xml:space="preserve">
     <value>Preview plan</value>
@@ -714,7 +714,7 @@
     <value>Cancel</value>
   </data>
   <data name="PreviewTip" xml:space="preserve">
-    <value>Preview writes to nothing — it is the same planner the poll loop runs, asked what would happen if you started now. The request does not survive a restart of the service: if it restarts overnight the car stops charging, and nothing will have told you.</value>
+    <value>The preview writes nothing — it asks the same planner the poll loop runs what would happen if you started now. The request does not survive a restart of the service: if it restarts overnight, the car stops charging and you will not be told.</value>
   </data>
   <data name="IfYouStartNow" xml:space="preserve">
     <value>The plan, if you start now</value>
@@ -729,7 +729,7 @@
     <value>Every figure</value>
   </data>
   <data name="NoPollForPlan" xml:space="preserve">
-    <value>No poll has completed yet, so there is nothing to build a plan from — no battery SOC, no house load, no forecast anchored to an instant. You can still start the target and the plan will appear on the first poll.</value>
+    <value>No poll has completed yet, so there is nothing to build a plan from — no battery SOC, no house load, no forecast tied to the current time. You can still start the target; the plan appears after the first poll.</value>
   </data>
   <data name="BackToForm" xml:space="preserve">
     <value>Back to the form</value>
@@ -741,22 +741,22 @@
     <value>The plan is only shown while {0} is the active charge mode. Current mode: {1}.</value>
   </data>
   <data name="AskingSoc" xml:space="preserve">
-    <value>Charging to {0}, from the {1} the car last reported: {2} at the charger, charge losses included.</value>
+    <value>Charging to {0} from the {1} the car last reported: {2} at the charger, including charging losses.</value>
   </data>
   <data name="AskingEnergy" xml:space="preserve">
     <value>{0} at the charger.</value>
   </data>
   <data name="NoSocForRest" xml:space="preserve">
-    <value>No usable SOC reading to measure the rest point from.</value>
+    <value>No usable SOC reading to work out the rest level from.</value>
   </data>
   <data name="AlreadyAboveRest" xml:space="preserve">
-    <value>The car is already at {0}, at or above the {1} rest level, so the whole charge is the held stretch and none of it will start until the release time.</value>
+    <value>The car is already at {0}, at or above the {1} rest level, so the whole charge is held back and none of it starts before the release time.</value>
   </data>
   <data name="FinishesBelowRest" xml:space="preserve">
-    <value>This target finishes at about {0}, at or below the {1} rest level, so there is nothing above it to hold and the charge runs as it would under Cheapest.</value>
+    <value>This target finishes at about {0}, at or below the {1} rest level, so there is nothing to hold back and the charge runs as it would with Cheapest.</value>
   </data>
   <data name="RestExplained" xml:space="preserve">
-    <value>The car charges on the sun up to {0} whenever the sun is there, then waits. The last {1} — about {2} to {3} — is scheduled to land just before you leave.</value>
+    <value>The car charges from the sun up to {0} whenever there is sun, then waits. The last {1} — about {2} to {3} — is scheduled to finish just before you leave.</value>
   </data>
   <data name="TitleSoc" xml:space="preserve">
     <value>{0} by {1}</value>
@@ -765,10 +765,10 @@
     <value>{0} by {1}</value>
   </data>
   <data name="HoldCostsNothing" xml:space="preserve">
-    <value>Holding the last stretch costs nothing here — the forecast has no sun to give it up.</value>
+    <value>Holding back the last part costs nothing here — the forecast has no sun it would miss.</value>
   </data>
   <data name="HoldCost" xml:space="preserve">
-    <value>Just in time buys about {0} more from the grid than charging as cheaply as possible would, because the sun is turned down while the tail waits. That is the trade: the car sits at {1} overnight instead of at its target.</value>
+    <value>Just in time buys about {0} more from the grid than the cheapest charge would, because sun is not used while the last part waits. In return, the car sits at {1} overnight instead of at its target.</value>
   </data>
   <data name="NotPolledYet" xml:space="preserve">
     <value>Not polled yet</value>
