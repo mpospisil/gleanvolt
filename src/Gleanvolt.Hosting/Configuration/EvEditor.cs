@@ -230,7 +230,7 @@ public sealed class EvEditor : IEvEditor
                 ConfigurationProblems.NoOverridesFile());
         }
 
-        lock (_gate)
+        using (PvSystemOverrides.Lock(_overrides.Path))
         {
             Dictionary<string, string> stored;
 

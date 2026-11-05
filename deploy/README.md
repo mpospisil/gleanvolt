@@ -246,6 +246,17 @@ the log, never a delayed or missing session.
 
 ## Setting the web UI password
 
+Forgot it? Reset it from the Pi, which prints a new recovery key, then restart the controller:
+
+```bash
+cd /opt/gleanvolt
+docker compose run --rm --no-deps gleanvolt-controller set-password
+docker compose restart gleanvolt-controller
+```
+
+The whole setup can be done the same way, from a file in `data/` or by answering prompts; see the main
+README, *Setting up from the command line*.
+
 **A fresh installation serves one page: the one that asks you to set a password.** The dashboard, the
 history and every control — the charge mode, the battery hold — stay unreachable until you have. Open
 `http://192.168.2.7:8090`, choose a password, and the UI behaves normally from then on.

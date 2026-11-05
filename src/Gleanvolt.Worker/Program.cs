@@ -5,6 +5,7 @@ using Serilog.Settings.Configuration;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting;
+using Gleanvolt.Hosting.Cli;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Web;
@@ -54,6 +55,27 @@ if (string.IsNullOrEmpty(System.Reflection.Assembly.GetEntryAssembly()?.Location
 // before configuration is built, so they reach the app whether it's started via `dotnet run` or
 // the VS Code debugger -- without living in any committed file. Real env vars still take priority.
 DotEnv.Load(Directory.GetCurrentDirectory());
+
+// The command-line setup (#303): setup, set-password/reset-password and discover. They read the
+// configuration the service reads and save through the same path as the web wizard, and they never
+// start the host. Under the .deb, the service's own environment is loaded first, so a command typed
+// in a shell writes where the service looks.
+if (GleanvoltCli.IsCommand(args))
+{
+    var serviceUser = DebEnvironment.Load(Environment.ProcessPath);
+
+    using var stop = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) =>
+    {
+        // The first Ctrl+C stops a device search and keeps what it found; a second one ends the process.
+        e.Cancel = !stop.IsCancellationRequested;
+        stop.Cancel();
+    };
+
+    var context = CliContext.ForThisHost(configuration => CliPlatform.Current(serviceUser, configuration));
+
+    return await GleanvoltCli.RunAsync(args, context, stop.Token);
+}
 
 // Serilog swallows failures inside its own sinks. That silence is dangerous in the container: if the
 // bind-mounted logs directory isn't writable by the image's non-root user, the console keeps logging

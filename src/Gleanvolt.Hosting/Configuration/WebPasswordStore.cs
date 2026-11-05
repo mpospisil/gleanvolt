@@ -50,7 +50,7 @@ public sealed class WebPasswordStore(IConfiguration configuration, ILogger<WebPa
             // Read-modify-write rather than a blind write: the file also holds the site's device
             // addresses and whatever the car editor has saved, and none of that may be lost to a
             // password being set.
-            lock (PvSystemOverrides.Gate)
+            using (PvSystemOverrides.Lock(overrides.Path))
             {
                 var values = PvSystemOverrides.Read(overrides.Path);
                 values[Key] = passwordHash;

@@ -119,6 +119,22 @@ encryption, which is yours to arrange and not something this package can do for 
 To stop handing it over, use **Sign out** on the web UI's Car page: it deletes the stored
 value rather than leaving a tombstone holding it.
 
+## Setting it up from the command line
+
+The web UI's setup wizard is the main route. Without a browser, the same setup runs from a shell, as the
+service user (the command refuses anyone else, since the service could not read what they wrote):
+
+```bash
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup                      # asks for each setting
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup --file /var/lib/gleanvolt/site.json
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker set-password               # forgot the password
+sudo systemctl restart gleanvolt
+```
+
+It reads the unit's `Environment=` lines and `/etc/gleanvolt/gleanvolt.env`, so it saves where the
+service looks. A setup file holding secrets must not be world-readable (`chmod 600`). See the main
+README, *Setting up from the command line*, for the file's shape.
+
 ## Running it
 
 ```bash

@@ -6,7 +6,10 @@ namespace Gleanvolt.Discovery.Cli;
 /// <summary>The command line, parsed. Hand-rolled: a dozen flags do not justify a dependency.</summary>
 internal sealed record CliArguments
 {
-    public const string Usage = """
+    /// <summary>The help text, under the name the tool was started as.</summary>
+    public static string Usage(string name) => UsageText.Replace("gleanvolt-discover", name, StringComparison.Ordinal);
+
+    private const string UsageText = """
         gleanvolt-discover: find the SolaX inverter and EV charger on your network, and the Modbus TCP
         host, port and unit id each one answers on. Read-only: it never writes to a device.
 

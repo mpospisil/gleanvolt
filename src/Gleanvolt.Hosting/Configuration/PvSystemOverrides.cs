@@ -37,6 +37,16 @@ public static class PvSystemOverrides
     /// </summary>
     public static Lock Gate { get; } = new();
 
+    /// <summary>
+    /// <see cref="Gate"/>, and a lock on <c>&lt;file&gt;.lock</c> beside it, held around a
+    /// read-modify-write of the file (#303): the command-line setup is another process, and it and the
+    /// web UI must not write the file at the same time. The file lock is advisory, which is all two
+    /// copies of this code need. When it cannot be had -- another writer holding it for longer than a
+    /// write takes, or a directory this user cannot write -- the in-process gate is still held, and the
+    /// write itself says what is wrong.
+    /// </summary>
+    public static IDisposable Lock(string path) => new FileLock(path);
+
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     /// <summary>
@@ -207,6 +217,81 @@ public static class PvSystemOverrides
 }
 
 /// <summary>The overrides file as a configuration source. Read once: no reload on change, by design.</summary>
+/// <summary>See <see cref="PvSystemOverrides.Lock"/>.</summary>
+internal sealed class FileLock : IDisposable
+{
+    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
+
+    private readonly FileStream? _file;
+    private bool _disposed;
+
+    public FileLock(string path)
+    {
+        PvSystemOverrides.Gate.Enter();
+
+        try
+        {
+            _file = Acquire(path + ".lock");
+        }
+        catch
+        {
+            PvSystemOverrides.Gate.Exit();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _file?.Dispose();
+        PvSystemOverrides.Gate.Exit();
+    }
+
+    private static FileStream? Acquire(string lockPath)
+    {
+        var deadline = DateTime.UtcNow + Wait;
+
+        try
+        {
+            if (Path.GetDirectoryName(lockPath) is { Length: > 0 } directory)
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        while (true)
+        {
+            try
+            {
+                // FileShare.None is an exclusive advisory lock on Linux (flock) and a sharing lock on
+                // Windows: either way a second holder is refused until this one is disposed.
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+    }
+}
+
 public sealed class PvSystemOverridesSource(string path) : IConfigurationSource
 {
     public string Path { get; } = path;
