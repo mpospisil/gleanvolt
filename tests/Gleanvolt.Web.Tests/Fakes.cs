@@ -167,6 +167,9 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
     public void RequestStop(string source) => Requests.Add(source);
 
     public void RequestRestart(string source) => Restarts.Add(source);
+
+    /// <summary>Whether a restart comes back by itself here; false is the Windows zip (#301).</summary>
+    public bool RestartsByItself { get; set; } = true;
 }
 
 /// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
@@ -1278,5 +1281,29 @@ internal sealed class FakeUntilFullSettings : IUntilFullSettings
     {
         Sets.Add((on, source));
         UntilFull = on;
+    }
+}
+
+/// <summary>A password store that keeps what it is given in memory (#301).</summary>
+internal sealed class FakePasswordStore : IWebPasswordStore
+{
+    public string? PasswordHash { get; private set; }
+
+    public string? RecoveryKeyHash { get; private set; }
+
+    public bool Accept { get; set; } = true;
+
+    public bool Save(string passwordHash) => Save(passwordHash, "");
+
+    public bool Save(string passwordHash, string recoveryKeyHash)
+    {
+        if (!Accept)
+        {
+            return false;
+        }
+
+        PasswordHash = passwordHash;
+        RecoveryKeyHash = recoveryKeyHash;
+        return true;
     }
 }

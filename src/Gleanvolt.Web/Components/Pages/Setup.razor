@@ -1,12 +1,10 @@
 @page "/setup"
 @attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
-@using Gleanvolt.Core.Interfaces
 @using Gleanvolt.Web.Auth
 @using Microsoft.AspNetCore.Components.Forms
 @inject WebPasswordState Password
-@inject IWebPasswordStore Store
-@inject NavigationManager Navigation
+@inject WebPasswordService Passwords
 
 @*
     Static server-side rendering, like the login page and for the same reason: the form is a real HTTP
@@ -17,7 +15,14 @@
 <PageTitle>@SharedText.SetupTitle</PageTitle>
 
 <div class="login-card">
-    @if (Password.IsSet)
+    @if (_recoveryKey is not null)
+    {
+        @* The one render that sees the key: it is in this response and nowhere else. *@
+        <h1>@SharedText.PasswordSet</h1>
+        <RecoveryKeyPanel Key="@_recoveryKey" Intro="@SharedText.RecoveryKeyIntro"
+                          ContinueHref="/login" ContinueText="@SharedText.RecoveryKeySaved" />
+    }
+    else if (Password.IsSet)
     {
         @* Reachable by typing the URL after setup is done. Says so rather than offering to
            re-set the password: changing it is not this page's job, and an unauthenticated page
@@ -68,6 +73,8 @@
 
     private string? _error;
 
+    private string? _recoveryKey;
+
     protected override void OnInitialized() => Input ??= new();
 
     private void SaveAsync()
@@ -80,19 +87,24 @@
             return;
         }
 
-        var hash = WebPasswordHasher.Hash(password);
+        // Persisted before it is believed, inside the service: a hash held only in memory would be a
+        // password that quietly stopped existing on the next restart, leaving the UI open again.
+        var result = Passwords.SetInitial(password);
 
-        // Persisted before it is believed. A hash held only in memory would be a password that
-        // quietly stopped existing on the next restart, leaving the UI open again with nobody told.
-        if (!Store.Save(hash))
+        if (!result.Succeeded)
         {
-            _error = SharedText.PasswordNotSaved;
+            _error = result.Error switch
+            {
+                PasswordError.TooShort => SharedText.PasswordTooShort,
+                PasswordError.AlreadySet => SharedText.AlreadySetUp,
+                _ => SharedText.PasswordNotSaved,
+            };
             return;
         }
 
-        Password.Set(hash);
-
-        Navigation.NavigateTo("/login", forceLoad: true);
+        // Shown here, once, instead of going straight to sign-in: this is the only moment the key
+        // exists outside its hash.
+        _recoveryKey = result.RecoveryKey;
     }
 
     private sealed class SetupInput

@@ -20,10 +20,7 @@ namespace Gleanvolt.Hosting.Tests;
 public class VehicleFeedRegistrationTests
 {
     private static readonly (string Key, string? Value)[] MinimalDevices =
-    [
-        ("Pv:Inverter:Host", "127.0.0.1"),
-        ("Pv:Chargers:0:Host", "127.0.0.1"),
-    ];
+    [.. UsableSite.Settings];
 
     /// <summary>Enough for the portal client to be considered configured.</summary>
     private static readonly (string Key, string? Value)[] Credentials =
@@ -43,7 +40,9 @@ public class VehicleFeedRegistrationTests
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
-            MinimalDevices.Concat(settings).Select(s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+            MinimalDevices.Concat(settings)
+                .GroupBy(s => s.Key)
+                .Select(group => new KeyValuePair<string, string?>(group.Key, group.Last().Value)));
         builder.Services.AddGleanvolt(builder.Configuration);
 
         return builder.Services;

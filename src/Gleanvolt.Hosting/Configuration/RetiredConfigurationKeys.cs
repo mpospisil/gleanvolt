@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Models;
 using Microsoft.Extensions.Configuration;
 
 namespace Gleanvolt.Hosting.Configuration;
@@ -53,6 +54,25 @@ public static class RetiredConfigurationKeys
     /// One or more retired keys are set. The message lists each with the key that replaces it, in both
     /// spellings, because the one an operator has to edit is usually the environment-variable form.
     /// </exception>
+    /// <summary>
+    /// Every retired key that is still set, as a problem in English and as a translatable phrase
+    /// (#301): setup mode lists them rather than refusing to start, and keeps the controller stopped
+    /// until they are gone.
+    /// </summary>
+    public static IReadOnlyList<(string English, Phrase Phrase)> Find(IConfiguration configuration) =>
+        [.. Moved
+            .Where(moved => IsSet(configuration, moved.Retired))
+            .Select(moved => (
+                $"{moved.Retired} has moved to {moved.Replacement} "
+                + $"({EnvironmentVariable(moved.Retired)} -> {EnvironmentVariable(moved.Replacement)}). "
+                + "Move the value to its replacement and remove the old key.",
+                Phrase.Of(
+                    "Config.RetiredKey",
+                    new PhraseArg.Text(moved.Retired),
+                    new PhraseArg.Text(moved.Replacement),
+                    new PhraseArg.Text(EnvironmentVariable(moved.Retired)),
+                    new PhraseArg.Text(EnvironmentVariable(moved.Replacement)))))];
+
     public static void Refuse(IConfiguration configuration)
     {
         var found = Moved

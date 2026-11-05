@@ -21,16 +21,15 @@ public class EnergyMonitorRegistrationTests
     // the loopback and are never dialled: constructing a Modbus client opens no socket, and no hosted
     // service is started.
     private static readonly (string Key, string? Value)[] MinimalDevices =
-    [
-        ("Pv:Inverter:Host", "127.0.0.1"),
-        ("Pv:Chargers:0:Host", "127.0.0.1"),
-    ];
+    [.. UsableSite.Settings];
 
     private static ServiceProvider Build(params (string Key, string? Value)[] settings)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
-            MinimalDevices.Concat(settings).Select(s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+            MinimalDevices.Concat(settings)
+                .GroupBy(s => s.Key)
+                .Select(group => new KeyValuePair<string, string?>(group.Key, group.Last().Value)));
         builder.Services.AddGleanvolt(builder.Configuration);
 
         return builder.Services.BuildServiceProvider();

@@ -23,7 +23,7 @@ public sealed class WebUiSetupGateTests : IAsyncDisposable
 {
     private WebApplication? _app;
 
-    private async Task<HttpClient> StartAsync(WebOptions web, IWebPasswordStore? store = null)
+    private async Task<HttpClient> StartAsync(WebOptions web, IWebPasswordStore? store = null, ISetupState? setup = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -51,6 +51,13 @@ public sealed class WebUiSetupGateTests : IAsyncDisposable
         {
             builder.Services.AddSingleton(store);
         }
+
+        if (setup is not null)
+        {
+            builder.Services.AddSingleton(setup);
+        }
+
+        builder.Services.AddSingleton(new PasswordResetOptions(Path.Combine(Path.GetTempPath(), $"gleanvolt-gate-{Guid.NewGuid():N}.txt")));
 
         builder.Services.AddGleanvoltWebUi(web);
 
@@ -167,5 +174,84 @@ public sealed class WebUiSetupGateTests : IAsyncDisposable
     private sealed class AcceptingPasswordStore : IWebPasswordStore
     {
         public bool Save(string passwordHash) => true;
+    }
+
+    private static WebOptions WithPassword() => new()
+    {
+        Enabled = true,
+        PasswordHash = WebPasswordHasher.Hash("s3cret-enough"),
+    };
+
+    [Fact]
+    public async Task In_setup_mode_a_page_that_needs_the_controller_goes_to_settings()
+    {
+        using var client = await StartAsync(WithPassword(), setup: new SetupModeState());
+
+        var dashboard = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, dashboard.StatusCode);
+        Assert.Equal(SetupGate.SetupModePath, dashboard.Headers.Location!.OriginalString);
+
+        // Settings itself is let through -- to the sign-in, not round in a loop.
+        var settings = await client.GetAsync("/settings");
+        Assert.Equal(HttpStatusCode.Redirect, settings.StatusCode);
+        Assert.Contains("/login", settings.Headers.Location!.ToString());
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/login")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/forgot-password")).StatusCode);
+    }
+
+    [Fact]
+    public async Task In_setup_mode_with_no_password_the_first_stop_is_the_password()
+    {
+        using var client = await StartAsync(Unconfigured(), setup: new SetupModeState());
+
+        var response = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(SetupGate.Path, response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task Setting_the_first_password_shows_the_recovery_key_once()
+    {
+        using var client = await StartAsync(Unconfigured(), new AcceptingPasswordStore());
+
+        var page = await client.GetAsync("/setup");
+        var body = await page.Content.ReadAsStringAsync();
+        var antiforgery = page.Headers.GetValues("Set-Cookie").First(c => c.Contains("Antiforgery", StringComparison.Ordinal)).Split(';')[0];
+        var token = System.Text.RegularExpressions.Regex.Match(body, "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value;
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/setup")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["_handler"] = "setup",
+                ["__RequestVerificationToken"] = token,
+                ["Input.Password"] = "s3cret-enough",
+                ["Input.Confirm"] = "s3cret-enough",
+            }),
+        };
+        request.Headers.Add("Cookie", antiforgery);
+
+        var answer = await (await client.SendAsync(request)).Content.ReadAsStringAsync();
+
+        Assert.Matches("id=\"recovery-key\">([A-Z0-9]{5}-){4}[A-Z0-9]{5}<", answer);
+        Assert.True(_app!.Services.GetRequiredService<WebPasswordState>().IsSet);
+
+        // Once: the next visit is the already-set-up page, with no key on it.
+        var again = await client.GetStringAsync("/setup");
+        Assert.DoesNotContain("recovery-key\"", again, StringComparison.Ordinal);
+    }
+
+    private sealed class SetupModeState : ISetupState
+    {
+        private static readonly SetupStatus Missing = new(
+            [new SetupProblem(SetupArea.Inverter, "No inverter is configured. Set Pv:Inverter:Host.", null)], []);
+
+        public bool SetupMode => true;
+
+        public SetupStatus AtStartup => Missing;
+
+        public SetupStatus Current() => Missing;
     }
 }

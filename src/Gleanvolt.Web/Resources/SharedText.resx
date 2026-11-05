@@ -235,7 +235,7 @@
     <value>Sign in</value>
   </data>
   <data name="SignInHint" xml:space="preserve">
-    <value>One password for this installation, chosen on the Setup page the first time it ran, or set as {0}. It cannot be reset from here: change a forgotten password in the settings on the machine itself.</value>
+    <value>One password for this installation, chosen on the Setup page the first time it ran, or set as {0}.</value>
     <comment>{0} is an environment variable, shown as code.</comment>
   </data>
   <data name="SetupTitle" xml:space="preserve">
@@ -262,7 +262,7 @@
     <value>Set the password</value>
   </data>
   <data name="SetupNote" xml:space="preserve">
-    <value>One password for the whole installation, not an account per person. Keep it somewhere safe: it cannot be reset from the UI, only by editing the settings file on the machine itself.</value>
+    <value>One password for the whole installation, not an account per person. Next you get a recovery key, which resets it if it is ever forgotten.</value>
   </data>
   <data name="PasswordsDiffer" xml:space="preserve">
     <value>The two passwords are not the same.</value>
@@ -459,5 +459,122 @@
   <data name="DatePattern" xml:space="preserve">
     <value>yyyy-MM-dd</value>
     <comment>A date on its own.</comment>
+  </data>
+  <data name="ForgotPasswordLink" xml:space="preserve">
+    <value>Forgot your password?</value>
+  </data>
+  <data name="PasswordSet" xml:space="preserve">
+    <value>The password is set</value>
+  </data>
+  <data name="RecoveryKeyTitle" xml:space="preserve">
+    <value>Your recovery key</value>
+  </data>
+  <data name="RecoveryKeyIntro" xml:space="preserve">
+    <value>If you forget the password, this key resets it from the sign-in page. It is shown only now: write it down or keep it in a password manager.</value>
+  </data>
+  <data name="RecoveryKeyUse" xml:space="preserve">
+    <value>Every change or reset of the password issues a new key, and the old one stops working.</value>
+  </data>
+  <data name="RecoveryKeySaved" xml:space="preserve">
+    <value>I have saved it, sign in</value>
+  </data>
+  <data name="ForgotTitle" xml:space="preserve">
+    <value>Reset the password — Gleanvolt</value>
+    <comment>The browser tab of the password reset page.</comment>
+  </data>
+  <data name="ResetPassword" xml:space="preserve">
+    <value>Reset the password</value>
+  </data>
+  <data name="PasswordReset" xml:space="preserve">
+    <value>The password has been reset</value>
+  </data>
+  <data name="ResetDoneIntro" xml:space="preserve">
+    <value>Every browser that was signed in has been signed out. This is the new recovery key, shown only now; the old one no longer works.</value>
+  </data>
+  <data name="ResetNoPassword" xml:space="preserve">
+    <value>This installation has no password yet. {0}.</value>
+    <comment>{0} is a link whose text is SetPassword.</comment>
+  </data>
+  <data name="ResetWithKey" xml:space="preserve">
+    <value>With the recovery key</value>
+  </data>
+  <data name="RecoveryKeyLabel" xml:space="preserve">
+    <value>Recovery key</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="ResetButton" xml:space="preserve">
+    <value>Reset the password</value>
+  </data>
+  <data name="ResetWithCode" xml:space="preserve">
+    <value>With a one-time code</value>
+  </data>
+  <data name="ResetCodeIntro" xml:space="preserve">
+    <value>Gleanvolt writes a one-time code to its log and to {0} on the machine it runs on. The code is never shown here: being able to read it proves you have access to that machine.</value>
+    <comment>{0} is a file path, shown as code.</comment>
+  </data>
+  <data name="RequestCode" xml:space="preserve">
+    <value>Write a code on the machine</value>
+  </data>
+  <data name="CodeIssued" xml:space="preserve">
+    <value>A code has been written. It works once, for 15 minutes; asking again replaces it.</value>
+  </data>
+  <data name="CodeTooSoon" xml:space="preserve">
+    <value>A code was asked for a moment ago. Use that one, or ask again in a minute.</value>
+  </data>
+  <data name="CodeLabel" xml:space="preserve">
+    <value>Code</value>
+  </data>
+  <data name="BackToSignIn" xml:space="preserve">
+    <value>Back to sign-in</value>
+  </data>
+  <data name="WrongRecoveryKey" xml:space="preserve">
+    <value>That recovery key is not right.</value>
+  </data>
+  <data name="WrongCode" xml:space="preserve">
+    <value>That code is not right, has expired, or has already been used.</value>
+  </data>
+  <data name="TooManyAttempts" xml:space="preserve">
+    <value>Too many wrong attempts. Try again in 15 minutes.</value>
+  </data>
+  <data name="EnterKeyOrCode" xml:space="preserve">
+    <value>Enter the key or the code.</value>
+  </data>
+  <data name="ChangePasswordTitle" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="ChangePasswordHint" xml:space="preserve">
+    <value>Changing the password signs out every browser, this one too, and issues a new recovery key.</value>
+  </data>
+  <data name="CurrentPassword" xml:space="preserve">
+    <value>Current password</value>
+  </data>
+  <data name="ChangePasswordButton" xml:space="preserve">
+    <value>Change the password</value>
+  </data>
+  <data name="ChangeDoneIntro" xml:space="preserve">
+    <value>The password has been changed. This is the new recovery key, shown only now; the old one no longer works. You will have to sign in again.</value>
+  </data>
+  <data name="SignInAgain" xml:space="preserve">
+    <value>Sign in again</value>
+  </data>
+  <data name="SetupModeTitle" xml:space="preserve">
+    <value>Setup mode: the controller is not running</value>
+  </data>
+  <data name="SetupModeIntro" xml:space="preserve">
+    <value>Gleanvolt started without the settings it needs, so it is not reading the inverter or driving the charger.</value>
+  </data>
+  <data name="SetupModeMissing" xml:space="preserve">
+    <value>Still missing:</value>
+  </data>
+  <data name="SetupModeReady" xml:space="preserve">
+    <value>Everything required is set. Start the controller to use it.</value>
+  </data>
+  <data name="SetupModeStart" xml:space="preserve">
+    <value>Start the controller</value>
+  </data>
+  <data name="RestartManual" xml:space="preserve">
+    <value>Gleanvolt is stopping. Nothing on this machine starts it again, so start Gleanvolt yourself to apply the settings.</value>
   </data>
 </root>

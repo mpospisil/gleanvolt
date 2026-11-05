@@ -19,13 +19,17 @@ public class PvSystemRegistrationTests
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
             settings.Select(s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+
+        // Headless, so a configuration that is not usable refuses to start rather than coming up in
+        // setup mode: these tests are about the refusal. Setup mode has its own tests.
+        builder.Configuration.AddInMemoryCollection([new("Web:Enabled", "false")]);
         builder.Services.AddGleanvolt(builder.Configuration);
 
         return builder.Services.BuildServiceProvider();
     }
 
     private static ServiceProvider BuildWithPvDevices(params (string Key, string? Value)[] settings) =>
-        Build([("Pv:Inverter:Host", "127.0.0.1"), ("Pv:Chargers:0:Host", "127.0.0.2"), .. settings]);
+        Build([.. UsableSite.Settings, .. settings]);
 
     [Fact]
     public async Task TheResolvedSiteIsInjectable()

@@ -376,4 +376,52 @@ public class HealthPageTests : PageTest
 
         PseudoLocale.AssertTranslated(page.Markup, "Europe/Prague");
     }
+
+    // -- Setup mode (#301).
+
+    private sealed class SetupModeState(params SetupProblem[] missing) : ISetupState
+    {
+        public bool SetupMode => true;
+
+        public SetupStatus AtStartup { get; } = new([new SetupProblem(SetupArea.Inverter, "No inverter.", null)], []);
+
+        public SetupStatus Current() => new(missing, []);
+    }
+
+    [Fact]
+    public void In_setup_mode_says_the_controller_is_not_running_and_what_is_missing()
+    {
+        Services.AddSingleton<ISetupState>(new SetupModeState(
+            new SetupProblem(SetupArea.Inverter, "No inverter is configured. Set Pv:Inverter:Host.", Phrase.Of("Config.PvNoInverter"))));
+
+        var page = Render<Health>();
+
+        Assert.Contains("Setup mode: the controller is not running", page.Markup);
+        Assert.Contains("No inverter is configured", page.Markup);
+        Assert.DoesNotContain("Start the controller", page.Markup);
+    }
+
+    [Fact]
+    public void Once_nothing_is_missing_setup_mode_offers_to_start_the_controller()
+    {
+        Services.AddSingleton<ISetupState>(new SetupModeState());
+
+        var page = Render<Health>();
+
+        Assert.Contains("Start the controller", page.Markup);
+    }
+
+    [Fact]
+    public void Where_nothing_restarts_it_a_restart_says_to_start_it_by_hand()
+    {
+        _shutdown.RestartsByItself = false;
+        Services.AddSingleton<ISetupState>(new SetupModeState());
+
+        var page = Render<Health>();
+        page.Find(".setup-mode #restart").Click();
+        page.Find(".setup-mode #restart-confirm").Click();
+
+        Assert.Contains("start Gleanvolt yourself", page.Markup);
+        Assert.Single(_shutdown.Restarts);
+    }
 }

@@ -19,7 +19,16 @@ public sealed class WebPasswordStore(IConfiguration configuration, ILogger<WebPa
     /// <summary>The configuration key the next start binds <c>WebOptions.PasswordHash</c> from.</summary>
     public const string Key = "Web:PasswordHash";
 
-    public bool Save(string passwordHash)
+    /// <summary>Where the recovery key's hash is kept, beside the password's (#301).</summary>
+    public const string RecoveryKeyHashKey = "Web:RecoveryKeyHash";
+
+    // Without a key of its own, a new password takes away the old one's: a recovery key that outlived
+    // its password would reset the next one.
+    public bool Save(string passwordHash) => Write(passwordHash, recoveryKeyHash: null);
+
+    public bool Save(string passwordHash, string recoveryKeyHash) => Write(passwordHash, recoveryKeyHash);
+
+    private bool Write(string passwordHash, string? recoveryKeyHash)
     {
         if (string.IsNullOrWhiteSpace(passwordHash))
         {
@@ -41,9 +50,22 @@ public sealed class WebPasswordStore(IConfiguration configuration, ILogger<WebPa
             // Read-modify-write rather than a blind write: the file also holds the site's device
             // addresses and whatever the car editor has saved, and none of that may be lost to a
             // password being set.
-            var values = PvSystemOverrides.Read(overrides.Path);
-            values[Key] = passwordHash;
-            PvSystemOverrides.Write(overrides.Path, values);
+            lock (PvSystemOverrides.Gate)
+            {
+                var values = PvSystemOverrides.Read(overrides.Path);
+                values[Key] = passwordHash;
+
+                if (string.IsNullOrWhiteSpace(recoveryKeyHash))
+                {
+                    values.Remove(RecoveryKeyHashKey);
+                }
+                else
+                {
+                    values[RecoveryKeyHashKey] = recoveryKeyHash;
+                }
+
+                PvSystemOverrides.Write(overrides.Path, values);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

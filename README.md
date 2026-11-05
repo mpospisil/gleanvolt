@@ -3003,7 +3003,8 @@ neither, and cannot be skipped by not reading a log.
 There is no per-user account: one shared password gates the whole UI, hashed with ASP.NET Core's
 `PasswordHasher`, matching a LAN appliance with one or two operators rather than a multi-tenant system.
 The setup page can only *set* a first password — never change an existing one, which an
-unauthenticated page has no business doing.
+unauthenticated page has no business doing. Changing it is on Settings; resetting a forgotten one is
+[below](#forgot-your-password).
 
 The hash is a secret and must never live in `appsettings.json` — supply it via `.env` / an
 environment variable, exactly like the MQTT broker credentials:
@@ -3034,6 +3035,75 @@ docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password
 The one refusal is the combination that cannot be honoured: a login demanded with nothing to check it
 against would leave the UI permanently unreachable, and a host that stops says so immediately where a
 running one looks like a broken page. Everything else starts.
+
+To change the password, sign in and use **Settings → Password**. It asks for the current one.
+
+#### Forgot your password
+
+The sign-in page links to **Forgot your password?** (`/forgot-password`). There is no email and no
+second account, so a reset proves one of two other things
+([issue #301](https://github.com/mpospisil/gleanvolt/issues/301)):
+
+- **The recovery key.** When a password is set in the web UI (on the setup page, in Settings, or by a
+  reset), Gleanvolt shows a recovery key **once**, in five groups of five characters. Keep it with the
+  password, for example in a password manager. Only its hash is stored, next to `Web:PasswordHash` in
+  `data/pv-system.json`. A password set by hand with `Web__PasswordHash` has no key until it is
+  changed in the UI.
+- **A one-time code from the host.** **Write a code on the machine** writes a code to Gleanvolt's log
+  and to `password-reset-code.txt` in the data directory (owner-only). The browser never receives it,
+  so reading it proves you can reach the machine Gleanvolt runs on. Read it with:
+
+  ```bash
+  docker logs gleanvolt-controller 2>&1 | grep "reset code"          # Docker
+  sudo cat /var/lib/gleanvolt/password-reset-code.txt                 # .deb
+  ```
+
+  On Windows, open `data\password-reset-code.txt` next to `gleanvolt.exe`, or the log in `logs\`.
+  Only the newest code works, once, for 15 minutes. Codes can be requested once a minute and five
+  times an hour.
+
+Every reset or change does three things:
+
+- it signs out every browser, including any tab still open (the sign-in cookie carries a stamp of the
+  password, and an old stamp is refused);
+- it issues a new recovery key, and the old one stops working;
+- it is written to the log.
+
+Ten wrong keys, codes or current passwords in 15 minutes lock all three paths for the rest of that
+window.
+
+#### Setup mode
+
+A fresh install has none of the required settings: the web UI password, the inverter's and the
+charger's addresses, the site's location (`Pv:Latitude`, `Pv:Longitude`) and its time zone. The time
+zone counts as set when `Controller:TimeZone` names a valid zone, or when it is empty and the host's
+own zone can be trusted. That is not the case on Windows, which ignores `TZ`, or on a host that
+reports plain UTC.
+
+Until every required setting is in place, Gleanvolt starts in **setup mode** instead of stopping
+([issue #301](https://github.com/mpospisil/gleanvolt/issues/301)):
+
+- The web UI, the settings stores and the secret store run. The controller does not: nothing polls
+  the inverter, drives the charger, records sessions or energy, or talks to MQTT or a car. Its Modbus
+  clients refuse every call.
+- The UI shows the setup page (if no password is set yet), then Settings and Health with a **Setup
+  mode** notice listing what is still missing. Pages that need the controller, such as the dashboard,
+  redirect to Settings.
+- The API answers every request with `503` and "Gleanvolt is not configured".
+- The log starts with a `SETUP MODE` warning that lists what is missing.
+
+When nothing required is missing, the notice offers **Start the controller**, which restarts
+Gleanvolt and starts it normally. Docker and the .deb's systemd unit start it again by themselves. The
+Windows zip, winget and `dotnet run` have nothing that does: there the page says to start Gleanvolt
+again yourself.
+
+Some problems keep the controller stopped even when everything else is set: a configuration key that
+has moved (its old name is listed with the new one), and a latitude without a longitude or the other
+way round. Gleanvolt never starts the controller on part of a configuration.
+
+With the web UI disabled (`Web:Enabled=false`) there is nothing to finish a setup in. A configuration
+that is not usable then stops Gleanvolt at startup, as before. The reason goes to the console and to
+the log file, and the exit code is 78 (`EX_CONFIG`).
 
 #### Deployment
 

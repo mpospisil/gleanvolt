@@ -51,10 +51,29 @@ public sealed class HostShutdown : IServiceShutdown
     private volatile string? _stopSource;
 
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger)
+        : this(lifetime, logger, Supervised())
+    {
+    }
+
+    /// <summary>For tests: with the supervision question answered rather than read from the environment.</summary>
+    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool restartsByItself)
     {
         _lifetime = lifetime;
         _logger = logger;
+        RestartsByItself = restartsByItself;
     }
+
+    /// <summary>
+    /// Whether something will start this process again after a restart (#301): the image's container,
+    /// whose compose file restarts it on failure, or a systemd unit, which sets INVOCATION_ID for every
+    /// service it starts. Neither is true of the Windows zip, winget or <c>dotnet run</c>, where a
+    /// restart is a stop and the person who asked for it has to start Gleanvolt again.
+    /// </summary>
+    public bool RestartsByItself { get; }
+
+    private static bool Supervised() =>
+        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer()
+        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INVOCATION_ID"));
 
     /// <summary>
     /// Whether this run is ending because somebody asked it to. Read after the host has stopped, to
@@ -88,6 +107,18 @@ public sealed class HostShutdown : IServiceShutdown
 
     private void LogStopped()
     {
+        if (_restartRequested && !RestartsByItself)
+        {
+            // Not a restart at all here, and the one place to say so: the page that asked has already
+            // told the person, but a log read later must not suggest the process came back.
+            _logger.LogWarning(
+                "Gleanvolt stopped for a restart requested by {Source}, but nothing on this host starts it "
+                + "again (no container, no systemd unit). Start Gleanvolt again to apply the configuration.",
+                _stopSource);
+
+            return;
+        }
+
         if (_restartRequested)
         {
             _logger.LogInformation(

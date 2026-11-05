@@ -881,6 +881,56 @@ h1 {
     font-size: 0.75rem;
 }
 
+.sign-in-forgot {
+    margin: var(--space-4) 0 0;
+    font-size: 0.9rem;
+}
+
+/*
+    The password reset page and the recovery key (#301). Two ways to reset, each its own section with
+    a rule between; a path or a key can be long enough to break out of the card, so both may wrap
+    anywhere.
+*/
+.login-card section + section {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+}
+
+.login-card code {
+    overflow-wrap: anywhere;
+}
+
+.login-card form + form,
+.login-card form + p {
+    margin-top: var(--space-4);
+}
+
+.recovery-key-value {
+    display: block;
+    padding: var(--space-3);
+    border: 1px dashed var(--accent);
+    border-radius: var(--radius-sm);
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+    text-align: center;
+    user-select: all;
+}
+
+/* The setup-mode notice (#301) opens with its heading; the alert's own padding is margin enough. */
+.setup-mode h2 {
+    margin-top: 0;
+}
+
+.setup-mode ul {
+    margin-bottom: 0;
+}
+
+.recovery-key .btn {
+    width: 100%;
+    justify-content: center;
+}
+
 /* On a phone the card is the screen: no frame floating in a margin, just the content at full width. */
 @media (max-width: 40rem) {
     .sign-in {

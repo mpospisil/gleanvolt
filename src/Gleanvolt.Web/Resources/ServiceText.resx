@@ -481,4 +481,40 @@
   <data name="Event_Rearmed" xml:space="preserve">
     <value>Charger switched back to Fast.</value>
   </data>
+  <data name="Config_SetupNoLocation" xml:space="preserve">
+    <value>The site's location is not set. Set Pv:Latitude and Pv:Longitude.</value>
+  </data>
+  <data name="Config_SetupNoPassword" xml:space="preserve">
+    <value>No web UI password is set. Choose one on the setup page.</value>
+  </data>
+  <data name="Config_SetupBadTimeZone" xml:space="preserve">
+    <value>Controller:TimeZone ('{0}') is not a time zone this host knows.</value>
+  </data>
+  <data name="Config_SetupNoTimeZone" xml:space="preserve">
+    <value>The site's time zone is not set. Set Controller:TimeZone (e.g. Europe/Prague).</value>
+  </data>
+  <data name="Config_RetiredKey" xml:space="preserve">
+    <value>{0} has moved to {1} ({2} -&gt; {3}). Move the value to its replacement and remove the old key.</value>
+  </data>
+  <data name="Config_SetupBadBatteryCapacity" xml:space="preserve">
+    <value>ChargeControl:Forecast:BatteryCapacityKWh ('{0}') must be a positive number of kWh.</value>
+  </data>
+  <data name="Config_SetupPasswordTooShort" xml:space="preserve">
+    <value>The web UI password must be at least {0} characters.</value>
+  </data>
+  <data name="Config_SetupSolcastIncomplete" xml:space="preserve">
+    <value>A Solcast account needs both Solcast:ApiKey and Solcast:ResourceId.</value>
+  </data>
+  <data name="Config_SetupNoPasswordService" xml:space="preserve">
+    <value>This host cannot set the web UI password.</value>
+  </data>
+  <data name="Config_SetupPasswordAlreadySet" xml:space="preserve">
+    <value>A web UI password is already set. Change it on Settings, or reset it from the sign-in page.</value>
+  </data>
+  <data name="Config_SetupPasswordNotSaved" xml:space="preserve">
+    <value>The web UI password could not be saved.</value>
+  </data>
+  <data name="Config_SetupSecretNotSaved" xml:space="preserve">
+    <value>The {0} secret could not be saved to the secret store. Check the data directory's permissions.</value>
+  </data>
 </root>

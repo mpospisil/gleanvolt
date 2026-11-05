@@ -1,0 +1,35 @@
+@inject ISetupState Setup
+@inject IServiceShutdown Shutdown
+
+@*
+    Setup mode, said where an owner lands (#301): Settings, where the missing values are entered, and
+    Health, which is where anyone looks when the controller is not doing anything. What is still
+    missing is judged afresh on each render, so it shrinks as values are saved, and when nothing
+    required is left the way out is right there: a restart, which starts the controller.
+*@
+
+@if (Setup.SetupMode)
+{
+    var current = Setup.Current();
+
+    <section class="alert setup-mode" role="status">
+        <h2>@SharedText.SetupModeTitle</h2>
+        <p>@SharedText.SetupModeIntro</p>
+
+        @if (current.Usable)
+        {
+            <p>@SharedText.SetupModeReady</p>
+            <RestartService Label="@SharedText.SetupModeStart" />
+        }
+        else
+        {
+            <p>@SharedText.SetupModeMissing</p>
+            <ul>
+                @foreach (var problem in current.MissingRequired)
+                {
+                    <li>@Localized.Say(problem.Phrase, problem.English)</li>
+                }
+            </ul>
+        }
+    </section>
+}

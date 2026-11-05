@@ -57,9 +57,12 @@
         <button type="submit" class="btn btn-primary">@SharedText.SignIn</button>
     </EditForm>
 
+    @* A forgotten password is reset with the recovery key or a code from the host (#301). *@
+    <p class="sign-in-forgot"><a href="@ForgotPassword.Path">@SharedText.ForgotPasswordLink</a></p>
+
     @* Where the password comes from, both ways it can -- the Setup page (which writes it to the
        overrides file) or Web__PasswordHash set by hand. No file is named: which one holds it depends on
-       which way it was set. There is no reset link because there is nothing behind one. *@
+       which way it was set. *@
     <p class="sign-in-hint">
         @Localized.Rich(SharedText.SignInHint, @<code>Web__PasswordHash</code>)
     </p>
@@ -106,6 +109,10 @@
         // One claim is enough: there is exactly one shared account, not a user to look up.
         var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme);
         identity.AddClaim(new Claim(ClaimTypes.Name, "operator"));
+
+        // Which password this cookie was issued under (#301): a reset changes it, and the cookie with it
+        // stops being accepted.
+        identity.AddClaim(new Claim(PasswordStamp.ClaimType, Password.Stamp));
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

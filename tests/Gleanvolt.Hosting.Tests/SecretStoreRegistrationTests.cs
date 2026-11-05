@@ -63,8 +63,9 @@ public sealed class SecretStoreRegistrationTests : IDisposable
     [InlineData("Vehicle:Skoda:KeyPath")]
     public void The_settings_it_replaced_are_refused_at_startup(string retired)
     {
-        var error = Assert.Throws<InvalidOperationException>(
-            () => Build((retired, "/var/lib/gleanvolt/somewhere.json")));
+        // Headless: with the UI on, a retired key is a setup-mode problem instead (#301).
+        var error = Assert.Throws<Core.Configuration.ConfigurationRefusedException>(
+            () => Build((retired, "/var/lib/gleanvolt/somewhere.json"), ("Web:Enabled", "false")));
 
         Assert.Contains(retired, error.Message);
         Assert.Contains("Secrets:Directory", error.Message);
@@ -75,12 +76,8 @@ public sealed class SecretStoreRegistrationTests : IDisposable
         var builder = WebApplication.CreateSlimBuilder();
 
         builder.Configuration.AddInMemoryCollection(
-            new (string Key, string? Value)[]
-            {
-                ("Pv:Inverter:Host", "127.0.0.1"),
-                ("Pv:Chargers:0:Host", "127.0.0.1"),
-                ("Secrets:Directory", _data),
-            }
+            UsableSite.Settings
+            .Append((Key: "Secrets:Directory", Value: (string?)_data))
             .Concat(settings)
             // Last wins, so a test can point the directory somewhere of its own.
             .GroupBy(setting => setting.Key)

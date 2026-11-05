@@ -32,7 +32,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
-    private readonly Lock _gate = new();
+    // The file's own lock, shared with every other writer of it (#301).
+    private static Lock _gate => PvSystemOverrides.Gate;
 
     /// <param name="configuration">The process's configuration, whose providers are walked.</param>
     /// <param name="running">Each editable key's value as this process started, taken before anything could change.</param>

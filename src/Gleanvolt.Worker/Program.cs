@@ -89,9 +89,28 @@ builder.Services.AddSerilog(config => config
 // Everything the controller is: polling, the control strategies, the session store, the Home
 // Assistant integration and the web UI. It lives in Gleanvolt.Hosting so that this file is a host and
 // nothing more -- see that assembly for why each service is registered the way it is.
-builder.AddGleanvolt();
+// A configuration the controller cannot run on stops it here -- headless, with the web UI off (#301);
+// with the UI on, the host starts in setup mode instead. Logged before the process ends, through a
+// logger of its own: the host's logging does not exist yet, and the log file is where a .deb or a
+// Windows install is looked into, not the console it was started from.
+WebApplication host;
+try
+{
+    builder.AddGleanvolt();
+    host = builder.Build();
+}
+catch (InvalidOperationException ex)
+{
+    using var refusal = new LoggerConfiguration()
+        .ReadFrom.Configuration(builder.Configuration, serilogAssemblies)
+        .CreateLogger();
 
-var host = builder.Build();
+    refusal.Fatal("Gleanvolt {Version} cannot start: {Reason}", BuildInfo.Describe(), ex.Message);
+
+    // EX_CONFIG from sysexits.h: "something was found in an unconfigured or misconfigured state".
+    // Non-zero, so systemd reports a failed start; Docker restarts it, as it always has.
+    return 78;
+}
 
 host.UseGleanvolt();
 
@@ -106,10 +125,25 @@ log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
 // #111). A log file that cannot answer that is a log file nobody can read six months later.
 // A value saved from /pv-system (issue #204) overrides .env, which is exactly what makes ".env isn't
 // working" otherwise inexplicable from a log. The suffix names every key the file overrode, and where it is.
-log.LogInformation(
-    "PV system: {System}{Overrides}.",
-    host.Services.GetRequiredService<PvSystemInfo>().Describe(),
-    PvSystemOverrides.DescribeLoaded(builder.Configuration));
+var setup = host.Services.GetRequiredService<ISetupState>();
+
+if (setup.SetupMode)
+{
+    // Setup mode (#301): the one thing this log must make obvious, since nothing else will happen.
+    log.LogWarning(
+        "SETUP MODE: Gleanvolt is not configured, so the controller is NOT running -- no polling, no "
+        + "charging, no recording. Open the web UI on port {Port} to finish the setup, then restart. "
+        + "Missing:{Problems}",
+        host.Services.GetRequiredService<IOptions<WebOptions>>().Value.Port,
+        string.Concat(setup.AtStartup.MissingRequired.Select(problem => Environment.NewLine + "  - " + problem.English)));
+}
+else
+{
+    log.LogInformation(
+        "PV system: {System}{Overrides}.",
+        host.Services.GetRequiredService<PvSystemInfo>().Describe(),
+        PvSystemOverrides.DescribeLoaded(builder.Configuration));
+}
 
 // Where the bearer-equivalent secrets live and what protects them (issue #215). On the startup log
 // because it is the answer to "is it safe to copy the data directory?", and the person asking that is
@@ -131,7 +165,12 @@ if (secretStore.Warning is { } secretWarning)
 
 // And the car, on the same terms (#124): "which installation was this, and what car did it think it
 // had" should both be answerable from a `docker logs` dump with no configuration file beside it.
-log.LogInformation("Vehicle: {Vehicle}.", host.Services.GetRequiredService<EvInfo>().Describe());
+// Not in setup mode: the car may be one of the things still being set up, and a car the rules refuse
+// must not stop the UI that would fix it.
+if (!setup.SetupMode)
+{
+    log.LogInformation("Vehicle: {Vehicle}.", host.Services.GetRequiredService<EvInfo>().Describe());
+}
 
 // Said explicitly because nothing else says it: Kestrel's own "Now listening on" is logged under
 // Microsoft.Hosting.Lifetime, which the Serilog configuration holds at Warning. Without this line a

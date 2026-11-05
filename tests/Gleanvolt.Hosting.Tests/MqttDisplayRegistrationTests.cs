@@ -20,10 +20,7 @@ namespace Gleanvolt.Hosting.Tests;
 public class MqttDisplayRegistrationTests
 {
     private static readonly (string Key, string? Value)[] MinimalDevices =
-    [
-        ("Pv:Inverter:Host", "127.0.0.1"),
-        ("Pv:Chargers:0:Host", "127.0.0.1"),
-    ];
+    [.. UsableSite.Settings];
 
     // Everything the Home Assistant link needs to be genuinely on, including the id it publishes under.
     private static readonly (string Key, string? Value)[] HomeAssistantOn =
@@ -39,7 +36,9 @@ public class MqttDisplayRegistrationTests
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
-            MinimalDevices.Concat(settings).Select(s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+            MinimalDevices.Concat(settings)
+                .GroupBy(s => s.Key)
+                .Select(group => new KeyValuePair<string, string?>(group.Key, group.Last().Value)));
         builder.Services.AddGleanvolt(builder.Configuration);
 
         return builder.Services.BuildServiceProvider();
@@ -126,7 +125,7 @@ public class MqttDisplayRegistrationTests
     [Fact]
     public async Task TheBrokerPasswordIsWithheldFromAnOpenUi()
     {
-        await using var provider = Build(HomeAssistantOn);
+        await using var provider = Build([.. HomeAssistantOn, ("Web:PasswordHash", ""), ("Web:RequireAuthentication", "false")]);
 
         var connection = provider.GetRequiredService<MqttDisplayOptions>().HomeAssistant.Connection;
 

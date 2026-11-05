@@ -31,6 +31,12 @@ public static class PvSystemOverrides
     /// <summary>Where the file is when <see cref="PathKey"/> is not set, relative to the content root.</summary>
     public const string DefaultPath = "data/pv-system.json";
 
+    /// <summary>
+    /// Held around every read-modify-write of the file (#301). Settings' editors, the password store
+    /// and setup all write it, and two of them interleaving would lose whatever the first one saved.
+    /// </summary>
+    public static Lock Gate { get; } = new();
+
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     /// <summary>
