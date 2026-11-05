@@ -50,8 +50,6 @@ public sealed class SetupDocument
     [
         WebPassword,
         .. PvSystemSettingKeys.All,
-        TimeZone,
-        HomeBatteryCapacityKWh,
         SolcastApiKey,
         SolcastResourceId,
         .. EvSettingKeys.All,

@@ -517,4 +517,7 @@
   <data name="Config_SetupSecretNotSaved" xml:space="preserve">
     <value>The {0} secret could not be saved to the secret store. Check the data directory's permissions.</value>
   </data>
+  <data name="Config_BadBatteryEfficiency" xml:space="preserve">
+    <value>ChargeControl:Forecast:ChargeEfficiency ('{0}') must be more than 0 and at most 1.</value>
+  </data>
 </root>

@@ -489,4 +489,7 @@
   <data name="Config_SetupSecretNotSaved" xml:space="preserve">
     <value>Tajný údaj {0} se nepodařilo uložit do úložiště tajných údajů. Zkontrolujte oprávnění datového adresáře.</value>
   </data>
+  <data name="Config_BadBatteryEfficiency" xml:space="preserve">
+    <value>ChargeControl:Forecast:ChargeEfficiency ('{0}') musí být větší než 0 a nejvýš 1.</value>
+  </data>
 </root>

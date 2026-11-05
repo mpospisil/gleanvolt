@@ -27,6 +27,18 @@
   </ItemGroup>
 
   <!--
+    The run-time directories are not content. The Web SDK copies every .json under the project to the
+    build and publish output, so a developer's data/pv-system.json (device addresses, the password hash)
+    and data/vw-website-session.json (a live session) followed every build into bin/, and every copy of
+    bin/ started against that developer's own inverter. CI builds from a clean checkout and never had
+    them; a local publish did.
+  -->
+  <ItemGroup>
+    <Content Remove="data/**;logs/**" />
+    <None Remove="data/**;logs/**" />
+  </ItemGroup>
+
+  <!--
     One reference, deliberately: everything this host needs comes through Gleanvolt.Hosting, including
     Gleanvolt.Web and its static assets. Referencing Core or Infrastructure directly would let host code
     reach past the composition root again, which is the thing this project no longer does.
