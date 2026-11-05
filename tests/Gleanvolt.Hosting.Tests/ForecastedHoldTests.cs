@@ -78,7 +78,7 @@ public class ForecastedHoldTests
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecastSettings = new ForecastChargeOptions();
+        var forecastSettings = new ForecastChargeOptions { BatteryCapacityKWh = 9.0 };
         var forecastOptions = Options.Create(forecastSettings);
         var forecast = new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 6_300);
 

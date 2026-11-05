@@ -71,6 +71,13 @@ public sealed class DayPlanProvider
             _options.TrustBandMin,
             _options.TrustBandMax,
             _options.TrustBreachPeriods);
+
+        if (_options.BatteryCapacityWh is null)
+        {
+            _logger.LogWarning(
+                "The home battery's capacity is not configured (ChargeControl:Forecast:BatteryCapacityKWh): "
+                + "Forecasted charges from live surplus only, and Targeted books nothing for the battery.");
+        }
     }
 
     /// <summary>The learned household-load profile the plan is built on.</summary>
@@ -178,8 +185,16 @@ public sealed class DayPlanProvider
                 deadline, Invariant($"forecast accuracy {_accuracy.BiasFactor:F2} outside the trust band for {_options.TrustBreachPeriods} periods"));
         }
 
+        // Every SOC-to-energy figure in the plan scales off the pack's size; without it there is no plan,
+        // only a guess, and the mode charges from live surplus as it does without a forecast.
+        if (_options.BatteryCapacityWh is not { } batteryCapacityWh)
+        {
+            return SolarDayPlan.Unavailable(
+                deadline, "home battery capacity not configured (ChargeControl:Forecast:BatteryCapacityKWh)");
+        }
+
         var plannerOptions = new SolarDayPlannerOptions(
-            BatteryCapacityWh: _options.BatteryCapacityWh,
+            BatteryCapacityWh: batteryCapacityWh,
             ChargeEfficiency: _options.ChargeEfficiency,
             MinChargePowerWatts: _power.AmpsToWatts(_minChargingCurrentAmps),
             MaxLoanPowerWatts: _options.EnableBatteryLoan ? _options.MaxLoanPowerWatts : 0,

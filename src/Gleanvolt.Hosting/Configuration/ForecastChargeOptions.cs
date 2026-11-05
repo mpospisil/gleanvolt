@@ -27,18 +27,22 @@ public sealed class ForecastChargeOptions
     /// conversion scales off it, so a wrong value makes the plan wrong in a way nothing else can catch.
     ///
     /// <para>The inverter reports SOC across the range the pack will actually cycle, so 0–100 % spans
-    /// the usable energy. The default is the reference install: a SolaX T-BAT H 2.5 stack of 10 kWh
-    /// nominal, i.e. ~9 kWh at the ~90 % depth of discharge these packs allow. Set it to your own, and
-    /// if in doubt round <em>up</em> — an overstated capacity books more of the forecast for the
-    /// battery and raises the SOC floor, which are both the safe direction.</para>
+    /// the usable energy: a 10 kWh nominal stack at ~90 % depth of discharge is ~9 kWh. If in doubt
+    /// round <em>up</em> — an overstated capacity books more of the forecast for the battery and
+    /// raises the SOC floor, which are both the safe direction.</para>
+    ///
+    /// <para>Not set by default: no figure is right for every site, and a borrowed one would be
+    /// silently wrong. Until it is set, the Forecasted day plan is unavailable (the mode charges from
+    /// live surplus only) and Targeted books nothing for the home battery.</para>
     /// </summary>
-    public double BatteryCapacityKWh { get; init; } = 9.0;
+    public double? BatteryCapacityKWh { get; init; }
 
     /// <summary>
-    /// <see cref="BatteryCapacityKWh"/> in the base unit (#263). The key stays in kWh, as a battery
-    /// is stated; everything that plans reads this.
+    /// <see cref="BatteryCapacityKWh"/> in the base unit (#263), or null when it is not configured
+    /// (unset, zero or negative). The key stays in kWh, as a battery is stated; everything that plans
+    /// reads this.
     /// </summary>
-    public double BatteryCapacityWh => BatteryCapacityKWh * 1000;
+    public double? BatteryCapacityWh => BatteryCapacityKWh is > 0 and var kwh ? kwh * 1000 : null;
 
     /// <summary>PV → battery charge efficiency (0..1], used to size what the sun must actually deliver.</summary>
     public double ChargeEfficiency { get; init; } = 0.95;

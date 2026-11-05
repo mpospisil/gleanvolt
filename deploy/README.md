@@ -22,8 +22,8 @@ steps further down apply to you.
     └────────────────────────────────────────────────────────────────────┘
          │ Modbus TCP
          ▼
-  inverter 192.168.2.10:502
-  charger  192.168.2.6:502
+  inverter <INVERTER_HOST>:502
+  charger  <EV_CHARGER_HOST>:502
 ```
 
 The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to GHCR; the Pi pulls it.
@@ -82,8 +82,8 @@ Required in `/opt/gleanvolt/.env`:
 
 ```bash
 TZ=Europe/Prague               # your timezone
-INVERTER_HOST=192.168.2.10      # your inverter's address
-EV_CHARGER_HOST=192.168.2.6   # your charger's address
+INVERTER_HOST=192.168.1.10     # your inverter's address (an example; there is no default)
+EV_CHARGER_HOST=192.168.1.11   # your charger's address (an example; there is no default)
 
 HOMEASSISTANT_ENABLED=true     # the controller's own switch to publish MQTT
 MQTT_USERNAME=solax            # must match the broker's password file
@@ -119,8 +119,8 @@ Required in `/opt/gleanvolt/.env` — this is the whole list:
 
 ```bash
 TZ=Europe/Prague               # your timezone
-INVERTER_HOST=192.168.2.10      # your inverter's address
-EV_CHARGER_HOST=192.168.2.6   # your charger's address
+INVERTER_HOST=192.168.1.10     # your inverter's address (an example; there is no default)
+EV_CHARGER_HOST=192.168.1.11   # your charger's address (an example; there is no default)
 ```
 
 Nothing about the web UI needs setting: it is on by default, on the Pi's own port 8090 (the
@@ -736,7 +736,7 @@ echo '<github-pat-with-read:packages>' | docker login ghcr.io -u mpospisil --pas
 **9. Check the devices are reachable** from the Pi, before blaming the container:
 
 ```bash
-nc -vz 192.168.2.10 502 && nc -vz 192.168.2.6 502
+nc -vz <inverter address> 502 && nc -vz <charger address> 502
 ```
 
 ## Deploy

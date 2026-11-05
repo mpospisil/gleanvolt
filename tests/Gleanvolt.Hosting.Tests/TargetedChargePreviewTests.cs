@@ -35,7 +35,7 @@ public class TargetedChargePreviewTests
         var chargeControl = new ChargeControlOptions { Phases = 3, MaxChargingCurrentAmps = 16 };
         var forecast = new NoForecastService();
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecastOptions = Options.Create(new ForecastChargeOptions());
+        var forecastOptions = Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 });
 
         _provider = TargetedCharge.Provider(
             forecast,

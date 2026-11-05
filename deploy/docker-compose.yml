@@ -113,8 +113,13 @@ services:
       Pv__LossFactor: ${PV_LOSS_FACTOR:-}
       Pv__InstallDate: ${PV_INSTALL_DATE:-}
 
+      # Usable capacity of the home battery, in kWh. Not defaulted: without it the Forecasted day plan
+      # is unavailable and Targeted books nothing for the battery, which beats planning on someone
+      # else's pack.
+      ChargeControl__Forecast__BatteryCapacityKWh: ${HOME_BATTERY_CAPACITY_KWH:-}
+
       Pv__Inverter__Model: ${PV_INVERTER_MODEL:-SolaX X3-HYB-G4 PRO}
-      Pv__Inverter__Host: ${INVERTER_HOST:-192.168.2.10}
+      Pv__Inverter__Host: ${INVERTER_HOST:-}
       # Only for a grid meter missing a phase clamp: which phase (L1-L3, or R/S/T). Unset reads the meter
       # as it is, which is right for every correctly wired installation. See .env.example.
       Pv__Inverter__UnmeteredGridPhase: ${PV_INVERTER_UNMETERED_GRID_PHASE:-}
@@ -124,7 +129,7 @@ services:
       # charger never has to think about arrays.
       Pv__Chargers__0__Id: ${PV_CHARGER_ID:-charger}
       Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
-      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-192.168.2.6}
+      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
 
       # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them

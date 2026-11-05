@@ -842,4 +842,18 @@ public class TargetedChargePlannerTests
         Assert.Equal(plain.BatteryToFullWh, constrained.BatteryToFullWh, 1);
         Assert.Equal(plain.SocFloorPercent, constrained.SocFloorPercent, 1);
     }
+
+    [Fact]
+    public void WithoutAConfiguredPackSize_NothingIsBookedForTheBatteryAndTheFloorIsTheConfiguredMinimum()
+    {
+        var now = FirstPeriodEnd.AddHours(-1);
+        var options = Options(minSocFloorPercent: 40) with { BatteryCapacityWh = 0 };
+
+        var plan = Plan(requiredWh: 10_000, departBy: now.AddHours(12), now: now, socPercent: 60, options: options);
+
+        // A zero-sized pack would otherwise divide its way to NaN through every SOC figure.
+        Assert.Equal(0, plan.BatteryToFullWh);
+        Assert.Equal(40, plan.SocFloorPercent);
+        Assert.True(double.IsFinite(plan.ExpectedEnergyWh));
+    }
 }

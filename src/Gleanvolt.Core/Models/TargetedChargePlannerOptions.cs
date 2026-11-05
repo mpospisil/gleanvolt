@@ -7,7 +7,10 @@ namespace Gleanvolt.Core.Models;
 /// same reason <see cref="SolarDayPlannerOptions"/> is one: the planner stays free of configuration
 /// and hosting types, and a test can construct one in a line.
 /// </summary>
-/// <param name="BatteryCapacityWh">Usable capacity of the home battery, which everything SOC-related scales off.</param>
+/// <param name="BatteryCapacityWh">
+/// Usable capacity of the home battery, which everything SOC-related scales off. Zero when it is not
+/// configured: nothing is booked for the battery and the floor is the configured minimum.
+/// </param>
 /// <param name="ChargeEfficiency">
 /// PV → battery efficiency (0..1]. Applied so "the battery needs 20% of 11.6 kWh" becomes the larger
 /// figure the sun actually has to deliver before any of it reaches the car.

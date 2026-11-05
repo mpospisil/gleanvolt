@@ -44,7 +44,7 @@ public class HaButtonCommandTests
         Options.Create(new SolarGridChargeOptions()),
         NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance);
     private readonly UntilFullSettings _untilFull =
-        new(Options.Create(new ForecastChargeOptions()), NullLogger<UntilFullSettings>.Instance);
+        new(Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 }), NullLogger<UntilFullSettings>.Instance);
 
     [Theory]
     [InlineData("start_solar", ChargeControlMode.Solar)]
@@ -484,7 +484,7 @@ public class HaButtonCommandTests
             _actions,
             new BatteryHoldSelector(initialHold: false, NullLogger<BatteryHoldSelector>.Instance),
             new ForecastRuntimeSettings(
-                Options.Create(new ForecastChargeOptions()), NullLogger<ForecastRuntimeSettings>.Instance),
+                Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 }), NullLogger<ForecastRuntimeSettings>.Instance),
             _target,
             _fast,
             new NoopShutdown(),

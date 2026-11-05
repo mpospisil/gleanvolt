@@ -330,6 +330,12 @@ public static class TargetedChargePlanner
     /// </summary>
     private static double SocFloor(double refillableWh, TargetedChargePlannerOptions options)
     {
+        // No configured pack size: no trajectory to compute, only the owner's minimum.
+        if (options.BatteryCapacityWh <= 0)
+        {
+            return Math.Clamp(options.MinBatterySocFloorPercent, 0, 100);
+        }
+
         var recoverablePercent = refillableWh * Math.Clamp(options.ChargeEfficiency, 0.1, 1.0)
             / options.BatteryCapacityWh * 100;
 

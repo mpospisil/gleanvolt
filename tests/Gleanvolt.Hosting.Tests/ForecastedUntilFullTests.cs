@@ -187,7 +187,7 @@ public sealed class ForecastedUntilFullTests : IDisposable
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecastSettings = new ForecastChargeOptions { UntilFull = untilFull, EnableBatteryLoan = false };
+        var forecastSettings = new ForecastChargeOptions { UntilFull = untilFull, EnableBatteryLoan = false, BatteryCapacityKWh = 9.0 };
         var forecastOptions = Options.Create(forecastSettings);
         var clock = new UtcClock();
         var reader = new ClockedReader(clock, states);

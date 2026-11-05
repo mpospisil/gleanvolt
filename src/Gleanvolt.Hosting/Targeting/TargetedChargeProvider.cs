@@ -173,7 +173,9 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         departBy > now ? _forecast.GetForecast(now, departBy) : null;
 
     private TargetedChargePlannerOptions PlannerOptions() => new(
-        BatteryCapacityWh: _forecastOptions.BatteryCapacityWh,
+        // Zero when the pack's size is not configured: the planner then books nothing for the home
+        // battery, and the deadline -- which only ever rests on the grid -- still holds.
+        BatteryCapacityWh: _forecastOptions.BatteryCapacityWh ?? 0,
         ChargeEfficiency: _forecastOptions.ChargeEfficiency,
         MinChargePowerWatts: _power.AmpsToWatts(_chargeControl.MinChargingCurrentAmps),
         MaxChargePowerWatts: _power.AmpsToWatts(_chargeControl.MaxChargingCurrentAmps),

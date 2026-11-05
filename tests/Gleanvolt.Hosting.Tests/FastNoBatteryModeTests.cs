@@ -627,7 +627,7 @@ public class FastNoBatteryModeTests
             idlePowerThresholdWatts: chargeControl.CompletionPowerThresholdWatts,
             NullLogger<ChargingControlCoordinator>.Instance);
 
-        var forecastOptions = Options.Create(new ForecastChargeOptions());
+        var forecastOptions = Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 });
         var dayPlan = new DayPlanProvider(
             forecast,
             forecastOptions,
