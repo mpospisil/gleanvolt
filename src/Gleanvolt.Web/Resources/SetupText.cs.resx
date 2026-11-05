@@ -60,11 +60,11 @@
   <data name="ExtrasIntro" xml:space="preserve">
     <value>Volitelné: kdy je energie ze sítě levnější, a propojení s Home Assistant a počasím.</value>
   </data>
-  <data name="MqttAndWeather" xml:space="preserve">
-    <value>Home Assistant a počasí</value>
+  <data name="HomeAssistant" xml:space="preserve">
+    <value>Home Assistant</value>
   </data>
-  <data name="MqttAndWeatherText" xml:space="preserve">
-    <value>Ty se zatím nastavují v {0}; jak, popisuje {1}. Lze je přidat kdykoli a nic nebrzdí.</value>
+  <data name="HomeAssistantText" xml:space="preserve">
+    <value>Propojení s Home Assistant (MQTT) se zatím nastavuje v {0}; jak, popisuje {1}. Lze ho přidat kdykoli a nic nebrzdí.</value>
   </data>
   <data name="FinishTitle" xml:space="preserve">
     <value>Dokončení</value>

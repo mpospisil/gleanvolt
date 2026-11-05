@@ -9,8 +9,8 @@
 @*
     Settings: the installation (issue #111). The form at the top (issue #204) edits the configuration the
     *next* start reads: a save goes to the web UI's overrides file, a restart applies it, and until then
-    each field says what is still running. See PvSystemEditorForm. The Solcast account (issue #286) and
-    the tariff (issue #265) below it are the exceptions: the services that use them read them afresh, so
+    each field says what is still running. See PvSystemEditorForm. The Solcast account (issue #286), the
+    weather key and the tariff (issue #265) below it are the exceptions: the services that use them read them afresh, so
     a save applies at once.
 
     The MQTT and API sections are read-only, and not merely for now: they are resolved once at startup,
@@ -34,6 +34,8 @@
 <PvSystemEditorForm />
 
 <SolcastAccountForm />
+
+<WeatherKeyForm />
 
 <TariffEditorForm />
 
