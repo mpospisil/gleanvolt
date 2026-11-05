@@ -1253,6 +1253,10 @@ public static class GleanvoltHostingExtensions
                     provider.GetRequiredService<IHostEnvironment>().ContentRootPath),
                 "password-reset-code.txt")));
 
+            // The setup wizard's device search (#302): one scanner for the whole process, so one scan
+            // at a time whoever starts it.
+            services.AddSingleton<IDeviceDiscovery, DeviceDiscoveryService>();
+
             services.AddGleanvoltWebUi(web);
         }
 

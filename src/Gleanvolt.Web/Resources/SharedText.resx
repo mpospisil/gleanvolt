@@ -577,4 +577,16 @@
   <data name="RestartManual" xml:space="preserve">
     <value>Gleanvolt is stopping. Nothing on this machine starts it again, so start Gleanvolt yourself to apply the settings.</value>
   </data>
+  <data name="SetupModeWizard" xml:space="preserve">
+    <value>Continue the setup</value>
+  </data>
+  <data name="CopyKey" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="PrintKey" xml:space="preserve">
+    <value>Print</value>
+  </data>
+  <data name="KeyCopied" xml:space="preserve">
+    <value>Copied.</value>
+  </data>
 </root>

@@ -51,6 +51,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Api\Gleanvolt.Api.csproj" />
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Discovery\Gleanvolt.Discovery.csproj" />
     <ProjectReference Include="..\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
     <ProjectReference Include="..\Gleanvolt.Web\Gleanvolt.Web.csproj" />
   </ItemGroup>

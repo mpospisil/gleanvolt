@@ -531,4 +531,16 @@
   <data name="RestartManual" xml:space="preserve">
     <value>Gleanvolt se zastavuje. Na tomto počítači ho nic znovu nespustí, takže ho pro použití nastavení spusťte sami.</value>
   </data>
+  <data name="SetupModeWizard" xml:space="preserve">
+    <value>Pokračovat v nastavení</value>
+  </data>
+  <data name="CopyKey" xml:space="preserve">
+    <value>Kopírovat</value>
+  </data>
+  <data name="PrintKey" xml:space="preserve">
+    <value>Tisknout</value>
+  </data>
+  <data name="KeyCopied" xml:space="preserve">
+    <value>Zkopírováno.</value>
+  </data>
 </root>

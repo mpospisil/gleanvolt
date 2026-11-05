@@ -492,4 +492,13 @@
   <data name="Config_BadBatteryEfficiency" xml:space="preserve">
     <value>ChargeControl:Forecast:ChargeEfficiency ('{0}') musí být větší než 0 a nejvýš 1.</value>
   </data>
+  <data name="Discovery_NoNetwork" xml:space="preserve">
+    <value>Nebyla nalezena žádná místní síť k prohledání. Zadejte rozsah své sítě, např. 192.168.1.0/24.</value>
+  </data>
+  <data name="Discovery_BadSubnet" xml:space="preserve">
+    <value>'{0}' není soukromá síť o nejvýš 1022 adresách (např. 192.168.1.0/24) ani jedna soukromá adresa.</value>
+  </data>
+  <data name="Discovery_AlreadyRunning" xml:space="preserve">
+    <value>Hledání už běží.</value>
+  </data>
 </root>

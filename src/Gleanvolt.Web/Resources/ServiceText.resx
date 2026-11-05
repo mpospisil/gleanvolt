@@ -520,4 +520,13 @@
   <data name="Config_BadBatteryEfficiency" xml:space="preserve">
     <value>ChargeControl:Forecast:ChargeEfficiency ('{0}') must be more than 0 and at most 1.</value>
   </data>
+  <data name="Discovery_NoNetwork" xml:space="preserve">
+    <value>No local network to scan was found. Enter your LAN's range, e.g. 192.168.1.0/24.</value>
+  </data>
+  <data name="Discovery_BadSubnet" xml:space="preserve">
+    <value>'{0}' is not a private network of at most 1022 hosts (e.g. 192.168.1.0/24) or a single private address.</value>
+  </data>
+  <data name="Discovery_AlreadyRunning" xml:space="preserve">
+    <value>A search is already running.</value>
+  </data>
 </root>

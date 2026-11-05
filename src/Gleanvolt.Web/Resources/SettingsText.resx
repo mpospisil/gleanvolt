@@ -772,4 +772,7 @@
   <data name="HintHomeBatteryEfficiency" xml:space="preserve">
     <value>0 to 1, e.g. 0.95</value>
   </data>
+  <data name="SolcastIntroSetupMode" xml:space="preserve">
+    <value>Solcast's forecast for this roof, used by Forecasted and Targeted. In setup mode a save only stores the account; the forecast is fetched when Gleanvolt starts, so the setup spends none of the day's calls.</value>
+  </data>
 </root>

@@ -1,0 +1,174 @@
+@implements IDisposable
+@inject IDeviceDiscovery Discovery
+
+@*
+    The wizard's device search (#302). It suggests this machine's own subnet, runs one scan at a time
+    for the whole process (a second browser sees the first one's progress), and lists every address
+    that answered with what it identified as.
+
+    The roles are offered, never taken: each SolaX device has a "use as inverter" and a "use as
+    charger" button, and choosing the role it did not identify as says so. A swapped pair answers
+    Modbus on 502 like the right one does, and only shows itself once running, as a frozen battery and
+    no sun. Nothing here saves: a choice fills the address fields below, and Save there checks it.
+*@
+
+<section class="controls discovery" id="discovery">
+    <div class="section-head">
+        <h2>@SetupText.FindDevices</h2>
+    </div>
+
+    <p class="muted">@SetupText.FindDevicesIntro</p>
+
+    <div class="discovery-start">
+        <label for="discovery-subnet">@SetupText.Subnet</label>
+        <input id="discovery-subnet" type="text" spellcheck="false" autocomplete="off"
+               placeholder="@string.Join(", ", _suggestion.Subnets)"
+               disabled="@Running"
+               @bind="_subnet" />
+        @if (Running)
+        {
+            <button type="button" class="secondary" id="discovery-cancel" @onclick="Discovery.Cancel">@SetupText.StopScan</button>
+        }
+        else
+        {
+            <button type="button" class="primary" id="discovery-scan" @onclick="Start">@SetupText.Scan</button>
+        }
+    </div>
+
+    @foreach (var warning in _suggestion.Warnings)
+    {
+        <p class="hint">@warning</p>
+    }
+
+    @if (_problem is not null)
+    {
+        <p class="error" role="alert">@_problem</p>
+    }
+
+    @if (Discovery.Current is { } scan)
+    {
+        <p class="muted" id="discovery-progress" role="status">
+            @if (scan.Running)
+            {
+                @Localized.Format(SetupText.Scanning, string.Join(", ", scan.Networks), Percent(scan))
+                <progress max="@scan.ToProbe" value="@scan.Probed"></progress>
+            }
+            else if (scan.Cancelled)
+            {
+                @Localized.Format(SetupText.ScanStopped, scan.Devices.Count)
+            }
+            else
+            {
+                @Localized.Format(SetupText.ScanDone, string.Join(", ", scan.Networks), scan.Devices.Count)
+            }
+        </p>
+
+        @if (scan.Devices.Count > 0)
+        {
+            <table class="discovery-results" id="discovery-results">
+                <thead>
+                    <tr>
+                        <th>@SetupText.Address</th>
+                        <th>@SetupText.Identified</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var device in scan.Devices)
+                    {
+                        <tr class="@(device.Supported ? null : "muted")">
+                            <td><code>@device.Host:@device.Port</code>@(device.UnitId is { } unit ? $" · {SetupText.Unit} {unit}" : null)</td>
+                            <td>
+                                @(device.Model ?? SetupText.Unidentified)
+                                @if (device.Role is { } role)
+                                {
+                                    <span class="hint"> — @(role == PvDeviceRole.Inverter ? SetupText.LooksLikeInverter : SetupText.LooksLikeCharger)</span>
+                                }
+                                @if (!device.Supported)
+                                {
+                                    <div class="hint">@device.Note</div>
+                                }
+                            </td>
+                            <td class="discovery-use">
+                                @if (device.UnitId is not null)
+                                {
+                                    <button type="button" class="@(device.Role == PvDeviceRole.Inverter ? "primary" : "secondary")"
+                                            @onclick="() => Use(device, PvDeviceRole.Inverter)">@SetupText.UseAsInverter</button>
+                                    <button type="button" class="@(device.Role == PvDeviceRole.Charger ? "primary" : "secondary")"
+                                            @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @foreach (var warning in scan.Warnings.Except(_suggestion.Warnings))
+        {
+            <p class="hint">@warning</p>
+        }
+    }
+
+    @if (_roleWarning is not null)
+    {
+        <p class="error" id="discovery-role-warning" role="alert">@_roleWarning</p>
+    }
+</section>
+
+@code {
+    /// <summary>
+    /// Raised with the address fields a choice fills in: host, port and unit id of the role chosen.
+    /// </summary>
+    [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> OnChosen { get; set; }
+
+    private DiscoverySuggestion _suggestion = new([], []);
+    private string _subnet = "";
+    private string? _problem;
+    private string? _roleWarning;
+
+    private bool Running => Discovery.Current?.Running == true;
+
+    protected override void OnInitialized()
+    {
+        _suggestion = Discovery.Suggest();
+        Discovery.Changed += OnChanged;
+    }
+
+    public void Dispose() => Discovery.Changed -= OnChanged;
+
+    // From the scan's thread: render on the circuit's.
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void Start()
+    {
+        _roleWarning = null;
+        var started = Discovery.Start(_subnet);
+        _problem = started.Started ? null : Localized.Say(started.ProblemPhrase, started.Problem ?? "");
+    }
+
+    private async Task Use(FoundDevice device, PvDeviceRole role)
+    {
+        // Said, not prevented: a device that did not identify itself may well be the right one, and
+        // the owner is the one who knows which box is which.
+        _roleWarning = device.Role is { } identified && identified != role
+            ? Localized.Format(
+                role == PvDeviceRole.Inverter ? SetupText.RoleMismatchInverter : SetupText.RoleMismatchCharger,
+                $"{device.Host}:{device.Port}")
+            : null;
+
+        var keys = role == PvDeviceRole.Inverter
+            ? (Host: PvSystemSettingKeys.InverterHost, Port: PvSystemSettingKeys.InverterPort, Unit: PvSystemSettingKeys.InverterUnitId)
+            : (Host: PvSystemSettingKeys.ChargerHost, Port: PvSystemSettingKeys.ChargerPort, Unit: PvSystemSettingKeys.ChargerUnitId);
+
+        await OnChosen.InvokeAsync(new Dictionary<string, string>
+        {
+            [keys.Host] = device.Host,
+            [keys.Port] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            [keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        });
+    }
+
+    private static string Percent(DiscoveryScan scan) =>
+        Units.Percent(scan.ToProbe == 0 ? 0 : 100.0 * scan.Probed / scan.ToProbe);
+}

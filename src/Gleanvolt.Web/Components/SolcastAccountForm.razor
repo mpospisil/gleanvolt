@@ -36,7 +36,7 @@
     </div>
 
     <p class="muted">
-        @SettingsText.SolcastIntro
+        @(Editor.FetchesOnSave ? SettingsText.SolcastIntro : SettingsText.SolcastIntroSetupMode)
     </p>
 
     <p class="@(_settings.Status.Failure == SolcastFetchFailure.None ? "muted" : "error")" id="solcast-status" role="status">
@@ -82,7 +82,7 @@
 
         <div class="control actions">
             <button type="button" class="primary" id="solcast-save" disabled="@(_busy || !HasChanges)" @onclick="SaveAsync">
-                @(_busy ? SettingsText.Fetching : SettingsText.SaveAndFetch)
+                @(_busy ? SettingsText.Fetching : Editor.FetchesOnSave ? SettingsText.SaveAndFetch : SettingsText.SaveButton)
             </button>
             @if (_settings.Source == SolcastAccountSource.Page)
             {

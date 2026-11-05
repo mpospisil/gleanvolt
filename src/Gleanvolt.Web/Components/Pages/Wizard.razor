@@ -1,0 +1,192 @@
+@page "/wizard"
+@page "/wizard/{Step}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ISetupState Setup
+@inject IServiceShutdown Shutdown
+@inject IEvEditor Cars
+@inject NavigationManager Navigation
+
+@*
+    The first-run setup (#302): Settings in a guided order. Every step is one of the forms Settings
+    itself uses -- the same fields, the same checks, the same file -- so nothing here can disagree with
+    what Settings would say, and a step skipped now is done later on Settings without anything to learn.
+
+    The password comes before this page, on /setup, which is where the recovery key is shown. Each step
+    is its own address, so a reload stays on it, and each saves as it goes: closing the browser halfway
+    loses nothing that was saved. The devices and the site are what the controller needs; everything
+    after them can be skipped.
+*@
+
+<SiteTitle Page="@SetupText.WizardTitle" />
+
+<h1>@SetupText.WizardTitle</h1>
+
+<ol class="wizard-steps" aria-label="@SetupText.WizardSteps">
+    @foreach (var step in Steps)
+    {
+        <li class="@(step == _step ? "active" : null)">
+            <a href="@Href(step)" aria-current="@(step == _step ? "step" : null)">@Name(step)</a>
+        </li>
+    }
+</ol>
+
+@switch (_step)
+{
+    case WizardStep.Devices:
+        <p class="muted">@SetupText.DevicesIntro</p>
+        <DeviceDiscoveryPanel OnChosen="Choose" />
+        <PvSystemEditorForm Sections="DeviceSections" Suggested="_suggested" OnSaved="StateHasChanged" />
+        break;
+
+    case WizardStep.Site:
+        <p class="muted">@SetupText.SiteIntro</p>
+        <PvSystemEditorForm Sections="SiteSections" OnSaved="StateHasChanged" />
+        break;
+
+    case WizardStep.Solcast:
+        <p class="muted">@SetupText.SolcastIntro</p>
+        <SolcastAccountForm />
+        break;
+
+    case WizardStep.Car:
+        <p class="muted">@SetupText.CarIntro</p>
+        <CarEditorForm />
+        <VehicleAccount Feed="_runningFeed" />
+        break;
+
+    case WizardStep.Extras:
+        <p class="muted">@SetupText.ExtrasIntro</p>
+        <TariffEditorForm />
+        <section class="controls" id="wizard-extras">
+            <div class="section-head"><h2>@SetupText.MqttAndWeather</h2></div>
+            <p class="muted">@Localized.Rich(SetupText.MqttAndWeatherText, @<code>.env</code>, @<a href="https://github.com/mpospisil/gleanvolt#configuration">README</a>)</p>
+        </section>
+        break;
+
+    default:
+        var status = Setup.Current();
+        <section class="controls" id="wizard-finish">
+            <div class="section-head"><h2>@SetupText.FinishTitle</h2></div>
+
+            @if (status.Usable)
+            {
+                <p>@SetupText.FinishReady</p>
+            }
+            else
+            {
+                <p class="error">@SetupText.FinishMissing</p>
+                <ul>
+                    @foreach (var problem in status.MissingRequired)
+                    {
+                        <li>
+                            @Localized.Say(problem.Phrase, problem.English)
+                            <a href="@Href(StepFor(problem.Area))">@Name(StepFor(problem.Area))</a>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (status.MissingOptional.Count > 0)
+            {
+                <p class="muted">@SetupText.FinishOptional</p>
+                <OptionalChecklist Missing="status.MissingOptional" />
+            }
+
+            @if (status.Usable && Setup.SetupMode)
+            {
+                <RestartService Label="@SetupText.StartGleanvolt" />
+            }
+            else if (status.Usable)
+            {
+                <p class="muted">@Localized.Rich(SetupText.FinishRunning, @<a href="/settings/health">@SetupText.FinishRunning_0</a>)</p>
+                <a class="button-link" href="/">@SetupText.ToDashboard</a>
+            }
+        </section>
+        break;
+}
+
+<div class="wizard-nav">
+    @if (Previous is { } previous)
+    {
+        <a class="button-link secondary" id="wizard-back" href="@Href(previous)">@SetupText.Back</a>
+    }
+    @if (Next is { } next)
+    {
+        <a class="button-link" id="wizard-next" href="@Href(next)">
+            @(Skippable(_step) ? SetupText.NextOrSkip : SetupText.Next)
+        </a>
+    }
+</div>
+
+@code {
+    /// <summary>Where the wizard starts, for the setup gate and the setup page.</summary>
+    public const string Path = "/wizard";
+
+    [Parameter] public string? Step { get; set; }
+
+    private static readonly WizardStep[] Steps =
+        [WizardStep.Devices, WizardStep.Site, WizardStep.Solcast, WizardStep.Car, WizardStep.Extras, WizardStep.Finish];
+
+    private static readonly PvEditorSection[] DeviceSections = [PvEditorSection.Inverter, PvEditorSection.Charger];
+
+    private static readonly PvEditorSection[] SiteSections =
+        [PvEditorSection.Identity, PvEditorSection.Location, PvEditorSection.HomeBattery, PvEditorSection.Capacity];
+
+    private WizardStep _step;
+    private IReadOnlyDictionary<string, string>? _suggested;
+    private VehicleFeed _runningFeed;
+
+    protected override void OnInitialized() => _runningFeed = Cars.Read().RunningFeed;
+
+    protected override void OnParametersSet() =>
+        _step = Enum.TryParse<WizardStep>(Step, ignoreCase: true, out var step) ? step : WizardStep.Devices;
+
+    private WizardStep? Previous => Array.IndexOf(Steps, _step) is var index and > 0 ? Steps[index - 1] : null;
+
+    private WizardStep? Next => Array.IndexOf(Steps, _step) is var index && index < Steps.Length - 1 ? Steps[index + 1] : null;
+
+    // A choice from the search fills the address fields; both roles add up, so choosing the inverter
+    // and then the charger leaves both filled.
+    private void Choose(IReadOnlyDictionary<string, string> fields)
+    {
+        var merged = new Dictionary<string, string>(_suggested ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in fields)
+        {
+            merged[key] = value;
+        }
+
+        _suggested = merged;
+    }
+
+    private static bool Skippable(WizardStep step) => step is WizardStep.Solcast or WizardStep.Car or WizardStep.Extras;
+
+    private static string Href(WizardStep step) => $"{Path}/{step.ToString().ToLowerInvariant()}";
+
+    private static WizardStep StepFor(SetupArea area) => area switch
+    {
+        SetupArea.Inverter or SetupArea.Charger => WizardStep.Devices,
+        SetupArea.Password => WizardStep.Finish,
+        _ => WizardStep.Site,
+    };
+
+    private static string Name(WizardStep step) => step switch
+    {
+        WizardStep.Devices => SetupText.StepDevices,
+        WizardStep.Site => SetupText.StepSite,
+        WizardStep.Solcast => SetupText.StepSolcast,
+        WizardStep.Car => SetupText.StepCar,
+        WizardStep.Extras => SetupText.StepExtras,
+        _ => SetupText.StepFinish,
+    };
+
+    private enum WizardStep
+    {
+        Devices,
+        Site,
+        Solcast,
+        Car,
+        Extras,
+        Finish,
+    }
+}

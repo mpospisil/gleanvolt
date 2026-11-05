@@ -21,7 +21,7 @@ public class SolcastAccountEditorTests
 
     private readonly CountingHandler _handler = new();
 
-    private (SolcastAccountEditor Editor, SolcastForecastService Service) Create(SolcastOptions? environment = null)
+    private (SolcastAccountEditor Editor, SolcastForecastService Service) Create(SolcastOptions? environment = null, ISetupState? setup = null)
     {
         var options = Options.Create(environment ?? new SolcastOptions());
         var store = new SolcastAccountStore(new InMemorySecretStore(), options);
@@ -29,7 +29,30 @@ public class SolcastAccountEditorTests
             new Factory(_handler), store, NullLogger<SolcastForecastService>.Instance,
             new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 8, 9, 6, 0, 0, TimeSpan.Zero)));
 
-        return (new SolcastAccountEditor(store, service, NullLogger<SolcastAccountEditor>.Instance), service);
+        return (new SolcastAccountEditor(store, service, NullLogger<SolcastAccountEditor>.Instance, setup), service);
+    }
+
+    [Fact]
+    public async Task InSetupModeASaveStoresTheAccountAndSpendsNoCall()
+    {
+        // #302: nothing would use the forecast before the controller starts, and starting fetches one.
+        var (editor, _) = Create(setup: new InSetupMode());
+
+        var result = await editor.SaveAsync("page-key", "page-site");
+
+        Assert.True(result.Saved);
+        Assert.False(editor.FetchesOnSave);
+        Assert.Equal(0, _handler.Calls);
+        Assert.Equal("page-site", editor.Read().ResourceId);
+    }
+
+    private sealed class InSetupMode : ISetupState
+    {
+        public bool SetupMode => true;
+
+        public SetupStatus AtStartup => new([], []);
+
+        public SetupStatus Current() => AtStartup;
     }
 
     [Fact]
