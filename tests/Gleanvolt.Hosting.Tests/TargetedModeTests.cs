@@ -247,7 +247,7 @@ public class TargetedModeTests
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
-        var forecastOptions = Options.Create(new ForecastChargeOptions());
+        var forecastOptions = Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 });
 
         var coordinator = new ChargingControlCoordinator(
             new Dictionary<ChargeControlMode, IChargingController>

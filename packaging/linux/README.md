@@ -50,9 +50,8 @@ Nothing is written to your hardware. Out of the box:
 - the **battery discharge hold** is disabled;
 - **Home Assistant, MQTT and the vehicle feeds** are off;
 - the **Solcast forecast and weather** are off until you give them an API key;
-- the **inverter and charger addresses** are the reference installation's, `192.168.2.10` and
-  `192.168.2.6`. On your network nothing answers there, so the dashboard stays empty until you set
-  yours. That is the first thing to change.
+- the **inverter and charger addresses** are not set, and Gleanvolt does not start until they are
+  ("No inverter is configured. Set Pv:Inverter:Host."). That is the first thing to set.
 
 ## Settings
 

@@ -438,7 +438,7 @@ feature.
 "Pv": {
   "Id": "home-roof",               // stable slug: the system's identity, on the broker and upstream
   "Name": "Home Roof",             // what a human sees
-  "Address": "Krásného 12, Praha", // display only, never parsed
+  "Address": "",                   // display only, never parsed
   "Latitude": 50.0755,
   "Longitude": 14.4378,
   "AzimuthDegrees": 172,           // compass bearing: 0 = north, 90 = east, 180 = south
@@ -916,7 +916,7 @@ each time. Two things prevent that:
   better: a car that takes every watt the sun makes holds SOC *exactly* on the floor all morning, and
   the pack never gets the charge the evening needs. So while SOC is inside the resume margin,
   `FloorGuardReserveWatts` (default 750) of surplus is withheld from the car and the battery lends
-  nothing — a loan and a reserve at the same SOC would only cancel out. On the 9 kWh default that
+  nothing — a loan and a reserve at the same SOC would only cancel out. On a 9 kWh pack that
   clears a 5 % band in about forty minutes and costs a three-phase session roughly one amp. Where the
   surplus is marginal it stops the session outright, which is the intent: the pack gets the whole
   surplus and the resume margin keeps the car off until it has climbed clear, so a morning that used to
@@ -1067,7 +1067,7 @@ deadline.
     "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
     "UntilFull": false,              // boot value of "Until full": one session over several days
     "UntilFullSessionPath": "data/until-full.json", // such a session, kept so a restart resumes it
-    "BatteryCapacityKWh": 9.0,       // REQUIRED: USABLE capacity (see the warning below), not nameplate
+    "BatteryCapacityKWh": 9.0,       // REQUIRED, no default: USABLE capacity (see the warning below), not nameplate
     "ChargeEfficiency": 0.95,
     "BaselineHouseLoadWatts": 350,   // house load for an hour neither the history nor the live profile knows yet
     "HouseLoadHistoryDays": 14,      // energy history the house-load profile is rebuilt from at startup, 0 = off
@@ -1099,7 +1099,10 @@ deadline.
 
 > ⚠️ **`BatteryCapacityKWh` is the pack's *usable* capacity, not its nameplate.** It is the one value
 > with no safe default: the SOC floor, the battery's booking and the shortfall all scale off it, and a
-> wrong figure makes the plan wrong in a way nothing else catches.
+> wrong figure makes the plan wrong in a way nothing else catches. So it ships unset: until it is set,
+> the Forecasted day plan is unavailable (the mode charges from live surplus, as without a forecast),
+> Targeted books nothing for the battery, and the log says so at startup. Under Docker it is
+> `HOME_BATTERY_CAPACITY_KWH` in `.env`.
 >
 > The reference install is a **SolaX T-BAT H 2.5** stack — 10 kWh nominal, so **9.0 kWh** usable at the
 > ~90 % depth of discharge these packs allow (confirm the exact figure against your datasheet). The
