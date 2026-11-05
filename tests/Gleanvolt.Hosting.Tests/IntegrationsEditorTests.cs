@@ -153,7 +153,7 @@ public sealed class IntegrationsEditorTests : IDisposable
 
         var created = editor.CreateApiKey("claude");
         Assert.True(created.Result.Saved);
-        Assert.Matches("^[0-9a-f]{64}$", created.Key!);
+        Assert.Matches("^[A-Za-z0-9]{24}$", created.Key!);
 
         Assert.True(editor.Save(on).Saved);
 

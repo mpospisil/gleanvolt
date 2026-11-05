@@ -3342,7 +3342,7 @@ Api__Keys__claude-mcp=$(openssl rand -hex 32)
 ```
 
 Or on **Settings → Installation → API access**, or in the setup wizard's Extras step: type the
-client's name and **Create key** makes one the way `openssl rand -hex 32` does, keeps it in the secret
+client's name and **Create key** makes one — 24 random letters and digits, about 143 bits — keeps it in the secret
 store, and lists it beside the environment's keys (shown behind the login, with Copy). A key saved
 there under the same name as one in `.env` wins. The API cannot be turned on there without a key, and
 its last key cannot be removed while it is on, so the next start never meets a keyless API. Like
