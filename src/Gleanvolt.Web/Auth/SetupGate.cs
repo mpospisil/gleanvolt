@@ -23,8 +23,11 @@ public static class SetupGate
     /// <summary>Where an un-set-up UI sends every request.</summary>
     public const string Path = "/setup";
 
-    /// <summary>Where setup mode sends a page that needs the controller (#301).</summary>
-    public const string SetupModePath = "/settings";
+    /// <summary>
+    /// Where setup mode sends a page that needs the controller: the setup wizard (#302), which is
+    /// Settings in a guided order and ends with starting the controller.
+    /// </summary>
+    public const string SetupModePath = Components.Pages.Wizard.Path;
 
     /// <summary>
     /// Serves only the setup page while no password is set. Must sit before authentication: with no
@@ -36,7 +39,7 @@ public static class SetupGate
     public static void UseGleanvoltSetupGate(this WebApplication app, WebOptions web)
     {
         // Setup mode (#301): the controller is not running, so a page that shows or drives it has
-        // nothing to show. Those go to Settings, where the missing values are entered; the pages that
+        // nothing to show. Those go to the wizard (#302), where the missing values are entered; the pages that
         // set up, sign in, reset a password or report health still answer. Ahead of the password
         // check below, and regardless of it: setup mode is about the controller, not the login.
         app.Use(async (context, next) =>
@@ -113,5 +116,6 @@ public static class SetupGate
         || path.StartsWithSegments("/pv-system")
         || path.StartsWithSegments("/health")
         || path.StartsWithSegments("/car")
+        || path.StartsWithSegments(Components.Pages.Wizard.Path)
         || path.StartsWithSegments("/_blazor");
 }

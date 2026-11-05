@@ -22,8 +22,10 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
     public SolcastAccountEditor(
         SolcastAccountStore account,
         SolcastForecastService forecast,
-        ILogger<SolcastAccountEditor> logger)
+        ILogger<SolcastAccountEditor> logger,
+        ISetupState? setup = null)
     {
+        FetchesOnSave = setup?.SetupMode != true;
         _account = account;
         _forecast = forecast;
         _logger = logger;
@@ -33,6 +35,8 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
     }
 
     public event Action? Changed;
+
+    public bool FetchesOnSave { get; }
 
     public SolcastAccountSettings Read()
     {
@@ -82,6 +86,15 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
         {
             _logger.LogWarning(
                 "The Solcast account saved on Settings is in use, but the secret store would not keep it; a restart will forget it.");
+        }
+
+        if (!FetchesOnSave)
+        {
+            _logger.LogInformation(
+                "Solcast account saved in setup mode for rooftop site {ResourceId}; the forecast is fetched when the controller starts.",
+                site);
+
+            return new SolcastAccountSaveResult([], persisted);
         }
 
         _logger.LogInformation("Solcast account saved on Settings for rooftop site {ResourceId}; fetching the forecast with it.", site);

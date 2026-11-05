@@ -48,7 +48,7 @@
         </p>
     }
 
-    @foreach (var (group, keys) in Groups)
+    @foreach (var (section, group, keys) in Groups.Where(entry => Sections is null || Sections.Contains(entry.Section)))
     {
         <h3>@group</h3>
 
@@ -152,14 +152,48 @@
 @code {
     private const string Missing = Units.Missing;
 
-    private static (string Group, string[] Keys)[] Groups =>
+    /// <summary>
+    /// Which groups to show; all of them when null. The setup wizard (#302) shows the devices on one
+    /// step and the site on another, through this one form rather than a copy of it.
+    /// </summary>
+    [Parameter] public IReadOnlyCollection<PvEditorSection>? Sections { get; set; }
+
+    /// <summary>
+    /// Values to put in the fields, as though typed: the wizard's device search fills the addresses it
+    /// found. Applied when a new dictionary arrives; nothing is saved until Save is pressed.
+    /// </summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Suggested { get; set; }
+
+    /// <summary>Raised after a save that wrote something.</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private IReadOnlyDictionary<string, string>? _applied;
+
+    protected override void OnParametersSet()
+    {
+        if (Suggested is null || ReferenceEquals(Suggested, _applied))
+        {
+            return;
+        }
+
+        _applied = Suggested;
+        foreach (var (key, value) in Suggested)
+        {
+            if (_values.ContainsKey(key))
+            {
+                _values[key] = value;
+            }
+        }
+    }
+
+    private static (PvEditorSection Section, string Group, string[] Keys)[] Groups =>
     [
-        (SettingsText.GroupIdentity, [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
-        (SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.TimeZone, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
-        (SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
-        (SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
-        (SettingsText.Inverter, [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
-        (SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
+        (PvEditorSection.Identity, SettingsText.GroupIdentity, [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
+        (PvEditorSection.Location, SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.TimeZone, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
+        (PvEditorSection.Capacity, SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
+        (PvEditorSection.HomeBattery, SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
+        (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
+        (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
     private static Dictionary<string, string> Labels => new(StringComparer.OrdinalIgnoreCase)
@@ -290,6 +324,7 @@
             _message = _pending.Count > 0
                 ? SettingsText.SavedRestart
                 : SettingsText.SavedRunning;
+            await OnSaved.InvokeAsync();
         }
         finally
         {

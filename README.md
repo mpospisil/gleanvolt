@@ -3086,9 +3086,9 @@ Until every required setting is in place, Gleanvolt starts in **setup mode** ins
 - The web UI, the settings stores and the secret store run. The controller does not: nothing polls
   the inverter, drives the charger, records sessions or energy, or talks to MQTT or a car. Its Modbus
   clients refuse every call.
-- The UI shows the setup page (if no password is set yet), then Settings and Health with a **Setup
-  mode** notice listing what is still missing. Pages that need the controller, such as the dashboard,
-  redirect to Settings.
+- The UI shows the setup page (if no password is set yet), then the [setup wizard](#the-setup-wizard).
+  Pages that need the controller, such as the dashboard, redirect to the wizard. Settings and Health
+  show a **Setup mode** notice listing what is still missing.
 - The API answers every request with `503` and "Gleanvolt is not configured".
 - The log starts with a `SETUP MODE` warning that lists what is missing.
 
@@ -3104,6 +3104,34 @@ way round. Gleanvolt never starts the controller on part of a configuration.
 With the web UI disabled (`Web:Enabled=false`) there is nothing to finish a setup in. A configuration
 that is not usable then stops Gleanvolt at startup, as before. The reason goes to the console and to
 the log file, and the exit code is 78 (`EX_CONFIG`).
+
+#### The setup wizard
+
+After the password, a fresh install continues at `/wizard`
+([issue #302](https://github.com/mpospisil/gleanvolt/issues/302)). It is Settings in a guided order:
+every step is one of the forms Settings uses, with the same checks, saving to the same file, so a step
+skipped now is done later on Settings. Each step saves as it goes and has its own address, so a reload
+or a closed browser loses nothing that was saved.
+
+1. **Devices.** **Search** looks for SolaX devices that answer Modbus TCP on this machine's own subnet
+   (or a private range you type, at most a /22) and lists what it finds with what each identified as.
+   One search runs at a time, whoever starts it. Choose **Use as inverter** or **Use as charger**:
+   Gleanvolt never assigns the roles itself, and says so when you choose the role a device did not
+   claim. A swapped pair both answer on port 502, and only show themselves once running, as a frozen
+   battery and no sun. Addresses can also be typed in. Saving reads one value from each device to
+   check it.
+2. **Site.** Location and time zone (both required), the home battery's usable capacity and charge
+   efficiency, the array's details.
+3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it; the forecast is
+   fetched when Gleanvolt starts, so the setup spends none of the day's Solcast calls.
+4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
+5. **Extras** (optional). The tariff. Home Assistant (MQTT) and the weather are still set in `.env`.
+6. **Finish.** What is still missing, each with a link to its step, the optional settings not yet set,
+   and **Start Gleanvolt**, which restarts it out of setup mode.
+
+Optional settings never block anything. A page that needs one says it is not configured, with the way
+to set it up: Forecast (Solcast), Car (the car), Charging plan (a tariff). Health and Settings list
+every optional setting still missing.
 
 #### Deployment
 

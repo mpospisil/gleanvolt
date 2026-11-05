@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="WizardTitle" xml:space="preserve">
+    <value>Nastavení Gleanvoltu</value>
+  </data>
+  <data name="WizardSteps" xml:space="preserve">
+    <value>Kroky nastavení</value>
+  </data>
+  <data name="StepDevices" xml:space="preserve">
+    <value>Zařízení</value>
+  </data>
+  <data name="StepSite" xml:space="preserve">
+    <value>Instalace</value>
+  </data>
+  <data name="StepSolcast" xml:space="preserve">
+    <value>Předpověď</value>
+  </data>
+  <data name="StepCar" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="StepExtras" xml:space="preserve">
+    <value>Doplňky</value>
+  </data>
+  <data name="StepFinish" xml:space="preserve">
+    <value>Dokončení</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Zpět</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Další</value>
+  </data>
+  <data name="NextOrSkip" xml:space="preserve">
+    <value>Další (nebo přeskočit)</value>
+  </data>
+  <data name="DevicesIntro" xml:space="preserve">
+    <value>Gleanvolt komunikuje se střídačem a nabíječkou přes Modbus TCP. Vyhledejte je v síti, nebo zadejte jejich adresy, a uložte: uložení z každého zařízení přečte jednu hodnotu, aby ověřilo, že je to to správné.</value>
+  </data>
+  <data name="SiteIntro" xml:space="preserve">
+    <value>Kde instalace je, její časové pásmo a domácí baterie, se kterou počítají režimy podle předpovědi. Poloha a časové pásmo jsou povinné, zbytek zpřesní předpověď.</value>
+  </data>
+  <data name="SolcastIntro" xml:space="preserve">
+    <value>Účet Solcast dává režimům podle předpovědi předpověď výroby. Bez něj Gleanvolt nabíjí jen z aktuálního přebytku.</value>
+  </data>
+  <data name="CarIntro" xml:space="preserve">
+    <value>Baterie auta, jeho limity a účet, ze kterého se čte stav nabití. Volitelné: bez nich se cíle nabíjení zadávají v energii místo v procentech.</value>
+  </data>
+  <data name="ExtrasIntro" xml:space="preserve">
+    <value>Volitelné: kdy je energie ze sítě levnější, a propojení s Home Assistant a počasím.</value>
+  </data>
+  <data name="MqttAndWeather" xml:space="preserve">
+    <value>Home Assistant a počasí</value>
+  </data>
+  <data name="MqttAndWeatherText" xml:space="preserve">
+    <value>Ty se zatím nastavují v {0}; jak, popisuje {1}. Lze je přidat kdykoli a nic nebrzdí.</value>
+  </data>
+  <data name="FinishTitle" xml:space="preserve">
+    <value>Dokončení</value>
+  </data>
+  <data name="FinishReady" xml:space="preserve">
+    <value>Vše potřebné je nastavené.</value>
+  </data>
+  <data name="FinishMissing" xml:space="preserve">
+    <value>Před spuštěním správce nabíjení ještě chybí:</value>
+  </data>
+  <data name="FinishOptional" xml:space="preserve">
+    <value>Volitelné a kdykoli nastavitelné v Nastavení:</value>
+  </data>
+  <data name="StartGleanvolt" xml:space="preserve">
+    <value>Spustit Gleanvolt</value>
+  </data>
+  <data name="FinishRunning" xml:space="preserve">
+    <value>Gleanvolt už běží. Uložené změny začnou platit po restartu, který najdete v {0}.</value>
+  </data>
+  <data name="FinishRunning_0" xml:space="preserve">
+    <value>Stavu</value>
+  </data>
+  <data name="ToDashboard" xml:space="preserve">
+    <value>Na přehled</value>
+  </data>
+  <data name="FindDevices" xml:space="preserve">
+    <value>Vyhledání zařízení</value>
+  </data>
+  <data name="FindDevicesIntro" xml:space="preserve">
+    <value>Prohledá tuto síť a najde zařízení SolaX, která odpovídají na Modbus TCP. Síť /24 trvá minutu nebo dvě.</value>
+  </data>
+  <data name="Subnet" xml:space="preserve">
+    <value>Síť</value>
+  </data>
+  <data name="Scan" xml:space="preserve">
+    <value>Hledat</value>
+  </data>
+  <data name="StopScan" xml:space="preserve">
+    <value>Zastavit</value>
+  </data>
+  <data name="Scanning" xml:space="preserve">
+    <value>Prohledává se {0}: {1}</value>
+  </data>
+  <data name="ScanStopped" xml:space="preserve">
+    <value>Zastaveno; zatím nalezeno {0}.</value>
+  </data>
+  <data name="ScanDone" xml:space="preserve">
+    <value>Prohledáno {0}; odpovědělo {1}.</value>
+  </data>
+  <data name="Address" xml:space="preserve">
+    <value>Adresa</value>
+  </data>
+  <data name="Identified" xml:space="preserve">
+    <value>Rozpoznáno jako</value>
+  </data>
+  <data name="Unit" xml:space="preserve">
+    <value>jednotka</value>
+  </data>
+  <data name="Unidentified" xml:space="preserve">
+    <value>nerozpoznáno</value>
+  </data>
+  <data name="LooksLikeInverter" xml:space="preserve">
+    <value>střídač</value>
+  </data>
+  <data name="LooksLikeCharger" xml:space="preserve">
+    <value>nabíječka</value>
+  </data>
+  <data name="UseAsInverter" xml:space="preserve">
+    <value>Použít jako střídač</value>
+  </data>
+  <data name="UseAsCharger" xml:space="preserve">
+    <value>Použít jako nabíječku</value>
+  </data>
+  <data name="RoleMismatchInverter" xml:space="preserve">
+    <value>{0} se ohlásilo jako nabíječka, ne jako střídač. Před uložením to ověřte: prohozená zařízení se po spuštění projeví jako zamrzlá baterie a nulová výroba.</value>
+  </data>
+  <data name="RoleMismatchCharger" xml:space="preserve">
+    <value>{0} se ohlásilo jako střídač, ne jako nabíječka. Před uložením to ověřte: prohozená zařízení se po spuštění projeví jako zamrzlá baterie a nulová výroba.</value>
+  </data>
+  <data name="SetItUp" xml:space="preserve">
+    <value>Nastavit</value>
+  </data>
+  <data name="NotConfiguredTitle" xml:space="preserve">
+    <value>{0}: nenastaveno</value>
+  </data>
+  <data name="OptionalSolcast" xml:space="preserve">
+    <value>Předpověď výroby</value>
+  </data>
+  <data name="OptionalEv" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="OptionalTariff" xml:space="preserve">
+    <value>Tarif</value>
+  </data>
+  <data name="OptionalMqtt" xml:space="preserve">
+    <value>Home Assistant (MQTT)</value>
+  </data>
+  <data name="OptionalWeather" xml:space="preserve">
+    <value>Počasí</value>
+  </data>
+  <data name="OptionalSolcastAdds" xml:space="preserve">
+    <value>účet Solcast umožní režimům Forecasted a Targeted plánovat den dopředu.</value>
+  </data>
+  <data name="OptionalEvAdds" xml:space="preserve">
+    <value>baterie auta a účet se stavem nabití umožní zadávat cíle v procentech.</value>
+  </data>
+  <data name="OptionalTariffAdds" xml:space="preserve">
+    <value>hodiny, kdy je energie ze sítě levnější, pro režimy, které na ně umí počkat.</value>
+  </data>
+  <data name="OptionalMqttAdds" xml:space="preserve">
+    <value>publikuje stav a ovládání Gleanvoltu do Home Assistant.</value>
+  </data>
+  <data name="OptionalWeatherAdds" xml:space="preserve">
+    <value>zaznamená počasí, za kterého každé nabíjení proběhlo.</value>
+  </data>
+  <data name="OptionalTitle" xml:space="preserve">
+    <value>Zatím nenastaveno</value>
+  </data>
+</root>

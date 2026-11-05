@@ -1,0 +1,31 @@
+@inject ISetupState Setup
+
+@*
+    A page that needs an optional setting says so where its content would be (#302), with the way to
+    set it up, instead of an empty chart or a figure of zero. Renders nothing once the setting exists:
+    judged from ISetupState.Current() when the page opens -- once, not on every live update, since it
+    reads the settings files -- so a key saved a moment ago counts.
+*@
+
+@if (_missing)
+{
+    <section class="controls not-configured" id="not-configured-@Setting.ToString().ToLowerInvariant()">
+        <h2>@Localized.Format(SetupText.NotConfiguredTitle, OptionalSettings.Name(Setting))</h2>
+        <p class="muted">@OptionalSettings.Adds(Setting)</p>
+        @if (ShowLink && OptionalSettings.Where(Setting) is { } where)
+        {
+            <a class="button-link" href="@where">@SetupText.SetItUp</a>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public OptionalSetting Setting { get; set; }
+
+    /// <summary>False where the form that sets it is on the same page.</summary>
+    [Parameter] public bool ShowLink { get; set; } = true;
+
+    private bool _missing;
+
+    protected override void OnInitialized() => _missing = Setup.Current().MissingOptional.Contains(Setting);
+}

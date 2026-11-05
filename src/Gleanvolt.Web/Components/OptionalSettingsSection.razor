@@ -1,0 +1,15 @@
+@inject ISetupState Setup
+
+@*
+    Health and Settings list the optional settings still missing (#302), each with what it adds and
+    where to set it. Nothing when everything is set, and nothing in setup mode, where the setup notice
+    above already leads to the wizard that offers them.
+*@
+
+@if (!Setup.SetupMode && Setup.Current().MissingOptional is { Count: > 0 } missing)
+{
+    <section class="controls optional-settings" id="optional-settings">
+        <div class="section-head"><h2>@SetupText.OptionalTitle</h2></div>
+        <OptionalChecklist Missing="missing" />
+    </section>
+}

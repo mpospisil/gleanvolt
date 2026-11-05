@@ -759,4 +759,7 @@
   <data name="HintHomeBatteryEfficiency" xml:space="preserve">
     <value>0 až 1, např. 0.95</value>
   </data>
+  <data name="SolcastIntroSetupMode" xml:space="preserve">
+    <value>Předpověď Solcast pro tuto střechu, kterou používají režimy Forecasted a Targeted. V režimu nastavení se účet jen uloží; předpověď se stáhne až po spuštění Gleanvoltu, takže nastavení nespotřebuje žádný z denních dotazů.</value>
+  </data>
 </root>

@@ -201,6 +201,17 @@ public sealed class WebUiSetupGateTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task In_setup_mode_the_wizard_itself_is_let_through_to_the_sign_in()
+    {
+        using var client = await StartAsync(WithPassword(), setup: new SetupModeState());
+
+        var wizard = await client.GetAsync("/wizard/devices");
+
+        Assert.Equal(HttpStatusCode.Redirect, wizard.StatusCode);
+        Assert.Contains("/login", wizard.Headers.Location!.ToString());
+    }
+
+    [Fact]
     public async Task In_setup_mode_with_no_password_the_first_stop_is_the_password()
     {
         using var client = await StartAsync(Unconfigured(), setup: new SetupModeState());

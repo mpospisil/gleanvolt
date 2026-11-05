@@ -2,12 +2,17 @@
     The recovery key, shown once (#301): after the first password is set, after a change from Settings
     and after a reset. One component because the three must say the same thing about it -- that it is
     shown only now, and what it is for -- and each says that in its own sentence above it. Copy and
-    print come with the setup wizard (#302).
+    Print are plain script (#302): the setup page has no circuit to handle a Blazor event.
 *@
 <section class="recovery-key">
     <h2>@SharedText.RecoveryKeyTitle</h2>
     <p>@Intro</p>
     <p><code class="recovery-key-value" id="recovery-key">@Key</code></p>
+    <p class="recovery-key-actions">
+        <button type="button" class="secondary" onclick="gleanvolt.copyRecoveryKey(this)">@SharedText.CopyKey</button>
+        <button type="button" class="secondary" onclick="window.print()">@SharedText.PrintKey</button>
+        <span class="recovery-key-status muted" role="status" hidden>@SharedText.KeyCopied</span>
+    </p>
     <p class="muted">@SharedText.RecoveryKeyUse</p>
     @if (ContinueHref is not null)
     {

@@ -1,0 +1,26 @@
+@*
+    The optional settings still missing (#302): the Solcast forecast, the car, a tariff, the MQTT link
+    and the weather. None of them blocks anything; each says what it adds and where it is set, so the
+    list reads as an offer rather than a to-do. Shown on the wizard's last step, on Health and on
+    Settings, from ISetupState.Current() so it shrinks as things are saved.
+*@
+
+@if (Missing.Count > 0)
+{
+    <ul class="optional-checklist">
+        @foreach (var setting in Missing)
+        {
+            <li>
+                <strong>@OptionalSettings.Name(setting)</strong> — @OptionalSettings.Adds(setting)
+                @if (OptionalSettings.Where(setting) is { } where)
+                {
+                    @(" ")<a href="@where">@SetupText.SetItUp</a>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OptionalSetting> Missing { get; set; } = [];
+}

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="WizardTitle" xml:space="preserve">
+    <value>Set up Gleanvolt</value>
+  </data>
+  <data name="WizardSteps" xml:space="preserve">
+    <value>Setup steps</value>
+  </data>
+  <data name="StepDevices" xml:space="preserve">
+    <value>Devices</value>
+  </data>
+  <data name="StepSite" xml:space="preserve">
+    <value>Site</value>
+  </data>
+  <data name="StepSolcast" xml:space="preserve">
+    <value>Forecast</value>
+  </data>
+  <data name="StepCar" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="StepExtras" xml:space="preserve">
+    <value>Extras</value>
+  </data>
+  <data name="StepFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="NextOrSkip" xml:space="preserve">
+    <value>Next (or skip)</value>
+  </data>
+  <data name="DevicesIntro" xml:space="preserve">
+    <value>Gleanvolt talks to the inverter and the charger over Modbus TCP. Search the network for them, or type their addresses, then save: saving reads one value from each, to check it is the device you meant.</value>
+  </data>
+  <data name="SiteIntro" xml:space="preserve">
+    <value>Where the installation is, its time zone, and the home battery the forecast modes plan around. The location and the time zone are required; the rest makes the forecast better.</value>
+  </data>
+  <data name="SolcastIntro" xml:space="preserve">
+    <value>A Solcast account gives the forecast modes their solar forecast. Without one, Gleanvolt charges from live surplus only.</value>
+  </data>
+  <data name="CarIntro" xml:space="preserve">
+    <value>The car's battery and limits, and the account its state of charge comes from. Optional: without them, charging targets are set in energy rather than in percent.</value>
+  </data>
+  <data name="ExtrasIntro" xml:space="preserve">
+    <value>Optional: when grid energy is cheaper, and the links to Home Assistant and the weather.</value>
+  </data>
+  <data name="MqttAndWeather" xml:space="preserve">
+    <value>Home Assistant and the weather</value>
+  </data>
+  <data name="MqttAndWeatherText" xml:space="preserve">
+    <value>These are set in {0} for now; the {1} says how. They can be added at any time and never hold anything up.</value>
+    <comment>{0} is the file name .env, {1} a link whose text is README.</comment>
+  </data>
+  <data name="FinishTitle" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <data name="FinishReady" xml:space="preserve">
+    <value>Everything required is set.</value>
+  </data>
+  <data name="FinishMissing" xml:space="preserve">
+    <value>Still missing before the controller can start:</value>
+  </data>
+  <data name="FinishOptional" xml:space="preserve">
+    <value>Optional, and possible at any time on Settings:</value>
+  </data>
+  <data name="StartGleanvolt" xml:space="preserve">
+    <value>Start Gleanvolt</value>
+  </data>
+  <data name="FinishRunning" xml:space="preserve">
+    <value>Gleanvolt is already running. Changes saved here apply after a restart, on {0}.</value>
+    <comment>{0} is a link whose text is FinishRunning_0.</comment>
+  </data>
+  <data name="FinishRunning_0" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="ToDashboard" xml:space="preserve">
+    <value>To the overview</value>
+  </data>
+  <data name="FindDevices" xml:space="preserve">
+    <value>Find the devices</value>
+  </data>
+  <data name="FindDevicesIntro" xml:space="preserve">
+    <value>Searches this network for SolaX devices that answer Modbus TCP. A /24 takes a minute or two.</value>
+  </data>
+  <data name="Subnet" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="Scan" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="StopScan" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="Scanning" xml:space="preserve">
+    <value>Searching {0}: {1}</value>
+    <comment>{0} is a list of networks, {1} a percentage.</comment>
+  </data>
+  <data name="ScanStopped" xml:space="preserve">
+    <value>Stopped; found {0} so far.</value>
+  </data>
+  <data name="ScanDone" xml:space="preserve">
+    <value>Searched {0}; {1} answered.</value>
+  </data>
+  <data name="Address" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Identified" xml:space="preserve">
+    <value>Identified as</value>
+  </data>
+  <data name="Unit" xml:space="preserve">
+    <value>unit</value>
+  </data>
+  <data name="Unidentified" xml:space="preserve">
+    <value>not identified</value>
+  </data>
+  <data name="LooksLikeInverter" xml:space="preserve">
+    <value>an inverter</value>
+  </data>
+  <data name="LooksLikeCharger" xml:space="preserve">
+    <value>a charger</value>
+  </data>
+  <data name="UseAsInverter" xml:space="preserve">
+    <value>Use as inverter</value>
+  </data>
+  <data name="UseAsCharger" xml:space="preserve">
+    <value>Use as charger</value>
+  </data>
+  <data name="RoleMismatchInverter" xml:space="preserve">
+    <value>{0} identified itself as a charger, not an inverter. Check before saving: swapped devices look like a frozen battery and no sun once running.</value>
+  </data>
+  <data name="RoleMismatchCharger" xml:space="preserve">
+    <value>{0} identified itself as an inverter, not a charger. Check before saving: swapped devices look like a frozen battery and no sun once running.</value>
+  </data>
+  <data name="SetItUp" xml:space="preserve">
+    <value>Set it up</value>
+  </data>
+  <data name="NotConfiguredTitle" xml:space="preserve">
+    <value>{0}: not configured</value>
+  </data>
+  <data name="OptionalSolcast" xml:space="preserve">
+    <value>Solar forecast</value>
+  </data>
+  <data name="OptionalEv" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="OptionalTariff" xml:space="preserve">
+    <value>Tariff</value>
+  </data>
+  <data name="OptionalMqtt" xml:space="preserve">
+    <value>Home Assistant (MQTT)</value>
+  </data>
+  <data name="OptionalWeather" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="OptionalSolcastAdds" xml:space="preserve">
+    <value>a Solcast account lets Forecasted and Targeted plan the day ahead.</value>
+  </data>
+  <data name="OptionalEvAdds" xml:space="preserve">
+    <value>the car's battery and an account for its state of charge let targets be set in percent.</value>
+  </data>
+  <data name="OptionalTariffAdds" xml:space="preserve">
+    <value>the hours when grid energy is cheaper, for the modes that can wait for them.</value>
+  </data>
+  <data name="OptionalMqttAdds" xml:space="preserve">
+    <value>publishes Gleanvolt's state and controls to Home Assistant.</value>
+  </data>
+  <data name="OptionalWeatherAdds" xml:space="preserve">
+    <value>records the weather each charging session ran in.</value>
+  </data>
+  <data name="OptionalTitle" xml:space="preserve">
+    <value>Not set up yet</value>
+  </data>
+</root>

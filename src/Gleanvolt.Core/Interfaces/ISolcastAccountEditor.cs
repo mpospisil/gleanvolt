@@ -27,4 +27,11 @@ public interface ISolcastAccountEditor
 
     /// <summary>Raised after a save, a remove, or any fetch, so a page showing the status can redraw.</summary>
     event Action? Changed;
+
+    /// <summary>
+    /// Whether a save also fetches the forecast to check the account. Not in setup mode (#302): nothing
+    /// would use the forecast before the controller starts, and starting it fetches one anyway, so a
+    /// fetch on save would spend two of the day's calls for one.
+    /// </summary>
+    bool FetchesOnSave => true;
 }
