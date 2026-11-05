@@ -118,6 +118,15 @@ public static class GleanvoltHostingExtensions
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>()));
 
+        // The Home Assistant link and the API, editable on Settings and in the setup wizard. Read once at
+        // startup like the installation, so the snapshot is what "running" means.
+        var runningIntegrations = IntegrationsSnapshot.From(configuration);
+        services.AddSingleton<IIntegrationsEditor>(provider => new IntegrationsEditor(
+            configuration,
+            runningIntegrations,
+            provider.GetRequiredService<ISecretStore>(),
+            provider.GetRequiredService<ILogger<IntegrationsEditor>>()));
+
         // What grid energy costs when (issue #265). Each way of knowing is a strategy registered here as
         // an ITariffProvider, in the order Settings offers them; the saved settings select one at runtime,
         // and a new strategy is one more line here (and its panel in the web UI), nothing else. The
@@ -929,6 +938,9 @@ public static class GleanvoltHostingExtensions
         // (issues #214, #215). Beside it in the order, and for the same reason: a password typed on
         // /car has to beat the one a long-forgotten .env still carries. See VehicleAccountSecret.
         builder.Configuration.AddVehicleAccountPassword(builder.Environment.ContentRootPath);
+
+        // The MQTT broker password and the API keys saved on Settings, likewise from the secret store.
+        builder.Configuration.AddIntegrationSecrets(builder.Environment.ContentRootPath);
 
         builder.Services.AddGleanvolt(builder.Configuration);
 

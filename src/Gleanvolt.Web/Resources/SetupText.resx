@@ -58,17 +58,7 @@
     <value>The car's battery and limits, and the account its state of charge comes from. Optional: without them, charging targets are set in energy rather than in percent.</value>
   </data>
   <data name="ExtrasIntro" xml:space="preserve">
-    <value>Optional: when grid energy is cheaper, and the links to Home Assistant and the weather.</value>
-  </data>
-  <data name="HomeAssistant" xml:space="preserve">
-    <value>Home Assistant</value>
-  </data>
-  <data name="HomeAssistantText" xml:space="preserve">
-    <value>The link to Home Assistant (MQTT) is set in {0} for now; the {1} says how. It can be added at any time and never holds anything up.</value>
-    <comment>{0} is the file name .env, {1} a link whose text is README.</comment>
-  </data>
-  <data name="FinishTitle" xml:space="preserve">
-    <value>Finish</value>
+    <value>Optional: when grid energy is cheaper, the weather, Home Assistant and the API.</value>
   </data>
   <data name="FinishReady" xml:space="preserve">
     <value>Everything required is set.</value>
@@ -185,5 +175,8 @@
   </data>
   <data name="OptionalTitle" xml:space="preserve">
     <value>Not set up yet</value>
+  </data>
+  <data name="FinishTitle" xml:space="preserve">
+    <value>Finish</value>
   </data>
 </root>

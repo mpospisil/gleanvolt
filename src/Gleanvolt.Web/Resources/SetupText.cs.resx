@@ -58,13 +58,7 @@
     <value>Baterie auta, jeho limity a účet, ze kterého se čte stav nabití. Volitelné: bez nich se cíle nabíjení zadávají v energii místo v procentech.</value>
   </data>
   <data name="ExtrasIntro" xml:space="preserve">
-    <value>Volitelné: kdy je energie ze sítě levnější, a propojení s Home Assistant a počasím.</value>
-  </data>
-  <data name="HomeAssistant" xml:space="preserve">
-    <value>Home Assistant</value>
-  </data>
-  <data name="HomeAssistantText" xml:space="preserve">
-    <value>Propojení s Home Assistant (MQTT) se zatím nastavuje v {0}; jak, popisuje {1}. Lze ho přidat kdykoli a nic nebrzdí.</value>
+    <value>Volitelné: kdy je energie ze sítě levnější, počasí, Home Assistant a API.</value>
   </data>
   <data name="FinishTitle" xml:space="preserve">
     <value>Dokončení</value>

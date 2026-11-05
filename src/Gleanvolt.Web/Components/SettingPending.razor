@@ -1,0 +1,25 @@
+@*
+    Under a field saved for the next start: what is running until a restart applies it, and the way
+    back to what the environment says.
+*@
+
+@if (Setting.IsPending)
+{
+    <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(Setting.Running))</span>
+}
+@if (Setting.IsEdited && Editable)
+{
+    <button type="button" class="link revert" @onclick="() => OnRevert.InvokeAsync(Setting.Key)">
+        @Localized.Format(SettingsText.RevertTo, Show(Setting.Underlying))
+    </button>
+}
+
+@code {
+    [Parameter, EditorRequired] public ConfiguredSetting Setting { get; set; } = default!;
+
+    [Parameter] public bool Editable { get; set; }
+
+    [Parameter] public EventCallback<string> OnRevert { get; set; }
+
+    private static string Show(string? value) => string.IsNullOrWhiteSpace(value) ? Units.Missing : value;
+}

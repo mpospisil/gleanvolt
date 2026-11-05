@@ -13,8 +13,9 @@
     weather key and the tariff (issue #265) below it are the exceptions: the services that use them read them afresh, so
     a save applies at once.
 
-    The MQTT and API sections are read-only, and not merely for now: they are resolved once at startup,
-    so a control that edited them would be editing a copy of a decision already made. They answer
+    The MQTT and API sections under their forms are read-only: they describe what is running, which
+    was resolved once at startup. The forms above them (MqttEditorForm, ApiEditorForm) save for the
+    next start, as the installation's form does. They answer
     "what is this talking to, and how do I reach it?" from a browser, the question the startup log
     answers once and then buries. Since the redesign (#255) the explanations sit in (i) tips; what
     reports a state -- a link that is off, a key withheld -- stays on the page. The car's facts and
@@ -42,6 +43,8 @@
 <ChangePassword />
 
 <p class="muted car-link">@Localized.Rich(SettingsText.CarLink, @<a href="/car">@SettingsText.CarLink_0</a>)</p>
+
+<MqttEditorForm />
 
 <div class="section-head tip-head">
     <h2>@SettingsText.Mqtt</h2>
@@ -200,6 +203,8 @@ else
         </p>
     }
 }
+
+<ApiEditorForm />
 
 <div class="section-head tip-head">
     <h2>@SettingsText.Api</h2>

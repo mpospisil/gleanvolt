@@ -504,4 +504,40 @@
   <data name="Weather_EnterKey" xml:space="preserve">
     <value>Zadejte klíč API ze svého účtu OpenWeatherMap.</value>
   </data>
+  <data name="Mqtt_TestConnected" xml:space="preserve">
+    <value>Připojeno k {0}.</value>
+  </data>
+  <data name="Mqtt_TestBadCredentials" xml:space="preserve">
+    <value>{0} odpověděl, ale odmítl uživatelské jméno nebo heslo.</value>
+  </data>
+  <data name="Mqtt_TestRefused" xml:space="preserve">
+    <value>{0} odpověděl, ale připojení odmítl ({1}).</value>
+  </data>
+  <data name="Config_MqttNoBroker" xml:space="preserve">
+    <value>Home Assistant potřebuje adresu MQTT brokeru.</value>
+  </data>
+  <data name="Config_MqttBadPort" xml:space="preserve">
+    <value>Port brokeru ('{0}') musí být číslo od 1 do 65535.</value>
+  </data>
+  <data name="Config_MqttNeedsPvId" xml:space="preserve">
+    <value>Home Assistant potřebuje ID instalace (Instalace → ID): je to část témat, pod kterými tento systém publikuje, aby se dvě instalace na jednom brokeru navzájem nepřepisovaly.</value>
+  </data>
+  <data name="Config_NotABoolean" xml:space="preserve">
+    <value>'{0}' není true ani false.</value>
+  </data>
+  <data name="Config_ApiNoKeys" xml:space="preserve">
+    <value>API nelze zapnout bez klíče: nejprve níže nějaký vytvořte.</value>
+  </data>
+  <data name="Config_ApiKeyBadName" xml:space="preserve">
+    <value>'{0}' nelze použít jako název klíče: písmena, číslice, '-', '_' a '.', nejvýše 40 znaků.</value>
+  </data>
+  <data name="Config_ApiKeyExists" xml:space="preserve">
+    <value>Klíč s názvem '{0}' už existuje.</value>
+  </data>
+  <data name="Config_ApiKeyNotHere" xml:space="preserve">
+    <value>'{0}' není klíč uložený tady; klíč z prostředí se odstraňuje tam.</value>
+  </data>
+  <data name="Config_ApiLastKey" xml:space="preserve">
+    <value>API je zapnuté a toto je jeho poslední klíč. Nejprve API vypněte, nebo vytvořte jiný klíč.</value>
+  </data>
 </root>

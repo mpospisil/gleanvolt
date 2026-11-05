@@ -2658,3 +2658,11 @@ a.seg-opt {
 .settings-tabs {
     margin: 0 0 var(--space-5);
 }
+
+/* A checkbox that is a setting of its own, on the forms saved for the next start. */
+label.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
