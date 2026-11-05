@@ -1115,6 +1115,40 @@ internal static class TestForecasts
 /// The Solcast account on Settings, held in memory. A save records what it was given and applies
 /// <see cref="NextStatus"/>, as the real editor's fetch would.
 /// </summary>
+internal sealed class FakeWeatherKeyEditor : IWeatherKeyEditor
+{
+    public WeatherKeySettings Settings { get; set; } = new(WeatherKeySource.None, string.Empty, false, "an owner-only file");
+
+    /// <summary>What OpenWeatherMap says to the next saved key.</summary>
+    public WeatherKeyCheck NextCheck { get; set; } = WeatherKeyCheck.Accepted;
+
+    public List<string> Saves { get; } = [];
+
+    public int Removes { get; private set; }
+
+    public WeatherKeySettings Read() => Settings;
+
+    public Task<WeatherKeySaveResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default)
+    {
+        Saves.Add(apiKey);
+        if (apiKey.Trim().Length == 0)
+        {
+            return Task.FromResult(new WeatherKeySaveResult(["Enter the key."], false, WeatherKeyCheck.NotChecked));
+        }
+
+        Settings = Settings with { Source = WeatherKeySource.Page, ApiKey = apiKey.Trim() };
+        return Task.FromResult(new WeatherKeySaveResult([], true, NextCheck));
+    }
+
+    public void Remove()
+    {
+        Removes++;
+        Settings = Settings.EnvironmentConfigured
+            ? Settings with { Source = WeatherKeySource.Environment, ApiKey = "env-key" }
+            : Settings with { Source = WeatherKeySource.None, ApiKey = string.Empty };
+    }
+}
+
 internal sealed class FakeSolcastAccountEditor : ISolcastAccountEditor
 {
     public SolcastAccountSettings Settings { get; set; } = new(

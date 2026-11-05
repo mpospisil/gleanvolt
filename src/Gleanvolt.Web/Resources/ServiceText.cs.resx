@@ -501,4 +501,7 @@
   <data name="Discovery_AlreadyRunning" xml:space="preserve">
     <value>Hledání už běží.</value>
   </data>
+  <data name="Weather_EnterKey" xml:space="preserve">
+    <value>Zadejte klíč API ze svého účtu OpenWeatherMap.</value>
+  </data>
 </root>

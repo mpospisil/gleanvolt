@@ -28,6 +28,7 @@ public class WizardTests : PageTest
         Services.AddSingleton<ISetupState>(_setup);
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
+        Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
         Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
         Services.AddSingleton<IVehicleAccountSignIn>(new FakeVehicleAccountSignIn(configured: false));
@@ -68,6 +69,12 @@ public class WizardTests : PageTest
     public void An_unknown_step_starts_at_the_devices()
     {
         Assert.NotNull(Step("nonsense").Find("#discovery"));
+    }
+
+    [Fact]
+    public void The_extras_step_sets_the_weather_key()
+    {
+        Assert.NotNull(Step("extras").Find("#weather-api-key"));
     }
 
     [Fact]

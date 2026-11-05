@@ -1,0 +1,172 @@
+@inject IWeatherKeyEditor Editor
+@inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+
+@*
+    The OpenWeatherMap key: the weather each charging session ran in. The same arrangement as the
+    Solcast account above it -- saved in the secret store, wins over the environment, applies at once --
+    with one difference: the free plan allows a thousand calls a day, so a save checks the key without
+    anything to count.
+
+    The key box is always empty, on every load and after every save: a field that rendered its value
+    back would put the key on the wire for every browser that opened the page. The key in use is behind
+    Secret instead, and only behind a login.
+*@
+
+<section class="controls pv-editor weather-editor" id="weather-editor">
+    <div class="section-head tip-head">
+        <h2>@SettingsText.Weather</h2>
+        <InfoTip Topic="@SettingsText.WeatherTopic" Group="settings-info" Wide="true">
+            <p>@SettingsText.WeatherTip1</p>
+            <p>@Localized.Rich(SettingsText.WeatherTip2, @<code>WEATHER_API_KEY</code>, @<code>.env</code>)</p>
+        </InfoTip>
+    </div>
+
+    <p class="muted">@SettingsText.WeatherIntro</p>
+
+    <p class="muted" id="weather-status" role="status">
+        @(_settings.IsConfigured ? SettingsText.WeatherConfigured : SettingsText.NotConfiguredNoWeather)
+    </p>
+
+    @if (ReadOnly)
+    {
+        <p class="muted" id="weather-readonly">
+            @Localized.Rich(SettingsText.WeatherReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>WEATHER_API_KEY</code>, @<code>.env</code>)
+        </p>
+    }
+    else
+    {
+        <div class="pv-fields">
+            <div class="pv-field">
+                <label for="weather-api-key">@SettingsText.ApiKey</label>
+                <input id="weather-api-key" type="password" autocomplete="new-password" spellcheck="false"
+                       placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
+                       disabled="@_busy"
+                       value="@_apiKey"
+                       @oninput="e => Edit(e.Value?.ToString() ?? string.Empty)" />
+                <span class="source @(_settings.Source == WeatherKeySource.Page ? "edited" : null)" id="weather-source">
+                    @SourceName()
+                </span>
+                @if (_settings.IsConfigured)
+                {
+                    <div id="weather-key-in-use"><Secret Value="@_settings.ApiKey" /></div>
+                }
+                <span class="hint">
+                    @Localized.Format(SettingsText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
+                </span>
+            </div>
+        </div>
+
+        <div class="control actions">
+            <button type="button" class="primary" id="weather-save" disabled="@(_busy || _apiKey.Trim().Length == 0)" @onclick="SaveAsync">
+                @(_busy ? SettingsText.Checking : SettingsText.SaveAndCheck)
+            </button>
+            @if (_settings.Source == WeatherKeySource.Page)
+            {
+                <button type="button" class="secondary" id="weather-remove" disabled="@_busy" @onclick="Remove">@SettingsText.Remove</button>
+            }
+        </div>
+    }
+
+    @if (_errors.Count > 0)
+    {
+        <ul class="error" id="weather-errors">
+            @foreach (var error in _errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="@(_messageIsError ? "error" : "muted")" id="weather-message">@message</p>
+    }
+</section>
+
+@code {
+    private WeatherKeySettings _settings = new(WeatherKeySource.None, string.Empty, false, string.Empty);
+    private string _apiKey = string.Empty;
+    private IReadOnlyList<string> _errors = [];
+    private string? _message;
+    private bool _messageIsError;
+    private bool _busy;
+
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _settings = Editor.Read();
+        _apiKey = string.Empty;
+    }
+
+    private void Edit(string value)
+    {
+        _apiKey = value;
+        _message = null;
+        _errors = [];
+    }
+
+    private async Task SaveAsync()
+    {
+        if (ReadOnly || _busy || _apiKey.Trim().Length == 0)
+        {
+            return;
+        }
+
+        _busy = true;
+        _message = null;
+        _errors = [];
+
+        try
+        {
+            var result = await Editor.SaveAsync(_apiKey);
+
+            if (!result.Saved)
+            {
+                _errors = Localized.Say(result.Errors, result.ErrorPhrases);
+                return;
+            }
+
+            Reload();
+            _messageIsError = !result.Persisted || result.Check is WeatherKeyCheck.Refused;
+            _message = !result.Persisted
+                ? SettingsText.InUseNotKept
+                : result.Check switch
+                {
+                    WeatherKeyCheck.Accepted => SettingsText.WeatherKeyAccepted,
+                    WeatherKeyCheck.Refused => SettingsText.WeatherKeyRefused,
+                    WeatherKeyCheck.Failed => SettingsText.WeatherCheckFailed,
+                    _ => SettingsText.SavedInUse,
+                };
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Remove()
+    {
+        if (ReadOnly || _busy)
+        {
+            return;
+        }
+
+        Editor.Remove();
+        Reload();
+        _errors = [];
+        _messageIsError = false;
+        _message = _settings.IsConfigured ? SettingsText.WeatherRemovedEnvironment : SettingsText.WeatherRemovedNone;
+    }
+
+    private string SourceName() => _settings.Source switch
+    {
+        WeatherKeySource.Page => SettingsText.SourcePage,
+        WeatherKeySource.Environment => SettingsText.SourceEnvironmentWeather,
+        _ => SettingsText.NotConfigured,
+    };
+}

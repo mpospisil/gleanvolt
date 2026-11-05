@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Infrastructure;
+using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web.Auth;
 
@@ -39,6 +40,9 @@ public sealed class SetupDocument
     /// <summary>The Solcast rooftop site, stored with the key.</summary>
     public const string SolcastResourceId = "Solcast:ResourceId";
 
+    /// <summary>The OpenWeatherMap API key: a secret.</summary>
+    public const string WeatherApiKey = "Weather:ApiKey";
+
     /// <summary>The site's time zone.</summary>
     public const string TimeZone = "Controller:TimeZone";
 
@@ -52,12 +56,13 @@ public sealed class SetupDocument
         .. PvSystemSettingKeys.All,
         SolcastApiKey,
         SolcastResourceId,
+        WeatherApiKey,
         .. EvSettingKeys.All,
     ];
 
     /// <summary>The keys whose values are secrets: never written to the overrides file.</summary>
     public static IReadOnlyList<string> SecretKeys { get; } =
-        [WebPassword, SolcastApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword];
+        [WebPassword, SolcastApiKey, WeatherApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword];
 
     private SetupDocument(IReadOnlyDictionary<string, string> values) => Values = values;
 
@@ -247,6 +252,17 @@ public sealed class SetupDocument
             }
         }
 
+        if (Values.TryGetValue(WeatherApiKey, out var weatherKey) && !string.IsNullOrWhiteSpace(weatherKey))
+        {
+            var saved = target.Weather?.Save(weatherKey)
+                ?? target.Secrets.Write(SecretNames.WeatherApiKey, weatherKey.Trim());
+
+            if (!saved)
+            {
+                return SetupApplyResult.Refused(SecretNotSaved("weather"));
+            }
+        }
+
         var vehiclePassword = Values
             .Where(entry => entry.Key.Equals(EvSettingKeys.WebsitePassword, StringComparison.OrdinalIgnoreCase)
                 || entry.Key.Equals(EvSettingKeys.DataActPassword, StringComparison.OrdinalIgnoreCase))
@@ -355,12 +371,14 @@ public sealed class SetupDocument
 /// <param name="Secrets">The secret store secrets go to.</param>
 /// <param name="Password">Sets the web UI password; null on a host that has none.</param>
 /// <param name="Solcast">The running Solcast account, so a saved key is used without a restart; null writes the store directly.</param>
+/// <param name="Weather">The running weather key, likewise.</param>
 public sealed record SetupTarget(
     IConfiguration Configuration,
     string OverridesPath,
     ISecretStore Secrets,
     WebPasswordService? Password = null,
-    SolcastAccountStore? Solcast = null);
+    SolcastAccountStore? Solcast = null,
+    WeatherKeyStore? Weather = null);
 
 /// <summary>What applying a document came to. <see cref="RecoveryKey"/> is set when it set the password.</summary>
 public sealed record SetupApplyResult(bool Applied, IReadOnlyList<string> Problems, string? RecoveryKey)

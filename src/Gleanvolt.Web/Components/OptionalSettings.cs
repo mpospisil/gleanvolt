@@ -24,7 +24,7 @@ internal static class OptionalSettings
         _ => SetupText.OptionalWeatherAdds,
     };
 
-    // The wizard's step for what has a form; MQTT and the weather are set in .env and have none yet.
+    // The wizard's step that sets each one; MQTT has no form yet, and its step says where it is set.
     public static string? Where(OptionalSetting setting) => setting switch
     {
         OptionalSetting.Solcast => "/wizard/solcast",

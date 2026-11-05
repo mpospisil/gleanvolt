@@ -580,7 +580,7 @@ Records **what the sky was actually doing** while a session ran, so a finished s
 
 **Which site the weather is fetched for is [the `Pv` section's](#the-pv-system-the-pv-section) business**, not this one's: `Pv:Latitude` and `Pv:Longitude` are where the coordinates belong. `Weather:Latitude` and `Weather:Longitude` are retired, and setting either stops the worker at startup rather than being ignored.
 
-The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY` in `deploy/.env`, and the site's coordinates as `PV_LATITUDE` / `PV_LONGITUDE`.
+The **API key is a secret**, on exactly the same terms as `Solcast:ApiKey` above — `.env`, an environment variable (`Weather__ApiKey`), or user-secrets. Deployments set `WEATHER_API_KEY` in `deploy/.env`, and the site's coordinates as `PV_LATITUDE` / `PV_LONGITUDE`. Or paste it on **Settings → Installation → Weather** (or the setup wizard's Extras step): a key saved there goes to the secret store, wins over the environment's, and is used from the next session without a restart. The save checks it with one call; a new OpenWeatherMap key can take a couple of hours to start working, so a refusal right after creating one is expected and the key is kept anyway. **Remove** goes back to the environment's key.
 
 **Two calls per charging session**, one when it opens and one when it closes, and none in between. There is no refresh worker and no cached forecast: weather is decoration on a record, not an input to any decision, so spending the provider's quota on hours when nothing is recording would buy nothing. Any free OpenWeatherMap plan covers a few sessions a day comfortably.
 
@@ -3125,7 +3125,8 @@ or a closed browser loses nothing that was saved.
 3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it; the forecast is
    fetched when Gleanvolt starts, so the setup spends none of the day's Solcast calls.
 4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
-5. **Extras** (optional). The tariff. Home Assistant (MQTT) and the weather are still set in `.env`.
+5. **Extras** (optional). The tariff and the OpenWeatherMap key. Home Assistant (MQTT) is still set in
+   `.env`.
 6. **Finish.** What is still missing, each with a link to its step, the optional settings not yet set,
    and **Start Gleanvolt**, which restarts it out of setup mode.
 

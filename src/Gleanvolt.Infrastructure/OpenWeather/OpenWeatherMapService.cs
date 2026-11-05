@@ -28,6 +28,7 @@ public sealed class OpenWeatherMapService : IWeatherService
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WeatherOptions _options;
+    private readonly WeatherKeyStore _key;
     private readonly PvSystemInfo _site;
     private readonly ILogger<OpenWeatherMapService> _logger;
 
@@ -42,23 +43,29 @@ public sealed class OpenWeatherMapService : IWeatherService
     /// <c>Pv:Latitude</c> (issue #111). The resolved site already carries whichever of the two won, so
     /// this service never has to know there were two.
     /// </param>
+    /// <param name="key">
+    /// The key in use, read on every call: one saved on Settings is used from the next session on.
+    /// </param>
     public OpenWeatherMapService(
         IHttpClientFactory httpClientFactory,
         IOptions<WeatherOptions> options,
+        WeatherKeyStore key,
         PvSystemInfo site,
         ILogger<OpenWeatherMapService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
+        _key = key;
         _site = site;
         _logger = logger;
     }
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ApiKey) && _site.HasLocation;
+    public bool IsConfigured => _key.Current is not null && _site.HasLocation;
 
     public async Task<WeatherReading?> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsConfigured)
+        // Read once: the key can be removed on Settings while this runs.
+        if (_key.Current is not { } key || !_site.HasLocation)
         {
             return null;
         }
@@ -72,7 +79,7 @@ public sealed class OpenWeatherMapService : IWeatherService
 
             var client = _httpClientFactory.CreateClient(HttpClientName);
             var response = await client
-                .GetFromJsonAsync<CurrentWeatherResponse>(RequestUri(), timeout.Token)
+                .GetFromJsonAsync<CurrentWeatherResponse>(RequestUri(key, _site.Latitude!.Value, _site.Longitude!.Value), timeout.Token)
                 .ConfigureAwait(false);
 
             var reading = Map(response);
@@ -99,14 +106,47 @@ public sealed class OpenWeatherMapService : IWeatherService
         }
     }
 
-    private string RequestUri()
+    /// <summary>
+    /// Asks OpenWeatherMap once with <paramref name="apiKey"/>, to say on Settings whether it works.
+    /// The site's coordinates when it has them; otherwise any place answers for a key -- in setup mode
+    /// the location may have been saved a moment ago and not be in use yet.
+    /// </summary>
+    public async Task<WeatherKeyCheck> CheckKeyAsync(string apiKey, CancellationToken cancellationToken = default)
     {
-        var lat = _site.Latitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
-        var lon = _site.Longitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return WeatherKeyCheck.NotChecked;
+        }
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(_options.RequestTimeout);
+
+            var client = _httpClientFactory.CreateClient(HttpClientName);
+            using var response = await client
+                .GetAsync(RequestUri(apiKey.Trim(), _site.Latitude ?? 0, _site.Longitude ?? 0), timeout.Token)
+                .ConfigureAwait(false);
+
+            return response.IsSuccessStatusCode ? WeatherKeyCheck.Accepted
+                : response.StatusCode == System.Net.HttpStatusCode.Unauthorized ? WeatherKeyCheck.Refused
+                : WeatherKeyCheck.Failed;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Could not reach OpenWeatherMap to check the key: {Reason}", ex.Message);
+            return WeatherKeyCheck.Failed;
+        }
+    }
+
+    private string RequestUri(string apiKey, double latitude, double longitude)
+    {
+        var lat = latitude.ToString("0.######", CultureInfo.InvariantCulture);
+        var lon = longitude.ToString("0.######", CultureInfo.InvariantCulture);
 
         return $"data/2.5/weather?lat={lat}&lon={lon}"
             + $"&units={Uri.EscapeDataString(_options.Units)}"
-            + $"&appid={Uri.EscapeDataString(_options.ApiKey)}";
+            + $"&appid={Uri.EscapeDataString(apiKey)}";
     }
 
     private void Warn(string message, Exception? ex)

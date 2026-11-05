@@ -2,6 +2,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Tariff;
+using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web.Auth;
 
@@ -11,7 +12,7 @@ namespace Gleanvolt.Hosting.Setup;
 /// This run's setup mode, and the setup as saved since (#301). See <see cref="ISetupState"/>.
 ///
 /// <para><see cref="Current"/> re-reads what the web UI writes -- the overrides file, the password in
-/// force, the Solcast account, the tariff -- because none of that reaches <see cref="IConfiguration"/>
+/// force, the Solcast account, the weather key, the tariff -- because none of that reaches <see cref="IConfiguration"/>
 /// until a restart. Everything else comes from configuration as it is now.</para>
 /// </summary>
 public sealed class SetupState : ISetupState
@@ -52,7 +53,10 @@ public sealed class SetupState : ISetupState
         var tariff = _services.GetService<TariffSettingsFile>()?.Read().Provider is { } provider
             && provider != TariffProviderIds.None;
 
-        return SetupStatusEvaluator.Evaluate(fresh, _host, fromConfiguration with { Solcast = solcast, Tariff = tariff });
+        var weather = _services.GetService<WeatherKeyStore>()?.Current is not null || fromConfiguration.Weather;
+
+        return SetupStatusEvaluator.Evaluate(
+            fresh, _host, fromConfiguration with { Solcast = solcast, Tariff = tariff, Weather = weather });
     }
 
     /// <summary>

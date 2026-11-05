@@ -105,6 +105,7 @@ public sealed class SetupDocumentTests : IDisposable
             ("ChargeControl:Forecast:BatteryCapacityKWh", "9"),
             ("Solcast:ApiKey", "solcast-secret"),
             ("Solcast:ResourceId", "abcd-1234"),
+            ("Weather:ApiKey", "weather-secret"),
             ("Web:Password", "correct horse"))
             .Apply(Target());
 
@@ -124,6 +125,8 @@ public sealed class SetupDocumentTests : IDisposable
         Assert.DoesNotContain("solcast-secret", file, StringComparison.Ordinal);
         Assert.DoesNotContain("correct horse", file, StringComparison.Ordinal);
         Assert.DoesNotContain("abcd-1234", file, StringComparison.Ordinal);
+        Assert.DoesNotContain("weather-secret", file, StringComparison.Ordinal);
+        Assert.Equal("weather-secret", Secrets.Read(SecretNames.WeatherApiKey));
 
         var account = JsonSerializer.Deserialize<SolcastAccount>(Secrets.Read(SecretNames.SolcastAccount)!);
         Assert.Equal(new SolcastAccount("solcast-secret", "abcd-1234"), account);

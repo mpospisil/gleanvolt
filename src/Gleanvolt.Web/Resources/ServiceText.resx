@@ -529,4 +529,7 @@
   <data name="Discovery_AlreadyRunning" xml:space="preserve">
     <value>A search is already running.</value>
   </data>
+  <data name="Weather_EnterKey" xml:space="preserve">
+    <value>Enter the API key from your OpenWeatherMap account.</value>
+  </data>
 </root>
