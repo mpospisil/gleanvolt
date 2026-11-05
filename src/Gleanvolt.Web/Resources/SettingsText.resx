@@ -775,4 +775,49 @@
   <data name="SolcastIntroSetupMode" xml:space="preserve">
     <value>Solcast's forecast for this roof, used by Forecasted and Targeted. In setup mode a save only stores the account; the forecast is fetched when Gleanvolt starts, so the setup spends none of the day's calls.</value>
   </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="WeatherTopic" xml:space="preserve">
+    <value>the weather</value>
+  </data>
+  <data name="WeatherTip1" xml:space="preserve">
+    <value>The weather comes from a free OpenWeatherMap account: create a key under API keys on openweathermap.org. A new key can take up to a couple of hours to start working.</value>
+  </data>
+  <data name="WeatherTip2" xml:space="preserve">
+    <value>A key saved here overrides {0} in {1}. Remove it to use the environment's key again.</value>
+  </data>
+  <data name="WeatherIntro" xml:space="preserve">
+    <value>The weather each charging session ran in — temperature, cloud cover, sunrise and sunset — recorded with the session for the site's location. Optional. A save applies at once and checks the key with one call.</value>
+  </data>
+  <data name="WeatherReadOnly" xml:space="preserve">
+    <value>Read-only, because this UI has no login, and the key is a secret. Configure {0} ({1}) and the key becomes editable here; until then, set {2} in {3} and restart.</value>
+  </data>
+  <data name="SourceEnvironmentWeather" xml:space="preserve">
+    <value>From the environment (WEATHER_API_KEY)</value>
+  </data>
+  <data name="NotConfiguredNoWeather" xml:space="preserve">
+    <value>Not configured — sessions are recorded without the weather.</value>
+  </data>
+  <data name="WeatherConfigured" xml:space="preserve">
+    <value>Configured — each charging session records the weather it ran in.</value>
+  </data>
+  <data name="SaveAndCheck" xml:space="preserve">
+    <value>Save and check</value>
+  </data>
+  <data name="WeatherKeyAccepted" xml:space="preserve">
+    <value>Saved, and OpenWeatherMap accepted the key.</value>
+  </data>
+  <data name="WeatherKeyRefused" xml:space="preserve">
+    <value>Saved, but OpenWeatherMap refused the key. A new key can take up to a couple of hours to start working; if this one is older, check it on openweathermap.org.</value>
+  </data>
+  <data name="WeatherCheckFailed" xml:space="preserve">
+    <value>Saved, but OpenWeatherMap could not be reached to check the key. It is tried again with the next charging session.</value>
+  </data>
+  <data name="WeatherRemovedEnvironment" xml:space="preserve">
+    <value>Removed. The key from the environment is in use again.</value>
+  </data>
+  <data name="WeatherRemovedNone" xml:space="preserve">
+    <value>Removed. Sessions are recorded without the weather.</value>
+  </data>
 </root>

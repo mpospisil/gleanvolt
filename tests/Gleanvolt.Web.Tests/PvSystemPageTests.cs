@@ -148,6 +148,7 @@ public class PvSystemPageTests : BunitContext
 
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
+        context.Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
 
         // The tariff form's, with no tariff set up.
         context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());

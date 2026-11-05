@@ -309,7 +309,12 @@ public static class GleanvoltHostingExtensions
             client.Timeout = options.RequestTimeout;
         });
 
-        services.AddSingleton<IWeatherService, OpenWeatherMapService>();
+        // The key itself can also be saved on Settings, which wins over Weather__ApiKey and is read on
+        // every call -- the same arrangement as the Solcast account.
+        services.AddSingleton<WeatherKeyStore>();
+        services.AddSingleton<OpenWeatherMapService>();
+        services.AddSingleton<IWeatherService>(provider => provider.GetRequiredService<OpenWeatherMapService>());
+        services.AddSingleton<IWeatherKeyEditor, WeatherKeyEditor>();
 
         // Forecast-driven EV charge control (issue #10). Disabled by default -- it writes to the
         // charger and the control register addresses must be verified first (see EvChargerRegister).

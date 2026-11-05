@@ -148,7 +148,7 @@ public static class SetupStatusEvaluator
             missing.Add(OptionalSetting.Mqtt);
         }
 
-        if (string.IsNullOrWhiteSpace(configuration["Weather:ApiKey"]))
+        if (!present.Weather)
         {
             missing.Add(OptionalSetting.Weather);
         }
@@ -173,10 +173,11 @@ public sealed record SetupHost(TimeZoneInfo LocalZone, bool IsWindows)
 }
 
 /// <summary>Which optional settings are in place.</summary>
-public sealed record OptionalSettings(bool Solcast, bool Ev, bool Tariff)
+public sealed record OptionalSettings(bool Solcast, bool Ev, bool Tariff, bool Weather = false)
 {
     /// <summary>
-    /// Judged from configuration alone: a Solcast key and site in the environment, a described car.
+    /// Judged from configuration alone: a Solcast key and site in the environment, a described car, a
+    /// weather key in the environment.
     /// The tariff lives only in its own file, so configuration cannot see one.
     /// </summary>
     public static OptionalSettings FromConfiguration(IConfiguration configuration)
@@ -189,6 +190,9 @@ public sealed record OptionalSettings(bool Solcast, bool Ev, bool Tariff)
         var ev = !string.IsNullOrWhiteSpace(configuration[EvSettingKeys.Id])
             || double.TryParse(configuration[EvSettingKeys.BatteryCapacityKWh], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var capacity) && capacity > 0;
 
-        return new OptionalSettings(solcast, ev, Tariff: false);
+        var weather = !string.IsNullOrWhiteSpace(configuration["Weather:ApiKey"])
+            && configuration["Weather:ApiKey"] != "your-openweathermap-api-key";
+
+        return new OptionalSettings(solcast, ev, Tariff: false, weather);
     }
 }

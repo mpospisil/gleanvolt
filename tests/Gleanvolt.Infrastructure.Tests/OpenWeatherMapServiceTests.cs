@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.OpenWeather;
 
@@ -142,6 +143,75 @@ public sealed class OpenWeatherMapServiceTests
         Assert.Null(await service.GetCurrentAsync(Ct));
     }
 
+    [Fact]
+    public async Task AKeySavedOnSettingsIsUsedAtOnceAndWinsOverTheEnvironment()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, SampleResponse);
+        var secrets = new MemorySecrets();
+        var key = new WeatherKeyStore(secrets, Options.Create(Configured()));
+        var service = NewService(handler, key: key);
+
+        Assert.Equal(WeatherKeySource.Environment, key.Source);
+
+        Assert.True(key.Save("  page-key "));
+        await service.GetCurrentAsync(Ct);
+
+        Assert.Equal(WeatherKeySource.Page, key.Source);
+        Assert.Contains("appid=page-key", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal("page-key", secrets.Read(SecretNames.WeatherApiKey));
+
+        // Kept across a restart: a new store reads it back.
+        Assert.Equal("page-key", new WeatherKeyStore(secrets, Options.Create(Configured())).Current);
+
+        key.Clear();
+        await service.GetCurrentAsync(Ct);
+
+        Assert.Contains("appid=test-key", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Null(secrets.Read(SecretNames.WeatherApiKey));
+    }
+
+    [Fact]
+    public async Task AKeySavedWithNoneInTheEnvironmentSwitchesTheWeatherOn()
+    {
+        var key = new WeatherKeyStore(new MemorySecrets(), Options.Create(new WeatherOptions()));
+        var service = NewService(new StubHandler(HttpStatusCode.OK, SampleResponse), key: key);
+
+        Assert.False(service.IsConfigured);
+
+        key.Save("page-key");
+
+        Assert.True(service.IsConfigured);
+        Assert.NotNull(await service.GetCurrentAsync(Ct));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.OK, WeatherKeyCheck.Accepted)]
+    [InlineData(HttpStatusCode.Unauthorized, WeatherKeyCheck.Refused)]
+    [InlineData(HttpStatusCode.TooManyRequests, WeatherKeyCheck.Failed)]
+    public async Task ACheckSaysWhatOpenWeatherMapMadeOfTheKey(HttpStatusCode status, WeatherKeyCheck expected)
+    {
+        var handler = new StubHandler(status, SampleResponse);
+
+        Assert.Equal(expected, await NewService(handler).CheckKeyAsync("new-key", Ct));
+        Assert.Contains("appid=new-key", handler.LastRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task ACheckWorksBeforeTheSiteHasALocation()
+    {
+        // In setup mode the location saved a moment ago is not in use yet; any place answers for a key.
+        var handler = new StubHandler(HttpStatusCode.OK, SampleResponse);
+
+        Assert.Equal(WeatherKeyCheck.Accepted, await NewService(handler, site: SiteAt(null, null)).CheckKeyAsync("k", Ct));
+        Assert.Contains("lat=0&lon=0", handler.LastRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task ACheckThatCannotReachTheProviderSaysSoRatherThanThrowing()
+    {
+        Assert.Equal(WeatherKeyCheck.Failed, await NewService(new ThrowingHandler()).CheckKeyAsync("k", Ct));
+    }
+
     private static WeatherOptions Configured() => new() { ApiKey = "test-key" };
 
     // The site the reading is about. Only its coordinates matter here -- the provider is asked about a
@@ -164,12 +234,14 @@ public sealed class OpenWeatherMapServiceTests
     private static OpenWeatherMapService NewService(
         HttpMessageHandler handler,
         Func<WeatherOptions, WeatherOptions>? configure = null,
-        PvSystemInfo? site = null)
+        PvSystemInfo? site = null,
+        WeatherKeyStore? key = null)
     {
         var options = configure is null ? Configured() : configure(Configured());
         return new OpenWeatherMapService(
             new SingleClientFactory(handler, options.BaseUrl),
             Options.Create(options),
+            key ?? new WeatherKeyStore(new MemorySecrets(), Options.Create(options)),
             site ?? SiteAt(49.2678029, 16.5294859),
             NullLogger<OpenWeatherMapService>.Instance);
     }
@@ -196,6 +268,23 @@ public sealed class OpenWeatherMapServiceTests
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
             });
         }
+    }
+
+    private sealed class MemorySecrets : ISecretStore
+    {
+        private readonly Dictionary<string, string> _values = [];
+
+        public string? Read(string name) => _values.GetValueOrDefault(name);
+
+        public bool Write(string name, string value)
+        {
+            _values[name] = value;
+            return true;
+        }
+
+        public bool Delete(string name) => _values.Remove(name) || true;
+
+        public string Describe() => "memory";
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler

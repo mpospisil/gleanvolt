@@ -60,11 +60,11 @@
   <data name="ExtrasIntro" xml:space="preserve">
     <value>Optional: when grid energy is cheaper, and the links to Home Assistant and the weather.</value>
   </data>
-  <data name="MqttAndWeather" xml:space="preserve">
-    <value>Home Assistant and the weather</value>
+  <data name="HomeAssistant" xml:space="preserve">
+    <value>Home Assistant</value>
   </data>
-  <data name="MqttAndWeatherText" xml:space="preserve">
-    <value>These are set in {0} for now; the {1} says how. They can be added at any time and never hold anything up.</value>
+  <data name="HomeAssistantText" xml:space="preserve">
+    <value>The link to Home Assistant (MQTT) is set in {0} for now; the {1} says how. It can be added at any time and never holds anything up.</value>
     <comment>{0} is the file name .env, {1} a link whose text is README.</comment>
   </data>
   <data name="FinishTitle" xml:space="preserve">

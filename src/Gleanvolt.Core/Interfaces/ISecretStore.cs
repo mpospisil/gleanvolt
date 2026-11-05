@@ -64,4 +64,7 @@ public static class SecretNames
 
     /// <summary>The Solcast API key and rooftop site, when entered on Settings rather than in the environment (#286).</summary>
     public const string SolcastAccount = "solcast-account";
+
+    /// <summary>The OpenWeatherMap API key, when entered on Settings rather than in the environment.</summary>
+    public const string WeatherApiKey = "weather-api-key";
 }

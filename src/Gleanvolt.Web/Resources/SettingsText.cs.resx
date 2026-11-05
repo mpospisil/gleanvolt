@@ -762,4 +762,49 @@
   <data name="SolcastIntroSetupMode" xml:space="preserve">
     <value>Předpověď Solcast pro tuto střechu, kterou používají režimy Forecasted a Targeted. V režimu nastavení se účet jen uloží; předpověď se stáhne až po spuštění Gleanvoltu, takže nastavení nespotřebuje žádný z denních dotazů.</value>
   </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Počasí</value>
+  </data>
+  <data name="WeatherTopic" xml:space="preserve">
+    <value>počasí</value>
+  </data>
+  <data name="WeatherTip1" xml:space="preserve">
+    <value>Počasí pochází z bezplatného účtu OpenWeatherMap: klíč vytvoříte v sekci API keys na openweathermap.org. Nový klíč může začít fungovat až za několik hodin.</value>
+  </data>
+  <data name="WeatherTip2" xml:space="preserve">
+    <value>Klíč uložený tady má přednost před {0} v {1}. Když ho odstraníte, znovu se použije klíč z prostředí.</value>
+  </data>
+  <data name="WeatherIntro" xml:space="preserve">
+    <value>Počasí, za kterého každé nabíjení proběhlo — teplota, oblačnost, východ a západ slunce — se zaznamená k nabíjení pro polohu instalace. Volitelné. Uložení platí hned a ověří klíč jedním dotazem.</value>
+  </data>
+  <data name="WeatherReadOnly" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení a klíč je tajný. Nastavte {0} ({1}) a klíč půjde upravovat tady; do té doby nastavte {2} v {3} a restartujte.</value>
+  </data>
+  <data name="SourceEnvironmentWeather" xml:space="preserve">
+    <value>Z prostředí (WEATHER_API_KEY)</value>
+  </data>
+  <data name="NotConfiguredNoWeather" xml:space="preserve">
+    <value>Nenastaveno — nabíjení se zaznamenává bez počasí.</value>
+  </data>
+  <data name="WeatherConfigured" xml:space="preserve">
+    <value>Nastaveno — každé nabíjení zaznamená počasí, za kterého proběhlo.</value>
+  </data>
+  <data name="SaveAndCheck" xml:space="preserve">
+    <value>Uložit a ověřit</value>
+  </data>
+  <data name="WeatherKeyAccepted" xml:space="preserve">
+    <value>Uloženo a OpenWeatherMap klíč přijal.</value>
+  </data>
+  <data name="WeatherKeyRefused" xml:space="preserve">
+    <value>Uloženo, ale OpenWeatherMap klíč odmítl. Nový klíč může začít fungovat až za několik hodin; pokud je tento starší, zkontrolujte ho na openweathermap.org.</value>
+  </data>
+  <data name="WeatherCheckFailed" xml:space="preserve">
+    <value>Uloženo, ale OpenWeatherMap nebyl dostupný, aby klíč ověřil. Zkusí se znovu při dalším nabíjení.</value>
+  </data>
+  <data name="WeatherRemovedEnvironment" xml:space="preserve">
+    <value>Odstraněno. Znovu se používá klíč z prostředí.</value>
+  </data>
+  <data name="WeatherRemovedNone" xml:space="preserve">
+    <value>Odstraněno. Nabíjení se zaznamenává bez počasí.</value>
+  </data>
 </root>

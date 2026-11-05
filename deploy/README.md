@@ -225,6 +225,12 @@ PV_LATITUDE=49.267803          # your site, in decimal degrees
 PV_LONGITUDE=16.529486
 ```
 
+Or leave `.env` alone and paste the key on **Settings → Installation → Weather** (or the setup
+wizard's Extras step). A key saved there is kept in the secret store, wins over `WEATHER_API_KEY`, and
+is used from the next session without a restart; the save checks it with one call. A new
+OpenWeatherMap key can take a couple of hours to start working, so a refusal right after creating it
+is expected.
+
 The key is free: this makes **two API calls per charging session**, a handful a day, which no
 OpenWeatherMap plan charges for. Leave the key out, or the coordinates unset, and the controller makes
 no weather call at all — sessions are simply recorded without it, which is also what every session
