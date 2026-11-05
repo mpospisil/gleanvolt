@@ -5,7 +5,7 @@
 @*
     The REST API: on or off, and a key per client. Read once at startup -- the routes are mapped or not
     -- so like the installation's form, a save is for the next start. A key is made here rather than
-    typed: 32 random bytes, the same as `openssl rand -hex 32`, kept in the secret store under the
+    typed: 24 random letters and digits (about 143 bits), kept in the secret store under the
     client's name, and shown behind Secret like the keys from the environment.
 
     Turning the API on needs a key first, and the last key of an API that is on cannot be removed: the

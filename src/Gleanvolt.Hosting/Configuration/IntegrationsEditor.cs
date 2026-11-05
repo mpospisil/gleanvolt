@@ -44,6 +44,12 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(6);
 
+    // A created API key: 24 letters and digits, about 143 bits -- beyond guessing against a server, and
+    // short enough to paste into a client's settings without scrolling. No punctuation, so a
+    // double-click selects all of it.
+    private const string KeyAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    private const int KeyLength = 24;
+
     private readonly IConfigurationRoot? _configuration;
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IntegrationsSnapshot _running;
@@ -242,7 +248,7 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
             }
 
             var saved = IntegrationSecrets.ReadApiKeys(_secrets);
-            var key = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+            var key = RandomNumberGenerator.GetString(KeyAlphabet, KeyLength);
             saved[name] = key;
 
             if (!IntegrationSecrets.WriteApiKeys(_secrets, saved))
