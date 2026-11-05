@@ -1067,7 +1067,7 @@ deadline.
     "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
     "UntilFull": false,              // boot value of "Until full": one session over several days
     "UntilFullSessionPath": "data/until-full.json", // such a session, kept so a restart resumes it
-    "BatteryCapacityKWh": 9.0,       // REQUIRED, no default: USABLE capacity (see the warning below), not nameplate
+    "BatteryCapacityKWh": 10.0,      // REQUIRED, no default: USABLE capacity (see the warning below), not nameplate
     "ChargeEfficiency": 0.95,
     "BaselineHouseLoadWatts": 350,   // house load for an hour neither the history nor the live profile knows yet
     "HouseLoadHistoryDays": 14,      // energy history the house-load profile is rebuilt from at startup, 0 = off
@@ -1104,9 +1104,9 @@ deadline.
 > Targeted books nothing for the battery, and the log says so at startup. Under Docker it is
 > `HOME_BATTERY_CAPACITY_KWH` in `.env`.
 >
-> The reference install is a **SolaX T-BAT H 2.5** stack — 10 kWh nominal, so **9.0 kWh** usable at the
-> ~90 % depth of discharge these packs allow (confirm the exact figure against your datasheet). The
-> distinction matters because the inverter reports SOC across the range it will actually cycle: 0–100 %
+> The reference install is a **SolaX T-BAT H 2.5** stack of **10 kWh**, and runs with 10. Check your
+> datasheet for the *usable* figure: a pack that only cycles ~90 % of its nameplate is ~9 kWh usable
+> on a 10 kWh label. The distinction matters because the inverter reports SOC across the range it will actually cycle: 0–100 %
 > spans the *usable* energy, not the nameplate.
 >
 > **If you must guess, guess high.** Both uses move in the safe direction when the figure is
