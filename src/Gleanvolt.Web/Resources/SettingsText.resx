@@ -820,4 +820,82 @@
   <data name="WeatherRemovedNone" xml:space="preserve">
     <value>Removed. Sessions are recorded without the weather.</value>
   </data>
+  <data name="HomeAssistantLink" xml:space="preserve">
+    <value>Home Assistant (MQTT)</value>
+  </data>
+  <data name="MqttEditorIntro" xml:space="preserve">
+    <value>Publishes Gleanvolt's state and controls to Home Assistant through an MQTT broker — usually Home Assistant's Mosquitto add-on. Read once at startup, so a save applies after a restart.</value>
+  </data>
+  <data name="IntegrationsReadOnly" xml:space="preserve">
+    <value>Read-only, because this UI has no login, and these settings include secrets. Configure {0} ({1}) to edit them here; until then, change them in {2} and restart.</value>
+  </data>
+  <data name="FieldMqttEnabled" xml:space="preserve">
+    <value>Publish to Home Assistant</value>
+  </data>
+  <data name="FieldBrokerHost" xml:space="preserve">
+    <value>Broker address</value>
+  </data>
+  <data name="HintBrokerHost" xml:space="preserve">
+    <value>e.g. 192.168.1.5 or homeassistant.local</value>
+  </data>
+  <data name="FieldBrokerPort" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="FieldMqttUsername" xml:space="preserve">
+    <value>User name</value>
+  </data>
+  <data name="FieldMqttPassword" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="FieldDiscoveryPrefix" xml:space="preserve">
+    <value>Discovery prefix</value>
+  </data>
+  <data name="PasswordRestartToApply" xml:space="preserve">
+    <value>Changed · restart to apply</value>
+  </data>
+  <data name="PasswordKeptInSecretStore" xml:space="preserve">
+    <value>Kept in the secret store — {0}. Leave it empty to keep the current one.</value>
+  </data>
+  <data name="RemovePassword" xml:space="preserve">
+    <value>Remove the saved password</value>
+  </data>
+  <data name="PasswordRemoved" xml:space="preserve">
+    <value>Password removed. Restart the controller to apply it.</value>
+  </data>
+  <data name="TestConnection" xml:space="preserve">
+    <value>Test connection</value>
+  </data>
+  <data name="Testing" xml:space="preserve">
+    <value>Testing…</value>
+  </data>
+  <data name="ApiAccess" xml:space="preserve">
+    <value>API access</value>
+  </data>
+  <data name="ApiEditorIntro" xml:space="preserve">
+    <value>A REST API for scripts, dashboards and AI assistants, at /api/v1 on the web UI's port. Each client gets its own key, and what it does is recorded under the key's name. Read once at startup, so a change applies after a restart.</value>
+  </data>
+  <data name="FieldApiEnabled" xml:space="preserve">
+    <value>Turn the API on</value>
+  </data>
+  <data name="NoApiKeys" xml:space="preserve">
+    <value>No keys yet. Create one before turning the API on.</value>
+  </data>
+  <data name="KeyFromNextStart" xml:space="preserve">
+    <value>accepted from the next start</value>
+  </data>
+  <data name="ApiKeyName" xml:space="preserve">
+    <value>New key for</value>
+  </data>
+  <data name="HintApiKeyName" xml:space="preserve">
+    <value>e.g. home-assistant or claude</value>
+  </data>
+  <data name="CreateKey" xml:space="preserve">
+    <value>Create key</value>
+  </data>
+  <data name="KeyCreated" xml:space="preserve">
+    <value>Key created for {0}. It is accepted from the next start; copy it from the table above.</value>
+  </data>
+  <data name="KeyRemoved" xml:space="preserve">
+    <value>Key for {0} removed. It is refused from the next start.</value>
+  </data>
 </root>

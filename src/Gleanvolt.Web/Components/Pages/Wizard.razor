@@ -59,10 +59,8 @@
         <p class="muted">@SetupText.ExtrasIntro</p>
         <TariffEditorForm />
         <WeatherKeyForm />
-        <section class="controls" id="wizard-extras">
-            <div class="section-head"><h2>@SetupText.HomeAssistant</h2></div>
-            <p class="muted">@Localized.Rich(SetupText.HomeAssistantText, @<code>.env</code>, @<a href="https://github.com/mpospisil/gleanvolt#configuration">README</a>)</p>
-        </section>
+        <MqttEditorForm />
+        <ApiEditorForm />
         break;
 
     default:

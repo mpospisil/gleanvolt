@@ -532,4 +532,40 @@
   <data name="Weather_EnterKey" xml:space="preserve">
     <value>Enter the API key from your OpenWeatherMap account.</value>
   </data>
+  <data name="Mqtt_TestConnected" xml:space="preserve">
+    <value>Connected to {0}.</value>
+  </data>
+  <data name="Mqtt_TestBadCredentials" xml:space="preserve">
+    <value>{0} answered, and refused the user name or password.</value>
+  </data>
+  <data name="Mqtt_TestRefused" xml:space="preserve">
+    <value>{0} answered, and refused the connection ({1}).</value>
+  </data>
+  <data name="Config_MqttNoBroker" xml:space="preserve">
+    <value>Home Assistant needs the MQTT broker's address.</value>
+  </data>
+  <data name="Config_MqttBadPort" xml:space="preserve">
+    <value>The broker port ('{0}') must be a number from 1 to 65535.</value>
+  </data>
+  <data name="Config_MqttNeedsPvId" xml:space="preserve">
+    <value>Home Assistant needs the installation's id (Installation → Id): it is the topic segment this system publishes under, so two installations on one broker do not overwrite each other.</value>
+  </data>
+  <data name="Config_NotABoolean" xml:space="preserve">
+    <value>'{0}' is not true or false.</value>
+  </data>
+  <data name="Config_ApiNoKeys" xml:space="preserve">
+    <value>The API cannot be turned on without a key: create one below first.</value>
+  </data>
+  <data name="Config_ApiKeyBadName" xml:space="preserve">
+    <value>'{0}' is not a usable key name: letters, digits, '-', '_' and '.', up to 40 characters.</value>
+  </data>
+  <data name="Config_ApiKeyExists" xml:space="preserve">
+    <value>There is already a key called '{0}'.</value>
+  </data>
+  <data name="Config_ApiKeyNotHere" xml:space="preserve">
+    <value>'{0}' is not a key saved here; a key from the environment is removed there.</value>
+  </data>
+  <data name="Config_ApiLastKey" xml:space="preserve">
+    <value>The API is on, and this is its last key. Turn the API off first, or create another key.</value>
+  </data>
 </root>

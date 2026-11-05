@@ -149,6 +149,7 @@ public class PvSystemPageTests : BunitContext
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         context.Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
+        context.Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
 
         // The tariff form's, with no tariff set up.
         context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
@@ -347,8 +348,9 @@ public class PvSystemPageTests : BunitContext
         var page = Render(mqtt: Mqtt(
             homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
 
-        // The MQTT section only: the edit form above it names Web__PasswordHash for its own reason.
-        var mqtt = page.Markup[page.Markup.IndexOf("<h2>MQTT</h2>", StringComparison.Ordinal)..];
+        // The MQTT section only: the edit forms around it name Web__PasswordHash for their own reason.
+        var start = page.Markup.IndexOf("<h2>MQTT</h2>", StringComparison.Ordinal);
+        var mqtt = page.Markup[start..page.Markup.IndexOf("id=\"api-editor\"", start, StringComparison.Ordinal)];
         Assert.DoesNotContain("Web__PasswordHash", mqtt);
         Assert.Contains("anonymous", mqtt);
     }

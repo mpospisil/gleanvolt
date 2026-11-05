@@ -1115,6 +1115,83 @@ internal static class TestForecasts
 /// The Solcast account on Settings, held in memory. A save records what it was given and applies
 /// <see cref="NextStatus"/>, as the real editor's fetch would.
 /// </summary>
+internal sealed class FakeIntegrationsEditor : IIntegrationsEditor
+{
+    public Dictionary<string, string> Stored { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, string> Running { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public string? Password { get; set; }
+
+    public List<ApiKeyEntry> Keys { get; } = [];
+
+    public List<(IReadOnlyDictionary<string, string> Values, string? Password)> Saves { get; } = [];
+
+    public List<(string Host, int Port, string? Username, string? Password)> Tests { get; } = [];
+
+    public SettingsSaveResult NextResult { get; set; } = SettingsSaveResult.Success;
+
+    public MqttTestResult NextTest { get; set; } = new(true, "Connected to 192.168.1.5:1883.");
+
+    public IntegrationSettings Read() => new(
+        "data/pv-system.json",
+        [.. IntegrationSettingKeys.Plain.Select(key => new ConfiguredSetting(
+            key,
+            Stored.GetValueOrDefault(key),
+            Running.GetValueOrDefault(key),
+            Stored.ContainsKey(key) ? SettingSource.WebUi : SettingSource.Default,
+            string.Empty,
+            null))],
+        new SecretSettingState(Password is not null, Password is null ? SettingSource.Default : SettingSource.SecretStore, Password is not null),
+        [.. Keys],
+        "an owner-only file");
+
+    public SettingsSaveResult Save(IReadOnlyDictionary<string, string> values, string? mqttPassword = null)
+    {
+        Saves.Add((new Dictionary<string, string>(values), mqttPassword));
+        if (!NextResult.Saved)
+        {
+            return NextResult;
+        }
+
+        foreach (var (key, value) in values)
+        {
+            Stored[key] = value;
+        }
+
+        if (mqttPassword is not null)
+        {
+            Password = mqttPassword.Length == 0 ? null : mqttPassword;
+        }
+
+        return NextResult;
+    }
+
+    public SettingsSaveResult Revert(string key)
+    {
+        Stored.Remove(key);
+        return SettingsSaveResult.Success;
+    }
+
+    public Task<MqttTestResult> TestMqttAsync(string host, int port, string? username, string? password, CancellationToken cancellationToken = default)
+    {
+        Tests.Add((host, port, username, password));
+        return Task.FromResult(NextTest);
+    }
+
+    public ApiKeyCreateResult CreateApiKey(string name)
+    {
+        Keys.Add(new ApiKeyEntry(name, "0123456789abcdef", SettingSource.SecretStore, true));
+        return new ApiKeyCreateResult(SettingsSaveResult.Success, "0123456789abcdef");
+    }
+
+    public SettingsSaveResult RemoveApiKey(string name)
+    {
+        Keys.RemoveAll(key => key.Name == name);
+        return SettingsSaveResult.Success;
+    }
+}
+
 internal sealed class FakeWeatherKeyEditor : IWeatherKeyEditor
 {
     public WeatherKeySettings Settings { get; set; } = new(WeatherKeySource.None, string.Empty, false, "an owner-only file");

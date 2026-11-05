@@ -160,6 +160,10 @@ MQTT_USERNAME=solax            # an account on *that* broker
 MQTT_PASSWORD=<its password>
 ```
 
+The Home Assistant link can also be set on **Settings → Installation → Home Assistant (MQTT)**, which
+wins over these lines and applies on the next start; its **Test connection** checks the broker first.
+It covers Home Assistant's link only: the car's link still takes the broker from these lines.
+
 `PV_ID` is required once Home Assistant is enabled — see [`.env.example`](.env.example). Deploy with
 `./deploy/deploy-controller-only.sh`; skip step 7, which is about this stack's own broker. The
 entities appear in the Home Assistant that broker serves, through its MQTT integration's discovery,
@@ -471,6 +475,9 @@ openssl rand -hex 32
 API_ENABLED=true
 API_KEY=3f1c...   # the generated secret; Api__Keys__client in docker-compose.yml
 ```
+
+Or skip `.env`: turn it on and create a key on **Settings → Installation → API access**, then restart
+on Health. The key is kept in the secret store under the data volume.
 
 Redeploy, and the API answers on the port the UI already uses (`:8090`), under `/api/v1/`, with the
 document at `/api/v1/openapi.json`:

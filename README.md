@@ -1979,6 +1979,14 @@ HomeAssistant__Username=<user>
 HomeAssistant__Password=<pass>
 ```
 
+Or set the link on **Settings → Installation → Home Assistant (MQTT)**, or in the setup wizard's Extras
+step: on/off, the broker's address and port, the user name, the password and the discovery prefix.
+The plain settings go to the overrides file and the password to the secret store; both win over
+`.env` and apply on the next start, since the worker connects once with what it was given. **Test
+connection** connects once with what the form holds, under a client id of its own so it never knocks
+the running link off the broker. Turning the link on needs the installation's `Pv:Id` (below), and
+the form says so rather than the next start.
+
 All of it is **readable back** at [`/pv-system`](#pv-system--the-installation-and-editing-it) — including
 the topic prefix, which no single setting spells out — so "what is this controller publishing, and
 where?" does not need an ssh session and a `grep` of `.env`. The password itself is shown there only
@@ -3125,8 +3133,8 @@ or a closed browser loses nothing that was saved.
 3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it; the forecast is
    fetched when Gleanvolt starts, so the setup spends none of the day's Solcast calls.
 4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
-5. **Extras** (optional). The tariff and the OpenWeatherMap key. Home Assistant (MQTT) is still set in
-   `.env`.
+5. **Extras** (optional). The tariff, the OpenWeatherMap key, the Home Assistant (MQTT) link and the
+   API with its keys.
 6. **Finish.** What is still missing, each with a link to its step, the optional settings not yet set,
    and **Start Gleanvolt**, which restarts it out of setup mode.
 
@@ -3332,6 +3340,13 @@ variable, exactly like the broker password and the Solcast key:
 Api__Enabled=true
 Api__Keys__claude-mcp=$(openssl rand -hex 32)
 ```
+
+Or on **Settings → Installation → API access**, or in the setup wizard's Extras step: type the
+client's name and **Create key** makes one the way `openssl rand -hex 32` does, keeps it in the secret
+store, and lists it beside the environment's keys (shown behind the login, with Copy). A key saved
+there under the same name as one in `.env` wins. The API cannot be turned on there without a key, and
+its last key cannot be removed while it is on, so the next start never meets a keyless API. Like
+everything the API reads, a change applies on the next start.
 
 The web UI's password is hashed because it is a password a *human* chose and may have reused; these
 are generated, single-purpose and high-entropy, and a slow KDF on every request would buy nothing

@@ -807,4 +807,82 @@
   <data name="WeatherRemovedNone" xml:space="preserve">
     <value>Odstraněno. Nabíjení se zaznamenává bez počasí.</value>
   </data>
+  <data name="HomeAssistantLink" xml:space="preserve">
+    <value>Home Assistant (MQTT)</value>
+  </data>
+  <data name="MqttEditorIntro" xml:space="preserve">
+    <value>Publikuje stav a ovládání Gleanvoltu do Home Assistant přes MQTT broker — obvykle doplněk Mosquitto v Home Assistant. Načítá se jednou při startu, takže uložené nastavení začne platit po restartu.</value>
+  </data>
+  <data name="IntegrationsReadOnly" xml:space="preserve">
+    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení a nastavení obsahuje tajné údaje. Nastavte {0} ({1}) a půjde upravovat tady; do té doby ho měňte v {2} a restartujte.</value>
+  </data>
+  <data name="FieldMqttEnabled" xml:space="preserve">
+    <value>Publikovat do Home Assistant</value>
+  </data>
+  <data name="FieldBrokerHost" xml:space="preserve">
+    <value>Adresa brokeru</value>
+  </data>
+  <data name="HintBrokerHost" xml:space="preserve">
+    <value>např. 192.168.1.5 nebo homeassistant.local</value>
+  </data>
+  <data name="FieldBrokerPort" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="FieldMqttUsername" xml:space="preserve">
+    <value>Uživatelské jméno</value>
+  </data>
+  <data name="FieldMqttPassword" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="FieldDiscoveryPrefix" xml:space="preserve">
+    <value>Prefix pro discovery</value>
+  </data>
+  <data name="PasswordRestartToApply" xml:space="preserve">
+    <value>Změněno · projeví se po restartu</value>
+  </data>
+  <data name="PasswordKeptInSecretStore" xml:space="preserve">
+    <value>Uloženo v úložišti tajných údajů — {0}. Když pole necháte prázdné, zůstane současné heslo.</value>
+  </data>
+  <data name="RemovePassword" xml:space="preserve">
+    <value>Odstranit uložené heslo</value>
+  </data>
+  <data name="PasswordRemoved" xml:space="preserve">
+    <value>Heslo odstraněno. Projeví se po restartu správce nabíjení.</value>
+  </data>
+  <data name="TestConnection" xml:space="preserve">
+    <value>Vyzkoušet připojení</value>
+  </data>
+  <data name="Testing" xml:space="preserve">
+    <value>Zkouším…</value>
+  </data>
+  <data name="ApiAccess" xml:space="preserve">
+    <value>Přístup k API</value>
+  </data>
+  <data name="ApiEditorIntro" xml:space="preserve">
+    <value>REST API pro skripty, dashboardy a AI asistenty, na /api/v1 na portu webového rozhraní. Každý klient má vlastní klíč a vše, co udělá, se zaznamená pod názvem klíče. Načítá se jednou při startu, takže změna začne platit po restartu.</value>
+  </data>
+  <data name="FieldApiEnabled" xml:space="preserve">
+    <value>Zapnout API</value>
+  </data>
+  <data name="NoApiKeys" xml:space="preserve">
+    <value>Zatím žádné klíče. Před zapnutím API nějaký vytvořte.</value>
+  </data>
+  <data name="KeyFromNextStart" xml:space="preserve">
+    <value>platí od příštího startu</value>
+  </data>
+  <data name="ApiKeyName" xml:space="preserve">
+    <value>Nový klíč pro</value>
+  </data>
+  <data name="HintApiKeyName" xml:space="preserve">
+    <value>např. home-assistant nebo claude</value>
+  </data>
+  <data name="CreateKey" xml:space="preserve">
+    <value>Vytvořit klíč</value>
+  </data>
+  <data name="KeyCreated" xml:space="preserve">
+    <value>Klíč pro {0} vytvořen. Platí od příštího startu; zkopírujte ho z tabulky výše.</value>
+  </data>
+  <data name="KeyRemoved" xml:space="preserve">
+    <value>Klíč pro {0} odstraněn. Od příštího startu bude odmítnut.</value>
+  </data>
 </root>

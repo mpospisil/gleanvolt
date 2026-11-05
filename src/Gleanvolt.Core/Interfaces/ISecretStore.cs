@@ -67,4 +67,10 @@ public static class SecretNames
 
     /// <summary>The OpenWeatherMap API key, when entered on Settings rather than in the environment.</summary>
     public const string WeatherApiKey = "weather-api-key";
+
+    /// <summary>The Home Assistant MQTT broker password, when entered on Settings.</summary>
+    public const string MqttPassword = "mqtt-password";
+
+    /// <summary>The REST API keys created on Settings, as a JSON object of name to key.</summary>
+    public const string ApiKeys = "api-keys";
 }

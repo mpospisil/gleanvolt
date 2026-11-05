@@ -1,0 +1,237 @@
+@inject IIntegrationsEditor Editor
+@inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+
+@*
+    The REST API: on or off, and a key per client. Read once at startup -- the routes are mapped or not
+    -- so like the installation's form, a save is for the next start. A key is made here rather than
+    typed: 32 random bytes, the same as `openssl rand -hex 32`, kept in the secret store under the
+    client's name, and shown behind Secret like the keys from the environment.
+
+    Turning the API on needs a key first, and the last key of an API that is on cannot be removed: the
+    next start refuses a keyless API rather than leaving control open, and the page says so before the
+    restart would.
+*@
+
+<section class="controls pv-editor api-editor" id="api-editor">
+    <div class="section-head">
+        <h2>@SettingsText.ApiAccess</h2>
+    </div>
+
+    <p class="muted">@SettingsText.ApiEditorIntro</p>
+
+    @if (Pending > 0)
+    {
+        <div class="restart-banner" id="api-pending" role="status">
+            <span>
+                <strong>@Localized.Format(Localized.Plural(Pending, SettingsText.ChangesSaved_One, SettingsText.ChangesSaved_Few, SettingsText.ChangesSaved_Other), Pending)</strong>
+                @SettingsText.NotRunningUntilRestart
+            </span>
+            <a class="button-link" href="/settings/health">@SettingsText.RestartOnHealth</a>
+        </div>
+    }
+
+    @if (_settings.Unavailable is { } unavailable)
+    {
+        <p class="error" id="api-unavailable">@unavailable</p>
+    }
+    else if (ReadOnly)
+    {
+        <p class="muted" id="api-readonly">
+            @Localized.Rich(SettingsText.IntegrationsReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>.env</code>)
+        </p>
+    }
+
+    <div class="control">
+        <label class="check">
+            <input type="checkbox" id="api-enabled" disabled="@(!Editable || _busy)"
+                   checked="@_enabled" @onchange="Toggle" />
+            @SettingsText.FieldApiEnabled
+        </label>
+        <SettingPending Setting="_settings[IntegrationSettingKeys.ApiEnabled]" Editable="Editable" OnRevert="Revert" />
+    </div>
+
+    <h3>@SettingsText.Keys</h3>
+
+    @if (_settings.ApiKeys.Count == 0)
+    {
+        <p class="muted" id="api-no-keys">@SettingsText.NoApiKeys</p>
+    }
+    else
+    {
+        <table class="sessions" id="api-keys">
+            <thead>
+                <tr>
+                    <th>@SettingsText.Name</th>
+                    <th>@SettingsText.Key</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var key in _settings.ApiKeys)
+                {
+                    <tr>
+                        <td>
+                            <code>@key.Name</code>
+                            <div class="hint">
+                                @SettingSources.Name(key.Source)
+                                @if (key.IsPending)
+                                {
+                                    <text> · @SettingsText.KeyFromNextStart</text>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (ReadOnly)
+                            {
+                                <span class="muted">@SettingsText.Configured</span>
+                            }
+                            else
+                            {
+                                <Secret Value="@key.Key" />
+                            }
+                        </td>
+                        <td>
+                            @if (Editable && key.Source == SettingSource.SecretStore)
+                            {
+                                <button type="button" class="link" disabled="@_busy" @onclick="() => Remove(key.Name)">@SettingsText.Remove</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (Editable)
+    {
+        <div class="pv-fields">
+            <div class="pv-field">
+                <label for="api-key-name">@SettingsText.ApiKeyName</label>
+                <input id="api-key-name" type="text" spellcheck="false" autocomplete="off"
+                       placeholder="@SettingsText.HintApiKeyName"
+                       disabled="@_busy"
+                       value="@_name"
+                       @oninput="e => { _name = e.Value?.ToString() ?? string.Empty; Touch(); }" />
+            </div>
+        </div>
+
+        <div class="control actions">
+            <button type="button" class="primary" id="api-create-key" disabled="@(_busy || _name.Trim().Length == 0)" @onclick="Create">
+                @SettingsText.CreateKey
+            </button>
+        </div>
+    }
+
+    @if (_problems.Count > 0)
+    {
+        <ul class="error" id="api-problems">
+            @foreach (var problem in _problems)
+            {
+                <li>@problem</li>
+            }
+        </ul>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="muted" id="api-message">@message</p>
+    }
+</section>
+
+@code {
+    private IntegrationSettings _settings = new(
+        string.Empty, [], new SecretSettingState(false, SettingSource.Default, false), [], string.Empty);
+
+    private bool _enabled;
+    private string _name = string.Empty;
+    private IReadOnlyList<string> _problems = [];
+    private string? _message;
+    private bool _busy;
+
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
+
+    private bool Editable => !ReadOnly && _settings.Unavailable is null;
+
+    private int Pending =>
+        _settings.PendingCount([IntegrationSettingKeys.ApiEnabled]) + _settings.ApiKeys.Count(key => key.IsPending);
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _settings = Editor.Read();
+        _enabled = bool.TryParse(_settings[IntegrationSettingKeys.ApiEnabled].Saved, out var on) && on;
+    }
+
+    private void Touch()
+    {
+        _message = null;
+        _problems = [];
+    }
+
+    // The checkbox saves at once: it is the whole of the plain setting, and a separate Save would be one
+    // more thing to forget before the restart.
+    private void Toggle(ChangeEventArgs e)
+    {
+        Touch();
+        var on = e.Value is true;
+        var result = Editor.Save(new Dictionary<string, string> { [IntegrationSettingKeys.ApiEnabled] = on ? "true" : "false" });
+
+        if (!result.Saved)
+        {
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
+            Reload();
+            return;
+        }
+
+        Reload();
+        _message = Pending > 0 ? SettingsText.SavedRestart : SettingsText.SavedRunning;
+    }
+
+    private void Create()
+    {
+        Touch();
+        var name = _name.Trim();
+        var created = Editor.CreateApiKey(name);
+
+        if (!created.Result.Saved)
+        {
+            _problems = Localized.Say(created.Result.Problems, created.Result.ProblemPhrases);
+            return;
+        }
+
+        _name = string.Empty;
+        Reload();
+        _message = Localized.Format(SettingsText.KeyCreated, name);
+    }
+
+    private void Remove(string name)
+    {
+        Touch();
+        var result = Editor.RemoveApiKey(name);
+
+        if (!result.Saved)
+        {
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
+            return;
+        }
+
+        Reload();
+        _message = Localized.Format(SettingsText.KeyRemoved, name);
+    }
+
+    private void Revert(string key)
+    {
+        Touch();
+        var result = Editor.Revert(key);
+
+        if (!result.Saved)
+        {
+            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
+            return;
+        }
+
+        Reload();
+    }
+}
