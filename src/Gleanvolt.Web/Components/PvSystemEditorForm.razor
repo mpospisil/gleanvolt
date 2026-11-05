@@ -155,8 +155,9 @@
     private static (string Group, string[] Keys)[] Groups =>
     [
         (SettingsText.GroupIdentity, [PvSystemSettingKeys.Id, PvSystemSettingKeys.Name, PvSystemSettingKeys.Address, PvSystemSettingKeys.InstallDate]),
-        (SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
+        (SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.TimeZone, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
         (SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
+        (SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
         (SettingsText.Inverter, [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
         (SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
@@ -174,6 +175,9 @@
         [PvSystemSettingKeys.CapacityKwp] = SettingsText.FieldCapacityKwp,
         [PvSystemSettingKeys.InverterCapacityKw] = SettingsText.FieldInverterCapacity,
         [PvSystemSettingKeys.LossFactor] = SettingsText.FieldLossFactor,
+        [PvSystemSettingKeys.TimeZone] = SettingsText.FieldTimeZone,
+        [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.FieldHomeBatteryCapacity,
+        [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.FieldHomeBatteryEfficiency,
         [PvSystemSettingKeys.InverterModel] = SettingsText.FieldInverterModel,
         [PvSystemSettingKeys.InverterHost] = SettingsText.FieldInverterHost,
         [PvSystemSettingKeys.InverterPort] = SettingsText.FieldInverterPort,
@@ -195,6 +199,9 @@
         [PvSystemSettingKeys.AzimuthDegrees] = SettingsText.HintAzimuth,
         [PvSystemSettingKeys.TiltDegrees] = SettingsText.HintTilt,
         [PvSystemSettingKeys.LossFactor] = SettingsText.HintLossFactor,
+        [PvSystemSettingKeys.TimeZone] = SettingsText.HintTimeZone,
+        [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.HintHomeBatteryCapacity,
+        [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.HintHomeBatteryEfficiency,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HintPhase,
         [PvSystemSettingKeys.InverterPort] = "502",
         [PvSystemSettingKeys.ChargerPort] = "502",

@@ -1,0 +1,30 @@
+@*
+    The recovery key, shown once (#301): after the first password is set, after a change from Settings
+    and after a reset. One component because the three must say the same thing about it -- that it is
+    shown only now, and what it is for -- and each says that in its own sentence above it. Copy and
+    print come with the setup wizard (#302).
+*@
+<section class="recovery-key">
+    <h2>@SharedText.RecoveryKeyTitle</h2>
+    <p>@Intro</p>
+    <p><code class="recovery-key-value" id="recovery-key">@Key</code></p>
+    <p class="muted">@SharedText.RecoveryKeyUse</p>
+    @if (ContinueHref is not null)
+    {
+        <a class="btn btn-primary" href="@ContinueHref">@ContinueText</a>
+    }
+</section>
+
+@code {
+    /// <summary>The key, as the password service formatted it.</summary>
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+
+    /// <summary>The sentence above it: why there is a new key now.</summary>
+    [Parameter, EditorRequired] public string Intro { get; set; } = "";
+
+    /// <summary>Where to go once it is saved; no button when null.</summary>
+    [Parameter] public string? ContinueHref { get; set; }
+
+    /// <summary>The button's text.</summary>
+    [Parameter] public string? ContinueText { get; set; }
+}

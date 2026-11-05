@@ -19,16 +19,15 @@ namespace Gleanvolt.Hosting.Tests;
 public class ApiSurfaceRegistrationTests
 {
     private static readonly (string Key, string? Value)[] MinimalDevices =
-    [
-        ("Pv:Inverter:Host", "127.0.0.1"),
-        ("Pv:Chargers:0:Host", "127.0.0.1"),
-    ];
+    [.. UsableSite.Settings];
 
     private static ServiceProvider Build(params (string Key, string? Value)[] settings)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
-            MinimalDevices.Concat(settings).Select(s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+            MinimalDevices.Concat(settings)
+                .GroupBy(s => s.Key)
+                .Select(group => new KeyValuePair<string, string?>(group.Key, group.Last().Value)));
         builder.Services.AddGleanvolt(builder.Configuration);
 
         return builder.Services.BuildServiceProvider();
@@ -147,8 +146,10 @@ public class ApiSurfaceRegistrationTests
     {
         // Silently ignoring it would leave a capacity the operator's file says is set and the
         // controller has stopped reading -- which makes every SOC-based target quietly wrong.
-        var error = Assert.Throws<InvalidOperationException>(
-            () => Build(("Vehicle:BatteryCapacityKWh", "77")));
+        // Headless, a retired key stops the host; with the UI on it is a setup-mode problem instead
+        // (#301), which SetupModeRegistrationTests covers.
+        var error = Assert.Throws<Core.Configuration.ConfigurationRefusedException>(
+            () => Build(("Vehicle:BatteryCapacityKWh", "77"), ("Web:Enabled", "false")));
 
         Assert.Contains("Vehicle:BatteryCapacityKWh", error.Message);
         Assert.Contains("Ev:Vehicles:0:BatteryCapacityKWh", error.Message);
@@ -196,7 +197,8 @@ public class ApiSurfaceRegistrationTests
     {
         // A key is bearer-equivalent to the stop button on the wallbox, and with no password the UI
         // admits anyone on the network. The page cannot disclose what it was never given.
-        await using var provider = Build(("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"));
+        await using var provider = Build(
+            ("Api:Enabled", "true"), ("Api:Keys:mcp", "a-key"), ("Web:PasswordHash", ""), ("Web:RequireAuthentication", "false"));
 
         var key = Assert.Single(provider.GetRequiredService<ApiDisplayOptions>().Keys);
 

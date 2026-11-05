@@ -354,4 +354,57 @@ public sealed class PvSystemEditorTests : IDisposable
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    // -- The site's keys outside the Pv section: time zone and home battery (#301).
+
+    [Fact]
+    public void The_home_battery_and_the_time_zone_are_saved_like_any_other_field()
+    {
+        var editor = Editor(Configuration());
+
+        var result = editor.Save(new Dictionary<string, string>
+        {
+            [PvSystemSettingKeys.HomeBatteryCapacityKWh] = "9",
+            [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = "0.93",
+            [PvSystemSettingKeys.TimeZone] = "Europe/Prague",
+        });
+
+        Assert.True(result.Saved, string.Join("; ", result.Problems));
+
+        var stored = PvSystemOverrides.Read(OverridesPath);
+        Assert.Equal("9", stored[PvSystemSettingKeys.HomeBatteryCapacityKWh]);
+        Assert.Equal("0.93", stored[PvSystemSettingKeys.HomeBatteryChargeEfficiency]);
+        Assert.Equal("Europe/Prague", stored[PvSystemSettingKeys.TimeZone]);
+
+        var settings = editor.Read();
+        Assert.Equal(SettingSource.WebUi, settings[PvSystemSettingKeys.HomeBatteryCapacityKWh].Source);
+
+        // Read by the next start where the forecast modes read it.
+        Assert.Equal(9, Configuration().GetSection("ChargeControl:Forecast").Get<ForecastChargeOptions>()!.BatteryCapacityKWh);
+    }
+
+    [Theory]
+    [InlineData(PvSystemSettingKeys.HomeBatteryCapacityKWh, "0", "BatteryCapacityKWh")]
+    [InlineData(PvSystemSettingKeys.HomeBatteryCapacityKWh, "nine", "BatteryCapacityKWh")]
+    [InlineData(PvSystemSettingKeys.HomeBatteryChargeEfficiency, "1.2", "ChargeEfficiency")]
+    [InlineData(PvSystemSettingKeys.TimeZone, "Europe/Atlantis", "Europe/Atlantis")]
+    public void A_wrong_site_value_is_refused_and_nothing_is_written(string key, string value, string named)
+    {
+        var result = Editor(Configuration()).Save(new Dictionary<string, string> { [key] = value });
+
+        Assert.False(result.Saved);
+        Assert.Contains(result.Problems, problem => problem.Contains(named, StringComparison.Ordinal));
+        Assert.False(File.Exists(OverridesPath));
+    }
+
+    [Fact]
+    public void Emptying_the_capacity_is_allowed_it_is_what_unset_means()
+    {
+        WriteFile((PvSystemSettingKeys.HomeBatteryCapacityKWh, "9"));
+
+        var result = Editor(Configuration()).Save(new Dictionary<string, string> { [PvSystemSettingKeys.HomeBatteryCapacityKWh] = "" });
+
+        Assert.True(result.Saved, string.Join("; ", result.Problems));
+    }
 }
+

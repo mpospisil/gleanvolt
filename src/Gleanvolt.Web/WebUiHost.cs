@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,7 +88,29 @@ public static class WebUiHost
                 options.Cookie.Name = "solax_auth";
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+
+                // A cookie issued under another password is refused (#301): a reset or a change signs
+                // everybody out, which is the point of resetting a password somebody else may know.
+                // A cookie from before stamps existed has none, and is refused the same way -- once.
+                options.Events = new CookieAuthenticationEvents
+                {
+                    OnValidatePrincipal = async context =>
+                    {
+                        var password = context.HttpContext.RequestServices.GetRequiredService<WebPasswordState>();
+
+                        if (!PasswordStampRevalidation.Matches(context.Principal, password))
+                        {
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        }
+                    },
+                };
             });
+
+        // The same check for a page that is already open: an interactive circuit keeps the identity it
+        // was opened with, and without this a tab left open would outlive the reset that was meant to
+        // close it.
+        services.AddScoped<AuthenticationStateProvider, PasswordStampRevalidation>();
 
         // Flows the signed-in user down to AuthorizeView and AuthorizeRouteView in both the static
         // and the interactive parts of the component tree -- MainLayout's sign-out control and every
@@ -96,7 +119,15 @@ public static class WebUiHost
 
         // The hash actually in force, seeded from configuration. An operator who already set
         // Web__PasswordHash never sees a setup page; everyone else gets one until they do.
-        services.TryAddSingleton(new WebPasswordState(web.PasswordHash));
+        services.TryAddSingleton(new WebPasswordState(web.PasswordHash, web.RecoveryKeyHash));
+
+        // Every way the password changes (#301). The code file defaults to the data directory a test
+        // host would use; Gleanvolt.Hosting registers the real one, beside the secrets.
+        services.TryAddSingleton(new PasswordResetOptions(Path.Combine("data", "password-reset-code.txt")));
+        services.TryAddSingleton<WebPasswordService>();
+
+        // No setup mode unless the host has one (#301).
+        services.TryAddSingleton<ISetupState, NoSetupState>();
 
         // Refuses by default, so a host that wires no persistence says so rather than losing a
         // password on the next restart. Gleanvolt.Hosting registers the real one.

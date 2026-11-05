@@ -34,12 +34,26 @@ public static class PvSystemSettingKeys
     public const string ChargerPort = "Pv:Chargers:0:Port";
     public const string ChargerUnitId = "Pv:Chargers:0:UnitId";
 
+    // Outside the Pv section, but facts about the same installation (#301): where its day begins and
+    // ends, and the battery the forecast modes plan around. Setup needs both, and an owner who cannot
+    // set them on Settings has nowhere but .env to go.
+    public const string TimeZone = "Controller:TimeZone";
+    public const string HomeBatteryCapacityKWh = "ChargeControl:Forecast:BatteryCapacityKWh";
+    public const string HomeBatteryChargeEfficiency = "ChargeControl:Forecast:ChargeEfficiency";
+
+    /// <summary>
+    /// The keys outside the <c>Pv</c> section (#301). The resolver does not judge them, so the editor
+    /// does.
+    /// </summary>
+    public static IReadOnlyList<string> Site { get; } = [TimeZone, HomeBatteryCapacityKWh, HomeBatteryChargeEfficiency];
+
     /// <summary>Every editable key, in the order the page shows them.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
         Id, Name, Address, InstallDate,
-        Latitude, Longitude, AzimuthDegrees, TiltDegrees,
+        Latitude, Longitude, TimeZone, AzimuthDegrees, TiltDegrees,
         CapacityKwp, InverterCapacityKw, LossFactor,
+        HomeBatteryCapacityKWh, HomeBatteryChargeEfficiency,
         InverterModel, InverterHost, InverterPort, InverterUnitId, InverterUnmeteredGridPhase,
         ChargerId, ChargerModel, ChargerHost, ChargerPort, ChargerUnitId,
     ];

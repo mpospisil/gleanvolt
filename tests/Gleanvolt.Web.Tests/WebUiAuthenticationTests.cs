@@ -63,6 +63,10 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
         // sign-in page included, which is what two of these tests are about.
         builder.Services.AddSingleton(Sites.Home);
         builder.Services.AddSingleton(new VehicleDisplayOptions(TimeSpan.FromHours(12)));
+
+        // A store that keeps a changed password, so a reset can happen at all (#301).
+        builder.Services.AddSingleton<IWebPasswordStore>(new FakePasswordStore());
+        builder.Services.AddSingleton(new Auth.PasswordResetOptions(Path.Combine(Path.GetTempPath(), $"gleanvolt-auth-{Guid.NewGuid():N}.txt")));
         builder.Services.AddGleanvoltWebUi(web);
 
         _app = builder.Build();
@@ -320,5 +324,84 @@ public sealed class WebUiAuthenticationTests : IAsyncDisposable
 
         Assert.Equal(HttpStatusCode.Redirect, dashboard.StatusCode);
         Assert.Contains("/login", dashboard.Headers.Location?.OriginalString ?? "");
+    }
+
+    private async Task<string> SignInAsync(HttpClient client, string password = Password)
+    {
+        var (cookie, token) = await GetLoginFormAsync(client);
+        var response = await PostLoginAsync(client, cookie, token, password);
+
+        return response.Headers.GetValues("Set-Cookie")
+            .First(c => c.StartsWith("solax_auth=", StringComparison.Ordinal))
+            .Split(';')[0];
+    }
+
+    private async Task<HttpResponseMessage> GetWithCookieAsync(HttpClient client, string path, string cookie)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("Cookie", cookie);
+        return await client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task A_password_reset_signs_out_every_session_issued_before_it()
+    {
+        var client = await StartAsync(Protected());
+        var before = await SignInAsync(client);
+
+        Assert.Equal(HttpStatusCode.OK, (await GetWithCookieAsync(client, "/", before)).StatusCode);
+
+        // A reset from the login page, by the code written on the host (#301).
+        var passwords = _app!.Services.GetRequiredService<Auth.WebPasswordService>();
+        var change = passwords.Change(Password, "a new password");
+        Assert.True(change.Succeeded);
+
+        var refused = await GetWithCookieAsync(client, "/", before);
+        Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
+        Assert.Contains("/login", refused.Headers.Location!.ToString());
+
+        // And the new password signs in as usual.
+        var after = await SignInAsync(client, "a new password");
+        Assert.Equal(HttpStatusCode.OK, (await GetWithCookieAsync(client, "/", after)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_sign_in_page_links_to_the_reset_and_the_reset_page_answers_without_a_login()
+    {
+        var client = await StartAsync(Protected());
+
+        Assert.Contains("/forgot-password", await client.GetStringAsync("/login"), StringComparison.Ordinal);
+
+        var reset = await client.GetAsync("/forgot-password");
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+    }
+
+    [Fact]
+    public async Task Asking_for_a_code_never_puts_it_in_the_response()
+    {
+        var client = await StartAsync(Protected());
+        var page = await client.GetAsync("/forgot-password");
+        var body = await page.Content.ReadAsStringAsync();
+        var antiforgery = page.Headers.GetValues("Set-Cookie").First(c => c.Contains("Antiforgery", StringComparison.Ordinal)).Split(';')[0];
+        var token = Regex.Match(body, "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value;
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/forgot-password")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["_handler"] = "reset-request",
+                ["__RequestVerificationToken"] = token,
+            }),
+        };
+        request.Headers.Add("Cookie", antiforgery);
+        var response = await client.SendAsync(request);
+        var answer = await response.Content.ReadAsStringAsync();
+
+        var options = _app!.Services.GetRequiredService<Auth.PasswordResetOptions>();
+        var code = File.ReadAllLines(options.CodeFilePath)[0];
+        File.Delete(options.CodeFilePath);
+
+        Assert.Contains("A code has been written", answer, StringComparison.Ordinal);
+        Assert.DoesNotContain(code, answer, StringComparison.Ordinal);
     }
 }

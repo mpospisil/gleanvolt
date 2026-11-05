@@ -453,4 +453,43 @@
   <data name="Event_Rearmed" xml:space="preserve">
     <value>Nabíječka přepnuta zpět do Fast.</value>
   </data>
+  <data name="Config_SetupNoLocation" xml:space="preserve">
+    <value>Není nastavená poloha instalace. Nastavte Pv:Latitude a Pv:Longitude.</value>
+  </data>
+  <data name="Config_SetupNoPassword" xml:space="preserve">
+    <value>Není nastavené heslo webového rozhraní. Zvolte ho na stránce nastavení hesla.</value>
+  </data>
+  <data name="Config_SetupBadTimeZone" xml:space="preserve">
+    <value>Controller:TimeZone ('{0}') není časové pásmo, které tento počítač zná.</value>
+  </data>
+  <data name="Config_SetupNoTimeZone" xml:space="preserve">
+    <value>Není nastavené časové pásmo instalace. Nastavte Controller:TimeZone (např. Europe/Prague).</value>
+  </data>
+  <data name="Config_RetiredKey" xml:space="preserve">
+    <value>{0} se přesunul do {1} ({2} -&gt; {3}). Přesuňte hodnotu na nové místo a starý klíč odstraňte.</value>
+  </data>
+  <data name="Config_SetupBadBatteryCapacity" xml:space="preserve">
+    <value>ChargeControl:Forecast:BatteryCapacityKWh ('{0}') musí být kladné číslo v kWh.</value>
+  </data>
+  <data name="Config_SetupPasswordTooShort" xml:space="preserve">
+    <value>Heslo webového rozhraní musí mít aspoň {0} znaků.</value>
+  </data>
+  <data name="Config_SetupSolcastIncomplete" xml:space="preserve">
+    <value>Účet Solcast potřebuje Solcast:ApiKey i Solcast:ResourceId.</value>
+  </data>
+  <data name="Config_SetupNoPasswordService" xml:space="preserve">
+    <value>Tento počítač nedokáže nastavit heslo webového rozhraní.</value>
+  </data>
+  <data name="Config_SetupPasswordAlreadySet" xml:space="preserve">
+    <value>Heslo webového rozhraní už je nastavené. Změňte ho v Nastavení, nebo ho obnovte z přihlašovací stránky.</value>
+  </data>
+  <data name="Config_SetupPasswordNotSaved" xml:space="preserve">
+    <value>Heslo webového rozhraní se nepodařilo uložit.</value>
+  </data>
+  <data name="Config_SetupSecretNotSaved" xml:space="preserve">
+    <value>Tajný údaj {0} se nepodařilo uložit do úložiště tajných údajů. Zkontrolujte oprávnění datového adresáře.</value>
+  </data>
+  <data name="Config_BadBatteryEfficiency" xml:space="preserve">
+    <value>ChargeControl:Forecast:ChargeEfficiency ('{0}') musí být větší než 0 a nejvýš 1.</value>
+  </data>
 </root>

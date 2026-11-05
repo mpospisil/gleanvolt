@@ -33,8 +33,7 @@ public sealed class EvEditorRegistrationTests : IDisposable
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(
         [
-            new("Pv:Inverter:Host", "127.0.0.1"),
-            new("Pv:Chargers:0:Host", "127.0.0.2"),
+            .. UsableSite.Pairs,
             new("Ev:Vehicles:0:Id", "id4"),
         ]);
 

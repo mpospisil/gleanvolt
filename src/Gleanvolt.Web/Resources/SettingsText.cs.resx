@@ -738,4 +738,25 @@
   <data name="KeyPlaceholder" xml:space="preserve">
     <value>klíč</value>
   </data>
+  <data name="GroupHomeBattery" xml:space="preserve">
+    <value>Domácí baterie</value>
+  </data>
+  <data name="FieldTimeZone" xml:space="preserve">
+    <value>Časové pásmo</value>
+  </data>
+  <data name="FieldHomeBatteryCapacity" xml:space="preserve">
+    <value>Využitelná kapacita (kWh)</value>
+  </data>
+  <data name="FieldHomeBatteryEfficiency" xml:space="preserve">
+    <value>Účinnost nabíjení</value>
+  </data>
+  <data name="HintTimeZone" xml:space="preserve">
+    <value>např. Europe/Prague</value>
+  </data>
+  <data name="HintHomeBatteryCapacity" xml:space="preserve">
+    <value>využitelná, ne jmenovitá</value>
+  </data>
+  <data name="HintHomeBatteryEfficiency" xml:space="preserve">
+    <value>0 až 1, např. 0.95</value>
+  </data>
 </root>

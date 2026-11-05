@@ -32,7 +32,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
-    private readonly Lock _gate = new();
+    // The file's own lock, shared with every other writer of it (#301).
+    private static Lock _gate => PvSystemOverrides.Gate;
 
     /// <param name="configuration">The process's configuration, whose providers are walked.</param>
     /// <param name="running">Each editable key's value as this process started, taken before anything could change.</param>
@@ -247,14 +248,23 @@ public sealed class PvSystemEditor : IPvSystemEditor
             }
         }
 
+        var site = CheckSite(stored);
+
         try
         {
             PvSystemResolver.Resolve(new ConfigurationBuilder().AddInMemoryCollection(candidate).Build());
-            return [];
+            return site;
         }
         catch (ConfigurationRefusedException refused)
         {
-            return refused.Problems;
+            var problems = refused.Problems;
+            var phrases = site.Phrases;
+            for (var index = 0; index < site.Count; index++)
+            {
+                problems.Add(site[index], phrases[index]!);
+            }
+
+            return problems;
         }
         catch (InvalidOperationException ex)
         {
@@ -265,6 +275,51 @@ public sealed class PvSystemEditor : IPvSystemEditor
             return [.. listed.Count > 0 ? listed : [ex.Message]];
         }
     }
+
+    // The keys outside the Pv section (#301), judged as the next start would read them: the zone must be
+    // one this host knows, the pack a positive size, the efficiency a fraction. Empty is fine for all
+    // three -- unset is what setup mode and the forecast modes already know how to say.
+    private ConfigurationProblems CheckSite(IReadOnlyDictionary<string, string> stored)
+    {
+        var problems = new ConfigurationProblems();
+
+        if (Next(PvSystemSettingKeys.TimeZone, stored)?.Value?.Trim() is { Length: > 0 } zone)
+        {
+            try
+            {
+                ZonedTimeProvider.Resolve(zone);
+            }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                problems.Add(
+                    $"Controller:TimeZone ('{zone}') is not a time zone this host knows.",
+                    Phrase.Of("Config.SetupBadTimeZone", new PhraseArg.Text(zone)));
+            }
+        }
+
+        if (Next(PvSystemSettingKeys.HomeBatteryCapacityKWh, stored)?.Value?.Trim() is { Length: > 0 } capacity
+            && !(Number(capacity) is { } kwh && kwh > 0))
+        {
+            problems.Add(
+                $"{PvSystemSettingKeys.HomeBatteryCapacityKWh} ('{capacity}') must be a positive number of kWh.",
+                Phrase.Of("Config.SetupBadBatteryCapacity", new PhraseArg.Text(capacity)));
+        }
+
+        if (Next(PvSystemSettingKeys.HomeBatteryChargeEfficiency, stored)?.Value?.Trim() is { Length: > 0 } efficiency
+            && !(Number(efficiency) is { } fraction && fraction is > 0 and <= 1))
+        {
+            problems.Add(
+                $"{PvSystemSettingKeys.HomeBatteryChargeEfficiency} ('{efficiency}') must be more than 0 and at most 1.",
+                Phrase.Of("Config.BadBatteryEfficiency", new PhraseArg.Text(efficiency)));
+        }
+
+        return problems;
+    }
+
+    private static double? Number(string value) =>
+        double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            ? number
+            : null;
 
     private List<ConfiguredSetting> Describe(IReadOnlyDictionary<string, string> stored) =>
     [

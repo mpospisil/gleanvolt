@@ -20,4 +20,11 @@ public interface IWebPasswordStore
     /// itself open again on the next restart.
     /// </summary>
     bool Save(string passwordHash);
+
+    /// <summary>
+    /// Writes a new password together with the hash of its recovery key (#301), as one change: a
+    /// password saved without its key would leave the old key able to reset the new password. Hosts
+    /// that keep no recovery key fall back to <see cref="Save(string)"/>.
+    /// </summary>
+    bool Save(string passwordHash, string recoveryKeyHash) => Save(passwordHash);
 }

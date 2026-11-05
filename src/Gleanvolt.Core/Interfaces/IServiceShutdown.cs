@@ -37,4 +37,11 @@ public interface IServiceShutdown
     /// zip) it simply exits. Returns immediately, like <see cref="RequestStop"/>.
     /// </summary>
     void RequestRestart(string source);
+
+    /// <summary>
+    /// Whether something will start the process again after <see cref="RequestRestart"/>: Docker's
+    /// restart policy, systemd. False for the Windows zip, winget and <c>dotnet run</c>, where a restart
+    /// is a stop, and the page that offers one has to say so rather than leave the owner waiting (#301).
+    /// </summary>
+    bool RestartsByItself => true;
 }

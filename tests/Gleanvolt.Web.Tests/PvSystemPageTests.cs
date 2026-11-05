@@ -139,6 +139,12 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton(Options.Create(new WebOptions()));
         context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
+        context.Services.AddSingleton<ISetupState>(new NoSetupState());
+        context.Services.AddSingleton(provider => new Gleanvolt.Web.Auth.WebPasswordService(
+            provider.GetRequiredService<Gleanvolt.Web.Auth.WebPasswordState>(),
+            new FakePasswordStore(),
+            new Gleanvolt.Web.Auth.PasswordResetOptions(Path.Combine(Path.GetTempPath(), "gleanvolt-test-reset-code.txt")),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Gleanvolt.Web.Auth.WebPasswordService>.Instance));
 
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());

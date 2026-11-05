@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
@@ -10,6 +11,7 @@ using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
+using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Tariff;
@@ -54,13 +56,40 @@ public static class GleanvoltHostingExtensions
     /// from an unpublished build needs one thing more than a registration, and that overload is
     /// where it is done.</para>
     /// </summary>
-    public static IServiceCollection AddGleanvolt(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddGleanvolt(this IServiceCollection services, IConfiguration configuration) =>
+        services.AddGleanvolt(configuration, SetupHost.Current);
+
+    /// <summary>
+    /// <see cref="AddGleanvolt(IServiceCollection, IConfiguration)"/> with the host's time zone and
+    /// platform given rather than read from the machine, so a test can judge setup the way a
+    /// particular host would.
+    /// </summary>
+    public static IServiceCollection AddGleanvolt(this IServiceCollection services, IConfiguration configuration, SetupHost setupHost)
     {
-        // Keys that used to describe the installation and no longer do (issue #111). Checked before
-        // anything is bound, because the failure they prevent is invisible: a build that ignored
-        // Solax__Inverter__Host would run against the default address while the operator's file says
-        // otherwise -- starting, polling and charging, pointed somewhere else.
-        RetiredConfigurationKeys.Refuse(configuration);
+        ArgumentNullException.ThrowIfNull(setupHost);
+
+        // Everything registered from here on is this method's, which is what lets setup mode take the
+        // workers back out at the end without naming each one.
+        var firstRegistration = services.Count;
+
+        // Setup mode (#301): is this configuration one the controller may run on? The answer decides
+        // what is registered at all, so it is asked first, before anything is bound. Retired keys are
+        // part of it -- they used to be refused right here, because the failure they prevent is
+        // invisible: a build that ignored Solax__Inverter__Host would run against the default address
+        // while the operator's file says otherwise.
+        var setup = SetupStatusEvaluator.Evaluate(configuration, setupHost);
+        var setupMode = !setup.Usable;
+
+        if (setupMode && !ReadWebOptions(configuration).Enabled)
+        {
+            // Headless, nothing could ask for the missing settings: refuse as the resolver always has.
+            throw Refusal(configuration, new ConfigurationRefusedException(
+                "Gleanvolt is not configured usably, and the web UI that could set it up is disabled "
+                + "(Web:Enabled=false). Set the following, or enable the web UI and finish the setup in a browser:",
+                setup.Problems));
+        }
+
+        services.AddSingleton<ISetupState>(provider => new SetupState(configuration, setup, setupHost, provider));
 
         // The zone every "local" decision is made in. Registered as the app's TimeProvider rather than
         // read at each call site, so the services that already take one need no change and there is
@@ -68,15 +97,16 @@ public static class GleanvoltHostingExtensions
         // host at startup, not surface days later as a day boundary in the wrong place. See
         // ControllerOptions.TimeZone for why Windows containers cannot rely on TZ the way Linux does.
         services.Configure<ControllerOptions>(configuration.GetSection(ControllerOptions.SectionName));
-        services.AddSingleton(ZonedTimeProvider.Resolve(
-            configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)]));
+        services.AddSingleton(setupMode
+            ? SetupModeTimeProvider(configuration)
+            : ZonedTimeProvider.Resolve(configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)]));
 
         // The installation itself (issue #111): where the array is, and what it is made of. Resolved
         // eagerly, and once, for the same reason the time zone above is — a site that cannot be
         // described is a startup failure, not a connection error minutes later — and registered as one
         // object so that every surface reads the same answer.
         services.Configure<PvSystemOptions>(configuration.GetSection(PvSystemOptions.SectionName));
-        var site = ResolveSite(configuration);
+        var site = setupMode ? PartialSite(configuration) : ResolveSite(configuration);
         services.AddSingleton(site);
 
         // The same section, editable from /pv-system (issue #204). The values are taken now, while they
@@ -177,45 +207,56 @@ public static class GleanvoltHostingExtensions
                 options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(keys), loggers);
             });
 
-        services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
+        if (setupMode)
         {
-            // The battery discharge hold is the only thing that ever writes to the inverter, so the
-            // client is writable only while that feature is both enabled and out of dry-run. With
-            // BatteryHold:Enabled false — the default — an inverter write is structurally impossible,
-            // not merely skipped.
-            var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
-            return WriteProof(
-                provider,
-                new ModbusTcpClient(site.Inverter.Connection),
-                batteryHold.Enabled && !batteryHold.DryRun);
-        });
-
-        // A loop that runs once today. The composition root is what the charger list has to reach
-        // first: registering each charger under its own id is what makes a second one a matter of
-        // control logic rather than of wiring. What still cannot handle two is everything downstream —
-        // one mode, one set of Home Assistant controls, one surplus to divide — which is why the
-        // resolver refuses a second entry rather than this loop quietly accepting it.
-        foreach (var charger in site.Chargers)
-        {
-            services.AddKeyedSingleton<IModbusClient>(charger.Id, (provider, _) =>
-            {
-                // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
-                // a controlling mode at any time, so the client has to be ready for it.
-                var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-                return WriteProof(provider, new ModbusTcpClient(charger.Connection), !chargeControl.DryRun);
-            });
+            // No devices to talk to: the addresses are missing or wrong, which is why this is setup
+            // mode. A client that refuses every call, under both keys, so that nothing reached by
+            // accident in setup mode can open a socket to an address nobody confirmed.
+            services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (_, _) => new NotConfiguredModbusClient());
+            services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (_, _) => new NotConfiguredModbusClient());
         }
+        else
+        {
+            services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (provider, _) =>
+            {
+                // The battery discharge hold is the only thing that ever writes to the inverter, so the
+                // client is writable only while that feature is both enabled and out of dry-run. With
+                // BatteryHold:Enabled false — the default — an inverter write is structurally impossible,
+                // not merely skipped.
+                var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+                return WriteProof(
+                    provider,
+                    new ModbusTcpClient(site.Inverter.Connection),
+                    batteryHold.Enabled && !batteryHold.DryRun);
+            });
 
-        // The charger the control path drives, under the fixed key, because [FromKeyedServices] takes a
-        // compile-time constant and EvChargerControl and EnergyStateReader are written against one. It
-        // resolves the registration above rather than constructing a second client: two clients would be
-        // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
-        // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
-        // key is not — so this is an alias and never a self-reference.
-        var controlledCharger = site.Chargers[0].Id;
-        services.AddKeyedSingleton<IModbusClient>(
-            ModbusClientKeys.EvCharger,
-            (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
+            // A loop that runs once today. The composition root is what the charger list has to reach
+            // first: registering each charger under its own id is what makes a second one a matter of
+            // control logic rather than of wiring. What still cannot handle two is everything downstream —
+            // one mode, one set of Home Assistant controls, one surplus to divide — which is why the
+            // resolver refuses a second entry rather than this loop quietly accepting it.
+            foreach (var charger in site.Chargers)
+            {
+                services.AddKeyedSingleton<IModbusClient>(charger.Id, (provider, _) =>
+                {
+                    // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
+                    // a controlling mode at any time, so the client has to be ready for it.
+                    var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+                    return WriteProof(provider, new ModbusTcpClient(charger.Connection), !chargeControl.DryRun);
+                });
+            }
+
+            // The charger the control path drives, under the fixed key, because [FromKeyedServices] takes a
+            // compile-time constant and EvChargerControl and EnergyStateReader are written against one. It
+            // resolves the registration above rather than constructing a second client: two clients would be
+            // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
+            // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
+            // key is not — so this is an alias and never a self-reference.
+            var controlledCharger = site.Chargers[0].Id;
+            services.AddKeyedSingleton<IModbusClient>(
+                ModbusClientKeys.EvCharger,
+                (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
+        }
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 
@@ -643,7 +684,8 @@ public static class GleanvoltHostingExtensions
         // an anonymous installation stops being a describable one. Demanded only when the integration is
         // actually on: a controller-only deployment publishes nothing and has nothing to collide with,
         // and failing it over a value nobody would read would be a rule for its own sake.
-        if (configuration.GetSection(HomeAssistantOptions.SectionName).GetValue<bool>(nameof(HomeAssistantOptions.Enabled))
+        if (!setupMode
+            && configuration.GetSection(HomeAssistantOptions.SectionName).GetValue<bool>(nameof(HomeAssistantOptions.Enabled))
             && string.IsNullOrWhiteSpace(site.Id))
         {
             throw new InvalidOperationException(
@@ -847,6 +889,23 @@ public static class GleanvoltHostingExtensions
 
         AddHttpSurfaces(services, configuration);
 
+        if (setupMode)
+        {
+            // What setup mode is: the UI, the stores and the editors run; nothing that polls a device,
+            // drives the charger, records a session or energy, or talks to a broker or a car does. They
+            // are all hosted services, so taking those back out is what keeps the controller stopped --
+            // including any worker added later, which is off in setup mode unless it is let through here.
+            var workers = services
+                .Skip(firstRegistration)
+                .Where(descriptor => descriptor.ServiceType == typeof(IHostedService))
+                .ToList();
+
+            foreach (var worker in workers)
+            {
+                services.Remove(worker);
+            }
+        }
+
         return services;
     }
 
@@ -882,9 +941,6 @@ public static class GleanvoltHostingExtensions
         return builder;
     }
 
-    // The resolver's refusal, with one thing added when it applies: that some of what it refused was
-    // saved from the web UI. The resolver checks every save, so this takes a change underneath it --
-    // an .env edited afterwards -- but when it happens, the file is the thing nobody thinks to look at.
     /// <summary>
     /// Why the Data Act portal is not started although it is switched on, or null when nothing
     /// better reads this car (issue #212). A live feed that is configured wins; one merely enabled
@@ -905,13 +961,54 @@ public static class GleanvoltHostingExtensions
         {
             return PvSystemResolver.Resolve(configuration);
         }
-        catch (InvalidOperationException ex) when (PvSystemOverrides.Find(configuration) is { LoadedKeys.Count: > 0 } overrides)
+        catch (InvalidOperationException ex)
         {
-            throw new InvalidOperationException(
+            throw Refusal(configuration, ex);
+        }
+    }
+
+    // A refusal, with one thing added when it applies: that some of what it refused was saved from the
+    // web UI. The resolver checks every save, so this takes a change underneath it -- an .env edited
+    // afterwards -- but when it happens, the file is the thing nobody thinks to look at.
+    private static InvalidOperationException Refusal(IConfiguration configuration, InvalidOperationException ex) =>
+        PvSystemOverrides.Find(configuration) is { LoadedKeys.Count: > 0 } overrides
+            ? new InvalidOperationException(
                 ex.Message + Environment.NewLine
                 + $"These keys come from {overrides.Path}, saved from the web UI, and override .env: "
                 + string.Join(", ", overrides.LoadedKeys) + ". Delete the file to go back to .env and appsettings.json.",
-                ex);
+                ex)
+            : ex;
+
+    // The site as far as it can be described, for the pages that name it while setup mode collects the
+    // rest. Every problem is ignored -- they are what setup mode lists -- and a value the binder cannot
+    // read at all leaves the section unread rather than stopping the UI that could fix it.
+    private static PvSystemInfo PartialSite(IConfiguration configuration)
+    {
+        PvSystemOptions pv;
+        try
+        {
+            pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
+        }
+        catch (InvalidOperationException)
+        {
+            pv = new PvSystemOptions();
+        }
+
+        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems());
+    }
+
+    // The configured zone where it resolves, the host's own where it does not: setup mode is there to
+    // fix a wrong zone, and refusing to start over one would take away the page that fixes it.
+    private static TimeProvider SetupModeTimeProvider(IConfiguration configuration)
+    {
+        try
+        {
+            return ZonedTimeProvider.Resolve(
+                configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)]);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return TimeProvider.System;
         }
     }
 
@@ -922,6 +1019,8 @@ public static class GleanvoltHostingExtensions
     {
         var web = app.Services.GetRequiredService<IOptions<WebOptions>>().Value;
         var api = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
+
+        app.UseGleanvoltSetupMode();
 
         if (web.Enabled)
         {
@@ -953,6 +1052,47 @@ public static class GleanvoltHostingExtensions
         // both are on. Neither applies to these routes -- the API carries its own key check and speaks
         // JSON rather than forms -- and the order is what keeps that true rather than incidental.
         app.MapGleanvoltApi(api, app.Logger);
+
+        return app;
+    }
+
+    /// <summary>
+    /// In setup mode (#301), answers every API route with 503: the controller behind it is not running.
+    /// Nothing at all outside setup mode. Mounted before the API, so the API's own key check never
+    /// gets the chance to imply that a right key would have worked.
+    /// </summary>
+    public static WebApplication UseGleanvoltSetupMode(this WebApplication app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        if (!app.Services.GetRequiredService<ISetupState>().SetupMode)
+        {
+            return app;
+        }
+
+        // The API answers a program, which cannot finish a setup and should not be sent to a page
+        // that does. What it gets instead is the truth: nothing behind these routes is running.
+        // 503 rather than 404 or 500, because it is a state that ends -- after the setup and a restart.
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/api"))
+            {
+                await next(context);
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await context.Response.WriteAsJsonAsync(
+                new
+                {
+                    title = "Gleanvolt is not configured",
+                    status = StatusCodes.Status503ServiceUnavailable,
+                    detail = "Gleanvolt is in setup mode: the controller is not running until the setup is "
+                        + "finished in the web UI and Gleanvolt is restarted.",
+                },
+                options: (System.Text.Json.JsonSerializerOptions?)null,
+                contentType: "application/problem+json");
+        });
 
         return app;
     }
@@ -1105,6 +1245,14 @@ public static class GleanvoltHostingExtensions
             // Everything else -- Razor components, cookie authentication, the RequireAuthentication
             // toggle, login/logout -- is host-independent and lives in Gleanvolt.Web so it can be exercised
             // by a test host too (issues #46, #47).
+            // Where a one-time password reset code is written (#301): beside the secrets, owner-only,
+            // where only someone with access to the host can read it.
+            services.AddSingleton(provider => new PasswordResetOptions(Path.Combine(
+                VehicleAccountSecret.Directory(
+                    configuration.GetSection(SecretsOptions.SectionName).Get<SecretsOptions>() ?? new SecretsOptions(),
+                    provider.GetRequiredService<IHostEnvironment>().ContentRootPath),
+                "password-reset-code.txt")));
+
             services.AddGleanvoltWebUi(web);
         }
 

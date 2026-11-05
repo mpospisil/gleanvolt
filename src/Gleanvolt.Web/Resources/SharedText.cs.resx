@@ -211,7 +211,7 @@
     <value>Přihlásit</value>
   </data>
   <data name="SignInHint" xml:space="preserve">
-    <value>Jedno heslo pro celou instalaci. Zvolili jste ho při prvním spuštění na stránce nastavení hesla, nebo je zadané jako {0}. Odsud ho obnovit nelze; zapomenuté heslo se mění v nastavení přímo na počítači, kde služba běží.</value>
+    <value>Jedno heslo pro celou instalaci. Zvolili jste ho při prvním spuštění na stránce nastavení hesla, nebo je zadané jako {0}.</value>
   </data>
   <data name="SetupTitle" xml:space="preserve">
     <value>Nastavení hesla — Gleanvolt</value>
@@ -235,7 +235,7 @@
     <value>Nastavit heslo</value>
   </data>
   <data name="SetupNote" xml:space="preserve">
-    <value>Jedno heslo pro celou instalaci, ne účet pro každého uživatele. Uložte si ho na bezpečné místo: v rozhraní ho obnovit nelze, jen úpravou souboru nastavení přímo na počítači.</value>
+    <value>Jedno heslo pro celou instalaci, ne účet pro každého uživatele. Potom dostanete klíč pro obnovení, kterým heslo obnovíte, když ho zapomenete.</value>
   </data>
   <data name="PasswordsDiffer" xml:space="preserve">
     <value>Hesla se neshodují.</value>
@@ -416,5 +416,119 @@
   </data>
   <data name="DatePattern" xml:space="preserve">
     <value>d. M. yyyy</value>
+  </data>
+  <data name="ForgotPasswordLink" xml:space="preserve">
+    <value>Zapomněli jste heslo?</value>
+  </data>
+  <data name="PasswordSet" xml:space="preserve">
+    <value>Heslo je nastavené</value>
+  </data>
+  <data name="RecoveryKeyTitle" xml:space="preserve">
+    <value>Klíč pro obnovení</value>
+  </data>
+  <data name="RecoveryKeyIntro" xml:space="preserve">
+    <value>Když heslo zapomenete, tímto klíčem ho obnovíte na přihlašovací stránce. Zobrazí se jen teď: zapište si ho nebo ho uložte do správce hesel.</value>
+  </data>
+  <data name="RecoveryKeyUse" xml:space="preserve">
+    <value>Každá změna nebo obnovení hesla vydá nový klíč a ten starý přestane platit.</value>
+  </data>
+  <data name="RecoveryKeySaved" xml:space="preserve">
+    <value>Klíč mám uložený, přihlásit se</value>
+  </data>
+  <data name="ForgotTitle" xml:space="preserve">
+    <value>Obnovení hesla — Gleanvolt</value>
+  </data>
+  <data name="ResetPassword" xml:space="preserve">
+    <value>Obnovení hesla</value>
+  </data>
+  <data name="PasswordReset" xml:space="preserve">
+    <value>Heslo je obnovené</value>
+  </data>
+  <data name="ResetDoneIntro" xml:space="preserve">
+    <value>Všechny přihlášené prohlížeče byly odhlášeny. Toto je nový klíč pro obnovení a zobrazí se jen teď; starý už neplatí.</value>
+  </data>
+  <data name="ResetNoPassword" xml:space="preserve">
+    <value>Tato instalace zatím nemá heslo. {0}.</value>
+  </data>
+  <data name="ResetWithKey" xml:space="preserve">
+    <value>Klíčem pro obnovení</value>
+  </data>
+  <data name="RecoveryKeyLabel" xml:space="preserve">
+    <value>Klíč pro obnovení</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>Nové heslo</value>
+  </data>
+  <data name="ResetButton" xml:space="preserve">
+    <value>Obnovit heslo</value>
+  </data>
+  <data name="ResetWithCode" xml:space="preserve">
+    <value>Jednorázovým kódem</value>
+  </data>
+  <data name="ResetCodeIntro" xml:space="preserve">
+    <value>Gleanvolt zapíše jednorázový kód do svého logu a do souboru {0} na počítači, kde běží. Tady se kód nikdy nezobrazí: kdo ho dokáže přečíst, má k tomu počítači přístup.</value>
+  </data>
+  <data name="RequestCode" xml:space="preserve">
+    <value>Zapsat kód na počítači</value>
+  </data>
+  <data name="CodeIssued" xml:space="preserve">
+    <value>Kód je zapsaný. Platí jednou a 15 minut; nová žádost ho nahradí.</value>
+  </data>
+  <data name="CodeTooSoon" xml:space="preserve">
+    <value>O kód jste žádali před chvílí. Použijte ten, nebo požádejte znovu za minutu.</value>
+  </data>
+  <data name="CodeLabel" xml:space="preserve">
+    <value>Kód</value>
+  </data>
+  <data name="BackToSignIn" xml:space="preserve">
+    <value>Zpět na přihlášení</value>
+  </data>
+  <data name="WrongRecoveryKey" xml:space="preserve">
+    <value>Tento klíč pro obnovení nesedí.</value>
+  </data>
+  <data name="WrongCode" xml:space="preserve">
+    <value>Kód nesedí, vypršel, nebo už byl použitý.</value>
+  </data>
+  <data name="TooManyAttempts" xml:space="preserve">
+    <value>Příliš mnoho chybných pokusů. Zkuste to znovu za 15 minut.</value>
+  </data>
+  <data name="EnterKeyOrCode" xml:space="preserve">
+    <value>Zadejte klíč nebo kód.</value>
+  </data>
+  <data name="ChangePasswordTitle" xml:space="preserve">
+    <value>Heslo</value>
+  </data>
+  <data name="ChangePasswordHint" xml:space="preserve">
+    <value>Změna hesla odhlásí všechny prohlížeče včetně tohoto a vydá nový klíč pro obnovení.</value>
+  </data>
+  <data name="CurrentPassword" xml:space="preserve">
+    <value>Současné heslo</value>
+  </data>
+  <data name="ChangePasswordButton" xml:space="preserve">
+    <value>Změnit heslo</value>
+  </data>
+  <data name="ChangeDoneIntro" xml:space="preserve">
+    <value>Heslo je změněné. Toto je nový klíč pro obnovení a zobrazí se jen teď; starý už neplatí. Budete se muset znovu přihlásit.</value>
+  </data>
+  <data name="SignInAgain" xml:space="preserve">
+    <value>Znovu se přihlásit</value>
+  </data>
+  <data name="SetupModeTitle" xml:space="preserve">
+    <value>Režim nastavení: správce nabíjení neběží</value>
+  </data>
+  <data name="SetupModeIntro" xml:space="preserve">
+    <value>Gleanvolt se spustil bez nastavení, která potřebuje, a proto nečte data ze střídače ani neřídí nabíječku.</value>
+  </data>
+  <data name="SetupModeMissing" xml:space="preserve">
+    <value>Ještě chybí:</value>
+  </data>
+  <data name="SetupModeReady" xml:space="preserve">
+    <value>Vše potřebné je nastavené. Spusťte správce nabíjení, aby nastavení začalo platit.</value>
+  </data>
+  <data name="SetupModeStart" xml:space="preserve">
+    <value>Spustit správce nabíjení</value>
+  </data>
+  <data name="RestartManual" xml:space="preserve">
+    <value>Gleanvolt se zastavuje. Na tomto počítači ho nic znovu nespustí, takže ho pro použití nastavení spusťte sami.</value>
   </data>
 </root>

@@ -23,6 +23,9 @@ public static class SetupGate
     /// <summary>Where an un-set-up UI sends every request.</summary>
     public const string Path = "/setup";
 
+    /// <summary>Where setup mode sends a page that needs the controller (#301).</summary>
+    public const string SetupModePath = "/settings";
+
     /// <summary>
     /// Serves only the setup page while no password is set. Must sit before authentication: with no
     /// password there is nothing to authenticate against, so the login page would be a dead end.
@@ -32,6 +35,31 @@ public static class SetupGate
     /// </summary>
     public static void UseGleanvoltSetupGate(this WebApplication app, WebOptions web)
     {
+        // Setup mode (#301): the controller is not running, so a page that shows or drives it has
+        // nothing to show. Those go to Settings, where the missing values are entered; the pages that
+        // set up, sign in, reset a password or report health still answer. Ahead of the password
+        // check below, and regardless of it: setup mode is about the controller, not the login.
+        app.Use(async (context, next) =>
+        {
+            var setup = context.RequestServices.GetRequiredService<Core.Interfaces.ISetupState>();
+
+            // With no password yet, the password gate below sends everything to /setup, and that is
+            // the first step anyway: one redirect, not two.
+            var passwordFirst = web.RequireAuthentication != false
+                && !context.RequestServices.GetRequiredService<WebPasswordState>().IsSet;
+
+            if (setup.SetupMode
+                && !passwordFirst
+                && !IsAllowedInSetupMode(context.Request.Path)
+                && !context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.Redirect(SetupModePath);
+                return;
+            }
+
+            await next(context);
+        });
+
         // An operator who has said Web:RequireAuthentication=false has chosen an open UI knowingly,
         // and gets one. The gate exists to close the *default*, not to remove the choice -- being
         // sent to a setup page you deliberately opted out of would be the tool overriding you.
@@ -65,6 +93,7 @@ public static class SetupGate
 
     private static bool IsAllowedWhileUnconfigured(PathString path) =>
         path.StartsWithSegments(Path)
+        || path.StartsWithSegments(Components.Pages.ForgotPassword.Path)
         || path.StartsWithSegments(WebUiCultures.Path)
         // Blazor's own script and the static assets the page is rendered with.
         || path.StartsWithSegments("/_framework")
@@ -72,4 +101,17 @@ public static class SetupGate
         || path.StartsWithSegments("/css")
         || path.StartsWithSegments("/lib")
         || path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase);
+
+    // Everything that works without the controller: setting up, signing in and out, resetting the
+    // password, Settings and its Health half, the car's editor -- and the circuit those interactive
+    // pages run on, without which none of them would.
+    private static bool IsAllowedInSetupMode(PathString path) =>
+        IsAllowedWhileUnconfigured(path)
+        || path.StartsWithSegments("/login")
+        || path.StartsWithSegments("/logout")
+        || path.StartsWithSegments("/settings")
+        || path.StartsWithSegments("/pv-system")
+        || path.StartsWithSegments("/health")
+        || path.StartsWithSegments("/car")
+        || path.StartsWithSegments("/_blazor");
 }

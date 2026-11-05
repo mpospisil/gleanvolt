@@ -60,6 +60,13 @@ public sealed class WebOptions
     public string PasswordHash { get; init; } = "";
 
     /// <summary>
+    /// The hash of the recovery key that can reset <see cref="PasswordHash"/> from the login page
+    /// (#301). Written beside the password whenever one is set from the web UI, and replaced with every
+    /// reset; empty for a password set by hand, which then resets with a one-time code instead.
+    /// </summary>
+    public string RecoveryKeyHash { get; init; } = "";
+
+    /// <summary>
     /// Whether a login is actually enforced: <see cref="RequireAuthentication"/> when it says
     /// anything, otherwise "yes if a <see cref="PasswordHash"/> is configured". The single answer
     /// every consumer should ask for — the authorization policy, the startup warning and the

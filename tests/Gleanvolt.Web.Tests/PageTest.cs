@@ -18,6 +18,20 @@ public abstract class PageTest : BunitContext
 
         // Resolved lazily, so a fixture that registers a feed after this still gets it (#212).
         Services.AddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
+
+        // Not in setup mode unless a fixture says so (#301), and a password service over whatever
+        // password state the fixture registers -- resolved lazily for the same reason as the feed.
+        Services.AddSingleton<ISetupState>(new NoSetupState());
+        Services.AddSingleton(provider => new Auth.WebPasswordService(
+            provider.GetService<Auth.WebPasswordState>() ?? new Auth.WebPasswordState(null),
+            provider.GetService<IWebPasswordStore>() ?? new RefusingPasswordStore(),
+            new Auth.PasswordResetOptions(Path.Combine(Path.GetTempPath(), "gleanvolt-test-reset-code.txt")),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Auth.WebPasswordService>.Instance));
+    }
+
+    private sealed class RefusingPasswordStore : IWebPasswordStore
+    {
+        public bool Save(string passwordHash) => false;
     }
 }
 
