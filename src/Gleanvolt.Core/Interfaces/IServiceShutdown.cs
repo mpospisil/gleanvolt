@@ -29,19 +29,13 @@ public interface IServiceShutdown
     void RequestStop(string source);
 
     /// <summary>
-    /// Begins the same graceful shutdown as <see cref="RequestStop"/>, but ends the process with the
-    /// exit code that means "bring me back" (issue #204). A supervisor that restarts on failure —
-    /// <c>restart: on-failure</c> in Docker, <c>Restart=on-failure</c> under systemd — starts it again,
-    /// and the new process reads the configuration afresh; that is how a saved change is applied.
-    /// Where nothing supervises the process (<c>dotnet run</c>, a plain <c>docker run</c>, the Windows
-    /// zip) it simply exits. Returns immediately, like <see cref="RequestStop"/>.
+    /// Begins the same graceful shutdown as <see cref="RequestStop"/>, then starts the service again so
+    /// that it reads the configuration afresh; that is how a saved change is applied (issue #204).
+    /// Where a supervisor restarts on failure -- <c>restart: on-failure</c> in Docker,
+    /// <c>Restart=on-failure</c> under systemd -- the process exits with the code that means "bring me
+    /// back" and the supervisor starts a new one. Where nothing supervises it (<c>dotnet run</c>, the
+    /// debugger, the Windows zip) a fresh host is built in the same process. Returns immediately, like
+    /// <see cref="RequestStop"/>.
     /// </summary>
     void RequestRestart(string source);
-
-    /// <summary>
-    /// Whether something will start the process again after <see cref="RequestRestart"/>: Docker's
-    /// restart policy, systemd. False for the Windows zip, winget and <c>dotnet run</c>, where a restart
-    /// is a stop, and the page that offers one has to say so rather than leave the owner waiting (#301).
-    /// </summary>
-    bool RestartsByItself => true;
 }

@@ -56,24 +56,34 @@ public sealed class HostShutdown : IServiceShutdown
     }
 
     /// <summary>For tests: with the supervision question answered rather than read from the environment.</summary>
-    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool restartsByItself)
+    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool supervised)
     {
         _lifetime = lifetime;
         _logger = logger;
-        RestartsByItself = restartsByItself;
+        RestartsInProcess = !supervised;
     }
 
     /// <summary>
-    /// Whether something will start this process again after a restart (#301): the image's container,
-    /// whose compose file restarts it on failure, or a systemd unit, which sets INVOCATION_ID for every
-    /// service it starts. Neither is true of the Windows zip, winget or <c>dotnet run</c>, where a
-    /// restart is a stop and the person who asked for it has to start Gleanvolt again.
+    /// Whether a restart is carried out inside this process rather than by whoever started it. Where
+    /// something supervises the process -- the image's container, whose compose file restarts it on
+    /// failure, or the .deb's systemd unit -- a restart exits with <see cref="RestartExitCode"/> and the
+    /// supervisor starts a new process. Where nothing does -- the Windows zip, winget, <c>dotnet run</c>,
+    /// the debugger -- <c>Program.cs</c> builds a fresh host in the same process instead, so a restart
+    /// always comes back.
     /// </summary>
-    public bool RestartsByItself { get; }
+    public bool RestartsInProcess { get; }
 
+    /// <summary>
+    /// Whether this process is a container's or a systemd service's own. Systemd is recognised the way
+    /// <c>AddSystemd()</c> recognises it, by the parent process being systemd -- the check the .deb's
+    /// <c>Type=notify</c> readiness already depends on. Not by INVOCATION_ID: a desktop session runs
+    /// under systemd's user manager, so every terminal and editor inherits that variable, and a
+    /// <c>dotnet run</c> or a debug session started from one took itself for a service and exited on
+    /// a restart that nothing then carried out.
+    /// </summary>
     private static bool Supervised() =>
         Infrastructure.Secrets.SecretStoreSelection.RunningInContainer()
-        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INVOCATION_ID"));
+        || Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService();
 
     /// <summary>
     /// Whether this run is ending because somebody asked it to. Read after the host has stopped, to
@@ -107,13 +117,14 @@ public sealed class HostShutdown : IServiceShutdown
 
     private void LogStopped()
     {
-        if (_restartRequested && !RestartsByItself)
+        if (_restartRequested && RestartsInProcess)
         {
-            // Not a restart at all here, and the one place to say so: the page that asked has already
-            // told the person, but a log read later must not suggest the process came back.
-            _logger.LogWarning(
-                "Gleanvolt stopped for a restart requested by {Source}, but nothing on this host starts it "
-                + "again (no container, no systemd unit). Start Gleanvolt again to apply the configuration.",
+            // Nothing outside starts this process again, so it does not exit: Program.cs builds a new
+            // host, which reads the configuration afresh. Said so that the log does not read as a stop.
+            _logger.LogInformation(
+                "Gleanvolt stopped cleanly for a restart requested by {Source}. Nothing on this host "
+                + "starts the process again, so it restarts in the same process and reads its "
+                + "configuration afresh.",
                 _stopSource);
 
             return;
@@ -176,10 +187,11 @@ public sealed class HostShutdown : IServiceShutdown
         // at 14:02?", and the next run's first lines will not say.
         _logger.LogWarning(
             "Restart requested by {Source}. Shutting down gracefully — the charger will be paused and the "
-            + "open session closed — and exiting with code {ExitCode} so that the restart policy starts it "
-            + "again.",
+            + "open session closed — and {How}.",
             source,
-            RestartExitCode);
+            RestartsInProcess
+                ? "starting again in this process"
+                : $"exiting with code {RestartExitCode} so that the restart policy starts it again");
 
         _stopSource = source;
         _restartRequested = true;

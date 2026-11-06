@@ -410,18 +410,4 @@ public class HealthPageTests : PageTest
 
         Assert.Contains("Start the controller", page.Markup);
     }
-
-    [Fact]
-    public void Where_nothing_restarts_it_a_restart_says_to_start_it_by_hand()
-    {
-        _shutdown.RestartsByItself = false;
-        Services.AddSingleton<ISetupState>(new SetupModeState());
-
-        var page = Render<Health>();
-        page.Find(".setup-mode #restart").Click();
-        page.Find(".setup-mode #restart-confirm").Click();
-
-        Assert.Contains("start Gleanvolt yourself", page.Markup);
-        Assert.Single(_shutdown.Restarts);
-    }
 }

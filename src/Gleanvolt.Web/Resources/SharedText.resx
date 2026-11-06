@@ -178,7 +178,7 @@
     <comment>{0} and {1} are shell commands, shown as code.</comment>
   </data>
   <data name="RestartCost" xml:space="preserve">
-    <value>A charge in progress is paused, and the controller starts again in Off, as after any start. The charging mode, a Targeted request and a Fast limit are not kept, so set them again afterwards. This UI and Home Assistant are unreachable for about half a minute. Starting up fetches the solar forecast, so a restart uses one of the day's Solcast calls when a key is configured. It restarts by itself under Docker's {0} and under the .deb's systemd unit. Run any other way — {1}, a plain {2}, the Windows zip — it just exits and must be started again by hand.</value>
+    <value>A charge in progress is paused, and the controller starts again in Off, as after any start. The charging mode, a Targeted request and a Fast limit are not kept, so set them again afterwards. This UI and Home Assistant are unreachable for about half a minute. Starting up fetches the solar forecast, so a restart uses one of the day's Solcast calls when a key is configured. Under Docker's {0} and the .deb's systemd unit it comes back as a new process; run with {1} or from the Windows zip, it starts again inside the same process. Only a plain {2} with no restart policy stays down and must be started again by hand.</value>
     <comment>{0}, {1} and {2} are configuration and commands, shown as code.</comment>
   </data>
   <!-- MQTT connection -->
@@ -573,9 +573,6 @@
   </data>
   <data name="SetupModeStart" xml:space="preserve">
     <value>Start the controller</value>
-  </data>
-  <data name="RestartManual" xml:space="preserve">
-    <value>Gleanvolt is stopping. Nothing on this machine starts it again, so start Gleanvolt yourself to apply the settings.</value>
   </data>
   <data name="SetupModeWizard" xml:space="preserve">
     <value>Continue the setup</value>
