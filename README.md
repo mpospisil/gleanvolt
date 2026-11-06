@@ -201,8 +201,10 @@ dotnet test Gleanvolt.slnx
 dotnet run --project src/Gleanvolt.Worker
 ```
 
-Set your device addresses first (see [Configuration](#configuration)). On a first run nothing is
-written to either device: the service always boots with the charge mode **Off** and the battery hold
+Then open `http://localhost:8090`: a fresh clone starts in [setup mode](#setup-mode), which asks for
+a password and runs the [setup wizard](#the-setup-wizard) for the device addresses and the site (or use
+[the command line](#setting-up-from-the-command-line)). Nothing is polled until that is done. After
+that, nothing is written to either device either: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
 
@@ -259,9 +261,9 @@ MQTT broker:
 curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
 ```
 
-It starts straight away with the default configuration: web UI on `http://<device>:8090`, charge mode
-`Off`, battery hold disabled. Set your inverter and charger addresses in `/etc/gleanvolt/gleanvolt.env`
-and `sudo systemctl restart gleanvolt`. Running the command again upgrades; settings and data are kept.
+It starts straight away in setup mode: open `http://<device>:8090`, choose a password and finish the
+setup wizard, which finds the inverter and the charger on your network. Charge mode starts `Off` and the
+battery hold disabled. Running the command again upgrades; settings and data are kept.
 
 Settings, where the data and logs live, pinning a version and uninstalling are in
 **[packaging/linux/README.md](packaging/linux/README.md)**. For Home Assistant alongside it, use the

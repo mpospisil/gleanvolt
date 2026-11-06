@@ -78,7 +78,7 @@ for the controller.
 For a Pi with **2 GB of RAM or more**. Choose this if you already run Home Assistant, or want the
 inverter and charger to sit alongside the rest of your home automation.
 
-Required in `/opt/gleanvolt/.env`:
+In `/opt/gleanvolt/.env` (the addresses can be left out and set in the web UI's setup wizard instead):
 
 ```bash
 TZ=Europe/Prague               # your timezone
@@ -115,7 +115,8 @@ controller's own [web UI](../README.md#self-hosted-web-ui-the-web-section) shows
 drives every control Home Assistant would, and browses charging-session history and the forecast
 plan — so this is a smaller deployment, not a lesser one.
 
-Required in `/opt/gleanvolt/.env` — this is the whole list:
+Nothing in `/opt/gleanvolt/.env` is required: the web UI's setup wizard asks for whatever is missing.
+Setting these ahead of time leaves it less to ask:
 
 ```bash
 TZ=Europe/Prague               # your timezone
