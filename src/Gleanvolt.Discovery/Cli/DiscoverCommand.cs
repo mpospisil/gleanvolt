@@ -3,7 +3,7 @@ namespace Gleanvolt.Discovery.Cli;
 /// <summary>
 /// The device search on the command line: <c>gleanvolt discover</c>, and the standalone
 /// <c>gleanvolt-discover</c>, which is now a thin wrapper around this (#303). Progress goes to
-/// <paramref name="error"/>, so <c>--json</c> on the output stays parseable.
+/// <c>error</c>, so <c>--json</c> on the output stays parseable.
 /// </summary>
 public static class DiscoverCommand
 {

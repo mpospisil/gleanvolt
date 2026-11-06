@@ -73,7 +73,9 @@ public sealed class WebUiCulturesTests : IAsyncDisposable
         Assert.Contains("<option value=\"en\"", html);
         Assert.Contains("<option value=\"cs\"", html);
         Assert.Contains(">Čeština</option>", html);
-        Assert.DoesNotContain("qps", html, StringComparison.OrdinalIgnoreCase);
+        // The whole name, not "qps": the page carries a random antiforgery token, and base64 spells
+        // "qps" often enough to fail a run now and then.
+        Assert.DoesNotContain(WebUiCultures.Pseudo, html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
