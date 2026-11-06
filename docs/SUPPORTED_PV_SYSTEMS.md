@@ -123,18 +123,21 @@ need those registers — they serve only `UnmeteredGridPhase`, which is a three-
 
 ## EV chargers
 
+The Manufacturer column links to SolaX's page for the charger: Smart EV Charger G2 for the HAC models, Smart
+EV Charger for the EVC.
+
 ### Verified
 
-| Model | Family |
-|---|---|
-| **SolaX X1/X3-HAC** | GEN2 (HAC) — the reference installation |
+| Manufacturer | Model | Family |
+|---|---|---|
+| [SolaX](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) | **X1/X3-HAC** | GEN2 (HAC) — the reference installation |
 
 ### Expected — same registers, not tested
 
-| Model | Family | Serial | Notes |
-|---|---|---|---|
-| **X1-HAC, X3-HAC, X1-HAC-S, X3-HAC-S, A1-HAC, J1-HAC, C1-HAC, C3-HAC** — 4.6, 7.2, 11 and 22 kW | GEN2 (HAC) | `5` + model code + power code | Same four registers as the reference |
-| **X1-EVC 7 kW, X3-EVC 11 kW, X3-EVC 22 kW** | GEN1 (EVC) | `C107`, `C311`, `C322` | Upstream enables all four registers. With firmware 7.0 or later upstream treats the unit as a HAC. Early units were reported with Modbus TCP port 502 closed and reachable only over RS485 at address 70 ([discussion #349](https://github.com/wills106/homeassistant-solax-modbus/discussions/349), 2023) |
+| Manufacturer | Model | Family | Serial | Notes |
+|---|---|---|---|---|
+| [SolaX](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) | **X1-HAC, X3-HAC, X1-HAC-S, X3-HAC-S, A1-HAC, J1-HAC, C1-HAC, C3-HAC** — 4.6, 7.2, 11 and 22 kW | GEN2 (HAC) | `5` + model code + power code | Same four registers as the reference |
+| [SolaX](https://www.solaxpower.com/our-products/smart-ev-charger.html) | **X1-EVC 7 kW, X3-EVC 11 kW, X3-EVC 22 kW** | GEN1 (EVC) | `C107`, `C311`, `C322` | Upstream enables all four registers. With firmware 7.0 or later upstream treats the unit as a HAC. Early units were reported with Modbus TCP port 502 closed and reachable only over RS485 at address 70 ([discussion #349](https://github.com/wills106/homeassistant-solax-modbus/discussions/349), 2023) |
 
 ### Not supported
 
