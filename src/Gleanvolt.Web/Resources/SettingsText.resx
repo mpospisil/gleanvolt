@@ -908,7 +908,7 @@
     <value>The postal address, for people to read. Nothing is worked out from it: the location comes from the latitude and longitude.</value>
   </data>
   <data name="HelpCommissioned" xml:space="preserve">
-    <value>The date the installation went into service, as yyyy-MM-dd. For reference only.</value>
+    <value>The date the PV system was installed and went into service, as yyyy-MM-dd. For reference only.</value>
   </data>
   <data name="HelpLatitude" xml:space="preserve">
     <value>How far north or south the installation is, in decimal degrees, for example 50.0755. Used with the longitude to look up the weather for each charging session.</value>

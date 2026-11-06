@@ -895,7 +895,7 @@
     <value>Poštovní adresa pro lidi. Nic se z ní nevypočítává: polohu určuje zeměpisná šířka a délka.</value>
   </data>
   <data name="HelpCommissioned" xml:space="preserve">
-    <value>Datum, kdy byla instalace uvedena do provozu, ve tvaru yyyy-MM-dd. Jen pro informaci.</value>
+    <value>Datum, kdy byla fotovoltaická elektrárna nainstalována a uvedena do provozu, ve tvaru yyyy-MM-dd. Jen pro informaci.</value>
   </data>
   <data name="HelpLatitude" xml:space="preserve">
     <value>Jak daleko na sever nebo na jih instalace leží, v desetinných stupních, například 50.0755. Spolu se zeměpisnou délkou slouží ke zjištění počasí pro každé nabíjení.</value>
