@@ -301,7 +301,7 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
             return SettingsSaveResult.Refused(ConfigurationProblems.NoOverridesFile());
         }
 
-        lock (Gate)
+        using (PvSystemOverrides.Lock(_overrides.Path))
         {
             Dictionary<string, string> stored;
 

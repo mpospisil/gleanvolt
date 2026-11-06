@@ -58,11 +58,32 @@ public sealed class SetupDocument
         SolcastResourceId,
         WeatherApiKey,
         .. EvSettingKeys.All,
+        .. IntegrationSettingKeys.Plain,
+        IntegrationSettingKeys.MqttPassword,
     ];
+
+    /// <summary>
+    /// Whether <paramref name="key"/> may be in a setup document: one of <see cref="AllowedKeys"/>, or an
+    /// API key, <c>Api:Keys:&lt;name&gt;</c>, whose name is the client's.
+    /// </summary>
+    public static bool IsAllowed(string key) =>
+        AllowedKeys.Contains(key, StringComparer.OrdinalIgnoreCase) || ApiKeyName(key) is not null;
+
+    // The client's name in an Api:Keys:<name> key, or null for any other key.
+    private static string? ApiKeyName(string key) =>
+        key.StartsWith(IntegrationSettingKeys.ApiKeysSection + ":", StringComparison.OrdinalIgnoreCase)
+        && key[(IntegrationSettingKeys.ApiKeysSection.Length + 1)..] is { Length: > 0 } name
+        && !name.Contains(':', StringComparison.Ordinal)
+            ? name
+            : null;
+
+    /// <summary>Whether <paramref name="key"/> holds a secret: never written to the overrides file.</summary>
+    public static bool IsSecret(string key) =>
+        SecretKeys.Contains(key, StringComparer.OrdinalIgnoreCase) || ApiKeyName(key) is not null;
 
     /// <summary>The keys whose values are secrets: never written to the overrides file.</summary>
     public static IReadOnlyList<string> SecretKeys { get; } =
-        [WebPassword, SolcastApiKey, WeatherApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword];
+        [WebPassword, SolcastApiKey, WeatherApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword, IntegrationSettingKeys.MqttPassword];
 
     private SetupDocument(IReadOnlyDictionary<string, string> values) => Values = values;
 
@@ -108,10 +129,18 @@ public sealed class SetupDocument
     {
         ArgumentNullException.ThrowIfNull(current);
 
-        var refused = Values.Keys.Where(key => !AllowedKeys.Contains(key, StringComparer.OrdinalIgnoreCase)).ToList();
+        var refused = Values.Keys.Where(key => !IsAllowed(key)).ToList();
         if (refused.Count > 0)
         {
-            return ConfigurationProblems.NotEditable(refused);
+            var notAllowed = new ConfigurationProblems();
+            foreach (var key in refused)
+            {
+                notAllowed.Add(
+                    $"{key} is not a setting a setup file can hold (see `gleanvolt setup --print-schema`).",
+                    Phrase.Of("Config.SetupKeyNotAllowed", new PhraseArg.Text(key)));
+            }
+
+            return notAllowed;
         }
 
         var problems = new ConfigurationProblems();
@@ -179,6 +208,53 @@ public sealed class SetupDocument
                 Phrase.Of("Config.SetupPasswordTooShort", new PhraseArg.Number(WebPasswordService.MinimumLength)));
         }
 
+        // Home Assistant and the API, as the next start would judge them (the same rules as Settings).
+        if (Values.Keys.Any(IntegrationSettingKeys.IsPlain) || Values.Keys.Any(key => ApiKeyName(key) is not null))
+        {
+            if (bool.TryParse(candidate[IntegrationSettingKeys.MqttEnabled], out var mqtt) && mqtt)
+            {
+                if (string.IsNullOrWhiteSpace(candidate[IntegrationSettingKeys.MqttBrokerHost]))
+                {
+                    problems.Add("Home Assistant needs the MQTT broker's address.", Phrase.Of("Config.MqttNoBroker"));
+                }
+
+                if (string.IsNullOrWhiteSpace(candidate[PvSystemSettingKeys.Id]))
+                {
+                    problems.Add(
+                        "Home Assistant needs the installation's id (Pv:Id): it is the topic segment this system "
+                        + "publishes under, so two installations on one broker do not overwrite each other.",
+                        Phrase.Of("Config.MqttNeedsPvId"));
+                }
+            }
+
+            if (candidate[IntegrationSettingKeys.MqttBrokerPort] is { Length: > 0 } port
+                && !(int.TryParse(port.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var number) && number is >= 1 and <= 65535))
+            {
+                problems.Add($"The broker port ('{port}') must be a number from 1 to 65535.",
+                    Phrase.Of("Config.MqttBadPort", new PhraseArg.Text(port)));
+            }
+
+            var keyed = current.GetSection(IntegrationSettingKeys.ApiKeysSection).GetChildren().Any(child => !string.IsNullOrWhiteSpace(child.Value))
+                || Values.Any(entry => ApiKeyName(entry.Key) is not null && !string.IsNullOrWhiteSpace(entry.Value));
+
+            if (bool.TryParse(candidate[IntegrationSettingKeys.ApiEnabled], out var api) && api && !keyed)
+            {
+                problems.Add(
+                    "The API cannot be turned on without a key: add one as Api:Keys:<name>.",
+                    Phrase.Of("Config.ApiNoKeys"));
+            }
+
+            foreach (var name in Values.Keys.Select(ApiKeyName).OfType<string>())
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$"))
+                {
+                    problems.Add(
+                        $"'{name}' is not a usable key name: letters, digits, '-', '_' and '.', up to 40 characters.",
+                        Phrase.Of("Config.ApiKeyBadName", new PhraseArg.Text(name)));
+                }
+            }
+        }
+
         var hasKey = Values.TryGetValue(SolcastApiKey, out var apiKey) && !string.IsNullOrWhiteSpace(apiKey);
         var hasSite = Values.TryGetValue(SolcastResourceId, out var resource) && !string.IsNullOrWhiteSpace(resource);
         if (hasKey != hasSite)
@@ -207,7 +283,7 @@ public sealed class SetupDocument
         }
 
         var plain = Values
-            .Where(entry => !SecretKeys.Contains(entry.Key, StringComparer.OrdinalIgnoreCase)
+            .Where(entry => !IsSecret(entry.Key)
                 && !entry.Key.Equals(SolcastResourceId, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -215,7 +291,7 @@ public sealed class SetupDocument
         {
             try
             {
-                lock (PvSystemOverrides.Gate)
+                using (PvSystemOverrides.Lock(target.OverridesPath))
                 {
                     var stored = PvSystemOverrides.Read(target.OverridesPath);
 
@@ -263,6 +339,30 @@ public sealed class SetupDocument
             }
         }
 
+        if (Values.TryGetValue(IntegrationSettingKeys.MqttPassword, out var mqttPassword) && !string.IsNullOrEmpty(mqttPassword)
+            && !target.Secrets.Write(SecretNames.MqttPassword, mqttPassword))
+        {
+            return SetupApplyResult.Refused(SecretNotSaved("MQTT password"));
+        }
+
+        var apiKeys = Values
+            .Where(entry => ApiKeyName(entry.Key) is not null && !string.IsNullOrWhiteSpace(entry.Value))
+            .ToList();
+
+        if (apiKeys.Count > 0)
+        {
+            var saved = IntegrationSecrets.ReadApiKeys(target.Secrets);
+            foreach (var (key, value) in apiKeys)
+            {
+                saved[ApiKeyName(key)!] = value.Trim();
+            }
+
+            if (!IntegrationSecrets.WriteApiKeys(target.Secrets, saved))
+            {
+                return SetupApplyResult.Refused(SecretNotSaved("API key"));
+            }
+        }
+
         var vehiclePassword = Values
             .Where(entry => entry.Key.Equals(EvSettingKeys.WebsitePassword, StringComparison.OrdinalIgnoreCase)
                 || entry.Key.Equals(EvSettingKeys.DataActPassword, StringComparison.OrdinalIgnoreCase))
@@ -289,7 +389,7 @@ public sealed class SetupDocument
             {
                 return SetupApplyResult.Refused(changed.Error == PasswordError.AlreadySet
                     ? new ConfigurationProblems(
-                        "A web UI password is already set. Change it on Settings, or reset it from the login page.",
+                        "A web UI password is already set. Change it on Settings, reset it from the sign-in page, or run `gleanvolt set-password`.",
                         Phrase.Of("Config.SetupPasswordAlreadySet"))
                     : new ConfigurationProblems(
                         "The web UI password could not be saved.", Phrase.Of("Config.SetupPasswordNotSaved")));
@@ -309,7 +409,7 @@ public sealed class SetupDocument
         // An empty value removes the key from the overrides file, which leaves whatever .env says; the
         // current configuration is the closest thing to that, so an empty value adds nothing here.
         var overlay = Values
-            .Where(entry => !SecretKeys.Contains(entry.Key, StringComparer.OrdinalIgnoreCase)
+            .Where(entry => !IsSecret(entry.Key)
                 && !string.IsNullOrWhiteSpace(entry.Value))
             .Select(entry => new KeyValuePair<string, string?>(entry.Key, entry.Value.Trim()))
             .ToList();

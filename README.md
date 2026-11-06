@@ -127,7 +127,7 @@ Gleanvolt.slnx
 │   │   └── Vehicles/               # EV telemetry MQTT subscriber
 │   │
 │   ├── Gleanvolt.Discovery/            # The LAN scan: finds the SolaX devices and their Modbus address
-│   ├── Gleanvolt.Discovery.Cli/        # gleanvolt-discover, the console around it
+│   ├── Gleanvolt.Discovery.Cli/        # gleanvolt-discover, a thin console over Discovery's DiscoverCommand
 │   │
 │   └── Gleanvolt.Worker/               # The executable host, and nothing else
 │       ├── Program.cs              # .env, Serilog, AddGleanvolt(), the exit code
@@ -201,14 +201,18 @@ dotnet test Gleanvolt.slnx
 dotnet run --project src/Gleanvolt.Worker
 ```
 
-Set your device addresses first (see [Configuration](#configuration)). On a first run nothing is
-written to either device: the service always boots with the charge mode **Off** and the battery hold
+Then open `http://localhost:8090`: a fresh clone starts in [setup mode](#setup-mode), which asks for
+a password and runs the [setup wizard](#the-setup-wizard) for the device addresses and the site (or use
+[the command line](#setting-up-from-the-command-line)). Nothing is polled until that is done. After
+that, nothing is written to either device either: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
 
 ### Finding your devices
 
 Don't know the inverter's or the charger's address, or which port and unit id they speak Modbus on?
+The setup wizard's **Search** finds them, and so does `gleanvolt discover` on an installed Gleanvolt
+([issue #303](https://github.com/mpospisil/gleanvolt/issues/303)). For a machine with no Gleanvolt,
 `gleanvolt-discover` scans your LAN and tells you
 ([issue #267](https://github.com/mpospisil/gleanvolt/issues/267)). It runs on its own, on any laptop or
 Pi on the same network, with no Gleanvolt installed, and it only ever reads: every connection goes
@@ -257,9 +261,9 @@ MQTT broker:
 curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
 ```
 
-It starts straight away with the default configuration: web UI on `http://<device>:8090`, charge mode
-`Off`, battery hold disabled. Set your inverter and charger addresses in `/etc/gleanvolt/gleanvolt.env`
-and `sudo systemctl restart gleanvolt`. Running the command again upgrades; settings and data are kept.
+It starts straight away in setup mode: open `http://<device>:8090`, choose a password and finish the
+setup wizard, which finds the inverter and the charger on your network. Charge mode starts `Off` and the
+battery hold disabled. Running the command again upgrades; settings and data are kept.
 
 Settings, where the data and logs live, pinning a version and uninstalling are in
 **[packaging/linux/README.md](packaging/linux/README.md)**. For Home Assistant alongside it, use the
@@ -3141,6 +3145,66 @@ or a closed browser loses nothing that was saved.
 Optional settings never block anything. A page that needs one says it is not configured, with the way
 to set it up: Forecast (Solcast), Car (the car), Charging plan (a tariff). Health and Settings list
 every optional setting still missing.
+
+#### Setting up from the command line
+
+The same setup without a browser ([issue #303](https://github.com/mpospisil/gleanvolt/issues/303)), for
+a headless install, a script, or a site described once in a file. It is an optional route beside the
+wizard, and it saves through the same path, with the same checks and to the same files. None of these
+commands starts Gleanvolt; each saves for the next start and says to restart.
+
+| Command | Does |
+|---|---|
+| `setup --file site.json` | Checks the file and applies it. Lists every problem and exits 1 if there is any; exits 0 when saved. |
+| `setup --validate site.json` | Checks the file only. Writes nothing. |
+| `setup --print-schema` | Prints the JSON schema of what a setup file may hold. |
+| `setup` | Asks for each setting in turn, as the wizard does: the password (when none is set), a device search, the addresses, the location, the time zone, the home battery, and the Solcast and OpenWeatherMap keys. Passwords and keys are not echoed. |
+| `set-password`, `reset-password` | Sets a new web UI password, signs every browser out on the next start, and prints a new recovery key. Being able to run this as the service user is the proof a recovery key would otherwise be. |
+| `discover [--json]` | The device search, as `gleanvolt-discover` (see [Finding your devices](#finding-your-devices)). |
+
+A setup file is shaped like `appsettings.json`, with only the keys the wizard sets:
+
+```json
+{
+  "Pv": {
+    "Id": "home-roof",
+    "Latitude": 50.0755,
+    "Longitude": 14.4378,
+    "Inverter": { "Host": "192.168.1.10" },
+    "Chargers": [ { "Host": "192.168.1.11" } ]
+  },
+  "Controller": { "TimeZone": "Europe/Prague" },
+  "ChargeControl": { "Forecast": { "BatteryCapacityKWh": 9 } },
+  "Web": { "Password": "at least 8 characters" },
+  "Solcast": { "ApiKey": "…", "ResourceId": "…" },
+  "HomeAssistant": { "Enabled": true, "BrokerHost": "192.168.1.5", "Username": "gleanvolt", "Password": "…" },
+  "Api": { "Enabled": true, "Keys": { "claude": "…" } }
+}
+```
+
+Anything else is refused by name. An empty value removes a saved one, so `.env` applies again.
+**Secrets may be in the file**: the web password is saved as a hash, and the rest go to the secret
+store, never to the overrides file. Because of that, a file holding secrets that every user on the
+machine can read is refused until it is private (`chmod 600`), and after applying it the command
+reminds you that the file still holds them.
+
+Where to run it:
+
+- **Docker**, from `/opt/gleanvolt`, with the file in the mounted `data` directory:
+  `docker compose run --rm --no-deps gleanvolt-controller setup --file /app/data/site.json`. It runs as
+  the image's own user, so the files it writes are ones the controller can read. Restart the controller
+  afterwards: `docker compose restart gleanvolt-controller`.
+- **The .deb**, as the service user, which the command insists on, since the service could not read
+  files written by anyone else:
+  `sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup --file /var/lib/gleanvolt/site.json`. It
+  reads the service's own environment (the unit's `Environment=` lines and
+  `/etc/gleanvolt/gleanvolt.env`), so it writes where the service looks. Then
+  `sudo systemctl restart gleanvolt`.
+- **Windows**: `gleanvolt setup --file site.json`, as the user Gleanvolt runs as. With DPAPI, the
+  default there, secrets are sealed to the user who saved them, and the command says which.
+
+The command line and the web UI never write the overrides file at the same time: both take a lock on
+`pv-system.json.lock` beside it.
 
 #### Deployment
 

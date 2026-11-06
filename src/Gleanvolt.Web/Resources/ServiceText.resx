@@ -509,7 +509,7 @@
     <value>This host cannot set the web UI password.</value>
   </data>
   <data name="Config_SetupPasswordAlreadySet" xml:space="preserve">
-    <value>A web UI password is already set. Change it on Settings, or reset it from the sign-in page.</value>
+    <value>A web UI password is already set. Change it on Settings, reset it from the sign-in page, or run `gleanvolt set-password`.</value>
   </data>
   <data name="Config_SetupPasswordNotSaved" xml:space="preserve">
     <value>The web UI password could not be saved.</value>
@@ -567,5 +567,8 @@
   </data>
   <data name="Config_ApiLastKey" xml:space="preserve">
     <value>The API is on, and this is its last key. Turn the API off first, or create another key.</value>
+  </data>
+  <data name="Config_SetupKeyNotAllowed" xml:space="preserve">
+    <value>{0} is not a setting a setup file can hold (see `gleanvolt setup --print-schema`).</value>
   </data>
 </root>

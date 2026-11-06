@@ -179,7 +179,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 ConfigurationProblems.NoOverridesFile());
         }
 
-        lock (_gate)
+        using (PvSystemOverrides.Lock(_overrides.Path))
         {
             Dictionary<string, string> stored;
 

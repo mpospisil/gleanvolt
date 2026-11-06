@@ -78,7 +78,7 @@ for the controller.
 For a Pi with **2 GB of RAM or more**. Choose this if you already run Home Assistant, or want the
 inverter and charger to sit alongside the rest of your home automation.
 
-Required in `/opt/gleanvolt/.env`:
+In `/opt/gleanvolt/.env` (the addresses can be left out and set in the web UI's setup wizard instead):
 
 ```bash
 TZ=Europe/Prague               # your timezone
@@ -115,7 +115,8 @@ controller's own [web UI](../README.md#self-hosted-web-ui-the-web-section) shows
 drives every control Home Assistant would, and browses charging-session history and the forecast
 plan — so this is a smaller deployment, not a lesser one.
 
-Required in `/opt/gleanvolt/.env` — this is the whole list:
+Nothing in `/opt/gleanvolt/.env` is required: the web UI's setup wizard asks for whatever is missing.
+Setting these ahead of time leaves it less to ask:
 
 ```bash
 TZ=Europe/Prague               # your timezone
@@ -245,6 +246,17 @@ does to your car or your battery. A refused key or an outage costs one null colu
 the log, never a delayed or missing session.
 
 ## Setting the web UI password
+
+Forgot it? Reset it from the Pi, which prints a new recovery key, then restart the controller:
+
+```bash
+cd /opt/gleanvolt
+docker compose run --rm --no-deps gleanvolt-controller set-password
+docker compose restart gleanvolt-controller
+```
+
+The whole setup can be done the same way, from a file in `data/` or by answering prompts; see the main
+README, *Setting up from the command line*.
 
 **A fresh installation serves one page: the one that asks you to set a password.** The dashboard, the
 history and every control — the charge mode, the battery hold — stay unreachable until you have. Open

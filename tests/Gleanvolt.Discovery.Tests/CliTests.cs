@@ -5,6 +5,47 @@ namespace Gleanvolt.Discovery.Tests;
 
 public class CliTests
 {
+    [Fact]
+    public async Task Discover_json_has_the_reports_shape_on_stdout_and_progress_on_stderr()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        // Nothing open anywhere: the scan ends at once with an empty report.
+        var exit = await DiscoverCommand.RunAsync(
+            ["--host", "192.168.1.10", "--json"],
+            "gleanvolt discover",
+            output,
+            error,
+            CancellationToken.None,
+            options => new DeviceScanner(options, portProbe: new ClosedPorts()));
+
+        Assert.Equal(0, exit);
+        Assert.Contains("Scanning 1 host(s)", error.ToString(), StringComparison.Ordinal);
+
+        using var report = System.Text.Json.JsonDocument.Parse(output.ToString());
+        var root = report.RootElement;
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, root.GetProperty("devices").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, root.GetProperty("networks").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, root.GetProperty("warnings").ValueKind);
+        Assert.False(root.GetProperty("cancelled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Help_names_the_tool_as_it_was_started()
+    {
+        var output = new StringWriter();
+
+        Assert.Equal(0, await DiscoverCommand.RunAsync(["--help"], "gleanvolt discover", output, TextWriter.Null, CancellationToken.None));
+        Assert.Contains("Usage: gleanvolt discover [options]", output.ToString(), StringComparison.Ordinal);
+    }
+
+    private sealed class ClosedPorts : IPortProbe
+    {
+        public Task<bool> IsOpenAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+    }
+
     private static DiscoveredDevice Device(PvDeviceRole role, string host, string model, SupportTier tier, byte unitId = 1) =>
         new(host, 502, unitId, DiscoveryFinding.SolaxDevice, role, model, "family", "SERIAL00000000", tier, true, "ok");
 

@@ -16,8 +16,8 @@ against the release's `SHA256SUMS`, and installs it with apt. The service starts
 the default configuration, and the script prints where the web UI is:
 
 ```
-  Web UI     http://192.168.2.7:8090   (plain HTTP, no login until you set one)
-  Settings   /etc/gleanvolt/gleanvolt.env   -- set your inverter and charger addresses first
+  Web UI     http://192.168.2.7:8090   (plain HTTP; a new install opens on the setup wizard)
+  Settings   /etc/gleanvolt/gleanvolt.env
 ```
 
 If you would rather not pipe a script into a root shell, download the package for your architecture
@@ -44,14 +44,16 @@ run the self-contained `linux-x64` / `linux-arm64` zip from the same release.
 
 Nothing is written to your hardware. Out of the box:
 
-- the **web UI** is on at port 8090, plain HTTP, **with no login**: anyone on your LAN can change
-  the charging mode. See [Settings](#settings) to set a password;
+- the **web UI** is on at port 8090, plain HTTP. It requires a login, and until a password exists it
+  serves only the setup wizard, whose first step sets one;
 - **charge control** starts in mode **Off**, and touches the charger only when a mode is chosen in the UI;
 - the **battery discharge hold** is disabled;
 - **Home Assistant, MQTT and the vehicle feeds** are off;
 - the **Solcast forecast and weather** are off until you give them an API key;
-- the **inverter and charger addresses** are not set, and Gleanvolt does not start until they are
-  ("No inverter is configured. Set Pv:Inverter:Host."). That is the first thing to set.
+- the **inverter and charger addresses** are not set, so Gleanvolt starts in **setup mode**: the web
+  UI shows the setup wizard, and nothing is polled or controlled until the setup is finished and the
+  service restarted. The wizard finds the devices on your network for you. No browser? See
+  [Setting it up from the command line](#setting-it-up-from-the-command-line).
 
 ## Settings
 
@@ -79,12 +81,16 @@ systemctl status gleanvolt
 The file is readable only by root and the service, because API keys and the web password hash live in
 it. Upgrades never overwrite it.
 
-**To put a password on the web UI**, generate the hash and set it:
+The web password is set in the wizard and changed on the web UI's Settings page. To set it ahead of
+time instead, so no wizard is shown, generate the hash and put it in this file:
 
 ```bash
 /opt/gleanvolt/Gleanvolt.Worker hash-password 'your password'
 # then in gleanvolt.env:  Web__PasswordHash=<the output>
 ```
+
+Forgot it? Use **Forgot your password?** on the sign-in page, or `set-password` from the
+[command line](#setting-it-up-from-the-command-line).
 
 ## Where things are
 
@@ -118,6 +124,22 @@ encryption, which is yours to arrange and not something this package can do for 
 
 To stop handing it over, use **Sign out** on the web UI's Car page: it deletes the stored
 value rather than leaving a tombstone holding it.
+
+## Setting it up from the command line
+
+The web UI's setup wizard is the main route. Without a browser, the same setup runs from a shell, as the
+service user (the command refuses anyone else, since the service could not read what they wrote):
+
+```bash
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup                      # asks for each setting
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup --file /var/lib/gleanvolt/site.json
+sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker set-password               # forgot the password
+sudo systemctl restart gleanvolt
+```
+
+It reads the unit's `Environment=` lines and `/etc/gleanvolt/gleanvolt.env`, so it saves where the
+service looks. A setup file holding secrets must not be world-readable (`chmod 600`). See the main
+README, *Setting up from the command line*, for the file's shape.
 
 ## Running it
 

@@ -90,6 +90,19 @@ public sealed class WebPasswordService
         }
     }
 
+    /// <summary>
+    /// Replaces the password from the host's own command line (#303): being able to run the program as
+    /// its service user is the proof a recovery key or a code would otherwise be. Signs out every
+    /// session and issues a new recovery key, as a reset on the login page does.
+    /// </summary>
+    public PasswordChangeResult ResetFromHost(string next)
+    {
+        lock (_gate)
+        {
+            return Replace(next, "reset from the command line", signsOut: true);
+        }
+    }
+
     /// <summary>Replaces the password for someone who knows the current one.</summary>
     public PasswordChangeResult Change(string current, string next)
     {
