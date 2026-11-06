@@ -46,11 +46,14 @@ the other, and a test fails when the code names a device by a prefix this page d
 
 ## Inverters
 
+The Manufacturer column links to the manufacturer's page for the model. The G2 and G3 hybrids and the
+Q.VOLT are discontinued and have no product page any more, so theirs goes to the manufacturer's home page.
+
 ### Verified
 
-| Model | Family | Serial prefix | Readings | Battery hold |
-|---|---|---|---|---|
-| **SolaX X3-HYB-G4 PRO** | GEN6 hybrid | `10K` | Verified | **Verified** 2026-07-27 — see [DECISIONS.md](DECISIONS.md) |
+| Manufacturer | Model | Family | Serial prefix | Readings | Battery hold |
+|---|---|---|---|---|---|
+| [SolaX](https://www.solaxpower.com/our-products/x3-hyb-g4-pro.html) | **X3-HYB-G4 PRO** | GEN6 hybrid | `10K` | Verified | **Verified** 2026-07-27 — see [DECISIONS.md](DECISIONS.md) |
 
 The battery hold on this model is Gleanvolt's own evidence, not upstream's. The upstream integration
 classes the G4 PRO as GEN6 and does not enable `0x7C` for it, citing incomplete documentation for that
@@ -60,25 +63,25 @@ different firmware revision may behave differently.
 
 ### Expected — same registers, not tested
 
-| Model | Family | Serial prefix | Battery hold | Caveats |
-|---|---|---|---|---|
-| **X3-Hybrid G4** | GEN4 hybrid | `H34` | Supported upstream | — |
-| **TIGO TSI X3** | GEN4 hybrid | `H31` | Supported upstream | — |
-| **Qcells Q.VOLT HYB-G3-3P** | GEN4 hybrid (listed by upstream) | — | Supported upstream | — |
-| **X1-Hybrid G4** | GEN4 hybrid | `H43`, `H44`, `H450`, `H460`, `H475` | Supported upstream | [3](#3-x1-models-and-the-block-read) |
-| **X1-IES** | GEN5 hybrid | `H53`, `H55`, `H56`, `H58` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) on 5–8 kW |
-| **X3-IES** | GEN5 hybrid | `H35…`, `P35…` | Supported upstream | — |
-| **X3-Ultra** | GEN5 hybrid | `H3B…` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) on some sizes, [2](#2-only-battery-1-is-read) |
-| **X3-Aelio** | GEN5 hybrid (commercial) | `8021` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) |
-| **X1-VAST** | GEN6 hybrid | `10M` | **Untested anywhere** | [1](#1-only-pv-strings-1-and-2-are-read), [3](#3-x1-models-and-the-block-read) |
+| Manufacturer | Model | Family | Serial prefix | Battery hold | Caveats |
+|---|---|---|---|---|---|
+| [SolaX](https://www.solaxpower.com/our-products/x3-hybrid-g4.html) | **X3-Hybrid G4** | GEN4 hybrid | `H34` | Supported upstream | — |
+| [Tigo](https://www.tigoenergy.com/ei-residential-solution-eu) | **TSI X3** | GEN4 hybrid | `H31` | Supported upstream | — |
+| [Qcells](https://www.qcells.com/) | **Q.VOLT HYB-G3-3P** | GEN4 hybrid (listed by upstream) | — | Supported upstream | — |
+| [SolaX](https://www.solaxpower.com/our-products/x1-hybrid-g4.html) | **X1-Hybrid G4** | GEN4 hybrid | `H43`, `H44`, `H450`, `H460`, `H475` | Supported upstream | [3](#3-x1-models-and-the-block-read) |
+| [SolaX](https://www.solaxpower.com/our-products/x1-ies.html) | **X1-IES** | GEN5 hybrid | `H53`, `H55`, `H56`, `H58` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) on 5–8 kW |
+| [SolaX](https://www.solaxpower.com/our-products/x3-ies.html) | **X3-IES** | GEN5 hybrid | `H35…`, `P35…` | Supported upstream | — |
+| [SolaX](https://www.solaxpower.com/our-products/x3-ultra.html) | **X3-Ultra** | GEN5 hybrid | `H3B…` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) on some sizes, [2](#2-only-battery-1-is-read) |
+| [SolaX](https://www.solaxpower.com/our-products/x3-aelio-hybrid-inverter.html) | **X3-Aelio** | GEN5 hybrid (commercial) | `8021` | Supported upstream | [1](#1-only-pv-strings-1-and-2-are-read) |
+| [SolaX](https://www.solaxpower.com/our-products/x1-vast.html) | **X1-VAST** | GEN6 hybrid | `10M` | **Untested anywhere** | [1](#1-only-pv-strings-1-and-2-are-read), [3](#3-x1-models-and-the-block-read) |
 
 ### Readings and charging only
 
-| Model | Family | Serial prefix |
-|---|---|---|
-| **X1-Hybrid G2** (SK-TL, SK-SU) | GEN2 hybrid | `L30`, `U30`, `L37`, `U37`, `L50`, `U50` |
-| **X1-Hybrid G3** | GEN3 hybrid | `H1E`, `H1I`, `HCC`, `HUE`, `XRE` |
-| **X3-Hybrid G3** | GEN3 hybrid | `H3DE`, `H3E`, `H3LE`, `H3PE`, `H3UE` |
+| Manufacturer | Model | Family | Serial prefix |
+|---|---|---|---|
+| [SolaX](https://www.solaxpower.com/) | **X1-Hybrid G2** (SK-TL, SK-SU) | GEN2 hybrid | `L30`, `U30`, `L37`, `U37`, `L50`, `U50` |
+| [SolaX](https://www.solaxpower.com/) | **X1-Hybrid G3** | GEN3 hybrid | `H1E`, `H1I`, `HCC`, `HUE`, `XRE` |
+| [SolaX](https://www.solaxpower.com/) | **X3-Hybrid G3** | GEN3 hybrid | `H3DE`, `H3E`, `H3LE`, `H3PE`, `H3UE` |
 
 The Modbus Power Control block at `0x7C` exists from GEN4 on. Leave `BatteryHold:Enabled` off on
 these: there is nothing at that address for the hold to write to.
