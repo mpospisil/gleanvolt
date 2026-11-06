@@ -62,7 +62,13 @@
                     <div class="field-head">
                         <label for="@id">@Labels[key]</label>
                         <InfoTip Topic="@Labels[key]" Group="settings-info">
-                            <p>@Help[key]</p>
+                            <p>
+                                @Help[key]
+                                @if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
+                                {
+                                    @(" ")<a href="@SettingsText.HelpUnmeteredPhaseUrl" target="_blank" rel="noopener">@SettingsText.HelpUnmeteredPhaseLink</a>
+                                }
+                            </p>
                             <p>@Localized.Format(SettingsText.CurrentValueFrom, SourcePhrase(setting))</p>
                             <p>@SourceTitle(setting)</p>
                         </InfoTip>

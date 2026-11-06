@@ -953,7 +953,7 @@
     <value>The device's Modbus unit id. Usually 1, which is also what an empty field means; change it only if the device is set to another.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
-    <value>Only for a grid meter that is missing the clamp on one phase: enter the phase it does not measure, and Gleanvolt estimates that phase instead. Leave it empty when the meter measures all three phases, which is the normal case.</value>
+    <value>Leave it empty if your grid meter measures all three phases, which is the normal case. If it misses one, it reads 0 W there: Gleanvolt then misses the sun exported and the car's power on that phase, so the solar modes start late or take grid power. Enter that phase (L1, L2, L3, or SolaX's R, S, T) and Gleanvolt estimates it instead.</value>
   </data>
   <data name="HelpChargerId" xml:space="preserve">
     <value>A short machine name for the charger. Empty means "charger", which is fine for one charger.</value>
@@ -966,5 +966,11 @@
   </data>
   <data name="Reverted" xml:space="preserve">
     <value>{0} reverted; it comes from {1} again.</value>
+  </data>
+  <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
+    <value>How to tell whether your meter misses a phase</value>
+  </data>
+  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
+    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.md</value>
   </data>
 </root>

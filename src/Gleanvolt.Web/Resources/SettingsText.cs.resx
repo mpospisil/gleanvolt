@@ -940,7 +940,7 @@
     <value>Unit ID zařízení v protokolu Modbus. Obvykle 1; prázdné pole znamená také 1. Měňte ho, jen pokud je zařízení nastavené jinak.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
-    <value>Jen pro elektroměr, kterému na jedné fázi chybí měřicí kleště: zadejte fázi, kterou neměří, a Gleanvolt ji místo měření odhadne. Pokud elektroměr měří všechny tři fáze, což je běžné, nechte pole prázdné.</value>
+    <value>Nechte prázdné, pokud elektroměr měří všechny tři fáze, což je běžné. Pokud jednu neměří, ukazuje na ní 0 W: Gleanvolt pak nevidí přetoky ze slunce ani odběr auta na té fázi, takže solární režimy začnou nabíjet pozdě nebo berou energii ze sítě. Zadejte tu fázi (L1, L2, L3, nebo podle SolaX R, S, T) a Gleanvolt ji místo měření odhadne.</value>
   </data>
   <data name="HelpChargerId" xml:space="preserve">
     <value>Krátké strojové označení nabíječky. Prázdné pole znamená „charger“, což pro jednu nabíječku stačí.</value>
@@ -953,5 +953,11 @@
   </data>
   <data name="Reverted" xml:space="preserve">
     <value>Hodnota pole {0} je vrácena; její zdroj je opět: {1}.</value>
+  </data>
+  <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
+    <value>Jak poznat, že elektroměr jednu fázi neměří</value>
+  </data>
+  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
+    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.cs.md</value>
   </data>
 </root>

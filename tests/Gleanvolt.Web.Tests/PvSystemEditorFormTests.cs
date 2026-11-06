@@ -29,6 +29,20 @@ public class PvSystemEditorFormTests : BunitContext
 
     private static string Field(string key) => "#pv-" + key.Replace(':', '-');
 
+    // The guide the unmetered-phase tip links to lives in the repository, not in the app.
+    private static string RepoRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Gleanvolt.slnx")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException("Gleanvolt.slnx not found above " + AppContext.BaseDirectory);
+    }
+
     [Fact]
     public void Says_where_each_value_comes_from()
     {
@@ -60,7 +74,10 @@ public class PvSystemEditorFormTests : BunitContext
         }
 
         var phase = form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).ParentElement!;
-        Assert.Contains("missing the clamp on one phase", phase.QuerySelector(".info-pop p")!.TextContent);
+        var link = phase.QuerySelector(".info-pop p a")!;
+        Assert.EndsWith("docs/UNMETERED_GRID_PHASE.md", link.GetAttribute("href"));
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.md")));
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.cs.md")));
     }
 
     [Fact]
