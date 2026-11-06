@@ -50,17 +50,39 @@ public sealed class HostShutdown : IServiceShutdown
     // Who asked, kept for the closing log line. Same threading story as the flag above.
     private volatile string? _stopSource;
 
+    // How to start the process again after a Stop, for the log line that says it stays down. Depends on
+    // what started it, so a `dotnet run` or a Windows install is not told to go to the Pi.
+    private readonly string _startAgain;
+
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger)
-        : this(lifetime, logger, Supervised())
+        : this(lifetime, logger, CurrentSupervisor())
     {
     }
 
     /// <summary>For tests: with the supervision question answered rather than read from the environment.</summary>
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool supervised)
+        : this(lifetime, logger, supervised ? Supervisor.Container : Supervisor.None)
+    {
+    }
+
+    private HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, Supervisor supervisor)
     {
         _lifetime = lifetime;
         _logger = logger;
-        RestartsInProcess = !supervised;
+        RestartsInProcess = supervisor == Supervisor.None;
+        _startAgain = supervisor switch
+        {
+            Supervisor.Container => "with 'docker compose start gleanvolt-controller'",
+            Supervisor.Systemd => "with 'sudo systemctl start gleanvolt'",
+            _ => "the same way it was started",
+        };
+    }
+
+    private enum Supervisor
+    {
+        None,
+        Container,
+        Systemd,
     }
 
     /// <summary>
@@ -74,16 +96,17 @@ public sealed class HostShutdown : IServiceShutdown
     public bool RestartsInProcess { get; }
 
     /// <summary>
-    /// Whether this process is a container's or a systemd service's own. Systemd is recognised the way
+    /// Which supervisor, if any, this process is the service of. Systemd is recognised the way
     /// <c>AddSystemd()</c> recognises it, by the parent process being systemd -- the check the .deb's
     /// <c>Type=notify</c> readiness already depends on. Not by INVOCATION_ID: a desktop session runs
     /// under systemd's user manager, so every terminal and editor inherits that variable, and a
     /// <c>dotnet run</c> or a debug session started from one took itself for a service and exited on
     /// a restart that nothing then carried out.
     /// </summary>
-    private static bool Supervised() =>
-        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer()
-        || Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService();
+    private static Supervisor CurrentSupervisor() =>
+        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer() ? Supervisor.Container
+        : Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService() ? Supervisor.Systemd
+        : Supervisor.None;
 
     /// <summary>
     /// Whether this run is ending because somebody asked it to. Read after the host has stopped, to
@@ -168,9 +191,9 @@ public sealed class HostShutdown : IServiceShutdown
         // answer "why is the controller not running?", and this is the answer.
         _logger.LogWarning(
             "Stop requested by {Source}. Shutting down gracefully — the charger will be paused and the "
-            + "open session closed. The service will NOT restart by itself; start it again with "
-            + "'docker compose start gleanvolt-controller' on the Pi.",
-            source);
+            + "open session closed. The service will NOT restart by itself; start it again {StartAgain}.",
+            source,
+            _startAgain);
 
         _stopSource = source;
         _stopRequested = true;

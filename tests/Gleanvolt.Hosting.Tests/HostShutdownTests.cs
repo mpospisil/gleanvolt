@@ -121,6 +121,27 @@ public class HostShutdownTests
     }
 
     [Fact]
+    public void A_stop_says_how_to_start_it_again_where_it_runs()
+    {
+        var log = new CapturingLogger();
+        new HostShutdown(_lifetime, log, supervised: false).RequestStop("Web UI");
+
+        var line = Assert.Single(log.Messages, m => m.Contains("Stop requested"));
+        Assert.Contains("the same way it was started", line);
+        Assert.DoesNotContain("docker", line);
+    }
+
+    [Fact]
+    public void In_the_container_a_stop_names_the_compose_command()
+    {
+        var log = new CapturingLogger();
+        new HostShutdown(_lifetime, log, supervised: true).RequestStop("Web UI");
+
+        var line = Assert.Single(log.Messages, m => m.Contains("Stop requested"));
+        Assert.Contains("docker compose start gleanvolt-controller", line);
+    }
+
+    [Fact]
     public void Under_a_supervisor_a_restart_leaves_it_to_the_supervisor()
     {
         var shutdown = new HostShutdown(_lifetime, new CapturingLogger(), supervised: true);
