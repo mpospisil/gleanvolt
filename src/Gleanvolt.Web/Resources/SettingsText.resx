@@ -950,7 +950,7 @@
     <value>The Modbus TCP port the device answers on. Almost always 502, which is also what an empty field means.</value>
   </data>
   <data name="HelpUnitId" xml:space="preserve">
-    <value>The device's Modbus unit id. Usually 1, which is also what an empty field means; change it only if the device is set to another.</value>
+    <value>Leave it at 1. The unit id tells apart devices that share one network address, for example several chargers behind one Modbus gateway. Gleanvolt will use it once it supports more than one inverter or charger. Empty also means 1.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
     <value>Leave it empty if your grid meter measures all three phases, which is the normal case. If it misses one, it reads 0 W there: Gleanvolt then misses the sun exported and the car's power on that phase, so the solar modes start late or take grid power. Enter that phase (L1, L2, L3, or SolaX's R, S, T) and Gleanvolt estimates it instead.</value>

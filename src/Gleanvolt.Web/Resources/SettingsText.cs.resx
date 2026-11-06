@@ -937,7 +937,7 @@
     <value>Port Modbus TCP, na kterém zařízení odpovídá. Téměř vždy 502; prázdné pole znamená také 502.</value>
   </data>
   <data name="HelpUnitId" xml:space="preserve">
-    <value>Unit ID zařízení v protokolu Modbus. Obvykle 1; prázdné pole znamená také 1. Měňte ho, jen pokud je zařízení nastavené jinak.</value>
+    <value>Nechte 1. Unit ID rozlišuje zařízení, která sdílejí jednu síťovou adresu, například několik nabíječek za jednou bránou Modbus. Gleanvolt ho začne využívat, až bude podporovat víc střídačů nebo nabíječek. Prázdné pole znamená také 1.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
     <value>Nechte prázdné, pokud elektroměr měří všechny tři fáze, což je běžné. Pokud jednu neměří, ukazuje na ní 0 W: Gleanvolt pak nevidí přetoky ze slunce ani odběr auta na té fázi, takže solární režimy začnou nabíjet pozdě nebo berou energii ze sítě. Zadejte tu fázi (L1, L2, L3, nebo podle SolaX R, S, T) a Gleanvolt ji místo měření odhadne.</value>
