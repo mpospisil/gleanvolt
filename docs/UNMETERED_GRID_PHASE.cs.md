@@ -31,6 +31,30 @@ Pokud na jedné fázi měřicí kleště chybí, jsou odpojené nebo nasazené n
   fázi. Gleanvolt vidí menší odběr ze sítě, než ve skutečnosti je, myslí si, že auto pokrývá slunce, a
   nabíjení potichu bere energii ze sítě.
 
+## Proč toto nastavení vzniklo: skutečný případ
+
+Nastavení pochází z instalace, na které se Gleanvolt vyvíjel: třífázový hybridní střídač SolaX
+s domácí baterií a wallbox SolaX. Elektroměr té instalace nemá na fázi **L3** (u SolaX „T“) funkční
+měřicí kleště, takže na ní ukazuje vždy 0 W — přitom střídač sám hlásí, že za slunečného odpoledne
+posílá do L3 **1,7–2,3 kW**.
+
+Jak to vypadalo navenek:
+
+- **Každé slunečné odpoledne to vypadalo, že dům spotřebuje asi 90 % solární výroby** — nejméně dvanáct
+  dní po sobě. Přetoky na L3 se nikdy neukázaly jako dodávka do sítě, a tak se započítaly jako spotřeba
+  domu.
+- **Solární režimy auto nenabíjely.** SolarGrid se při přechodu mraku pozastavil a už se znovu
+  nespustil, i když ze střechy šlo 4–5 kW. Podle toho, co Gleanvolt viděl, žádný přebytek nebyl.
+- **Během nabíjení auta to vypadalo, že dům několik kilowattů *vyrábí*.** Třetina odběru auta šla
+  neviděna přes L3, takže odběr ze sítě vypadal menší než samotné auto a spotřeba domu vyšla záporná.
+
+Nejdřív to vypadalo na skrytý spotřebič, třeba regulátor přetoků do bojleru, který si potichu bere
+přebytek. Nebyl to on: porovnání údajů elektroměru po fázích s výkonem střídače po fázích ukázalo, že
+jedna fáze stojí na 0 W, zatímco střídač do ní zjevně dodává.
+
+Správným řešením je doplnit měřicí kleště, na to je ale potřeba elektrikář. Do té doby díky tomuto
+nastavení Gleanvolt chybějící fázi odhadne a solární režimy fungují.
+
 ## Příznaky, že elektroměr jednu fázi nevidí
 
 - Slunečné odpoledne, plná domácí baterie, a přesto Gleanvolt ukazuje vysokou spotřebu domu a skoro

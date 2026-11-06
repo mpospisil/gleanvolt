@@ -31,6 +31,32 @@ phase whatever actually flows there**. Everything on that phase becomes invisibl
   power through the blind phase. Gleanvolt sees less grid import than there really is, believes the
   sun is covering the car, and the charge quietly takes power from the grid.
 
+## Why this setting exists: a real case
+
+The setting comes from the installation Gleanvolt was developed on: a three-phase SolaX hybrid
+inverter with a home battery and a SolaX wallbox. Its grid meter has no working clamp on **L3** (SolaX
+"T"), so it always reads 0 W on that phase — while the inverter itself reports **1.7–2.3 kW** going out
+on L3 on a sunny afternoon.
+
+What that looked like from the outside:
+
+- **Every sunny afternoon, the house seemed to use about 90 % of the solar production** — for at least
+  twelve days in a row. The power exported on L3 never showed up as export, so it was counted as house
+  consumption.
+- **The solar modes would not charge the car.** SolarGrid paused when a cloud passed and then never
+  started again, although 4–5 kW was coming off the roof. As far as Gleanvolt could tell, there was no
+  surplus.
+- **While the car charged, the house seemed to *produce* several kilowatts.** A third of the car's draw
+  went through L3 unseen, so the grid import looked smaller than the car alone, and the house came out
+  negative.
+
+At first it looked like a hidden consumer, such as a hot-water diverter quietly taking the surplus. It
+was not: comparing the meter's per-phase readings with the inverter's per-phase output showed one phase
+stuck at 0 W while the inverter clearly exported on it.
+
+Fitting the clamp is the proper fix, but it needs an electrician. Until then, this setting lets
+Gleanvolt estimate the missing phase so the solar modes work.
+
 ## Signs that your meter may be blind on one phase
 
 - Sunny afternoon, home battery full, yet Gleanvolt shows a large house consumption and almost no
