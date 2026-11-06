@@ -87,6 +87,12 @@
   <data name="StartAgain" xml:space="preserve">
     <value>Znovu ho spustíte na Pi příkazem {0} v adresáři {1}. Sám se znovu nespustí — tím se zastavení liší od restartu.</value>
   </data>
+  <data name="StartAgainSystemd" xml:space="preserve">
+    <value>Znovu ho spustíte příkazem {0}. Sám se znovu nespustí — tím se zastavení liší od restartu.</value>
+  </data>
+  <data name="StartAgainManual" xml:space="preserve">
+    <value>Gleanvolt spusťte znovu stejným způsobem, jakým jste ho spustili. Sám se znovu nespustí — tím se zastavení liší od restartu.</value>
+  </data>
   <data name="StopQuestion" xml:space="preserve">
     <value>Zastavit službu?</value>
   </data>
@@ -94,7 +100,7 @@
     <value>Ano, zastavit</value>
   </data>
   <data name="StopConfirmHint" xml:space="preserve">
-    <value>Nabíjení se zastaví, toto rozhraní i integrace s Home Assistant přestanou být dostupné a správce nabíjení zůstane vypnutý, dokud ho znovu nespustíte z příkazové řádky na Pi.</value>
+    <value>Nabíjení se zastaví, toto rozhraní i integrace s Home Assistant přestanou být dostupné a správce nabíjení zůstane vypnutý, dokud ho znovu nespustíte.</value>
   </data>
   <data name="StopLabel" xml:space="preserve">
     <value>Zastavit službu</value>

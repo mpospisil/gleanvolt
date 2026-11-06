@@ -92,7 +92,7 @@ public class HostShutdownTests
     public void Says_who_asked_for_the_restart_and_that_it_comes_back()
     {
         var log = new CapturingLogger();
-        var shutdown = new HostShutdown(_lifetime, log);
+        var shutdown = new HostShutdown(_lifetime, log, supervised: true);
         shutdown.LogWhenStopped();
 
         shutdown.RequestRestart("Web UI");
@@ -101,6 +101,52 @@ public class HostShutdownTests
         var line = Assert.Single(log.Messages, m => m.Contains("stopped cleanly"));
         Assert.Contains("restart requested by Web UI", line);
         Assert.Contains($"code {HostShutdown.RestartExitCode}", line);
+    }
+
+    [Fact]
+    public void Where_nothing_supervises_it_a_restart_happens_in_the_process()
+    {
+        var log = new CapturingLogger();
+        var shutdown = new HostShutdown(_lifetime, log, supervised: false);
+        shutdown.LogWhenStopped();
+
+        shutdown.RequestRestart("Web UI");
+        _lifetime.NotifyStopped();
+
+        Assert.True(shutdown.RestartsInProcess);
+        Assert.True(shutdown.RestartRequested);
+        var line = Assert.Single(log.Messages, m => m.Contains("stopped cleanly"));
+        Assert.Contains("restart requested by Web UI", line);
+        Assert.Contains("same process", line);
+    }
+
+    [Fact]
+    public void A_stop_says_how_to_start_it_again_where_it_runs()
+    {
+        var log = new CapturingLogger();
+        new HostShutdown(_lifetime, log, supervised: false).RequestStop("Web UI");
+
+        var line = Assert.Single(log.Messages, m => m.Contains("Stop requested"));
+        Assert.Contains("the same way it was started", line);
+        Assert.DoesNotContain("docker", line);
+    }
+
+    [Fact]
+    public void In_the_container_a_stop_names_the_compose_command()
+    {
+        var log = new CapturingLogger();
+        new HostShutdown(_lifetime, log, supervised: true).RequestStop("Web UI");
+
+        var line = Assert.Single(log.Messages, m => m.Contains("Stop requested"));
+        Assert.Contains("docker compose start gleanvolt-controller", line);
+    }
+
+    [Fact]
+    public void Under_a_supervisor_a_restart_leaves_it_to_the_supervisor()
+    {
+        var shutdown = new HostShutdown(_lifetime, new CapturingLogger(), supervised: true);
+
+        Assert.False(shutdown.RestartsInProcess);
     }
 
     // The closing line. A run's log ending without one is how an operator tells a deliberate stop from

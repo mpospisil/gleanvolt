@@ -50,30 +50,59 @@ public sealed class HostShutdown : IServiceShutdown
     // Who asked, kept for the closing log line. Same threading story as the flag above.
     private volatile string? _stopSource;
 
+    // How to start the process again after a Stop, for the log line that says it stays down. Depends on
+    // what started it, so a `dotnet run` or a Windows install is not told to go to the Pi.
+    private readonly string _startAgain;
+
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger)
-        : this(lifetime, logger, Supervised())
+        : this(lifetime, logger, CurrentSupervisor())
     {
     }
 
     /// <summary>For tests: with the supervision question answered rather than read from the environment.</summary>
-    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool restartsByItself)
+    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool supervised)
+        : this(lifetime, logger, supervised ? ServiceSupervisor.Container : ServiceSupervisor.None)
+    {
+    }
+
+    /// <summary>For tests: with the supervisor named rather than read from the environment.</summary>
+    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, ServiceSupervisor supervisor)
     {
         _lifetime = lifetime;
         _logger = logger;
-        RestartsByItself = restartsByItself;
+        Supervisor = supervisor;
+        _startAgain = supervisor switch
+        {
+            ServiceSupervisor.Container => "with 'docker compose start gleanvolt-controller'",
+            ServiceSupervisor.Systemd => "with 'sudo systemctl start gleanvolt'",
+            _ => "the same way it was started",
+        };
     }
 
-    /// <summary>
-    /// Whether something will start this process again after a restart (#301): the image's container,
-    /// whose compose file restarts it on failure, or a systemd unit, which sets INVOCATION_ID for every
-    /// service it starts. Neither is true of the Windows zip, winget or <c>dotnet run</c>, where a
-    /// restart is a stop and the person who asked for it has to start Gleanvolt again.
-    /// </summary>
-    public bool RestartsByItself { get; }
+    public ServiceSupervisor Supervisor { get; }
 
-    private static bool Supervised() =>
-        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer()
-        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INVOCATION_ID"));
+    /// <summary>
+    /// Whether a restart is carried out inside this process rather than by whoever started it. Where
+    /// something supervises the process -- the image's container, whose compose file restarts it on
+    /// failure, or the .deb's systemd unit -- a restart exits with <see cref="RestartExitCode"/> and the
+    /// supervisor starts a new process. Where nothing does -- the Windows zip, winget, <c>dotnet run</c>,
+    /// the debugger -- <c>Program.cs</c> builds a fresh host in the same process instead, so a restart
+    /// always comes back.
+    /// </summary>
+    public bool RestartsInProcess => Supervisor == ServiceSupervisor.None;
+
+    /// <summary>
+    /// Which supervisor, if any, this process is the service of. Systemd is recognised the way
+    /// <c>AddSystemd()</c> recognises it, by the parent process being systemd -- the check the .deb's
+    /// <c>Type=notify</c> readiness already depends on. Not by INVOCATION_ID: a desktop session runs
+    /// under systemd's user manager, so every terminal and editor inherits that variable, and a
+    /// <c>dotnet run</c> or a debug session started from one took itself for a service and exited on
+    /// a restart that nothing then carried out.
+    /// </summary>
+    private static ServiceSupervisor CurrentSupervisor() =>
+        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer() ? ServiceSupervisor.Container
+        : Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService() ? ServiceSupervisor.Systemd
+        : ServiceSupervisor.None;
 
     /// <summary>
     /// Whether this run is ending because somebody asked it to. Read after the host has stopped, to
@@ -107,13 +136,14 @@ public sealed class HostShutdown : IServiceShutdown
 
     private void LogStopped()
     {
-        if (_restartRequested && !RestartsByItself)
+        if (_restartRequested && RestartsInProcess)
         {
-            // Not a restart at all here, and the one place to say so: the page that asked has already
-            // told the person, but a log read later must not suggest the process came back.
-            _logger.LogWarning(
-                "Gleanvolt stopped for a restart requested by {Source}, but nothing on this host starts it "
-                + "again (no container, no systemd unit). Start Gleanvolt again to apply the configuration.",
+            // Nothing outside starts this process again, so it does not exit: Program.cs builds a new
+            // host, which reads the configuration afresh. Said so that the log does not read as a stop.
+            _logger.LogInformation(
+                "Gleanvolt stopped cleanly for a restart requested by {Source}. Nothing on this host "
+                + "starts the process again, so it restarts in the same process and reads its "
+                + "configuration afresh.",
                 _stopSource);
 
             return;
@@ -157,9 +187,9 @@ public sealed class HostShutdown : IServiceShutdown
         // answer "why is the controller not running?", and this is the answer.
         _logger.LogWarning(
             "Stop requested by {Source}. Shutting down gracefully — the charger will be paused and the "
-            + "open session closed. The service will NOT restart by itself; start it again with "
-            + "'docker compose start gleanvolt-controller' on the Pi.",
-            source);
+            + "open session closed. The service will NOT restart by itself; start it again {StartAgain}.",
+            source,
+            _startAgain);
 
         _stopSource = source;
         _stopRequested = true;
@@ -176,10 +206,11 @@ public sealed class HostShutdown : IServiceShutdown
         // at 14:02?", and the next run's first lines will not say.
         _logger.LogWarning(
             "Restart requested by {Source}. Shutting down gracefully — the charger will be paused and the "
-            + "open session closed — and exiting with code {ExitCode} so that the restart policy starts it "
-            + "again.",
+            + "open session closed — and {How}.",
             source,
-            RestartExitCode);
+            RestartsInProcess
+                ? "starting again in this process"
+                : $"exiting with code {RestartExitCode} so that the restart policy starts it again");
 
         _stopSource = source;
         _restartRequested = true;

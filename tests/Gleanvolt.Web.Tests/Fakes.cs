@@ -168,8 +168,8 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
 
     public void RequestRestart(string source) => Restarts.Add(source);
 
-    /// <summary>Whether a restart comes back by itself here; false is the Windows zip (#301).</summary>
-    public bool RestartsByItself { get; set; } = true;
+    /// <summary>What runs the service; the Health page's start-again line depends on it.</summary>
+    public ServiceSupervisor Supervisor { get; set; } = ServiceSupervisor.Container;
 }
 
 /// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>

@@ -7,20 +7,12 @@
     click is the same in both and easy to let drift.
 
     Two clicks, like Stop, but for a different reason: nothing is lost, and it comes back by itself
-    where a restart policy is watching. What the confirmation is for is the cost -- a charge that pauses,
-    half a minute without a controller, a Solcast call spent -- and the one host where it does not come
-    back at all.
+    every time: under a restart policy as a new process, anywhere else in the same one. What the
+    confirmation is for is the cost -- a charge that pauses, half a minute without a controller, a
+    Solcast call spent.
 *@
 
-@if (_restarting && !Shutdown.RestartsByItself)
-{
-    @* Nothing on this host brings the process back (#301): the Windows zip, winget, dotnet run. A
-       page that said "restarting" would leave the owner waiting for something that never happens. *@
-    <p class="stopping" id="restart-progress">
-        @SharedText.RestartManual
-    </p>
-}
-else if (_restarting)
+@if (_restarting)
 {
     <p class="stopping" id="restart-progress">
         @SharedText.RestartProgress
@@ -68,15 +60,12 @@ else
         // The browser starts watching before the server goes away, so the reload does not depend on the
         // circuit surviving long enough to ask for it. A browser that has no script to run it is left
         // with Blazor's own reconnect prompt, which is where it would have been anyway.
-        if (Shutdown.RestartsByItself)
+        try
         {
-            try
-            {
-                await JS.InvokeVoidAsync("gleanvolt.reloadAfterRestart");
-            }
-            catch (JSException)
-            {
-            }
+            await JS.InvokeVoidAsync("gleanvolt.reloadAfterRestart");
+        }
+        catch (JSException)
+        {
         }
 
         Shutdown.RequestRestart("Web UI");

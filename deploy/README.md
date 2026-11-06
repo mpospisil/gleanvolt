@@ -1040,8 +1040,10 @@ the same graceful shutdown as Stop and exits with code `75`, which `restart: on-
 seconds, reads its configuration afresh, and starts in mode **Off**; the page reloads by itself. It
 spends one Solcast call at startup, like any restart.
 
-Where nothing restarts the process — `dotnet run`, a `docker run` without a restart policy, the
-Windows zip — Restart simply exits. There is no way to detect a restart policy from inside the
+Where nothing supervises the process — `dotnet run`, the VS Code debugger, the Windows zip — it does
+not exit at all: once the host has stopped, the same process builds a fresh one, which reads the
+configuration afresh just the same, and the debugger stays attached. The one case that stays down is
+a `docker run` without a restart policy: there is no way to detect a restart policy from inside the
 container, so the confirmation says this rather than checking.
 
 ### Settings saved from the web UI

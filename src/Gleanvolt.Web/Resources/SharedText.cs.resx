@@ -160,7 +160,7 @@
     <value>Pokud se do minuty nebo dvou nespustí, nic ho automaticky nerestartuje. Podívejte se na {0} nebo {1}, případně ho spusťte ručně.</value>
   </data>
   <data name="RestartCost" xml:space="preserve">
-    <value>Probíhající nabíjení se pozastaví a správce nabíjení se jako po každém startu spustí v režimu Off. Režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, proto je po restartu nastavte znovu. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď solární energie, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se správce nabíjení spustí znovu sám. Pokud ho spouštíte jinak — {1}, prostý {2}, zip pro Windows — jen se ukončí a musíte ho spustit znovu ručně.</value>
+    <value>Probíhající nabíjení se pozastaví a správce nabíjení se jako po každém startu spustí v režimu Off. Režim nabíjení, požadavek Targeted ani limit Fast se nezachovají, proto je po restartu nastavte znovu. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď solární energie, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se spustí znovu jako nový proces; spuštěný přes {1} nebo ze zipu pro Windows se spustí znovu uvnitř stejného procesu. Jen prostý {2} bez zásady restartu zůstane zastavený a musíte ho spustit znovu ručně.</value>
   </data>
   <data name="MqttBroker" xml:space="preserve">
     <value>Broker</value>
@@ -527,9 +527,6 @@
   </data>
   <data name="SetupModeStart" xml:space="preserve">
     <value>Spustit správce nabíjení</value>
-  </data>
-  <data name="RestartManual" xml:space="preserve">
-    <value>Gleanvolt se zastavuje. Na tomto počítači ho nic znovu nespustí, takže ho pro použití nastavení spusťte sami.</value>
   </data>
   <data name="SetupModeWizard" xml:space="preserve">
     <value>Pokračovat v nastavení</value>
