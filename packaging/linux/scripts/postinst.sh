@@ -66,8 +66,8 @@ cat <<EOF
 
 Gleanvolt is installed.
 
-  Web UI     http://${address:-<this machine>}:${port:-8090}   (plain HTTP, no login until you set one)
-  Settings   /etc/gleanvolt/gleanvolt.env   -- set your inverter and charger addresses first
+  Web UI     http://${address:-<this machine>}:${port:-8090}   (plain HTTP; a new install opens on the setup wizard)
+  Settings   /etc/gleanvolt/gleanvolt.env
   Data       /var/lib/gleanvolt
   Logs       journalctl -u gleanvolt -e   and   /var/log/gleanvolt
   Service    sudo systemctl status|restart|stop gleanvolt
