@@ -45,9 +45,11 @@
         <label for="password">@SharedText.PasswordLabel</label>
         @* InputText sets aria-invalid and the "invalid" class itself, from the message SignInAsync
            records against the field; only the link to the words is this page's to add. *@
-        <InputText id="password" type="password" @bind-Value="Input!.Password" autofocus
-                   autocomplete="current-password"
-                   aria-describedby="@(_failed ? "password-error" : null)" />
+        <RevealInput>
+            <InputText id="password" type="password" @bind-Value="Input!.Password" autofocus
+                       autocomplete="current-password"
+                       aria-describedby="@(_failed ? "password-error" : null)" />
+        </RevealInput>
 
         @if (_failed)
         {

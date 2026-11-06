@@ -142,7 +142,7 @@
     <value>Stav</value>
   </data>
   <data name="MqttTip2" xml:space="preserve">
-    <value>Nic z toho neříká, zda je některé ze spojení {0}. Vše na této stránce se načetlo jednou při startu. Stránka {1} ukazuje smyčku čtení, ne broker. Zda spojení funguje, proto zjistíte z logu brokeru, nebo podle toho, zda Home Assistant ukazuje zařízení jako nedostupné.</value>
+    <value>Údaje níže načetl správce nabíjení při startu; formuláře výše je změní až od dalšího startu. Neukazují, zda je některé ze spojení {0}, a stránka {1} ukazuje smyčku čtení, ne broker. Spojení s Home Assistant ověříte tlačítkem Vyzkoušet připojení výše, nebo podle toho, zda Home Assistant ukazuje zařízení jako nedostupné.</value>
   </data>
   <data name="HomeAssistant" xml:space="preserve">
     <value>Home Assistant</value>
@@ -151,7 +151,7 @@
     <value>Home Assistant</value>
   </data>
   <data name="HaTip1" xml:space="preserve">
-    <value>ID zařízení je základem {0} každé entity. Jeho změna jako jediná zdejší hodnota něco stojí: Home Assistant váže entitu na její {1}, takže nové ID vytvoří novou entitu vedle staré a všechny grafy začnou znovu. Témata a názvy lze měnit volně. Interval stavu určuje, jak často se znovu publikuje stavové téma — to bývá odpověď na otázku, proč je přehled v Home Assistant pozadu.</value>
+    <value>ID zařízení je základem {0} každé entity a je to jediná hodnota tady, jejíž změna něco stojí: Home Assistant váže entitu na její {1}, takže nové ID vytvoří nové entity vedle starých a všechny grafy začnou znovu. Témata a názvy lze měnit volně. Interval stavu určuje, jak často se znovu publikuje stavové téma — to bývá odpověď na otázku, proč je přehled v Home Assistant pozadu.</value>
   </data>
   <data name="HaTip2_3" xml:space="preserve">
     <value>příchozí</value>
@@ -313,7 +313,7 @@
     <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči). Nic se nezmění, dokud se správce nabíjení nerestartuje.</value>
   </data>
   <data name="SavingTip2" xml:space="preserve">
-    <value>Ikona (i) u každého pole ukazuje, odkud pochází jeho aktuální hodnota. Pokud po uložení hodnota pole ještě neplatí, je to pod polem uvedeno.</value>
+    <value>Ikona (i) u každého pole vysvětluje, co pole znamená a odkud pochází jeho aktuální hodnota. Pokud po uložení nová hodnota ještě neplatí, je to uvedeno pod polem.</value>
   </data>
   <data name="NotRunningUntilRestart" xml:space="preserve">
     <value>— začne platit po restartu správce nabíjení.</value>
@@ -325,7 +325,7 @@
     <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Pole obsahují i adresy, na které správce nabíjení posílá příkazy Modbus, a bez přihlášení by je kdokoli v místní síti mohl přesměrovat jinam. Nastavte {0} ({1}) a pole půjde upravovat tady; do té doby je měňte v {2} a restartujte.</value>
   </data>
   <data name="CurrentValueFrom" xml:space="preserve">
-    <value>Aktuální hodnota pochází z: {0}.</value>
+    <value>Zdroj aktuální hodnoty: {0}.</value>
   </data>
   <data name="RunningRestartToApply" xml:space="preserve">
     <value>Platí: {0} · nová hodnota se projeví po restartu</value>
@@ -457,7 +457,7 @@
     <value>Změna ID přesune všechna témata MQTT, pod kterými správce nabíjení publikuje, takže Home Assistant po restartu uvidí nová témata. Jak vyčistit stará, popisuje kapitola „Renaming what Home Assistant sees“ v deploy/README.md a proměnná HA_RETIRE_TOPIC_PREFIX. ID zařízení v Home Assistant se nastavuje zvlášť a nemění se.</value>
   </data>
   <data name="CoordinatesWarning" xml:space="preserve">
-    <value>Vymazáním souřadnic se vypne zaznamenávání počasí k nabíjení a zruší se poloha pro předpověď.</value>
+    <value>Vymazáním souřadnic se přestane k nabíjení zaznamenávat počasí.</value>
   </data>
   <data name="SourceWebUi" xml:space="preserve">
     <value>webové rozhraní</value>
@@ -769,7 +769,7 @@
     <value>počasí</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Počasí pochází z bezplatného účtu OpenWeatherMap: klíč vytvoříte v sekci API keys na openweathermap.org. Nový klíč může začít fungovat až za několik hodin.</value>
+    <value>Počasí pochází z bezplatného účtu OpenWeatherMap: klíč vytvoříte v sekci API keys na openweathermap.org. Než nový klíč začne fungovat, může to trvat až několik hodin.</value>
   </data>
   <data name="WeatherTip2" xml:space="preserve">
     <value>Klíč uložený tady má přednost před {0} v {1}. Když ho odstraníte, znovu se použije klíč z prostředí.</value>
@@ -884,5 +884,80 @@
   </data>
   <data name="KeyRemoved" xml:space="preserve">
     <value>Klíč pro {0} odstraněn. Od příštího startu bude odmítnut.</value>
+  </data>
+  <data name="HelpId" xml:space="preserve">
+    <value>Krátké strojové označení instalace. Obsahuje ho každé téma MQTT, do kterého Gleanvolt publikuje, proto je povinné, když je zapnutý Home Assistant. Zvolte ho jednou: pozdější změna přesune všechna témata.</value>
+  </data>
+  <data name="HelpName" xml:space="preserve">
+    <value>Jak instalaci říkáte, například Střecha doma. Zobrazuje se v záložce prohlížeče a klientům API.</value>
+  </data>
+  <data name="HelpAddress" xml:space="preserve">
+    <value>Poštovní adresa pro lidi. Nic se z ní nevypočítává: polohu určuje zeměpisná šířka a délka.</value>
+  </data>
+  <data name="HelpCommissioned" xml:space="preserve">
+    <value>Datum, kdy byla fotovoltaická elektrárna nainstalována a uvedena do provozu, ve tvaru yyyy-MM-dd. Jen pro informaci.</value>
+  </data>
+  <data name="HelpLatitude" xml:space="preserve">
+    <value>Jak daleko na sever nebo na jih instalace leží, v desetinných stupních, například 50.0755. Spolu se zeměpisnou délkou slouží ke zjištění počasí pro každé nabíjení.</value>
+  </data>
+  <data name="HelpLongitude" xml:space="preserve">
+    <value>Jak daleko na východ nebo na západ instalace leží, v desetinných stupních, například 14.4378. Spolu se zeměpisnou šířkou slouží ke zjištění počasí pro každé nabíjení.</value>
+  </data>
+  <data name="HelpTimeZone" xml:space="preserve">
+    <value>Časové pásmo instalace jako název, například Europe/Prague. Určuje, kdy den začíná a končí, takže se jím řídí denní plány, časy tarifu i historie.</value>
+  </data>
+  <data name="HelpAzimuth" xml:space="preserve">
+    <value>Směr, kterým panely míří, ve stupních od severu: 90 = východ, 180 = jih, 270 = západ. Jen pro informaci: předpověď bere orientaci z vaší instalace v Solcastu.</value>
+  </data>
+  <data name="HelpTilt" xml:space="preserve">
+    <value>Sklon panelů: 0 = vodorovně, 90 = svisle. Jen pro informaci: předpověď bere sklon z vaší instalace v Solcastu.</value>
+  </data>
+  <data name="HelpCapacityKwp" xml:space="preserve">
+    <value>Celkový jmenovitý výkon panelů, tedy součet hodnot z jejich štítků, v kWp. Jen pro informaci.</value>
+  </data>
+  <data name="HelpInverterCapacity" xml:space="preserve">
+    <value>Nejvyšší střídavý výkon, který střídač dodá, v kW. Má význam, jen když je nižší než špičkový výkon panelů, protože pak výrobu omezuje. Jen pro informaci.</value>
+  </data>
+  <data name="HelpLossFactor" xml:space="preserve">
+    <value>Podíl stejnosměrné energie z panelů, který zbude po ztrátách v kabelech, střídači a jinde: 1 = bez ztrát, 0.85 = ztráta 15 %. Jen pro informaci.</value>
+  </data>
+  <data name="HelpHomeBatteryCapacity" xml:space="preserve">
+    <value>Kolik energie domácí baterie skutečně uloží a vydá, v kWh: využitelná kapacita, ne jmenovitá. Režimy Forecasted a Targeted podle ní plánují, kolik slunce si vezme baterie. Bez ní nabíjí Forecasted jen z aktuálního přebytku.</value>
+  </data>
+  <data name="HelpHomeBatteryEfficiency" xml:space="preserve">
+    <value>Podíl solární energie poslané do domácí baterie, který se v ní skutečně uloží, například 0.95. Spolu s kapacitou určuje, kolik slunce je potřeba na dobití baterie.</value>
+  </data>
+  <data name="HelpInverterModel" xml:space="preserve">
+    <value>Model střídače, například SolaX X3-HYB-G4 PRO. Jen pro informaci: nemění, jak Gleanvolt se zařízením komunikuje.</value>
+  </data>
+  <data name="HelpInverterHost" xml:space="preserve">
+    <value>IP adresa nebo název střídače v místní síti. Gleanvolt z něj přes Modbus TCP čte výkon panelů, stav domácí baterie a tok energie ze sítě a do sítě.</value>
+  </data>
+  <data name="HelpPort" xml:space="preserve">
+    <value>Port Modbus TCP, na kterém zařízení odpovídá. Téměř vždy 502; prázdné pole znamená také 502.</value>
+  </data>
+  <data name="HelpUnitId" xml:space="preserve">
+    <value>Nechte 1. Unit ID rozlišuje zařízení, která sdílejí jednu síťovou adresu, například několik nabíječek za jednou bránou Modbus. Gleanvolt ho začne využívat, až bude podporovat víc střídačů nebo nabíječek. Prázdné pole znamená také 1.</value>
+  </data>
+  <data name="HelpUnmeteredPhase" xml:space="preserve">
+    <value>Nechte prázdné, pokud elektroměr měří všechny tři fáze, což je běžné. Pokud jednu neměří, ukazuje na ní 0 W: Gleanvolt pak nevidí přetoky ze slunce ani odběr auta na té fázi, takže solární režimy začnou nabíjet pozdě nebo berou energii ze sítě. Zadejte tu fázi (L1, L2, L3, nebo podle SolaX R, S, T) a Gleanvolt ji místo měření odhadne.</value>
+  </data>
+  <data name="HelpChargerId" xml:space="preserve">
+    <value>Krátké strojové označení nabíječky. Prázdné pole znamená „charger“, což pro jednu nabíječku stačí.</value>
+  </data>
+  <data name="HelpChargerModel" xml:space="preserve">
+    <value>Model nabíječky, například SolaX X3-HAC. Jen pro informaci: nemění, jak Gleanvolt se zařízením komunikuje.</value>
+  </data>
+  <data name="HelpChargerHost" xml:space="preserve">
+    <value>IP adresa nebo název nabíječky v místní síti. Gleanvolt přes ni pomocí Modbus TCP spouští a zastavuje nabíjení a nastavuje nabíjecí proud.</value>
+  </data>
+  <data name="Reverted" xml:space="preserve">
+    <value>Hodnota pole {0} je vrácena; její zdroj je opět: {1}.</value>
+  </data>
+  <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
+    <value>Jak poznat, že elektroměr jednu fázi neměří</value>
+  </data>
+  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
+    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.cs.md</value>
   </data>
 </root>

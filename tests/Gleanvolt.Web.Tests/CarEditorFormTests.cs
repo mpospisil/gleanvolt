@@ -221,7 +221,7 @@ public class CarEditorFormTests : BunitContext
         Assert.Equal("password", password.GetAttribute("type"));
         Assert.Equal(string.Empty, password.GetAttribute("value"));
         Assert.Equal("unchanged", password.GetAttribute("placeholder"));
-        Assert.Contains("secret store", password.ParentElement!.QuerySelector(".source")!.TextContent);
+        Assert.Contains("secret store", password.Closest(".pv-field")!.QuerySelector(".source")!.TextContent);
     }
 
     [Fact]

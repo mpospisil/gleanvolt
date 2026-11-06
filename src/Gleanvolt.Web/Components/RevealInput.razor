@@ -1,0 +1,31 @@
+@*
+    A password box whose typed text can be checked before it is saved: an API key pasted into the
+    Solcast or OpenWeatherMap field, a broker password, a new sign-in password. Secret (the stored value
+    behind Reveal) only shows what is already saved; this shows what is in the box now.
+
+    The toggle is a plain script (js/reveal.js) rather than a Blazor event, because the sign-in, setup
+    and reset pages are static server rendering with no circuit to call back into, and one mechanism
+    serves both. Blazor never renders the box's type differently, so a re-render leaves a revealed box
+    revealed; the button's state lives in aria-pressed, which only the script writes.
+*@
+<span class="reveal">
+    @ChildContent
+    @if (!Disabled)
+    {
+        <button type="button" class="reveal-toggle">
+            <span class="reveal-show">@SharedText.Reveal</span>
+            <span class="reveal-hide">@SharedText.Hide</span>
+        </button>
+    }
+</span>
+
+@code {
+    /// <summary>The password input itself.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// No toggle, for a box nobody may type into (a form without a login): there is nothing to check,
+    /// and a read-only page offers no buttons at all.
+    /// </summary>
+    [Parameter] public bool Disabled { get; set; }
+}

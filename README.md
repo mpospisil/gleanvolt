@@ -497,6 +497,8 @@ downstream reads the estimate, Home Assistant's **Grid power** included; the pol
 own figure beside it, and the startup line says the correction is on. To confirm a blind phase, read the
 inverter's per-phase meter registers (0x82/0x84/0x86): one reads 0 W while the inverter's output register
 for the same phase (0x6C/0x70/0x74) does not. The real fix is the clamp; once it is fitted, empty this.
+A step-by-step guide for owners, linked from the field on Settings, is
+[docs/UNMETERED_GRID_PHASE.md](docs/UNMETERED_GRID_PHASE.md) ([česky](docs/UNMETERED_GRID_PHASE.cs.md)).
 
 **What is validated at startup.** A site that cannot be described stops the worker with every problem
 listed at once, each naming its key: an id that is not a slug, a latitude without a longitude, a tilt

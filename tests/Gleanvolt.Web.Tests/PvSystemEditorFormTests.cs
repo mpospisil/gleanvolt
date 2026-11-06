@@ -29,6 +29,20 @@ public class PvSystemEditorFormTests : BunitContext
 
     private static string Field(string key) => "#pv-" + key.Replace(':', '-');
 
+    // The guide the unmetered-phase tip links to lives in the repository, not in the app.
+    private static string RepoRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Gleanvolt.slnx")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException("Gleanvolt.slnx not found above " + AppContext.BaseDirectory);
+    }
+
     [Fact]
     public void Says_where_each_value_comes_from()
     {
@@ -44,6 +58,26 @@ public class PvSystemEditorFormTests : BunitContext
         var host = form.Find(Field(PvSystemSettingKeys.InverterHost)).ParentElement!;
         Assert.Contains("comes from the environment file", host.QuerySelector(".info-pop")!.TextContent);
         Assert.Null(host.QuerySelector(".revert"));
+    }
+
+    [Fact]
+    public void Every_field_says_what_it_means_before_where_it_comes_from()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        foreach (var key in PvSystemSettingKeys.All)
+        {
+            var tip = form.Find(Field(key)).ParentElement!.QuerySelectorAll(".info-pop p");
+            Assert.True(tip.Length == 3, $"{key}: expected a meaning and two lines of source, got {tip.Length} paragraphs.");
+            Assert.False(string.IsNullOrWhiteSpace(tip[0].TextContent), $"{key} has no explanation.");
+            Assert.DoesNotContain("Current value comes from", tip[0].TextContent);
+        }
+
+        var phase = form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).ParentElement!;
+        var link = phase.QuerySelector(".info-pop p a")!;
+        Assert.EndsWith("docs/UNMETERED_GRID_PHASE.md", link.GetAttribute("href"));
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.md")));
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.cs.md")));
     }
 
     [Fact]

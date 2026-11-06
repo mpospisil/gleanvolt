@@ -62,6 +62,13 @@
                     <div class="field-head">
                         <label for="@id">@Labels[key]</label>
                         <InfoTip Topic="@Labels[key]" Group="settings-info">
+                            <p>
+                                @Help[key]
+                                @if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
+                                {
+                                    @(" ")<a href="@SettingsText.HelpUnmeteredPhaseUrl" target="_blank" rel="noopener">@SettingsText.HelpUnmeteredPhaseLink</a>
+                                }
+                            </p>
                             <p>@Localized.Format(SettingsText.CurrentValueFrom, SourcePhrase(setting))</p>
                             <p>@SourceTitle(setting)</p>
                         </InfoTip>
@@ -98,7 +105,7 @@
                 <p class="error">@warning</p>
             }
             <button type="button" class="danger" id="pv-save-anyway" @onclick="() => SaveAsync(confirmed: true)">@SettingsText.SaveAnyway</button>
-            <button type="button" class="secondary" @onclick="() => _warnings = []">Cancel</button>
+            <button type="button" class="secondary" @onclick="() => _warnings = []">@SettingsText.Cancel</button>
         </div>
     }
     else if (Editable)
@@ -224,6 +231,36 @@
         [PvSystemSettingKeys.ChargerUnitId] = SettingsText.FieldChargerUnitId,
     };
 
+    // What each field means, first in its (i): the label alone does not say what a value is used for,
+    // or that several of them are only recorded.
+    private static Dictionary<string, string> Help => new(StringComparer.OrdinalIgnoreCase)
+    {
+        [PvSystemSettingKeys.Id] = SettingsText.HelpId,
+        [PvSystemSettingKeys.Name] = SettingsText.HelpName,
+        [PvSystemSettingKeys.Address] = SettingsText.HelpAddress,
+        [PvSystemSettingKeys.InstallDate] = SettingsText.HelpCommissioned,
+        [PvSystemSettingKeys.Latitude] = SettingsText.HelpLatitude,
+        [PvSystemSettingKeys.Longitude] = SettingsText.HelpLongitude,
+        [PvSystemSettingKeys.AzimuthDegrees] = SettingsText.HelpAzimuth,
+        [PvSystemSettingKeys.TiltDegrees] = SettingsText.HelpTilt,
+        [PvSystemSettingKeys.CapacityKwp] = SettingsText.HelpCapacityKwp,
+        [PvSystemSettingKeys.InverterCapacityKw] = SettingsText.HelpInverterCapacity,
+        [PvSystemSettingKeys.LossFactor] = SettingsText.HelpLossFactor,
+        [PvSystemSettingKeys.TimeZone] = SettingsText.HelpTimeZone,
+        [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.HelpHomeBatteryCapacity,
+        [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.HelpHomeBatteryEfficiency,
+        [PvSystemSettingKeys.InverterModel] = SettingsText.HelpInverterModel,
+        [PvSystemSettingKeys.InverterHost] = SettingsText.HelpInverterHost,
+        [PvSystemSettingKeys.InverterPort] = SettingsText.HelpPort,
+        [PvSystemSettingKeys.InverterUnitId] = SettingsText.HelpUnitId,
+        [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HelpUnmeteredPhase,
+        [PvSystemSettingKeys.ChargerId] = SettingsText.HelpChargerId,
+        [PvSystemSettingKeys.ChargerModel] = SettingsText.HelpChargerModel,
+        [PvSystemSettingKeys.ChargerHost] = SettingsText.HelpChargerHost,
+        [PvSystemSettingKeys.ChargerPort] = SettingsText.HelpPort,
+        [PvSystemSettingKeys.ChargerUnitId] = SettingsText.HelpUnitId,
+    };
+
     private static Dictionary<string, string> Hints => new(StringComparer.OrdinalIgnoreCase)
     {
         [PvSystemSettingKeys.Id] = SettingsText.HintId,
@@ -346,7 +383,7 @@
 
         _problems = [];
         Reload();
-        _message = $"{Labels[key]} reverted; it comes from {SourceName(_settings[key])} again.";
+        _message = Localized.Format(SettingsText.Reverted, Labels[key], SourceName(_settings[key]));
     }
 
     private void Discard()

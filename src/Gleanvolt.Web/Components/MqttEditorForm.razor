@@ -70,11 +70,13 @@
 
         <div class="pv-field">
             <label for="mqtt-password">@SettingsText.FieldMqttPassword</label>
-            <input id="mqtt-password" type="password" autocomplete="new-password" spellcheck="false"
-                   placeholder="@(_settings.MqttPassword.IsSet ? SettingsText.Unchanged : SettingsText.NotSet)"
-                   disabled="@(!Editable || _busy)"
-                   value="@_password"
-                   @oninput="e => { _password = e.Value?.ToString() ?? string.Empty; Touch(); }" />
+            <RevealInput Disabled="!Editable">
+                <input id="mqtt-password" type="password" autocomplete="new-password" spellcheck="false"
+                       placeholder="@(_settings.MqttPassword.IsSet ? SettingsText.Unchanged : SettingsText.NotSet)"
+                       disabled="@(!Editable || _busy)"
+                       value="@_password"
+                       @oninput="e => { _password = e.Value?.ToString() ?? string.Empty; Touch(); }" />
+            </RevealInput>
             <span class="source @(_settings.MqttPassword.Source == SettingSource.SecretStore ? "edited" : null)" id="mqtt-password-source">
                 @(_settings.MqttPassword.IsSet ? SettingSources.Name(_settings.MqttPassword.Source) : SettingsText.NotSet)
             </span>

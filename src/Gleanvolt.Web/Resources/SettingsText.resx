@@ -145,7 +145,7 @@
     <value>Health</value>
   </data>
   <data name="MqttTip2" xml:space="preserve">
-    <value>None of this tells you whether either connection is {0}. Everything on this page was read once at startup, and {1} reports the polling loop, not the broker. Until it does, check the broker's log, or whether Home Assistant shows the device as unavailable.</value>
+    <value>The details below are what the controller read when it started; the forms above change them from the next start. They do not show whether either connection is {0}, and {1} reports the polling loop, not the broker. To check the Home Assistant link, use Test connection above, or see whether Home Assistant shows the device as unavailable.</value>
   </data>
   <data name="HomeAssistant" xml:space="preserve">
     <value>Home Assistant</value>
@@ -321,7 +321,7 @@
     <value>A save is checked the same way startup checks the configuration, and only values that differ are written to {0}. That file overrides {1} key by key. Nothing changes until the controller restarts.</value>
   </data>
   <data name="SavingTip2" xml:space="preserve">
-    <value>Each field's (i) shows where its current value comes from. After a save, a field whose new value is not in use yet says so below it.</value>
+    <value>Each field's (i) says what the field means and where its current value comes from. After a save, a field whose new value is not in use yet says so below it.</value>
   </data>
   <data name="NotRunningUntilRestart" xml:space="preserve">
     <value>— not in use until the controller restarts.</value>
@@ -465,7 +465,7 @@
     <value>Changing the id moves every MQTT topic the controller publishes, so Home Assistant sees new topics after the restart. To clear the old ones, see "Renaming what Home Assistant sees" in deploy/README.md and HA_RETIRE_TOPIC_PREFIX. The Home Assistant device id is set separately and does not change.</value>
   </data>
   <data name="CoordinatesWarning" xml:space="preserve">
-    <value>Clearing the coordinates turns off weather recording for charging sessions and removes the forecast location.</value>
+    <value>Clearing the coordinates turns off weather recording for charging sessions.</value>
   </data>
   <data name="SourceWebUi" xml:space="preserve">
     <value>web UI</value>
@@ -897,5 +897,80 @@
   </data>
   <data name="KeyRemoved" xml:space="preserve">
     <value>Key for {0} removed. It is refused from the next start.</value>
+  </data>
+  <data name="HelpId" xml:space="preserve">
+    <value>A short machine name for this installation. Every MQTT topic Gleanvolt publishes contains it, so it is required when Home Assistant is on. Choose it once: changing it later moves all the topics.</value>
+  </data>
+  <data name="HelpName" xml:space="preserve">
+    <value>What you call this installation, for example Home roof. Shown in the browser tab and to API clients.</value>
+  </data>
+  <data name="HelpAddress" xml:space="preserve">
+    <value>The postal address, for people to read. Nothing is worked out from it: the location comes from the latitude and longitude.</value>
+  </data>
+  <data name="HelpCommissioned" xml:space="preserve">
+    <value>The date the PV system was installed and went into service, as yyyy-MM-dd. For reference only.</value>
+  </data>
+  <data name="HelpLatitude" xml:space="preserve">
+    <value>How far north or south the installation is, in decimal degrees, for example 50.0755. Used with the longitude to look up the weather for each charging session.</value>
+  </data>
+  <data name="HelpLongitude" xml:space="preserve">
+    <value>How far east or west the installation is, in decimal degrees, for example 14.4378. Used with the latitude to look up the weather for each charging session.</value>
+  </data>
+  <data name="HelpTimeZone" xml:space="preserve">
+    <value>The installation's time zone, as a name such as Europe/Prague. It decides when a day starts and ends, so daily plans, tariff times and the history all follow it.</value>
+  </data>
+  <data name="HelpAzimuth" xml:space="preserve">
+    <value>The direction the panels face, in degrees from north: 90 = east, 180 = south, 270 = west. For reference only: the forecast takes the orientation from your Solcast site.</value>
+  </data>
+  <data name="HelpTilt" xml:space="preserve">
+    <value>How steep the panels are: 0 = flat, 90 = vertical. For reference only: the forecast takes the tilt from your Solcast site.</value>
+  </data>
+  <data name="HelpCapacityKwp" xml:space="preserve">
+    <value>The panels' total rated power, the sum of their nameplate watts, in kWp. For reference only.</value>
+  </data>
+  <data name="HelpInverterCapacity" xml:space="preserve">
+    <value>The most AC power the inverter can deliver, in kW. It matters only when it is lower than the panels' peak, because it then caps production. For reference only.</value>
+  </data>
+  <data name="HelpLossFactor" xml:space="preserve">
+    <value>The share of the panels' DC energy that is left after cable, inverter and other losses: 1 = no losses, 0.85 = 15 % lost. For reference only.</value>
+  </data>
+  <data name="HelpHomeBatteryCapacity" xml:space="preserve">
+    <value>How much energy the home battery really stores and gives back, in kWh: the usable figure, not the nameplate. Forecasted and Targeted use it to plan how much of the sun the battery will take. Without it, Forecasted charges from live surplus only.</value>
+  </data>
+  <data name="HelpHomeBatteryEfficiency" xml:space="preserve">
+    <value>The share of the solar energy sent to the home battery that ends up stored, for example 0.95. With the capacity, it says how much sun refilling the battery takes.</value>
+  </data>
+  <data name="HelpInverterModel" xml:space="preserve">
+    <value>The inverter's model, for example SolaX X3-HYB-G4 PRO. For reference only: it does not change how Gleanvolt talks to the device.</value>
+  </data>
+  <data name="HelpInverterHost" xml:space="preserve">
+    <value>The inverter's IP address or host name on your network. Gleanvolt reads the solar power, the home battery and the grid flow from it over Modbus TCP.</value>
+  </data>
+  <data name="HelpPort" xml:space="preserve">
+    <value>The Modbus TCP port the device answers on. Almost always 502, which is also what an empty field means.</value>
+  </data>
+  <data name="HelpUnitId" xml:space="preserve">
+    <value>Leave it at 1. The unit id tells apart devices that share one network address, for example several chargers behind one Modbus gateway. Gleanvolt will use it once it supports more than one inverter or charger. Empty also means 1.</value>
+  </data>
+  <data name="HelpUnmeteredPhase" xml:space="preserve">
+    <value>Leave it empty if your grid meter measures all three phases, which is the normal case. If it misses one, it reads 0 W there: Gleanvolt then misses the sun exported and the car's power on that phase, so the solar modes start late or take grid power. Enter that phase (L1, L2, L3, or SolaX's R, S, T) and Gleanvolt estimates it instead.</value>
+  </data>
+  <data name="HelpChargerId" xml:space="preserve">
+    <value>A short machine name for the charger. Empty means "charger", which is fine for one charger.</value>
+  </data>
+  <data name="HelpChargerModel" xml:space="preserve">
+    <value>The charger's model, for example SolaX X3-HAC. For reference only: it does not change how Gleanvolt talks to the device.</value>
+  </data>
+  <data name="HelpChargerHost" xml:space="preserve">
+    <value>The charger's IP address or host name on your network. Gleanvolt starts and stops charging and sets the charging current through it over Modbus TCP.</value>
+  </data>
+  <data name="Reverted" xml:space="preserve">
+    <value>{0} reverted; it comes from {1} again.</value>
+  </data>
+  <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
+    <value>How to tell whether your meter misses a phase</value>
+  </data>
+  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
+    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.md</value>
   </data>
 </root>

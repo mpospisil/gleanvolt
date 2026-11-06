@@ -69,8 +69,10 @@
             {
                 <div class="control">
                     <label for="account-key">@CarText.ApiKey</label>
-                    <input id="account-key" type="password" autocomplete="off" spellcheck="false"
-                           @bind="_answer" @bind:event="oninput" />
+                    <RevealInput>
+                        <input id="account-key" type="password" autocomplete="off" spellcheck="false"
+                               @bind="_answer" @bind:event="oninput" />
+                    </RevealInput>
                 </div>
 
                 <div class="actions">
