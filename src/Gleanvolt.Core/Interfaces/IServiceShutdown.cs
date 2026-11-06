@@ -38,4 +38,24 @@ public interface IServiceShutdown
     /// <see cref="RequestStop"/>.
     /// </summary>
     void RequestRestart(string source);
+
+    /// <summary>
+    /// What, if anything, runs this process as a service: what a restart is handed to, and what the
+    /// person who pressed Stop has to type to start it again.
+    /// </summary>
+    ServiceSupervisor Supervisor { get; }
+}
+
+/// <summary>What runs Gleanvolt as a service, as far as stopping and starting it is concerned.</summary>
+public enum ServiceSupervisor
+{
+    /// <summary>Nothing: <c>dotnet run</c>, the debugger, the Windows zip, winget. A restart happens in
+    /// the process; after a stop, it is started again the way it was started.</summary>
+    None,
+
+    /// <summary>The image's container under Docker's <c>restart: on-failure</c>.</summary>
+    Container,
+
+    /// <summary>The .deb's systemd unit under <c>Restart=on-failure</c>.</summary>
+    Systemd,
 }

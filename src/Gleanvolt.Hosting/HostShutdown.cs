@@ -61,29 +61,25 @@ public sealed class HostShutdown : IServiceShutdown
 
     /// <summary>For tests: with the supervision question answered rather than read from the environment.</summary>
     public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, bool supervised)
-        : this(lifetime, logger, supervised ? Supervisor.Container : Supervisor.None)
+        : this(lifetime, logger, supervised ? ServiceSupervisor.Container : ServiceSupervisor.None)
     {
     }
 
-    private HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, Supervisor supervisor)
+    /// <summary>For tests: with the supervisor named rather than read from the environment.</summary>
+    public HostShutdown(IHostApplicationLifetime lifetime, ILogger<HostShutdown> logger, ServiceSupervisor supervisor)
     {
         _lifetime = lifetime;
         _logger = logger;
-        RestartsInProcess = supervisor == Supervisor.None;
+        Supervisor = supervisor;
         _startAgain = supervisor switch
         {
-            Supervisor.Container => "with 'docker compose start gleanvolt-controller'",
-            Supervisor.Systemd => "with 'sudo systemctl start gleanvolt'",
+            ServiceSupervisor.Container => "with 'docker compose start gleanvolt-controller'",
+            ServiceSupervisor.Systemd => "with 'sudo systemctl start gleanvolt'",
             _ => "the same way it was started",
         };
     }
 
-    private enum Supervisor
-    {
-        None,
-        Container,
-        Systemd,
-    }
+    public ServiceSupervisor Supervisor { get; }
 
     /// <summary>
     /// Whether a restart is carried out inside this process rather than by whoever started it. Where
@@ -93,7 +89,7 @@ public sealed class HostShutdown : IServiceShutdown
     /// the debugger -- <c>Program.cs</c> builds a fresh host in the same process instead, so a restart
     /// always comes back.
     /// </summary>
-    public bool RestartsInProcess { get; }
+    public bool RestartsInProcess => Supervisor == ServiceSupervisor.None;
 
     /// <summary>
     /// Which supervisor, if any, this process is the service of. Systemd is recognised the way
@@ -103,10 +99,10 @@ public sealed class HostShutdown : IServiceShutdown
     /// <c>dotnet run</c> or a debug session started from one took itself for a service and exited on
     /// a restart that nothing then carried out.
     /// </summary>
-    private static Supervisor CurrentSupervisor() =>
-        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer() ? Supervisor.Container
-        : Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService() ? Supervisor.Systemd
-        : Supervisor.None;
+    private static ServiceSupervisor CurrentSupervisor() =>
+        Infrastructure.Secrets.SecretStoreSelection.RunningInContainer() ? ServiceSupervisor.Container
+        : Microsoft.Extensions.Hosting.Systemd.SystemdHelpers.IsSystemdService() ? ServiceSupervisor.Systemd
+        : ServiceSupervisor.None;
 
     /// <summary>
     /// Whether this run is ending because somebody asked it to. Read after the host has stopped, to

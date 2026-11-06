@@ -238,6 +238,33 @@ public class HealthPageTests : PageTest
         Assert.Empty(page.FindAll("#restart"));
     }
 
+    [Fact]
+    public void Under_systemd_a_stop_names_the_systemctl_command()
+    {
+        _shutdown.Supervisor = ServiceSupervisor.Systemd;
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+        page.Find("button.danger").Click();
+
+        Assert.Contains("sudo systemctl start gleanvolt", page.Markup);
+        Assert.DoesNotContain("docker compose", page.Markup);
+    }
+
+    [Fact]
+    public void Run_by_hand_a_stop_says_to_start_it_the_same_way()
+    {
+        _shutdown.Supervisor = ServiceSupervisor.None;
+        var page = Render<Health>();
+
+        page.Find("button.danger").Click();
+        page.Find("button.danger").Click();
+
+        Assert.Contains("the same way you started it", page.Markup);
+        Assert.DoesNotContain("docker compose", page.Markup);
+        Assert.DoesNotContain("on the Pi", page.Markup);
+    }
+
     // The restart control (#204): the same two clicks, and a different request -- the one whose exit
     // code brings the controller back.
 

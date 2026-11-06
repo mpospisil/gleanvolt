@@ -149,7 +149,20 @@
                 @SettingsText.Stopping
             </p>
             <span class="hint">
-                @Localized.Rich(SettingsText.StartAgain, @<code>docker compose start gleanvolt-controller</code>, @<code>/opt/gleanvolt</code>)
+                @* How to start it again depends on what runs it: the line is the last thing this page
+                   says before it goes away, so it must not send a dotnet run or a Windows install to the Pi. *@
+                @switch (Shutdown.Supervisor)
+                {
+                    case ServiceSupervisor.Container:
+                        @Localized.Rich(SettingsText.StartAgain, @<code>docker compose start gleanvolt-controller</code>, @<code>/opt/gleanvolt</code>)
+                        break;
+                    case ServiceSupervisor.Systemd:
+                        @Localized.Rich(SettingsText.StartAgainSystemd, @<code>sudo systemctl start gleanvolt</code>)
+                        break;
+                    default:
+                        @SettingsText.StartAgainManual
+                        break;
+                }
             </span>
         }
         else if (_confirming)

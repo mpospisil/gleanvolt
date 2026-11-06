@@ -534,6 +534,8 @@ public class HaButtonCommandTests
         public void RequestStop(string source) { }
 
         public void RequestRestart(string source) { }
+
+        public ServiceSupervisor Supervisor => ServiceSupervisor.Container;
     }
 
     /// <summary>A clock that does not move, in the site's zone — "07:00" has to mean tomorrow morning.</summary>

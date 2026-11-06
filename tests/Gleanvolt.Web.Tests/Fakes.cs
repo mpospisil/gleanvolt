@@ -167,6 +167,9 @@ internal sealed class FakeServiceShutdown : IServiceShutdown
     public void RequestStop(string source) => Requests.Add(source);
 
     public void RequestRestart(string source) => Restarts.Add(source);
+
+    /// <summary>What runs the service; the Health page's start-again line depends on it.</summary>
+    public ServiceSupervisor Supervisor { get; set; } = ServiceSupervisor.Container;
 }
 
 /// <summary>A minimal stand-in for <c>ForecastRuntimeSettings</c>; see <see cref="FakeChargeControlModeSelector"/>.</summary>
