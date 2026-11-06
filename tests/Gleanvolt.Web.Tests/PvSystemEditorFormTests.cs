@@ -47,6 +47,23 @@ public class PvSystemEditorFormTests : BunitContext
     }
 
     [Fact]
+    public void Every_field_says_what_it_means_before_where_it_comes_from()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        foreach (var key in PvSystemSettingKeys.All)
+        {
+            var tip = form.Find(Field(key)).ParentElement!.QuerySelectorAll(".info-pop p");
+            Assert.True(tip.Length == 3, $"{key}: expected a meaning and two lines of source, got {tip.Length} paragraphs.");
+            Assert.False(string.IsNullOrWhiteSpace(tip[0].TextContent), $"{key} has no explanation.");
+            Assert.DoesNotContain("Current value comes from", tip[0].TextContent);
+        }
+
+        var phase = form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).ParentElement!;
+        Assert.Contains("missing the clamp on one phase", phase.QuerySelector(".info-pop p")!.TextContent);
+    }
+
+    [Fact]
     public void Saves_only_what_changed()
     {
         var form = Render<PvSystemEditorForm>();

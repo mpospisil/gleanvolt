@@ -49,10 +49,10 @@
     <value>Gleanvolt talks to the inverter and the charger over Modbus TCP. Search the network for them, or type their addresses, then save: saving reads one value from each, to check it is the device you meant.</value>
   </data>
   <data name="SiteIntro" xml:space="preserve">
-    <value>Where the installation is, its time zone, and the home battery the forecast modes plan around. The location and the time zone are required; the rest makes the forecast better.</value>
+    <value>Where the installation is, its time zone, and the home battery the forecast modes plan around. The location and the time zone are required; without the home battery, Forecasted charges from live surplus only.</value>
   </data>
   <data name="SolcastIntro" xml:space="preserve">
-    <value>A Solcast account gives the forecast modes their solar forecast. Without one, Gleanvolt charges from live surplus only.</value>
+    <value>A Solcast account provides the solar forecast that Forecasted and Targeted plan with. Without one, Gleanvolt charges from live surplus only.</value>
   </data>
   <data name="CarIntro" xml:space="preserve">
     <value>The car's battery and limits, and the account its state of charge comes from. Optional: without them, charging targets are set in energy rather than in percent.</value>

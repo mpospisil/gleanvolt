@@ -49,10 +49,10 @@
     <value>Gleanvolt komunikuje se střídačem a nabíječkou přes Modbus TCP. Vyhledejte je v síti, nebo zadejte jejich adresy, a uložte: uložení z každého zařízení přečte jednu hodnotu, aby ověřilo, že je to to správné.</value>
   </data>
   <data name="SiteIntro" xml:space="preserve">
-    <value>Kde instalace je, její časové pásmo a domácí baterie, se kterou počítají režimy podle předpovědi. Poloha a časové pásmo jsou povinné, zbytek zpřesní předpověď.</value>
+    <value>Kde instalace je, její časové pásmo a domácí baterie, se kterou počítají režimy podle předpovědi. Poloha a časové pásmo jsou povinné; bez domácí baterie nabíjí Forecasted jen z aktuálního přebytku.</value>
   </data>
   <data name="SolcastIntro" xml:space="preserve">
-    <value>Účet Solcast dává režimům podle předpovědi předpověď výroby. Bez něj Gleanvolt nabíjí jen z aktuálního přebytku.</value>
+    <value>Účet Solcast poskytuje předpověď solární energie, podle které plánují režimy Forecasted a Targeted. Bez něj Gleanvolt nabíjí jen z aktuálního přebytku.</value>
   </data>
   <data name="CarIntro" xml:space="preserve">
     <value>Baterie auta, jeho limity a účet, ze kterého se čte stav nabití. Volitelné: bez nich se cíle nabíjení zadávají v energii místo v procentech.</value>
@@ -145,7 +145,7 @@
     <value>{0}: nenastaveno</value>
   </data>
   <data name="OptionalSolcast" xml:space="preserve">
-    <value>Předpověď výroby</value>
+    <value>Předpověď solární energie</value>
   </data>
   <data name="OptionalEv" xml:space="preserve">
     <value>Auto</value>
