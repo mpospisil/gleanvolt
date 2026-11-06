@@ -2666,3 +2666,55 @@ label.check {
     gap: 0.5rem;
     font-weight: 600;
 }
+
+/*
+    A password box with Reveal/Hide inside its right edge (RevealInput.razor), to check what was typed
+    before saving it. The label swaps on aria-pressed, which only js/reveal.js writes.
+*/
+.reveal {
+    position: relative;
+    display: block;
+}
+
+.reveal input {
+    padding-right: 5.5rem;
+}
+
+.reveal .reveal-toggle,
+.login-card .reveal .reveal-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    width: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.reveal .reveal-toggle:hover,
+.login-card .reveal .reveal-toggle:hover {
+    background: none;
+    color: var(--accent-ink);
+}
+
+.reveal-toggle .reveal-hide,
+.reveal-toggle[aria-pressed="true"] .reveal-show {
+    display: none;
+}
+
+.reveal-toggle[aria-pressed="true"] .reveal-hide {
+    display: inline;
+}
+
+.login-card .reveal {
+    margin-top: var(--space-1);
+}
+
+.login-card .reveal input {
+    margin-top: 0;
+}

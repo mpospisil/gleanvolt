@@ -421,11 +421,13 @@
 
     private RenderFragment Password(string key) => @<div class="pv-field">
         <label for="@Id(key)">@Label(key)</label>
-        <input id="@Id(key)" type="password" autocomplete="new-password" spellcheck="false"
-               placeholder="@(_settings.Secret(key).Stored ? CarText.Unchanged : CarText.NotSet)"
-               disabled="@(!Editable || _busy)"
-               value="@_passwords[key]"
-               @oninput="e => _passwords[key] = e.Value?.ToString() ?? string.Empty" />
+        <RevealInput Disabled="!Editable">
+            <input id="@Id(key)" type="password" autocomplete="new-password" spellcheck="false"
+                   placeholder="@(_settings.Secret(key).Stored ? CarText.Unchanged : CarText.NotSet)"
+                   disabled="@(!Editable || _busy)"
+                   value="@_passwords[key]"
+                   @oninput="e => _passwords[key] = e.Value?.ToString() ?? string.Empty" />
+        </RevealInput>
         <span class="source @(_settings.Secret(key).IsEdited ? "edited" : null)">@SecretSource(_settings.Secret(key))</span>
         @if (_settings.Secret(key).IsEdited && Editable)
         {

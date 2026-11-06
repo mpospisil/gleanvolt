@@ -39,11 +39,13 @@
         <div class="pv-fields">
             <div class="pv-field">
                 <label for="weather-api-key">@SettingsText.ApiKey</label>
-                <input id="weather-api-key" type="password" autocomplete="new-password" spellcheck="false"
-                       placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
-                       disabled="@_busy"
-                       value="@_apiKey"
-                       @oninput="e => Edit(e.Value?.ToString() ?? string.Empty)" />
+                <RevealInput>
+                    <input id="weather-api-key" type="password" autocomplete="new-password" spellcheck="false"
+                           placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
+                           disabled="@_busy"
+                           value="@_apiKey"
+                           @oninput="e => Edit(e.Value?.ToString() ?? string.Empty)" />
+                </RevealInput>
                 <span class="source @(_settings.Source == WeatherKeySource.Page ? "edited" : null)" id="weather-source">
                     @SourceName()
                 </span>

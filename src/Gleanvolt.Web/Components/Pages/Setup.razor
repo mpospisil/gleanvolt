@@ -48,12 +48,16 @@
 
             <label>
                 @SharedText.PasswordLabel
-                <InputText type="password" @bind-Value="Input!.Password" autofocus />
+                <RevealInput>
+                    <InputText type="password" @bind-Value="Input!.Password" autofocus />
+                </RevealInput>
             </label>
 
             <label>
                 @SharedText.RepeatPassword
-                <InputText type="password" @bind-Value="Input!.Confirm" />
+                <RevealInput>
+                    <InputText type="password" @bind-Value="Input!.Confirm" />
+                </RevealInput>
             </label>
 
             <ValidationSummary />

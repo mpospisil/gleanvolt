@@ -54,11 +54,13 @@
         <div class="pv-fields">
             <div class="pv-field">
                 <label for="solcast-api-key">@SettingsText.ApiKey</label>
-                <input id="solcast-api-key" type="password" autocomplete="new-password" spellcheck="false"
-                       placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
-                       disabled="@_busy"
-                       value="@_apiKey"
-                       @oninput="e => Edit(() => _apiKey = Text(e))" />
+                <RevealInput>
+                    <input id="solcast-api-key" type="password" autocomplete="new-password" spellcheck="false"
+                           placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
+                           disabled="@_busy"
+                           value="@_apiKey"
+                           @oninput="e => Edit(() => _apiKey = Text(e))" />
+                </RevealInput>
                 <span class="source @(_settings.Source == SolcastAccountSource.Page ? "edited" : null)" id="solcast-source">
                     @SourceName()
                 </span>
