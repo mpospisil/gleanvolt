@@ -60,8 +60,17 @@ def settings():
         "Api__Enabled": "true",
         f"Api__Keys__smoke": KEY,
 
+        # No password: the smoke test signs in to nothing, and saying so is an operator's choice the
+        # setup check honours. Without it -- or without a location below -- the binary starts in setup
+        # mode (#301), where every API route answers 503 and /health proves nothing about the controller.
+        "Web__RequireAuthentication": "false",
+
         "Pv__Id": "smoke",
         "Pv__Name": "Smoke test",
+
+        # Any real place will do; the shipped defaults carry none since #300.
+        "Pv__Latitude": "50.08",
+        "Pv__Longitude": "14.42",
 
         # Refused immediately rather than routed and dropped: the controller should handle a dead
         # inverter, and this makes it discover that in milliseconds instead of at a TCP timeout.
