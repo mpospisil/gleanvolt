@@ -96,7 +96,31 @@ these: there is nothing at that address for the hold to write to.
   no battery.
 - **Other SolaX lines with their own register maps** — X3-MEGA / FORTH G2, A1-Hybrid, J1-Hybrid,
   X1-Hybrid-LV, X1-Lite-LV.
-- **Inverters from other manufacturers.**
+- **Inverters from other manufacturers**, unless they are a rebadged SolaX — see below.
+
+### Sold under another brand
+
+Some vendors sell SolaX inverters under their own name. Neither table above lists them, because their
+tier is the SolaX model's, **if** the unit is the SolaX hardware with SolaX firmware. The matches below
+come from datasheets, not from any statement by the vendor, and no unit has been run. Before relying on a
+row, check that [`gleanvolt-discover`](../README.md#finding-your-devices) names the device by a SolaX
+serial prefix. A unit it cannot name runs firmware this page knows nothing about.
+
+#### Dražice (DZ Dražice)
+
+Reviewed 2026-11-07 from [dzd.cz](https://www.dzd.cz/fotovoltaika-drazice/stridace).
+
+| Dražice model | Matches | Tier | Why we think so |
+|---|---|---|---|
+| [**IN.HYBRID COMPACT PRO**](https://www.dzd.cz/fotovoltaika-drazice/stridace/fotovoltaicky-stridac-in-hybrid-compact-pro) 5–15 kW | SolaX **X3-HYB-G4 PRO** | Verified on the SolaX unit, not on this one | Identical datasheet: 2 or 3 MPPT at 20 A, 110–950 V, 200 % PV oversizing, 110 % AC, 2× EPS for 10 s, 560×503×210 mm, 38 kg, two battery ports with a 2-in-1 cable, the same VPP list (OpenADR, IEEE 2030.5, FCAS, API) |
+| [**IN.HYBRID COMPACT S**](https://www.dzd.cz/fotovoltaika-drazice/stridace/fotovoltaicky-stridac-in-hybrid-compact-s) 15–30 kW | SolaX **X3-Ultra** | Expected — caveats [1](#1-only-pv-strings-1-and-2-are-read), [2](#2-only-battery-1-is-read) | 15–30 kW including a 19.9K size, 36 A per MPPT, 696×526×240 mm, 47 kg, two battery ports |
+| [**IN.HYBRID COMPACT M**](https://www.dzd.cz/fotovoltaika-drazice/stridace/fotovoltaicky-stridac-in-hybrid-compact-m) 50/60 kW | SolaX **X3-Aelio** | Expected — caveat [1](#1-only-pv-strings-1-and-2-are-read) | 50 and 60 kW, 6 MPPT at 40 A, two battery ports |
+| **IN.HYBRID COMPACT** (earlier, `-D`/`-M` sizes) | SolaX **X3-Hybrid G4** | Expected | 5–15 kW three-phase hybrid with the same `-D`/`-M` variants as the G4 |
+| **IN.ENTITY S/M/L, IN.COMPACT, IN.One** | — | Not supported | Grid-tied, no battery |
+
+Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing about Modbus TCP on the LAN
+port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
+Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
 ### Caveats
 
@@ -191,3 +215,6 @@ what turns an *Expected* row into a *Verified* one.
 - [SolaX Hybrid X1/X3 G4 Modbus TCP/RTU protocol V3.21](https://www.gbc-solino.cz/files/uploads/FAQ%20SolaX/Hybrid-X1X3-G4-ModbusTCPRTU-V3.21-English_0622-public-version.pdf)
 - [SolaX X1/X3-HAC user manual](https://www.solaxpower.com/uploads/file/x1-x3-hac-series-user-manual-en.pdf)
 - [evcc discussion #7996 — SolaX Hybrid G4 Modbus](https://github.com/evcc-io/evcc/discussions/7996)
+- [Dražice inverters](https://www.dzd.cz/fotovoltaika-drazice/stridace), the
+  [IN.HYBRID COMPACT PRO datasheet](https://www.dzd.cz/images/sortiment/in-hybrid-compact-pro/PL-stridace-inhybrid-compact-pro-cz.pdf),
+  and SolaX's [X3-HYB G4 PRO page](https://www.solaxpower.com/our-products/x3-hyb-g4-pro.html) it was compared with
