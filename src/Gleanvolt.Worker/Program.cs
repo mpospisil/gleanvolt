@@ -170,6 +170,12 @@ while (true)
             "PV system: {System}{Overrides}.",
             host.Services.GetRequiredService<PvSystemInfo>().Describe(),
             PvSystemOverrides.DescribeLoaded(builder.Configuration));
+
+        // Recommended but not set: the controller runs without these, so a line each rather than a stop.
+        foreach (var problem in setup.AtStartup.Recommended)
+        {
+            log.LogWarning("Recommended setting missing: {Problem}", problem.English);
+        }
     }
 
     // Where the bearer-equivalent secrets live and what protects them (issue #215). On the startup log

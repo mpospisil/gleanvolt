@@ -43,10 +43,9 @@ public class SetupStatusEvaluatorTests
         var status = Evaluate(Linux);
 
         Assert.False(status.Usable);
-        Assert.Equal(
-            [SetupArea.Password, SetupArea.Inverter, SetupArea.Charger, SetupArea.Location],
-            Areas(status));
+        Assert.Equal([SetupArea.Password, SetupArea.Inverter, SetupArea.Charger], Areas(status));
         Assert.All(status.MissingRequired, problem => Assert.NotNull(problem.Phrase));
+        Assert.Equal([SetupArea.Location], status.Recommended.Select(problem => problem.Area));
     }
 
     [Theory]
@@ -61,22 +60,25 @@ public class SetupStatusEvaluatorTests
     }
 
     [Fact]
-    public void No_location_at_all_is_missing()
+    public void No_location_at_all_is_recommended_but_does_not_block()
     {
         var status = Usable(("Pv:Latitude", null), ("Pv:Longitude", null));
 
-        var problem = Assert.Single(status.MissingRequired);
+        Assert.True(status.Usable);
+        var problem = Assert.Single(status.Recommended);
         Assert.Equal(SetupArea.Location, problem.Area);
         Assert.Equal(Phrase.Of("Config.SetupNoLocation"), problem.Phrase);
     }
 
     [Fact]
-    public void Half_a_location_is_a_problem_too()
+    public void Half_a_location_is_recommended_but_does_not_block()
     {
         var status = Usable(("Pv:Longitude", null));
 
-        Assert.Equal([SetupArea.Location], Areas(status));
-        Assert.Contains("Pv:Longitude", status.MissingRequired[0].English);
+        Assert.True(status.Usable);
+        var problem = Assert.Single(status.Recommended);
+        Assert.Equal(SetupArea.Location, problem.Area);
+        Assert.Equal(Phrase.Of("Config.PvLocation"), problem.Phrase);
     }
 
     [Fact]
@@ -112,13 +114,15 @@ public class SetupStatusEvaluatorTests
     }
 
     [Fact]
-    public void An_unset_zone_is_missing_on_windows_and_on_a_bare_utc_host()
+    public void An_unset_zone_is_recommended_on_windows_and_on_a_bare_utc_host_but_does_not_block()
     {
         var windows = Evaluate(new SetupHost(Prague, IsWindows: true), [.. UsableSite.Settings, ("Controller:TimeZone", "")]);
         var utc = Evaluate(new SetupHost(TimeZoneInfo.Utc, IsWindows: false), [.. UsableSite.Settings, ("Controller:TimeZone", "")]);
 
-        Assert.Equal([SetupArea.TimeZone], Areas(windows));
-        Assert.Equal([SetupArea.TimeZone], Areas(utc));
+        Assert.True(windows.Usable);
+        Assert.True(utc.Usable);
+        Assert.Equal([SetupArea.TimeZone], windows.Recommended.Select(problem => problem.Area));
+        Assert.Equal([SetupArea.TimeZone], utc.Recommended.Select(problem => problem.Area));
     }
 
     [Fact]

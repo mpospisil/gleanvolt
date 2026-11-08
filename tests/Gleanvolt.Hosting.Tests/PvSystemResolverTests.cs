@@ -120,12 +120,15 @@ public class PvSystemResolverTests
     }
 
     [Fact]
-    public void HalfAPairOfCoordinatesDescribesNowhereAndStopsTheHost()
+    public void HalfAPairOfCoordinatesDescribesNowhereButDoesNotStopTheHost()
     {
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(WithDevices(("Pv:Latitude", "50.0755"))));
+        // Only the weather needs a place, and it is off without one; setup lists the half pair as a
+        // recommended setting instead (SetupStatusEvaluatorTests).
+        var site = Resolve(WithDevices(("Pv:Latitude", "50.0755")));
 
-        Assert.Contains("Pv:Latitude", error.Message);
-        Assert.Contains("Pv:Longitude", error.Message);
+        Assert.False(site.HasLocation);
+        Assert.Null(site.Latitude);
+        Assert.Null(site.Longitude);
     }
 
     [Fact]

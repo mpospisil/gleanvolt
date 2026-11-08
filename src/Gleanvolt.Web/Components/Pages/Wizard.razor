@@ -14,8 +14,8 @@
 
     The password comes before this page, on /setup, which is where the recovery key is shown. Each step
     is its own address, so a reload stays on it, and each saves as it goes: closing the browser halfway
-    loses nothing that was saved. The devices and the site are what the controller needs; everything
-    after them can be skipped.
+    loses nothing that was saved. The devices are what the controller needs; the site's location and time
+    zone are asked for but do not hold the start back; everything after them can be skipped.
 *@
 
 <SiteTitle Page="@SetupText.WizardTitle" />
@@ -86,6 +86,22 @@
                 </ul>
             }
 
+            @if (status.Recommended.Count > 0)
+            {
+                <div id="wizard-recommended">
+                    <p class="warning">@SetupText.FinishRecommended</p>
+                    <ul>
+                        @foreach (var problem in status.Recommended)
+                        {
+                            <li>
+                                @Localized.Say(problem.Phrase, problem.English)
+                                <a href="@Href(StepFor(problem.Area))">@Name(StepFor(problem.Area))</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
             @if (status.MissingOptional.Count > 0)
             {
                 <p class="muted">@SetupText.FinishOptional</p>
@@ -94,7 +110,7 @@
 
             @if (status.Usable && Setup.SetupMode)
             {
-                <RestartService Label="@SetupText.StartGleanvolt" />
+                <RestartService Label="@SetupText.StartGleanvolt" After="/" />
             }
             else if (status.Usable)
             {

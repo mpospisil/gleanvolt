@@ -74,7 +74,6 @@ public class SetupModeRegistrationTests
     [Theory]
     [InlineData("Pv:Chargers:0:Host", "")]            // half the devices
     [InlineData("Pv:Inverter:Port", "70000")]         // a device that is configured wrong
-    [InlineData("Pv:Longitude", null)]                // half a location
     [InlineData("Vehicle:BatteryCapacityKWh", "77")]  // a key that has moved
     [InlineData("Web:PasswordHash", "")]              // no password yet
     public void Any_required_problem_keeps_every_worker_out(string key, string? value)
