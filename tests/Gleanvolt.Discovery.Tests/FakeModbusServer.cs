@@ -190,6 +190,35 @@ internal sealed class FakeUnit
     /// <summary>A SolaX charger: its serial at holding 0x600, its run mode at input 0x1D.</summary>
     public static FakeUnit Charger(string serial, ushort runMode = 2) => new FakeUnit().WithSerial(0x0600, serial).WithInput(0x1D, runMode);
 
+    /// <summary>
+    /// A Huawei SUN2000 (#324): its model name at holding 30000, its serial at 30015, the battery's state of
+    /// charge in tenths of a percent at 37760. Nothing at SolaX's serial addresses.
+    /// </summary>
+    public static FakeUnit Huawei(string model, string serial = "HV21XXXXXXXX", ushort socTenths = 545) =>
+        new FakeUnit().WithText(30000, model, 15).WithText(30015, serial, 10).WithHolding(37760, socTenths);
+
+    /// <summary>A Huawei EMMA answering for itself on unit 0: its grid power at holding 31657.</summary>
+    public static FakeUnit Emma(string model = "EMMA-A02") =>
+        new FakeUnit().WithText(30000, model, 15).WithHolding(31657, 0xFFFF).WithHolding(31658, 0xFC7C);
+
+    public FakeUnit WithText(ushort start, string text, int registers)
+    {
+        var padded = text.PadRight(registers * 2, '\0');
+
+        for (var i = 0; i < registers; i++)
+        {
+            Holding[(ushort)(start + i)] = (ushort)((padded[i * 2] << 8) | padded[i * 2 + 1]);
+        }
+
+        return this;
+    }
+
+    public FakeUnit WithHolding(ushort address, ushort value)
+    {
+        Holding[address] = value;
+        return this;
+    }
+
     public FakeUnit WithSerial(ushort start, string serial)
     {
         var padded = serial.PadRight(14, '\0');

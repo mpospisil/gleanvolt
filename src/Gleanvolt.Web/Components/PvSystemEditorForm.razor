@@ -235,7 +235,17 @@
         _applied = Suggested;
         foreach (var (key, value) in Suggested)
         {
-            if (_values.ContainsKey(key))
+            // The driver and its topology as if picked from their drop-downs: what is configured already is
+            // not an edit, and another brand's topology goes. The driver comes first in a suggestion.
+            if (key.Equals(PvSystemSettingKeys.InverterDriver, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectDriver(value);
+            }
+            else if (key.Equals(PvSystemSettingKeys.InverterTopology, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectTopology(value);
+            }
+            else if (_values.ContainsKey(key))
             {
                 _values[key] = value;
             }

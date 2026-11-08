@@ -109,6 +109,43 @@ public class WizardTests : PageTest
     }
 
     [Fact]
+    public void Choosing_a_found_inverter_of_another_family_brings_its_driver_and_topology()
+    {
+        // A Huawei behind an EMMA, as the scan reports it (#324); the fake editor's second family stands in.
+        var behindEmma = new FoundDevice("192.168.1.20", 502, 1, PvDeviceRole.Inverter, "SUN2000-10K-MAP0", null, true, "note",
+            Driver: "acme", Topology: "emma");
+        _discovery.Finish(behindEmma);
+        var page = Step("devices");
+
+        page.Find("#discovery-results tbody tr button").Click();
+
+        Assert.Equal("acme", page.Find(Field(PvSystemSettingKeys.InverterDriver)).GetAttribute("value"));
+        Assert.Equal("emma", page.Find(Field(PvSystemSettingKeys.InverterTopology)).GetAttribute("value"));
+        Assert.NotNull(page.Find("#pv-emma-one-client"));
+
+        page.Find("#pv-save").Click();
+
+        var saved = Assert.Single(_pv.Saves);
+        Assert.Equal("acme", saved[PvSystemSettingKeys.InverterDriver]);
+        Assert.Equal("emma", saved[PvSystemSettingKeys.InverterTopology]);
+    }
+
+    [Fact]
+    public void Choosing_a_found_inverter_of_the_configured_family_is_no_driver_edit()
+    {
+        var solax = Inverter with { Driver = "solax" };
+        _discovery.Finish(solax);
+        var page = Step("devices");
+
+        page.Find("#discovery-results tbody tr button").Click();
+        page.Find("#pv-save").Click();
+
+        var saved = Assert.Single(_pv.Saves);
+        Assert.False(saved.ContainsKey(PvSystemSettingKeys.InverterDriver));
+        Assert.False(saved.ContainsKey(PvSystemSettingKeys.InverterTopology));
+    }
+
+    [Fact]
     public void Choosing_a_found_device_fills_the_address_and_saves_nothing()
     {
         _discovery.Finish(Inverter, Charger);

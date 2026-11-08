@@ -161,12 +161,21 @@
             ? (Host: PvSystemSettingKeys.InverterHost, Port: PvSystemSettingKeys.InverterPort, Unit: PvSystemSettingKeys.InverterUnitId)
             : (Host: PvSystemSettingKeys.ChargerHost, Port: PvSystemSettingKeys.ChargerPort, Unit: PvSystemSettingKeys.ChargerUnitId);
 
-        await OnChosen.InvokeAsync(new Dictionary<string, string>
+        var fields = new Dictionary<string, string>();
+
+        // An inverter the scan identified brings its driver, and how it is reached (#324): a Huawei behind an
+        // EMMA is useless read as a SolaX, or through a dongle it does not have. The driver goes first.
+        if (role == PvDeviceRole.Inverter && device.Driver is { } driver)
         {
-            [keys.Host] = device.Host,
-            [keys.Port] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            [keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
-        });
+            fields[PvSystemSettingKeys.InverterDriver] = driver;
+            fields[PvSystemSettingKeys.InverterTopology] = device.Topology ?? string.Empty;
+        }
+
+        fields[keys.Host] = device.Host;
+        fields[keys.Port] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        fields[keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        await OnChosen.InvokeAsync(fields);
     }
 
     private static string Percent(DiscoveryScan scan) =>

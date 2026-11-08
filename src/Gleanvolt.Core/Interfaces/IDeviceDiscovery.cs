@@ -65,8 +65,9 @@ public sealed record DiscoveryScan(
 
 /// <summary>
 /// One address that answered. <see cref="Role"/> is what the device identified as, null when it did
-/// not say; <see cref="Supported"/> is false for a SolaX model Gleanvolt cannot drive and for
-/// anything that is not SolaX at all.
+/// not say; <see cref="Supported"/> is false for a model Gleanvolt cannot drive and for anything it
+/// could not identify. <see cref="Driver"/> and <see cref="Topology"/> are what choosing it as the
+/// inverter fills in (issue #324): the family's driver id, and how it is reached, null for the default.
 /// </summary>
 public sealed record FoundDevice(
     string Host,
@@ -76,4 +77,6 @@ public sealed record FoundDevice(
     string? Model,
     string? SerialNumber,
     bool Supported,
-    string Note);
+    string Note,
+    string? Driver = null,
+    string? Topology = null);

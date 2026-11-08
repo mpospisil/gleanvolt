@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
     <ProjectReference Include="..\Gleanvolt.Devices.Solax\Gleanvolt.Devices.Solax.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Devices.Huawei\Gleanvolt.Devices.Huawei.csproj" />
   </ItemGroup>
 
   <ItemGroup>

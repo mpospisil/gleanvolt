@@ -1,3 +1,4 @@
+using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Discovery;
@@ -14,7 +15,7 @@ public static class DiscoveryConfiguration
     public static IReadOnlyList<string> EnvironmentLines(IEnumerable<DiscoveredDevice> devices)
     {
         var usable = devices
-            .Where(device => device is { Finding: DiscoveryFinding.SolaxDevice, Role: not null, UnitId: not null }
+            .Where(device => device is { Identified: true, Role: not null, UnitId: not null, Tier: not null }
                 && device.Tier is not SupportTier.NotSupported)
             .ToList();
 
@@ -22,6 +23,17 @@ public static class DiscoveryConfiguration
 
         if (usable.FirstOrDefault(device => device.Role == PvDeviceRole.Inverter) is { } inverter)
         {
+            // The driver only when it is not the default, as a configuration written by hand would have it.
+            if (inverter.Driver is { } driver && driver != PvSystemRules.DefaultInverterDriver)
+            {
+                lines.Add($"{PvSystemSettingKeys.EnvironmentVariable(PvSystemSettingKeys.InverterDriver)}={driver}");
+            }
+
+            if (inverter.Topology is { } topology)
+            {
+                lines.Add($"{PvSystemSettingKeys.EnvironmentVariable(PvSystemSettingKeys.InverterTopology)}={topology}");
+            }
+
             lines.AddRange(Lines(inverter, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost,
                 PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId));
         }
@@ -37,7 +49,8 @@ public static class DiscoveryConfiguration
 
     private static IEnumerable<string> Lines(DiscoveredDevice device, string model, string host, string port, string unitId)
     {
-        yield return $"{PvSystemSettingKeys.EnvironmentVariable(model)}=SolaX {device.Model}";
+        var brand = device.Finding == DiscoveryFinding.HuaweiDevice ? "Huawei" : "SolaX";
+        yield return $"{PvSystemSettingKeys.EnvironmentVariable(model)}={brand} {device.Model}";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(host)}={device.Host}";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(port)}={device.Port}";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(unitId)}={device.UnitId}";
