@@ -9,18 +9,17 @@ namespace Gleanvolt.Discovery.Tests;
 /// <summary>
 /// A Modbus TCP server on loopback that answers the way the hardware does, without the hardware: units
 /// with registers, a gateway that answers "nobody here" for the rest, or a device that accepts the
-/// connection and never replies, as one whose connections are already taken does. It counts the
-/// connections it has open, so a test can say the scan never held two at once.
+/// connection and never replies, as one whose connections are already taken does. It numbers the
+/// connections in the order it accepts them and tags each request with its connection, so a test can
+/// say the scan never worked two at once.
 /// </summary>
 internal sealed class FakeModbusServer : IAsyncDisposable
 {
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentBag<TcpClient> _clients = [];
-    private readonly ConcurrentDictionary<TcpClient, byte> _live = new();
     private readonly Task _accepting;
     private int _open;
-    private int _maxOpen;
 
     public FakeModbusServer()
     {
@@ -43,12 +42,19 @@ internal sealed class FakeModbusServer : IAsyncDisposable
 
     public int OpenConnections => Volatile.Read(ref _open);
 
-    public int MaxOpenConnections => Volatile.Read(ref _maxOpen);
+    /// <summary>
+    /// Whether requests on two connections ever interleaved: one arriving on an earlier connection after a
+    /// later one had been accepted and used. Judged from the requests rather than from the sockets,
+    /// because a client's close reaches the server asynchronously and can land after the next accept.
+    /// </summary>
+    public bool ConnectionsOverlapped =>
+        Requests.Select(request => request.Connection).Zip(Requests.Select(request => request.Connection).Skip(1))
+            .Any(pair => pair.Second < pair.First);
 
     public int Writes { get; private set; }
 
     /// <summary>When each request arrived, in order.</summary>
-    public ConcurrentQueue<(long Timestamp, byte UnitId, byte Function, ushort Address)> Requests { get; } = new();
+    public ConcurrentQueue<(long Timestamp, int Connection, byte UnitId, byte Function, ushort Address)> Requests { get; } = new();
 
     public async ValueTask DisposeAsync()
     {
@@ -78,14 +84,13 @@ internal sealed class FakeModbusServer : IAsyncDisposable
         {
             var client = await _listener.AcceptTcpClientAsync(_stop.Token).ConfigureAwait(false);
             _clients.Add(client);
-            Connections++;
+            var connection = ++Connections;
             Interlocked.Increment(ref _open);
-            InterlockedMax(ref _maxOpen, CountOpenAtAccept(client));
-            _ = ServeAsync(client);
+            _ = ServeAsync(client, connection);
         }
     }
 
-    private async Task ServeAsync(TcpClient client)
+    private async Task ServeAsync(TcpClient client, int connection)
     {
         try
         {
@@ -103,7 +108,7 @@ internal sealed class FakeModbusServer : IAsyncDisposable
                 var function = pdu[0];
                 var address = BinaryPrimitives.ReadUInt16BigEndian(pdu.AsSpan(1));
                 var count = BinaryPrimitives.ReadUInt16BigEndian(pdu.AsSpan(3));
-                Requests.Enqueue((Stopwatch.GetTimestamp(), unitId, function, address));
+                Requests.Enqueue((Stopwatch.GetTimestamp(), connection, unitId, function, address));
 
                 if (Silent)
                 {
@@ -164,53 +169,12 @@ internal sealed class FakeModbusServer : IAsyncDisposable
         }
         finally
         {
-            _live.TryRemove(client, out _);
             Interlocked.Decrement(ref _open);
             client.Dispose();
         }
     }
 
-    // The client closes a connection before it opens the next, but the serving loop only notices the
-    // close when its read ends, which can come after the next accept. So the overlap is judged from
-    // the sockets themselves: one the peer has already closed reads as readable with nothing to read.
-    private int CountOpenAtAccept(TcpClient accepted)
-    {
-        _live[accepted] = 0;
-        var open = 0;
-
-        foreach (var client in _live.Keys)
-        {
-            try
-            {
-                var socket = client.Client;
-
-                if (socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0)
-                {
-                    continue;
-                }
-
-                open++;
-            }
-            catch (Exception ex) when (ex is ObjectDisposedException or SocketException)
-            {
-                // Already served and closed.
-            }
-        }
-
-        return open;
-    }
-
     private static byte[] Exception(byte function, byte code) => [(byte)(function | 0x80), code];
-
-    private static void InterlockedMax(ref int target, int value)
-    {
-        int current;
-
-        while ((current = Volatile.Read(ref target)) < value
-            && Interlocked.CompareExchange(ref target, value, current) != current)
-        {
-        }
-    }
 }
 
 /// <summary>One unit's registers.</summary>
