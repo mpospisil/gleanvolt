@@ -124,4 +124,11 @@ public sealed record InverterDriverOptions
     /// id, lower case. Empty is the factory's first, or the only way for a family with none.
     /// </summary>
     public string Topology { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Where the driver keeps what must survive a restart (issue #323), such as the original of a lasting
+    /// setting its battery hold changes. Null keeps it in memory only, which is enough for a driver that
+    /// changes nothing lasting, and for tests.
+    /// </summary>
+    public IDriverStateStore? State { get; init; }
 }

@@ -154,9 +154,25 @@ with a DDSU666-H meter ([#321](https://github.com/mpospisil/gleanvolt/issues/321
 same registers, so one driver reads them. Neither reports output per phase, so `UnmeteredGridPhase` is
 not available. It is **Expected** and untested on hardware:
 its readings come from Huawei's interface definitions, and the signs of the grid meter and the battery
-are still to be confirmed by a tester. There is no battery hold. Modbus TCP is off on the SDongle by
-default, and enabling it, the hold and discovery follow in
-[#316](https://github.com/mpospisil/gleanvolt/issues/316).
+are still to be confirmed by a tester. Modbus TCP is off on the SDongle by default, and enabling it and
+discovery follow in [#316](https://github.com/mpospisil/gleanvolt/issues/316).
+
+**The battery hold is Untested** ([#323](https://github.com/mpospisil/gleanvolt/issues/323)): leave
+`BatteryHold` disabled, or in dry-run, until a tester reports a dry-run log and then a live run. It works
+differently from SolaX's. It writes the battery's **maximum discharging power** (`47077`) as 0 to hold,
+and the original value back to release. That is a **lasting setting**, not a command that lapses, so:
+
+- the original is stored in `data/inverter-state.json` before 0 is written, and written back on release
+  and when Gleanvolt stops normally;
+- after a crash or a power cut, the first poll finds the register at 0 with an original stored, and puts
+  it back (or keeps the hold, if one is due);
+- a register that already reads 0 with nothing stored was set by someone else, and is left alone;
+- arming is spaced at least a minute after the last write, until it is known whether the setting wears
+  out flash memory.
+
+If Gleanvolt is gone for good while a hold is on, set the maximum discharging power back in the FusionSolar
+app. Behind an EMMA, the EMMA's own AI energy optimisation must be off, with the EMMA in maximum
+self-consumption mode: only one system may schedule the battery.
 
 **Behind an EMMA** ([#322](https://github.com/mpospisil/gleanvolt/issues/322)), set `Pv:Inverter:Topology`
 to `emma` (Settings → Inverter → *Connected through*) and point the host at the EMMA. The grid then comes
