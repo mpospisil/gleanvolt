@@ -52,10 +52,18 @@ public static class SetupStatusEvaluator
             required.Add(new SetupProblem(AreaOf(pvProblems[index]), pvProblems[index], phrases[index]));
         }
 
-        // Half-set coordinates are already a PvSystemRules problem; this is the other half of
-        // "location": none at all. The rules allow it -- nothing in them needs a place -- so a first
-        // run asks for it but does not wait for it: without one the weather is simply not fetched.
-        if (pv.Latitude is null && pv.Longitude is null)
+        // No location, or half of one (which the rules read as none): nothing the controller needs to
+        // run depends on a place, so a first run asks for it but does not wait for it -- without one the
+        // weather is simply not fetched.
+        if (pv.Latitude is null != pv.Longitude is null)
+        {
+            recommended.Add(new SetupProblem(
+                SetupArea.Location,
+                "A latitude without a longitude (or the other way round) is not a location. Set both "
+                + "Pv:Latitude and Pv:Longitude, or neither.",
+                Phrase.Of("Config.PvLocation")));
+        }
+        else if (pv.Latitude is null && pv.Longitude is null)
         {
             recommended.Add(new SetupProblem(
                 SetupArea.Location,

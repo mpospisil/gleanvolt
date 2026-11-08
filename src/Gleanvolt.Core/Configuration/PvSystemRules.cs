@@ -145,13 +145,13 @@ public static partial class PvSystemRules
         return id;
     }
 
+    // Half a location describes nowhere, so it is read as none -- not refused: nothing the controller
+    // needs to run depends on where the site is, only the weather does, and that is off without one.
+    // Setup lists it as a recommended setting (SetupStatusEvaluator), so it is not silently lost.
     private static (double? Latitude, double? Longitude) ResolveLocation(PvSystemOptions pv, ConfigurationProblems problems)
     {
         if (pv.Latitude is null != pv.Longitude is null)
         {
-            problems.Add(
-                "A latitude without a longitude (or the other way round) describes nowhere. Set both "
-                + "Pv:Latitude and Pv:Longitude, or neither.", Phrase.Of("Config.PvLocation"));
             return (null, null);
         }
 

@@ -3092,7 +3092,8 @@ A fresh install has none of the required settings: the web UI password and the i
 charger's addresses. Those are what the controller cannot run without.
 
 The site's location (`Pv:Latitude`, `Pv:Longitude`) and its time zone are **recommended**: setup asks
-for them, but Gleanvolt starts without them. Without a location there is no weather. Without a time
+for them, but Gleanvolt starts without them. Without a location there is no weather; only one of the
+two coordinates counts as no location, and is listed as such. Without a time
 zone the controller runs in the host's own zone, which on Windows (it ignores `TZ`) or on a host that
 reports plain UTC means UTC, so days start and sessions are filed at UTC midnight. The time zone
 counts as set when `Controller:TimeZone` names a valid zone, or when it is empty and the host's own
@@ -3116,8 +3117,8 @@ Windows zip, winget and `dotnet run` have nothing that does: there the page says
 again yourself.
 
 Some problems keep the controller stopped even when everything else is set: a configuration key that
-has moved (its old name is listed with the new one), a latitude without a longitude or the other
-way round, and a `Controller:TimeZone` this host cannot resolve (on the Nano Server image, an IANA id
+has moved (its old name is listed with the new one), and a `Controller:TimeZone` this host cannot
+resolve (on the Nano Server image, an IANA id
 such as `Europe/Prague`; use `Central Europe Standard Time` there). Gleanvolt never starts the
 controller on part of a configuration.
 

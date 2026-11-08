@@ -71,12 +71,14 @@ public class SetupStatusEvaluatorTests
     }
 
     [Fact]
-    public void Half_a_location_is_a_problem_too()
+    public void Half_a_location_is_recommended_but_does_not_block()
     {
         var status = Usable(("Pv:Longitude", null));
 
-        Assert.Equal([SetupArea.Location], Areas(status));
-        Assert.Contains("Pv:Longitude", status.MissingRequired[0].English);
+        Assert.True(status.Usable);
+        var problem = Assert.Single(status.Recommended);
+        Assert.Equal(SetupArea.Location, problem.Area);
+        Assert.Equal(Phrase.Of("Config.PvLocation"), problem.Phrase);
     }
 
     [Fact]

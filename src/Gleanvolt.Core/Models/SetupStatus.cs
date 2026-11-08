@@ -9,12 +9,12 @@ namespace Gleanvolt.Core.Models;
 ///
 /// <para><b>Required</b> is the minimum the controller needs to run: the web UI's password, the
 /// inverter and the charger. Anything else that makes the configuration unsafe to run on is required
-/// too: a key that has moved, a latitude without its longitude, a time zone this host cannot resolve.
+/// too: a key that has moved, a time zone this host cannot resolve.
 /// Until every required item is in place the controller does not start — with the web UI on the host
 /// comes up in setup mode instead; headless it refuses to start.</para>
 ///
 /// <para><b>Recommended</b> is what the controller runs without, but runs worse without: where the site
-/// is (no weather without it) and which time zone it lives in (UTC days without it on Windows). Listed
+/// is, both coordinates (no weather without it) and which time zone it lives in (UTC days without it on Windows). Listed
 /// so the UI can ask for them, and never block the start.</para>
 ///
 /// <para><b>Optional</b> is what a working installation can do without: the Solcast forecast, the
