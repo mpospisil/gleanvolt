@@ -37,6 +37,9 @@ public class ForecastedHoldTests
         Assert.Contains("needed to restart", _charger.ModeWrites[^1].Reason);
         Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal([false, false], _inverter.Applied);
+
+        // A normal stop asks the hold to release: a lasting setting would otherwise outlive the process (#323).
+        Assert.Equal(1, _inverter.ShutdownReleases);
     }
 
     [Fact]

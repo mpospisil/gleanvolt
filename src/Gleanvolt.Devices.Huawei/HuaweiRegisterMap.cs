@@ -48,6 +48,19 @@ public static class HuaweiRegisterMap
     public const ushort BatteryBlockCount = BatteryPower + 2 - BatterySoc;
 
     /// <summary>
+    /// The battery's maximum charging power, uint32, watts. Read beside <see cref="MaxDischargePower"/> by a
+    /// snapshot only.
+    /// </summary>
+    public const ushort MaxChargePower = 47075;
+
+    /// <summary>
+    /// The battery's maximum discharging power, uint32, watts, read and written (issue #323). Zero holds the
+    /// battery out of discharge. <b>A lasting setting</b>, not a command that lapses: it stays as written
+    /// until something writes it again, through a restart of Gleanvolt or of the inverter.
+    /// </summary>
+    public const ushort MaxDischargePower = 47077;
+
+    /// <summary>
     /// The EMMA's own unit id (issue #322): it answers for itself here, and forwards the inverter's unit id
     /// to the inverter.
     /// </summary>

@@ -745,6 +745,15 @@ internal sealed class FakeBatteryDischargeControl : IBatteryDischargeControl
         Applied.Add(hold);
         return Task.FromResult(new BatteryHoldState(hold, hold ? activePowerTargetWatts : null, hold ? now : null, Wrote: true));
     }
+
+    /// <summary>How many times the host asked the hold to release on a normal stop (#323).</summary>
+    public int ShutdownReleases { get; private set; }
+
+    public Task ReleaseOnShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        ShutdownReleases++;
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>No forecast at all: the day plan is unusable, as it is on a cold start or a Solcast outage.</summary>

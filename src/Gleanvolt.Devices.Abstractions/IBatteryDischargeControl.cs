@@ -30,4 +30,11 @@ public interface IBatteryDischargeControl
         double activePowerTargetWatts,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The host is stopping normally (issue #323). A hold that lapses on its own, like SolaX's command,
+    /// needs nothing; a hold that is a lasting setting puts the original back now, so the battery is not
+    /// left blocked while nothing runs to release it.
+    /// </summary>
+    Task ReleaseOnShutdownAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

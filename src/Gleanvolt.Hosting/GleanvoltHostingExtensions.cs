@@ -277,6 +277,17 @@ public static class GleanvoltHostingExtensions
             services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
         }
 
+        // What a driver's hold must be able to undo after a crash (#323), on the data bind mount.
+        services.AddSingleton<IDriverStateStore>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var path = Path.IsPathRooted(options.StatePath)
+                ? options.StatePath
+                : Path.Combine(environment.ContentRootPath, options.StatePath);
+            return new DriverStateFile(Path.GetFullPath(path), provider.GetRequiredService<ILogger<DriverStateFile>>());
+        });
+
         services.AddSingleton<IInverterDriver>(provider =>
         {
             var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
@@ -288,6 +299,7 @@ public static class GleanvoltHostingExtensions
                     HoldCommandDuration = batteryHold.Duration,
                     HoldRetargetThresholdWatts = batteryHold.TargetChangeThresholdWatts,
                     Topology = provider.GetRequiredService<PvSystemInfo>().InverterTopology,
+                    State = provider.GetRequiredService<IDriverStateStore>(),
                 });
         });
 
