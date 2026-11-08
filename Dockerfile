@@ -43,6 +43,8 @@ WORKDIR /source
 # else -- which is why DockerfileTests asserts all three stay in step.
 COPY Gleanvolt.slnx ./
 COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj                     src/Gleanvolt.Core/
+COPY src/Gleanvolt.Devices.Abstractions/Gleanvolt.Devices.Abstractions.csproj src/Gleanvolt.Devices.Abstractions/
+COPY src/Gleanvolt.Devices.Solax/Gleanvolt.Devices.Solax.csproj   src/Gleanvolt.Devices.Solax/
 COPY src/Gleanvolt.Api/Gleanvolt.Api.csproj                       src/Gleanvolt.Api/
 COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj                       src/Gleanvolt.Web/

@@ -48,7 +48,7 @@ public sealed record PvSystemInfo(
     /// <see cref="Strategies.UnmeteredGridPhaseEstimate"/>. Not positional, so a site described anywhere
     /// else need not mention it.
     /// </summary>
-    public Enums.GridPhase? UnmeteredGridPhase { get; init; }
+    public Gleanvolt.Devices.GridPhase? UnmeteredGridPhase { get; init; }
 
     /// <summary>
     /// One line for the log at startup, so a `docker logs` dump answers "which installation was this,

@@ -1,16 +1,12 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Gleanvolt.Core.Interfaces;
-using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.RegisterMaps;
 using static System.FormattableString;
 
-namespace Gleanvolt.Infrastructure;
+namespace Gleanvolt.Devices.Solax;
 
 /// <summary>
-/// <see cref="IBatteryDischargeControl"/> over Modbus, on the keyed <b>inverter</b> client. This is
+/// <see cref="IBatteryDischargeControl"/> over Modbus, on the inverter's client. This is
 /// the first write this project ever makes to the inverter — everything before it only wrote the
-/// charger's current setpoint — so it keeps the same discipline as <see cref="EvChargerControl"/>:
+/// charger's current setpoint — so it keeps the same discipline as the charger control (<c>EvChargerControl</c>):
 /// write only when something has to change, log the encoded register values, and skip the write
 /// entirely in dry-run.
 ///
@@ -36,7 +32,7 @@ public sealed class BatteryDischargeControl : IBatteryDischargeControl
     private DateTimeOffset? _armedAt;
 
     public BatteryDischargeControl(
-        [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient client,
+        IModbusClient client,
         ILogger<BatteryDischargeControl> logger,
         bool dryRun = false,
         TimeSpan? duration = null,

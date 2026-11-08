@@ -1,6 +1,4 @@
-using Gleanvolt.Core.Enums;
-
-namespace Gleanvolt.Infrastructure.RegisterMaps;
+namespace Gleanvolt.Devices.Solax;
 
 // The SolaX protocol requires >=1 second between separate Modbus instructions, so we
 // read the whole telemetry block we need in a single request rather than one register

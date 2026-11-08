@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices.Solax;
 
 /// <summary>
 /// The <c>set_type</c> field of the Modbus Power Control block. Upstream always sends

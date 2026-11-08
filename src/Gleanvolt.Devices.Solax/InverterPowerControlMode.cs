@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices.Solax;
 
 /// <summary>
 /// The device-level values of the <c>power_control</c> field, the first register of the Modbus Power
@@ -7,7 +7,7 @@ namespace Gleanvolt.Core.Enums;
 /// <para><b>There is deliberately no "No Discharge" value here.</b> The upstream Home Assistant
 /// integration offers an <c>Enabled No Discharge</c> option, but it never reaches the inverter — it
 /// is a client-side strategy that resolves to <see cref="EnabledPowerControl"/> with a computed
-/// <c>active_power</c> target (see <see cref="Strategies.BatteryDischargeHoldStrategy"/> and
+/// <c>active_power</c> target (see the controller's <c>BatteryDischargeHoldStrategy</c> and
 /// docs/DECISIONS.md). The device enum itself is just these values.</para>
 /// </summary>
 public enum InverterPowerControlMode : ushort

@@ -1,6 +1,4 @@
-using Gleanvolt.Core.Enums;
-
-namespace Gleanvolt.Core.Models;
+namespace Gleanvolt.Devices;
 
 /// <summary>A power figure for each of the three phases, in watts.</summary>
 public sealed record PhaseWatts(double L1, double L2, double L3)

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.RegisterMaps;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Infrastructure.Tests;
 
@@ -36,7 +36,7 @@ public class EnergyStateReaderUnmeteredPhaseTests
 
     private static Task<EnergyState> Read(GridPhase? unmetered) =>
         new EnergyStateReader(
-            Inverter(),
+            new SolaxInverterDriver(Inverter()),
             new FakeModbusClient(),
             NullLogger<EnergyStateReader>.Instance,
             Site(unmetered),

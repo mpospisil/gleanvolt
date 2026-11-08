@@ -1,8 +1,9 @@
 using System.Net.Sockets;
-using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.RegisterMaps;
 using NModbus;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Discovery;
 

@@ -1,5 +1,5 @@
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Core.Strategies;
 

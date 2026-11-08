@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-08 — The inverter is a driver behind a contract, in assemblies of its own
+
+**Context.** [Issue #317](https://github.com/mpospisil/gleanvolt/issues/317), the first step of Huawei
+support ([#316](https://github.com/mpospisil/gleanvolt/issues/316)). SolaX was compiled into
+Infrastructure and Core: its register enums sat in `Core.Enums`, `EnergyState.FromRawRegisters` decoded
+SolaX raw values, and `EnergyStateReader` did the block read.
+
+**Decision — two new assemblies.** `Gleanvolt.Devices.Abstractions` holds the contract: `IModbusClient`,
+`IInverterDriver` and its reading, `IInverterDriverFactory`, `IBatteryDischargeControl` with
+`BatteryHoldState`, and `GridPhase`/`PhaseWatts`, which the reading carries. It references nothing.
+Core references it, not the other way round, so it can later be published on its own for third-party
+drivers. `Gleanvolt.Devices.Solax` holds the register map, `PowerControlPayload`, the decoding, and
+`BatteryDischargeControl` as the driver's hold. The compiler enforces the boundary: Core no longer
+compiles against a SolaX type. Folders inside Infrastructure would have been cheaper, but the boundary
+would have leaked quietly.
+
+**One contract, fixed units and signs.** A driver returns watts and percent, with grid import positive
+and battery charging positive. `EnergyStateReader` composes: driver, then charger (best-effort, as
+before), then the blind-phase correction when the reading has per-phase output, then `EnergyState`.
+Nothing past the driver knows the brand.
+
+**The host owns the client.** A driver is handed the inverter's client as registered: read-only unless
+the battery hold is enabled and out of dry-run. Its factory takes `ILoggerFactory` from the container
+rather than through the contract, which keeps Abstractions free of even the logging package. "Test
+connection" builds a driver on a read-only client for the address under test and asks its probe.
+
+**Kept as it was:** log text (the default Serilog template has no source context, so moving a class to a
+new namespace changes no line), entities, the API and configuration. The grid-register debug line now
+comes from `Gleanvolt.Devices.Solax`, so that is the category to raise to Debug.
+
 ## 2026-11-04 — A phrase is stored, and a configuration problem carries one
 
 **Context.** [Issue #292](https://github.com/mpospisil/gleanvolt/issues/292), the rest of the service

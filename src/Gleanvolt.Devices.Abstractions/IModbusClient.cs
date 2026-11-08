@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Interfaces;
+namespace Gleanvolt.Devices;
 
 public interface IModbusClient : IAsyncDisposable
 {

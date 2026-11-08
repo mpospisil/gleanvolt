@@ -2,6 +2,9 @@ using Gleanvolt.Core.Configuration;
 using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
+using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.RegisterMaps;
@@ -29,6 +32,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IReadOnlyDictionary<string, string?> _running;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
+    private readonly IInverterDriverFactory _inverterDriver;
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
@@ -43,13 +47,15 @@ public sealed class PvSystemEditor : IPvSystemEditor
         IConfiguration configuration,
         IReadOnlyDictionary<string, string?> running,
         ILogger<PvSystemEditor> logger,
-        Func<DeviceConfig, IModbusClient>? clientFactory = null)
+        Func<DeviceConfig, IModbusClient>? clientFactory = null,
+        IInverterDriverFactory? inverterDriver = null)
     {
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
         _running = running;
         _logger = logger;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device));
+        _inverterDriver = inverterDriver ?? new SolaxInverterDriverFactory();
     }
 
     /// <summary>Each editable key's value in <paramref name="configuration"/>, for the <c>running</c> argument.</summary>
@@ -135,7 +141,6 @@ public sealed class PvSystemEditor : IPvSystemEditor
         CancellationToken cancellationToken = default)
     {
         var address = $"{host}:{port}";
-        var register = DeviceRoleCheck.Register(role);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(ProbeTimeout);
@@ -144,24 +149,38 @@ public sealed class PvSystemEditor : IPvSystemEditor
         {
             await using var client = _clientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
             await client.ConnectAsync(timeout.Token).ConfigureAwait(false);
+
+            if (role == PvDeviceRole.Inverter)
+            {
+                // Through the driver, so "Test connection" asks whatever the family's own probe asks. The
+                // client refuses writes, and the probe makes none: an address nobody has confirmed yet is
+                // never written to.
+                var driver = _inverterDriver.Create(
+                    new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
+                    new InverterDriverOptions { DryRun = true });
+                var probe = await driver.ProbeAsync(timeout.Token).ConfigureAwait(false);
+                var reading = (long)Math.Round(probe.Reading);
+
+                return probe.Recognised
+                    ? new DeviceProbeResult(true, true, $"{address} answered: battery at {reading} %.",
+                        Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(reading)))
+                    : new DeviceProbeResult(true, false,
+                        $"{address} answered, but its battery register reads {reading}, which is no state of "
+                        + "charge. Is this the charger's address?",
+                        Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(reading)));
+            }
+
+            var register = DeviceRoleCheck.Register(role);
             var value = (await client.ReadInputRegistersAsync(register, 1, timeout.Token).ConfigureAwait(false))[0];
             var plausible = DeviceRoleCheck.IsPlausible(role, value);
 
-            return role == PvDeviceRole.Inverter
-                ? plausible
-                    ? new DeviceProbeResult(true, true, $"{address} answered: battery at {value} %.",
-                        Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
-                    : new DeviceProbeResult(true, false,
-                        $"{address} answered, but its battery register reads {value}, which is no state of "
-                        + "charge. Is this the charger's address?",
-                        Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)))
-                : plausible
-                    ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
-                        Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
-                    : new DeviceProbeResult(true, false,
-                        $"{address} answered, but its run-mode register reads {value}, which no charger "
-                        + "reports. Is this the inverter's address?",
-                        Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
+            return plausible
+                ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
+                    Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
+                : new DeviceProbeResult(true, false,
+                    $"{address} answered, but its run-mode register reads {value}, which no charger "
+                    + "reports. Is this the inverter's address?",
+                    Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {

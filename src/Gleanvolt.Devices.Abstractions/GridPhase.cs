@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices;
 
 /// <summary>
 /// One phase of a three-phase grid connection. SolaX names them R, S and T; the values follow that order,

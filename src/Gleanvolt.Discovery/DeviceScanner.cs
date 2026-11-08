@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Net;
-using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
 using Microsoft.Extensions.Logging.Abstractions;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Discovery;
 

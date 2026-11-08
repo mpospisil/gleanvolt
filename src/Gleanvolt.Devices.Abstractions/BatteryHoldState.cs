@@ -1,9 +1,9 @@
-namespace Gleanvolt.Core.Models;
+namespace Gleanvolt.Devices;
 
 /// <summary>
 /// What the battery discharge hold believes the inverter is doing, after a reconciliation cycle.
 /// Reported state, not a device read-back — the command register cannot be read back (see
-/// <see cref="Interfaces.IBatteryDischargeControl"/>).
+/// <see cref="IBatteryDischargeControl"/>).
 /// </summary>
 /// <param name="Held">Whether a hold command is currently armed.</param>
 /// <param name="ActivePowerTargetWatts">The target last written, or null when not held.</param>

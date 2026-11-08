@@ -1,4 +1,4 @@
-using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting.Setup;
 

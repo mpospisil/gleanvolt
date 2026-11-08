@@ -249,12 +249,12 @@ public class PvSystemResolverTests
     }
 
     [Theory]
-    [InlineData("L3", Core.Enums.GridPhase.L3)]
-    [InlineData("T", Core.Enums.GridPhase.L3)]
-    [InlineData("t", Core.Enums.GridPhase.L3)]
-    [InlineData("R", Core.Enums.GridPhase.L1)]
-    [InlineData(" l2 ", Core.Enums.GridPhase.L2)]
-    public void An_unmetered_phase_is_read_in_either_spelling(string configured, Core.Enums.GridPhase expected)
+    [InlineData("L3", Gleanvolt.Devices.GridPhase.L3)]
+    [InlineData("T", Gleanvolt.Devices.GridPhase.L3)]
+    [InlineData("t", Gleanvolt.Devices.GridPhase.L3)]
+    [InlineData("R", Gleanvolt.Devices.GridPhase.L1)]
+    [InlineData(" l2 ", Gleanvolt.Devices.GridPhase.L2)]
+    public void An_unmetered_phase_is_read_in_either_spelling(string configured, Gleanvolt.Devices.GridPhase expected)
     {
         var site = Resolve(WithDevices(("Pv:Inverter:UnmeteredGridPhase", configured)));
 

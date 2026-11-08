@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Gleanvolt.Core.Enums;
 using Gleanvolt.Infrastructure.RegisterMaps;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Infrastructure.Tests;
 

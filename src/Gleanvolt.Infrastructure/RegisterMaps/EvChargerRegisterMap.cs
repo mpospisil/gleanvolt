@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Infrastructure.RegisterMaps;
 

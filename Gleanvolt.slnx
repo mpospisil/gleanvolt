@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Gleanvolt.Core/Gleanvolt.Core.csproj" />
+    <Project Path="src/Gleanvolt.Devices.Abstractions/Gleanvolt.Devices.Abstractions.csproj" />
+    <Project Path="src/Gleanvolt.Devices.Solax/Gleanvolt.Devices.Solax.csproj" />
     <Project Path="src/Gleanvolt.Api/Gleanvolt.Api.csproj" />
     <Project Path="src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj" />
     <Project Path="src/Gleanvolt.Web/Gleanvolt.Web.csproj" />

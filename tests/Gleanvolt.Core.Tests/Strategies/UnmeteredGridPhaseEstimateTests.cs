@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
