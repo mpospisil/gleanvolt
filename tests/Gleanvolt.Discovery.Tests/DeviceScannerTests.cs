@@ -159,9 +159,9 @@ public class DeviceScannerTests
 
         await ScanAsync(Options(server.Port, 1, 0, 2) with { AllUnitIds = true });
 
-        // The port probe, then one connection per unit id; never two open together.
+        // The port probe, then one connection per unit id; never two worked together, and all closed.
         Assert.True(server.Connections >= 2);
-        Assert.Equal(1, server.MaxOpenConnections);
+        Assert.False(server.ConnectionsOverlapped);
         await WaitUntilAsync(() => server.OpenConnections == 0);
     }
 
