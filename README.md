@@ -863,6 +863,7 @@ the signal it is there to give.
   "Enabled": false,                 // master switch — while off, inverter writes are impossible
   "DryRun": true,                   // decide and log, but write nothing
   "Duration": "00:01:00",           // how long each command stays armed; also the failsafe window
+  "StatePath": "data/inverter-state.json", // Huawei: the setting the hold changed, so a crash can undo it
   "TargetChangeThresholdWatts": 100, // how far the target must move before reissuing
   "BridgeShortfallWatts": 300,      // SolarGrid/Targeted: arm when the car draws this much more than the sun gives
   "BridgeReleaseDwell": "00:03:00", // SolarGrid/Targeted: keep it this long after the last need, while charging

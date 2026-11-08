@@ -153,9 +153,24 @@ public sealed class PollingService : BackgroundService
 
     // Shutdown runs with a fresh token (ExecuteAsync's is already cancelled), so the pause write can
     // still reach the charger. Without this we'd leave the charger drawing at our last setpoint.
+    // The battery hold too: a family whose hold is a lasting setting (Huawei, #323) would otherwise leave
+    // the battery blocked while nothing runs to release it. SolaX's command lapses on its own and does nothing.
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await _chargingControl.PauseOnShutdownAsync(cancellationToken);
+
+        if (_batteryHoldOptions.Enabled)
+        {
+            try
+            {
+                await _batteryDischargeControl.ReleaseOnShutdownAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Could not release the battery hold on shutdown; the next start will try again.");
+            }
+        }
+
         await base.StopAsync(cancellationToken);
     }
 

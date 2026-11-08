@@ -6,9 +6,9 @@ namespace Gleanvolt.Devices.Huawei;
 
 /// <summary>
 /// A Huawei SUN2000 hybrid with a LUNA2000 battery and a Huawei smart meter, reached through the SDongle:
-/// three-phase -KTL-M1 and -MAP0 (issue #320), and single-phase -KTL-L1 and -LC0 (issue #321). Readings
-/// only: the family is in the "Expected" tier, with no battery hold, until a tester's dump and a dry-run
-/// confirm it (#323, #325).
+/// three-phase -KTL-M1 and -MAP0 (issue #320), and single-phase -KTL-L1 and -LC0 (issue #321). In the
+/// "Expected" tier until a tester's dump confirms the readings; the battery hold (#323) stays untested until
+/// a tester's dry-run and then a live run confirm it (#325).
 ///
 /// <para><b>One driver for both phase counts.</b> The single-phase models keep the same registers, and their
 /// DDSU666-H meter reports its one phase as the total at <see cref="HuaweiRegisterMap.MeterActivePower"/>,
@@ -45,28 +45,39 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
     /// <param name="behindEmma">
     /// Whether the inverter is behind an EMMA, which then answers for the grid on its own unit id.
     /// </param>
+    /// <param name="options">Dry-run and the state store the hold keeps its original in. Null uses the defaults.</param>
     public HuaweiSun2000Driver(
-        IModbusClient client, ILoggerFactory? loggers = null, TimeProvider? time = null, bool behindEmma = false)
+        IModbusClient client,
+        ILoggerFactory? loggers = null,
+        TimeProvider? time = null,
+        bool behindEmma = false,
+        InverterDriverOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(client);
+        loggers ??= NullLoggerFactory.Instance;
+        options ??= new InverterDriverOptions();
         _client = client;
         _emma = behindEmma ? client.ForUnit(HuaweiRegisterMap.EmmaUnitId) : null;
-        _logger = (loggers ?? NullLoggerFactory.Instance).CreateLogger<HuaweiSun2000Driver>();
+        _logger = loggers.CreateLogger<HuaweiSun2000Driver>();
         _time = time ?? TimeProvider.System;
+
+        // On the inverter's own unit, behind an EMMA too: the setting is the inverter's.
+        BatteryHold = new HuaweiBatteryHold(
+            client, options.State ?? new InMemoryDriverStateStore(), loggers.CreateLogger<HuaweiBatteryHold>(), options.DryRun, _time);
     }
 
     /// <summary>Whether the grid is read from an EMMA rather than the inverter's meter.</summary>
     public bool BehindEmma => _emma is not null;
 
     /// <summary>
-    /// No battery hold yet (#323), and no output per phase: the meter's figure is the whole connection, so
-    /// the correction for a meter blind on one phase does not apply.
+    /// The battery hold (<see cref="HuaweiBatteryHold"/>, #323), and no output per phase: the meter's figure
+    /// is the whole connection, so the correction for a meter blind on one phase does not apply.
     /// </summary>
-    public static InverterCapabilities Sun2000Capabilities { get; } = new(HasBatteryHold: false, HasPhaseOutput: false);
+    public static InverterCapabilities Sun2000Capabilities { get; } = new(HasBatteryHold: true, HasPhaseOutput: false);
 
     public InverterCapabilities Capabilities => Sun2000Capabilities;
 
-    public IBatteryDischargeControl? BatteryHold => null;
+    public IBatteryDischargeControl BatteryHold { get; }
 
     /// <summary>
     /// Three reads, one per range the values sit in: PV, the grid (the inverter's meter, or the EMMA's
@@ -244,6 +255,7 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.InputPower, 31),
             new RegisterRange(RegisterTable.Holding, 37100, 39),
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.BatteryBlockStart, HuaweiRegisterMap.BatteryBlockCount),
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.MaxChargePower, 4),
         ],
         SerialNumber: new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.SerialNumber, HuaweiRegisterMap.SerialNumberCount),
         SerialPrefixLength: 0);
@@ -255,6 +267,7 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.ModelName, 35),
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.InputPower, 31),
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.BatteryBlockStart, HuaweiRegisterMap.BatteryBlockCount),
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.MaxChargePower, 4),
             new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.EmmaGridActivePower, HuaweiRegisterMap.EmmaGridBlockCount, HuaweiRegisterMap.EmmaUnitId),
         ],
         SerialNumber: new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.SerialNumber, HuaweiRegisterMap.SerialNumberCount),
@@ -264,7 +277,7 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
         IsBehindEmma(options) ? EmmaSnapshot : Snapshot;
 
     public IInverterDriver Create(IModbusClient client, InverterDriverOptions options) =>
-        new HuaweiSun2000Driver(client, _loggers, _time, IsBehindEmma(options));
+        new HuaweiSun2000Driver(client, _loggers, _time, IsBehindEmma(options), options);
 
     private static bool IsBehindEmma(InverterDriverOptions options)
     {

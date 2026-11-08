@@ -29,6 +29,13 @@ public sealed class BatteryHoldOptions
     public bool DryRun { get; init; } = true;
 
     /// <summary>
+    /// Where the inverter driver keeps what its hold must be able to undo after a crash (issue #323): for
+    /// Huawei, the battery's maximum discharging power from before the hold set it to 0. Relative to the
+    /// content root unless absolute, beside <c>pv-system.json</c>. Present only while a hold is on.
+    /// </summary>
+    public string StatePath { get; init; } = "data/inverter-state.json";
+
+    /// <summary>
     /// How long each issued command stays armed before the inverter drops it. This is the failsafe:
     /// if the service stops, nothing renews the command and the inverter returns to normal operation
     /// within this window. Renewal happens at half of it, so it must comfortably exceed

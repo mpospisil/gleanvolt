@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — The Huawei hold is a lasting setting, so its original is kept on disk
+
+**Context.** [Issue #323](https://github.com/mpospisil/gleanvolt/issues/323). Huawei has no lapsing
+power-control command like SolaX's. The hold writes the battery's maximum discharging power (`47077`,
+uint32) as 0, as evcc does, and the original back to release. If Gleanvolt dies in between, the battery
+stays blocked.
+
+**Decision — the driver keeps the original through the host, not the disk.** `IDriverStateStore` is in the
+contract and `InverterDriverOptions.State` carries it. The host's `DriverStateFile`
+(`BatteryHold:StatePath`, default `data/inverter-state.json`) writes atomically and flushed to disk, and
+throws on failure. The hold stores the original *before* writing 0, so a failed store means no write.
+The file exists only while a hold is on.
+
+**Decision — three restore paths.** The hold is released when the controller releases it. It is also
+released on a normal stop, through a new `IBatteryDischargeControl.ReleaseOnShutdownAsync`: a default
+no-op that SolaX keeps, because its command lapses, and that `PollingService.StopAsync` calls when the
+hold is enabled. And it is restored on the first reconciliation after a start: with an original stored,
+a register at 0 and no hold due, the original goes back; a hold still due carries on; a register no
+longer at 0 means someone else restored it, and the stored value is dropped. A register already at 0
+with nothing stored is never treated as ours: 0 is never stored as an original, and that register is
+left alone on hold and on release.
+
+**Decision — only on a change, and arming spaced.** A steady state reads and writes nothing. Whether
+`47077` lives in EEPROM is unknown, so arming waits at least one minute after the last write. Releasing
+never waits. The controller's active-power target is not used: the register is a limit, and the hold
+blocks discharge outright.
+
+**Untested.** `HasBatteryHold` is true, so the existing `BatteryHold:Enabled` and `DryRun` (default on)
+gate it as they gate SolaX's. Docs list it as Untested until a tester's dry-run and live run (#325).
+
 ## 2026-11-08 — Huawei behind an EMMA: two unit ids on one connection, and a topology per driver
 
 **Context.** [Issue #322](https://github.com/mpospisil/gleanvolt/issues/322). Newer Huawei installations
