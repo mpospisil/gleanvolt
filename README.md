@@ -3135,7 +3135,10 @@ or a closed browser loses nothing that was saved.
    battery and no sun. Addresses can also be typed in. Saving reads one value from each device to
    check it.
 2. **Site.** Location and time zone (both required), the home battery's usable capacity and charge
-   efficiency, the array's details.
+   efficiency, the array's details. The time zone takes an IANA id (`Europe/Prague`) or a Windows id
+   (`Central Europe Standard Time`). On the Nano Server image only the Windows id works, since it
+   ships no ICU to resolve IANA ids; an IANA id there is refused with "is not a time zone this host
+   knows" (see [Configuration](#configuration)).
 3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it; the forecast is
    fetched when Gleanvolt starts, so the setup spends none of the day's Solcast calls.
 4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
