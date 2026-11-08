@@ -4,6 +4,40 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-08 — Huawei SUN2000 readings, and what a slow gateway needs from the host
+
+**Context.** [Issue #320](https://github.com/mpospisil/gleanvolt/issues/320), the first Huawei driver: a
+SUN2000 M1/MAP0 hybrid through the SDongle. Nobody on the project has one, so it ships in the "Expected"
+tier with readings only, from Huawei's interface definitions and evcc's `huawei-sun2000-hybrid.yaml` (MIT).
+
+**Decision — three reads a poll, holding registers, high word first.** PV input power (`32064`), the meter
+(`37113`) and the battery block (`37760`–`37766`: state of charge to charge/discharge power) are in three
+ranges. The meter counts export as positive and is negated; the battery already counts charging as
+positive. A negative PV input (standby draw at night) reads as zero. No battery hold, so the host runs
+its `NoBatteryHold`, which never writes; and no output per phase, so `UnmeteredGridPhase` is refused for
+`huawei` by the existing capability rule.
+
+**"Device busy" is the driver's to repeat.** The SDongle answers Modbus exception 0x06 when a request
+arrives while it is still forwarding another. `ModbusDeviceException.IsBusy` names it, and the driver
+waits 1 s, then 2 s, and repeats; a third busy answer fails the poll. The client still drops the connection
+on it, as on every failed exchange (2026-07-29): an exception response cannot desynchronise the stream, but
+relaxing that rule is not this driver's call, and a reconnect after the odd busy answer is cheap.
+
+**Reconnect backoff is a family default, off for SolaX.** `ModbusDefaults.ReconnectBackoff` reaches
+`DeviceConfig` like the request spacing does. With it set, a failed connect blocks the next attempt for the
+backoff, doubling with each further failure up to 2 minutes, and a successful connect starts it over. A
+dongle that takes few clients does not recover while it is reconnected to every 5 s. Only a failed connect
+counts: a failed exchange still reconnects at once. Huawei sets 5 s, and 1 s between requests; the 5 s
+request timeout is the client's default. SolaX keeps 0, so nothing changes on the reference installation.
+
+**The probe reads the model name, then the state of charge.** Recognised when the name starts with
+`SUN2000` and the state of charge is a percentage. A device that keeps nothing at `30000` refuses the read,
+which "Test connection" reports as no answer.
+
+**Synthetic dumps until a tester's.** The fixtures are generated from the interface definitions and say
+so. Both signs are exactly what they cannot prove; a real snapshot (#325) replaces them before the family
+moves above "Expected".
+
 ## 2026-11-08 — Drivers are tested against recordings of real devices
 
 **Context.** [Issue #319](https://github.com/mpospisil/gleanvolt/issues/319). Huawei support (#316) will

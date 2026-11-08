@@ -459,7 +459,7 @@ feature.
   "InstallDate": "2024-05-01",
 
   "Inverter": {
-    "Driver": "",                  // which inverter family it speaks to; empty = "solax", the only one so far
+    "Driver": "",                  // which inverter family it speaks to: "solax" (empty) or "huawei" (readings only)
     "Model": "SolaX X3-HYB-G4 PRO",
     "Host": "192.168.2.10", "Port": 502, "UnitId": 1,
     "UnmeteredGridPhase": ""       // only for a grid meter missing a phase clamp: "L3" (or SolaX's "T")
