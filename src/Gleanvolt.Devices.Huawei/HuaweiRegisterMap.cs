@@ -26,7 +26,8 @@ public static class HuaweiRegisterMap
     public const ushort InputPower = 32064;
 
     /// <summary>
-    /// The power meter's active power, int32, watts. Huawei counts <b>export as positive</b> (feed-in &gt; 0,
+    /// The power meter's active power, int32, watts: the total of all phases on a three-phase meter
+    /// (DTSU666-H), the one phase on a single-phase meter (DDSU666-H). Huawei counts <b>export as positive</b> (feed-in &gt; 0,
     /// supply from the grid &lt; 0). To be confirmed by a tester's dump (#325).
     /// </summary>
     public const ushort MeterActivePower = 37113;

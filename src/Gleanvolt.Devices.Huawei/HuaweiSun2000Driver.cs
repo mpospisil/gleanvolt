@@ -5,9 +5,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Gleanvolt.Devices.Huawei;
 
 /// <summary>
-/// A Huawei SUN2000 three-phase hybrid (-KTL-M1, -MAP0) with a LUNA2000 battery and a Huawei smart meter,
-/// reached through the SDongle (issue #320). Readings only: the family is in the "Expected" tier, with no
-/// battery hold, until a tester's dump and a dry-run confirm it (#323, #325).
+/// A Huawei SUN2000 hybrid with a LUNA2000 battery and a Huawei smart meter, reached through the SDongle:
+/// three-phase -KTL-M1 and -MAP0 (issue #320), and single-phase -KTL-L1 and -LC0 (issue #321). Readings
+/// only: the family is in the "Expected" tier, with no battery hold, until a tester's dump and a dry-run
+/// confirm it (#323, #325).
+///
+/// <para><b>One driver for both phase counts.</b> The single-phase models keep the same registers, and their
+/// DDSU666-H meter reports its one phase as the total at <see cref="HuaweiRegisterMap.MeterActivePower"/>,
+/// so nothing here asks how many phases there are. Neither kind reports per-phase output the driver uses,
+/// so the correction for a meter blind on one phase is unavailable on both.</para>
 ///
 /// <para><b>The SDongle is slow.</b> It answers "device busy" (<see cref="ModbusDeviceException.IsBusy"/>)
 /// when a request arrives while it is still forwarding another, so a busy read is waited out and repeated,

@@ -25,7 +25,52 @@ public class HuaweiConformanceTests : InverterDriverConformanceTests<HuaweiSun20
     /// <summary>A single-tower MAP0 at night, the battery carrying the house.</summary>
     private static RegisterDump Map0NightDischarging => Load(Fixture("huawei-map0-night-discharging.json"));
 
-    protected override IEnumerable<RegisterDump> Dumps => [NightImporting, BatteryCharging, Map0NightDischarging];
+    /// <summary>A single-phase L1 with a DDSU666-H meter, at night, importing (#321).</summary>
+    private static RegisterDump L1NightImporting => Load(Fixture("huawei-l1-night-importing.json"));
+
+    /// <summary>A single-phase LC0 with a DDSU666-H meter, the battery charging while exporting (#321).</summary>
+    private static RegisterDump Lc0BatteryCharging => Load(Fixture("huawei-lc0-battery-charging.json"));
+
+    protected override IEnumerable<RegisterDump> Dumps =>
+        [NightImporting, BatteryCharging, Map0NightDischarging, L1NightImporting, Lc0BatteryCharging];
+
+    [Fact]
+    public async Task A_single_phase_hybrid_reads_import_and_charging_as_positive()
+    {
+        var night = await CreateFactory().Create(new ReplayModbusClient(L1NightImporting), new InverterDriverOptions()).ReadAsync();
+        var charging = await CreateFactory().Create(new ReplayModbusClient(Lc0BatteryCharging), new InverterDriverOptions()).ReadAsync();
+
+        Assert.Equal(620, night.GridWatts);
+        Assert.InRange(night.PvWatts, 0, IdleToleranceWatts);
+        Assert.Equal(2500, charging.BatteryWatts);
+        Assert.Equal(-900, charging.GridWatts);
+        Assert.Equal(45.5, charging.BatterySocPercent, precision: 6);
+    }
+
+    [Theory]
+    [InlineData("huawei-l1-night-importing.json")]
+    [InlineData("huawei-lc0-battery-charging.json")]
+    public void A_single_phase_meter_reports_its_one_phase_as_the_total(string file)
+    {
+        // What a tester's L1/LC0 dump has to show for the driver to need no single-phase case (#321): a
+        // DDSU666-H says "single-phase" in its meter type, and the total the driver reads is phase A's
+        // power, with B and C empty.
+        var holding = Load(Fixture(file)).Holding;
+        int Int32(ushort address) => unchecked((int)(((uint)holding[address] << 16) | holding[(ushort)(address + 1)]));
+
+        Assert.Equal(0, holding[37125]);
+        Assert.Equal(Int32(37132), Int32(HuaweiRegisterMap.MeterActivePower));
+        Assert.Equal(0, Int32(37134));
+        Assert.Equal(0, Int32(37136));
+    }
+
+    [Theory]
+    [InlineData("SUN2000-10KTL-M1")]
+    [InlineData("SUN2000-8K-MAP0")]
+    [InlineData("SUN2000-5KTL-L1")]
+    [InlineData("SUN2000-6K-LC0")]
+    public void Every_supported_model_is_a_sun2000(string model) =>
+        Assert.True(HuaweiSun2000Driver.IsSun2000(model));
 
     [Fact]
     public async Task A_discharging_battery_at_night_reads_as_negative_battery_with_no_sun()
