@@ -45,7 +45,7 @@ public static class PvSystemResolver
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
 
         var problems = new ConfigurationProblems();
-        var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, problems);
+        var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, problems, InverterDrivers.Known);
 
         if (problems.Count > 0)
         {

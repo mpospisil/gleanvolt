@@ -414,6 +414,9 @@
   <data name="FieldLossFactor" xml:space="preserve">
     <value>Loss factor</value>
   </data>
+  <data name="FieldInverterDriver" xml:space="preserve">
+    <value>Inverter brand</value>
+  </data>
   <data name="FieldInverterModel" xml:space="preserve">
     <value>Inverter model</value>
   </data>
@@ -947,8 +950,11 @@
   <data name="HelpHomeBatteryEfficiency" xml:space="preserve">
     <value>The share of the solar energy sent to the home battery that ends up stored, for example 0.95. With the capacity, it says how much sun refilling the battery takes.</value>
   </data>
+  <data name="HelpInverterDriver" xml:space="preserve">
+    <value>Which family of inverters Gleanvolt is talking to. It decides which registers are read and how the home battery is held. Every model of a brand that shares the same Modbus registers uses the same entry.</value>
+  </data>
   <data name="HelpInverterModel" xml:space="preserve">
-    <value>The inverter's model, for example SolaX X3-HYB-G4 PRO. For reference only: it does not change how Gleanvolt talks to the device.</value>
+    <value>The inverter's model, for example SolaX X3-HYB-G4 PRO. For reference only: the brand above decides how Gleanvolt talks to the device.</value>
   </data>
   <data name="HelpInverterHost" xml:space="preserve">
     <value>The inverter's IP address or host name on your network. Gleanvolt reads the solar power, the home battery and the grid flow from it over Modbus TCP.</value>

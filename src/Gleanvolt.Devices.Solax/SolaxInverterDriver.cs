@@ -36,7 +36,10 @@ public sealed class SolaxInverterDriver : IInverterDriver
     /// <summary>The input register "Test connection" reads: the battery's state of charge.</summary>
     public static ushort ProbeRegister => InverterRegisterMap.BatteryCapacity.Address;
 
-    public InverterCapabilities Capabilities { get; } = new(HasBatteryHold: true, HasPhaseOutput: true);
+    /// <summary>What the SolaX family supports: the hold, and the inverter's output per phase.</summary>
+    public static InverterCapabilities SolaxCapabilities { get; } = new(HasBatteryHold: true, HasPhaseOutput: true);
+
+    public InverterCapabilities Capabilities => SolaxCapabilities;
 
     public IBatteryDischargeControl BatteryHold { get; }
 
@@ -170,6 +173,10 @@ public sealed class SolaxInverterDriverFactory : IInverterDriverFactory
     }
 
     public string Id => DriverId;
+
+    public string DisplayName => "SolaX";
+
+    public InverterCapabilities Capabilities => SolaxInverterDriver.SolaxCapabilities;
 
     // Port 502, unit 1, and the 250 ms compromise between requests: see DeviceConfig.MinRequestInterval.
     public ModbusDefaults Defaults { get; } = new(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250));

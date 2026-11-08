@@ -237,7 +237,7 @@ public class WizardTests : PageTest
 
         // The fixture's own data: addresses, models, file names.
         PseudoLocale.AssertTranslated(
-            page.Markup, "192.168.1.10", "192.168.1.11", "192.168.1.0/24", "X3-HYB-G4 PRO", "X3-HAC", ".env", "README",
+            page.Markup, "192.168.1.10", "192.168.1.11", "192.168.1.0/24", "X3-HYB-G4 PRO", "X3-HAC", ".env", "README", "SolaX Acme",
             "502", "Home Roof", "home-roof", "SolaX X3-HYB-G4 PRO", "wallbox", "Home Assistant");
     }
 

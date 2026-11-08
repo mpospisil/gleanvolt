@@ -4,6 +4,33 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-08 — The driver is its own field, and the host tells the rules which drivers exist
+
+**Context.** [Issue #318](https://github.com/mpospisil/gleanvolt/issues/318). With SolaX behind a driver
+contract (#317), the configuration needs a way to name the driver.
+
+**Decision — `Pv:Inverter:Driver`, not `Model`.** One driver covers every model of a family that shares
+its registers (every SUN2000 hybrid, every SolaX G4), so selecting by model would need an alias list that
+grows with each model sold, plus a migration for the free text already saved in `Model`. Empty means
+`solax`, so no existing configuration changes. `Model` stays a label, and its doc comment no longer
+promises to become a selector.
+
+**The rules stay in Core and are handed the drivers.** `PvSystemRules.Resolve` takes the known drivers as
+`InverterDriverInfo` (id, display name, Modbus defaults, capabilities), the same way it already takes the
+inverter's device id. Core cannot see the driver assemblies, and must not, because the portal links it.
+The host's one list, `InverterDrivers`, feeds the rules, the container and the Settings drop-down, so a
+driver added there exists everywhere at once. An unknown id is an ordinary configuration problem: a
+startup failure naming the known drivers when headless, a problem on the inverter step in setup mode.
+
+**The driver supplies the address defaults.** An empty `Port`, `UnitId` or `MinRequestInterval` takes the
+driver's `ModbusDefaults`. The shipped `appsettings.json` now leaves the inverter's port and unit id
+`null`, because explicit `502`/`1` there would have overridden every driver's defaults. For SolaX the
+effective values are unchanged.
+
+**Capabilities are known before a driver exists.** The factory declares them, so a blind grid phase
+configured for a driver with no per-phase output is refused when it is saved, rather than discovered at
+the first poll. That closes the gap #317 left with a warning.
+
 ## 2026-11-08 — The inverter is a driver behind a contract, in assemblies of its own
 
 **Context.** [Issue #317](https://github.com/mpospisil/gleanvolt/issues/317), the first step of Huawei

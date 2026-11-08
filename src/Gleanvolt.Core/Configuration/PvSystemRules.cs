@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
 using static System.FormattableString;
 
 namespace Gleanvolt.Core.Configuration;
@@ -35,6 +36,21 @@ public static partial class PvSystemRules
     /// <summary>How many chargers the control logic can actually drive. See <see cref="PvSystemOptions.Chargers"/>.</summary>
     public const int SupportedChargerCount = 1;
 
+    /// <summary>The inverter driver an empty <c>Pv:Inverter:Driver</c> means (issue #318).</summary>
+    public const string DefaultInverterDriver = "solax";
+
+    // What a caller that names no drivers is held to: the default, with DeviceConfig's defaults and SolaX's
+    // capabilities. A host passes the drivers it has registered instead; this is for the portal, and for
+    // the rules on their own.
+    private static readonly IReadOnlyList<InverterDriverInfo> DefaultInverterDrivers =
+    [
+        new(
+            DefaultInverterDriver,
+            "SolaX",
+            new ModbusDefaults(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250)),
+            new InverterCapabilities(HasBatteryHold: true, HasPhaseOutput: true)),
+    ];
+
     [GeneratedRegex("^[a-z0-9][a-z0-9_-]{0,47}$")]
     private static partial Regex Slug();
 
@@ -50,14 +66,37 @@ public static partial class PvSystemRules
     /// Collects every problem found, each naming the configuration key it is about. The caller decides
     /// what a non-empty list means: a startup failure in the controller, a rejected save in the portal.
     /// </param>
+    /// <param name="inverterDrivers">
+    /// The inverter drivers the caller can run, which <c>Pv:Inverter:Driver</c> must name one of. Their
+    /// defaults fill in an inverter address the configuration left incomplete. Null means only
+    /// <see cref="DefaultInverterDriver"/>.
+    /// </param>
     /// <returns>
     /// The resolved system. When <paramref name="problems"/> is non-empty this is a partially-filled
     /// placeholder — it exists so that resolution can continue and report everything, not to be used.
     /// </returns>
-    public static PvSystemInfo Resolve(PvSystemOptions pv, string inverterDeviceId, ConfigurationProblems problems)
+    public static PvSystemInfo Resolve(
+        PvSystemOptions pv,
+        string inverterDeviceId,
+        ConfigurationProblems problems,
+        IReadOnlyList<InverterDriverInfo>? inverterDrivers = null)
     {
         ArgumentNullException.ThrowIfNull(pv);
         ArgumentNullException.ThrowIfNull(problems);
+
+        var driver = ResolveInverterDriver(pv, inverterDrivers ?? DefaultInverterDrivers, problems);
+        var unmeteredGridPhase = ResolveUnmeteredGridPhase(pv, problems);
+
+        // The blind-phase estimate is built from the inverter's own output per phase; a family that does not
+        // report it cannot be corrected, and running uncorrected while the owner believes otherwise is the
+        // failure the setting exists to end.
+        if (unmeteredGridPhase is not null && driver is { Capabilities.HasPhaseOutput: false })
+        {
+            problems.Add(
+                $"Pv:Inverter:UnmeteredGridPhase cannot be used with the {driver.DisplayName} driver: it does not "
+                + "report the inverter's output per phase, which the estimate needs. Leave it empty.",
+                Phrase.Of("Config.PvPhaseNotSupported", new PhraseArg.Text(driver.DisplayName)));
+        }
 
         var id = ResolveId(pv, problems);
         var (latitude, longitude) = ResolveLocation(pv, problems);
@@ -75,11 +114,39 @@ public static partial class PvSystemRules
             InverterCapacityWatts: Positive(pv.InverterCapacityKw, "Pv:InverterCapacityKw", problems) * 1000,
             LossFactor: Fraction(pv.LossFactor, "Pv:LossFactor", problems),
             InstallDate: ParseInstallDate(pv.InstallDate, problems),
-            Inverter: ResolveInverter(pv, inverterDeviceId, problems),
+            Inverter: ResolveInverter(pv, inverterDeviceId, driver?.Defaults, problems),
             Chargers: ResolveChargers(pv, problems))
         {
-            UnmeteredGridPhase = ResolveUnmeteredGridPhase(pv, problems),
+            UnmeteredGridPhase = unmeteredGridPhase,
+            InverterDriver = driver?.Id ?? NormaliseDriverId(pv),
         };
+    }
+
+    // Empty is the default, so nothing configured before the field existed has to change. Anything else
+    // must be a driver this host has: an inverter spoken to in another family's dialect reads nonsense,
+    // and a fallback to SolaX would hide the typo behind exactly that.
+    private static InverterDriverInfo? ResolveInverterDriver(
+        PvSystemOptions pv, IReadOnlyList<InverterDriverInfo> drivers, ConfigurationProblems problems)
+    {
+        var id = NormaliseDriverId(pv);
+        var driver = drivers.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+
+        if (driver is null)
+        {
+            var known = string.Join(", ", drivers.Select(candidate => candidate.Id));
+            problems.Add(
+                $"Pv:Inverter:Driver ('{id}') is not an inverter driver this Gleanvolt knows. Known drivers: {known}. "
+                + $"Empty means {DefaultInverterDriver}.",
+                Phrase.Of("Config.PvDriver", new PhraseArg.Text(id), new PhraseArg.Text(known), new PhraseArg.Text(DefaultInverterDriver)));
+        }
+
+        return driver;
+    }
+
+    private static string NormaliseDriverId(PvSystemOptions pv)
+    {
+        var id = pv.Inverter?.Driver.Trim().ToLowerInvariant() ?? string.Empty;
+        return id.Length == 0 ? DefaultInverterDriver : id;
     }
 
     // Empty is the ordinary installation. Both spellings are accepted because the one on the inverter's
@@ -111,10 +178,12 @@ public static partial class PvSystemRules
     /// than what it resolves to — the portal validating a form before it writes a row.
     /// </summary>
     /// <returns>Every problem found, each naming the configuration key it is about. Empty means usable.</returns>
-    public static ConfigurationProblems Validate(PvSystemOptions pv)
+    /// <param name="pv">The section as bound.</param>
+    /// <param name="inverterDrivers">See <see cref="Resolve"/>.</param>
+    public static ConfigurationProblems Validate(PvSystemOptions pv, IReadOnlyList<InverterDriverInfo>? inverterDrivers = null)
     {
         var problems = new ConfigurationProblems();
-        Resolve(pv, DefaultInverterDeviceId, problems);
+        Resolve(pv, DefaultInverterDeviceId, problems, inverterDrivers);
         return problems;
     }
 
@@ -161,7 +230,8 @@ public static partial class PvSystemRules
         return (pv.Latitude, pv.Longitude);
     }
 
-    private static PvDeviceInfo ResolveInverter(PvSystemOptions pv, string inverterDeviceId, ConfigurationProblems problems)
+    private static PvDeviceInfo ResolveInverter(
+        PvSystemOptions pv, string inverterDeviceId, ModbusDefaults? defaults, ConfigurationProblems problems)
     {
         var name = pv.Inverter?.Name.Trim() ?? string.Empty;
         var model = pv.Inverter?.Model.Trim() ?? string.Empty;
@@ -177,7 +247,7 @@ public static partial class PvSystemRules
 
         ValidateConnection(pv.Inverter, "Pv:Inverter", problems);
 
-        return new PvDeviceInfo(inverterDeviceId, name, model, pv.Inverter.ToDeviceConfig());
+        return new PvDeviceInfo(inverterDeviceId, name, model, pv.Inverter.ToDeviceConfig(defaults));
     }
 
     private static IReadOnlyList<PvDeviceInfo> ResolveChargers(PvSystemOptions pv, ConfigurationProblems problems)

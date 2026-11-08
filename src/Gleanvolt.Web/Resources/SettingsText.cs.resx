@@ -405,6 +405,9 @@
   <data name="FieldLossFactor" xml:space="preserve">
     <value>Ztrátový koeficient</value>
   </data>
+  <data name="FieldInverterDriver" xml:space="preserve">
+    <value>Značka střídače</value>
+  </data>
   <data name="FieldInverterModel" xml:space="preserve">
     <value>Model střídače</value>
   </data>
@@ -933,8 +936,11 @@
   <data name="HelpHomeBatteryEfficiency" xml:space="preserve">
     <value>Podíl solární energie poslané do domácí baterie, který se v ní skutečně uloží, například 0.95. Spolu s kapacitou určuje, kolik slunce je potřeba na dobití baterie.</value>
   </data>
+  <data name="HelpInverterDriver" xml:space="preserve">
+    <value>S jakou rodinou střídačů Gleanvolt komunikuje. Určuje, které registry čte a jak drží domácí baterii. Všechny modely jedné značky se stejnými registry Modbus používají stejnou položku.</value>
+  </data>
   <data name="HelpInverterModel" xml:space="preserve">
-    <value>Model střídače, například SolaX X3-HYB-G4 PRO. Jen pro informaci: nemění, jak Gleanvolt se zařízením komunikuje.</value>
+    <value>Model střídače, například SolaX X3-HYB-G4 PRO. Jen pro informaci: jak Gleanvolt se zařízením komunikuje, určuje značka výše.</value>
   </data>
   <data name="HelpInverterHost" xml:space="preserve">
     <value>IP adresa nebo název střídače v místní síti. Gleanvolt z něj přes Modbus TCP čte výkon panelů, stav domácí baterie a tok energie ze sítě a do sítě.</value>

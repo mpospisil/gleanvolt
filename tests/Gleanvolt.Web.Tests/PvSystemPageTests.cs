@@ -187,7 +187,7 @@ public class PvSystemPageTests : BunitContext
 
         Assert.All(page.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
         Assert.Empty(page.FindAll("button"));
-        Assert.Empty(page.FindAll("select"));
+        Assert.All(page.FindAll("select"), select => Assert.True(select.HasAttribute("disabled")));
         Assert.Contains("no login", page.Find("#pv-readonly").TextContent);
     }
 
@@ -473,6 +473,7 @@ public class PvSystemPageTests : BunitContext
         PseudoLocale.AssertTranslated(
             page.Markup,
             "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
-            "curl Authorization Bearer http localhost status api openapi json home assistant availability set");
+            "curl Authorization Bearer http localhost status api openapi json home assistant availability set",
+            "SolaX Acme"); // the brands in the inverter drop-down: names, never translated
     }
 }

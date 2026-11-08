@@ -456,6 +456,7 @@ feature.
   "InstallDate": "2024-05-01",
 
   "Inverter": {
+    "Driver": "",                  // which inverter family it speaks to; empty = "solax", the only one so far
     "Model": "SolaX X3-HYB-G4 PRO",
     "Host": "192.168.2.10", "Port": 502, "UnitId": 1,
     "UnmeteredGridPhase": ""       // only for a grid meter missing a phase clamp: "L3" (or SolaX's "T")
@@ -472,11 +473,14 @@ feature.
 }
 ```
 
-**`Model` is documentation, not a selector.** The register maps are compiled for the two devices in
-[Hardware targets](#hardware-targets) and are chosen by nothing, so writing another model here does not
-make the controller speak that device's dialect — it only mislabels the one it is speaking to. What it
-does do is answer "what is on the other end of 192.168.2.10?" from a log line rather than an ssh
-session. The day a second register map exists, this is the field that picks it.
+**`Driver` picks how the inverter is spoken to; `Model` is only a label.** `Driver` names the inverter
+family — `solax`, the only one so far — and decides which registers are read and how the battery is held.
+Empty means `solax`, so an existing configuration needs no change; a value no driver has is a startup
+failure that lists the ones there are (and a problem on the setup page, in setup mode). The driver also
+supplies the port and unit id when `Port` and `UnitId` are left out. On Settings it is the **Inverter
+brand** drop-down. `Model` selects nothing: one driver covers every model of a family that shares its
+registers, so writing another model here does not make the controller speak that device's dialect. It
+answers "what is on the other end of 192.168.2.10?" from a log line rather than an ssh session.
 
 **`AzimuthDegrees` is stored, not sent.** Nothing computes from it today: the forecast is fetched by
 Solcast resource id, which already encodes the orientation inside your Solcast account. Before it is

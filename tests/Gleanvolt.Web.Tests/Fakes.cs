@@ -1,3 +1,4 @@
+using Gleanvolt.Devices;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
@@ -838,6 +839,17 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
 
     public List<(PvDeviceRole Role, string Host, int Port, byte UnitId)> Probes { get; } = [];
 
+    /// <summary>The driver each probe in <see cref="Probes"/> asked for, in the same order.</summary>
+    public List<string?> ProbeDrivers { get; } = [];
+
+    // SolaX as the host has it, and a second family with its own port, so a test can see the form follow
+    // the selected driver's defaults.
+    public IReadOnlyList<InverterDriverInfo> InverterDrivers { get; set; } =
+    [
+        new("solax", "SolaX", new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)), new InverterCapabilities(true, true)),
+        new("acme", "Acme", new ModbusDefaults(6607, 0, TimeSpan.FromMilliseconds(50)), new InverterCapabilities(false, false)),
+    ];
+
     public PvSystemSettings Read() => new(
         "/app/data/pv-system.json",
         [.. PvSystemSettingKeys.All.Select(key =>
@@ -881,9 +893,10 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     }
 
     public Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role, string host, int port, byte unitId, CancellationToken cancellationToken = default)
+        PvDeviceRole role, string host, int port, byte unitId, string? inverterDriver = null, CancellationToken cancellationToken = default)
     {
         Probes.Add((role, host, port, unitId));
+        ProbeDrivers.Add(inverterDriver);
         return Task.FromResult(ProbeResult);
     }
 }

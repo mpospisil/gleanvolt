@@ -4,8 +4,8 @@ Which inverters and EV chargers Gleanvolt can drive. It talks **Modbus TCP** to 
 LAN — a SolaX hybrid inverter and a SolaX EV charger — using register maps written for the reference
 installation's **X3-HYB-G4 PRO** and **X1/X3-HAC**.
 
-Nothing selects a register map by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are
-documentation. So *supported* here means one thing — **the device answers the same registers, with the
+The inverter's register map is chosen by `Pv:Inverter:Driver` (empty means `solax`, the only driver so
+far), never by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So *supported* here means one thing — **the device answers the same registers, with the
 same meaning, as the reference hardware.**
 
 > **Last reviewed 2026-09-13.** Which SolaX families share those registers comes from the

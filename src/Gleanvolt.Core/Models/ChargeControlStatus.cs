@@ -33,7 +33,7 @@ namespace Gleanvolt.Core.Models;
 /// <param name="BatteryHoldRequested">Whether the hold is switched on (the user's intent).</param>
 /// <param name="BatteryHoldActive">
 /// Whether a hold command is currently armed on the inverter. This is what we last wrote, not a
-/// device read-back — the command register cannot be read (see <see cref="Interfaces.IBatteryDischargeControl"/>).
+/// device read-back — the command register cannot be read (see <see cref="Gleanvolt.Devices.IBatteryDischargeControl"/>).
 /// </param>
 /// <param name="BatteryHoldTargetWatts">The active-power target currently commanded, or null when not held.</param>
 /// <param name="Plan">

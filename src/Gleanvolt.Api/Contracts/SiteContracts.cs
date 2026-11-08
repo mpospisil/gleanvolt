@@ -29,6 +29,9 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="LossFactor">System loss factor in (0, 1] — the fraction of DC yield that reaches the meter.</param>
 /// <param name="InstallDate">Commissioning date.</param>
 /// <param name="Inverter">The inverter every figure in <c>/status</c> is read from.</param>
+/// <param name="InverterDriver">
+/// The driver that reads and controls the inverter (<c>Pv:Inverter:Driver</c>): <c>solax</c>, the only one so far.
+/// </param>
 /// <param name="Chargers">The EV chargers. Exactly one is supported today; it is a list because that will not always be true.</param>
 public sealed record SiteResponse(
     string Id,
@@ -43,7 +46,8 @@ public sealed record SiteResponse(
     double? LossFactor,
     DateOnly? InstallDate,
     SiteDeviceResponse Inverter,
-    IReadOnlyList<SiteDeviceResponse> Chargers)
+    IReadOnlyList<SiteDeviceResponse> Chargers,
+    string InverterDriver)
 {
     public static SiteResponse From(PvSystemInfo site) => new(
         site.Id,
@@ -58,16 +62,17 @@ public sealed record SiteResponse(
         site.LossFactor,
         site.InstallDate,
         SiteDeviceResponse.From(site.Inverter),
-        [.. site.Chargers.Select(SiteDeviceResponse.From)]);
+        [.. site.Chargers.Select(SiteDeviceResponse.From)],
+        site.InverterDriver);
 }
 
 /// <summary>One Modbus device on the system: what it is, and where it is on the network.</summary>
 /// <param name="Id">Its identity within the system — for a charger, the id its topics are named after.</param>
 /// <param name="Name">Display name, or empty.</param>
 /// <param name="Model">
-/// What the box is. <b>Reported, not acted on:</b> the register maps are compiled for the devices in the
-/// README's hardware targets and are chosen by nothing, so this says what the operator believes is on
-/// the other end of the address, not what the controller is speaking.
+/// What the box is. <b>Reported, not acted on:</b> what the controller speaks to the inverter is chosen by
+/// the site's <c>InverterDriver</c>, so this says what the operator believes is on the other end of the
+/// address, not what the controller is speaking.
 /// </param>
 /// <param name="Host">Hostname or IP address on the local network.</param>
 /// <param name="Port">Modbus TCP port.</param>

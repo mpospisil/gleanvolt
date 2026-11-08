@@ -1,3 +1,5 @@
+@using Gleanvolt.Core.Configuration
+@using Gleanvolt.Devices
 @inject IPvSystemEditor Editor
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
@@ -73,11 +75,30 @@
                             <p>@SourceTitle(setting)</p>
                         </InfoTip>
                     </div>
-                    <input id="@id" type="text" spellcheck="false" autocomplete="off"
-                           placeholder="@Hints.GetValueOrDefault(key)"
-                           disabled="@(!Editable || _busy)"
-                           value="@_values[key]"
-                           @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
+                    @if (key == PvSystemSettingKeys.InverterDriver)
+                    {
+                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedDriverId"
+                                @onchange="e => SelectDriver(e.Value?.ToString() ?? string.Empty)">
+                            @foreach (var driver in Editor.InverterDrivers)
+                            {
+                                <option value="@driver.Id">@driver.DisplayName</option>
+                            }
+                            @if (SelectedDriver is null)
+                            {
+                                @* Configured outside the page with an id this build does not have: shown as it is, so
+                                   the owner can see what the save is refusing, and pick a real one. *@
+                                <option value="@SelectedDriverId">@SelectedDriverId</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input id="@id" type="text" spellcheck="false" autocomplete="off"
+                               placeholder="@Hint(key)"
+                               disabled="@(!Editable || _busy)"
+                               value="@_values[key]"
+                               @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
+                    }
                     @if (Note(key, _values[key]) is { } note)
                     {
                         <span class="field-note">@note</span>
@@ -199,7 +220,7 @@
         (PvEditorSection.Location, SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.TimeZone, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
         (PvEditorSection.Capacity, SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
         (PvEditorSection.HomeBattery, SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
-        (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
+        (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
         (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
@@ -219,6 +240,7 @@
         [PvSystemSettingKeys.TimeZone] = SettingsText.FieldTimeZone,
         [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.FieldHomeBatteryCapacity,
         [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.FieldHomeBatteryEfficiency,
+        [PvSystemSettingKeys.InverterDriver] = SettingsText.FieldInverterDriver,
         [PvSystemSettingKeys.InverterModel] = SettingsText.FieldInverterModel,
         [PvSystemSettingKeys.InverterHost] = SettingsText.FieldInverterHost,
         [PvSystemSettingKeys.InverterPort] = SettingsText.FieldInverterPort,
@@ -249,6 +271,7 @@
         [PvSystemSettingKeys.TimeZone] = SettingsText.HelpTimeZone,
         [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.HelpHomeBatteryCapacity,
         [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.HelpHomeBatteryEfficiency,
+        [PvSystemSettingKeys.InverterDriver] = SettingsText.HelpInverterDriver,
         [PvSystemSettingKeys.InverterModel] = SettingsText.HelpInverterModel,
         [PvSystemSettingKeys.InverterHost] = SettingsText.HelpInverterHost,
         [PvSystemSettingKeys.InverterPort] = SettingsText.HelpPort,
@@ -282,6 +305,37 @@
 
     private static readonly string[] InverterAddress =
         [PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId];
+
+    // What makes the inverter worth probing again before a save: its address, or the driver, whose own
+    // probe decides whether the box at that address is one it can speak to.
+    private static readonly string[] InverterProbeKeys = [.. InverterAddress, PvSystemSettingKeys.InverterDriver];
+
+    // The driver the form has selected, as an id: empty means the default, as it does in configuration.
+    private string SelectedDriverId => NormaliseDriver(_values.GetValueOrDefault(PvSystemSettingKeys.InverterDriver));
+
+    // Null when the configured id is not one this host has; the save will say so.
+    private InverterDriverInfo? SelectedDriver =>
+        Editor.InverterDrivers.FirstOrDefault(driver => driver.Id == SelectedDriverId);
+
+    private static string NormaliseDriver(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? PvSystemRules.DefaultInverterDriver : value.Trim().ToLowerInvariant();
+
+    // Choosing what is already configured -- the default, when the setting is empty -- leaves the setting as
+    // it is, so picking SolaX on a site that never named a driver is not an edit.
+    private void SelectDriver(string id)
+    {
+        var configured = _settings[PvSystemSettingKeys.InverterDriver].Saved ?? string.Empty;
+        _values[PvSystemSettingKeys.InverterDriver] = NormaliseDriver(id) == NormaliseDriver(configured) ? configured : id;
+    }
+
+    // The placeholder: what an empty field means. The inverter's port and unit id are the selected driver's.
+    private string? Hint(string key) =>
+        (key, SelectedDriver?.Defaults) switch
+        {
+            (PvSystemSettingKeys.InverterPort, { } defaults) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.InverterUnitId, { } defaults) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            _ => Hints.GetValueOrDefault(key),
+        };
 
     private static readonly string[] ChargerAddress =
         [PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId];
@@ -421,9 +475,10 @@
     {
         var probes = new List<(string, DeviceProbeResult)>();
 
-        if (InverterAddress.Any(edits.ContainsKey) && Address(InverterAddress) is { } inverter)
+        if (InverterProbeKeys.Any(edits.ContainsKey) && Address(InverterAddress, SelectedDriver?.Defaults) is { } inverter)
         {
-            probes.Add((SettingsText.Inverter, await Editor.ProbeAsync(PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId)));
+            probes.Add((SettingsText.Inverter, await Editor.ProbeAsync(
+                PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId, SelectedDriverId)));
         }
 
         if (ChargerAddress.Any(edits.ContainsKey) && Address(ChargerAddress) is { } charger)
@@ -436,7 +491,7 @@
 
     // The address as the form now has it, with the same defaults the device options take; null when it
     // is not one the resolver would accept, which the save will say better than a probe could.
-    private (string Host, int Port, byte UnitId)? Address(string[] keys)
+    private (string Host, int Port, byte UnitId)? Address(string[] keys, ModbusDefaults? defaults = null)
     {
         var host = _values[keys[0]].Trim();
         var port = _values[keys[1]].Trim();
@@ -447,8 +502,8 @@
             return null;
         }
 
-        var portNumber = 502;
-        byte unitId = 1;
+        var portNumber = defaults?.Port ?? 502;
+        var unitId = defaults?.UnitId ?? (byte)1;
 
         if ((port.Length > 0 && !int.TryParse(port, out portNumber))
             || (unit.Length > 0 && !byte.TryParse(unit, out unitId)))
