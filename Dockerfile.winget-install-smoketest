@@ -17,6 +17,11 @@
 #   docker build -f Dockerfile.winget-install-smoketest -t gleanvolt-winget-install-smoketest .
 #   docker run --rm -p 8090:8090 gleanvolt-winget-install-smoketest
 #
+# The container starts in setup mode. On the wizard's Site step enter the time zone as a *Windows* id
+# (`Central Europe Standard Time`), not an IANA one: resolving IANA ids like `Europe/Prague` needs
+# ICU, Nano Server ships no icu.dll, and setup refuses the zone with "is not a time zone this host
+# knows". A real winget install on Windows 10 1903+ / Windows 11 has ICU and takes either form.
+#
 # Requires Docker Desktop switched to Windows containers (right-click the tray icon -> "Switch to
 # Windows containers..."). Bare Nano Server, deliberately: curl.exe, tar.exe and mklink all ship in
 # it already, so there is no reason to pull in a heavier base just to fetch and unpack a zip. Nano
@@ -29,8 +34,8 @@
 # clean slate.
 
 ARG WINDOWS_VERSION=ltsc2022
-ARG GLEANVOLT_VERSION=1.0.12
-# GLEANVOLT_SHA256=BAF9712E58B510C27B40BB609E4800019F9B8C1B049077414B3EDD8A8E0EAF25
+ARG GLEANVOLT_VERSION=1.1.0
+# GLEANVOLT_SHA256=sha256:21c1480660f4059c077ea79542067d46f47c4be4aec770635dc873ad57ed2582
 
 FROM mcr.microsoft.com/windows/nanoserver:${WINDOWS_VERSION}
 
