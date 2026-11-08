@@ -17,6 +17,21 @@ inverter) — ship disabled by default, and `BatteryHold` additionally defaults 
 addresses vary between SolaX generations and firmware, so verify them against your own device before
 enabling either.
 
+## Use at your own risk
+
+Gleanvolt **writes to your hardware**: it changes the inverter's battery settings and starts, stops
+and throttles the EV charger over Modbus TCP. A wrong register address, a firmware that behaves
+differently, a bug, or a configuration mistake can leave the home battery drained or held at the
+wrong charge, exceed a grid-export limit, leave the car uncharged when you need it, or put a device
+into a state you have to reset by hand. Changing a device's settings outside the manufacturer's own
+tools may also affect its warranty.
+
+You run it at your own risk. The software is provided **as is, without any warranty**, and to the
+extent the law allows the author is **not liable for any damage** to inverters, batteries, chargers,
+vehicles or other equipment, or for any loss arising from its use — see the *No Liability* section of
+the [LICENSE](LICENSE). Start with the write features off or in dry-run, check the register addresses
+against your own device, and watch the first runs.
+
 ## Why local?
 
 Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) introduces latency, external dependencies, and data collection outside the user's control. This project talks directly to the inverter and EV charger over Modbus TCP on the local network, so:
@@ -4029,7 +4044,8 @@ GROUP BY utc_slot ORDER BY utc_slot;
 
 ## License
 
-Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). It comes without any warranty
+and without liability for damage — see [Use at your own risk](#use-at-your-own-risk).
 
 **Free for any noncommercial purpose**, which includes running it on your own home installation,
 hobby and amateur use, and use by charities, schools, public research bodies and government
