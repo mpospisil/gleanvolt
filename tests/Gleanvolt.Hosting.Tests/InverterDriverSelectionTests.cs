@@ -95,8 +95,33 @@ public class InverterDriverSelectionTests
 
         Assert.IsType<HuaweiSun2000Driver>(provider.GetRequiredService<IInverterDriver>());
 
+        Assert.False(((HuaweiSun2000Driver)provider.GetRequiredService<IInverterDriver>()).BehindEmma);
+
         var connection = provider.GetRequiredService<PvSystemInfo>().Inverter.Connection;
         Assert.Equal(TimeSpan.FromSeconds(1), connection.MinRequestInterval);
         Assert.Equal(TimeSpan.FromSeconds(5), connection.ReconnectBackoff);
+    }
+
+    [Fact]
+    public async Task Huawei_behind_an_emma_reads_the_grid_from_it()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs, new("Pv:Inverter:Driver", "huawei"), new("Pv:Inverter:Topology", "EMMA"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.Equal("emma", provider.GetRequiredService<PvSystemInfo>().InverterTopology);
+        Assert.True(Assert.IsType<HuaweiSun2000Driver>(provider.GetRequiredService<IInverterDriver>()).BehindEmma);
+    }
+
+    [Fact]
+    public void Headless_a_topology_for_solax_stops_the_start()
+    {
+        var error = Record.Exception(() =>
+            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Inverter:Topology", "emma")])));
+
+        Assert.NotNull(error);
+        Assert.Contains("Pv:Inverter:Topology ('emma') cannot be used with the SolaX driver", error.Message);
     }
 }

@@ -98,6 +98,7 @@ public static partial class PvSystemRules
                 Phrase.Of("Config.PvPhaseNotSupported", new PhraseArg.Text(driver.DisplayName)));
         }
 
+        var topology = ResolveTopology(pv, driver, problems);
         var id = ResolveId(pv, problems);
         var (latitude, longitude) = ResolveLocation(pv, problems);
 
@@ -119,7 +120,49 @@ public static partial class PvSystemRules
         {
             UnmeteredGridPhase = unmeteredGridPhase,
             InverterDriver = driver?.Id ?? NormaliseDriverId(pv),
+            InverterTopology = topology,
         };
+    }
+
+    // Empty is the driver's first way; anything else must be one the driver lists. A driver reached one way
+    // only takes nothing here: a value would claim a gateway the driver never reads through.
+    private static string ResolveTopology(PvSystemOptions pv, InverterDriverInfo? driver, ConfigurationProblems problems)
+    {
+        var value = pv.Inverter?.Topology.Trim().ToLowerInvariant() ?? string.Empty;
+        if (driver is null)
+        {
+            return value;
+        }
+
+        if (driver.Topologies.Count == 0)
+        {
+            if (value.Length > 0)
+            {
+                problems.Add(
+                    $"Pv:Inverter:Topology ('{value}') cannot be used with the {driver.DisplayName} driver: it is reached "
+                    + "one way only. Leave it empty.",
+                    Phrase.Of("Config.PvTopologyNone", new PhraseArg.Text(value), new PhraseArg.Text(driver.DisplayName)));
+            }
+
+            return string.Empty;
+        }
+
+        if (value.Length == 0)
+        {
+            return driver.Topologies[0].Id;
+        }
+
+        if (driver.Topologies.All(topology => topology.Id != value))
+        {
+            var known = string.Join(", ", driver.Topologies.Select(topology => topology.Id));
+            problems.Add(
+                $"Pv:Inverter:Topology ('{value}') is not a way the {driver.DisplayName} driver reaches an inverter: "
+                + $"{known}. Empty means {driver.Topologies[0].Id}.",
+                Phrase.Of("Config.PvTopology", new PhraseArg.Text(value), new PhraseArg.Text(driver.DisplayName),
+                    new PhraseArg.Text(known), new PhraseArg.Text(driver.Topologies[0].Id)));
+        }
+
+        return value;
     }
 
     // Empty is the default, so nothing configured before the field existed has to change. Anything else

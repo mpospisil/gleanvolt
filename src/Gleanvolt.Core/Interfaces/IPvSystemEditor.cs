@@ -51,11 +51,16 @@ public interface IPvSystemEditor
     /// For the inverter, the driver whose probe asks: the one the form has selected. Null or empty means
     /// the default driver.
     /// </param>
+    /// <param name="inverterTopology">
+    /// For the inverter, how it is reached (<c>Pv:Inverter:Topology</c>): behind an EMMA the probe asks the
+    /// EMMA too. Null or empty means the driver's default.
+    /// </param>
     Task<DeviceProbeResult> ProbeAsync(
         PvDeviceRole role,
         string host,
         int port,
         byte unitId,
         string? inverterDriver = null,
+        string? inverterTopology = null,
         CancellationToken cancellationToken = default);
 }

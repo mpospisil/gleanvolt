@@ -55,7 +55,7 @@
         <h3>@group</h3>
 
         <div class="pv-fields">
-            @foreach (var key in keys)
+            @foreach (var key in keys.Where(Shown))
             {
                 var setting = _settings[key];
                 var id = "pv-" + key.Replace(':', '-');
@@ -91,6 +91,21 @@
                             }
                         </select>
                     }
+                    else if (key == PvSystemSettingKeys.InverterTopology && SelectedDriver is { } topologyDriver)
+                    {
+                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedTopologyId"
+                                @onchange="e => SelectTopology(e.Value?.ToString() ?? string.Empty)">
+                            @foreach (var topology in topologyDriver.Topologies)
+                            {
+                                <option value="@topology.Id">@topology.DisplayName</option>
+                            }
+                            @if (topologyDriver.Topologies.All(topology => topology.Id != SelectedTopologyId))
+                            {
+                                @* Configured outside the page with a way this driver does not have: shown as it is, as for the driver. *@
+                                <option value="@SelectedTopologyId">@SelectedTopologyId</option>
+                            }
+                        </select>
+                    }
                     else
                     {
                         <input id="@id" type="text" spellcheck="false" autocomplete="off"
@@ -102,6 +117,10 @@
                     @if (Note(key, _values[key]) is { } note)
                     {
                         <span class="field-note">@note</span>
+                    }
+                    @if (key == PvSystemSettingKeys.InverterTopology && SelectedTopologyId == EmmaTopology)
+                    {
+                        <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
                     }
                     @if (setting.IsPending)
                     {
@@ -229,7 +248,7 @@
         (PvEditorSection.Location, SettingsText.GroupLocation, [PvSystemSettingKeys.Latitude, PvSystemSettingKeys.Longitude, PvSystemSettingKeys.TimeZone, PvSystemSettingKeys.AzimuthDegrees, PvSystemSettingKeys.TiltDegrees]),
         (PvEditorSection.Capacity, SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
         (PvEditorSection.HomeBattery, SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
-        (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
+        (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterTopology, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
         (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
@@ -250,6 +269,7 @@
         [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.FieldHomeBatteryCapacity,
         [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.FieldHomeBatteryEfficiency,
         [PvSystemSettingKeys.InverterDriver] = SettingsText.FieldInverterDriver,
+        [PvSystemSettingKeys.InverterTopology] = SettingsText.FieldInverterTopology,
         [PvSystemSettingKeys.InverterModel] = SettingsText.FieldInverterModel,
         [PvSystemSettingKeys.InverterHost] = SettingsText.FieldInverterHost,
         [PvSystemSettingKeys.InverterPort] = SettingsText.FieldInverterPort,
@@ -281,6 +301,7 @@
         [PvSystemSettingKeys.HomeBatteryCapacityKWh] = SettingsText.HelpHomeBatteryCapacity,
         [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.HelpHomeBatteryEfficiency,
         [PvSystemSettingKeys.InverterDriver] = SettingsText.HelpInverterDriver,
+        [PvSystemSettingKeys.InverterTopology] = SettingsText.HelpInverterTopology,
         [PvSystemSettingKeys.InverterModel] = SettingsText.HelpInverterModel,
         [PvSystemSettingKeys.InverterHost] = SettingsText.HelpInverterHost,
         [PvSystemSettingKeys.InverterPort] = SettingsText.HelpPort,
@@ -317,7 +338,29 @@
 
     // What makes the inverter worth probing again before a save: its address, or the driver, whose own
     // probe decides whether the box at that address is one it can speak to.
-    private static readonly string[] InverterProbeKeys = [.. InverterAddress, PvSystemSettingKeys.InverterDriver];
+    private static readonly string[] InverterProbeKeys =
+        [.. InverterAddress, PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterTopology];
+
+    // Huawei's EMMA (#322), the one topology the page has something to say about: it takes one client.
+    private const string EmmaTopology = "emma";
+
+    // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
+    private bool Shown(string key) =>
+        key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 };
+
+    // The topology the form has selected, as an id: empty means the driver's first, as in configuration.
+    private string SelectedTopologyId =>
+        NormaliseTopology(_values.GetValueOrDefault(PvSystemSettingKeys.InverterTopology));
+
+    private string NormaliseTopology(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? SelectedDriver?.Topologies.FirstOrDefault()?.Id ?? string.Empty : value.Trim().ToLowerInvariant();
+
+    // As for the driver: choosing what is already configured leaves the setting as it is.
+    private void SelectTopology(string id)
+    {
+        var configured = _settings[PvSystemSettingKeys.InverterTopology].Saved ?? string.Empty;
+        _values[PvSystemSettingKeys.InverterTopology] = NormaliseTopology(id) == NormaliseTopology(configured) ? configured : id;
+    }
 
     // The driver the form has selected, as an id: empty means the default, as it does in configuration.
     private string SelectedDriverId => NormaliseDriver(_values.GetValueOrDefault(PvSystemSettingKeys.InverterDriver));
@@ -335,6 +378,14 @@
     {
         var configured = _settings[PvSystemSettingKeys.InverterDriver].Saved ?? string.Empty;
         _values[PvSystemSettingKeys.InverterDriver] = NormaliseDriver(id) == NormaliseDriver(configured) ? configured : id;
+
+        // A way to reach one brand means nothing to another, and the save would refuse it: back to the
+        // saved value if the new driver has it, otherwise empty, its default.
+        var topology = _settings[PvSystemSettingKeys.InverterTopology].Saved ?? string.Empty;
+        _values[PvSystemSettingKeys.InverterTopology] =
+            SelectedDriver is { } driver && (topology.Length == 0 || driver.Topologies.Any(candidate => candidate.Id == NormaliseTopology(topology)))
+                ? topology
+                : string.Empty;
     }
 
     // The placeholder: what an empty field means. The inverter's port and unit id are the selected driver's.
@@ -487,7 +538,8 @@
         if (InverterProbeKeys.Any(edits.ContainsKey) && Address(InverterAddress, SelectedDriver?.Defaults) is { } inverter)
         {
             probes.Add((SettingsText.Inverter, await Editor.ProbeAsync(
-                PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId, SelectedDriverId)));
+                PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId, SelectedDriverId,
+                _values.GetValueOrDefault(PvSystemSettingKeys.InverterTopology))));
         }
 
         if (ChargerAddress.Any(edits.ContainsKey) && Address(ChargerAddress) is { } charger)

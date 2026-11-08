@@ -146,6 +146,54 @@ public class RegisterSnapshotTests
         await Assert.ThrowsAsync<IOException>(() => RegisterSnapshot.TakeAsync(new DeadClient(), spec, new RegisterDump()));
     }
 
+    [Fact]
+    public async Task A_range_on_another_unit_is_read_on_that_unit_and_kept_apart()
+    {
+        // An inverter behind Huawei's EMMA (#322): the inverter on the client's unit, the EMMA on unit 0,
+        // both at addresses that could overlap.
+        var device = new ReplayModbusClient(Device(holding: new() { [100] = 1, [101] = 2 }) with
+        {
+            Units = new Dictionary<byte, RegisterDump> { [0] = Device(holding: new() { [100] = 7, [101] = 8 }) },
+        });
+        var spec = new RegisterSnapshotSpec(
+        [
+            new RegisterRange(RegisterTable.Holding, 100, 2),
+            new RegisterRange(RegisterTable.Holding, 100, 2, UnitId: 0),
+        ]);
+
+        var dump = await RegisterSnapshot.TakeAsync(device, spec, new RegisterDump());
+
+        Assert.Equal([1, 2], dump.Holding.Values);
+        Assert.Equal([7, 8], dump.Units[0].Holding.Values);
+        Assert.Equal([null, (byte?)0], device.Reads.Select(read => read.UnitId));
+    }
+
+    [Fact]
+    public void Another_unit_survives_the_file()
+    {
+        var dump = Device(input: new() { [1] = 5 }) with
+        {
+            Units = new Dictionary<byte, RegisterDump> { [0] = Device(holding: new() { [31657] = 65535 }) },
+        };
+
+        var read = RegisterDump.FromJson(dump.ToJson());
+
+        Assert.Equal(5, read.Input[1]);
+        Assert.Equal(65535, read.Units[0].Holding[31657]);
+        Assert.Empty(RegisterDump.FromJson(Device().ToJson()).Units);
+        Assert.DoesNotContain("units", Device().ToJson());
+    }
+
+    [Fact]
+    public async Task A_unit_the_recording_lacks_refuses_every_address()
+    {
+        var device = new ReplayModbusClient(Device(holding: new() { [0] = 1 }));
+
+        var error = await Assert.ThrowsAsync<ModbusDeviceException>(() => device.ForUnit(5).ReadHoldingRegistersAsync(0, 1));
+
+        Assert.True(error.IsIllegalAddress);
+    }
+
     private sealed class RegisterWriteComparer : IEqualityComparer<RegisterWrite>
     {
         public static readonly RegisterWriteComparer Instance = new();

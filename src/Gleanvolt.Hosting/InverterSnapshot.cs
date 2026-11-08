@@ -46,7 +46,7 @@ public sealed class InverterSnapshot : IInverterSnapshot
         var now = _time.GetUtcNow();
         var dump = await RegisterSnapshot.TakeAsync(
             _inverter,
-            driver.Snapshot,
+            driver.SnapshotFor(new InverterDriverOptions { Topology = _site.InverterTopology }),
             new RegisterDump
             {
                 Driver = driver.Id,

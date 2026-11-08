@@ -168,6 +168,15 @@ public sealed class PvInverterOptions : PvDeviceOptions
     public string Driver { get; init; } = string.Empty;
 
     /// <summary>
+    /// How the inverter is reached, for a driver that knows more than one way (issue #322): for
+    /// <c>huawei</c>, <c>dongle</c> (its SDongle, the default) or <c>emma</c> (behind an EMMA energy
+    /// manager, which answers for the grid itself and forwards to the inverter on <see cref="PvDeviceOptions.UnitId"/>).
+    /// Empty is the driver's default. Case-insensitive. A value for a driver reached one way only, or one
+    /// the driver does not know, is a configuration problem.
+    /// </summary>
+    public string Topology { get; init; } = string.Empty;
+
+    /// <summary>
     /// The phase the grid meter does not measure — <c>L1</c>, <c>L2</c> or <c>L3</c>, or SolaX's
     /// <c>R</c>, <c>S</c>, <c>T</c> — or empty for a meter that sees all three, which is every correctly
     /// wired installation and the default.

@@ -223,6 +223,24 @@ public class ModbusTcpClientTests
         await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
     }
 
+    [Fact]
+    public async Task AnotherUnitIsAddressedOnTheSameConnection()
+    {
+        // Huawei's EMMA (#322) resets a second client: the inverter behind it and the EMMA itself are two
+        // unit ids on one socket.
+        await using var server = new FakeModbusTcpServer();
+        await using var client = new ModbusTcpClient(Device(server.Port));
+        var emma = client.ForUnit(0);
+
+        await client.ReadHoldingRegistersAsync(32064, 2);
+        await emma.ReadHoldingRegistersAsync(31657, 2);
+        await emma.DisposeAsync();
+        await client.ReadHoldingRegistersAsync(37760, 1);
+
+        Assert.Equal(new byte[] { 1, 0, 1 }, server.UnitIds);
+        Assert.Equal(1, server.Connections);
+    }
+
     // A loopback port nothing listens on, so a connect is refused at once.
     private static int ClosedPort()
     {

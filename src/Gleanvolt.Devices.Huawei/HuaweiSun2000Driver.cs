@@ -15,6 +15,12 @@ namespace Gleanvolt.Devices.Huawei;
 /// so nothing here asks how many phases there are. Neither kind reports per-phase output the driver uses,
 /// so the correction for a meter blind on one phase is unavailable on both.</para>
 ///
+/// <para><b>Two topologies</b> (<see cref="HuaweiSun2000DriverFactory.Topologies"/>). Through the SDongle,
+/// everything is the inverter's, on its unit id. Behind an EMMA (issue #322), the grid comes from the EMMA
+/// itself on unit <see cref="HuaweiRegisterMap.EmmaUnitId"/>, and PV and the battery from the inverter
+/// through it, on the inverter's unit id, which the EMMA assigns. Both on the one connection
+/// (<see cref="IModbusClient.ForUnit"/>): the EMMA resets a second client.</para>
+///
 /// <para><b>The SDongle is slow.</b> It answers "device busy" (<see cref="ModbusDeviceException.IsBusy"/>)
 /// when a request arrives while it is still forwarding another, so a busy read is waited out and repeated,
 /// not reported as a failure. The spacing between requests and the reconnect backoff are the host
@@ -29,19 +35,28 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
     public static IReadOnlyList<TimeSpan> BusyRetryDelays { get; } = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)];
 
     private readonly IModbusClient _client;
+    private readonly IModbusClient? _emma;
     private readonly ILogger<HuaweiSun2000Driver> _logger;
     private readonly TimeProvider _time;
 
-    /// <param name="client">The inverter's client, owned by the host.</param>
+    /// <param name="client">The inverter's client, owned by the host, on the inverter's unit id.</param>
     /// <param name="loggers">For the driver's log. Null logs nothing.</param>
     /// <param name="time">The clock a busy read waits on. Null is the system clock.</param>
-    public HuaweiSun2000Driver(IModbusClient client, ILoggerFactory? loggers = null, TimeProvider? time = null)
+    /// <param name="behindEmma">
+    /// Whether the inverter is behind an EMMA, which then answers for the grid on its own unit id.
+    /// </param>
+    public HuaweiSun2000Driver(
+        IModbusClient client, ILoggerFactory? loggers = null, TimeProvider? time = null, bool behindEmma = false)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
+        _emma = behindEmma ? client.ForUnit(HuaweiRegisterMap.EmmaUnitId) : null;
         _logger = (loggers ?? NullLoggerFactory.Instance).CreateLogger<HuaweiSun2000Driver>();
         _time = time ?? TimeProvider.System;
     }
+
+    /// <summary>Whether the grid is read from an EMMA rather than the inverter's meter.</summary>
+    public bool BehindEmma => _emma is not null;
 
     /// <summary>
     /// No battery hold yet (#323), and no output per phase: the meter's figure is the whole connection, so
@@ -53,13 +68,18 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
 
     public IBatteryDischargeControl? BatteryHold => null;
 
-    /// <summary>Three reads, one per range the values sit in: PV, the meter, the battery.</summary>
+    /// <summary>
+    /// Three reads, one per range the values sit in: PV, the grid (the inverter's meter, or the EMMA's
+    /// sensor), the battery.
+    /// </summary>
     public async Task<InverterReading> ReadAsync(CancellationToken cancellationToken = default)
     {
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
 
         var pv = await ReadAsync(HuaweiRegisterMap.InputPower, 2, cancellationToken).ConfigureAwait(false);
-        var meter = await ReadAsync(HuaweiRegisterMap.MeterActivePower, 2, cancellationToken).ConfigureAwait(false);
+        var meter = _emma is { } emma
+            ? await ReadAsync(emma, HuaweiRegisterMap.EmmaGridActivePower, 2, cancellationToken).ConfigureAwait(false)
+            : await ReadAsync(HuaweiRegisterMap.MeterActivePower, 2, cancellationToken).ConfigureAwait(false);
         var battery = await ReadAsync(HuaweiRegisterMap.BatteryBlockStart, HuaweiRegisterMap.BatteryBlockCount, cancellationToken).ConfigureAwait(false);
 
         return Decode(pv, meter, battery);
@@ -68,11 +88,17 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
     /// <summary>
     /// The model name, then the state of charge. Recognised when the name is a SUN2000's and the state of
     /// charge is a percentage. A device that keeps nothing at the model name's address is no Huawei
-    /// inverter, and its refusal propagates.
+    /// inverter, and its refusal propagates. Behind an EMMA, the EMMA's grid sensor is read first: an
+    /// address with no EMMA refuses it, or no inverter answers on the unit id.
     /// </summary>
     public async Task<InverterProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
     {
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
+
+        if (_emma is { } emma)
+        {
+            await ReadAsync(emma, HuaweiRegisterMap.EmmaGridActivePower, 2, cancellationToken).ConfigureAwait(false);
+        }
 
         var name = await ReadAsync(HuaweiRegisterMap.ModelName, HuaweiRegisterMap.ModelNameCount, cancellationToken).ConfigureAwait(false);
         if (!IsSun2000(DecodeString(name)))
@@ -99,7 +125,10 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
     /// contract is import positive. The battery already counts charging as positive.</para>
     /// </summary>
     /// <param name="pv">The two registers at <see cref="HuaweiRegisterMap.InputPower"/>.</param>
-    /// <param name="meter">The two registers at <see cref="HuaweiRegisterMap.MeterActivePower"/>.</param>
+    /// <param name="meter">
+    /// The two registers at <see cref="HuaweiRegisterMap.MeterActivePower"/>, or at the EMMA's
+    /// <see cref="HuaweiRegisterMap.EmmaGridActivePower"/>: the same encoding and sign.
+    /// </param>
     /// <param name="battery">The battery block, from <see cref="HuaweiRegisterMap.BatteryBlockStart"/>.</param>
     public static InverterReading Decode(ushort[] pv, ushort[] meter, ushort[] battery)
     {
@@ -132,13 +161,16 @@ public sealed class HuaweiSun2000Driver : IInverterDriver
     private static int Int32(ushort[] registers, int offset) =>
         unchecked((int)(((uint)registers[offset] << 16) | registers[offset + 1]));
 
-    private async Task<ushort[]> ReadAsync(ushort start, ushort count, CancellationToken cancellationToken)
+    private Task<ushort[]> ReadAsync(ushort start, ushort count, CancellationToken cancellationToken) =>
+        ReadAsync(_client, start, count, cancellationToken);
+
+    private async Task<ushort[]> ReadAsync(IModbusClient client, ushort start, ushort count, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                return await _client.ReadHoldingRegistersAsync(start, count, cancellationToken).ConfigureAwait(false);
+                return await client.ReadHoldingRegistersAsync(start, count, cancellationToken).ConfigureAwait(false);
             }
             catch (ModbusDeviceException ex) when (ex.IsBusy && attempt < BusyRetryDelays.Count)
             {
@@ -164,6 +196,18 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
     /// <summary>The SUN2000's id in configuration.</summary>
     public const string DriverId = "huawei";
 
+    /// <summary>The topology id for the inverter's own SDongle, the default.</summary>
+    public const string DongleTopology = "dongle";
+
+    /// <summary>The topology id for an inverter behind an EMMA (issue #322).</summary>
+    public const string EmmaTopology = "emma";
+
+    private static readonly IReadOnlyList<InverterTopology> SupportedTopologies =
+    [
+        new(DongleTopology, "SDongle"),
+        new(EmmaTopology, "EMMA"),
+    ];
+
     private readonly ILoggerFactory _loggers;
     private readonly TimeProvider _time;
 
@@ -178,6 +222,9 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
     public string DisplayName => "Huawei";
 
     public InverterCapabilities Capabilities => HuaweiSun2000Driver.Sun2000Capabilities;
+
+    /// <summary>Through the SDongle (the default), or behind an EMMA.</summary>
+    public IReadOnlyList<InverterTopology> Topologies => SupportedTopologies;
 
     // Port 502 and unit 1, the inverter behind the SDongle. A full second between requests: the dongle
     // forwards one request at a time and answers "busy" to the next, and three reads a poll still fit
@@ -201,6 +248,34 @@ public sealed class HuaweiSun2000DriverFactory : IInverterDriverFactory
         SerialNumber: new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.SerialNumber, HuaweiRegisterMap.SerialNumberCount),
         SerialPrefixLength: 0);
 
+    // Behind an EMMA the inverter has no meter of its own to read; the EMMA's grid block, on its unit, takes
+    // the meter block's place. No serial number from the EMMA: only its grid registers are read.
+    private static readonly RegisterSnapshotSpec EmmaSnapshot = new(
+        [
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.ModelName, 35),
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.InputPower, 31),
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.BatteryBlockStart, HuaweiRegisterMap.BatteryBlockCount),
+            new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.EmmaGridActivePower, HuaweiRegisterMap.EmmaGridBlockCount, HuaweiRegisterMap.EmmaUnitId),
+        ],
+        SerialNumber: new RegisterRange(RegisterTable.Holding, HuaweiRegisterMap.SerialNumber, HuaweiRegisterMap.SerialNumberCount),
+        SerialPrefixLength: 0);
+
+    public RegisterSnapshotSpec SnapshotFor(InverterDriverOptions options) =>
+        IsBehindEmma(options) ? EmmaSnapshot : Snapshot;
+
     public IInverterDriver Create(IModbusClient client, InverterDriverOptions options) =>
-        new HuaweiSun2000Driver(client, _loggers, _time);
+        new HuaweiSun2000Driver(client, _loggers, _time, IsBehindEmma(options));
+
+    private static bool IsBehindEmma(InverterDriverOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var topology = options.Topology.Trim().ToLowerInvariant();
+        return topology switch
+        {
+            "" or DongleTopology => false,
+            EmmaTopology => true,
+            _ => throw new ArgumentException(
+                $"'{options.Topology}' is not a way to reach a Huawei inverter: '{DongleTopology}' or '{EmmaTopology}'.", nameof(options)),
+        };
+    }
 }

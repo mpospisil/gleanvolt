@@ -141,6 +141,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         int port,
         byte unitId,
         string? inverterDriver = null,
+        string? inverterTopology = null,
         CancellationToken cancellationToken = default)
     {
         var address = $"{host}:{port}";
@@ -160,7 +161,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 // never written to.
                 var driver = InverterDriverFactory(inverterDriver).Create(
                     new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
-                    new InverterDriverOptions { DryRun = true });
+                    new InverterDriverOptions { DryRun = true, Topology = KnownTopology(inverterDriver, inverterTopology) });
                 var probe = await driver.ProbeAsync(timeout.Token).ConfigureAwait(false);
                 var reading = (long)Math.Round(probe.Reading);
 
@@ -200,6 +201,14 @@ public sealed class PvSystemEditor : IPvSystemEditor
         return _inverterDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
             ?? _inverterDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultInverterDriver)
             ?? _inverterDrivers[0];
+    }
+
+    // The topology the form has selected, if the driver has it; anything else probes the default, and the
+    // save refuses it with a message naming the ones there are.
+    private string KnownTopology(string? driverId, string? topology)
+    {
+        var wanted = topology?.Trim().ToLowerInvariant() ?? string.Empty;
+        return InverterDriverFactory(driverId).Topologies.Any(candidate => candidate.Id == wanted) ? wanted : string.Empty;
     }
 
     // One read-modify-write of the file: apply the change, check the result would start, write it.

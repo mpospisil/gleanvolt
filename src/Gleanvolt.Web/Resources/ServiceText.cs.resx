@@ -360,6 +360,12 @@
   <data name="Config_PvDriver" xml:space="preserve">
     <value>Pv:Inverter:Driver ('{0}') není ovladač střídače, který tento Gleanvolt zná. Známé ovladače: {1}. Prázdná hodnota znamená {2}.</value>
   </data>
+  <data name="Config_PvTopology" xml:space="preserve">
+    <value>Pv:Inverter:Topology ('{0}') není způsob, jakým ovladač {1} střídač připojuje: {2}. Prázdná hodnota znamená {3}.</value>
+  </data>
+  <data name="Config_PvTopologyNone" xml:space="preserve">
+    <value>Pv:Inverter:Topology ('{0}') nelze použít s ovladačem {1}: ten se připojuje jen jedním způsobem. Nechte pole prázdné.</value>
+  </data>
   <data name="Config_PvPhaseNotSupported" xml:space="preserve">
     <value>Pv:Inverter:UnmeteredGridPhase nelze použít s ovladačem {0}: ten neposkytuje výkon střídače po fázích, který odhad potřebuje. Nechte pole prázdné.</value>
   </data>

@@ -39,28 +39,61 @@ public static class RegisterSnapshot
             await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        // One pair of tables per unit: null is the client's own, anything else the same connection
+        // addressed to another unit (#322).
+        var tables = new Dictionary<byte, (SortedDictionary<ushort, ushort> Holding, SortedDictionary<ushort, ushort> Input)>();
         var holding = new SortedDictionary<ushort, ushort>();
         var input = new SortedDictionary<ushort, ushort>();
 
         foreach (var range in Merge(spec.Ranges))
         {
-            var table = range.Table == RegisterTable.Holding ? holding : input;
+            var unitClient = client;
+            SortedDictionary<ushort, ushort> table;
+            if (range.UnitId is { } unit)
+            {
+                if (!tables.TryGetValue(unit, out var unitTables))
+                {
+                    unitTables = ([], []);
+                    tables[unit] = unitTables;
+                }
+
+                unitClient = client.ForUnit(unit);
+                table = range.Table == RegisterTable.Holding ? unitTables.Holding : unitTables.Input;
+            }
+            else
+            {
+                table = range.Table == RegisterTable.Holding ? holding : input;
+            }
+
             for (var start = range.Start; start < range.Start + range.Count; start += MaxRegistersPerRead)
             {
                 var count = (ushort)Math.Min(MaxRegistersPerRead, range.Start + range.Count - start);
-                await ReadAsync(client, range.Table, (ushort)start, count, table, cancellationToken).ConfigureAwait(false);
+                await ReadAsync(unitClient, range.Table, (ushort)start, count, table, cancellationToken).ConfigureAwait(false);
             }
         }
 
         if (spec.SerialNumber is { } serial)
         {
-            Redact(serial.Table == RegisterTable.Holding ? holding : input, serial, spec.SerialPrefixLength);
+            var (serialHolding, serialInput) = serial.UnitId is { } serialUnit
+                ? tables.GetValueOrDefault(serialUnit)
+                : (holding, input);
+            if (serialHolding is not null && serialInput is not null)
+            {
+                Redact(serial.Table == RegisterTable.Holding ? serialHolding : serialInput, serial, spec.SerialPrefixLength);
+            }
         }
 
         return template with
         {
             Holding = new Dictionary<ushort, ushort>(holding),
             Input = new Dictionary<ushort, ushort>(input),
+            Units = tables.ToDictionary(
+                entry => entry.Key,
+                entry => new RegisterDump
+                {
+                    Holding = new Dictionary<ushort, ushort>(entry.Value.Holding),
+                    Input = new Dictionary<ushort, ushort>(entry.Value.Input),
+                }),
         };
     }
 
@@ -128,7 +161,7 @@ public static class RegisterSnapshot
     // are as few as the 125-register limit allows.
     private static IEnumerable<RegisterRange> Merge(IEnumerable<RegisterRange> ranges)
     {
-        foreach (var group in ranges.GroupBy(range => range.Table))
+        foreach (var group in ranges.GroupBy(range => (range.UnitId, range.Table)))
         {
             RegisterRange? current = null;
             foreach (var range in group.Where(range => range.Count > 0).OrderBy(range => range.Start))

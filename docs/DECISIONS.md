@@ -4,6 +4,31 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-08 — Huawei behind an EMMA: two unit ids on one connection, and a topology per driver
+
+**Context.** [Issue #322](https://github.com/mpospisil/gleanvolt/issues/322). Newer Huawei installations
+have an EMMA energy manager. Gleanvolt then talks to the EMMA: the grid from its own sensor on unit 0,
+PV and the battery from the inverter through it, on the unit id the EMMA assigned. The EMMA resets any
+second Modbus TCP client.
+
+**Decision — `IModbusClient.ForUnit`.** A view of the same connection addressed to another unit id:
+the one socket, the one request gate and the one spacing, so the EMMA is never opened twice. It is a
+default interface method that throws, so a client that cannot do it (and every test fake) needs no
+change. `ModbusTcpClient`, `ReadOnlyModbusClient` (still unable to write on any unit),
+`NotConfiguredModbusClient` and `ReplayModbusClient` implement it. A register dump keeps other units'
+tables under `units`, and a `RegisterRange` can name a unit, so a snapshot behind an EMMA replays.
+
+**Decision — the topology is the driver's to declare.** A factory lists the ways its inverter is reached
+(`Topologies`; Huawei: `dongle`, `emma`), the first being the default, and `Pv:Inverter:Topology` picks
+one. The rules refuse a value the driver does not list, and any value for a driver reached one way.
+Settings shows the field only for a driver with topologies, so nothing in the page knows it is Huawei
+except the EMMA's one-client note. `Pv:Inverter:UnitId` keeps meaning the inverter's unit id; the EMMA's
+is fixed at 0. `IInverterDriverFactory.SnapshotFor(options)` lets the snapshot follow the topology: behind
+an EMMA the inverter's meter block is replaced by the EMMA's grid block.
+
+**Not done here.** Finding the inverter's unit id by trying ids belongs with discovery (#324). The EMMA's
+grid sign is assumed to be the meter's until a tester's dump confirms it (#325).
+
 ## 2026-11-08 — Huawei SUN2000 readings, and what a slow gateway needs from the host
 
 **Context.** [Issue #320](https://github.com/mpospisil/gleanvolt/issues/320), the first Huawei driver: a

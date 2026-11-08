@@ -155,8 +155,20 @@ same registers, so one driver reads them. Neither reports output per phase, so `
 not available. It is **Expected** and untested on hardware:
 its readings come from Huawei's interface definitions, and the signs of the grid meter and the battery
 are still to be confirmed by a tester. There is no battery hold. Modbus TCP is off on the SDongle by
-default, and enabling it, the EMMA, the hold and discovery follow in
+default, and enabling it, the hold and discovery follow in
 [#316](https://github.com/mpospisil/gleanvolt/issues/316).
+
+**Behind an EMMA** ([#322](https://github.com/mpospisil/gleanvolt/issues/322)), set `Pv:Inverter:Topology`
+to `emma` (Settings → Inverter → *Connected through*) and point the host at the EMMA. The grid then comes
+from the EMMA's own sensor on unit 0 (register `31657`), and PV and the battery from the inverter through
+the EMMA, on the unit id the EMMA assigned to it: put that in `Pv:Inverter:UnitId`. Two things to know:
+
+- **The EMMA accepts one Modbus TCP client** and resets any further connection. Gleanvolt has to be the
+  only one, or a Modbus proxy goes in front of the EMMA. Gleanvolt itself reads both units over one
+  connection.
+- Modbus TCP is enabled with the installer account: *Commission device → Communication settings → Modbus
+  TCP*. The EMMA's grid sign is assumed to be the meter's (export positive) until a tester's dump
+  confirms it.
 
 ## EV chargers
 

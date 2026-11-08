@@ -28,6 +28,19 @@ public interface IInverterDriverFactory
     RegisterSnapshotSpec Snapshot { get; }
 
     /// <summary>
+    /// How the family's inverter can be reached, when there is more than one way (issue #322): through a
+    /// dongle, or behind an energy manager that answers for the grid itself. The first is the default, the
+    /// one an empty <c>Pv:Inverter:Topology</c> means. Empty for a family reached one way only.
+    /// </summary>
+    IReadOnlyList<InverterTopology> Topologies => [];
+
+    /// <summary>
+    /// What a snapshot reads for a driver made with <paramref name="options"/>: <see cref="Snapshot"/>,
+    /// unless the topology changes what the driver reads.
+    /// </summary>
+    RegisterSnapshotSpec SnapshotFor(InverterDriverOptions options) => Snapshot;
+
+    /// <summary>
     /// A driver on <paramref name="client"/>. The client belongs to the host, which connects and disposes
     /// it; in dry-run it is one that refuses writes.
     /// </summary>
@@ -42,16 +55,40 @@ public interface IInverterDriverFactory
 /// <param name="DisplayName">See <see cref="IInverterDriverFactory.DisplayName"/>.</param>
 /// <param name="Defaults">See <see cref="IInverterDriverFactory.Defaults"/>.</param>
 /// <param name="Capabilities">See <see cref="IInverterDriverFactory.Capabilities"/>.</param>
+/// <param name="Topologies">See <see cref="IInverterDriverFactory.Topologies"/>; null is none.</param>
 public sealed record InverterDriverInfo(
-    string Id, string DisplayName, ModbusDefaults Defaults, InverterCapabilities Capabilities)
+    string Id,
+    string DisplayName,
+    ModbusDefaults Defaults,
+    InverterCapabilities Capabilities,
+    IReadOnlyList<InverterTopology>? Topologies = null)
 {
+    /// <summary>The ways the inverter can be reached; empty when there is one.</summary>
+    public IReadOnlyList<InverterTopology> Topologies { get; init; } = Topologies ?? [];
+
     /// <summary>The description of <paramref name="factory"/>.</summary>
     public static InverterDriverInfo Of(IInverterDriverFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
-        return new InverterDriverInfo(factory.Id, factory.DisplayName, factory.Defaults, factory.Capabilities);
+        return new InverterDriverInfo(factory.Id, factory.DisplayName, factory.Defaults, factory.Capabilities, factory.Topologies);
     }
+
+    // The topologies by content, so two descriptions of one factory are equal.
+    public bool Equals(InverterDriverInfo? other) =>
+        other is not null
+        && Id == other.Id
+        && DisplayName == other.DisplayName
+        && Defaults == other.Defaults
+        && Capabilities == other.Capabilities
+        && Topologies.SequenceEqual(other.Topologies);
+
+    public override int GetHashCode() => HashCode.Combine(Id, DisplayName, Defaults, Capabilities, Topologies.Count);
 }
+
+/// <summary>One way an inverter family can be reached (issue #322).</summary>
+/// <param name="Id">The id in configuration (<c>Pv:Inverter:Topology</c>), lower case: <c>emma</c>.</param>
+/// <param name="DisplayName">What the owner knows it as: <c>EMMA</c>. A product name, so never translated.</param>
+public sealed record InverterTopology(string Id, string DisplayName);
 
 /// <summary>A family's Modbus defaults.</summary>
 /// <param name="Port">The TCP port.</param>
@@ -81,4 +118,10 @@ public sealed record InverterDriverOptions
 
     /// <summary>How far the hold's target has to move before the command is sent again.</summary>
     public double HoldRetargetThresholdWatts { get; init; } = 100;
+
+    /// <summary>
+    /// How the inverter is reached: one of the factory's <see cref="IInverterDriverFactory.Topologies"/> by
+    /// id, lower case. Empty is the factory's first, or the only way for a family with none.
+    /// </summary>
+    public string Topology { get; init; } = string.Empty;
 }

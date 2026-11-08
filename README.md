@@ -460,6 +460,7 @@ feature.
 
   "Inverter": {
     "Driver": "",                  // which inverter family it speaks to: "solax" (empty) or "huawei" (readings only)
+    "Topology": "",                // huawei only: "dongle" (empty) or "emma"; UnitId is then the inverter's behind the EMMA
     "Model": "SolaX X3-HYB-G4 PRO",
     "Host": "192.168.2.10", "Port": 502, "UnitId": 1,
     "UnmeteredGridPhase": ""       // only for a grid meter missing a phase clamp: "L3" (or SolaX's "T")

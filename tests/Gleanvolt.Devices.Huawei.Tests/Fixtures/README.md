@@ -9,6 +9,8 @@ The recordings `HuaweiConformanceTests` replays (issues #319, #320). Each one is
 | `huawei-map0-night-discharging.json` | SUN2000-8K-MAP0, night, battery carrying the house | Discharging reads negative, no sun |
 | `huawei-l1-night-importing.json` | SUN2000-5KTL-L1, single-phase, DDSU666-H meter, night, importing 620 W | Single-phase import is positive; the meter's one phase is the total |
 | `huawei-lc0-battery-charging.json` | SUN2000-6K-LC0, single-phase, DDSU666-H meter, battery charging 2500 W, exporting 900 W | Single-phase charging positive, export negative |
+| `huawei-emma-night-importing.json` | SUN2000-10K-MAP0 on unit 1 behind an EMMA (unit 0), night, importing 900 W | The EMMA suite: import positive, read from the EMMA |
+| `huawei-emma-battery-charging.json` | The same, battery charging 4000 W, exporting 1500 W | The EMMA suite: charging positive, export negative |
 | `solax-inverter.json` | A SolaX inverter at the address (linked from the SolaX tests, not a copy) | The probe refuses another family |
 
 **Every Huawei file is synthetic.** They were generated from Huawei's *Solar Inverter Modbus Interface
