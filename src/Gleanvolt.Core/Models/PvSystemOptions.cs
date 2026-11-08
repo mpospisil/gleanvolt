@@ -1,3 +1,5 @@
+using Gleanvolt.Devices;
+
 namespace Gleanvolt.Core.Models;
 
 /// <summary>
@@ -108,12 +110,11 @@ public abstract class PvDeviceOptions
     /// <summary>
     /// What the box is — <c>SolaX X3-HYB-G4 PRO</c>, <c>SolaX X3-HAC</c>.
     ///
-    /// <para><b>Documentation today, a selector later.</b> The register maps are compiled for those two
-    /// devices and are chosen by nothing, so putting another model here does not make the controller
-    /// speak that device's dialect — it only mislabels the one it is speaking to. What it does do is
-    /// answer "what is on the other end of 192.168.2.10?" without an ssh session. The day a second
-    /// register map exists this is the field that picks it, and it becomes a known-value check with a
-    /// startup failure for anything unrecognised.</para>
+    /// <para><b>A label, never a selector.</b> What the controller speaks to the inverter is chosen by
+    /// <see cref="PvInverterOptions.Driver"/> (issue #318): one driver covers a whole family of models
+    /// that share their registers, so selecting by model would need a list of aliases that grows with
+    /// every model sold. This answers "what is on the other end of 192.168.2.10?" without an ssh
+    /// session, and nothing reads it to decide anything.</para>
     /// </summary>
     public string Model { get; init; } = string.Empty;
 
@@ -140,18 +141,30 @@ public abstract class PvDeviceOptions
     private static readonly DeviceConfig Defaults = new() { Host = string.Empty };
 
     /// <summary>The connection as the Modbus client wants it, with unset values taking their defaults.</summary>
-    public DeviceConfig ToDeviceConfig() => new()
+    /// <param name="defaults">
+    /// The device family's own defaults (its driver's <see cref="ModbusDefaults"/>). Null takes
+    /// <see cref="DeviceConfig"/>'s.
+    /// </param>
+    public DeviceConfig ToDeviceConfig(ModbusDefaults? defaults = null) => new()
     {
         Host = Host,
-        Port = Port ?? Defaults.Port,
-        UnitId = UnitId ?? Defaults.UnitId,
-        MinRequestInterval = MinRequestInterval ?? Defaults.MinRequestInterval,
+        Port = Port ?? defaults?.Port ?? Defaults.Port,
+        UnitId = UnitId ?? defaults?.UnitId ?? Defaults.UnitId,
+        MinRequestInterval = MinRequestInterval ?? defaults?.MinRequestInterval ?? Defaults.MinRequestInterval,
     };
 }
 
 /// <summary>The system's inverter. No id: a PV system has one, and it is addressed as such.</summary>
 public sealed class PvInverterOptions : PvDeviceOptions
 {
+    /// <summary>
+    /// Which inverter driver reads and controls this inverter: <c>solax</c>, the only one so far. Empty
+    /// means <c>solax</c>, so a configuration from before the field existed needs no change (issue #318).
+    /// Case-insensitive. An id no registered driver has is a configuration problem naming the ones there
+    /// are, not a fallback.
+    /// </summary>
+    public string Driver { get; init; } = string.Empty;
+
     /// <summary>
     /// The phase the grid meter does not measure — <c>L1</c>, <c>L2</c> or <c>L3</c>, or SolaX's
     /// <c>R</c>, <c>S</c>, <c>T</c> — or empty for a meter that sees all three, which is every correctly

@@ -44,7 +44,7 @@ public static class SetupStatusEvaluator
 
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
         var pvProblems = new ConfigurationProblems();
-        PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, pvProblems);
+        PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, pvProblems, InverterDrivers.Known);
 
         var phrases = pvProblems.Phrases;
         for (var index = 0; index < pvProblems.Count; index++)

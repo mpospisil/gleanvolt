@@ -51,6 +51,12 @@ public sealed record PvSystemInfo(
     public Gleanvolt.Devices.GridPhase? UnmeteredGridPhase { get; init; }
 
     /// <summary>
+    /// The id of the driver that reads and controls the inverter (<c>Pv:Inverter:Driver</c>), lower case;
+    /// <c>solax</c> when the configuration leaves it empty.
+    /// </summary>
+    public string InverterDriver { get; init; } = Configuration.PvSystemRules.DefaultInverterDriver;
+
+    /// <summary>
     /// One line for the log at startup, so a `docker logs` dump answers "which installation was this,
     /// and what was it talking to" without the configuration beside it.
     /// </summary>

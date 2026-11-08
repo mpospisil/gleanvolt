@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Devices;
-using Gleanvolt.Devices.Solax;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
@@ -32,7 +31,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IReadOnlyDictionary<string, string?> _running;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
-    private readonly IInverterDriverFactory _inverterDriver;
+    private readonly IReadOnlyList<IInverterDriverFactory> _inverterDrivers;
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
@@ -48,19 +47,22 @@ public sealed class PvSystemEditor : IPvSystemEditor
         IReadOnlyDictionary<string, string?> running,
         ILogger<PvSystemEditor> logger,
         Func<DeviceConfig, IModbusClient>? clientFactory = null,
-        IInverterDriverFactory? inverterDriver = null)
+        IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null)
     {
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
         _running = running;
         _logger = logger;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device));
-        _inverterDriver = inverterDriver ?? new SolaxInverterDriverFactory();
+        _inverterDrivers = inverterDrivers ?? [.. Gleanvolt.Hosting.InverterDrivers.Factories.Select(make => make(null))];
+        InverterDrivers = [.. _inverterDrivers.Select(InverterDriverInfo.Of)];
     }
 
     /// <summary>Each editable key's value in <paramref name="configuration"/>, for the <c>running</c> argument.</summary>
     public static IReadOnlyDictionary<string, string?> Snapshot(IConfiguration configuration) =>
         PvSystemSettingKeys.All.ToDictionary(key => key, key => configuration[key], StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyList<InverterDriverInfo> InverterDrivers { get; }
 
     public PvSystemSettings Read()
     {
@@ -138,6 +140,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         string host,
         int port,
         byte unitId,
+        string? inverterDriver = null,
         CancellationToken cancellationToken = default)
     {
         var address = $"{host}:{port}";
@@ -155,7 +158,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 // Through the driver, so "Test connection" asks whatever the family's own probe asks. The
                 // client refuses writes, and the probe makes none: an address nobody has confirmed yet is
                 // never written to.
-                var driver = _inverterDriver.Create(
+                var driver = InverterDriverFactory(inverterDriver).Create(
                     new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
                     new InverterDriverOptions { DryRun = true });
                 var probe = await driver.ProbeAsync(timeout.Token).ConfigureAwait(false);
@@ -187,6 +190,16 @@ public sealed class PvSystemEditor : IPvSystemEditor
             return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).",
                 Phrase.Of("Probe.NoAnswer", new PhraseArg.Text(address), new PhraseArg.Text(ex.Message)));
         }
+    }
+
+    // The driver the form has selected. An id this host does not have probes with the default: the save
+    // refuses that id with a message naming the known ones, which says more than a probe could.
+    private IInverterDriverFactory InverterDriverFactory(string? id)
+    {
+        var wanted = string.IsNullOrWhiteSpace(id) ? PvSystemRules.DefaultInverterDriver : id.Trim().ToLowerInvariant();
+        return _inverterDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
+            ?? _inverterDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultInverterDriver)
+            ?? _inverterDrivers[0];
     }
 
     // One read-modify-write of the file: apply the change, check the result would start, write it.

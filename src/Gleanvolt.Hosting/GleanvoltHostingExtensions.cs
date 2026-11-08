@@ -33,7 +33,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Gleanvolt.Devices;
-using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Hosting;
 
@@ -119,7 +118,7 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>(),
-            inverterDriver: InverterDriverFactory(provider)));
+            inverterDrivers: [.. provider.GetServices<IInverterDriverFactory>()]));
 
         // The Home Assistant link and the API, editable on Settings and in the setup wizard. Read once at
         // startup like the installation, so the snapshot is what "running" means.
@@ -270,10 +269,14 @@ public static class GleanvoltHostingExtensions
                 (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
         }
 
-        // The inverter's driver (issue #317). SolaX is the only family so far; #318 lets the configuration
-        // name another. The driver gets the inverter's client as registered above -- read-only unless the
-        // battery hold may write -- and never opens a socket of its own.
-        services.AddSingleton<IInverterDriverFactory, SolaxInverterDriverFactory>();
+        // The inverter's driver (issues #317, #318): the one Pv:Inverter:Driver names, which the resolver
+        // has already checked is one of these. It gets the inverter's client as registered above --
+        // read-only unless the battery hold may write -- and never opens a socket of its own.
+        foreach (var make in InverterDrivers.Factories)
+        {
+            services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
+        }
+
         services.AddSingleton<IInverterDriver>(provider =>
         {
             var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
@@ -1026,7 +1029,7 @@ public static class GleanvoltHostingExtensions
             pv = new PvSystemOptions();
         }
 
-        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems());
+        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems(), InverterDrivers.Known);
     }
 
     // The configured zone where it resolves, the host's own where it does not: setup mode is there to
@@ -1312,10 +1315,14 @@ public static class GleanvoltHostingExtensions
     private static ApiOptions ReadApiOptions(IConfiguration configuration) =>
         configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>() ?? new ApiOptions();
 
-    // The inverter family's driver factory. SolaX until the configuration can name another (#318).
-    private static IInverterDriverFactory InverterDriverFactory(IServiceProvider provider) =>
-        provider.GetServices<IInverterDriverFactory>()
-            .Single(candidate => candidate.Id == SolaxInverterDriverFactory.DriverId);
+    // The factory of the driver the site names. Only reached outside setup mode, where the resolver has
+    // refused any id that is not registered, so a miss here is a bug rather than a configuration problem.
+    private static IInverterDriverFactory InverterDriverFactory(IServiceProvider provider)
+    {
+        var id = provider.GetRequiredService<PvSystemInfo>().InverterDriver;
+        return provider.GetServices<IInverterDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
+            ?? throw new InvalidOperationException($"No inverter driver '{id}' is registered.");
+    }
 
     // Enforces the dry-run guarantee structurally: when a device may not be written to, its client
     // physically cannot write, so even a caller that forgot its own guard can never reach the hardware.

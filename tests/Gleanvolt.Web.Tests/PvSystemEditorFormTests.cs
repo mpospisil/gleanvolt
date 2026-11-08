@@ -122,6 +122,90 @@ public class PvSystemEditorFormTests : BunitContext
         Assert.Equal("192.168.2.20", _editor.Stored[PvSystemSettingKeys.ChargerHost]);
     }
 
+    // -- The inverter's brand (#318).
+
+    [Fact]
+    public void Offers_every_driver_with_the_default_selected_when_none_is_configured()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        var select = form.Find(Field(PvSystemSettingKeys.InverterDriver));
+        Assert.Equal("SELECT", select.TagName);
+        Assert.Equal(["solax", "acme"], select.QuerySelectorAll("option").Select(option => option.GetAttribute("value")));
+        Assert.Equal(["SolaX", "Acme"], select.QuerySelectorAll("option").Select(option => option.TextContent));
+        Assert.Equal("solax", select.GetAttribute("value"));
+    }
+
+    [Fact]
+    public void Choosing_a_brand_saves_it_after_probing_the_inverter_with_that_driver()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("acme");
+        form.Find("#pv-save").Click();
+
+        Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.InverterDriver] = "acme" }, Assert.Single(_editor.Saves));
+        var probe = Assert.Single(_editor.Probes);
+        Assert.Equal(PvDeviceRole.Inverter, probe.Role);
+        Assert.Equal("acme", Assert.Single(_editor.ProbeDrivers));
+    }
+
+    [Fact]
+    public void Choosing_the_brand_already_in_force_is_not_an_edit()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("acme");
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("solax");
+
+        Assert.True(form.Find("#pv-save").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void An_id_this_host_does_not_have_is_shown_as_configured()
+    {
+        _editor.Running[PvSystemSettingKeys.InverterDriver] = "huawei";
+
+        var form = Render<PvSystemEditorForm>();
+
+        var select = form.Find(Field(PvSystemSettingKeys.InverterDriver));
+        Assert.Equal("huawei", select.GetAttribute("value"));
+        Assert.Contains("huawei", select.QuerySelectorAll("option").Select(option => option.GetAttribute("value")));
+    }
+
+    [Fact]
+    public void The_unit_id_placeholder_is_the_selected_drivers_default()
+    {
+        var form = Render<PvSystemEditorForm>();
+        Assert.Equal("1", form.Find(Field(PvSystemSettingKeys.InverterUnitId)).GetAttribute("placeholder"));
+
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("acme");
+
+        Assert.Equal("0", form.Find(Field(PvSystemSettingKeys.InverterUnitId)).GetAttribute("placeholder"));
+    }
+
+    [Theory]
+    [InlineData("en", "Inverter brand")]
+    [InlineData("cs", "Značka střídače")]
+    public void The_brand_field_is_labelled_in_the_viewers_language(string culture, string label)
+    {
+        var (previous, previousUi) = (System.Globalization.CultureInfo.CurrentCulture, System.Globalization.CultureInfo.CurrentUICulture);
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo(culture);
+        System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo(culture);
+        try
+        {
+            var form = Render<PvSystemEditorForm>();
+
+            var field = form.Find(Field(PvSystemSettingKeys.InverterDriver)).ParentElement!;
+            Assert.Equal(label, field.QuerySelector("label")!.TextContent);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+            System.Globalization.CultureInfo.CurrentUICulture = previousUi;
+        }
+    }
+
     [Fact]
     public void Does_not_probe_when_no_address_changed()
     {
@@ -286,7 +370,8 @@ public class PvSystemEditorFormTests : BunitContext
     {
         var form = PseudoLocale.Render(() => Render<PvSystemEditorForm>());
 
-        PseudoLocale.AssertTranslated(form.Markup);
+        // The brands in the drop-down are names, and stay as they are in every language.
+        PseudoLocale.AssertTranslated(form.Markup, [.. _editor.InverterDrivers.Select(driver => driver.DisplayName)]);
     }
 
     [Fact]

@@ -6,17 +6,45 @@ namespace Gleanvolt.Devices;
 /// </summary>
 public interface IInverterDriverFactory
 {
-    /// <summary>The family's id in configuration, lower case: <c>solax</c>.</summary>
+    /// <summary>The family's id in configuration (<c>Pv:Inverter:Driver</c>), lower case: <c>solax</c>.</summary>
     string Id { get; }
+
+    /// <summary>The brand as an owner knows it, for a drop-down: <c>SolaX</c>. A name, so never translated.</summary>
+    string DisplayName { get; }
 
     /// <summary>How this family's Modbus server is reached when the configuration does not say.</summary>
     ModbusDefaults Defaults { get; }
+
+    /// <summary>
+    /// What the family can do, known before a driver exists, so a configuration that asks for more can be
+    /// refused when it is saved. Every driver this makes reports the same.
+    /// </summary>
+    InverterCapabilities Capabilities { get; }
 
     /// <summary>
     /// A driver on <paramref name="client"/>. The client belongs to the host, which connects and disposes
     /// it; in dry-run it is one that refuses writes.
     /// </summary>
     IInverterDriver Create(IModbusClient client, InverterDriverOptions options);
+}
+
+/// <summary>
+/// What is known about a driver without creating one: enough to check a configured id, name the brand in a
+/// drop-down and fill in an address the configuration left incomplete.
+/// </summary>
+/// <param name="Id">See <see cref="IInverterDriverFactory.Id"/>.</param>
+/// <param name="DisplayName">See <see cref="IInverterDriverFactory.DisplayName"/>.</param>
+/// <param name="Defaults">See <see cref="IInverterDriverFactory.Defaults"/>.</param>
+/// <param name="Capabilities">See <see cref="IInverterDriverFactory.Capabilities"/>.</param>
+public sealed record InverterDriverInfo(
+    string Id, string DisplayName, ModbusDefaults Defaults, InverterCapabilities Capabilities)
+{
+    /// <summary>The description of <paramref name="factory"/>.</summary>
+    public static InverterDriverInfo Of(IInverterDriverFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        return new InverterDriverInfo(factory.Id, factory.DisplayName, factory.Defaults, factory.Capabilities);
+    }
 }
 
 /// <summary>A family's Modbus defaults.</summary>

@@ -542,6 +542,7 @@
       "installDate": "string(date)? (required)",
       "inverter": "$SiteDeviceResponse (required)",
       "inverterCapacityWatts": "number|string(double)? (required)",
+      "inverterDriver": "string (required)",
       "latitude": "number|string(double)? (required)",
       "longitude": "number|string(double)? (required)",
       "lossFactor": "number|string(double)? (required)",

@@ -383,6 +383,12 @@
     <value>{0} ({1}) must be greater than zero.</value>
   </data>
   <!-- The installation's settings, as the form or startup checks them -->
+  <data name="Config_PvDriver" xml:space="preserve">
+    <value>Pv:Inverter:Driver ('{0}') is not an inverter driver this Gleanvolt knows. Known drivers: {1}. Empty means {2}.</value>
+  </data>
+  <data name="Config_PvPhaseNotSupported" xml:space="preserve">
+    <value>Pv:Inverter:UnmeteredGridPhase cannot be used with the {0} driver: it does not report the inverter's output per phase, which the estimate needs. Leave it empty.</value>
+  </data>
   <data name="Config_PvPhase" xml:space="preserve">
     <value>Pv:Inverter:UnmeteredGridPhase ('{0}') must be L1, L2 or L3 (or SolaX's R, S or T), or empty for a grid meter that measures all three phases.</value>
   </data>

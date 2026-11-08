@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -330,6 +331,61 @@ public sealed class PvSystemEditorTests : IDisposable
 
         Assert.False(result.Answered);
         Assert.Contains("did not answer", result.Message);
+    }
+
+    [Fact]
+    public async Task The_inverter_probe_is_the_selected_drivers_and_writes_nothing()
+    {
+        var other = new RecordingDriverFactory("acme");
+        var client = new OneRegisterClient(57);
+        var editor = new PvSystemEditor(
+            Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
+            _ => client, [new SolaxInverterDriverFactory(), other]);
+
+        var result = await editor.ProbeAsync(PvDeviceRole.Inverter, "192.168.2.20", 502, 1, inverterDriver: "ACME");
+
+        Assert.True(result.Plausible);
+        Assert.Equal(1, other.Probes);
+        Assert.Equal(["solax", "acme"], editor.InverterDrivers.Select(driver => driver.Id));
+    }
+
+    [Fact]
+    public void Without_drivers_given_the_editor_offers_the_hosts_catalog()
+    {
+        Assert.Equal(InverterDrivers.Known, Editor(Configuration()).InverterDrivers);
+    }
+
+    /// <summary>A driver family whose probe always recognises what answered, and counts how often it was asked.</summary>
+    private sealed class RecordingDriverFactory(string id) : IInverterDriverFactory
+    {
+        public int Probes { get; private set; }
+
+        public string Id => id;
+
+        public string DisplayName => id;
+
+        public ModbusDefaults Defaults { get; } = new(502, 1, TimeSpan.Zero);
+
+        public InverterCapabilities Capabilities { get; } = new(false, false);
+
+        public IInverterDriver Create(IModbusClient client, InverterDriverOptions options) => new Driver(this, client);
+
+        private sealed class Driver(RecordingDriverFactory factory, IModbusClient client) : IInverterDriver
+        {
+            public InverterCapabilities Capabilities => factory.Capabilities;
+
+            public IBatteryDischargeControl? BatteryHold => null;
+
+            public Task<InverterReading> ReadAsync(CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException();
+
+            public async Task<InverterProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
+            {
+                factory.Probes++;
+                var value = (await client.ReadInputRegistersAsync(0, 1, cancellationToken))[0];
+                return new InverterProbeResult(true, value);
+            }
+        }
     }
 
     /// <summary>A device that answers every read with one value, or refuses the connection when there is none.</summary>
