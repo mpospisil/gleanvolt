@@ -21,4 +21,15 @@ public sealed class DeviceConfig
     /// that requires recovering.</para>
     /// </summary>
     public TimeSpan MinRequestInterval { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>
+    /// How long to wait before connecting again after a connect failed; it doubles with each further
+    /// failure, up to <see cref="MaxReconnectBackoff"/>, and a connect that succeeds starts it over. Zero,
+    /// the default, connects on the next request. Not configurable: it comes from the driver's
+    /// <c>ModbusDefaults</c>, because it is about the family's gateway, not the site (issue #320).
+    /// </summary>
+    public TimeSpan ReconnectBackoff { get; init; } = TimeSpan.Zero;
+
+    /// <summary>The longest <see cref="ReconnectBackoff"/> grows to.</summary>
+    public static TimeSpan MaxReconnectBackoff { get; } = TimeSpan.FromMinutes(2);
 }

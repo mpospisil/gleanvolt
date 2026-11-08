@@ -43,6 +43,11 @@ public sealed class ModbusTcpClient : IModbusClient
     private IModbusMaster? _master;
     private long _lastRequestTicks;
 
+    // Reconnect backoff (issue #320): how many connects in a row have failed, and when the next may be
+    // tried. Unused while DeviceConfig.ReconnectBackoff is zero.
+    private int _failedConnects;
+    private DateTimeOffset _nextConnectAt;
+
     /// <param name="device">Where the device is, and how long to wait between requests to it.</param>
     /// <param name="timeProvider">The clock the request spacing is measured on.</param>
     /// <param name="connectTimeout">How long a connect may take; 5 s by default.</param>
@@ -169,6 +174,34 @@ public sealed class ModbusTcpClient : IModbusClient
     }
 
     private async Task ConnectCoreAsync(CancellationToken cancellationToken)
+    {
+        var backoff = _device.ReconnectBackoff;
+        if (backoff > TimeSpan.Zero && _failedConnects > 0 && _timeProvider.GetUtcNow() < _nextConnectAt)
+        {
+            // Not even a SYN: a gateway that takes few clients and recovers slowly (Huawei's SDongle) is
+            // kept from recovering by a connect on every poll. The poll fails as it would have anyway.
+            var wait = _nextConnectAt - _timeProvider.GetUtcNow();
+            throw new IOException(
+                $"Not reconnecting to Modbus device at {_device.Host}:{_device.Port} for another {wait.TotalSeconds:0} s: "
+                + $"the last {_failedConnects} connect(s) failed.");
+        }
+
+        try
+        {
+            await OpenAsync(cancellationToken).ConfigureAwait(false);
+            _failedConnects = 0;
+        }
+        catch (Exception) when (backoff > TimeSpan.Zero && !cancellationToken.IsCancellationRequested)
+        {
+            _failedConnects++;
+            var doublings = Math.Min(_failedConnects - 1, 16);
+            var delay = TimeSpan.FromTicks(Math.Min(backoff.Ticks << doublings, DeviceConfig.MaxReconnectBackoff.Ticks));
+            _nextConnectAt = _timeProvider.GetUtcNow() + delay;
+            throw;
+        }
+    }
+
+    private async Task OpenAsync(CancellationToken cancellationToken)
     {
         using var timeoutCts = new CancellationTokenSource(_connectTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);

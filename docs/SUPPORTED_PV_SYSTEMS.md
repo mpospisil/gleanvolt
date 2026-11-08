@@ -4,8 +4,8 @@ Which inverters and EV chargers Gleanvolt can drive. It talks **Modbus TCP** to 
 LAN — a SolaX hybrid inverter and a SolaX EV charger — using register maps written for the reference
 installation's **X3-HYB-G4 PRO** and **X1/X3-HAC**.
 
-The inverter's register map is chosen by `Pv:Inverter:Driver` (empty means `solax`, the only driver so
-far), never by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So *supported* here means one thing — **the device answers the same registers, with the
+The inverter's register map is chosen by `Pv:Inverter:Driver` (empty means `solax`; `huawei` is the
+second, see [Huawei](#huawei-sun2000-readings-only-for-now) below), never by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So *supported* here means one thing — **the device answers the same registers, with the
 same meaning, as the reference hardware.**
 
 > **Last reviewed 2026-09-13.** Which SolaX families share those registers comes from the
@@ -144,6 +144,16 @@ models, so a single-phase inverter might refuse the whole block. Untested. A sin
 need those registers — they serve only `UnmeteredGridPhase`, which is a three-phase correction.
 
 ---
+
+### Huawei SUN2000: readings only, for now
+
+`Pv:Inverter:Driver` `huawei` reads a **SUN2000-…KTL-M1** or **-MAP0** three-phase hybrid with a LUNA2000
+battery and a Huawei smart meter, through the SDongle on port 502, unit 1
+([#320](https://github.com/mpospisil/gleanvolt/issues/320)). It is **Expected** and untested on hardware:
+its readings come from Huawei's interface definitions, and the signs of the grid meter and the battery
+are still to be confirmed by a tester. There is no battery hold. Modbus TCP is off on the SDongle by
+default, and enabling it, single-phase models, the EMMA, the hold and discovery follow in
+[#316](https://github.com/mpospisil/gleanvolt/issues/316).
 
 ## EV chargers
 

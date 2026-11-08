@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- The recordings the conformance tests replay (#319), and a SolaX inverter: the other family the probe must refuse. -->
+  <ItemGroup>
+    <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Gleanvolt.Devices.Solax.Tests\Fixtures\solax-night-importing.json" Link="Fixtures\solax-inverter.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gleanvolt.Devices.Huawei\Gleanvolt.Devices.Huawei.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Devices.Testing\Gleanvolt.Devices.Testing.csproj" />
+  </ItemGroup>
+
+</Project>
