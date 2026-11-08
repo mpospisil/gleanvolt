@@ -84,15 +84,15 @@ public static partial class PvSystemRules
 
     // Empty is the ordinary installation. Both spellings are accepted because the one on the inverter's
     // display and in its register names is SolaX's R/S/T, and the one on an electrician's drawing is L1-L3.
-    private static Enums.GridPhase? ResolveUnmeteredGridPhase(PvSystemOptions pv, ConfigurationProblems problems)
+    private static Gleanvolt.Devices.GridPhase? ResolveUnmeteredGridPhase(PvSystemOptions pv, ConfigurationProblems problems)
     {
         var value = pv.Inverter?.UnmeteredGridPhase.Trim() ?? string.Empty;
 
-        Enums.GridPhase? phase = value.ToUpperInvariant() switch
+        Gleanvolt.Devices.GridPhase? phase = value.ToUpperInvariant() switch
         {
-            "L1" or "R" => Enums.GridPhase.L1,
-            "L2" or "S" => Enums.GridPhase.L2,
-            "L3" or "T" => Enums.GridPhase.L3,
+            "L1" or "R" => Gleanvolt.Devices.GridPhase.L1,
+            "L2" or "S" => Gleanvolt.Devices.GridPhase.L2,
+            "L3" or "T" => Gleanvolt.Devices.GridPhase.L3,
             _ => null,
         };
 

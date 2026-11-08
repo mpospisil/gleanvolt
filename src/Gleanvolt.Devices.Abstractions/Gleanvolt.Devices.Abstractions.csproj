@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Gleanvolt.Devices</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Devices.Abstractions</PackageId>
+    <Description>The device driver contract for the Gleanvolt: the Modbus client a driver is handed, the inverter driver and its reading, and the battery hold. No dependencies, deliberately -- it is what a driver for another inverter brand builds against.</Description>
+  </PropertyGroup>
+
+  <!--
+    No references, and that is the point of the project (issue #317). Core references this, not the
+    other way round, so a driver never sees the controller's domain and the contract can later be
+    published on its own for third-party drivers.
+  -->
+
+  <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

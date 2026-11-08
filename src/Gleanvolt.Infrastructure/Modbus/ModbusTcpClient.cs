@@ -1,7 +1,7 @@
 using System.Net.Sockets;
 using NModbus;
-using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Infrastructure.Modbus;
 

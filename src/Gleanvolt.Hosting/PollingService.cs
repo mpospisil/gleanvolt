@@ -9,6 +9,7 @@ using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using static System.FormattableString;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting;
 

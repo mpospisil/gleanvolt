@@ -32,6 +32,8 @@ using Gleanvolt.Web.Auth;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Hosting;
 
@@ -116,7 +118,8 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IPvSystemEditor>(provider => new PvSystemEditor(
             configuration,
             runningPv,
-            provider.GetRequiredService<ILogger<PvSystemEditor>>()));
+            provider.GetRequiredService<ILogger<PvSystemEditor>>(),
+            inverterDriver: InverterDriverFactory(provider)));
 
         // The Home Assistant link and the API, editable on Settings and in the setup wizard. Read once at
         // startup like the installation, so the snapshot is what "running" means.
@@ -266,6 +269,23 @@ public static class GleanvoltHostingExtensions
                 ModbusClientKeys.EvCharger,
                 (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
         }
+
+        // The inverter's driver (issue #317). SolaX is the only family so far; #318 lets the configuration
+        // name another. The driver gets the inverter's client as registered above -- read-only unless the
+        // battery hold may write -- and never opens a socket of its own.
+        services.AddSingleton<IInverterDriverFactory, SolaxInverterDriverFactory>();
+        services.AddSingleton<IInverterDriver>(provider =>
+        {
+            var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
+            return InverterDriverFactory(provider).Create(
+                provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.Inverter),
+                new InverterDriverOptions
+                {
+                    DryRun = batteryHold.DryRun,
+                    HoldCommandDuration = batteryHold.Duration,
+                    HoldRetargetThresholdWatts = batteryHold.TargetChangeThresholdWatts,
+                });
+        });
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 
@@ -622,16 +642,11 @@ public static class GleanvoltHostingExtensions
             initialHold: false,
             provider.GetRequiredService<ILogger<BatteryHoldSelector>>()));
 
+        // The driver's own hold. A family without one gets a hold that never writes; the hold is off by
+        // default and the controller only asks for it when somebody turns it on.
         services.AddSingleton<IBatteryDischargeControl>(provider =>
-        {
-            var options = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
-            return new BatteryDischargeControl(
-                provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.Inverter),
-                provider.GetRequiredService<ILogger<BatteryDischargeControl>>(),
-                dryRun: options.DryRun,
-                duration: options.Duration,
-                targetChangeThresholdWatts: options.TargetChangeThresholdWatts);
-        });
+            provider.GetRequiredService<IInverterDriver>().BatteryHold
+            ?? new NoBatteryHold(provider.GetRequiredService<ILogger<NoBatteryHold>>()));
 
         services.AddHostedService<PollingService>();
 
@@ -1296,6 +1311,11 @@ public static class GleanvoltHostingExtensions
 
     private static ApiOptions ReadApiOptions(IConfiguration configuration) =>
         configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>() ?? new ApiOptions();
+
+    // The inverter family's driver factory. SolaX until the configuration can name another (#318).
+    private static IInverterDriverFactory InverterDriverFactory(IServiceProvider provider) =>
+        provider.GetServices<IInverterDriverFactory>()
+            .Single(candidate => candidate.Id == SolaxInverterDriverFactory.DriverId);
 
     // Enforces the dry-run guarantee structurally: when a device may not be written to, its client
     // physically cannot write, so even a caller that forgot its own guard can never reach the hardware.

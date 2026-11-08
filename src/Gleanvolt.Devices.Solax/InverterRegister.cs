@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices.Solax;
 
 // Offsets within the Input Register block (Modbus function code 0x04) of the SolaX
 // X1/X3 Hybrid G4 inverter. Verified against "Energy Storage Inverter Modbus TCP&RTU

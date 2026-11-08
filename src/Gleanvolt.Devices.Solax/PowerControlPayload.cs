@@ -1,6 +1,4 @@
-using Gleanvolt.Core.Enums;
-
-namespace Gleanvolt.Infrastructure.RegisterMaps;
+namespace Gleanvolt.Devices.Solax;
 
 /// <summary>
 /// Encodes the SolaX "Modbus Power Control" command — the 13-register block written in one

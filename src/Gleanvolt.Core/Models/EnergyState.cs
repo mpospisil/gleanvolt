@@ -11,11 +11,10 @@ public sealed record EnergyState(
     EvChargerStatus EvChargerStatus,
     double EvChargerPowerWatts,
     // The charger's work/use mode (Fast/ECO/Green/Stop), or null when it couldn't be read (the
-    // holding register isn't available on every charger/firmware). Doesn't come from the inverter
-    // telemetry block, so it's attached after FromRawRegisters rather than being a raw parameter.
+    // holding register isn't available on every charger/firmware).
     EvChargerMode? ChargeMode = null,
     // The charger's active current setpoint in amps, or null when it couldn't be read. Same story as
-    // ChargeMode: a control holding register, attached after FromRawRegisters.
+    // ChargeMode: a control holding register.
     int? ChargeCurrentAmps = null,
     // What the grid meter itself read, set only while GridPowerWatts has been replaced by an estimate
     // because the meter is blind on a phase (PvSystemInfo.UnmeteredGridPhase). Null means GridPowerWatts
@@ -74,33 +73,4 @@ public sealed record EnergyState(
     /// production is a meter disagreeing with itself rather than sun to charge from.
     /// </summary>
     public double SolarSurplusPowerWatts => SolarPowerWatts - OtherLoadsPowerWatts;
-
-    // Per the SolaX Gen4 protocol: the battery power register is signed 16-bit with positive =
-    // charging (negative = discharging). FeedinPower is the signed 32-bit grid METER reading (low
-    // word first) using SolaX's convention where positive = EXPORT; we negate it so this model's
-    // convention is positive Grid = importing. Powerdc1/2 (solar) and EV charge power are unsigned
-    // (the HAC charger doesn't support V2G); SOC is an unsigned 0-100 percentage. Total solar power
-    // is the sum of both MPPT trackers (matches the "Solar" figure in the SolaX Cloud app).
-    public static EnergyState FromRawRegisters(
-        DateTimeOffset timestamp,
-        ushort batterySocRaw,
-        ushort batteryPowerRaw,
-        ushort pvPowerDc1Raw,
-        ushort pvPowerDc2Raw,
-        ushort feedinPowerLowRaw,
-        ushort feedinPowerHighRaw,
-        ushort evChargerStatusRaw,
-        ushort evChargerPowerRaw)
-    {
-        var feedinPowerWatts = unchecked((int)(((uint)feedinPowerHighRaw << 16) | feedinPowerLowRaw));
-
-        return new EnergyState(
-            timestamp,
-            batterySocRaw,
-            unchecked((short)batteryPowerRaw),
-            pvPowerDc1Raw + pvPowerDc2Raw,
-            -feedinPowerWatts, // meter reports positive = export; this model uses positive = import
-            EvChargerStatusMapping.FromRaw(evChargerStatusRaw),
-            evChargerPowerRaw);
-    }
 }

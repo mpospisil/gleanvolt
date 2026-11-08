@@ -1,6 +1,4 @@
-using Gleanvolt.Core.Models;
-
-namespace Gleanvolt.Core.Interfaces;
+namespace Gleanvolt.Devices;
 
 /// <summary>
 /// Holds the home battery out of discharge by issuing the inverter's Modbus Power Control command
@@ -21,7 +19,7 @@ public interface IBatteryDischargeControl
     /// </summary>
     /// <param name="hold">Whether the hold should be active.</param>
     /// <param name="activePowerTargetWatts">
-    /// The target from <see cref="Strategies.BatteryDischargeHoldStrategy"/>. Ignored when
+    /// The target from controller's hold strategy (<c>BatteryDischargeHoldStrategy</c>). Ignored when
     /// <paramref name="hold"/> is false.
     /// </param>
     /// <param name="now">

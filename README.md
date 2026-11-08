@@ -91,15 +91,18 @@ The solution is organized to keep domain/control logic testable and free of hard
 ```
 Gleanvolt.slnx
 ├── src/
-│   ├── Gleanvolt.Core/                 # Domain logic and hardware abstractions
+│   ├── Gleanvolt.Devices.Abstractions/ # The driver contract: IModbusClient, IInverterDriver, the battery hold
+│   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
+│   │
+│   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
-│   │   ├── Enums/                  # Register addresses, charger modes, inverter control values
+│   │   ├── Enums/                  # Charger registers and modes, control states
 │   │   ├── Strategies/             # Pure decision logic (charging controller, discharge hold, smoothing)
-│   │   └── Interfaces/             # IModbusClient, IChargingController, IBatteryDischargeControl, ...
+│   │   └── Interfaces/             # IChargingController, IEnergyStateReader, ...
 │   │
 │   ├── Gleanvolt.Infrastructure/       # External communication
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
-│   │   ├── RegisterMaps/           # Hex address mappings for SolaX Gen4 and EV Charger
+│   │   ├── RegisterMaps/           # Hex address mappings for the SolaX EV charger
 │   │   ├── Monitoring/             # SQLite energy-interval store (the analytics tables)
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   ├── Solcast/                # Solar-forecast HTTP client

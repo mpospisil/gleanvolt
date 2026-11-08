@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Devices.Solax\Gleanvolt.Devices.Solax.csproj" />
   </ItemGroup>
 
   <ItemGroup>

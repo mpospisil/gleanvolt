@@ -1,4 +1,4 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices.Solax;
 
 // Holding Registers (Modbus function codes 0x03/0x10) of the SolaX X1/X3 Hybrid G4/G5 inverter.
 // A DIFFERENT address space from InverterRegister, which is Input Registers (0x04) -- the same

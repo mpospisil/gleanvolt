@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Discovery.Tests;
 

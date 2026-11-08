@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
-using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Infrastructure.RegisterMaps;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Infrastructure.Tests;
 
@@ -13,7 +14,7 @@ namespace Gleanvolt.Infrastructure.Tests;
 public class EnergyStateReaderTests
 {
     private static EnergyStateReader Reader(IModbusClient inverter, IModbusClient evCharger) =>
-        new(inverter, evCharger, NullLogger<EnergyStateReader>.Instance);
+        new(new SolaxInverterDriver(inverter), evCharger, NullLogger<EnergyStateReader>.Instance);
 
     [Fact]
     public async Task Reports_inverter_telemetry_when_the_charger_cannot_be_connected()
@@ -79,6 +80,29 @@ public class EnergyStateReaderTests
 
         Assert.Equal(EvChargerStatus.Charging, afterRecovery.EvChargerStatus);
         Assert.Equal(7000, afterRecovery.EvChargerPowerWatts);
+    }
+
+    // The charger's two raw readings, now that EnergyStateReader (not EnergyState) decodes them.
+    [Fact]
+    public async Task Maps_the_charger_run_mode_to_its_status()
+    {
+        var evCharger = new FakeModbusClient();
+        evCharger.SetHolding(EvChargerRegisterMap.RunMode.Address, 2);
+
+        var state = await Reader(new FakeModbusClient(), evCharger).ReadAsync();
+
+        Assert.Equal(EvChargerStatus.Charging, state.EvChargerStatus);
+    }
+
+    [Fact]
+    public async Task Reads_the_charger_power_as_unsigned()
+    {
+        var evCharger = new FakeModbusClient();
+        evCharger.SetHolding(EvChargerRegisterMap.ChargePowerTotal.Address, 7000);
+
+        var state = await Reader(new FakeModbusClient(), evCharger).ReadAsync();
+
+        Assert.Equal(7000, state.EvChargerPowerWatts);
     }
 
     /// <summary>Nothing at the address at all: every operation fails, the connect included.</summary>

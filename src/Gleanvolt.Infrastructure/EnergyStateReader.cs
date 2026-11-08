@@ -4,10 +4,16 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
 using Gleanvolt.Infrastructure.RegisterMaps;
 
 namespace Gleanvolt.Infrastructure;
 
+/// <summary>
+/// One telemetry poll, composed (issue #317): the inverter through its driver, the charger as before and
+/// best-effort, the correction for a grid meter blind on one phase, and the <see cref="EnergyState"/> the
+/// rest of the controller reads. Nothing here knows the inverter's brand.
+/// </summary>
 public sealed class EnergyStateReader : IEnergyStateReader
 {
     // A RunMode value outside the register's real 0-13 range, which EvChargerStatusMapping turns into
@@ -16,7 +22,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
     // field on EnergyState, and therefore no new entity anywhere downstream.
     private const ushort UnreachableStatusRaw = ushort.MaxValue;
 
-    private readonly IModbusClient _inverterClient;
+    private readonly IInverterDriver _inverter;
     private readonly IModbusClient _evChargerClient;
     private readonly ILogger<EnergyStateReader> _logger;
 
@@ -30,59 +36,59 @@ public sealed class EnergyStateReader : IEnergyStateReader
     // rather than one per poll; this service is a singleton, so it survives between polls.
     private bool _evChargerReachable = true;
 
+    /// <param name="inverter">The inverter's driver.</param>
     /// <param name="site">The installation, for its unmetered grid phase. Null reads the meter as it is.</param>
     /// <param name="limits">The car's phase count, for how its load divides between phases. Null assumes three.</param>
     public EnergyStateReader(
-        [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverterClient,
+        IInverterDriver inverter,
         [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient evChargerClient,
         ILogger<EnergyStateReader> logger,
         PvSystemInfo? site = null,
         ChargingLimits? limits = null)
     {
-        _inverterClient = inverterClient;
+        _inverter = inverter;
         _evChargerClient = evChargerClient;
         _logger = logger;
         _unmeteredGridPhase = site?.UnmeteredGridPhase;
         _evPhases = limits?.Phases ?? 3;
+
+        // The correction needs the inverter's output per phase. Only SolaX exists today and it reports
+        // one, so this cannot fire yet; once the driver is chosen in configuration (#318), the rules
+        // refuse the combination before it gets here.
+        if (_unmeteredGridPhase is { } blind && !inverter.Capabilities.HasPhaseOutput)
+        {
+            _logger.LogWarning(
+                "The grid meter is configured as blind on {Phase}, but this inverter does not report its output per phase, so the meter is read as it is.",
+                blind);
+        }
     }
 
     public async Task<EnergyState> ReadAsync(CancellationToken cancellationToken = default)
     {
-        if (!_inverterClient.IsConnected)
-        {
-            await _inverterClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        var inverterBlock = await ReadInverterTelemetryBlockAsync(cancellationToken).ConfigureAwait(false);
-        LogGridRegisterCandidates(inverterBlock);
-
+        var inverter = await _inverter.ReadAsync(cancellationToken).ConfigureAwait(false);
         var evCharger = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
 
-        var state = EnergyState.FromRawRegisters(
+        // Unsigned: the HAC charger doesn't support V2G.
+        var state = new EnergyState(
             DateTimeOffset.UtcNow,
-            batterySocRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryCapacity),
-            batteryPowerRaw: FromBlock(inverterBlock, InverterRegisterMap.BatteryPowerCharge1),
-            pvPowerDc1Raw: FromBlock(inverterBlock, InverterRegisterMap.Powerdc1),
-            pvPowerDc2Raw: FromBlock(inverterBlock, InverterRegisterMap.Powerdc2),
-            feedinPowerLowRaw: FromBlock(inverterBlock, InverterRegisterMap.FeedinPowerLow),
-            feedinPowerHighRaw: FromBlock(inverterBlock, InverterRegisterMap.FeedinPowerHigh),
-            evChargerStatusRaw: evCharger.StatusRaw,
-            evChargerPowerRaw: evCharger.PowerRaw)
-            with
-        { ChargeMode = evCharger.Mode, ChargeCurrentAmps = evCharger.CurrentAmps };
+            inverter.BatterySocPercent,
+            inverter.BatteryWatts,
+            inverter.PvWatts,
+            inverter.GridWatts,
+            EvChargerStatusMapping.FromRaw(evCharger.StatusRaw),
+            evCharger.PowerRaw)
+        {
+            ChargeMode = evCharger.Mode,
+            ChargeCurrentAmps = evCharger.CurrentAmps,
+        };
 
-        return _unmeteredGridPhase is { } blind ? WithUnmeteredPhaseEstimated(state, inverterBlock, blind) : state;
+        return _unmeteredGridPhase is { } blind && inverter.InverterOutputPerPhase is { } inverterOutput
+            ? WithUnmeteredPhaseEstimated(state, inverterOutput, blind)
+            : state;
     }
 
-    // The inverter's per-phase output is already in the telemetry block (it is what the grid diagnostic
-    // below logs), so the correction costs no extra Modbus read.
-    private EnergyState WithUnmeteredPhaseEstimated(EnergyState state, ushort[] block, GridPhase blind)
+    private EnergyState WithUnmeteredPhaseEstimated(EnergyState state, PhaseWatts inverterOutput, GridPhase blind)
     {
-        var inverterOutput = new PhaseWatts(
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerR)),
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerS)),
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerT)));
-
         var estimate = UnmeteredGridPhaseEstimate.GridPowerWatts(
             state.GridPowerWatts, blind, inverterOutput, state.EvChargerPowerWatts, _evPhases);
 
@@ -176,55 +182,6 @@ public sealed class EnergyStateReader : IEnergyStateReader
             return null;
         }
     }
-
-    // Reads the whole telemetry range in one Modbus request (the SolaX protocol requires
-    // >=1 second between separate instructions, so batching beats many small reads).
-    private async Task<ushort[]> ReadInverterTelemetryBlockAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await _inverterClient
-                .ReadInputRegistersAsync(
-                    InverterRegisterMap.TelemetryBlockStart,
-                    InverterRegisterMap.TelemetryBlockCount,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException(
-                $"Failed to read inverter telemetry block starting at address {InverterRegisterMap.TelemetryBlockStart}.", ex);
-        }
-    }
-
-    // Diagnostic: dumps every register that could plausibly be "the grid" so we can compare each one
-    // against the live figures in the SolaX Cloud app and confirm which reading is real. FeedinPower
-    // (0x46/0x47) is the grid METER we use for surplus; GridPowerR/S/T (0x6C/70/74) are the inverter's
-    // AC output per phase (not the meter). All come from the one telemetry block, so this costs no
-    // extra Modbus reads. Logs at Debug -- enable with Logging:LogLevel:Gleanvolt.Infrastructure=Debug.
-    private void LogGridRegisterCandidates(ushort[] block)
-    {
-        if (!_logger.IsEnabled(LogLevel.Debug))
-        {
-            return;
-        }
-
-        var feedinLow = FromBlock(block, InverterRegisterMap.FeedinPowerLow);
-        var feedinHigh = FromBlock(block, InverterRegisterMap.FeedinPowerHigh);
-        var feedinWatts = unchecked((int)(((uint)feedinHigh << 16) | feedinLow));
-
-        _logger.LogDebug(
-            "Grid registers: FeedinPower(0x46/47)={FeedinWatts}W (raw low={FeedinLow} high={FeedinHigh}, +=export) | "
-            + "inverter AC output GridPowerR(0x6C)={GridR}W S(0x70)={GridS}W T(0x74)={GridT}W",
-            feedinWatts,
-            feedinLow,
-            feedinHigh,
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerR)),
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerS)),
-            unchecked((short)FromBlock(block, InverterRegisterMap.GridPowerT)));
-    }
-
-    private static ushort FromBlock(ushort[] block, RegisterDescriptor register) => block[register.Address];
 
     private static async Task<ushort> ReadAsync(
         IModbusClient client,

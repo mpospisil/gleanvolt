@@ -5,100 +5,6 @@ namespace Gleanvolt.Core.Tests.Models;
 
 public class EnergyStateTests
 {
-    [Fact]
-    public void FromRawRegisters_MapsUnsignedBatterySoc()
-    {
-        var timestamp = DateTimeOffset.UtcNow;
-
-        var state = EnergyState.FromRawRegisters(
-            timestamp,
-            batterySocRaw: 42,
-            batteryPowerRaw: 0,
-            pvPowerDc1Raw: 0,
-            pvPowerDc2Raw: 0,
-            feedinPowerLowRaw: 0,
-            feedinPowerHighRaw: 0,
-            evChargerStatusRaw: 0,
-            evChargerPowerRaw: 0);
-
-        Assert.Equal(42, state.BatterySocPercent);
-        Assert.Equal(timestamp, state.Timestamp);
-    }
-
-    [Theory]
-    [InlineData((ushort)1500, 1500)] // charging
-    [InlineData(unchecked((ushort)(short)-1500), -1500)] // discharging
-    public void FromRawRegisters_MapsSignedBatteryPower_PositiveIsCharging(ushort raw, double expectedWatts)
-    {
-        var state = EnergyState.FromRawRegisters(
-            DateTimeOffset.UtcNow,
-            batterySocRaw: 0,
-            batteryPowerRaw: raw,
-            pvPowerDc1Raw: 0,
-            pvPowerDc2Raw: 0,
-            feedinPowerLowRaw: 0,
-            feedinPowerHighRaw: 0,
-            evChargerStatusRaw: 0,
-            evChargerPowerRaw: 0);
-
-        Assert.Equal(expectedWatts, state.BatteryPowerWatts);
-    }
-
-    [Theory]
-    // FeedinPower is the grid METER (int32, low word first): positive = export. This model negates
-    // it so positive = import.
-    [InlineData((ushort)1500, (ushort)0, -1500)]                        // exporting 1500W
-    [InlineData(unchecked((ushort)(short)-1500), (ushort)0xFFFF, 1500)] // importing 1500W
-    public void FromRawRegisters_DecodesFeedinPowerMeter_PositiveIsImporting(ushort low, ushort high, double expectedWatts)
-    {
-        var state = EnergyState.FromRawRegisters(
-            DateTimeOffset.UtcNow,
-            batterySocRaw: 0,
-            batteryPowerRaw: 0,
-            pvPowerDc1Raw: 0,
-            pvPowerDc2Raw: 0,
-            feedinPowerLowRaw: low,
-            feedinPowerHighRaw: high,
-            evChargerStatusRaw: 0,
-            evChargerPowerRaw: 0);
-
-        Assert.Equal(expectedWatts, state.GridPowerWatts);
-    }
-
-    [Fact]
-    public void FromRawRegisters_MapsUnsignedEvChargerPower()
-    {
-        var state = EnergyState.FromRawRegisters(
-            DateTimeOffset.UtcNow,
-            batterySocRaw: 0,
-            batteryPowerRaw: 0,
-            pvPowerDc1Raw: 0,
-            pvPowerDc2Raw: 0,
-            feedinPowerLowRaw: 0,
-            feedinPowerHighRaw: 0,
-            evChargerStatusRaw: 0,
-            evChargerPowerRaw: 7000);
-
-        Assert.Equal(7000, state.EvChargerPowerWatts);
-    }
-
-    [Fact]
-    public void FromRawRegisters_SumsSolarPowerAcrossBothMpptTrackers()
-    {
-        var state = EnergyState.FromRawRegisters(
-            DateTimeOffset.UtcNow,
-            batterySocRaw: 0,
-            batteryPowerRaw: 0,
-            pvPowerDc1Raw: 300,
-            pvPowerDc2Raw: 450,
-            feedinPowerLowRaw: 0,
-            feedinPowerHighRaw: 0,
-            evChargerStatusRaw: 0,
-            evChargerPowerRaw: 0);
-
-        Assert.Equal(750, state.SolarPowerWatts);
-    }
-
     // Grid uses the import-positive convention (negative = exporting).
     private static EnergyState StateWith(double solar, double grid, double battery, double ev) =>
         new(
@@ -206,22 +112,5 @@ public class EnergyStateTests
             EvChargerPowerWatts: 0);
 
         Assert.Equal(251, state.OtherLoadsPowerWatts);
-    }
-
-    [Fact]
-    public void FromRawRegisters_MapsEvChargerStatus()
-    {
-        var state = EnergyState.FromRawRegisters(
-            DateTimeOffset.UtcNow,
-            batterySocRaw: 0,
-            batteryPowerRaw: 0,
-            pvPowerDc1Raw: 0,
-            pvPowerDc2Raw: 0,
-            feedinPowerLowRaw: 0,
-            feedinPowerHighRaw: 0,
-            evChargerStatusRaw: 2,
-            evChargerPowerRaw: 0);
-
-        Assert.Equal(EvChargerStatus.Charging, state.EvChargerStatus);
     }
 }
