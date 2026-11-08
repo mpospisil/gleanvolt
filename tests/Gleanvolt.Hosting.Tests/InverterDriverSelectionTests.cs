@@ -63,6 +63,17 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
+    public void Huawei_refuses_the_correction_for_a_meter_blind_on_one_phase()
+    {
+        // The SUN2000 driver reports no output per phase, single- or three-phase (#320, #321).
+        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration(
+            [.. UsableSite.Settings, ("Pv:Inverter:Driver", "huawei"), ("Pv:Inverter:UnmeteredGridPhase", "L3")])));
+
+        Assert.NotNull(error);
+        Assert.Contains("UnmeteredGridPhase cannot be used with the Huawei driver", error.Message);
+    }
+
+    [Fact]
     public async Task The_container_runs_the_configured_driver()
     {
         var builder = WebApplication.CreateSlimBuilder();

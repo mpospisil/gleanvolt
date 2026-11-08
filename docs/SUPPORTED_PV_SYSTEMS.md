@@ -147,12 +147,15 @@ need those registers — they serve only `UnmeteredGridPhase`, which is a three-
 
 ### Huawei SUN2000: readings only, for now
 
-`Pv:Inverter:Driver` `huawei` reads a **SUN2000-…KTL-M1** or **-MAP0** three-phase hybrid with a LUNA2000
-battery and a Huawei smart meter, through the SDongle on port 502, unit 1
-([#320](https://github.com/mpospisil/gleanvolt/issues/320)). It is **Expected** and untested on hardware:
+`Pv:Inverter:Driver` `huawei` reads a SUN2000 hybrid with a LUNA2000 battery and a Huawei smart meter,
+through the SDongle on port 502, unit 1: the three-phase **-KTL-M1** and **-MAP0** with a DTSU666-H meter
+([#320](https://github.com/mpospisil/gleanvolt/issues/320)), and the single-phase **-KTL-L1** and **-LC0**
+with a DDSU666-H meter ([#321](https://github.com/mpospisil/gleanvolt/issues/321)). Both kinds keep the
+same registers, so one driver reads them. Neither reports output per phase, so `UnmeteredGridPhase` is
+not available. It is **Expected** and untested on hardware:
 its readings come from Huawei's interface definitions, and the signs of the grid meter and the battery
 are still to be confirmed by a tester. There is no battery hold. Modbus TCP is off on the SDongle by
-default, and enabling it, single-phase models, the EMMA, the hold and discovery follow in
+default, and enabling it, the EMMA, the hold and discovery follow in
 [#316](https://github.com/mpospisil/gleanvolt/issues/316).
 
 ## EV chargers
