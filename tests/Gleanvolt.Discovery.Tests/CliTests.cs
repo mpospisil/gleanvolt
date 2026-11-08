@@ -123,6 +123,26 @@ public class CliTests
     }
 
     [Fact]
+    public void A_huawei_behind_an_emma_brings_its_driver_and_topology_into_the_configuration()
+    {
+        var lines = DiscoveryConfiguration.EnvironmentLines(
+        [
+            new DiscoveredDevice("192.168.2.20", 502, 1, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Inverter,
+                "SUN2000-10K-MAP0", "SUN2000 hybrid", null, SupportTier.Expected, true, "note", Driver: "huawei", Topology: "emma"),
+        ]);
+
+        Assert.Equal(
+        [
+            "Pv__Inverter__Driver=huawei",
+            "Pv__Inverter__Topology=emma",
+            "Pv__Inverter__Model=Huawei SUN2000-10K-MAP0",
+            "Pv__Inverter__Host=192.168.2.20",
+            "Pv__Inverter__Port=502",
+            "Pv__Inverter__UnitId=1",
+        ], lines);
+    }
+
+    [Fact]
     public void A_device_Gleanvolt_cannot_drive_is_not_offered_as_configuration()
     {
         var lines = DiscoveryConfiguration.EnvironmentLines(

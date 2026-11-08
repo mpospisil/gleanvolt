@@ -3,7 +3,7 @@
 [![CI](https://github.com/mpospisil/gleanvolt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mpospisil/gleanvolt/actions/workflows/ci.yml?query=branch%3Amain)
 [![Publish image](https://github.com/mpospisil/gleanvolt/actions/workflows/publish-image.yml/badge.svg?branch=main)](https://github.com/mpospisil/gleanvolt/actions/workflows/publish-image.yml?query=branch%3Amain)
 
-A standalone, locally hosted background service for managing and monitoring a **SolaX X3-HYB-G4 PRO** hybrid inverter and a **SolaX X1/X3-HAC** EV charger.
+A standalone, locally hosted background service for managing and monitoring a hybrid inverter (**SolaX**, the reference **X3-HYB-G4 PRO**, or a **Huawei SUN2000**) and a **SolaX X1/X3-HAC** EV charger.
 
 The controller operates entirely within the local LAN via **Modbus TCP**, bypassing cloud dependencies to ensure continuous operation, instantaneous polling, and strict local data ownership. It polls real-time data (PV generation, battery SOC, grid power flow) and applies automated decision-making logic to optimize EV charging and battery utilization based on household energy surpluses.
 
@@ -88,8 +88,10 @@ that affects it goes through the inverter's power-control block. Its **usable** 
 site-specific number the forecast-driven mode cannot work without — see
 [`BatteryCapacityKWh`](#forecast-driven-charging-the-forecasted-mode).
 
-Other SolaX inverters and chargers that answer the same registers are listed, with what has and has not
-been tested, in [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md).
+Other SolaX inverters and chargers that answer the same registers, and **Huawei SUN2000** hybrids (M1,
+MAP0, L1, LC0, through the SDongle or behind an EMMA), are listed with what has and has not been tested
+in [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md). A Huawei needs Modbus TCP enabled with the
+installer account first: see [Setting up a Huawei SUN2000](docs/HUAWEI_SETUP.md).
 
 ## Tech stack
 
@@ -108,6 +110,7 @@ Gleanvolt.slnx
 ├── src/
 │   ├── Gleanvolt.Devices.Abstractions/ # The driver contract: IModbusClient, IInverterDriver, the battery hold
 │   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
+│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold
 │   │
 │   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
@@ -144,7 +147,7 @@ Gleanvolt.slnx
 │   │   ├── Sessions/               # Charging-session recording worker
 │   │   └── Vehicles/               # EV telemetry MQTT subscriber
 │   │
-│   ├── Gleanvolt.Discovery/            # The LAN scan: finds the SolaX devices and their Modbus address
+│   ├── Gleanvolt.Discovery/            # The LAN scan: finds the SolaX and Huawei devices and their Modbus address
 │   ├── Gleanvolt.Discovery.Cli/        # gleanvolt-discover, a thin console over Discovery's DiscoverCommand
 │   │
 │   └── Gleanvolt.Worker/               # The executable host, and nothing else
@@ -160,7 +163,8 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
 │   ├── Gleanvolt.Devices.Testing/      # The driver test kit: replay client and conformance tests
 │   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
-│   └── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
+│   ├── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
+│   └── Gleanvolt.Devices.Huawei.Tests/ # The Huawei driver against the same tests, on synthetic recordings
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
@@ -239,8 +243,8 @@ The setup wizard's **Search** finds them, and so does `gleanvolt discover` on an
 Pi on the same network, with no Gleanvolt installed, and it only ever reads: every connection goes
 through `ReadOnlyModbusClient`.
 
-**Stop Gleanvolt first** (and Home Assistant's SolaX integration, if you run it). A SolaX device accepts
-very few Modbus TCP connections, so while something else holds one the scan finds the port open and gets
+**Stop Gleanvolt first** (and Home Assistant's SolaX or `huawei_solar` integration, if you run it). A
+SolaX device accepts very few Modbus TCP connections, and a Huawei EMMA only one, so while something else holds one the scan finds the port open and gets
 no reply, and says so: *port open, no Modbus reply. Is Gleanvolt or Home Assistant connected to it right
 now?*
 
@@ -256,7 +260,8 @@ dotnet publish src/Gleanvolt.Discovery.Cli -c Release -r linux-x64 --self-contai
 
 It tries ports 502 (Modbus TCP), 8899 (the usual RS485 bridge) and 80 (where it recognises a SolaX
 dongle's web page, which is not Modbus), unit ids `1,0,2,3,4,5,247`, and names each box from its serial
-number, with the support tier from [SUPPORTED_PV_SYSTEMS.md](docs/SUPPORTED_PV_SYSTEMS.md). Under the
+number (SolaX) or its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of it), with the
+support tier from [SUPPORTED_PV_SYSTEMS.md](docs/SUPPORTED_PV_SYSTEMS.md). Under the
 table it prints the configuration that would use what it found, ready to paste into `.env` or to enter on
 `/pv-system`:
 

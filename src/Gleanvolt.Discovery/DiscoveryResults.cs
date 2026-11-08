@@ -25,6 +25,12 @@ public enum DiscoveryFinding
 
     /// <summary>A SolaX Wi-Fi or LAN dongle's web page. Not Modbus.</summary>
     SolaxDongle,
+
+    /// <summary>
+    /// Answered Modbus with a Huawei model name (issue #324): a SUN2000 inverter, through its SDongle or
+    /// behind an EMMA, or an EMMA itself.
+    /// </summary>
+    HuaweiDevice,
 }
 
 /// <summary>
@@ -48,7 +54,7 @@ public enum SupportTier
     /// <summary>A serial number in SolaX's shape that Gleanvolt's table does not know.</summary>
     UnknownSolax,
 
-    /// <summary>Answers Modbus, but nothing about it says SolaX.</summary>
+    /// <summary>Answers Modbus, but nothing about it says SolaX or Huawei.</summary>
     NotSolax,
 }
 
@@ -76,6 +82,14 @@ public sealed record SolaxModel(PvDeviceRole Role, string Model, string Family, 
 /// with the serial number; null when it was not run.
 /// </param>
 /// <param name="Note">One sentence for a human: what was read, or what to do next.</param>
+/// <param name="Driver">
+/// The inverter driver that speaks to it (<c>Pv:Inverter:Driver</c>), when the scan identified a family
+/// Gleanvolt has a driver for; null otherwise.
+/// </param>
+/// <param name="Topology">
+/// How that driver reaches it (<c>Pv:Inverter:Topology</c>): <c>emma</c> for a Huawei inverter found
+/// behind an EMMA; null for the driver's default.
+/// </param>
 public sealed record DiscoveredDevice(
     string Host,
     int Port,
@@ -87,7 +101,13 @@ public sealed record DiscoveredDevice(
     string? SerialNumber,
     SupportTier? Tier,
     bool? RoleConfirmed,
-    string Note);
+    string Note,
+    string? Driver = null,
+    string? Topology = null)
+{
+    /// <summary>Whether the scan said what the device is: a SolaX serial number or a Huawei model name.</summary>
+    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice;
+}
 
 /// <summary>Everything one scan found, and what it was told to scan.</summary>
 /// <param name="Networks">The subnets (or single hosts) scanned, as text.</param>

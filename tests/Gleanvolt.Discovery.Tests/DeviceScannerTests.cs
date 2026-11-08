@@ -48,6 +48,72 @@ public class DeviceScannerTests
     }
 
     [Fact]
+    public async Task A_huawei_inverter_is_named_from_its_model_name_and_brings_its_driver()
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[1] = FakeUnit.Huawei("SUN2000-10KTL-M1", socTenths: 545);
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
+
+        Assert.Equal(DiscoveryFinding.HuaweiDevice, device.Finding);
+        Assert.Equal(PvDeviceRole.Inverter, device.Role);
+        Assert.Equal("SUN2000-10KTL-M1", device.Model);
+        Assert.Equal(SupportTier.Expected, device.Tier);
+        Assert.Equal("huawei", device.Driver);
+        Assert.Null(device.Topology);
+        Assert.True(device.RoleConfirmed);
+        Assert.Contains("54.5 %", device.Note);
+        Assert.Equal("HV21XXXXXXXX", device.SerialNumber);
+    }
+
+    [Fact]
+    public async Task A_huawei_inverter_behind_an_emma_is_found_with_the_emma_topology_on_one_connection()
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[1] = FakeUnit.Huawei("SUN2000-8K-MAP0");
+        server.Units[0] = FakeUnit.Emma();
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
+
+        Assert.Equal("emma", device.Topology);
+        Assert.Contains("EMMA", device.Note);
+
+        // The EMMA resets a second client: unit 0 is asked on the connection the inverter's reads are on, not
+        // on one opened beside it. (Earlier reads the device refused each closed theirs; that is sequential.)
+        var requests = server.Requests.ToList();
+        var emma = requests.FindIndex(request => request.UnitId == 0);
+        Assert.True(emma > 0);
+        Assert.Equal(requests[emma - 1].Connection, requests[emma].Connection);
+        Assert.Equal((byte)1, requests[emma - 1].UnitId);
+    }
+
+    [Fact]
+    public async Task An_emma_answering_for_itself_is_named_and_pointed_at_the_inverter_behind_it()
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[0] = FakeUnit.Emma("EMMA-A02");
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port, 0))).Devices);
+
+        Assert.Equal(DiscoveryFinding.HuaweiDevice, device.Finding);
+        Assert.Equal("EMMA-A02", device.Model);
+        Assert.Null(device.Role);
+        Assert.Null(device.Driver);
+        Assert.Contains("inverter behind it", device.Note);
+    }
+
+    [Fact]
+    public async Task A_huawei_model_that_is_not_a_sun2000_or_emma_is_not_identified()
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[1] = new FakeUnit().WithText(30000, "SCharger-7KS-S0", 15);
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
+
+        Assert.Equal(DiscoveryFinding.NotSolax, device.Finding);
+    }
+
+    [Fact]
     public async Task A_charger_is_found_by_its_own_serial_registers()
     {
         await using var server = new FakeModbusServer();

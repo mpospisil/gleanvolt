@@ -1,12 +1,14 @@
 # Supported PV systems
 
 Which inverters and EV chargers Gleanvolt can drive. It talks **Modbus TCP** to two devices on your
-LAN — a SolaX hybrid inverter and a SolaX EV charger — using register maps written for the reference
-installation's **X3-HYB-G4 PRO** and **X1/X3-HAC**.
+LAN: a hybrid inverter, **SolaX** or **Huawei SUN2000**, and a SolaX EV charger. The SolaX register maps
+were written for the reference installation's **X3-HYB-G4 PRO** and **X1/X3-HAC**. The Huawei one comes
+from Huawei's interface definitions.
 
-The inverter's register map is chosen by `Pv:Inverter:Driver` (empty means `solax`; `huawei` is the
-second, see [Huawei](#huawei-sun2000-readings-only-for-now) below), never by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So *supported* here means one thing — **the device answers the same registers, with the
-same meaning, as the reference hardware.**
+The inverter's register map is chosen by its driver, `Pv:Inverter:Driver`: `solax` (the default, when it
+is empty) or `huawei`. It is never chosen by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are
+documentation. So *supported* here means one thing: **the device answers the registers its driver reads,
+with the meaning the driver expects.**
 
 > **Last reviewed 2026-09-13.** Which SolaX families share those registers comes from the
 > [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus)
@@ -32,15 +34,34 @@ the other, and a test fails when the code names a device by a prefix this page d
 
 ## What Gleanvolt needs from the hardware
 
-| Device | Registers | Used for |
+### SolaX inverter (`solax`)
+
+| Access | Registers | Used for |
 |---|---|---|
-| Inverter — read, one block `0x00`–`0x74` (input registers) | `0x0A`, `0x0B` — PV power, strings 1 and 2 | Solar, house load |
+| Read, one block `0x00`–`0x74` (input registers) | `0x0A`, `0x0B` — PV power, strings 1 and 2 | Solar, house load |
 | | `0x16` battery power, `0x1C` battery SOC | The home battery |
 | | `0x46`/`0x47` grid meter | Surplus, grid import/export |
 | | `0x6C`, `0x70`, `0x74` — inverter output per phase | Only [`UnmeteredGridPhase`](../README.md#the-pv-system-the-pv-section) |
-| Inverter — write (holding) | `0x7C` — the 13-register Modbus Power Control command | Only the battery discharge hold |
-| EV charger — read (input) | `0x0B` charge power, `0x1D` run state | Every charging mode |
-| EV charger — read and write (holding) | `0x60D` use mode, `0x628` charge current | Every charging mode |
+| Write (holding) | `0x7C` — the 13-register Modbus Power Control command | Only the battery discharge hold |
+
+### Huawei SUN2000 (`huawei`)
+
+All holding registers, 32-bit values high word first. Three reads per poll.
+
+| Access | Registers | Used for |
+|---|---|---|
+| Read | `32064` input power, all MPPTs | Solar, house load |
+| | `37760` battery SOC, `37765` battery power | The home battery |
+| | `37113` smart meter active power, or the EMMA's `31657` on unit 0 behind an EMMA | Surplus, grid import/export |
+| | `30000` model name | "Test connection" and discovery |
+| Read and write | `47077` maximum discharging power | Only the battery discharge hold |
+
+### SolaX EV charger
+
+| Access | Registers | Used for |
+|---|---|---|
+| Read (input) | `0x0B` charge power, `0x1D` run state | Every charging mode |
+| Read and write (holding) | `0x60D` use mode, `0x628` charge current | Every charging mode |
 
 ---
 
@@ -96,7 +117,8 @@ these: there is nothing at that address for the hold to write to.
   no battery.
 - **Other SolaX lines with their own register maps** — X3-MEGA / FORTH G2, A1-Hybrid, J1-Hybrid,
   X1-Hybrid-LV, X1-Lite-LV.
-- **Inverters from other manufacturers**, unless they are a rebadged SolaX — see below.
+- **Inverters from other manufacturers**, apart from the [Huawei SUN2000](#huawei-sun2000) and a
+  rebadged SolaX (see below). GoodWe is planned.
 
 ### Sold under another brand
 
@@ -145,46 +167,50 @@ need those registers — they serve only `UnmeteredGridPhase`, which is a three-
 
 ---
 
-### Huawei SUN2000: readings only, for now
+### Huawei SUN2000
 
-`Pv:Inverter:Driver` `huawei` reads a SUN2000 hybrid with a LUNA2000 battery and a Huawei smart meter,
-through the SDongle on port 502, unit 1: the three-phase **-KTL-M1** and **-MAP0** with a DTSU666-H meter
-([#320](https://github.com/mpospisil/gleanvolt/issues/320)), and the single-phase **-KTL-L1** and **-LC0**
-with a DDSU666-H meter ([#321](https://github.com/mpospisil/gleanvolt/issues/321)). Both kinds keep the
-same registers, so one driver reads them. Neither reports output per phase, so `UnmeteredGridPhase` is
-not available. It is **Expected** and untested on hardware:
-its readings come from Huawei's interface definitions, and the signs of the grid meter and the battery
-are still to be confirmed by a tester. Modbus TCP is off on the SDongle by default, and enabling it and
-discovery follow in [#316](https://github.com/mpospisil/gleanvolt/issues/316).
+Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)). How to connect it, enable
+Modbus TCP and set up an EMMA: **[Setting up a Huawei SUN2000](HUAWEI_SETUP.md)**. Huawei's product pages
+move by region, so the Manufacturer column links to Huawei's solar home page.
+[`gleanvolt-discover`](../README.md#finding-your-devices) names these by the model name at `30000`.
+There is no serial prefix: the name starts with `SUN2000`.
 
-**The battery hold is Untested** ([#323](https://github.com/mpospisil/gleanvolt/issues/323)): leave
-`BatteryHold` disabled, or in dry-run, until a tester reports a dry-run log and then a live run. It works
-differently from SolaX's. It writes the battery's **maximum discharging power** (`47077`) as 0 to hold,
-and the original value back to release. That is a **lasting setting**, not a command that lapses, so:
+| Manufacturer | Model | Family | Meter | Readings | Battery hold |
+|---|---|---|---|---|---|
+| [Huawei](https://solar.huawei.com/) | **SUN2000-…KTL-M1** (3–10 kW) | Three-phase hybrid | DTSU666-H | Expected | **Untested** |
+| [Huawei](https://solar.huawei.com/) | **SUN2000-…K-MAP0** | Three-phase hybrid | DTSU666-H | Expected | **Untested** |
+| [Huawei](https://solar.huawei.com/) | **SUN2000-…KTL-L1** | Single-phase hybrid | DDSU666-H | Expected | **Untested** |
+| [Huawei](https://solar.huawei.com/) | **SUN2000-…K-LC0** | Single-phase hybrid | DDSU666-H | Expected | **Untested** |
 
-- the original is stored in `data/inverter-state.json` before 0 is written, and written back on release
-  and when Gleanvolt stops normally;
-- after a crash or a power cut, the first poll finds the register at 0 with an original stored, and puts
-  it back (or keeps the hold, if one is due);
-- a register that already reads 0 with nothing stored was set by someone else, and is left alone;
-- arming is spaced at least a minute after the last write, until it is known whether the setting wears
-  out flash memory.
+The same models **behind an EMMA** energy manager are in the same tiers: set *Connected through* to EMMA
+([#322](https://github.com/mpospisil/gleanvolt/issues/322)). Not supported: the larger SUN2000 models (M2
+and up), the SmartLogger, the FusionSolar cloud API, direct RS485, and Huawei's own charger.
 
-If Gleanvolt is gone for good while a hold is on, set the maximum discharging power back in the FusionSolar
-app. Behind an EMMA, the EMMA's own AI energy optimisation must be off, with the EMMA in maximum
-self-consumption mode: only one system may schedule the battery.
+#### Caveats
 
-**Behind an EMMA** ([#322](https://github.com/mpospisil/gleanvolt/issues/322)), set `Pv:Inverter:Topology`
-to `emma` (Settings → Inverter → *Connected through*) and point the host at the EMMA. The grid then comes
-from the EMMA's own sensor on unit 0 (register `31657`), and PV and the battery from the inverter through
-the EMMA, on the unit id the EMMA assigned to it: put that in `Pv:Inverter:UnitId`. Two things to know:
+- **Nothing has run on a real device yet.** The readings come from Huawei's *Solar Inverter Modbus
+  Interface Definitions* and evcc's `huawei-sun2000-hybrid.yaml` and `huawei-emma.yaml` (MIT). Which way
+  the meter and the battery count is the documented sign, not one observed. The EMMA's grid sign is
+  assumed to be the meter's. A tester's register snapshot settles all three
+  ([#325](https://github.com/mpospisil/gleanvolt/issues/325)).
+- **No output per phase**, so [`UnmeteredGridPhase`](../README.md#the-pv-system-the-pv-section) is not
+  available.
+- **One Modbus client.** The SDongle serves very few clients, and the EMMA exactly one. Home Assistant's
+  `huawei_solar` integration competes for it. See [the setup page](HUAWEI_SETUP.md#2-only-one-client-at-a-time).
+- **The battery hold is a lasting setting.** It writes the maximum discharging power (`47077`) as 0, and
+  the original back to release ([#323](https://github.com/mpospisil/gleanvolt/issues/323)). Unlike
+  SolaX's command it does not lapse, so:
+  - the original is stored in `data/inverter-state.json` before 0 is written, and written back on
+    release and when Gleanvolt stops normally;
+  - after a crash or a power cut, the first poll finds the register at 0 with an original stored, and
+    puts it back (or keeps the hold, if one is due);
+  - a register that already reads 0 with nothing stored was set by someone else, and is left alone;
+  - arming is spaced at least a minute after the last write, until it is known whether the setting wears
+    out flash memory.
 
-- **The EMMA accepts one Modbus TCP client** and resets any further connection. Gleanvolt has to be the
-  only one, or a Modbus proxy goes in front of the EMMA. Gleanvolt itself reads both units over one
-  connection.
-- Modbus TCP is enabled with the installer account: *Commission device → Communication settings → Modbus
-  TCP*. The EMMA's grid sign is assumed to be the meter's (export positive) until a tester's dump
-  confirms it.
+  If Gleanvolt is gone for good while a hold is on, set the maximum discharging power back in the
+  FusionSolar app. Behind an EMMA, the EMMA's own AI energy optimisation must be off, with the EMMA in
+  maximum self-consumption mode.
 
 ## EV chargers
 
@@ -227,7 +253,10 @@ EV Charger for the EVC.
 ## Connecting
 
 - **Not sure of the address?** [`gleanvolt-discover`](../README.md#finding-your-devices) scans the LAN
-  and reports host, port and unit id for each device, from its serial number.
+  and reports host, port and unit id for each device, from its serial number (SolaX) or model name
+  (Huawei).
+- **Huawei:** Modbus TCP is off by default on the SDongle and the EMMA. See
+  [Setting up a Huawei SUN2000](HUAWEI_SETUP.md).
 - **Modbus TCP on port 502, unit id 1** for both devices. Both are configurable
   (`Pv:Inverter:Port`, `Pv:Inverter:UnitId`, and the same under `Pv:Chargers:0`).
 - **Inverter access.** G2 and G3 hybrids have Ethernet built in. G4 and later need the LAN port or a
@@ -263,6 +292,9 @@ signs and ranges are proven against your device rather than assumed.
 - [SolaX Hybrid X1/X3 G4 Modbus TCP/RTU protocol V3.21](https://www.gbc-solino.cz/files/uploads/FAQ%20SolaX/Hybrid-X1X3-G4-ModbusTCPRTU-V3.21-English_0622-public-version.pdf)
 - [SolaX X1/X3-HAC user manual](https://www.solaxpower.com/uploads/file/x1-x3-hac-series-user-manual-en.pdf)
 - [evcc discussion #7996 — SolaX Hybrid G4 Modbus](https://github.com/evcc-io/evcc/discussions/7996)
+- Huawei's *Solar Inverter Modbus Interface Definitions*, and evcc's
+  [`huawei-sun2000-hybrid.yaml` and `huawei-emma.yaml`](https://github.com/evcc-io/evcc/tree/master/templates/definition/meter)
+  (MIT)
 - [Dražice inverters](https://www.dzd.cz/fotovoltaika-drazice/stridace), the
   [IN.HYBRID COMPACT PRO datasheet](https://www.dzd.cz/images/sortiment/in-hybrid-compact-pro/PL-stridace-inhybrid-compact-pro-cz.pdf),
   and SolaX's [X3-HYB G4 PRO page](https://www.solaxpower.com/our-products/x3-hyb-g4-pro.html) it was compared with

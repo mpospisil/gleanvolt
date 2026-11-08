@@ -52,6 +52,7 @@ internal static class ReportWriter
         {
             output.WriteLine($"Nothing answered on {string.Join(", ", report.Networks)} ({report.HostsScanned} hosts).");
             output.WriteLine("Is Modbus TCP enabled in the inverter's own menu? A PocketLAN dongle does not provide it.");
+            output.WriteLine("On a Huawei SDongle or EMMA, Modbus TCP is enabled with the installer account in FusionSolar.");
             return;
         }
 
@@ -110,12 +111,13 @@ internal static class ReportWriter
         SupportTier.ReadingsAndChargingOnly => "Readings and charging only",
         SupportTier.NotSupported => "Not supported",
         SupportTier.UnknownSolax => "Unknown SolaX",
-        SupportTier.NotSolax => "Not a SolaX",
+        SupportTier.NotSolax => "Not identified",
         _ => device.Finding switch
         {
             DiscoveryFinding.NoModbusReply => "Open, no Modbus reply",
             DiscoveryFinding.NoUnitAnswered => "Gateway, no device",
             DiscoveryFinding.SolaxDongle => "Dongle",
+            DiscoveryFinding.HuaweiDevice => "Energy manager",
             _ => "-",
         },
     };

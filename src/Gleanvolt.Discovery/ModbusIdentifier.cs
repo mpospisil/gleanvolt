@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.RegisterMaps;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Discovery;
@@ -18,7 +19,8 @@ internal sealed class ModbusIdentifier(
 {
     private const string ConnectionTakenHint =
         "Is Gleanvolt or Home Assistant connected to it right now? SolaX devices accept very few Modbus "
-        + "connections; stop the other client for the scan.";
+        + "connections, and Huawei's SDongle and EMMA only one; stop the other client for the scan. A Huawei "
+        + "SDongle or EMMA also answers like this until Modbus TCP is enabled with the installer account.";
 
     public async Task<IReadOnlyList<DiscoveredDevice>> IdentifyAsync(
         string host,
@@ -143,6 +145,31 @@ internal sealed class ModbusIdentifier(
                 .ConfigureAwait(false);
         }
 
+        // Huawei keeps a model name at 30000 rather than a serial number in SolaX's shape (#324).
+        var huaweiName = await ReadAsync(
+            pacer, () => client.ReadHoldingRegistersAsync(
+                HuaweiRegisterMap.ModelName, HuaweiRegisterMap.ModelNameCount, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        if (huaweiName is { Outcome: ReadOutcome.Data, Registers: { } nameRegisters }
+            && HuaweiSun2000Driver.DecodeString(nameRegisters) is { Length: > 0 } huaweiModel)
+        {
+            if (HuaweiSun2000Driver.IsSun2000(huaweiModel))
+            {
+                return await HuaweiInverterAsync(client, pacer, host, port, unitId, huaweiModel, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (huaweiModel.StartsWith("EMMA", StringComparison.OrdinalIgnoreCase))
+            {
+                return new UnitAttempt.Answered(new DiscoveredDevice(
+                    host, port, unitId, DiscoveryFinding.HuaweiDevice, null, huaweiModel, "EMMA energy manager", null,
+                    null, null,
+                    "A Huawei EMMA energy manager. Use the inverter behind it instead: the same address, on the unit id "
+                    + "the EMMA gave the inverter, connected through the EMMA."));
+            }
+        }
+
         if ((serial ?? otherSerial) is { } unknown)
         {
             return new UnitAttempt.Answered(new DiscoveredDevice(
@@ -154,7 +181,79 @@ internal sealed class ModbusIdentifier(
 
         return new UnitAttempt.Answered(new DiscoveredDevice(
             host, port, unitId, DiscoveryFinding.NotSolax, null, null, null, null, SupportTier.NotSolax, null,
-            "Answers Modbus, but has no SolaX serial number: not a SolaX."));
+            "Answers Modbus, but has no SolaX serial number and no Huawei model name: not a device Gleanvolt knows."));
+    }
+
+    // A SUN2000 (#324): its serial number, to tell repeated answers apart; the battery's state of charge,
+    // as the driver's own probe reads it; and whether an EMMA answers for the grid on unit 0 of the same
+    // connection, which decides the topology. Readings only are Expected; the hold is untested.
+    private async Task<UnitAttempt> HuaweiInverterAsync(
+        IModbusClient client,
+        HostPacer pacer,
+        string host,
+        int port,
+        byte unitId,
+        string model,
+        CancellationToken cancellationToken)
+    {
+        var serialRead = await ReadAsync(
+            pacer, () => client.ReadHoldingRegistersAsync(
+                HuaweiRegisterMap.SerialNumber, HuaweiRegisterMap.SerialNumberCount, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        var serial = serialRead is { Outcome: ReadOutcome.Data, Registers: { } serialRegisters }
+            && HuaweiSun2000Driver.DecodeString(serialRegisters) is { Length: > 0 } text
+                ? text
+                : null;
+
+        var socRead = await ReadAsync(
+            pacer, () => client.ReadHoldingRegistersAsync(HuaweiRegisterMap.BatterySoc, 1, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        bool? confirmed = null;
+        string note;
+        if (socRead is { Outcome: ReadOutcome.Data, Registers: [var soc, ..] })
+        {
+            confirmed = soc <= 1000;
+            note = confirmed.Value
+                ? $"Battery at {soc / 10.0:0.#} %."
+                : $"The model name says inverter, but its battery register reads {soc}, which is no state of charge.";
+        }
+        else
+        {
+            note = $"Did not answer the battery register at {HuaweiRegisterMap.BatterySoc}: is a LUNA2000 battery connected?";
+        }
+
+        var behindEmma = unitId != HuaweiRegisterMap.EmmaUnitId
+            && await AnswersAsEmmaAsync(client, pacer, cancellationToken).ConfigureAwait(false);
+        note += behindEmma
+            ? " Behind a Huawei EMMA, which accepts only one Modbus client: set Connected through to EMMA."
+            : " Readings are Expected, the battery hold untested; see SUPPORTED_PV_SYSTEMS.md.";
+
+        return new UnitAttempt.Answered(new DiscoveredDevice(
+            host, port, unitId, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Inverter, model, "SUN2000 hybrid", serial,
+            SupportTier.Expected, confirmed, note,
+            Driver: HuaweiSun2000DriverFactory.DriverId,
+            Topology: behindEmma ? HuaweiSun2000DriverFactory.EmmaTopology : null));
+    }
+
+    // Unit 0 on the same connection -- the EMMA takes one client -- answering the grid register the driver
+    // reads from it. An SDongle has nothing there.
+    private static async Task<bool> AnswersAsEmmaAsync(IModbusClient client, HostPacer pacer, CancellationToken cancellationToken)
+    {
+        IModbusClient emma;
+        try
+        {
+            emma = client.ForUnit(HuaweiRegisterMap.EmmaUnitId);
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+
+        var read = await ReadAsync(
+            pacer, () => emma.ReadHoldingRegistersAsync(HuaweiRegisterMap.EmmaGridActivePower, 2, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        return read.Outcome == ReadOutcome.Data;
     }
 
     // The serial number says what the box should be; the role check — the register /pv-system's probe

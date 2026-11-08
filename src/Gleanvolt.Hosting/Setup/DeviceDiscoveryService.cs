@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Discovery;
@@ -236,9 +237,13 @@ public sealed class DeviceDiscoveryService : IDeviceDiscovery, IDisposable
             device.Role,
             device.Model,
             device.SerialNumber,
-            device.Finding == DiscoveryFinding.SolaxDevice
+            device.Identified
                 && device.Tier is SupportTier.Verified or SupportTier.Expected or SupportTier.ReadingsAndChargingOnly,
-            device.Note);
+            device.Note,
+            device.Finding == DiscoveryFinding.SolaxDevice && device.Role == PvDeviceRole.Inverter
+                ? PvSystemRules.DefaultInverterDriver
+                : device.Driver,
+            device.Topology);
 
     // A private subnet no wider than the scanner's own default, or one private address.
     private static ScanPlan? Parse(string text)
