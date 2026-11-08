@@ -22,6 +22,12 @@ public interface IInverterDriverFactory
     InverterCapabilities Capabilities { get; }
 
     /// <summary>
+    /// What a register snapshot of this family reads (issue #319): at least every register the driver reads,
+    /// so the snapshot replays it, and where the serial number is, so it can be removed.
+    /// </summary>
+    RegisterSnapshotSpec Snapshot { get; }
+
+    /// <summary>
     /// A driver on <paramref name="client"/>. The client belongs to the host, which connects and disposes
     /// it; in dry-run it is one that refuses writes.
     /// </summary>

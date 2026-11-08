@@ -986,4 +986,25 @@
   <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
     <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.md</value>
   </data>
+  <data name="SnapshotButton" xml:space="preserve">
+    <value>Save register snapshot</value>
+  </data>
+  <data name="SnapshotHelp" xml:space="preserve">
+    <value>Reads every register the inverter driver uses, once, and saves them to a file. The serial number is cut to its model prefix. Attach the file to an issue when you test an inverter Gleanvolt does not support yet.</value>
+  </data>
+  <data name="SnapshotNote" xml:space="preserve">
+    <value>What is happening now</value>
+  </data>
+  <data name="SnapshotNoteHint" xml:space="preserve">
+    <value>for example: night, battery idle, importing</value>
+  </data>
+  <data name="SnapshotReading" xml:space="preserve">
+    <value>Reading the inverter…</value>
+  </data>
+  <data name="SnapshotSaved" xml:space="preserve">
+    <value>Saved {0}.</value>
+  </data>
+  <data name="SnapshotFailed" xml:space="preserve">
+    <value>The inverter could not be read: {0}</value>
+  </data>
 </root>

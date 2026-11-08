@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-08 — Drivers are tested against recordings of real devices
+
+**Context.** [Issue #319](https://github.com/mpospisil/gleanvolt/issues/319). Huawei support (#316) will
+be written by people without the hardware, and tested by people without the code.
+
+**Decision — a recording is the test basis.** A `RegisterDump` is a JSON file of a device's holding and
+input registers, keyed by hex address, with the driver id, the configured model, the Gleanvolt version,
+the time and a note on what was happening. `ReplayModbusClient` answers from one. An address the dump
+lacks is refused with "illegal data address", as the device refuses it. Writes are recorded, never read
+back. `InverterDriverConformanceTests<TFactory>` holds every driver to the same checks against its
+recordings: import and charging are positive, readings are in range, capabilities match behaviour, dry-run
+and steady state write nothing, release writes, the probe refuses another family, and the snapshot covers
+everything the driver reads.
+
+**`ModbusDeviceException` in the contract.** A driver has to tell "this family keeps nothing there" from
+"nothing answered" without knowing NModbus. `ModbusTcpClient` now translates NModbus's `SlaveException`
+into it, still invalidating the connection first, as every failed exchange does. The LAN scan catches the
+new type. The replay throws the same type, so a driver's error handling is tested exactly as it runs.
+
+**The snapshot is a Settings button, not a tool.** Testers already have the web UI, and the owner prefers
+operator features there. Each factory names its ranges and where its serial number is
+(`RegisterSnapshotSpec`). The host reads them on the inverter's own client, so the read waits its turn
+with the poll loop rather than opening a second connection. The serial number is cut to its model prefix
+before the file reaches the browser. The button is offered on Settings only to a logged-in UI, and never
+in the wizard, where there is no running inverter.
+
+**The kit lives under `tests/`.** `Gleanvolt.Devices.Testing` ships nothing, so it stays out of the image
+and the packages until the contract is published with it (#316, out of scope).
+
 ## 2026-11-08 — The driver is its own field, and the host tells the rules which drivers exist
 
 **Context.** [Issue #318](https://github.com/mpospisil/gleanvolt/issues/318). With SolaX behind a driver

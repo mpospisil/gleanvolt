@@ -368,6 +368,8 @@ public sealed class PvSystemEditorTests : IDisposable
 
         public InverterCapabilities Capabilities { get; } = new(false, false);
 
+        public RegisterSnapshotSpec Snapshot { get; } = new([new RegisterRange(RegisterTable.Input, 0, 1)]);
+
         public IInverterDriver Create(IModbusClient client, InverterDriverOptions options) => new Driver(this, client);
 
         private sealed class Driver(RecordingDriverFactory factory, IModbusClient client) : IInverterDriver
