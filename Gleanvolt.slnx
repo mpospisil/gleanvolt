@@ -18,5 +18,8 @@
     <Project Path="tests/Gleanvolt.Web.Tests/Gleanvolt.Web.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Hosting.Tests/Gleanvolt.Hosting.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Discovery.Tests/Gleanvolt.Discovery.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Devices.Testing/Gleanvolt.Devices.Testing.csproj" />
+    <Project Path="tests/Gleanvolt.Devices.Tests/Gleanvolt.Devices.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Devices.Solax.Tests/Gleanvolt.Devices.Solax.Tests.csproj" />
   </Folder>
 </Solution>

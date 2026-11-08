@@ -130,6 +130,12 @@ public sealed class ModbusTcpClient : IModbusClient
             {
                 return await operation(master).ConfigureAwait(false);
             }
+            catch (SlaveException ex) when (Invalidated())
+            {
+                // The device's own refusal, in the type every client throws (#319), so a driver can tell
+                // "nothing kept at this address" from a dead link without knowing NModbus.
+                throw new ModbusDeviceException(ex.SlaveExceptionCode, ex.Message, ex);
+            }
             catch (Exception) when (InvalidateAndRethrow())
             {
                 throw; // unreachable: the filter always returns false, having done its work.
@@ -224,6 +230,14 @@ public sealed class ModbusTcpClient : IModbusClient
     {
         Invalidate();
         return false;
+    }
+
+    // The same invalidation, for a filter that then translates the exception rather than rethrowing it.
+    // A failed exchange invalidates the connection whatever the failure (DECISIONS 2026-07-29).
+    private bool Invalidated()
+    {
+        Invalidate();
+        return true;
     }
 
     private void Invalidate()

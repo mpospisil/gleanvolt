@@ -1431,3 +1431,19 @@ internal sealed class FakePasswordStore : IWebPasswordStore
         return true;
     }
 }
+
+/// <summary>Settings' register snapshot (#319): a fixed file, or the failure the link would give.</summary>
+internal sealed class FakeInverterSnapshot : IInverterSnapshot
+{
+    public Exception? Failure { get; set; }
+
+    public List<string> Notes { get; } = [];
+
+    public Task<RegisterSnapshotFile> TakeAsync(string note, CancellationToken cancellationToken = default)
+    {
+        Notes.Add(note);
+        return Failure is { } failure
+            ? Task.FromException<RegisterSnapshotFile>(failure)
+            : Task.FromResult(new RegisterSnapshotFile("gleanvolt-registers-solax-20261108-213000.json", "{\"format\":\"gleanvolt-register-dump\"}"));
+    }
+}

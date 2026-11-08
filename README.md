@@ -142,7 +142,10 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Api.Tests/            # The endpoints over TestServer, and the OpenAPI contract snapshot
 │   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
 │   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
-│   └── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
+│   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
+│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: replay client and conformance tests
+│   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
+│   └── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi

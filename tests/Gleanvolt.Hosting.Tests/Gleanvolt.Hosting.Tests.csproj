@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Devices.Testing\Gleanvolt.Devices.Testing.csproj" />
   </ItemGroup>
 
 </Project>

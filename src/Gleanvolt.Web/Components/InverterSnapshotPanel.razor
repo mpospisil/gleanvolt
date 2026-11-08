@@ -1,0 +1,65 @@
+@inject IInverterSnapshot Snapshot
+@inject IJSRuntime JS
+
+@*
+    Settings -> inverter -> "Save register snapshot" (issue #319). One read of every register the running
+    driver uses, handed to the browser as a JSON file. It is how a tester sends a recording of an inverter
+    family Gleanvolt does not drive yet, and how a driver's tests get their fixtures. Reads only; the serial
+    number leaves the house as its model prefix.
+*@
+
+<div class="pv-fields pv-snapshot" id="inverter-snapshot">
+    <div class="pv-field">
+        <div class="field-head">
+            <label for="inverter-snapshot-note">@SettingsText.SnapshotNote</label>
+            <InfoTip Topic="@SettingsText.SnapshotButton" Group="settings-info">
+                <p>@SettingsText.SnapshotHelp</p>
+            </InfoTip>
+        </div>
+        <input id="inverter-snapshot-note" type="text" autocomplete="off" placeholder="@SettingsText.SnapshotNoteHint"
+               disabled="@_busy" value="@_note" @oninput="e => _note = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <div class="pv-field snapshot-action">
+        <button type="button" class="secondary" id="inverter-snapshot-save" disabled="@_busy" @onclick="SaveAsync">
+            @(_busy ? SettingsText.SnapshotReading : SettingsText.SnapshotButton)
+        </button>
+    </div>
+</div>
+@if (_saved is { } saved)
+{
+    <p class="muted" id="inverter-snapshot-saved">@Localized.Format(SettingsText.SnapshotSaved, saved)</p>
+}
+@if (_error is { } error)
+{
+    <p class="error" id="inverter-snapshot-error">@Localized.Format(SettingsText.SnapshotFailed, error)</p>
+}
+
+@code {
+    private string _note = string.Empty;
+    private bool _busy;
+    private string? _saved;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _saved = null;
+        _error = null;
+
+        try
+        {
+            var file = await Snapshot.TakeAsync(_note);
+            await JS.InvokeVoidAsync("gleanvolt.downloadText", file.FileName, file.Json, "application/json");
+            _saved = file.FileName;
+        }
+        catch (Exception ex) when (ex is not JSDisconnectedException)
+        {
+            // The link's own words: a timeout, a refused connection, setup mode's "not configured".
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

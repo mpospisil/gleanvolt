@@ -116,6 +116,11 @@
                 </div>
             }
         </div>
+
+        @if (OfferSnapshot && !ReadOnly && section == PvEditorSection.Inverter)
+        {
+            <InverterSnapshotPanel />
+        }
     }
 
     @if (_warnings.Count > 0)
@@ -194,6 +199,10 @@
 
     /// <summary>Raised after a save that wrote something.</summary>
     [Parameter] public EventCallback OnSaved { get; set; }
+
+    // Settings offers "Save register snapshot" under the inverter (#319); the wizard does not, because in
+    // setup mode there is no running inverter to read.
+    [Parameter] public bool OfferSnapshot { get; set; }
 
     private IReadOnlyDictionary<string, string>? _applied;
 

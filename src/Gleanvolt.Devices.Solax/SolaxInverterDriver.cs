@@ -178,6 +178,18 @@ public sealed class SolaxInverterDriverFactory : IInverterDriverFactory
 
     public InverterCapabilities Capabilities => SolaxInverterDriver.SolaxCapabilities;
 
+    // The telemetry block (which holds the probe's register too), and the serial number, kept to the prefix
+    // the LAN scan names the model by -- four characters at most (SolaxModels). The power-control block is
+    // written, never read: reading it reports the firmware version, at an address nobody has verified, so
+    // it is not in the snapshot.
+    public RegisterSnapshotSpec Snapshot { get; } = new(
+        [
+            new RegisterRange(RegisterTable.Input, InverterRegisterMap.TelemetryBlockStart, InverterRegisterMap.TelemetryBlockCount),
+            new RegisterRange(RegisterTable.Holding, InverterRegisterMap.SerialNumberStart, InverterRegisterMap.SerialNumberCount),
+        ],
+        SerialNumber: new RegisterRange(RegisterTable.Holding, InverterRegisterMap.SerialNumberStart, InverterRegisterMap.SerialNumberCount),
+        SerialPrefixLength: 4);
+
     // Port 502, unit 1, and the 250 ms compromise between requests: see DeviceConfig.MinRequestInterval.
     public ModbusDefaults Defaults { get; } = new(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250));
 

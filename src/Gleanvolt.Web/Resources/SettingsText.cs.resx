@@ -972,4 +972,25 @@
   <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
     <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.cs.md</value>
   </data>
+  <data name="SnapshotButton" xml:space="preserve">
+    <value>Uložit snímek registrů</value>
+  </data>
+  <data name="SnapshotHelp" xml:space="preserve">
+    <value>Jednou přečte všechny registry, které ovladač střídače používá, a uloží je do souboru. Sériové číslo se zkrátí na předponu modelu. Soubor přiložte k issue, když testujete střídač, který Gleanvolt zatím nepodporuje.</value>
+  </data>
+  <data name="SnapshotNote" xml:space="preserve">
+    <value>Co se právě děje</value>
+  </data>
+  <data name="SnapshotNoteHint" xml:space="preserve">
+    <value>například: noc, baterie v klidu, odběr ze sítě</value>
+  </data>
+  <data name="SnapshotReading" xml:space="preserve">
+    <value>Čtu střídač…</value>
+  </data>
+  <data name="SnapshotSaved" xml:space="preserve">
+    <value>Uloženo: {0}.</value>
+  </data>
+  <data name="SnapshotFailed" xml:space="preserve">
+    <value>Střídač se nepodařilo přečíst: {0}</value>
+  </data>
 </root>

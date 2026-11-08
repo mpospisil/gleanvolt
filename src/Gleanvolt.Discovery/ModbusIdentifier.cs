@@ -1,7 +1,6 @@
 using System.Net.Sockets;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.RegisterMaps;
-using NModbus;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.Solax;
 
@@ -17,12 +16,6 @@ internal sealed class ModbusIdentifier(
     DiscoveryOptions options,
     Func<string, int, byte, IModbusClient> openClient)
 {
-    // Modbus exception codes a gateway answers with when nothing at that unit id replied on its RS485
-    // side: 0x0A "gateway path unavailable", 0x0B "gateway target device failed to respond". They mean
-    // "this unit id is not there", never "found a device".
-    private const byte GatewayPathUnavailable = 0x0A;
-    private const byte GatewayTargetFailedToRespond = 0x0B;
-
     private const string ConnectionTakenHint =
         "Is Gleanvolt or Home Assistant connected to it right now? SolaX devices accept very few Modbus "
         + "connections; stop the other client for the scan.";
@@ -222,11 +215,13 @@ internal sealed class ModbusIdentifier(
         {
             return new RegisterRead(ReadOutcome.Data, await read().ConfigureAwait(false));
         }
-        catch (SlaveException ex) when (ex.SlaveExceptionCode is GatewayPathUnavailable or GatewayTargetFailedToRespond)
+        // A gateway's 0x0A "path unavailable" or 0x0B "target failed to respond": nothing at that unit id
+        // replied on its RS485 side. "This unit id is not there", never "found a device".
+        catch (ModbusDeviceException ex) when (ex.IsGateway)
         {
             return new RegisterRead(ReadOutcome.Gateway, null);
         }
-        catch (SlaveException)
+        catch (ModbusDeviceException)
         {
             // Illegal function, illegal address: a device is there, it just keeps nothing at this one.
             return new RegisterRead(ReadOutcome.Refused, null);

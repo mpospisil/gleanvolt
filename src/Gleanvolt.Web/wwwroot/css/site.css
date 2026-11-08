@@ -1673,6 +1673,11 @@ button.link:hover {
     margin-bottom: 0.5rem;
 }
 
+/* "Save register snapshot" (#319) under the inverter: a note and a button, the button level with the box. */
+.pv-snapshot .snapshot-action {
+    align-self: end;
+}
+
 .pv-field label {
     display: block;
     font-weight: 600;

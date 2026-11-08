@@ -205,6 +205,13 @@ few characters** of its serial number (never the whole serial), the DSP and ARM 
 readings match the device's own display, and whether the battery hold did what its dry-run log said, is
 what turns an *Expected* row into a *Verified* one.
 
+**Attach a register snapshot.** On **Settings**, under the inverter, type what is happening at the moment
+("night, battery idle, importing") and press **Save register snapshot**. Gleanvolt reads every register its
+driver uses, once, and your browser saves a JSON file. The serial number in it is already cut to its model
+prefix. Two snapshots are the most useful: one at night with the battery idle and the house importing, and
+one with the battery charging. They become the test fixtures every driver is checked against, so the
+signs and ranges are proven against your device rather than assumed.
+
 ## Sources
 
 - [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus) —
