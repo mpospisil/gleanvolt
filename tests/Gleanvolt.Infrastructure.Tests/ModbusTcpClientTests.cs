@@ -159,4 +159,84 @@ public class ModbusTcpClientTests
         await Assert.ThrowsAnyAsync<Exception>(() => client.ReadInputRegistersAsync(0x1D, 1));
         Assert.False(client.IsConnected);
     }
+
+    [Fact]
+    public async Task WithABackoffAFailedConnectIsNotRetriedUntilTheBackoffHasPassedAndThenItDoubles()
+    {
+        // Huawei's SDongle (#320): a connect every poll keeps a struggling gateway from recovering.
+        var clock = new ManualClock();
+        var device = new DeviceConfig
+        {
+            Host = "127.0.0.1",
+            Port = ClosedPort(),
+            MinRequestInterval = TimeSpan.Zero,
+            ReconnectBackoff = TimeSpan.FromSeconds(5),
+        };
+        await using var client = new ModbusTcpClient(device, clock);
+
+        await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
+
+        clock.Now += TimeSpan.FromSeconds(4);
+        var waiting = await Assert.ThrowsAsync<IOException>(() => client.ReadHoldingRegistersAsync(0, 1));
+        Assert.Contains("Not reconnecting", waiting.Message);
+
+        clock.Now += TimeSpan.FromSeconds(1);
+        await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
+
+        // The second failure doubles the wait.
+        clock.Now += TimeSpan.FromSeconds(9);
+        await Assert.ThrowsAsync<IOException>(() => client.ReadHoldingRegistersAsync(0, 1));
+        clock.Now += TimeSpan.FromSeconds(1);
+        await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
+    }
+
+    [Fact]
+    public async Task WithABackoffASuccessfulConnectStartsItOver()
+    {
+        var clock = new ManualClock();
+        await using var server = new FakeModbusTcpServer();
+        var device = new DeviceConfig
+        {
+            Host = "127.0.0.1",
+            Port = server.Port,
+            MinRequestInterval = TimeSpan.Zero,
+            ReconnectBackoff = TimeSpan.FromSeconds(5),
+        };
+        await using var client = new ModbusTcpClient(device, clock);
+
+        await client.ReadInputRegistersAsync(0x1D, 1);
+        server.CorruptNextResponses(FakeModbusTcpServer.Persistent);
+        await Assert.ThrowsAnyAsync<Exception>(() => client.ReadInputRegistersAsync(0x1D, 1));
+        server.StopCorrupting();
+
+        // A failed exchange is not a failed connect: the next call reconnects at once.
+        Assert.Single(await client.ReadInputRegistersAsync(0x1D, 1));
+        Assert.Equal(2, server.Connections);
+    }
+
+    [Fact]
+    public async Task WithoutABackoffEveryCallTriesToConnect()
+    {
+        await using var client = new ModbusTcpClient(Device(ClosedPort()));
+
+        await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
+        await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => client.ReadHoldingRegistersAsync(0, 1));
+    }
+
+    // A loopback port nothing listens on, so a connect is refused at once.
+    private static int ClosedPort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private sealed class ManualClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
 }

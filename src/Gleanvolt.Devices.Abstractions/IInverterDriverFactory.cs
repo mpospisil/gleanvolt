@@ -57,7 +57,12 @@ public sealed record InverterDriverInfo(
 /// <param name="Port">The TCP port.</param>
 /// <param name="UnitId">The Modbus unit (slave) id.</param>
 /// <param name="MinRequestInterval">The pause the family needs between two requests.</param>
-public sealed record ModbusDefaults(int Port, byte UnitId, TimeSpan MinRequestInterval);
+/// <param name="ReconnectBackoff">
+/// How long to wait before connecting again after a connect failed, doubling with each further failure;
+/// zero reconnects on the next request. For a gateway that takes few clients and recovers slowly (Huawei's
+/// SDongle), where a reconnect every poll keeps it from recovering at all.
+/// </param>
+public sealed record ModbusDefaults(int Port, byte UnitId, TimeSpan MinRequestInterval, TimeSpan ReconnectBackoff = default);
 
 /// <summary>What the host tells a driver when it creates one.</summary>
 public sealed record InverterDriverOptions

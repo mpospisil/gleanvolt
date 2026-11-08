@@ -151,6 +151,7 @@ public abstract class PvDeviceOptions
         Port = Port ?? defaults?.Port ?? Defaults.Port,
         UnitId = UnitId ?? defaults?.UnitId ?? Defaults.UnitId,
         MinRequestInterval = MinRequestInterval ?? defaults?.MinRequestInterval ?? Defaults.MinRequestInterval,
+        ReconnectBackoff = defaults?.ReconnectBackoff ?? Defaults.ReconnectBackoff,
     };
 }
 
@@ -158,7 +159,8 @@ public abstract class PvDeviceOptions
 public sealed class PvInverterOptions : PvDeviceOptions
 {
     /// <summary>
-    /// Which inverter driver reads and controls this inverter: <c>solax</c>, the only one so far. Empty
+    /// Which inverter driver reads and controls this inverter: <c>solax</c> or <c>huawei</c> (issue #320,
+    /// readings only for now). Empty
     /// means <c>solax</c>, so a configuration from before the field existed needs no change (issue #318).
     /// Case-insensitive. An id no registered driver has is a configuration problem naming the ones there
     /// are, not a fallback.

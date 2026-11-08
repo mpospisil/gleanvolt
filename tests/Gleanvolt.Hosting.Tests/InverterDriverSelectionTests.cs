@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
@@ -23,12 +24,10 @@ public class InverterDriverSelectionTests
             .Build();
 
     [Fact]
-    public void The_catalog_has_solax()
+    public void The_catalog_has_solax_first_and_huawei()
     {
-        var solax = Assert.Single(InverterDrivers.Known);
-
-        Assert.Equal("solax", solax.Id);
-        Assert.Equal("SolaX", solax.DisplayName);
+        Assert.Equal(["solax", "huawei"], InverterDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(["SolaX", "Huawei"], InverterDrivers.Known.Select(driver => driver.DisplayName));
     }
 
     [Fact]
@@ -43,18 +42,18 @@ public class InverterDriverSelectionTests
     public void Headless_an_unknown_driver_stops_the_start_naming_the_known_drivers()
     {
         var error = Record.Exception(() =>
-            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Inverter:Driver", "huawei")])));
+            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Inverter:Driver", "goodwe")])));
 
         Assert.NotNull(error);
-        Assert.Contains("Pv:Inverter:Driver ('huawei')", error.Message);
-        Assert.Contains("Known drivers: solax", error.Message);
+        Assert.Contains("Pv:Inverter:Driver ('goodwe')", error.Message);
+        Assert.Contains("Known drivers: solax, huawei", error.Message);
     }
 
     [Fact]
     public void In_setup_mode_an_unknown_driver_is_a_problem_on_the_inverter_step()
     {
         var status = SetupStatusEvaluator.Evaluate(
-            Configuration([.. UsableSite.Settings, ("Pv:Inverter:Driver", "huawei")]),
+            Configuration([.. UsableSite.Settings, ("Pv:Inverter:Driver", "goodwe")]),
             new SetupHost(TimeZoneInfo.Utc, IsWindows: false));
 
         Assert.False(status.Usable);
@@ -72,6 +71,21 @@ public class InverterDriverSelectionTests
         await using var provider = builder.Services.BuildServiceProvider();
 
         Assert.IsType<SolaxInverterDriver>(provider.GetRequiredService<IInverterDriver>());
-        Assert.Equal("solax", Assert.Single(provider.GetServices<IInverterDriverFactory>()).Id);
+        Assert.Equal(["solax", "huawei"], provider.GetServices<IInverterDriverFactory>().Select(factory => factory.Id));
+    }
+
+    [Fact]
+    public async Task Huawei_runs_the_sun2000_driver_on_a_client_with_its_pacing()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection([.. UsableSite.Pairs, new("Pv:Inverter:Driver", "huawei"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.IsType<HuaweiSun2000Driver>(provider.GetRequiredService<IInverterDriver>());
+
+        var connection = provider.GetRequiredService<PvSystemInfo>().Inverter.Connection;
+        Assert.Equal(TimeSpan.FromSeconds(1), connection.MinRequestInterval);
+        Assert.Equal(TimeSpan.FromSeconds(5), connection.ReconnectBackoff);
     }
 }

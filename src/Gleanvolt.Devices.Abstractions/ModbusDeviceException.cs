@@ -20,6 +20,12 @@ public sealed class ModbusDeviceException : Exception
     /// <summary>The device failed while handling the request.</summary>
     public const byte ServerDeviceFailure = 0x04;
 
+    /// <summary>
+    /// The device is busy with an earlier request and asks for this one again later. Huawei's SDongle says
+    /// this often (issue #320): it is a reason to wait and retry, not a fault.
+    /// </summary>
+    public const byte ServerDeviceBusy = 0x06;
+
     /// <summary>A gateway (a data logger, an SDongle) has no path to the unit id.</summary>
     public const byte GatewayPathUnavailable = 0x0A;
 
@@ -37,6 +43,9 @@ public sealed class ModbusDeviceException : Exception
 
     /// <summary>Whether the device said it keeps nothing at the address: a register this family or firmware lacks.</summary>
     public bool IsIllegalAddress => ExceptionCode == IllegalDataAddress;
+
+    /// <summary>Whether the device asked for the request to be repeated later.</summary>
+    public bool IsBusy => ExceptionCode == ServerDeviceBusy;
 
     /// <summary>Whether a gateway answered for a unit it could not reach.</summary>
     public bool IsGateway => ExceptionCode is GatewayPathUnavailable or GatewayTargetFailedToRespond;
