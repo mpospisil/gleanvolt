@@ -3088,11 +3088,15 @@ window.
 
 #### Setup mode
 
-A fresh install has none of the required settings: the web UI password, the inverter's and the
-charger's addresses, the site's location (`Pv:Latitude`, `Pv:Longitude`) and its time zone. The time
-zone counts as set when `Controller:TimeZone` names a valid zone, or when it is empty and the host's
-own zone can be trusted. That is not the case on Windows, which ignores `TZ`, or on a host that
-reports plain UTC.
+A fresh install has none of the required settings: the web UI password and the inverter's and the
+charger's addresses. Those are what the controller cannot run without.
+
+The site's location (`Pv:Latitude`, `Pv:Longitude`) and its time zone are **recommended**: setup asks
+for them, but Gleanvolt starts without them. Without a location there is no weather. Without a time
+zone the controller runs in the host's own zone, which on Windows (it ignores `TZ`) or on a host that
+reports plain UTC means UTC, so days start and sessions are filed at UTC midnight. The time zone
+counts as set when `Controller:TimeZone` names a valid zone, or when it is empty and the host's own
+zone can be trusted. Each recommended setting still missing is logged as a warning at startup.
 
 Until every required setting is in place, Gleanvolt starts in **setup mode** instead of stopping
 ([issue #301](https://github.com/mpospisil/gleanvolt/issues/301)):
@@ -3112,8 +3116,10 @@ Windows zip, winget and `dotnet run` have nothing that does: there the page says
 again yourself.
 
 Some problems keep the controller stopped even when everything else is set: a configuration key that
-has moved (its old name is listed with the new one), and a latitude without a longitude or the other
-way round. Gleanvolt never starts the controller on part of a configuration.
+has moved (its old name is listed with the new one), a latitude without a longitude or the other
+way round, and a `Controller:TimeZone` this host cannot resolve (on the Nano Server image, an IANA id
+such as `Europe/Prague`; use `Central Europe Standard Time` there). Gleanvolt never starts the
+controller on part of a configuration.
 
 With the web UI disabled (`Web:Enabled=false`) there is nothing to finish a setup in. A configuration
 that is not usable then stops Gleanvolt at startup, as before. The reason goes to the console and to
@@ -3134,15 +3140,17 @@ or a closed browser loses nothing that was saved.
    claim. A swapped pair both answer on port 502, and only show themselves once running, as a frozen
    battery and no sun. Addresses can also be typed in. Saving reads one value from each device to
    check it.
-2. **Site.** Location and time zone (both required), the home battery's usable capacity and charge
-   efficiency, the array's details.
+2. **Site.** Location and time zone (recommended: Gleanvolt starts without them), the home battery's
+   usable capacity and charge efficiency, the array's details.
 3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it; the forecast is
    fetched when Gleanvolt starts, so the setup spends none of the day's Solcast calls.
 4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
 5. **Extras** (optional). The tariff, the OpenWeatherMap key, the Home Assistant (MQTT) link and the
    API with its keys.
-6. **Finish.** What is still missing, each with a link to its step, the optional settings not yet set,
-   and **Start Gleanvolt**, which restarts it out of setup mode.
+6. **Finish.** What is still missing, each with a link to its step; the recommended settings not yet
+   set (location, time zone), which do not hold the start back; the optional settings not yet set;
+   and **Start Gleanvolt**, which restarts it out of setup mode. Once the restarted Gleanvolt answers,
+   the browser goes to the **Overview**.
 
 Optional settings never block anything. A page that needs one says it is not configured, with the way
 to set it up: Forecast (Solcast), Car (the car), Charging plan (a tariff). Health and Settings list

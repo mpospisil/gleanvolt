@@ -4,7 +4,9 @@
 // for it to answer again, and then reloads onto the new process.
 window.gleanvolt = window.gleanvolt || {};
 
-window.gleanvolt.reloadAfterRestart = function () {
+// target, when given, is where the browser goes once the new process answers instead of reloading the
+// page it is on -- the setup wizard's last step, for one, which has nothing left to show afterwards.
+window.gleanvolt.reloadAfterRestart = function (target) {
     const started = Date.now();
     const interval = 1500;
     // A restart that was never seen to go down still reloads eventually, rather than leaving the
@@ -26,7 +28,11 @@ window.gleanvolt.reloadAfterRestart = function () {
         if (!up) {
             wentDown = true;
         } else if (wentDown || Date.now() - started > giveUpWaitingForDown) {
-            window.location.reload();
+            if (target) {
+                window.location.assign(target);
+            } else {
+                window.location.reload();
+            }
             return;
         }
 

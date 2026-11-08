@@ -49,7 +49,7 @@
     <value>Gleanvolt komunikuje se střídačem a nabíječkou přes Modbus TCP. Vyhledejte je v síti, nebo zadejte jejich adresy, a uložte: uložení z každého zařízení přečte jednu hodnotu, aby ověřilo, že je to to správné.</value>
   </data>
   <data name="SiteIntro" xml:space="preserve">
-    <value>Kde instalace je, její časové pásmo a domácí baterie, se kterou počítají režimy podle předpovědi. Poloha a časové pásmo jsou povinné; bez domácí baterie nabíjí Forecasted jen z aktuálního přebytku.</value>
+    <value>Kde instalace je, její časové pásmo a domácí baterie, se kterou počítají režimy podle předpovědi. Gleanvolt se spustí i bez polohy a časového pásma, ale doporučujeme je vyplnit: bez polohy nebude počasí a bez časového pásma počítá Windows dny v UTC; bez domácí baterie nabíjí Forecasted jen z aktuálního přebytku.</value>
   </data>
   <data name="SolcastIntro" xml:space="preserve">
     <value>Účet Solcast poskytuje předpověď solární energie, podle které plánují režimy Forecasted a Targeted. Bez něj Gleanvolt nabíjí jen z aktuálního přebytku.</value>
@@ -68,6 +68,9 @@
   </data>
   <data name="FinishMissing" xml:space="preserve">
     <value>Před spuštěním správce nabíjení ještě chybí:</value>
+  </data>
+  <data name="FinishRecommended" xml:space="preserve">
+    <value>Doporučené, i když se Gleanvolt spustí i bez nich:</value>
   </data>
   <data name="FinishOptional" xml:space="preserve">
     <value>Volitelné a kdykoli nastavitelné v Nastavení:</value>

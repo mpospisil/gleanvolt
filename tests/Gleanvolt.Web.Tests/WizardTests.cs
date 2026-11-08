@@ -182,6 +182,39 @@ public class WizardTests : PageTest
     }
 
     [Fact]
+    public void Starting_from_the_finish_lands_on_the_overview()
+    {
+        var page = Step("finish");
+
+        page.Find("#restart").Click();
+        page.Find("#restart-confirm").Click();
+
+        var reload = Assert.Single(JSInterop.Invocations, call => call.Identifier == "gleanvolt.reloadAfterRestart");
+        Assert.Equal("/", Assert.Single(reload.Arguments));
+    }
+
+    [Fact]
+    public void A_missing_location_or_time_zone_is_recommended_but_does_not_hold_the_start_back()
+    {
+        _setup.Status = new SetupStatus(
+            [],
+            [],
+            [
+                new SetupProblem(SetupArea.Location, "The site's location is not set. Set Pv:Latitude and Pv:Longitude.", Phrase.Of("Config.SetupNoLocation")),
+                new SetupProblem(SetupArea.TimeZone, "The site's time zone is not set. Set Controller:TimeZone (e.g. Europe/Prague).", Phrase.Of("Config.SetupNoTimeZone")),
+            ]);
+
+        var finish = Step("finish").Find("#wizard-finish");
+
+        var recommended = finish.QuerySelector("#wizard-recommended");
+        Assert.NotNull(recommended);
+        Assert.Contains("location is not set", recommended.TextContent);
+        Assert.Contains("time zone is not set", recommended.TextContent);
+        Assert.NotNull(recommended.QuerySelector("a[href='/wizard/site']"));
+        Assert.NotNull(finish.QuerySelector("#restart"));
+    }
+
+    [Fact]
     public void Optional_steps_can_be_skipped_and_required_ones_say_next()
     {
         Assert.Contains("skip", Step("solcast").Find("#wizard-next").TextContent);

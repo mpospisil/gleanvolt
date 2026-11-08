@@ -49,6 +49,10 @@ else
     [Parameter]
     public string? Hint { get; set; }
 
+    /// <summary>Where the browser goes once the restarted process answers; the same page when null.</summary>
+    [Parameter]
+    public string? After { get; set; }
+
     private bool _confirming;
     private bool _restarting;
 
@@ -62,7 +66,7 @@ else
         // with Blazor's own reconnect prompt, which is where it would have been anyway.
         try
         {
-            await JS.InvokeVoidAsync("gleanvolt.reloadAfterRestart");
+            await JS.InvokeVoidAsync("gleanvolt.reloadAfterRestart", After);
         }
         catch (JSException)
         {

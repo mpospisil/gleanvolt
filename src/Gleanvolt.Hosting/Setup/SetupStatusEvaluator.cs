@@ -8,8 +8,9 @@ namespace Gleanvolt.Hosting.Setup;
 
 /// <summary>
 /// Computes <see cref="SetupStatus"/> from configuration (#301). The rules are the resolver's own --
-/// <see cref="PvSystemRules"/>, the retired keys, the time zone -- plus the two things only a first
-/// run asks for: a location and the web UI's password.
+/// <see cref="PvSystemRules"/>, the retired keys, a time zone that resolves -- plus the web UI's
+/// password. A location and a time zone are asked for too, but only recommended: the controller runs
+/// without them, and the devices are what it cannot run without.
 /// </summary>
 public static class SetupStatusEvaluator
 {
@@ -30,6 +31,7 @@ public static class SetupStatusEvaluator
         ArgumentNullException.ThrowIfNull(host);
 
         var required = new List<SetupProblem>();
+        var recommended = new List<SetupProblem>();
 
         // Before anything is bound, as RetiredConfigurationKeys always has been: a moved key would
         // otherwise be silently ignored, and the controller run against whatever replaced it.
@@ -51,19 +53,22 @@ public static class SetupStatusEvaluator
         }
 
         // Half-set coordinates are already a PvSystemRules problem; this is the other half of
-        // "location": none at all. The rules allow it -- nothing in them needs a place -- but a first
-        // run has to collect it, and an installation without one plans its forecast nowhere.
+        // "location": none at all. The rules allow it -- nothing in them needs a place -- so a first
+        // run asks for it but does not wait for it: without one the weather is simply not fetched.
         if (pv.Latitude is null && pv.Longitude is null)
         {
-            required.Add(new SetupProblem(
+            recommended.Add(new SetupProblem(
                 SetupArea.Location,
                 "The site's location is not set. Set Pv:Latitude and Pv:Longitude.",
                 Phrase.Of("Config.SetupNoLocation")));
         }
 
-        TimeZone(configuration, host, required);
+        TimeZone(configuration, host, required, recommended);
 
-        return new SetupStatus(required, Optional(configuration, optional ?? OptionalSettings.FromConfiguration(configuration)));
+        return new SetupStatus(
+            required,
+            Optional(configuration, optional ?? OptionalSettings.FromConfiguration(configuration)),
+            recommended);
     }
 
     // The password the UI is locked with. Not needed where nothing serves the UI, and not needed
@@ -88,7 +93,10 @@ public static class SetupStatusEvaluator
     // the host's own zone can be believed. On Linux the container's TZ sets that; on Windows .NET
     // ignores TZ, and a host that reports bare UTC has most likely never been told its zone at all.
     // A household on UTC proper is not ruled out -- it says so with Controller:TimeZone=Etc/UTC.
-    private static void TimeZone(IConfiguration configuration, SetupHost host, List<SetupProblem> required)
+    // A zone that does not resolve is required: ZonedTimeProvider would stop the host at startup. One
+    // that is not set is only recommended: the controller runs on the host's zone (UTC) and says so.
+    private static void TimeZone(
+        IConfiguration configuration, SetupHost host, List<SetupProblem> required, List<SetupProblem> recommended)
     {
         var configured = configuration.GetSection(ControllerOptions.SectionName)[nameof(ControllerOptions.TimeZone)];
 
@@ -111,7 +119,7 @@ public static class SetupStatusEvaluator
 
         if (host.IsWindows || IsBareUtc(host.LocalZone))
         {
-            required.Add(new SetupProblem(
+            recommended.Add(new SetupProblem(
                 SetupArea.TimeZone,
                 "The site's time zone is not set. Set Controller:TimeZone (e.g. Europe/Prague).",
                 Phrase.Of("Config.SetupNoTimeZone")));
