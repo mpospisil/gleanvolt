@@ -14,7 +14,11 @@ public enum RegisterTable
 /// <param name="Table">Which table.</param>
 /// <param name="Start">The first address.</param>
 /// <param name="Count">How many registers, at least one.</param>
-public sealed record RegisterRange(RegisterTable Table, ushort Start, ushort Count)
+/// <param name="UnitId">
+/// Another unit id on the same connection (<see cref="IModbusClient.ForUnit"/>), for a gateway that answers
+/// for itself; null is the client's own unit.
+/// </param>
+public sealed record RegisterRange(RegisterTable Table, ushort Start, ushort Count, byte? UnitId = null)
 {
     /// <summary>Every address in the range.</summary>
     public IEnumerable<ushort> Addresses => Enumerable.Range(Start, Count).Select(address => (ushort)address);

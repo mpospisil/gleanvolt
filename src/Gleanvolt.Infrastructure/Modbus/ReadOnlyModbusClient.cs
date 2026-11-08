@@ -49,5 +49,26 @@ public sealed class ReadOnlyModbusClient : IModbusClient
         return Task.CompletedTask;
     }
 
+    /// <summary>Another unit on the same connection, just as unable to write.</summary>
+    public IModbusClient ForUnit(byte unitId) => new ReadOnlyModbusClient(new UnitScope(_inner.ForUnit(unitId)), _logger);
+
     public ValueTask DisposeAsync() => _inner.DisposeAsync();
+
+    // A unit view's disposal must not reach the shared connection; the view's own is a no-op on the real
+    // client, but this does not rely on it.
+    private sealed class UnitScope(IModbusClient view) : IModbusClient
+    {
+        public bool IsConnected => view.IsConnected;
+        public Task ConnectAsync(CancellationToken cancellationToken = default) => view.ConnectAsync(cancellationToken);
+        public Task<ushort[]> ReadHoldingRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
+            view.ReadHoldingRegistersAsync(startAddress, numberOfPoints, cancellationToken);
+        public Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
+            view.ReadInputRegistersAsync(startAddress, numberOfPoints, cancellationToken);
+        public Task WriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default) =>
+            view.WriteSingleRegisterAsync(address, value, cancellationToken);
+        public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default) =>
+            view.WriteMultipleRegistersAsync(startAddress, values, cancellationToken);
+        public IModbusClient ForUnit(byte unitId) => view.ForUnit(unitId);
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

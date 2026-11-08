@@ -417,6 +417,9 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Inverter brand</value>
   </data>
+  <data name="FieldInverterTopology" xml:space="preserve">
+    <value>Connected through</value>
+  </data>
   <data name="FieldInverterModel" xml:space="preserve">
     <value>Inverter model</value>
   </data>
@@ -952,6 +955,12 @@
   </data>
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>Which family of inverters Gleanvolt is talking to. It decides which registers are read and how the home battery is held. Every model of a brand that shares the same Modbus registers uses the same entry.</value>
+  </data>
+  <data name="HelpInverterTopology" xml:space="preserve">
+    <value>How Gleanvolt reaches the inverter. With the inverter's own dongle, everything is read from the inverter. Behind an energy manager such as Huawei's EMMA, Gleanvolt talks to the energy manager instead: the grid comes from its own sensor, and the inverter is reached through it, on the unit id the energy manager assigned to the inverter. Enter that id as the inverter unit id.</value>
+  </data>
+  <data name="NoteEmmaOneClient" xml:space="preserve">
+    <value>The EMMA accepts only one Modbus TCP client and resets any further connection. Gleanvolt has to be the only one, or put a Modbus proxy in front of the EMMA. Modbus TCP is enabled with the installer account: Commission device → Communication settings → Modbus TCP.</value>
   </data>
   <data name="HelpInverterModel" xml:space="preserve">
     <value>The inverter's model, for example SolaX X3-HYB-G4 PRO. For reference only: the brand above decides how Gleanvolt talks to the device.</value>

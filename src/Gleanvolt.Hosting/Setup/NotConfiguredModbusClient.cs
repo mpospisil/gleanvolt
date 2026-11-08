@@ -24,6 +24,9 @@ internal sealed class NotConfiguredModbusClient : IModbusClient
 
     public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default) => Refuse();
 
+    // Every unit refuses alike.
+    public IModbusClient ForUnit(byte unitId) => this;
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static Task Refuse() => Task.FromException(Error());

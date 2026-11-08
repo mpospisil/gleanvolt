@@ -287,6 +287,7 @@ public static class GleanvoltHostingExtensions
                     DryRun = batteryHold.DryRun,
                     HoldCommandDuration = batteryHold.Duration,
                     HoldRetargetThresholdWatts = batteryHold.TargetChangeThresholdWatts,
+                    Topology = provider.GetRequiredService<PvSystemInfo>().InverterTopology,
                 });
         });
 

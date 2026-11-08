@@ -63,6 +63,8 @@ public class PvSystemEditorFormTests : BunitContext
     [Fact]
     public void Every_field_says_what_it_means_before_where_it_comes_from()
     {
+        // A driver reached two ways, so the topology field is on the page too.
+        _editor.Running[PvSystemSettingKeys.InverterDriver] = "acme";
         var form = Render<PvSystemEditorForm>();
 
         foreach (var key in PvSystemSettingKeys.All)
@@ -148,6 +150,51 @@ public class PvSystemEditorFormTests : BunitContext
         var probe = Assert.Single(_editor.Probes);
         Assert.Equal(PvDeviceRole.Inverter, probe.Role);
         Assert.Equal("acme", Assert.Single(_editor.ProbeDrivers));
+    }
+
+    [Fact]
+    public void The_topology_is_offered_only_for_a_driver_reached_more_than_one_way()
+    {
+        var form = Render<PvSystemEditorForm>();
+        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.InverterTopology)));
+
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("acme");
+
+        var select = form.Find(Field(PvSystemSettingKeys.InverterTopology));
+        Assert.Equal(["Hub", "EMMA"], select.QuerySelectorAll("option").Select(option => option.TextContent));
+        Assert.Equal("hub", select.GetAttribute("value"));
+        Assert.Empty(form.FindAll("#pv-emma-one-client"));
+    }
+
+    [Fact]
+    public void Choosing_the_emma_says_it_takes_one_client_and_probes_through_it()
+    {
+        var form = Render<PvSystemEditorForm>();
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("acme");
+
+        form.Find(Field(PvSystemSettingKeys.InverterTopology)).Change("emma");
+
+        Assert.Contains("one Modbus TCP client", form.Find("#pv-emma-one-client").TextContent);
+
+        form.Find("#pv-save").Click();
+
+        Assert.Equal("emma", Assert.Single(_editor.Saves)[PvSystemSettingKeys.InverterTopology]);
+        Assert.Equal("emma", Assert.Single(_editor.ProbeTopologies));
+    }
+
+    [Fact]
+    public void Leaving_a_driver_takes_its_topology_with_it()
+    {
+        _editor.Running[PvSystemSettingKeys.InverterDriver] = "acme";
+        _editor.Running[PvSystemSettingKeys.InverterTopology] = "emma";
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.InverterDriver)).Change("solax");
+        form.Find("#pv-save").Click();
+
+        var save = Assert.Single(_editor.Saves);
+        Assert.Equal("solax", save[PvSystemSettingKeys.InverterDriver]);
+        Assert.Equal(string.Empty, save[PvSystemSettingKeys.InverterTopology]);
     }
 
     [Fact]

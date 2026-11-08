@@ -8,31 +8,50 @@ namespace Gleanvolt.Devices.Testing;
 /// "illegal data address" (<see cref="ModbusDeviceException.IllegalDataAddress"/>), as the device refuses it.
 /// A write is recorded and changes nothing that is read back: on the hardware a command block is not
 /// readable, and a test that wrote and read back its own value would prove nothing about the device.</para>
+///
+/// <para><b>Other units</b> (<see cref="ForUnit"/>, issue #322) answer from the dump's
+/// <see cref="RegisterDump.Units"/>, on the same recorded connection: their reads and writes land in this
+/// client's <see cref="Reads"/> and <see cref="Writes"/>, tagged with the unit id. A unit the dump does not
+/// have refuses every address, as a gateway with nothing behind that id does.</para>
 /// </summary>
 public sealed class ReplayModbusClient : IModbusClient
 {
     private readonly RegisterDump _dump;
+    private readonly byte? _unit;
+    private readonly ReplayModbusClient _root;
     private readonly List<RegisterWrite> _writes = [];
+    private readonly List<RegisterRange> _reads = [];
+    private bool _connected;
 
     public ReplayModbusClient(RegisterDump dump)
     {
         ArgumentNullException.ThrowIfNull(dump);
         _dump = dump;
+        _root = this;
     }
 
-    /// <summary>Every write, in order: the exact sequence a driver sent.</summary>
-    public IReadOnlyList<RegisterWrite> Writes => _writes;
+    private ReplayModbusClient(ReplayModbusClient root, byte unit)
+    {
+        _root = root;
+        _unit = unit;
+        _dump = root._dump.Units.GetValueOrDefault(unit) ?? new RegisterDump();
+    }
 
-    /// <summary>Every read, in order.</summary>
-    public List<RegisterRange> Reads { get; } = [];
+    /// <summary>Every write, in order: the exact sequence a driver sent, on every unit.</summary>
+    public IReadOnlyList<RegisterWrite> Writes => _root._writes;
 
-    public bool IsConnected { get; private set; }
+    /// <summary>Every read, in order, on every unit; a read of another unit carries its id.</summary>
+    public List<RegisterRange> Reads => _root._reads;
+
+    public bool IsConnected => _root._connected;
 
     public Task ConnectAsync(CancellationToken cancellationToken = default)
     {
-        IsConnected = true;
+        _root._connected = true;
         return Task.CompletedTask;
     }
+
+    public IModbusClient ForUnit(byte unitId) => new ReplayModbusClient(_root, unitId);
 
     public Task<ushort[]> ReadHoldingRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
         Read(RegisterTable.Holding, startAddress, numberOfPoints);
@@ -42,14 +61,14 @@ public sealed class ReplayModbusClient : IModbusClient
 
     public Task WriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default)
     {
-        _writes.Add(new RegisterWrite(address, [value]));
+        _root._writes.Add(new RegisterWrite(address, [value], _unit));
         return Task.CompletedTask;
     }
 
     public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(values);
-        _writes.Add(new RegisterWrite(startAddress, [.. values]));
+        _root._writes.Add(new RegisterWrite(startAddress, [.. values], _unit));
         return Task.CompletedTask;
     }
 
@@ -57,7 +76,7 @@ public sealed class ReplayModbusClient : IModbusClient
 
     private Task<ushort[]> Read(RegisterTable table, ushort start, ushort count)
     {
-        Reads.Add(new RegisterRange(table, start, count));
+        Reads.Add(new RegisterRange(table, start, count, _unit));
         var registers = _dump[table];
         var values = new ushort[count];
 
@@ -68,7 +87,7 @@ public sealed class ReplayModbusClient : IModbusClient
             {
                 return Task.FromException<ushort[]>(new ModbusDeviceException(
                     ModbusDeviceException.IllegalDataAddress,
-                    $"The recorded device keeps no {table.ToString().ToLowerInvariant()} register at 0x{address:X4}."));
+                    $"The recorded device{(_unit is { } unit ? $" (unit {unit})" : string.Empty)} keeps no {table.ToString().ToLowerInvariant()} register at 0x{address:X4}."));
             }
         }
 
@@ -76,5 +95,5 @@ public sealed class ReplayModbusClient : IModbusClient
     }
 }
 
-/// <summary>One write a driver made: the start address and every value, in order.</summary>
-public sealed record RegisterWrite(ushort Start, IReadOnlyList<ushort> Values);
+/// <summary>One write a driver made: the start address and every value, in order, and the other unit it went to, if any.</summary>
+public sealed record RegisterWrite(ushort Start, IReadOnlyList<ushort> Values, byte? UnitId = null);

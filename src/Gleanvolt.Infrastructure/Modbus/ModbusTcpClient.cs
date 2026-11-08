@@ -116,6 +116,13 @@ public sealed class ModbusTcpClient : IModbusClient
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(master => master.WriteMultipleRegistersAsync(_device.UnitId, startAddress, values), cancellationToken);
 
+    /// <summary>
+    /// The same connection, addressed to <paramref name="unitId"/> (issue #322): the one socket, the one
+    /// gate and the one request spacing, so a gateway that takes a single client (Huawei's EMMA) is never
+    /// opened twice. Disposing the view leaves the connection open.
+    /// </summary>
+    public IModbusClient ForUnit(byte unitId) => new UnitView(this, unitId);
+
     public ValueTask DisposeAsync()
     {
         Invalidate();
@@ -154,6 +161,30 @@ public sealed class ModbusTcpClient : IModbusClient
         {
             _gate.Release();
         }
+    }
+
+    private sealed class UnitView(ModbusTcpClient owner, byte unitId) : IModbusClient
+    {
+        public bool IsConnected => owner.IsConnected;
+
+        public Task ConnectAsync(CancellationToken cancellationToken = default) => owner.ConnectAsync(cancellationToken);
+
+        public Task<ushort[]> ReadHoldingRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
+            owner.ExecuteAsync(master => master.ReadHoldingRegistersAsync(unitId, startAddress, numberOfPoints), cancellationToken);
+
+        public Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
+            owner.ExecuteAsync(master => master.ReadInputRegistersAsync(unitId, startAddress, numberOfPoints), cancellationToken);
+
+        public Task WriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default) =>
+            owner.ExecuteAsync(master => master.WriteSingleRegisterAsync(unitId, address, value), cancellationToken);
+
+        public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default) =>
+            owner.ExecuteAsync(master => master.WriteMultipleRegistersAsync(unitId, startAddress, values), cancellationToken);
+
+        public IModbusClient ForUnit(byte otherUnitId) => owner.ForUnit(otherUnitId);
+
+        // The connection is the owner's.
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private Task ExecuteAsync(Func<IModbusMaster, Task> operation, CancellationToken cancellationToken) =>

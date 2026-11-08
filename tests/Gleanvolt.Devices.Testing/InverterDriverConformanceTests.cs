@@ -18,6 +18,16 @@ public abstract class InverterDriverConformanceTests<TFactory>
     /// <summary>The factory under test.</summary>
     protected abstract TFactory CreateFactory();
 
+    /// <summary>
+    /// What every driver under test is created with: the defaults, unless the suite covers one topology of a
+    /// family reached more than one way (#322). Dry-run is added where a test needs it.
+    /// </summary>
+    protected virtual InverterDriverOptions Options => new();
+
+    /// <summary>A driver from <see cref="CreateFactory"/> with <see cref="Options"/>, on <paramref name="client"/>.</summary>
+    protected IInverterDriver CreateDriver(IModbusClient client, bool dryRun = false) =>
+        CreateFactory().Create(client, Options with { DryRun = dryRun });
+
     /// <summary>At night, battery idle, the house importing from the grid.</summary>
     protected abstract RegisterDump NightImporting { get; }
 
@@ -81,7 +91,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
 
         foreach (var dump in Dumps)
         {
-            var driver = factory.Create(new ReplayModbusClient(dump), new InverterDriverOptions());
+            var driver = factory.Create(new ReplayModbusClient(dump), Options);
             var reading = await driver.ReadAsync();
 
             Assert.Equal(factory.Capabilities, driver.Capabilities);
@@ -96,7 +106,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         foreach (var dump in Dumps)
         {
             var client = new ReplayModbusClient(dump);
-            var driver = CreateFactory().Create(client, new InverterDriverOptions());
+            var driver = CreateDriver(client);
 
             await driver.ReadAsync();
             await driver.ProbeAsync();
@@ -109,7 +119,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
     public async Task In_dry_run_holding_and_releasing_write_nothing()
     {
         var client = new ReplayModbusClient(NightImporting);
-        var driver = CreateFactory().Create(client, new InverterDriverOptions { DryRun = true });
+        var driver = CreateDriver(client, dryRun: true);
         if (driver.BatteryHold is not { } hold)
         {
             return;
@@ -125,7 +135,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
     public async Task The_hold_writes_to_arm_and_to_release_and_nothing_in_a_steady_state()
     {
         var client = new ReplayModbusClient(NightImporting);
-        var driver = CreateFactory().Create(client, new InverterDriverOptions());
+        var driver = CreateDriver(client);
         if (driver.BatteryHold is not { } hold)
         {
             return;
@@ -160,7 +170,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
     {
         foreach (var dump in Dumps)
         {
-            var probe = await CreateFactory().Create(new ReplayModbusClient(dump), new InverterDriverOptions()).ProbeAsync();
+            var probe = await CreateDriver(new ReplayModbusClient(dump)).ProbeAsync();
 
             Assert.True(probe.Recognised, Describe(dump) + " was not recognised by its own driver's probe.");
         }
@@ -169,7 +179,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
     [Fact]
     public async Task The_probe_does_not_recognise_another_family()
     {
-        var driver = CreateFactory().Create(new ReplayModbusClient(OtherFamily), new InverterDriverOptions());
+        var driver = CreateDriver(new ReplayModbusClient(OtherFamily));
 
         // Either answer is a refusal: a reading this family would not report, or a device that keeps
         // nothing at the address the family is known by.
@@ -187,21 +197,21 @@ public abstract class InverterDriverConformanceTests<TFactory>
     {
         var factory = CreateFactory();
         var client = new ReplayModbusClient(NightImporting);
-        var driver = factory.Create(client, new InverterDriverOptions());
+        var driver = factory.Create(client, Options);
 
         await driver.ReadAsync();
         await driver.ProbeAsync();
 
-        var covered = factory.Snapshot.Ranges
-            .SelectMany(range => range.Addresses.Select(address => (range.Table, address)))
+        var covered = factory.SnapshotFor(Options).Ranges
+            .SelectMany(range => range.Addresses.Select(address => (range.UnitId, range.Table, address)))
             .ToHashSet();
 
         foreach (var read in client.Reads)
         {
             foreach (var address in read.Addresses)
             {
-                Assert.True(covered.Contains((read.Table, address)),
-                    $"The driver reads {read.Table} 0x{address:X4}, which its snapshot does not include; a tester's snapshot could not replay it.");
+                Assert.True(covered.Contains((read.UnitId, read.Table, address)),
+                    $"The driver reads {read.Table} 0x{address:X4}{(read.UnitId is { } unit ? $" on unit {unit}" : string.Empty)}, which its snapshot does not include; a tester's snapshot could not replay it.");
             }
         }
     }
@@ -211,13 +221,13 @@ public abstract class InverterDriverConformanceTests<TFactory>
     {
         var factory = CreateFactory();
         var snapshot = await RegisterSnapshot.TakeAsync(
-            new ReplayModbusClient(NightImporting), factory.Snapshot, new RegisterDump { Driver = factory.Id });
+            new ReplayModbusClient(NightImporting), factory.SnapshotFor(Options), new RegisterDump { Driver = factory.Id });
 
         var original = await ReadAsync(NightImporting);
-        var replayed = await factory.Create(new ReplayModbusClient(snapshot), new InverterDriverOptions()).ReadAsync();
+        var replayed = await factory.Create(new ReplayModbusClient(snapshot), Options).ReadAsync();
 
         Assert.Equal(original, replayed);
-        AssertSerialRedacted(factory.Snapshot, snapshot);
+        AssertSerialRedacted(factory.SnapshotFor(Options), snapshot);
     }
 
     [Fact]
@@ -227,7 +237,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         // repository.
         foreach (var dump in Dumps.Append(OtherFamily))
         {
-            AssertSerialRedacted(CreateFactory().Snapshot, dump);
+            AssertSerialRedacted(CreateFactory().SnapshotFor(Options), dump);
         }
     }
 
@@ -235,7 +245,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
     protected static RegisterDump Load(string path) => RegisterDump.FromJson(File.ReadAllText(path));
 
     private async Task<InverterReading> ReadAsync(RegisterDump dump) =>
-        await CreateFactory().Create(new ReplayModbusClient(dump), new InverterDriverOptions()).ReadAsync();
+        await CreateDriver(new ReplayModbusClient(dump)).ReadAsync();
 
     private static void AssertSerialRedacted(RegisterSnapshotSpec spec, RegisterDump dump)
     {
@@ -244,9 +254,11 @@ public abstract class InverterDriverConformanceTests<TFactory>
             return;
         }
 
+        var unit = serial.UnitId is { } id ? dump.Units.GetValueOrDefault(id) ?? new RegisterDump() : dump;
+        var table = unit[serial.Table];
         var characters = serial.Addresses
-            .Where(dump[serial.Table].ContainsKey)
-            .SelectMany(address => new[] { (char)(dump[serial.Table][address] >> 8), (char)(dump[serial.Table][address] & 0xFF) })
+            .Where(table.ContainsKey)
+            .SelectMany(address => new[] { (char)(table[address] >> 8), (char)(table[address] & 0xFF) })
             .ToList();
 
         for (var index = spec.SerialPrefixLength; index < characters.Count; index++)

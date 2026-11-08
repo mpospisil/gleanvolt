@@ -19,9 +19,14 @@ namespace Gleanvolt.Devices;
 ///   "gleanvoltVersion": "1.2.40", "capturedAt": "2026-11-08T12:00:00+00:00",
 ///   "note": "",
 ///   "holding": { "0x0000": 18484, ... },
-///   "input": { "0x001C": 57, ... }
+///   "input": { "0x001C": 57, ... },
+///   "units": { "0": { "holding": { "0x7BA9": 0, ... }, "input": {} } }
 /// }
 /// </code>
+///
+/// <para><c>units</c> is there only for a device reached through a gateway that answers for itself on
+/// another unit id, on the same connection (Huawei's EMMA, issue #322); the top-level tables are the
+/// configured unit's.</para>
 /// </summary>
 public sealed record RegisterDump
 {
@@ -52,6 +57,11 @@ public sealed record RegisterDump
     /// <summary>Input registers, by address.</summary>
     public IReadOnlyDictionary<ushort, ushort> Input { get; init; } = new Dictionary<ushort, ushort>();
 
+    /// <summary>
+    /// Other unit ids on the same connection, each with only its tables; empty for a dump of one unit.
+    /// </summary>
+    public IReadOnlyDictionary<byte, RegisterDump> Units { get; init; } = new Dictionary<byte, RegisterDump>();
+
     /// <summary>One table.</summary>
     public IReadOnlyDictionary<ushort, ushort> this[RegisterTable table] => table == RegisterTable.Holding ? Holding : Input;
 
@@ -70,6 +80,21 @@ public sealed record RegisterDump
             ["holding"] = Table(Holding),
             ["input"] = Table(Input),
         };
+
+        if (Units.Count > 0)
+        {
+            var units = new JsonObject();
+            foreach (var (unit, dump) in Units.OrderBy(entry => entry.Key))
+            {
+                units[unit.ToString(CultureInfo.InvariantCulture)] = new JsonObject
+                {
+                    ["holding"] = Table(dump.Holding),
+                    ["input"] = Table(dump.Input),
+                };
+            }
+
+            root["units"] = units;
+        }
 
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
@@ -110,7 +135,38 @@ public sealed record RegisterDump
             Note = (string?)root["note"] ?? string.Empty,
             Holding = ReadTable(root["holding"], "holding"),
             Input = ReadTable(root["input"], "input"),
+            Units = ReadUnits(root["units"]),
         };
+    }
+
+    private static Dictionary<byte, RegisterDump> ReadUnits(JsonNode? node)
+    {
+        var units = new Dictionary<byte, RegisterDump>();
+        if (node is null)
+        {
+            return units;
+        }
+
+        if (node is not JsonObject entries)
+        {
+            throw new FormatException("'units' is an object of unit id to tables.");
+        }
+
+        foreach (var (key, value) in entries)
+        {
+            if (!byte.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var unit))
+            {
+                throw new FormatException($"'units' key '{key}' is not a unit id (0 to 255).");
+            }
+
+            units[unit] = new RegisterDump
+            {
+                Holding = ReadTable(value?["holding"], $"units.{key}.holding"),
+                Input = ReadTable(value?["input"], $"units.{key}.input"),
+            };
+        }
+
+        return units;
     }
 
     private static JsonObject Table(IReadOnlyDictionary<ushort, ushort> registers)

@@ -408,6 +408,9 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Značka střídače</value>
   </data>
+  <data name="FieldInverterTopology" xml:space="preserve">
+    <value>Připojení přes</value>
+  </data>
   <data name="FieldInverterModel" xml:space="preserve">
     <value>Model střídače</value>
   </data>
@@ -938,6 +941,12 @@
   </data>
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>S jakou rodinou střídačů Gleanvolt komunikuje. Určuje, které registry čte a jak drží domácí baterii. Všechny modely jedné značky se stejnými registry Modbus používají stejnou položku.</value>
+  </data>
+  <data name="HelpInverterTopology" xml:space="preserve">
+    <value>Jak se Gleanvolt ke střídači připojuje. Přes vlastní dongle střídače čte všechno přímo ze střídače. Za správcem energie, jako je EMMA od Huawei, komunikuje Gleanvolt se správcem energie: síť čte z jeho vlastního senzoru a ke střídači se dostane přes něj, na Unit ID, které správce energie střídači přidělil. To ID zadejte do pole Unit ID střídače.</value>
+  </data>
+  <data name="NoteEmmaOneClient" xml:space="preserve">
+    <value>EMMA přijímá jen jednoho klienta Modbus TCP a každé další spojení ukončí. Gleanvolt musí být jediný klient, nebo před EMMA zařaďte proxy Modbus. Modbus TCP se zapíná instalačním účtem: Commission device → Communication settings → Modbus TCP.</value>
   </data>
   <data name="HelpInverterModel" xml:space="preserve">
     <value>Model střídače, například SolaX X3-HYB-G4 PRO. Jen pro informaci: jak Gleanvolt se zařízením komunikuje, určuje značka výše.</value>

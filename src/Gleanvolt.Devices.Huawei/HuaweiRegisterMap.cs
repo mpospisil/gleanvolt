@@ -46,4 +46,20 @@ public static class HuaweiRegisterMap
 
     /// <summary>How many registers the battery block takes.</summary>
     public const ushort BatteryBlockCount = BatteryPower + 2 - BatterySoc;
+
+    /// <summary>
+    /// The EMMA's own unit id (issue #322): it answers for itself here, and forwards the inverter's unit id
+    /// to the inverter.
+    /// </summary>
+    public const byte EmmaUnitId = 0;
+
+    /// <summary>
+    /// The EMMA's built-in sensor's active power at the grid connection, int32, watts, from evcc's
+    /// <c>huawei-emma.yaml</c> (MIT). Taken to count export as positive like the inverter's meter; to be
+    /// confirmed by a tester's dump (#325).
+    /// </summary>
+    public const ushort EmmaGridActivePower = 31657;
+
+    /// <summary>The EMMA's grid block a snapshot reads: the total, then phases A, B and C (31665/67/69), int32 each.</summary>
+    public const ushort EmmaGridBlockCount = 31671 - EmmaGridActivePower;
 }

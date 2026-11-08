@@ -38,6 +38,9 @@ public sealed class FakeModbusTcpServer : IAsyncDisposable
     /// <summary>How many requests were answered, corrupt responses included.</summary>
     public int RequestsHandled => Volatile.Read(ref _requestsHandled);
 
+    /// <summary>The unit id of every request, in order.</summary>
+    public System.Collections.Concurrent.ConcurrentQueue<byte> UnitIds { get; } = new();
+
     /// <summary>The value every register read returns.</summary>
     public ushort RegisterValue { get; set; } = 42;
 
@@ -103,6 +106,7 @@ public sealed class FakeModbusTcpServer : IAsyncDisposable
                     return;
                 }
 
+                UnitIds.Enqueue(header[6]);
                 var response = BuildResponse(header[6], pdu, transactionId);
                 Interlocked.Increment(ref _requestsHandled);
                 await stream.WriteAsync(response, _cts.Token).ConfigureAwait(false);

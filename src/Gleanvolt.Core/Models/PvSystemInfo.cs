@@ -57,6 +57,12 @@ public sealed record PvSystemInfo(
     public string InverterDriver { get; init; } = Configuration.PvSystemRules.DefaultInverterDriver;
 
     /// <summary>
+    /// How the inverter is reached (<c>Pv:Inverter:Topology</c>, issue #322), lower case: the driver's
+    /// default when the configuration leaves it empty, and empty for a driver reached one way only.
+    /// </summary>
+    public string InverterTopology { get; init; } = string.Empty;
+
+    /// <summary>
     /// One line for the log at startup, so a `docker logs` dump answers "which installation was this,
     /// and what was it talking to" without the configuration beside it.
     /// </summary>

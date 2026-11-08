@@ -58,4 +58,22 @@ public class ReadOnlyModbusClientTests
         var holding = await client.ReadHoldingRegistersAsync(0x628, 1);
         Assert.Equal(1600, holding[0]);
     }
+
+    [Fact]
+    public async Task AnotherUnitIsJustAsReadOnly()
+    {
+        // The EMMA's own unit (#322): reads reach it, on the one connection; writes reach nothing.
+        await using var server = new FakeModbusTcpServer();
+        await using var tcp = new ModbusTcpClient(new Gleanvolt.Core.Models.DeviceConfig
+        {
+            Host = "127.0.0.1", Port = server.Port, UnitId = 1, MinRequestInterval = TimeSpan.Zero,
+        });
+        var emma = new ReadOnlyModbusClient(tcp, NullLogger<ReadOnlyModbusClient>.Instance).ForUnit(0);
+
+        await emma.ReadHoldingRegistersAsync(31657, 2);
+        await emma.WriteSingleRegisterAsync(40000, 1);
+        await emma.WriteMultipleRegistersAsync(40000, [1, 2]);
+
+        Assert.Equal(new byte[] { 0 }, server.UnitIds);
+    }
 }

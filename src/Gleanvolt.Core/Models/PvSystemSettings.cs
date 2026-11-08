@@ -24,6 +24,7 @@ public static class PvSystemSettingKeys
     public const string InverterCapacityKw = "Pv:InverterCapacityKw";
     public const string LossFactor = "Pv:LossFactor";
     public const string InverterDriver = "Pv:Inverter:Driver";
+    public const string InverterTopology = "Pv:Inverter:Topology";
     public const string InverterModel = "Pv:Inverter:Model";
     public const string InverterHost = "Pv:Inverter:Host";
     public const string InverterPort = "Pv:Inverter:Port";
@@ -55,7 +56,7 @@ public static class PvSystemSettingKeys
         Latitude, Longitude, TimeZone, AzimuthDegrees, TiltDegrees,
         CapacityKwp, InverterCapacityKw, LossFactor,
         HomeBatteryCapacityKWh, HomeBatteryChargeEfficiency,
-        InverterDriver, InverterModel, InverterHost, InverterPort, InverterUnitId, InverterUnmeteredGridPhase,
+        InverterDriver, InverterTopology, InverterModel, InverterHost, InverterPort, InverterUnitId, InverterUnmeteredGridPhase,
         ChargerId, ChargerModel, ChargerHost, ChargerPort, ChargerUnitId,
     ];
 

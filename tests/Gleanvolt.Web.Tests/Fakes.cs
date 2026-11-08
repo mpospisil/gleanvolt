@@ -842,12 +842,16 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     /// <summary>The driver each probe in <see cref="Probes"/> asked for, in the same order.</summary>
     public List<string?> ProbeDrivers { get; } = [];
 
+    /// <summary>The topology each probe in <see cref="Probes"/> asked for, in the same order.</summary>
+    public List<string?> ProbeTopologies { get; } = [];
+
     // SolaX as the host has it, and a second family with its own port, so a test can see the form follow
-    // the selected driver's defaults.
+    // the selected driver's defaults; the second is reached two ways, the second of them an EMMA (#322).
     public IReadOnlyList<InverterDriverInfo> InverterDrivers { get; set; } =
     [
         new("solax", "SolaX", new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)), new InverterCapabilities(true, true)),
-        new("acme", "Acme", new ModbusDefaults(6607, 0, TimeSpan.FromMilliseconds(50)), new InverterCapabilities(false, false)),
+        new("acme", "Acme", new ModbusDefaults(6607, 0, TimeSpan.FromMilliseconds(50)), new InverterCapabilities(false, false),
+            [new InverterTopology("hub", "Hub"), new InverterTopology("emma", "EMMA")]),
     ];
 
     public PvSystemSettings Read() => new(
@@ -893,10 +897,11 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     }
 
     public Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role, string host, int port, byte unitId, string? inverterDriver = null, CancellationToken cancellationToken = default)
+        PvDeviceRole role, string host, int port, byte unitId, string? inverterDriver = null, string? inverterTopology = null, CancellationToken cancellationToken = default)
     {
         Probes.Add((role, host, port, unitId));
         ProbeDrivers.Add(inverterDriver);
+        ProbeTopologies.Add(inverterTopology);
         return Task.FromResult(ProbeResult);
     }
 }
