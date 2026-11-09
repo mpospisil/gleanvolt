@@ -4,6 +4,27 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — The SolaX probe also asks for the serial number's model prefix
+
+**Context.** [Issue #319](https://github.com/mpospisil/gleanvolt/issues/319). The SolaX inverter probe
+("Test connection", and the conformance tests) read one input register, `0x001C`, and accepted any value
+of 100 or less as a state of charge. The synthetic charger fixture put 4096 there. The real one, taken
+from the reference installation's X3-HAC, reads **24**: the probe would have taken the charger for an
+inverter, which is the swapped-address mistake it exists to catch.
+
+**Decision.** After a plausible state of charge, the probe reads the first two holding registers at
+`0x0000`, where the inverter keeps its serial number, and recognises the device only if they hold a
+4-character model prefix (upper-case letters or digits, e.g. `10K0`). The charger refuses that address,
+and a refusal reads as "not recognised", not as an error. Four characters is also what a register
+snapshot keeps (`SolaxInverterDriver.ModelPrefixLength` drives both), so the probe still recognises the
+committed, redacted recordings. The LAN scan already identified devices by their serial number and is
+unchanged.
+
+**Taking the charger's snapshot.** The charger serves one Modbus client at a time: a second connection
+is dropped on its first request. Its recording was read with the controller stopped for about a minute.
+
+---
+
 ## 2026-11-09 — The Huawei hold is a lasting setting, so its original is kept on disk
 
 **Context.** [Issue #323](https://github.com/mpospisil/gleanvolt/issues/323). Huawei has no lapsing

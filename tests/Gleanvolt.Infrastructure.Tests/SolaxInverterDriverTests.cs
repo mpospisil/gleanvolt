@@ -87,10 +87,12 @@ public class SolaxInverterDriverTests
     }
 
     [Fact]
-    public async Task Probe_recognises_a_state_of_charge()
+    public async Task Probe_recognises_a_state_of_charge_with_a_model_prefix()
     {
         var client = new FakeModbusClient();
         client.SetHolding(SolaxInverterDriver.ProbeRegister, 47);
+        client.SetHolding(InverterRegisterMap.SerialNumberStart, 0x3130); // "10"
+        client.SetHolding(InverterRegisterMap.SerialNumberStart + 1, 0x4B30); // "K0"
 
         var probe = await new SolaxInverterDriver(client).ProbeAsync();
 
@@ -109,6 +111,31 @@ public class SolaxInverterDriverTests
         var probe = await new SolaxInverterDriver(client).ProbeAsync();
 
         Assert.Equal(new InverterProbeResult(Recognised: false, Reading: 4096), probe);
+    }
+
+    [Fact]
+    public async Task Probe_does_not_recognise_a_state_of_charge_without_a_model_prefix()
+    {
+        // The SolaX charger's 0x001C reads a small number too (24 in the reference installation's
+        // snapshot, #319); what gives it away is the serial number it does not keep at holding 0x0000.
+        var client = new FakeModbusClient();
+        client.SetHolding(SolaxInverterDriver.ProbeRegister, 24);
+
+        var probe = await new SolaxInverterDriver(client).ProbeAsync();
+
+        Assert.Equal(new InverterProbeResult(Recognised: false, Reading: 24), probe);
+    }
+
+    [Theory]
+    [InlineData(new ushort[] { 0x3130, 0x4B30 }, true)] // "10K0"
+    [InlineData(new ushort[] { 0x4833, 0x3441 }, true)] // "H34A"
+    [InlineData(new ushort[] { 0x3130, 0x4B30, 0x2A2A }, true)] // "10K0**": a snapshot's redacted serial
+    [InlineData(new ushort[] { 0x0000, 0x0000 }, false)]
+    [InlineData(new ushort[] { 0x3130, 0x6B30 }, false)] // "10k0": lower case is no model prefix
+    [InlineData(new ushort[] { 0x3130 }, false)] // too short
+    public void A_model_prefix_is_four_upper_case_letters_or_digits(ushort[] registers, bool expected)
+    {
+        Assert.Equal(expected, SolaxInverterDriver.IsModelPrefix(registers));
     }
 
     [Fact]

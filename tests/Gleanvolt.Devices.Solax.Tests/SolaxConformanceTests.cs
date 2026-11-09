@@ -5,9 +5,10 @@ namespace Gleanvolt.Devices.Solax.Tests;
 /// <summary>
 /// The SolaX driver against the conformance tests every driver is held to (issue #319).
 ///
-/// <para>Every inverter fixture is a real Settings → "Save register snapshot" of the reference installation.
-/// Only <c>solax-ev-charger.json</c> is still <b>synthetic</b>, written from the installation's figures and
-/// labelled so in its <c>note</c>; replace it with a snapshot of the charger and the tests do not change.</para>
+/// <para>Every fixture is a real snapshot of the reference installation: the inverter's from Settings → "Save
+/// register snapshot", the charger's taken the same way with the controller stopped, as the charger serves
+/// one Modbus client at a time. The charger's replaced a synthetic one and caught a probe that took it for
+/// an inverter: its 0x001C reads 24, a plausible state of charge.</para>
 /// </summary>
 public class SolaxConformanceTests : InverterDriverConformanceTests<SolaxInverterDriverFactory>
 {

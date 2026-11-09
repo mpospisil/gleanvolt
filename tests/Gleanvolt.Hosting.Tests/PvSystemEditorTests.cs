@@ -391,6 +391,8 @@ public sealed class PvSystemEditorTests : IDisposable
     }
 
     /// <summary>A device that answers every read with one value, or refuses the connection when there is none.</summary>
+    // One input register, and the SolaX inverter's model prefix ("10K0") at the start of the holding
+    // registers, where the inverter keeps its serial number: the probe asks for both.
     private sealed class OneRegisterClient(ushort? value) : IModbusClient
     {
         public bool IsConnected => value is not null;
@@ -399,7 +401,9 @@ public sealed class PvSystemEditorTests : IDisposable
             value is null ? Task.FromException(new TimeoutException("Timed out connecting.")) : Task.CompletedTask;
 
         public Task<ushort[]> ReadHoldingRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new[] { value!.Value });
+            Task.FromResult(startAddress == 0
+                ? [.. new ushort[] { 0x3130, 0x4B30 }.Concat(Enumerable.Repeat((ushort)0, Math.Max(0, numberOfPoints - 2))).Take(numberOfPoints)]
+                : new[] { value!.Value });
 
         public Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
             Task.FromResult(new[] { value!.Value });

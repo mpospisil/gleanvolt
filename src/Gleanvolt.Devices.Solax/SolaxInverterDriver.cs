@@ -51,6 +51,28 @@ public sealed class SolaxInverterDriver : IInverterDriver
     /// </summary>
     public static bool IsStateOfCharge(ushort value) => value <= 100;
 
+    /// <summary>
+    /// How many characters of the serial number name the model (<c>10K0</c>, <c>H34A</c>): what "Test
+    /// connection" checks, and what a register snapshot keeps.
+    /// </summary>
+    public const int ModelPrefixLength = 4;
+
+    /// <summary>
+    /// Whether <paramref name="registers"/>, read from the start of the serial number, begin with a model
+    /// prefix: <see cref="ModelPrefixLength"/> upper-case letters or digits, two to a register, high byte first.
+    /// </summary>
+    public static bool IsModelPrefix(IReadOnlyList<ushort> registers)
+    {
+        ArgumentNullException.ThrowIfNull(registers);
+
+        var characters = registers.SelectMany(register => new[] { (char)(register >> 8), (char)(register & 0xFF) })
+            .Take(ModelPrefixLength)
+            .ToList();
+
+        return characters.Count == ModelPrefixLength
+            && characters.All(character => character is (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
+    }
+
     public async Task<InverterReading> ReadAsync(CancellationToken cancellationToken = default)
     {
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
@@ -66,7 +88,24 @@ public sealed class SolaxInverterDriver : IInverterDriver
         await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
 
         var value = (await _client.ReadInputRegistersAsync(ProbeRegister, 1, cancellationToken).ConfigureAwait(false))[0];
-        return new InverterProbeResult(IsStateOfCharge(value), value);
+        if (!IsStateOfCharge(value))
+        {
+            return new InverterProbeResult(false, value);
+        }
+
+        // A state of charge alone does not tell the inverter from the charger: the SolaX charger's 0x001C
+        // reads a small number too (24 in the reference installation's snapshot, #319). The inverter keeps
+        // its serial number at holding 0x0000; the charger refuses the address.
+        try
+        {
+            var prefix = await _client.ReadHoldingRegistersAsync(
+                InverterRegisterMap.SerialNumberStart, (ModelPrefixLength + 1) / 2, cancellationToken).ConfigureAwait(false);
+            return new InverterProbeResult(IsModelPrefix(prefix), value);
+        }
+        catch (ModbusDeviceException ex) when (ex.IsIllegalAddress)
+        {
+            return new InverterProbeResult(false, value);
+        }
     }
 
     /// <summary>
@@ -188,7 +227,7 @@ public sealed class SolaxInverterDriverFactory : IInverterDriverFactory
             new RegisterRange(RegisterTable.Holding, InverterRegisterMap.SerialNumberStart, InverterRegisterMap.SerialNumberCount),
         ],
         SerialNumber: new RegisterRange(RegisterTable.Holding, InverterRegisterMap.SerialNumberStart, InverterRegisterMap.SerialNumberCount),
-        SerialPrefixLength: 4);
+        SerialPrefixLength: SolaxInverterDriver.ModelPrefixLength);
 
     // Port 502, unit 1, and the 250 ms compromise between requests: see DeviceConfig.MinRequestInterval.
     public ModbusDefaults Defaults { get; } = new(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250));
