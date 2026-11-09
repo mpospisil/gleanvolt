@@ -66,18 +66,20 @@ public class SolaxModelsTests
     }
 
     /// <summary>
-    /// The prefix table is in code once and in <c>SUPPORTED_PV_SYSTEMS.md</c> once, by hand. A prefix
-    /// the tool names a device by and the doc does not list is a device the owner cannot look up.
+    /// The prefix table is in code once and in <c>SUPPORTED_INVERTERS.md</c> and <c>SUPPORTED_CHARGERS.md</c>
+    /// once, by hand. A prefix the tool names a device by and the docs do not list is a device the owner
+    /// cannot look up.
     /// </summary>
     [Fact]
     public void Every_prefix_the_scan_names_a_device_by_is_listed_in_the_supported_systems_doc()
     {
-        var doc = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_PV_SYSTEMS.md"));
+        var doc = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_INVERTERS.md"))
+            + File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_CHARGERS.md"));
         var listed = Regex.Matches(doc, "`([0-9A-Z]+)…?`").Select(match => match.Groups[1].Value).ToHashSet();
 
         foreach (var prefix in SolaxModels.InverterPrefixes.Concat(SolaxModels.ChargerPrefixes))
         {
-            Assert.True(listed.Contains(prefix), $"{prefix} is in SolaxModels but not in docs/SUPPORTED_PV_SYSTEMS.md.");
+            Assert.True(listed.Contains(prefix), $"{prefix} is in SolaxModels but in neither docs/SUPPORTED_INVERTERS.md nor docs/SUPPORTED_CHARGERS.md.");
         }
     }
 

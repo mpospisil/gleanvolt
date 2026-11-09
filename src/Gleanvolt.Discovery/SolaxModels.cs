@@ -4,8 +4,8 @@ namespace Gleanvolt.Discovery;
 
 /// <summary>
 /// What a SolaX serial number says the box is, from its prefix — the one table in code that
-/// <c>docs/SUPPORTED_PV_SYSTEMS.md</c> lists by hand. The two must agree; a test checks that every
-/// prefix here is in the doc.
+/// <c>docs/SUPPORTED_INVERTERS.md</c> and <c>docs/SUPPORTED_CHARGERS.md</c> list by hand. They must agree;
+/// a test checks that every prefix here is in one of them.
 ///
 /// <para>The prefixes are the wills106/homeassistant-solax-modbus integration's
 /// (<c>async_determineInverterType</c> in <c>plugin_solax.py</c> and
