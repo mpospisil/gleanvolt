@@ -2,7 +2,7 @@
 
 How to connect Gleanvolt to an EV charger that is not a SolaX: Huawei's **SCharger-7KS-S0** or
 **-22KT-S0**, or a **go-e Charger**. What works, and how well it has been tested, is in
-[Supported PV systems](SUPPORTED_PV_SYSTEMS.md#ev-chargers). In short: both are **Expected**. Their drivers
+[Supported EV chargers](SUPPORTED_CHARGERS.md). In short: both are **Expected**. Their drivers
 were written from the manufacturers' documentation, and nobody has run them against a real charger yet.
 
 **Run in dry-run first.** `ChargeControl:DryRun` is on by default: Gleanvolt then only reads, and logs the
