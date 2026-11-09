@@ -1,0 +1,43 @@
+{
+  "format": "gleanvolt-http-dump",
+  "formatVersion": 1,
+  "driver": "goe",
+  "family": "go-e Charger Gemini 22 kW",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC, written from go-e's API v2 key list (github.com/goecharger/go-eCharger-API-v2) until a tester's snapshot replaces it (#352, #354). Charging at 16 A on three phases, 11.05 kW, force state on.",
+  "responses": {
+    "api/status?filter=car,alw,frc,amp,ama,var,nrg,err,modelStatus,psm,pnp,fwv,typ": {
+      "car": 2,
+      "alw": true,
+      "frc": 2,
+      "amp": 16,
+      "ama": 32,
+      "var": 22,
+      "nrg": [
+        230,
+        229,
+        231,
+        2,
+        16.1,
+        16.0,
+        16.0,
+        3700,
+        3660,
+        3690,
+        0,
+        11050,
+        99,
+        99,
+        99,
+        0
+      ],
+      "err": 0,
+      "modelStatus": 3,
+      "psm": 0,
+      "pnp": 3,
+      "fwv": "59.4",
+      "typ": "go-eCharger"
+    }
+  }
+}

@@ -46,6 +46,7 @@ COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj                     src/Gleanvolt.
 COPY src/Gleanvolt.Devices.Abstractions/Gleanvolt.Devices.Abstractions.csproj src/Gleanvolt.Devices.Abstractions/
 COPY src/Gleanvolt.Devices.Solax/Gleanvolt.Devices.Solax.csproj   src/Gleanvolt.Devices.Solax/
 COPY src/Gleanvolt.Devices.Huawei/Gleanvolt.Devices.Huawei.csproj src/Gleanvolt.Devices.Huawei/
+COPY src/Gleanvolt.Devices.GoE/Gleanvolt.Devices.GoE.csproj       src/Gleanvolt.Devices.GoE/
 COPY src/Gleanvolt.Api/Gleanvolt.Api.csproj                       src/Gleanvolt.Api/
 COPY src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj src/Gleanvolt.Infrastructure/
 COPY src/Gleanvolt.Web/Gleanvolt.Web.csproj                       src/Gleanvolt.Web/

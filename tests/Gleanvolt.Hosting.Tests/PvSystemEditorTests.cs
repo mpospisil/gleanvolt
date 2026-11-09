@@ -3,7 +3,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Devices;
+using System.Text.Json.Nodes;
+using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Solax;
+using Gleanvolt.Devices.Testing;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -370,6 +373,41 @@ public sealed class PvSystemEditorTests : IDisposable
         Assert.True(result.Plausible);
         Assert.Equal(1, other.Probes);
         Assert.Equal(["solax", "wallco"], editor.ChargerDrivers.Select(driver => driver.Id));
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task A_charger_reached_over_http_is_probed_over_http_and_never_written(bool hasApi, bool plausible)
+    {
+        // go-e (#352): the probe is its status request on a read-only HTTP client at the form's host and port;
+        // the Modbus client is never made.
+        HttpClient? made = null;
+        var handler = new ReplayHttpHandler(new HttpDump
+        {
+            Responses = hasApi
+                ? new Dictionary<string, JsonNode?> { [GoeChargerDriver.StatusRequest] = JsonNode.Parse("""{"car":1,"fwv":"59.4"}""") }
+                : new Dictionary<string, JsonNode?>(),
+        });
+        DeviceConfig? probed = null;
+        var editor = new PvSystemEditor(
+            Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
+            _ => throw new InvalidOperationException("No Modbus client for an HTTP charger."),
+            chargerDrivers: [new SolaxChargerDriverFactory(), new GoeChargerDriverFactory()],
+            httpClientFactory: device =>
+            {
+                probed = device;
+                return made = new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri($"http://{device.Host}:{device.Port}/") };
+            });
+
+        var result = await editor.ProbeAsync(PvDeviceRole.Charger, "192.168.2.30", 80, 0, driver: "goe");
+
+        Assert.NotNull(made);
+        Assert.Equal(("192.168.2.30", 80), (probed!.Host, probed.Port));
+        Assert.True(result.Answered);
+        Assert.Equal(plausible, result.Plausible);
+        Assert.Empty(handler.Writes);
+        Assert.Equal(plausible ? "Probe.ChargerApiOk" : "Probe.ChargerApiImplausible", result.MessagePhrase?.Key);
     }
 
     /// <summary>A charger family whose probe always recognises what answered, and counts how often it was asked.</summary>

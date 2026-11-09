@@ -4,6 +4,59 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — go-e over its HTTP API: reads are marked, a pause is the force state, and two keys are written
+
+**Context.** [Issue #352](https://github.com/mpospisil/gleanvolt/issues/352), the first charger reached over
+HTTP. The source is go-e's API v2 documentation ([goecharger/go-eCharger-API-v2](https://github.com/goecharger/go-eCharger-API-v2)):
+`/api/status?filter=…` reads, `/api/set?key=value` writes, both GETs. evcc's go-e driver was read to confirm
+which keys it uses (`car`, `alw`, `nrg[11]`, `frc` 1/2, `amp`); no code was taken from it.
+
+**Decision — reads are marked, not writes.** Modbus has separate function codes; go-e's writes are GETs. The
+driver builds every read with `ChargerHttp.Read`, which marks the request, and the host's dry-run client
+(`ReadOnlyHttpHandler`) passes only marked GETs. An unmarked request is dropped with a warning and answered
+`{}`, as `ReadOnlyModbusClient` drops a write. A driver that forgets the mark is refused, never let through,
+and the conformance suite counts any unmarked request as a write, so "reading writes nothing" checks the mark.
+
+**Decision — the host builds one `HttpClient` per controlled charger**, keyed as the Modbus client is, base
+address `http://host:port/`, a 5 s timeout. A Modbus family never resolves it. The driver's `Defaults` give the
+port (80) to the resolver and the Settings placeholder; the unit id and spacing are unused. In setup mode the
+client refuses every request. "Test connection" probes over HTTP on a read-only client, with its own messages
+(the run-mode wording is Modbus's).
+
+**Decision — status from `car` and `alw`.** 1 Available, 2 Charging, 5 Faulted, 0 and null Unknown. 3 (waiting
+for the car) is Preparing while `alw` is true, and 4 (finished, car connected) SuspendedEV; with `alw` false both
+are SuspendedEVSE, because the charger is holding the car and our own stop must never read as "the car is full".
+`frc` On is "charging allowed"; Neutral is not, because then the owner's own logic is in charge.
+
+**Decision — a pause is the force state Off, and the driver remembers it.** The charger refuses a setpoint
+below 6 A, and the control loop pauses by writing 0. So `SetCurrentAsync` below the minimum writes `frc=1` and
+the driver keeps "paused": settings then read allowed at 0 A, which is what the loop wrote, and the next
+setpoint of 6 A or more writes `amp` and `frc=2` in one request. A start under a pause leaves it off; a pause
+under a stop writes nothing. After a restart the memory is gone and a paused charger reads as stopped; the
+controller starts in Off, so the next start rewrites both. The shared suite gained "a pause reads back as
+allowed at the pause current", which SolaX and the SCharger already met.
+
+**Decision — two keys are ever written, and only on a change.** API v2 documents no transient current: v1's
+`amx` is gone, `tcl` has no documented type, and `amp` and `frc` are both configuration the charger keeps. So
+the driver writes `amp` and `frc` and nothing else (no `psm`, no `ama`), the setpoint only past the threshold,
+and the shared suite gained "a steady control loop writes nothing", twenty polls with no write. Whether the
+charger's flash minds `amp` at the loop's rate is for a tester to confirm (#354); evcc writes the same key.
+
+**Decision — phase switching is reported, not commanded.** `CanSwitchPhases` is true and `psm` is in the
+recording; the command is a follow-up, as the epic's decision 3 allowed.
+
+**Decision — the HTTP recording.** `HttpDump` (`gleanvolt-http-dump`) holds each request's JSON body by path and
+query; `HttpSnapshotSpec` names the requests, and `IEvChargerDriverFactory.HttpSnapshot` (default null) gives
+it. Settings → charger → "Save register snapshot" saves `gleanvolt-http-goe-charger-<time>.json`. The driver's
+filter leaves out the serial number, Wi-Fi and cloud keys, so there is nothing to redact. The charger suite is
+now `ChargerConformanceTests<TFactory, TRecording>`, with a Modbus and an HTTP subclass each adding its
+snapshot checks; existing driver tests did not change.
+
+**Decision — one driver id, `goe`, 6–32 A, three phases.** An 11 kW unit (`var` 11) or a lower `ama` caps the
+setpoint from the last status read. **Expected tier**: every fixture is synthetic, until a tester's snapshot.
+
+---
+
 ## 2026-11-09 — Huawei's SCharger: two driver ids, no status, and a setpoint in kilowatts
 
 **Context.** [Issue #351](https://github.com/mpospisil/gleanvolt/issues/351). The register source is Huawei's

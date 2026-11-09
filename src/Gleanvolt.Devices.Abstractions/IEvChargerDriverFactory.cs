@@ -16,8 +16,9 @@ public interface IEvChargerDriverFactory
     EvChargerTransport Transport { get; }
 
     /// <summary>
-    /// How the family's Modbus server is reached when the configuration does not say; null for a family
-    /// reached over HTTP.
+    /// How the family's charger is reached when the configuration does not say. For a family reached over
+    /// HTTP only the port counts (go-e: 80, issue #352); its unit id and request spacing are unused. Null takes
+    /// the Modbus defaults.
     /// </summary>
     ModbusDefaults? Defaults { get; }
 
@@ -29,6 +30,12 @@ public interface IEvChargerDriverFactory
     /// and where the serial number is. Null for a family not reached over Modbus.
     /// </summary>
     RegisterSnapshotSpec? Snapshot { get; }
+
+    /// <summary>
+    /// What a snapshot of this family's HTTP API reads (issue #352): at least every request the driver makes.
+    /// Null for a family not reached over HTTP.
+    /// </summary>
+    HttpSnapshotSpec? HttpSnapshot => null;
 
     /// <summary>
     /// A driver on <paramref name="connection"/>. The connection belongs to the host, which opens and disposes
@@ -46,7 +53,7 @@ public interface IEvChargerDriverFactory
 /// <param name="Id">See <see cref="IEvChargerDriverFactory.Id"/>.</param>
 /// <param name="DisplayName">See <see cref="IEvChargerDriverFactory.DisplayName"/>.</param>
 /// <param name="Transport">See <see cref="IEvChargerDriverFactory.Transport"/>.</param>
-/// <param name="Defaults">See <see cref="IEvChargerDriverFactory.Defaults"/>; null for a family reached over HTTP.</param>
+/// <param name="Defaults">See <see cref="IEvChargerDriverFactory.Defaults"/>.</param>
 /// <param name="Capabilities">See <see cref="IEvChargerDriverFactory.Capabilities"/>.</param>
 public sealed record EvChargerDriverInfo(
     string Id,
@@ -107,6 +114,10 @@ public sealed record EvChargerConnection
     /// <summary>The Modbus client, or an exception that names the family which needed it.</summary>
     public IModbusClient RequireModbus(string family) =>
         Modbus ?? throw new ArgumentException($"The {family} charger is reached over Modbus, not over {Transport}.");
+
+    /// <summary>The HTTP client, or an exception that names the family which needed it.</summary>
+    public HttpClient RequireHttp(string family) =>
+        Http ?? throw new ArgumentException($"The {family} charger is reached over HTTP, not over {Transport}.");
 }
 
 /// <summary>What the host tells a charger driver when it creates one.</summary>

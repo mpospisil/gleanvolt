@@ -3,10 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
+using Gleanvolt.Infrastructure;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -126,9 +128,31 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void The_charger_catalog_has_solax_first_then_the_two_sChargers()
+    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e()
     {
-        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt"], ChargerDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe"], ChargerDrivers.Known.Select(driver => driver.Id));
+    }
+
+    [Fact]
+    public async Task The_container_runs_go_e_over_http_on_port_80_and_in_dry_run_passes_only_reads()
+    {
+        // go-e (#352): the driver gets the charger's HTTP client, at the configured host on the family's port,
+        // and in dry-run that client drops anything the driver did not mark as a read without sending it.
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "goe"), new("ChargeControl:DryRun", "true"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.IsType<GoeChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Equal(80, provider.GetRequiredService<PvSystemInfo>().Chargers[0].Connection.Port);
+
+        var http = provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger);
+        Assert.Equal(new Uri("http://127.0.0.2:80/"), http.BaseAddress);
+
+        using var write = ChargerHttp.Write("api/set?amp=6");
+        using var answer = await http.SendAsync(write);
+        Assert.Equal("{}", await answer.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -173,10 +197,10 @@ public class InverterDriverSelectionTests
     public void Headless_an_unknown_charger_driver_stops_the_start_naming_the_known_drivers()
     {
         var error = Record.Exception(() =>
-            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "goe")])));
+            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "wallco")])));
 
         Assert.NotNull(error);
-        Assert.Contains("Pv:Chargers:0:Driver ('goe')", error.Message);
+        Assert.Contains("Pv:Chargers:0:Driver ('wallco')", error.Message);
         Assert.Contains("Known drivers: solax", error.Message);
     }
 

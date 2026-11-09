@@ -173,7 +173,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
+          for project in Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \

@@ -1,0 +1,10 @@
+{
+  "format": "gleanvolt-http-dump",
+  "formatVersion": 1,
+  "driver": "goe",
+  "family": "A web server without go-e's API v2",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC. Nothing recorded, so every request is answered 404: a go-e with the local API off, an API v1 unit, or another device's web server.",
+  "responses": {}
+}

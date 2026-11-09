@@ -5,6 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Devices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.RegisterMaps;
 
@@ -31,6 +32,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IReadOnlyDictionary<string, string?> _running;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
+    private readonly Func<DeviceConfig, HttpClient> _httpClientFactory;
     private readonly IReadOnlyList<IInverterDriverFactory> _inverterDrivers;
     private readonly IReadOnlyList<IEvChargerDriverFactory> _chargerDrivers;
     private readonly ILogger<PvSystemEditor> _logger;
@@ -49,13 +51,18 @@ public sealed class PvSystemEditor : IPvSystemEditor
         ILogger<PvSystemEditor> logger,
         Func<DeviceConfig, IModbusClient>? clientFactory = null,
         IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null,
-        IReadOnlyList<IEvChargerDriverFactory>? chargerDrivers = null)
+        IReadOnlyList<IEvChargerDriverFactory>? chargerDrivers = null,
+        Func<DeviceConfig, HttpClient>? httpClientFactory = null)
     {
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
         _running = running;
         _logger = logger;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device));
+
+        // Read-only, as the Modbus probe's client is: an address nobody has confirmed is never written to.
+        _httpClientFactory = httpClientFactory
+            ?? (device => ChargerHttpClients.Create(device, writable: false, NullLogger<ReadOnlyHttpHandler>.Instance));
         _inverterDrivers = inverterDrivers ?? [.. Gleanvolt.Hosting.InverterDrivers.Factories.Select(make => make(null))];
         InverterDrivers = [.. _inverterDrivers.Select(InverterDriverInfo.Of)];
         _chargerDrivers = chargerDrivers ?? [.. Gleanvolt.Hosting.ChargerDrivers.Factories.Select(make => make(null))];
@@ -157,6 +164,23 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
         try
         {
+            // A charger reached over HTTP (go-e, #352) is probed over HTTP, on a client that passes only reads.
+            if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver) is { Transport: EvChargerTransport.Http } httpFamily)
+            {
+                using var http = _httpClientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
+                var apiProbe = await httpFamily.Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true })
+                    .ProbeAsync(timeout.Token).ConfigureAwait(false);
+                var answer = (long)Math.Round(apiProbe.Reading);
+
+                return apiProbe.Recognised
+                    ? new DeviceProbeResult(true, true, $"{address} answered: the charger's API reports car state {answer}.",
+                        Phrase.Of("Probe.ChargerApiOk", new PhraseArg.Text(address), new PhraseArg.Number(answer)))
+                    : new DeviceProbeResult(true, false,
+                        $"{address} answered (HTTP {answer}), but not with the selected charger's API. "
+                        + "Is its local HTTP API switched on?",
+                        Phrase.Of("Probe.ChargerApiImplausible", new PhraseArg.Text(address), new PhraseArg.Number(answer)));
+            }
+
             await using var client = _clientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
             await client.ConnectAsync(timeout.Token).ConfigureAwait(false);
 
@@ -184,22 +208,26 @@ public sealed class PvSystemEditor : IPvSystemEditor
             var charger = ChargerDriverFactory(driver).Create(
                 EvChargerConnection.Over(new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance)),
                 new EvChargerDriverOptions { DryRun = true });
-            var chargerProbe = await charger.ProbeAsync(timeout.Token).ConfigureAwait(false);
-            var value = (long)Math.Round(chargerProbe.Reading);
-
-            return chargerProbe.Recognised
-                ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
-                    Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
-                : new DeviceProbeResult(true, false,
-                    $"{address} answered, but its run-mode register reads {value}, which no charger "
-                    + "reports. Is this the inverter's address?",
-                    Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
+            return ChargerProbeResult(address, await charger.ProbeAsync(timeout.Token).ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).",
                 Phrase.Of("Probe.NoAnswer", new PhraseArg.Text(address), new PhraseArg.Text(ex.Message)));
         }
+    }
+
+    private static DeviceProbeResult ChargerProbeResult(string address, EvChargerProbeResult chargerProbe)
+    {
+        var value = (long)Math.Round(chargerProbe.Reading);
+
+        return chargerProbe.Recognised
+            ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
+                Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
+            : new DeviceProbeResult(true, false,
+                $"{address} answered, but its run-mode register reads {value}, which no charger "
+                + "reports. Is this the inverter's address?",
+                Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
     }
 
     // The driver the form has selected. An id this host does not have probes with the default: the save

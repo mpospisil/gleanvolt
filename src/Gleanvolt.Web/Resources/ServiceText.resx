@@ -124,6 +124,14 @@
   <data name="Probe_ChargerImplausible" xml:space="preserve">
     <value>{0} answered, but its run-mode register reads {1}, which no charger reports. Is this the inverter's address?</value>
   </data>
+  <data name="Probe_ChargerApiOk" xml:space="preserve">
+    <value>{0} answered: the charger's API reports car state {1}.</value>
+    <comment>A charger reached over HTTP (go-e). {1} is the charger's own car-state number.</comment>
+  </data>
+  <data name="Probe_ChargerApiImplausible" xml:space="preserve">
+    <value>{0} answered (HTTP {1}), but not with the selected charger's API. Is its local HTTP API switched on?</value>
+    <comment>{1} is the HTTP status code.</comment>
+  </data>
   <data name="Probe_NoAnswer" xml:space="preserve">
     <value>{0} did not answer ({1}).</value>
     <comment>{1} is the network error, in the operating system's words.</comment>

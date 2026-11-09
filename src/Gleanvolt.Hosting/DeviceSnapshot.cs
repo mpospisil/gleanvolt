@@ -8,7 +8,8 @@ namespace Gleanvolt.Hosting;
 
 /// <summary>
 /// <see cref="IDeviceSnapshot"/> on the running devices (issues #319, #350): the ranges the configured driver
-/// names, read once on the device's keyed client, the serial number cut to its prefix.
+/// names, read once on the device's keyed client, the serial number cut to its prefix; for a charger reached
+/// over HTTP (#352), the requests its driver names, on the charger's HTTP client.
 /// </summary>
 public sealed class DeviceSnapshot : IDeviceSnapshot
 {
@@ -17,6 +18,7 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
 
     private readonly IModbusClient _inverter;
     private readonly IModbusClient _charger;
+    private readonly HttpClient _chargerHttp;
     private readonly PvSystemInfo _site;
     private readonly IEnumerable<IInverterDriverFactory> _inverterDrivers;
     private readonly IEnumerable<IEvChargerDriverFactory> _chargerDrivers;
@@ -26,6 +28,7 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
     public DeviceSnapshot(
         [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverter,
         [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient charger,
+        [FromKeyedServices(ModbusClientKeys.EvCharger)] HttpClient chargerHttp,
         PvSystemInfo site,
         IEnumerable<IInverterDriverFactory> inverterDrivers,
         IEnumerable<IEvChargerDriverFactory> chargerDrivers,
@@ -34,6 +37,7 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
     {
         _inverter = inverter;
         _charger = charger;
+        _chargerHttp = chargerHttp;
         _site = site;
         _inverterDrivers = inverterDrivers;
         _chargerDrivers = chargerDrivers;
@@ -78,10 +82,14 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
         var driver = _chargerDrivers.FirstOrDefault(candidate => candidate.Id == id)
             ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
 
-        // A family reached over HTTP keeps no registers; its recording is of responses, and comes with its
-        // driver (go-e, #352).
+        // A family reached over HTTP keeps no registers: its recording is of its API's responses (go-e, #352).
+        if (driver.HttpSnapshot is { } requests)
+        {
+            return TakeHttpAsync(requests, driver.Id, charger.Model, note, cancellationToken);
+        }
+
         var spec = driver.Snapshot
-            ?? throw new InvalidOperationException($"The {driver.DisplayName} charger is reached over {driver.Transport}, not Modbus: it has no registers to save.");
+            ?? throw new InvalidOperationException($"The {driver.DisplayName} charger names nothing to save.");
 
         return TakeAsync(
             "charger",
@@ -92,6 +100,33 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
             $"gleanvolt-registers-{driver.Id}-charger",
             note,
             cancellationToken);
+    }
+
+    private async Task<RegisterSnapshotFile> TakeHttpAsync(
+        HttpSnapshotSpec spec, string driverId, string family, string note, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+
+        var now = _time.GetUtcNow();
+        var dump = await HttpSnapshot.TakeAsync(
+            _chargerHttp,
+            spec,
+            new HttpDump
+            {
+                Driver = driverId,
+                Family = family,
+                GleanvoltVersion = BuildInfo.Version,
+                CapturedAt = now,
+                Note = note.Trim(),
+            },
+            timeout.Token).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "HTTP snapshot of the charger taken: {Count} response(s) ({Driver}).", dump.Responses.Count, driverId);
+
+        var stamp = now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        return new RegisterSnapshotFile($"gleanvolt-http-{driverId}-charger-{stamp}.json", dump.ToJson());
     }
 
     private async Task<RegisterSnapshotFile> TakeAsync(
