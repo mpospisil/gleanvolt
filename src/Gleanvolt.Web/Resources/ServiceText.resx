@@ -116,7 +116,7 @@
     <value>{0} answered: battery at {1} %.</value>
   </data>
   <data name="Probe_InverterImplausible" xml:space="preserve">
-    <value>{0} answered, but its battery register reads {1}, which is not a valid state of charge. Is this the charger's address?</value>
+    <value>{0} answered, but it does not look like an inverter of the selected brand (battery register: {1}). Is this the charger's address?</value>
   </data>
   <data name="Probe_ChargerOk" xml:space="preserve">
     <value>{0} answered: charger run mode {1}.</value>

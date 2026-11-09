@@ -169,8 +169,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
                     ? new DeviceProbeResult(true, true, $"{address} answered: battery at {reading} %.",
                         Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(reading)))
                     : new DeviceProbeResult(true, false,
-                        $"{address} answered, but its battery register reads {reading}, which is no state of "
-                        + "charge. Is this the charger's address?",
+                        $"{address} answered, but it does not look like an inverter of the selected brand "
+                        + $"(battery register: {reading}). Is this the charger's address?",
                         Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(reading)));
             }
 

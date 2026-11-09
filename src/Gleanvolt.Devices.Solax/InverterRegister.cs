@@ -15,8 +15,9 @@ public enum InverterRegister : ushort
     //
     // It was briefly believed wrong, and PR #62 moved it to 0x0025 before being reverted by #63. The
     // register was never the problem -- the two device addresses were swapped in configuration, so
-    // every "inverter" read was answered by the EV charger, where 0x001C is a meaningless constant.
-    // Point the hosts at the right devices and this address is exactly right.
+    // every "inverter" read was answered by the EV charger, where 0x001C is not a state of charge.
+    // Point the hosts at the right devices and this address is exactly right. It can still read like
+    // one on the charger (24 in its snapshot, #319), so the probe also checks the serial number.
     BatteryCapacity = 0x001C,
     // The grid METER / CT reading (int32, low word first): net power at the utility connection,
     // positive = feeding in (exporting). This is the only register that sees the whole house, so it

@@ -109,7 +109,7 @@
     <value>{0} odpovídá: baterie na {1} %.</value>
   </data>
   <data name="Probe_InverterImplausible" xml:space="preserve">
-    <value>{0} odpovídá, ale registr baterie ukazuje {1}, což není platný stav nabití. Není to adresa nabíječky?</value>
+    <value>{0} odpovídá, ale nevypadá jako střídač zvolené značky (registr baterie: {1}). Není to adresa nabíječky?</value>
   </data>
   <data name="Probe_ChargerOk" xml:space="preserve">
     <value>{0} odpovídá: provozní režim nabíječky {1}.</value>
