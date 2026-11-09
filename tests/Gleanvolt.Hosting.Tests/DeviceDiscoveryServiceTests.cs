@@ -1,5 +1,8 @@
 using System.Net;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
+using Gleanvolt.Devices.Testing;
 using Gleanvolt.Discovery;
 using Gleanvolt.Hosting.Setup;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -88,6 +91,40 @@ public class DeviceDiscoveryServiceTests
         Assert.True(scan.Cancelled);
         Assert.True(discovery.Start("192.168.1.7").Started);
         discovery.Cancel();
+    }
+
+    [Fact]
+    public async Task A_found_solax_charger_brings_the_solax_charger_driver()
+    {
+        // A SolaX charger is identified by its serial number, which names no driver; the wizard still fills the
+        // brand (#353), as it does for a SolaX inverter (#324).
+        const string serial = "5030BXXXXXXXXX";
+        var dump = new RegisterDump
+        {
+            Holding = Enumerable.Range(0, 7).ToDictionary(i => (ushort)(0x0600 + i), i => (ushort)((serial[i * 2] << 8) | serial[i * 2 + 1])),
+            Input = new Dictionary<ushort, ushort> { [0x1D] = 2 },
+        };
+        var discovery = new DeviceDiscoveryService(
+            NullLogger<DeviceDiscoveryService>.Instance,
+            counted => new DeviceScanner(
+                new DiscoveryOptions { Ports = [502], WebPorts = [], UnitIds = [1], MinRequestInterval = TimeSpan.Zero },
+                counted,
+                _ => new ReplayModbusClient(dump)),
+            new OpenPort(502),
+            () => [Lan],
+            inContainer: false);
+
+        Assert.True(discovery.Start("192.168.1.6").Started);
+        var device = Assert.Single((await Finished(discovery)).Devices);
+
+        Assert.Equal(PvDeviceRole.Charger, device.Role);
+        Assert.Equal("solax", device.Driver);
+    }
+
+    private sealed class OpenPort(int open) : IPortProbe
+    {
+        public Task<bool> IsOpenAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult(port == open);
     }
 
     private sealed class ClosedPorts : IPortProbe

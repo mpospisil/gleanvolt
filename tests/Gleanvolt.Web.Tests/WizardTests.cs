@@ -131,6 +131,41 @@ public class WizardTests : PageTest
     }
 
     [Fact]
+    public void Choosing_a_found_charger_of_another_family_brings_its_brand_and_leaves_an_http_chargers_unit_id_alone()
+    {
+        // A go-e as the scan reports it (#353): over HTTP, so no unit id; the fake editor's second family stands in.
+        var goe = new FoundDevice("192.168.1.30", 80, null, PvDeviceRole.Charger, "go-e Charger", null, true, "note", Driver: "wallco");
+        _discovery.Finish(goe);
+        var page = Step("devices");
+
+        // Not Modbus, so it is offered only as the charger.
+        Assert.Single(page.Find("#discovery-results tbody tr").QuerySelectorAll("button")).Click();
+
+        Assert.Equal("wallco", page.Find(Field(PvSystemSettingKeys.ChargerDriver)).GetAttribute("value"));
+        Assert.Equal("192.168.1.30", page.Find(Field(PvSystemSettingKeys.ChargerHost)).GetAttribute("value"));
+        Assert.Equal("80", page.Find(Field(PvSystemSettingKeys.ChargerPort)).GetAttribute("value"));
+
+        page.Find("#pv-save").Click();
+
+        var saved = Assert.Single(_pv.Saves);
+        Assert.Equal("wallco", saved[PvSystemSettingKeys.ChargerDriver]);
+        Assert.False(saved.ContainsKey(PvSystemSettingKeys.ChargerUnitId));
+    }
+
+    [Fact]
+    public void A_found_inverter_chosen_as_the_charger_brings_no_charger_brand()
+    {
+        var huawei = new FoundDevice("192.168.1.20", 502, 1, PvDeviceRole.Inverter, "SUN2000-10K-MAP0", null, true, "note", Driver: "acme");
+        _discovery.Finish(huawei);
+        var page = Step("devices");
+
+        page.Find("#discovery-results tbody tr").QuerySelectorAll("button")[1].Click();   // as charger, against its role
+        page.Find("#pv-save").Click();
+
+        Assert.False(Assert.Single(_pv.Saves).ContainsKey(PvSystemSettingKeys.ChargerDriver));
+    }
+
+    [Fact]
     public void Choosing_a_found_inverter_of_the_configured_family_is_no_driver_edit()
     {
         var solax = Inverter with { Driver = "solax" };

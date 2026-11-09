@@ -97,6 +97,12 @@
                                     <button type="button" class="@(device.Role == PvDeviceRole.Charger ? "primary" : "secondary")"
                                             @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
                                 }
+                                else if (device is { Role: PvDeviceRole.Charger, Driver: not null })
+                                {
+                                    @* A charger found over HTTP (go-e, #353): no Modbus, so it can only be the charger. *@
+                                    <button type="button" class="primary"
+                                            @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
+                                }
                             </td>
                         </tr>
                     }
@@ -171,9 +177,21 @@
             fields[PvSystemSettingKeys.InverterTopology] = device.Topology ?? string.Empty;
         }
 
+        // A charger brings its brand the same way (#353). Only when the scan found a charger: a device that
+        // said it is an inverter has no charger driver to bring.
+        if (role == PvDeviceRole.Charger && device.Role == PvDeviceRole.Charger && device.Driver is { } chargerDriver)
+        {
+            fields[PvSystemSettingKeys.ChargerDriver] = chargerDriver;
+        }
+
         fields[keys.Host] = device.Host;
         fields[keys.Port] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        fields[keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        // A charger found over HTTP (go-e) has no unit id: the field is left to its default, unused.
+        if (device.UnitId is not null || device.Driver is null)
+        {
+            fields[keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         await OnChosen.InvokeAsync(fields);
     }

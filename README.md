@@ -95,7 +95,8 @@ installer account first: see [Setting up a Huawei SUN2000](docs/HUAWEI_SETUP.md)
 and **-22KT-S0** have drivers too (`huawei-7ks`, `huawei-22kt`), readings only and untested on hardware. Their
 Modbus reports no status, so an idle charger reads *unknown*, not *available*. The **go-e Charger** (Gemini,
 Gemini flex, HOMEfix and HOME+, hardware V3 or later) has one too (`goe`), over its local HTTP API v2 on port
-80, untested on hardware: switch the API on in the go-e app first.
+80, untested on hardware. Both need their local interface switched on first: see
+[Setting up a Huawei SCharger or a go-e](docs/CHARGER_SETUP.md).
 
 ## Tech stack
 
@@ -114,7 +115,8 @@ Gleanvolt.slnx
 ├── src/
 │   ├── Gleanvolt.Devices.Abstractions/ # The driver contract: IModbusClient, IInverterDriver, the battery hold
 │   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
-│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold
+│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold; and the SCharger
+│   ├── Gleanvolt.Devices.GoE/          # The go-e Charger driver, over its local HTTP API v2
 │   │
 │   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
@@ -165,10 +167,11 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
 │   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 │   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
-│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: replay client and conformance tests
+│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: Modbus and HTTP replays, and the conformance tests
 │   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
 │   ├── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
-│   └── Gleanvolt.Devices.Huawei.Tests/ # The Huawei driver against the same tests, on synthetic recordings
+│   ├── Gleanvolt.Devices.Huawei.Tests/ # The Huawei drivers against the same tests, on synthetic recordings
+│   └── Gleanvolt.Devices.GoE.Tests/    # The go-e driver against the charger tests, on synthetic HTTP recordings
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
@@ -263,9 +266,10 @@ dotnet publish src/Gleanvolt.Discovery.Cli -c Release -r linux-x64 --self-contai
 ```
 
 It tries ports 502 (Modbus TCP), 8899 (the usual RS485 bridge) and 80 (where it recognises a SolaX
-dongle's web page, which is not Modbus), unit ids `1,0,2,3,4,5,247`, and names each box from its serial
-number (SolaX) or its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of it), with the
-support tier from [SUPPORTED_PV_SYSTEMS.md](docs/SUPPORTED_PV_SYSTEMS.md). Under the
+dongle's web page, which is not Modbus, or a go-e's local API), unit ids `1,0,2,3,4,5,247`, and names each
+box from its serial number (SolaX), its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of
+it), its phase voltages (Huawei SCharger) or its API (go-e), with the driver to use and the support tier
+from [SUPPORTED_PV_SYSTEMS.md](docs/SUPPORTED_PV_SYSTEMS.md). Under the
 table it prints the configuration that would use what it found, ready to paste into `.env` or to enter on
 `/pv-system`:
 

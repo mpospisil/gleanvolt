@@ -170,6 +170,21 @@ internal sealed class ModbusIdentifier(
             }
         }
 
+        // Huawei's SCharger keeps no serial number and no model name: its phase voltages at 0x1000 are what
+        // its own driver's probe reads (#353).
+        if (serial is null && otherSerial is null)
+        {
+            var voltages = await ReadAsync(
+                pacer, () => client.ReadHoldingRegistersAsync(SChargerRegisterMap.PhaseL1Voltage, 6, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+
+            if (voltages is { Outcome: ReadOutcome.Data, Registers: { Length: >= 6 } phases }
+                && HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 0)))
+            {
+                return new UnitAttempt.Answered(SCharger(host, port, unitId, phases));
+            }
+        }
+
         if ((serial ?? otherSerial) is { } unknown)
         {
             return new UnitAttempt.Answered(new DiscoveredDevice(
@@ -181,7 +196,8 @@ internal sealed class ModbusIdentifier(
 
         return new UnitAttempt.Answered(new DiscoveredDevice(
             host, port, unitId, DiscoveryFinding.NotSolax, null, null, null, null, SupportTier.NotSolax, null,
-            "Answers Modbus, but has no SolaX serial number and no Huawei model name: not a device Gleanvolt knows."));
+            "Answers Modbus, but has no SolaX serial number, no Huawei model name and is no SCharger: not a device "
+            + "Gleanvolt knows."));
     }
 
     // A SUN2000 (#324): its serial number, to tell repeated answers apart; the battery's state of charge,
@@ -235,6 +251,25 @@ internal sealed class ModbusIdentifier(
             Driver: HuaweiSun2000DriverFactory.DriverId,
             Topology: behindEmma ? HuaweiSun2000DriverFactory.EmmaTopology : null));
     }
+
+    // An SCharger (#353). The protocol names no model, so the phases decide it: L2 and L3 with no mains voltage
+    // is the one-phase 7KS. A 22KT wired to one phase reads the same, which the note says.
+    private static DiscoveredDevice SCharger(string host, int port, byte unitId, ushort[] phases)
+    {
+        var l1 = Word32(phases, 0);
+        var threePhase = HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 2)) || HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 4));
+
+        return new DiscoveredDevice(
+            host, port, unitId, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Charger,
+            threePhase ? "SCharger-22KT-S0" : "SCharger-7KS-S0", "SCharger EV charger", null, SupportTier.Expected, true,
+            $"Phase L1 at {l1 / 10.0:0.#} V; {(threePhase ? "three phases" : "one phase")} live, so taken for the "
+            + $"{(threePhase ? "22KT" : "7KS")}: check the label. It reports no status, so an idle charger reads unknown. "
+            + "Untested on hardware; behind an EMMA, leave it to the EMMA.",
+            Driver: threePhase ? HuaweiSChargerDriverFactory.TwentyTwoKtId : HuaweiSChargerDriverFactory.SevenKsId);
+    }
+
+    private static uint Word32(ushort[] registers, int offset) =>
+        ((uint)registers[offset] << 16) | registers[offset + 1];
 
     // Unit 0 on the same connection -- the EMMA takes one client -- answering the grid register the driver
     // reads from it. An SDongle has nothing there.

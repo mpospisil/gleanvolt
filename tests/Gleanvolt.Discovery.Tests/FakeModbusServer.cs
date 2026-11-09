@@ -197,6 +197,22 @@ internal sealed class FakeUnit
     public static FakeUnit Huawei(string model, string serial = "HV21XXXXXXXX", ushort socTenths = 545) =>
         new FakeUnit().WithText(30000, model, 15).WithText(30015, serial, 10).WithHolding(37760, socTenths);
 
+    /// <summary>
+    /// A Huawei SCharger (#353): phase voltages at holding 0x1000 (U32, tenths of a volt), nothing else Discovery
+    /// asks for. L2 and L3 at 0 V is the one-phase 7KS.
+    /// </summary>
+    public static FakeUnit SCharger(bool threePhase, uint tenthsOfVolts = 2311)
+    {
+        var unit = new FakeUnit();
+        for (var phase = 0; phase < 3; phase++)
+        {
+            var volts = phase == 0 || threePhase ? tenthsOfVolts : 0;
+            unit.WithHolding((ushort)(0x1000 + (phase * 2)), (ushort)(volts >> 16)).WithHolding((ushort)(0x1001 + (phase * 2)), (ushort)(volts & 0xFFFF));
+        }
+
+        return unit;
+    }
+
     /// <summary>A Huawei EMMA answering for itself on unit 0: its grid power at holding 31657.</summary>
     public static FakeUnit Emma(string model = "EMMA-A02") =>
         new FakeUnit().WithText(30000, model, 15).WithHolding(31657, 0xFFFF).WithHolding(31658, 0xFC7C);

@@ -240,9 +240,12 @@ public sealed class DeviceDiscoveryService : IDeviceDiscovery, IDisposable
             device.Identified
                 && device.Tier is SupportTier.Verified or SupportTier.Expected or SupportTier.ReadingsAndChargingOnly,
             device.Note,
-            device.Finding == DiscoveryFinding.SolaxDevice && device.Role == PvDeviceRole.Inverter
-                ? PvSystemRules.DefaultInverterDriver
-                : device.Driver,
+            (device.Finding, device.Role) switch
+            {
+                (DiscoveryFinding.SolaxDevice, PvDeviceRole.Inverter) => PvSystemRules.DefaultInverterDriver,
+                (DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger) => PvSystemRules.DefaultChargerDriver,
+                _ => device.Driver,
+            },
             device.Topology);
 
     // A private subnet no wider than the scanner's own default, or one private address.

@@ -8,12 +8,15 @@ public sealed record DiscoveryOptions
     /// what <c>DeviceConfig.Port</c> defaults to; <c>8899</c> is the common default of the RS485 to
     /// Wi-Fi/Ethernet bridges people put in front of a SolaX (Elfin EW11 and similar); <c>80</c> is
     /// the SolaX dongle's web page, which is not Modbus but is the most common reason an owner finds
-    /// none. Confirm against real hardware before relying on any of them; the list is meant to grow
-    /// from what the scan finds in the field.
+    /// none, and a go-e Charger's local HTTP API (#353). Confirm against real hardware before relying on
+    /// any of them; the list is meant to grow from what the scan finds in the field.
     /// </summary>
     public IReadOnlyList<int> Ports { get; init; } = [502, 8899, 80];
 
-    /// <summary>Ports that are probed as a web page rather than spoken Modbus to.</summary>
+    /// <summary>
+    /// Ports that are probed as a web page rather than spoken Modbus to: a SolaX dongle's page, or else a go-e's
+    /// <c>/api/status</c>.
+    /// </summary>
     public IReadOnlyList<int> WebPorts { get; init; } = [80];
 
     /// <summary>

@@ -4,6 +4,31 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — Discovery finds the SCharger by its voltages and a go-e by its API
+
+**Context.** [Issue #353](https://github.com/mpospisil/gleanvolt/issues/353), the last step of charger
+drivers, as #324 was for the Huawei inverter.
+
+**Decision — the SCharger is the last Modbus check.** It keeps no serial number and no model name, so after
+the SolaX serials and Huawei's model name have failed, the scan reads `0x1000`–`0x1005` and takes a mains
+voltage on L1 (the driver's own probe range) for an SCharger. L2 or L3 live picks `huawei-22kt`, L1 alone
+`huawei-7ks`; a 22KT on one phase reads as a 7KS, and the note says to check the label. A device with a
+SolaX serial never reaches this check.
+
+**Decision — a go-e is asked on a web port, through its driver's probe.** Port 80 is already scanned for
+the SolaX dongle's page. A host that answers HTTP and is not a dongle is asked for go-e's filtered
+`/api/status`, on a read-only client; only a recognised answer is reported (finding `GoeCharger`, no unit
+id, driver `goe`). Routers and printers, and a go-e with its API off, say nothing: every LAN has web
+servers, and a row for each would bury the devices.
+
+**Decision — a found charger brings its brand.** `DiscoveredDevice.Driver` now names the charger driver too,
+and a SolaX charger maps to `solax` as a SolaX inverter does. The wizard's **Use as charger** fills the
+brand through the form's own drop-down logic, and only for a device the scan found as a charger. A charger
+found over HTTP is offered only as the charger, and leaves the unit id alone. The `.env` lines carry
+`Pv__Chargers__0__Driver` when it is not SolaX, and no unit id for a go-e.
+
+---
+
 ## 2026-11-09 — go-e over its HTTP API: reads are marked, a pause is the force state, and two keys are written
 
 **Context.** [Issue #352](https://github.com/mpospisil/gleanvolt/issues/352), the first charger reached over

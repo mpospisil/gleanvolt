@@ -260,6 +260,10 @@
             {
                 SelectTopology(value);
             }
+            else if (key.Equals(PvSystemSettingKeys.ChargerDriver, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectChargerDriver(value);
+            }
             else if (_values.ContainsKey(key))
             {
                 _values[key] = value;
