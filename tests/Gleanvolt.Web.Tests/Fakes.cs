@@ -1448,17 +1448,20 @@ internal sealed class FakePasswordStore : IWebPasswordStore
 }
 
 /// <summary>Settings' register snapshot (#319): a fixed file, or the failure the link would give.</summary>
-internal sealed class FakeInverterSnapshot : IInverterSnapshot
+internal sealed class FakeDeviceSnapshot : IDeviceSnapshot
 {
     public Exception? Failure { get; set; }
 
-    public List<string> Notes { get; } = [];
+    public List<(PvDeviceRole Role, string Note)> Calls { get; } = [];
 
-    public Task<RegisterSnapshotFile> TakeAsync(string note, CancellationToken cancellationToken = default)
+    public Task<RegisterSnapshotFile> TakeAsync(PvDeviceRole role, string note, CancellationToken cancellationToken = default)
     {
-        Notes.Add(note);
+        Calls.Add((role, note));
+        var name = role == PvDeviceRole.Charger
+            ? "gleanvolt-registers-solax-charger-20261108-213000.json"
+            : "gleanvolt-registers-solax-20261108-213000.json";
         return Failure is { } failure
             ? Task.FromException<RegisterSnapshotFile>(failure)
-            : Task.FromResult(new RegisterSnapshotFile("gleanvolt-registers-solax-20261108-213000.json", "{\"format\":\"gleanvolt-register-dump\"}"));
+            : Task.FromResult(new RegisterSnapshotFile(name, "{\"format\":\"gleanvolt-register-dump\"}"));
     }
 }

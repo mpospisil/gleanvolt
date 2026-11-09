@@ -282,6 +282,10 @@ prefix. Two snapshots are the most useful: one at night with the battery idle an
 one with the battery charging. They become the test fixtures every driver is checked against, so the
 signs and ranges are proven against your device rather than assumed.
 
+For a charger, the same button is under the charger. Three snapshots are the most useful: no car, a car
+plugged in and waiting, and a car charging. It reads over Gleanvolt's own connection, so Gleanvolt keeps
+running; a charger that serves one Modbus client at a time would drop a second one.
+
 ## Sources
 
 - [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus) —

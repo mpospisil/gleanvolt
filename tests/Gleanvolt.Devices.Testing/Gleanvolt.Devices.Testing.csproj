@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The driver test kit (issue #319): the replay Modbus client and the conformance tests every inverter
-    driver is held to, built-in or not. A library rather than a test project: each driver's test project
+    The driver test kit (issues #319, #350): the replay Modbus client and the conformance tests every inverter
+    and charger driver is held to, built-in or not. A library rather than a test project: each driver's test project
     references it and inherits the tests; under tests/ because nothing ships it yet; publishing it with the
     contract is for when two or three drivers have proved both (#316, out of scope).
   -->

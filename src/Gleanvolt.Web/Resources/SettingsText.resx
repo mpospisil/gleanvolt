@@ -1022,4 +1022,16 @@
   <data name="SnapshotFailed" xml:space="preserve">
     <value>The inverter could not be read: {0}</value>
   </data>
+  <data name="SnapshotHelpCharger" xml:space="preserve">
+    <value>Reads every register the charger driver uses, once, and saves them to a file. It reads over Gleanvolt's own connection, so nothing has to be stopped. The serial number is cut to its model prefix. Attach the file to an issue when you test a charger Gleanvolt does not support yet.</value>
+  </data>
+  <data name="SnapshotNoteHintCharger" xml:space="preserve">
+    <value>for example: car plugged in, charging at 16 A</value>
+  </data>
+  <data name="SnapshotReadingCharger" xml:space="preserve">
+    <value>Reading the charger…</value>
+  </data>
+  <data name="SnapshotFailedCharger" xml:space="preserve">
+    <value>The charger could not be read: {0}</value>
+  </data>
 </root>

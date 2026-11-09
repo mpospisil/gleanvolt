@@ -2,23 +2,24 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Web.Auth;
 using Gleanvolt.Web.Components;
 
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// Settings → inverter → "Save register snapshot" (issue #319): where it is offered, that a click hands the
-/// browser the file, and that a failure says what the link said.
+/// Settings → inverter / charger → "Save register snapshot" (issues #319, #350): where it is offered, that a
+/// click hands the browser the file of the right device, and that a failure says what the link said.
 /// </summary>
-public class InverterSnapshotPanelTests : BunitContext
+public class DeviceSnapshotPanelTests : BunitContext
 {
-    private readonly FakeInverterSnapshot _snapshot = new();
+    private readonly FakeDeviceSnapshot _snapshot = new();
 
-    public InverterSnapshotPanelTests()
+    public DeviceSnapshotPanelTests()
     {
         Services.AddSingleton<IPvSystemEditor>(new FakePvSystemEditor());
-        Services.AddSingleton<IInverterSnapshot>(_snapshot);
+        Services.AddSingleton<IDeviceSnapshot>(_snapshot);
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
         Services.AddSingleton(new WebPasswordState("hash"));
         JSInterop.SetupVoid("gleanvolt.downloadText", _ => true).SetVoidResult();
@@ -31,7 +32,8 @@ public class InverterSnapshotPanelTests : BunitContext
     public void Settings_offers_it_and_the_wizard_does_not()
     {
         Assert.NotNull(Form().Find("#inverter-snapshot-save"));
-        Assert.Empty(Form(offer: false).FindAll("#inverter-snapshot"));
+        Assert.NotNull(Form().Find("#charger-snapshot-save"));
+        Assert.Empty(Form(offer: false).FindAll(".pv-snapshot"));
     }
 
     [Fact]
@@ -40,7 +42,7 @@ public class InverterSnapshotPanelTests : BunitContext
         Services.AddSingleton(Options.Create(new WebOptions()));
         Services.AddSingleton(new WebPasswordState(null));
 
-        Assert.Empty(Form().FindAll("#inverter-snapshot"));
+        Assert.Empty(Form().FindAll(".pv-snapshot"));
     }
 
     [Fact]
@@ -51,7 +53,7 @@ public class InverterSnapshotPanelTests : BunitContext
         form.Find("#inverter-snapshot-note").Input("night, battery idle, importing");
         form.Find("#inverter-snapshot-save").Click();
 
-        Assert.Equal(["night, battery idle, importing"], _snapshot.Notes);
+        Assert.Equal([(PvDeviceRole.Inverter, "night, battery idle, importing")], _snapshot.Calls);
         var download = Assert.Single(JSInterop.Invocations, call => call.Identifier == "gleanvolt.downloadText");
         Assert.Equal("gleanvolt-registers-solax-20261108-213000.json", download.Arguments[0]);
         Assert.Contains("gleanvolt-register-dump", (string)download.Arguments[1]!);
@@ -71,6 +73,35 @@ public class InverterSnapshotPanelTests : BunitContext
     }
 
     [Fact]
+    public void The_chargers_button_reads_the_charger()
+    {
+        var form = Form();
+
+        form.Find("#charger-snapshot-note").Input("car plugged in, charging at 16 A");
+        form.Find("#charger-snapshot-save").Click();
+
+        Assert.Equal([(PvDeviceRole.Charger, "car plugged in, charging at 16 A")], _snapshot.Calls);
+        var download = Assert.Single(JSInterop.Invocations, call => call.Identifier == "gleanvolt.downloadText");
+        Assert.Equal("gleanvolt-registers-solax-charger-20261108-213000.json", download.Arguments[0]);
+        Assert.Contains("gleanvolt-registers-solax-charger-20261108-213000.json", form.Find("#charger-snapshot-saved").TextContent);
+        Assert.Empty(form.FindAll("#inverter-snapshot-saved"));
+    }
+
+    [Fact]
+    public void A_charger_failure_names_the_charger()
+    {
+        _snapshot.Failure = new TimeoutException("Timed out connecting to Modbus device at 192.168.2.6:502.");
+        var form = Form();
+
+        form.Find("#charger-snapshot-save").Click();
+
+        var error = form.Find("#charger-snapshot-error").TextContent;
+        Assert.Contains("charger", error);
+        Assert.Contains("192.168.2.6", error);
+        Assert.Empty(form.FindAll("#inverter-snapshot-error"));
+    }
+
+    [Fact]
     public void Every_string_comes_from_a_resource()
     {
         _snapshot.Failure = new InvalidOperationException("x");
@@ -78,9 +109,13 @@ public class InverterSnapshotPanelTests : BunitContext
         {
             var rendered = Form();
             rendered.Find("#inverter-snapshot-save").Click();
+            rendered.Find("#charger-snapshot-save").Click();
             return rendered;
         });
 
-        PseudoLocale.AssertTranslated(form.Find("#inverter-snapshot").OuterHtml + form.Find("#inverter-snapshot-error").OuterHtml, "x");
+        PseudoLocale.AssertTranslated(
+            form.Find("#inverter-snapshot").OuterHtml + form.Find("#inverter-snapshot-error").OuterHtml
+            + form.Find("#charger-snapshot").OuterHtml + form.Find("#charger-snapshot-error").OuterHtml,
+            "x");
     }
 }

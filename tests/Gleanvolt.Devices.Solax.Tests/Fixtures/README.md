@@ -1,6 +1,9 @@
 # SolaX register dumps
 
-The recordings `SolaxConformanceTests` replays (issue #319). Each one is a device in a known state:
+The recordings `SolaxConformanceTests` (the inverter, issue #319) and `SolaxChargerConformanceTests` (the
+X3-HAC charger, issue #350) replay. Each one is a device in a known state.
+
+## Inverter
 
 | File | State | Used for |
 |---|---|---|
@@ -19,3 +22,21 @@ charger refuses that address, and the synthetic file this one replaced had hidde
 
 Snapshots keep only the serial number's four-character model prefix; `The_recordings_keep_only_the_serial_prefix`
 fails on a file that keeps more, because these are committed to a public repository.
+
+## Charger
+
+| File | State | Used for |
+|---|---|---|
+| `solax-charger-idle.json` | No car (**synthetic**) | Idle reads `Available` and about 0 W |
+| `solax-charger-plugged-in.json` | A car plugged in and waiting, use-mode Stop (**synthetic**) | A plugged-in state with no power |
+| `solax-charger-charging.json` | Charging at 16 A on three phases, use-mode Fast (**synthetic**) | `Charging` and positive power; setpoint, start/stop and snapshot checks |
+| `solax-night-importing.json` | The SolaX inverter (above) | The probe refuses the inverter at the charger's address |
+
+**The three charger files are synthetic until real ones replace them.** Their input registers `0x0000`-`0x001D`
+are the reference installation's charger, read idle on 2026-11-09 11:30 UTC (the inputs of
+`solax-ev-charger.json`), with RunMode (`0x001D`) set to the state the file names and, for the charging one,
+the total power (`0x000B`) to 11040 W. The holding registers -- the serial number's prefix (`5031`, an
+X3-HAC), the use-mode (`0x060D`) and the setpoint (`0x0628`, 1600 = 16 A) -- are made up, because that read
+used the inverter's ranges and the charger refused them. A real one is a **Settings -> charger -> Save register
+snapshot** in the state the file name describes; it reads on the controller's own connection, so the controller
+keeps running.

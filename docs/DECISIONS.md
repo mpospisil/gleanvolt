@@ -4,6 +4,42 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — Charger snapshots go through the controller's own connection, and every charger driver passes one suite
+
+**Context.** [Issue #350](https://github.com/mpospisil/gleanvolt/issues/350), as #319 was for inverters. The
+SolaX charger serves one Modbus client at a time: its snapshot for #319 could only be taken with the
+controller stopped.
+
+**Decision — one snapshot service for both devices.** `IInverterSnapshot` became `IDeviceSnapshot`, which
+takes the device role; the charger's snapshot reads the configured charger driver's `RegisterSnapshotSpec`
+on the controlled charger's keyed client, so it queues behind the poll loop instead of opening the second
+connection the charger drops. Settings shows **Save register snapshot** under the charger as well as the
+inverter; the file is `gleanvolt-registers-<driver>-charger-<time>.json`. A charger driver without a spec
+(one reached over HTTP) is refused with a message that says so.
+
+**Decision — the HTTP recording waits for go-e.** The issue foresaw a second dump format for HTTP drivers.
+No such driver exists yet, so the format would be designed against nothing; it comes with go-e (#352), and
+the conformance suite is Modbus-only until then.
+
+**Decision — `EvChargerDriverConformanceTests<TFactory>`** in `Gleanvolt.Devices.Testing`, on three recordings
+(idle, a car plugged in and waiting, charging) and another family's. Idle reads `Available` and about 0 W;
+plugged in reads a connected state with about 0 W; charging reads `Charging` and positive power, and no
+reading exceeds the capabilities' current times phases times 250 V, which catches a power in the wrong unit.
+The setpoint is written on a change and not otherwise, and in dry-run reads back clamped to the capabilities.
+Start and stop each write, and write different things; they read back, and leave the setpoint alone. The
+issue said start and stop "write only on a change", but #348 made `SetChargingAllowedAsync` unconditional
+(stop must stop whatever the device already says), so the suite holds drivers to the contract. Dry-run writes
+nothing, reading and probing write nothing, the probe refuses the other family, and the snapshot covers every
+register read and keeps only the serial prefix. The serial-redaction and coverage checks are shared with the
+inverter suite.
+
+**Decision — SolaX's charger fixtures start synthetic, as the inverter's did.** Their input registers are the
+reference charger's real idle read (from #319's swapped-address recording) with RunMode and power set to the
+state; the holding registers were never read and are made up. The other family is the real SolaX inverter
+recording. Real charger snapshots replace them once the button is deployed.
+
+---
+
 ## 2026-11-09 — The charger driver is chosen in configuration, and the charge limits are checked against it
 
 **Context.** [Issue #349](https://github.com/mpospisil/gleanvolt/issues/349), as #318 was for inverters.
