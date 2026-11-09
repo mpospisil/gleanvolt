@@ -63,8 +63,8 @@ public interface IEvChargerDriver
 /// <param name="PauseCurrentAmps">The setpoint that pauses charging without stopping the session.</param>
 /// <param name="Phases">How many phases it supplies.</param>
 /// <param name="CanSwitchPhases">
-/// Whether it can switch between one phase and three while plugged in. Known now so the configuration can be
-/// checked; the command itself comes with the first family that has it (go-e, issue #352).
+/// Whether it can switch between one phase and three while plugged in (go-e, issue #352). Reported, never
+/// commanded: the contract has no phase-switch command yet, so a driver leaves the family's own setting alone.
 /// </param>
 /// <param name="HasUseMode">
 /// Whether it has modes of its own beyond charging allowed or not (SolaX's Eco and Green), which readings

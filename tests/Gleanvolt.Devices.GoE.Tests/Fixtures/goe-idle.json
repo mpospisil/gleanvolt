@@ -1,0 +1,43 @@
+{
+  "format": "gleanvolt-http-dump",
+  "formatVersion": 1,
+  "driver": "goe",
+  "family": "go-e Charger Gemini 22 kW",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC, written from go-e's API v2 key list (github.com/goecharger/go-eCharger-API-v2) until a tester's snapshot replaces it (#352, #354). No car; force state neutral, access open, 16 A requested.",
+  "responses": {
+    "api/status?filter=car,alw,frc,amp,ama,var,nrg,err,modelStatus,psm,pnp,fwv,typ": {
+      "car": 1,
+      "alw": true,
+      "frc": 0,
+      "amp": 16,
+      "ama": 32,
+      "var": 22,
+      "nrg": [
+        231,
+        230,
+        232,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "err": 0,
+      "modelStatus": 13,
+      "psm": 0,
+      "pnp": 3,
+      "fwv": "59.4",
+      "typ": "go-eCharger"
+    }
+  }
+}

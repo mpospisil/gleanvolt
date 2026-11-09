@@ -1,6 +1,7 @@
 using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Hosting.Configuration;
@@ -10,7 +11,7 @@ namespace Gleanvolt.Hosting;
 /// <summary>
 /// The EV charger drivers this build has (issue #348), in one list, as <see cref="InverterDrivers"/> is for
 /// inverters. SolaX first: it is the default. Then Huawei's SCharger, one entry per model (#351), because the
-/// two differ in phase count. <c>Pv:Chargers:0:Driver</c> picks one
+/// two differ in phase count. Then go-e, over its local HTTP API (#352). <c>Pv:Chargers:0:Driver</c> picks one
 /// (#349); the configuration is checked against this list, the container registers a factory from it, and
 /// Settings offers it in a drop-down.
 /// </summary>
@@ -25,6 +26,7 @@ public static class ChargerDrivers
         loggers => new SolaxChargerDriverFactory(loggers),
         loggers => HuaweiSChargerDriverFactory.SevenKs(loggers),
         loggers => HuaweiSChargerDriverFactory.TwentyTwoKt(loggers),
+        loggers => new GoeChargerDriverFactory(loggers),
     ];
 
     /// <summary>What each driver is, without creating one: for the configuration rules and the UI.</summary>

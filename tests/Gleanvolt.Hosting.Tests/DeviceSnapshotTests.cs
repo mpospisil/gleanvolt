@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
+using System.Text.Json.Nodes;
+using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Devices.Testing;
 using Gleanvolt.Hosting.Setup;
@@ -104,22 +106,44 @@ public class DeviceSnapshotTests
     }
 
     [Fact]
-    public async Task A_charger_reached_over_http_has_no_registers_to_save()
+    public async Task A_charger_reached_over_http_is_recorded_as_its_drivers_responses()
     {
-        var charger = new ReplayModbusClient(Charger());
-        var site = Site() with { Chargers = [Site().Chargers[0] with { Driver = "http" }] };
+        // go-e (#352): no registers, so the recording is the API's answers to the driver's own requests, taken on
+        // the charger's HTTP client and never on its Modbus one.
+        var modbus = new ReplayModbusClient(Charger());
+        var handler = new ReplayHttpHandler(new HttpDump
+        {
+            Responses = new Dictionary<string, JsonNode?>
+            {
+                [GoeChargerDriver.StatusRequest] = JsonNode.Parse(
+                    """{"car":2,"alw":true,"frc":2,"amp":16,"ama":32,"var":22,"nrg":[230,230,230,0,16,16,16,3680,3680,3680,0,11040,99,99,99,0],"fwv":"59.4"}"""),
+            },
+        });
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://192.168.2.6/") };
+        var site = Site() with { Chargers = [Site().Chargers[0] with { Driver = GoeChargerDriverFactory.DriverId, Model = "go-e Gemini 22" }] };
         var snapshot = new DeviceSnapshot(
-            new ReplayModbusClient(Device()), charger, site, [new SolaxInverterDriverFactory()],
-            [new SolaxChargerDriverFactory(), new HttpChargerFactory()], new FixedTime(Now), NullLogger<DeviceSnapshot>.Instance);
+            new ReplayModbusClient(Device()), modbus, http, site, [new SolaxInverterDriverFactory()],
+            [new SolaxChargerDriverFactory(), new GoeChargerDriverFactory()], new FixedTime(Now), NullLogger<DeviceSnapshot>.Instance);
 
-        var refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => snapshot.TakeAsync(PvDeviceRole.Charger, string.Empty));
+        var file = await snapshot.TakeAsync(PvDeviceRole.Charger, "charging at 16 A");
 
-        Assert.Contains("HTTP", refusal.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(charger.Reads);
+        Assert.Equal("gleanvolt-http-goe-charger-20261108-213000.json", file.FileName);
+        Assert.Empty(modbus.Reads);
+        Assert.Empty(handler.Writes);
+
+        var dump = HttpDump.FromJson(file.Json);
+        Assert.Equal("goe", dump.Driver);
+        Assert.Equal("go-e Gemini 22", dump.Family);
+        Assert.Equal("charging at 16 A", dump.Note);
+
+        using var replay = new HttpClient(new ReplayHttpHandler(dump)) { BaseAddress = new Uri("http://charger.test/") };
+        var reading = await new GoeChargerDriver(replay).ReadAsync();
+        Assert.Equal(EvChargerStatus.Charging, reading.Status);
+        Assert.Equal(11040, reading.PowerWatts);
     }
 
     private static DeviceSnapshot Snapshot(IModbusClient inverter, IModbusClient charger) => new(
-        inverter, charger, Site(), [new SolaxInverterDriverFactory()], [new SolaxChargerDriverFactory()],
+        inverter, charger, new HttpClient(), Site(), [new SolaxInverterDriverFactory()], [new SolaxChargerDriverFactory()],
         new FixedTime(Now), NullLogger<DeviceSnapshot>.Instance);
 
     // A SolaX charger charging at 16 A on three phases: what the charger driver reads, and the serial number.
@@ -136,25 +160,6 @@ public class DeviceSnapshotTests
         holding[EvChargerRegisterMap.ChargeCurrentSetpoint.Address] = 1600; // 16 A
 
         return new RegisterDump { Holding = holding, Input = input };
-    }
-
-    // A family reached over HTTP, as go-e will be (#352): no snapshot spec.
-    private sealed class HttpChargerFactory : IEvChargerDriverFactory
-    {
-        public string Id => "http";
-
-        public string DisplayName => "Http";
-
-        public EvChargerTransport Transport => EvChargerTransport.Http;
-
-        public ModbusDefaults? Defaults => null;
-
-        public EvChargerCapabilities Capabilities => SolaxChargerDriver.SolaxCapabilities;
-
-        public RegisterSnapshotSpec? Snapshot => null;
-
-        public IEvChargerDriver Create(EvChargerConnection connection, EvChargerDriverOptions options) =>
-            throw new NotSupportedException();
     }
 
     private sealed class FixedTime(DateTimeOffset now) : TimeProvider

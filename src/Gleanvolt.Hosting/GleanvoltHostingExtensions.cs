@@ -20,6 +20,7 @@ using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
+using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Secrets;
@@ -226,6 +227,7 @@ public static class GleanvoltHostingExtensions
             // accident in setup mode can open a socket to an address nobody confirmed.
             services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (_, _) => new NotConfiguredModbusClient());
             services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (_, _) => new NotConfiguredModbusClient());
+            services.AddKeyedSingleton(ModbusClientKeys.EvCharger, (_, _) => ChargerHttpClients.NotConfigured());
         }
         else
         {
@@ -268,6 +270,17 @@ public static class GleanvoltHostingExtensions
             services.AddKeyedSingleton<IModbusClient>(
                 ModbusClientKeys.EvCharger,
                 (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
+
+            // The same charger over HTTP, for a family whose local interface is a web API (go-e, #352): one
+            // client, made only if something asks for it, and in dry-run one that passes only the requests the
+            // driver marked as reads. A Modbus family never resolves it, so it never connects.
+            var controlledConnection = site.Chargers[0].Connection;
+            services.AddKeyedSingleton(ModbusClientKeys.EvCharger, (provider, _) =>
+            {
+                var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+                return ChargerHttpClients.Create(
+                    controlledConnection, !chargeControl.DryRun, provider.GetRequiredService<ILogger<ReadOnlyHttpHandler>>());
+            });
         }
 
         // The inverter's driver (issues #317, #318): the one Pv:Inverter:Driver names, which the resolver
@@ -305,8 +318,8 @@ public static class GleanvoltHostingExtensions
         });
 
         // The charger's driver (issues #348, #349): the one Pv:Chargers:0:Driver names, which the resolver has
-        // already checked is one of these, on the controlled charger's client as registered above -- read-only
-        // in dry-run.
+        // already checked is one of these, on the controlled charger's client as registered above -- Modbus or
+        // HTTP, as the family says (#352), and read-only in dry-run.
         foreach (var make in ChargerDrivers.Factories)
         {
             services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
@@ -320,13 +333,12 @@ public static class GleanvoltHostingExtensions
                 : ChargerDrivers.DefaultId;
             var factory = provider.GetServices<IEvChargerDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
                 ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
-            if (factory.Transport != EvChargerTransport.Modbus)
-            {
-                throw new NotSupportedException($"The {factory.DisplayName} charger is reached over {factory.Transport}, which this build cannot connect yet.");
-            }
+            var connection = factory.Transport == EvChargerTransport.Http
+                ? EvChargerConnection.Over(provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger))
+                : EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger));
 
             return factory.Create(
-                EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger)),
+                connection,
                 new EvChargerDriverOptions
                 {
                     DryRun = chargeControl.DryRun,
