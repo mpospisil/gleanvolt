@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -12,7 +13,7 @@ namespace Gleanvolt.Hosting.Tests;
 /// </summary>
 public class ChargeActionsTests
 {
-    private readonly FakeEvChargerControl _charger = new() { CurrentSettings = new(EvChargerMode.Green, 6) };
+    private readonly FakeEvChargerControl _charger = new() { CurrentSettings = SolaxMode.Green.At(6) };
 
     private readonly ChargeControlModeSelector _mode =
         new(ChargeControlMode.Off, NullLogger<ChargeControlModeSelector>.Instance);
@@ -36,7 +37,7 @@ public class ChargeActionsTests
         var result = await Actions().StartAsync(mode, "Web UI");
 
         Assert.True(result.Succeeded);
-        Assert.Equal(EvChargerMode.Fast, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Fast, Assert.Single(_charger.ModeWrites).Mode);
         Assert.Equal(mode, _mode.Mode);
     }
 
@@ -45,13 +46,13 @@ public class ChargeActionsTests
     {
         // Recorded from the selector's own event, so this is the real ordering rather than a claim
         // about it: by the time the mode changes, the write has already happened.
-        EvChargerMode? writtenWhenTheModeMoved = null;
+        SolaxMode? writtenWhenTheModeMoved = null;
         _mode.Changed += _ => writtenWhenTheModeMoved =
             _charger.ModeWrites.Count == 0 ? null : _charger.ModeWrites[^1].Mode;
 
         await Actions().StartAsync(ChargeControlMode.Solar, "Web UI");
 
-        Assert.Equal(EvChargerMode.Fast, writtenWhenTheModeMoved);
+        Assert.Equal(SolaxMode.Fast, writtenWhenTheModeMoved);
     }
 
     [Fact]
@@ -89,7 +90,7 @@ public class ChargeActionsTests
         var result = await Actions().StopAsync("Web UI");
 
         Assert.True(result.Succeeded);
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
     }
 
@@ -101,7 +102,7 @@ public class ChargeActionsTests
         var result = await Actions().StopAsync("Home Assistant");
 
         Assert.True(result.Succeeded);
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
     }
 
@@ -145,7 +146,7 @@ public class ChargeActionsTests
     public async Task StartAsync_PutsTheChargerAtTheMaximumWhenFastIsStarted()
     {
         // Where a finished charge leaves it: in Fast, at PauseCurrentAmps.
-        _charger.CurrentSettings = new(EvChargerMode.Fast, 0);
+        _charger.CurrentSettings = SolaxMode.Fast.At(0);
 
         var result = await Actions().StartAsync(ChargeControlMode.FastNoBattery, "Web UI");
 
@@ -158,7 +159,7 @@ public class ChargeActionsTests
     {
         // The charger has to be ours before we command a current under it. If Fast is refused we stop,
         // and the setpoint is never touched -- asserted separately below.
-        _charger.CurrentSettings = new(EvChargerMode.Green, 0);
+        _charger.CurrentSettings = SolaxMode.Green.At(0);
 
         await Actions().StartAsync(ChargeControlMode.FastNoBattery, "Web UI");
 
@@ -169,11 +170,11 @@ public class ChargeActionsTests
     [Fact]
     public async Task StartAsync_HandsTheDevicesOwnCurrentOverSoAPointlessWriteCanBeSkipped()
     {
-        // "If it is not set" is not decided here: EvChargerControl skips a write that would not move
-        // the setpoint (EvChargerControlTests covers that). What this level owes it is the truth about
+        // "If it is not set" is not decided here: the charger driver skips a write that would not move
+        // the setpoint (SolaxChargerDriverTests covers that). What this level owes it is the truth about
         // what is on the device, read rather than assumed -- get the `active` argument wrong and the
         // skip decision is made against a number nobody measured.
-        _charger.CurrentSettings = new(EvChargerMode.Fast, MaxAmps);
+        _charger.CurrentSettings = SolaxMode.Fast.At(MaxAmps);
 
         await Actions().StartAsync(ChargeControlMode.FastNoBattery, "Web UI");
 
@@ -191,7 +192,7 @@ public class ChargeActionsTests
         // Every other mode computes its setpoint from surplus or from a plan. Writing the maximum ahead
         // of them would charge flat out for a poll interval -- the opposite of what they were started
         // to do.
-        _charger.CurrentSettings = new(EvChargerMode.Fast, 0);
+        _charger.CurrentSettings = SolaxMode.Fast.At(0);
 
         await Actions().StartAsync(mode, "Web UI");
 
@@ -201,7 +202,7 @@ public class ChargeActionsTests
     [Fact]
     public async Task StartAsync_DoesNotTouchTheCurrentWhenTheChargerRefusedFast()
     {
-        _charger.CurrentSettings = new(EvChargerMode.Green, 0);
+        _charger.CurrentSettings = SolaxMode.Green.At(0);
         _charger.ModeWriteFailure = "the charger did not answer";
 
         var result = await Actions().StartAsync(ChargeControlMode.FastNoBattery, "Web UI");
@@ -216,7 +217,7 @@ public class ChargeActionsTests
     {
         // The use-mode is already written and the control loop commands the same current seconds later.
         // Refusing the whole start here would turn a recoverable hiccup into a charge that never began.
-        _charger.CurrentSettings = new(EvChargerMode.Fast, 0);
+        _charger.CurrentSettings = SolaxMode.Fast.At(0);
         _charger.CurrentWriteFailure = "the charger did not answer";
 
         var result = await Actions().StartAsync(ChargeControlMode.FastNoBattery, "Web UI");

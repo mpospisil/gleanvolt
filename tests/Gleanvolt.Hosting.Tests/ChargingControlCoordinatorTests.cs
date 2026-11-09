@@ -3,6 +3,8 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -34,7 +36,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ChargeDecision_WritesTheTargetCurrent()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
 
         var result = await Cycle();
@@ -48,7 +50,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task PauseDecision_WritesThePauseCurrent()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
         _controller.NextDecision = new(ChargingControlAction.Pause, null, "no surplus");
 
         var result = await Cycle();
@@ -141,7 +143,7 @@ public class ChargingControlCoordinatorTests
     /// <summary>A charger that answers until it doesn't — then hangs, the way a silent Modbus device does.</summary>
     private sealed class FlakyEvChargerControl : IEvChargerControl
     {
-        private EvChargerSettings _settings = new(EvChargerMode.Fast, 16);
+        private EvChargerSettings _settings = SolaxMode.Fast.At(16);
 
         public bool Answering { get; set; } = true;
 
@@ -171,10 +173,10 @@ public class ChargingControlCoordinatorTests
             _settings = _settings with { ChargeCurrentAmps = targetAmps };
         }
 
-        // The coordinator never calls this -- the use-mode belongs to the actions, not the poll loop --
-        // so a charger double built for the coordinator's tests has nothing to say about it.
-        public Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("The control loop must not write the charger's use-mode.");
+        // The coordinator never calls this on shutdown -- start and stop belong to the actions, not the
+        // pause -- so a charger double built for these tests has nothing to say about it.
+        public Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("The shutdown pause must not start or stop the charger.");
     }
 
     [Fact]
@@ -193,7 +195,7 @@ public class ChargingControlCoordinatorTests
             idlePowerThresholdWatts: 200,
             NullLogger<ChargingControlCoordinator>.Instance);
 
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "solar");
 
         await coordinator.RunCycleAsync(State(), ChargeControlMode.Forecasted, plan: null, CancellationToken.None);
@@ -205,7 +207,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task AnUnregisteredModeLeavesTheChargerAlone()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "solar");
 
         var result = await _coordinator.RunCycleAsync(State(), ChargeControlMode.Forecasted, plan: null, CancellationToken.None);
@@ -217,7 +219,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ALoanIsMeteredIntoTheDailyTotal()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "bridged", LoanPowerWatts: 1200);
 
         // Two samples three minutes apart: the first sample's loan power counts for the gap that follows.
@@ -230,7 +232,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task SessionEnergyAccumulatesWhileTheCarStaysConnected()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -242,7 +244,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task UnpluggingTheCarStartsTheSessionEnergyAfresh()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -268,7 +270,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task UnpluggingWhileOff_StartsTheNextSessionAfresh_AndCountsTheDrawBeforeAModeIsPicked()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -288,7 +290,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ACarLeftPluggedInThroughOff_KeepsItsSessionEnergy()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -306,7 +308,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ADrawSeenWhileOff_IsNotHandedToTheModePickedNext()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
 
         OffPoll(Charging(Now));
@@ -320,7 +322,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task TheCarsOwnDrawIsTrackedForTheFastMode()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
 
         // Plugged in but not drawing yet: idle time accumulates, but "has drawn" stays false, which is
@@ -345,7 +347,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ResumingAfterACommandedPauseDoesNotInheritTheWaitsIdleTime()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
 
         // The car draws once, so "has drawn" is armed -- as it is a few seconds into any fast charge
         // that is then deferred to a scheduled start.
@@ -374,30 +376,30 @@ public class ChargingControlCoordinatorTests
     {
         // What lets a two-minute-old Stop be believed and an eight-second one ignored. Timed rather than
         // counted, because polls are not evenly spaced.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        _charger.CurrentSettings = SolaxMode.Stop.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
-        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotAllowedFor);
 
         await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(3)), ChargeControlMode.Solar, null, CancellationToken.None);
-        Assert.Equal(TimeSpan.FromMinutes(3), _controller.LastInput!.ChargerNotFastFor);
+        Assert.Equal(TimeSpan.FromMinutes(3), _controller.LastInput!.ChargerNotAllowedFor);
 
         // Back in Fast: the clock is not merely paused, it is forgotten, so a later blip starts afresh
         // rather than inheriting a stretch that has already been recovered from.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
-        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotAllowedFor);
 
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        _charger.CurrentSettings = SolaxMode.Stop.At(6);
         await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
-        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotFastFor);
+        Assert.Equal(TimeSpan.Zero, _controller.LastInput!.ChargerNotAllowedFor);
     }
 
     [Fact]
     public async Task AStandDownIsNotReadAsTheCarLeavingAndComingBack()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
 
         // The car charges, so there is session energy and a "has drawn power" verdict worth losing.
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
@@ -413,7 +415,7 @@ public class ChargingControlCoordinatorTests
         _controller.NextDecision = new(ChargingControlAction.StandDown, null, "waiting until 05:27");
         await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(4)), ChargeControlMode.Solar, null, CancellationToken.None);
 
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 6);
+        _charger.CurrentSettings = SolaxMode.Stop.At(6);
         await _coordinator.RunCycleAsync(StoodDownWithCarAttached(Now.AddMinutes(5)), ChargeControlMode.Solar, null, CancellationToken.None);
         await _coordinator.RunCycleAsync(StoodDownWithCarAttached(Now.AddHours(7)), ChargeControlMode.Solar, null, CancellationToken.None);
 
@@ -430,7 +432,7 @@ public class ChargingControlCoordinatorTests
     {
         // On a full car this wallbox goes from drawing to Finishing / Stop in one poll (#280), so the rule
         // needs the poll before, and a poll the charger did not answer is not one.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -449,7 +451,7 @@ public class ChargingControlCoordinatorTests
     {
         // A targeted charge stood down overnight for sun, re-armed when it comes, and then due to hold its
         // tail until the afternoon: only leaving an appointment makes the release one-way.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
 
         _controller.NextDecision = new(ChargingControlAction.StandDown, null, "waiting for sun", WaitUntil: Now.AddHours(9));
         var waiting = await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -460,7 +462,7 @@ public class ChargingControlCoordinatorTests
         await _coordinator.RunCycleAsync(Charging(Now.AddHours(9)), ChargeControlMode.Solar, null, CancellationToken.None);
         await _coordinator.RunCycleAsync(Charging(Now.AddHours(9).AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
 
-        Assert.Equal(EvChargerMode.Fast, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Fast, _charger.ModeWrites[^1].Mode);
         Assert.False(_controller.LastInput!.WaitAlreadyReleased);
 
         // The held tail, then its release: that one latches.
@@ -477,7 +479,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task OnlyAWaitCarriesAWaitUntil()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
 
         _controller.NextDecision = new(ChargingControlAction.Pause, null, "dip", WaitUntil: Now.AddMinutes(3));
         Assert.Equal(Now.AddMinutes(3), (await Cycle()).WaitUntil);
@@ -489,7 +491,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ACarAnnouncingItIsDoneCountsAsIdleEvenWhileDrawing()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -506,7 +508,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task PluggingInAFreshCarForgetsTheLastOnesDraw()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -519,7 +521,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ReleaseControlForgetsTheCarsDrawToo()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 16, "fast");
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
 
@@ -534,7 +536,7 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task ACompletedSessionPausesTheChargerAndIsReportedUpwards()
     {
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
         _controller.NextDecision = new(
             ChargingControlAction.Pause, null, "car finished", EndsSession: ChargingSessionEndReason.SessionComplete);
 
@@ -550,7 +552,7 @@ public class ChargingControlCoordinatorTests
         // Unknown means the charger didn't answer this poll. Read as "no car", it looks like an unplug
         // followed by a replug, which zeroes the session's energy and its "the car has drawn power"
         // verdict -- both of which the strategies meter their decisions against.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -567,7 +569,7 @@ public class ChargingControlCoordinatorTests
     {
         // The reader fills in 0W for a charger that did not answer. The car drew straight through the
         // blink, so five minutes at 4140W is what the session took -- not four.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -588,7 +590,7 @@ public class ChargingControlCoordinatorTests
         // 2026-09-28 13:01: the car drawing 4.2kW, the charger blinked, and its 0W put the car in the
         // house load -- a -4238W sample that dragged the average under the floor and paused the charge
         // for fifteen minutes of full sun.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 6);
+        _charger.CurrentSettings = SolaxMode.Fast.At(6);
         _controller.NextDecision = new(ChargingControlAction.Charge, 6, "charging");
 
         await _coordinator.RunCycleAsync(SunnyCharging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
@@ -661,7 +663,7 @@ public class ChargingControlCoordinatorTests
             pauseCurrentAmps: 0,
             idlePowerThresholdWatts: 200,
             NullLogger<ChargingControlCoordinator>.Instance);
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
         solar.NextDecision = new(ChargingControlAction.Charge, 6, "charge");
         solarGrid.NextDecision = new(ChargingControlAction.Charge, 6, "charge");
 

@@ -7,6 +7,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- The SolaX use-modes the tests describe the charger in (#348); one copy, kept with Core's tests. -->
+  <ItemGroup>
+    <Compile Include="..\Gleanvolt.Core.Tests\SolaxMode.cs" Link="SolaxMode.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.11" />

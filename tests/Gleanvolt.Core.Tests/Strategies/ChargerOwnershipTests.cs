@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -9,21 +11,21 @@ public class ChargerOwnershipTests
     private static readonly DateTimeOffset Now = new(2026, 8, 29, 12, 0, 0, TimeSpan.Zero);
 
     private static ChargingControlInput Input(
-        EvChargerMode chargerMode,
+        SolaxMode chargerMode,
         bool stoodDown = false,
         TimeSpan notFastFor = default) =>
         new(
             new EnergyState(Now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
-            new EvChargerSettings(chargerMode, 6),
+            chargerMode.At(6),
             Charging: true,
             ChargerStoodDown: stoodDown,
-            ChargerNotFastFor: notFastFor);
+            ChargerNotAllowedFor: notFastFor);
 
     [Fact]
     public void AChargerInFastIsOursToDrive()
     {
-        Assert.Null(ChargerOwnership.NotOurs(Input(EvChargerMode.Fast)));
+        Assert.Null(ChargerOwnership.NotOurs(Input(SolaxMode.Fast)));
     }
 
     [Fact]
@@ -31,14 +33,14 @@ public class ChargerOwnershipTests
     {
         // The deferred charge's own stand-down. Without this the mode cannot arm the charger it is
         // waiting for -- the 8.5-hour inert overnight charge of 2026-08-28.
-        Assert.Null(ChargerOwnership.NotOurs(Input(EvChargerMode.Stop, stoodDown: true, notFastFor: TimeSpan.FromHours(7))));
+        Assert.Null(ChargerOwnership.NotOurs(Input(SolaxMode.Stop, stoodDown: true, notFastFor: TimeSpan.FromHours(7))));
     }
 
     [Theory]
-    [InlineData(EvChargerMode.Stop)]
-    [InlineData(EvChargerMode.Eco)]
-    [InlineData(EvChargerMode.Green)]
-    public void AModeTheOwnerSetIsLeftAlone(EvChargerMode ownersMode)
+    [InlineData(SolaxMode.Stop)]
+    [InlineData(SolaxMode.Eco)]
+    [InlineData(SolaxMode.Green)]
+    public void AModeTheOwnerSetIsLeftAlone(SolaxMode ownersMode)
     {
         var decision = ChargerOwnership.NotOurs(Input(ownersMode, notFastFor: TimeSpan.FromSeconds(30)));
 
@@ -54,7 +56,7 @@ public class ChargerOwnershipTests
         // use-modes on recovery: all ten lifetime Eco sightings fall in one two-minute window right
         // after "reachable again", interleaved with Stop. Ending a charge on one of those would be the
         // very bug this grace period exists to avoid, and it would fire nightly.
-        var decision = ChargerOwnership.NotOurs(Input(EvChargerMode.Eco, notFastFor: TimeSpan.FromSeconds(8)));
+        var decision = ChargerOwnership.NotOurs(Input(SolaxMode.Eco, notFastFor: TimeSpan.FromSeconds(8)));
 
         Assert.False(decision!.SessionComplete);
     }
@@ -65,7 +67,7 @@ public class ChargerOwnershipTests
         // 2026-08-24: the car finished, the wallbox went Finishing -> Stop, and Targeted then logged
         // "leaving it untouched" every eight seconds for 2 h 19 min because the guard returned before
         // the completion checks could run. The mode has to notice it is driving nothing.
-        var decision = ChargerOwnership.NotOurs(Input(EvChargerMode.Stop, notFastFor: TimeSpan.FromMinutes(3)));
+        var decision = ChargerOwnership.NotOurs(Input(SolaxMode.Stop, notFastFor: TimeSpan.FromMinutes(3)));
 
         Assert.Equal(ChargingSessionEndReason.ChargerTakenOver, decision!.EndsSession);
 
@@ -88,11 +90,11 @@ public class ChargerOwnershipTests
         new(
             new EnergyState(Now, 50, 0, 0, 0, status, 0),
             0,
-            new EvChargerSettings(EvChargerMode.Stop, 16),
+            SolaxMode.Stop.At(16),
             Charging: charging,
             EvDrewPower: true,
             ChargerStoodDown: stoodDown,
-            ChargerNotFastFor: TimeSpan.FromSeconds(8),
+            ChargerNotAllowedFor: TimeSpan.FromSeconds(8),
             EvWasDrawing: wasDrawing);
 
     [Theory]
@@ -136,7 +138,7 @@ public class ChargerOwnershipTests
     [Fact]
     public void AWallboxThatStaysInFastAtZeroWattsEndsOnTheDwell()
     {
-        var input = Input(EvChargerMode.Fast) with { EvDrewPower = true, EvIdleFor = Dwell };
+        var input = Input(SolaxMode.Fast) with { EvDrewPower = true, EvIdleFor = Dwell };
 
         var decision = ChargerOwnership.Check(input, Dwell, " at 3.0kWh");
 

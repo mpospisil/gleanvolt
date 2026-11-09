@@ -33,7 +33,7 @@ internal class FakeModbusClient : IModbusClient
         return Task.FromResult(result);
     }
 
-    public Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
+    public virtual Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
         ReadHoldingRegistersAsync(startAddress, numberOfPoints, cancellationToken);
 
     public Task WriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default)

@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — The charger is a driver behind a contract, and start and stop are one switch
+
+**Context.** [Issue #348](https://github.com/mpospisil/gleanvolt/issues/348), the first step of charger
+drivers ([#347](https://github.com/mpospisil/gleanvolt/issues/347)), as #317 was for inverters. The SolaX
+X3-HAC was compiled into Core and Infrastructure: `EvChargerMode` (its use-mode register) and
+`EvChargerRegister` sat in `Core.Enums`, `EnergyStateReader` read its registers, and `EvChargerControl`
+wrote them.
+
+**Decision — the contract, in `Gleanvolt.Devices.Abstractions`.** `IEvChargerDriver` has `ReadAsync`
+(status, power in W, setpoint in A, and the family's mode name for display), `ReadSettingsAsync` (what the
+control loop compares against), `SetCurrentAsync`, `SetChargingAllowedAsync` and `ProbeAsync`, and
+`EvChargerCapabilities` (min, max and pause amps, phases, phase switching, whether there is a use-mode).
+`IEvChargerDriverFactory` makes one from an `EvChargerConnection`. `EvChargerStatus` moved there too: it
+is OCPP's status names, and mapping onto it is each driver's job. A charger that cannot be read is still
+`Unknown`, never a car that is gone: the driver throws, and `EnergyStateReader` reports `Unknown`.
+
+**Decision 1 — start and stop are `SetChargingAllowedAsync(bool)`** (the epic's option A). SolaX maps it
+to Fast and Stop. `EvChargerSettings` carries `ChargingAllowed`, which is what every controller and
+`ChargerOwnership` now read instead of "the use-mode is Fast". Eco and Green are SolaX's, read as a mode
+name for the log and never written. Keeping `EvChargerMode` in the contract (option B) would have made
+every other family pretend to have SolaX's four modes.
+
+**Decision 2 — the connection is transport-neutral** (option A). `EvChargerConnection` holds a Modbus
+client or an `HttpClient`, and the factory says which it needs (`Transport`), so go-e's HTTP API v2 fits
+without changing the contract. The host owns both. Only Modbus is built today.
+
+**Decision 3 — phase switching is a capability now, a command later.** `CanSwitchPhases` is in
+`EvChargerCapabilities`, so configuration can be checked against it; the command arrives with go-e (#352),
+the first family that has one.
+
+**What moved, unchanged.** `SolaxChargerDriver` in `Gleanvolt.Devices.Solax` holds the register map, the
+setpoint's hysteresis, dry-run's simulated values, and the encodings. `IEvChargerControl` stays in Core as
+the control loop's narrower view, and `EvChargerControl` is now a pass-through to the driver. Start and
+stop are still written on transitions only, by the actions and the coordinator. Log lines are the same,
+except the two ownership reasons, which say "not allowed to charge" instead of "not Fast", and a failed
+start or stop, which no longer names the use-mode. The tests
+still describe the charger in SolaX's words (a test-only `SolaxMode`), because "left alone in Green" says
+what they are about. The driver is always SolaX until the configuration can name one (#349).
+
+---
+
 ## 2026-11-09 — The SolaX probe also asks for the serial number's model prefix
 
 **Context.** [Issue #319](https://github.com/mpospisil/gleanvolt/issues/319). The SolaX inverter probe

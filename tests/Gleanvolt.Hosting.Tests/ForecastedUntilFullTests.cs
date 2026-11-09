@@ -7,6 +7,8 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.SolarGrid;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -59,7 +61,7 @@ public sealed class ForecastedUntilFullTests : IDisposable
         // Never ended: one stand-down per night, one re-arm per morning.
         Assert.DoesNotContain(_statuses, status => status.SessionCompleted);
         Assert.Equal(
-            [EvChargerMode.Stop, EvChargerMode.Fast, EvChargerMode.Stop, EvChargerMode.Fast],
+            [SolaxMode.Stop, SolaxMode.Fast, SolaxMode.Stop, SolaxMode.Fast],
             _charger.ModeWrites.Select(write => write.Mode));
 
         var night = _statuses.Single(status => status.Timestamp == Day1.AddHours(22));
@@ -121,11 +123,11 @@ public sealed class ForecastedUntilFullTests : IDisposable
         await RunAsync(untilFull: false, Stopped(Day1.AddDays(1).AddHours(2)), Stopped(Day1.AddDays(1).AddHours(3)));
 
         Assert.Equal(ChargeControlMode.Forecasted, _mode.Mode);
-        Assert.Equal(EvChargerMode.Fast, _charger.ModeWrites[0].Mode);
+        Assert.Equal(SolaxMode.Fast, _charger.ModeWrites[0].Mode);
         Assert.Contains("restart", _charger.ModeWrites[0].Reason);
 
         // Night, so the first cycle stands the charger straight back down.
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal(2, _statuses[^1].UntilFull?.Day);
         Assert.True(File.Exists(SessionPath));
     }

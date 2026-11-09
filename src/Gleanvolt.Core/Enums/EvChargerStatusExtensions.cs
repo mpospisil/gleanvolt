@@ -1,3 +1,5 @@
+using Gleanvolt.Devices;
+
 namespace Gleanvolt.Core.Enums;
 
 public static class EvChargerStatusExtensions
@@ -21,7 +23,7 @@ public static class EvChargerStatusExtensions
     /// <summary>
     /// Whether the charger told us anything at all. <see cref="EvChargerStatus.Unknown"/> is what a
     /// <b>failed read</b> produces — the charger stopped answering Modbus, or answered with a value
-    /// outside the register's range (see <c>EnergyStateReader</c> and <c>EvChargerStatusMapping</c>).
+    /// its driver does not know (see <c>EnergyStateReader</c> and <c>IEvChargerDriver.ReadAsync</c>).
     /// It is the absence of information, not a fact about the car.
     /// </summary>
     public static bool IsConnectionKnown(this EvChargerStatus status) => status != EvChargerStatus.Unknown;

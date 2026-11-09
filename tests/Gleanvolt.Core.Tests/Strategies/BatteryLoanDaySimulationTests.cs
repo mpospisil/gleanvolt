@@ -2,6 +2,8 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -129,7 +131,7 @@ public class BatteryLoanDaySimulationTests
             var decision = controller.Decide(new ChargingControlInput(
                 state,
                 surplusWatts,
-                new EvChargerSettings(EvChargerMode.Fast, 6),
+                SolaxMode.Fast.At(6),
                 charging,
                 plan,
                 TimeInCurrentState: now - stateChangedAt,
@@ -223,7 +225,7 @@ public class BatteryLoanDaySimulationTests
             .Decide(new ChargingControlInput(
                 state,
                 2000 - HouseWatts,
-                new EvChargerSettings(EvChargerMode.Fast, 6),
+                SolaxMode.Fast.At(6),
                 Charging: false,
                 plan,
                 TimeInCurrentState: TimeSpan.FromHours(1),

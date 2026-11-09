@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Devices;
 using static System.FormattableString;
 
 namespace Gleanvolt.Hosting.Targeting;

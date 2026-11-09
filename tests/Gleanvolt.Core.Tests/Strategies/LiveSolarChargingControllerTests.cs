@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -21,14 +23,14 @@ public class LiveSolarChargingControllerTests
     private static EnergyState State(double socPercent) =>
         new(DateTimeOffset.UtcNow, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, EvChargerStatus.Charging, EvChargerPowerWatts: 0);
 
-    private static ChargingControlInput Input(double soc, double surplus, EvChargerMode chargerMode, bool charging) =>
-        new(State(soc), surplus, new EvChargerSettings(chargerMode, 6), charging);
+    private static ChargingControlInput Input(double soc, double surplus, SolaxMode chargerMode, bool charging) =>
+        new(State(soc), surplus, chargerMode.At(6), charging);
 
     [Theory]
-    [InlineData(EvChargerMode.Green)]
-    [InlineData(EvChargerMode.Eco)]
-    [InlineData(EvChargerMode.Stop)]
-    public void NotFastMode_LeavesTheChargerAlone(EvChargerMode mode)
+    [InlineData(SolaxMode.Green)]
+    [InlineData(SolaxMode.Eco)]
+    [InlineData(SolaxMode.Stop)]
+    public void NotFastMode_LeavesTheChargerAlone(SolaxMode mode)
     {
         // Plenty of sun and a full battery, but the charger isn't in Fast: we don't control it.
         var result = Controller.Decide(Input(96, 5000, mode, charging: false));
@@ -41,7 +43,7 @@ public class LiveSolarChargingControllerTests
     {
         // Not charging, 96% >= 95%, surplus 4000W clears the resume threshold -> charge at
         // floor(4000/230) = 17A.
-        var result = Controller.Decide(Input(96, 4000, EvChargerMode.Fast, charging: false));
+        var result = Controller.Decide(Input(96, 4000, SolaxMode.Fast, charging: false));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(17, result.ChargeCurrentAmps);
@@ -51,7 +53,7 @@ public class LiveSolarChargingControllerTests
     public void Fast_NotCharging_SurplusBetweenMinAndResume_Waits()
     {
         // 1450W is above the min (1380) but below the resume threshold (1580); not charging -> stay paused.
-        var result = Controller.Decide(Input(96, 1450, EvChargerMode.Fast, charging: false));
+        var result = Controller.Decide(Input(96, 1450, SolaxMode.Fast, charging: false));
 
         Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
@@ -60,7 +62,7 @@ public class LiveSolarChargingControllerTests
     public void Fast_BatteryBelowFull_NotCharging_Waits()
     {
         // 94% < 95% engage threshold: don't start, and (being in Fast) actively hold it paused.
-        var result = Controller.Decide(Input(94, 5000, EvChargerMode.Fast, charging: false));
+        var result = Controller.Decide(Input(94, 5000, SolaxMode.Fast, charging: false));
 
         Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
@@ -69,7 +71,7 @@ public class LiveSolarChargingControllerTests
     public void Fast_BatteryBelowRelease_WhileCharging_Waits()
     {
         // Dropped to 89% (< 90% release) while charging: disengage and pause.
-        var result = Controller.Decide(Input(89, 5000, EvChargerMode.Fast, charging: true));
+        var result = Controller.Decide(Input(89, 5000, SolaxMode.Fast, charging: true));
 
         Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
@@ -78,7 +80,7 @@ public class LiveSolarChargingControllerTests
     public void Fast_BatteryBetweenReleaseAndFull_WhileCharging_KeepsCharging()
     {
         // 92% is below 95% engage but above 90% release: already charging, so hysteresis keeps going.
-        var result = Controller.Decide(Input(92, 4000, EvChargerMode.Fast, charging: true));
+        var result = Controller.Decide(Input(92, 4000, SolaxMode.Fast, charging: true));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(17, result.ChargeCurrentAmps);
@@ -93,7 +95,7 @@ public class LiveSolarChargingControllerTests
     [InlineData(920, ChargingControlAction.StandDown)]
     public void Fast_WhileCharging_SurplusAtTheSixAmpFloor(double surplusWatts, ChargingControlAction expected)
     {
-        var result = Controller.Decide(Input(96, surplusWatts, EvChargerMode.Fast, charging: true));
+        var result = Controller.Decide(Input(96, surplusWatts, SolaxMode.Fast, charging: true));
 
         Assert.Equal(expected, result.Action);
     }
@@ -101,7 +103,7 @@ public class LiveSolarChargingControllerTests
     [Fact]
     public void Fast_SurplusExceedsConfiguredMax_ClampsToMax()
     {
-        var result = Controller.Decide(Input(96, 30000, EvChargerMode.Fast, charging: true));
+        var result = Controller.Decide(Input(96, 30000, SolaxMode.Fast, charging: true));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(20, result.ChargeCurrentAmps);
@@ -115,7 +117,7 @@ public class LiveSolarChargingControllerTests
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 40, currentStepAmps: 1,
             hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
-        var result = overConfigured.Decide(Input(96, 30000, EvChargerMode.Fast, charging: true));
+        var result = overConfigured.Decide(Input(96, 30000, SolaxMode.Fast, charging: true));
 
         Assert.Equal(EvChargerLimits.MaxCurrentAmps, result.ChargeCurrentAmps);
     }
@@ -129,7 +131,7 @@ public class LiveSolarChargingControllerTests
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 20, currentStepAmps: 1,
             hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
-        var result = threePhase.Decide(Input(96, 3000, EvChargerMode.Fast, charging: true));
+        var result = threePhase.Decide(Input(96, 3000, SolaxMode.Fast, charging: true));
 
         Assert.Equal(ChargingControlAction.StandDown, result.Action);
     }
@@ -143,7 +145,7 @@ public class LiveSolarChargingControllerTests
             minChargingCurrentAmps: 6, maxChargingCurrentAmps: 20, currentStepAmps: 1,
             hysteresisWatts: 200, fullSocPercent: 95, releaseSocPercent: 90, completionDwell: TimeSpan.FromMinutes(2));
 
-        var result = threePhase.Decide(Input(96, 6900, EvChargerMode.Fast, charging: true));
+        var result = threePhase.Decide(Input(96, 6900, SolaxMode.Fast, charging: true));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(10, result.ChargeCurrentAmps);
@@ -153,15 +155,15 @@ public class LiveSolarChargingControllerTests
     public void CloudCycle_ChargesThenWaitsThenResumes()
     {
         // Charging on 4000W.
-        var charging = Controller.Decide(Input(96, 4000, EvChargerMode.Fast, charging: true));
+        var charging = Controller.Decide(Input(96, 4000, SolaxMode.Fast, charging: true));
         Assert.Equal(ChargingControlAction.Charge, charging.Action);
 
         // Cloud drops it below the floor -> wait, stood down: with no forecast nobody knows for how long.
-        var paused = Controller.Decide(Input(96, 1000, EvChargerMode.Fast, charging: true));
+        var paused = Controller.Decide(Input(96, 1000, SolaxMode.Fast, charging: true));
         Assert.Equal(ChargingControlAction.StandDown, paused.Action);
 
         // Cloud clears; now not charging, surplus clears the resume threshold -> charge again.
-        var resumed = Controller.Decide(Input(96, 4000, EvChargerMode.Fast, charging: false));
+        var resumed = Controller.Decide(Input(96, 4000, SolaxMode.Fast, charging: false));
         Assert.Equal(ChargingControlAction.Charge, resumed.Action);
         Assert.Equal(17, resumed.ChargeCurrentAmps);
     }
@@ -178,7 +180,7 @@ public class LiveSolarChargingControllerTests
 
     private static ChargingControlInput At(TimeSpan sinceNoon, double soc, double batteryWatts, double surplus) =>
         new(new EnergyState(Noon + sinceNoon, soc, batteryWatts, SolarPowerWatts: 6000, GridPowerWatts: -4000, EvChargerStatus.Charging, EvChargerPowerWatts: 0),
-            surplus, new EvChargerSettings(EvChargerMode.Fast, 6), Charging: false);
+            surplus, SolaxMode.Fast.At(6), Charging: false);
 
     // Polls every 10 s from noon for the given span; returns the last decision.
     private static ChargingControlDecision Run(

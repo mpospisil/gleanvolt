@@ -7,6 +7,7 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting.Tests;
 

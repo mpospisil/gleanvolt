@@ -7,6 +7,8 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -93,7 +95,7 @@ public class TargetedModeTests
         // wallbox abandons after about seven minutes (#280).
         Assert.All(_writes, w => Assert.Equal(0, w.Target));
         Assert.All(_inverter.Applied, hold => Assert.False(hold));
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Contains("Waiting for sun", _charger.ModeWrites[^1].Reason);
     }
 
@@ -172,7 +174,7 @@ public class TargetedModeTests
 
         // #89: the same end state the Off button leaves -- stopped, not idling in Fast at the pause
         // current, which the car would happily start drawing from again.
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
     }
 
     [Fact]
@@ -183,7 +185,7 @@ public class TargetedModeTests
         // Nothing charges and nothing ends: the charger is stood down until a target is set, since nobody
         // knows how long that will take.
         Assert.Null(LastTarget);
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Contains("No target set", _charger.ModeWrites[^1].Reason);
         Assert.Equal(ChargeControlMode.Targeted, _mode.Mode);
         Assert.Null(_status.Current?.TargetedPlan);

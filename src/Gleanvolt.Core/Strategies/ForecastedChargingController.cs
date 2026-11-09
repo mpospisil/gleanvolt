@@ -11,7 +11,7 @@ namespace Gleanvolt.Core.Strategies;
 /// battery to still reach 100% by the evening deadline (see <see cref="SolarDayPlanner"/>).
 ///
 /// <para>Like the live-solar controller it only ever modulates the <em>current</em>, and only while the
-/// charger's own use-mode is <see cref="EvChargerMode.Fast"/> — which starting the mode wrote once and
+/// charger's allows charging (<see cref="Gleanvolt.Devices.EvChargerSettings.ChargingAllowed"/>; SolaX: use-mode Fast) — which starting the mode wrote once and
 /// which nothing here re-asserts. What it adds:</para>
 /// <list type="bullet">
 /// <item><description>a <b>moving SOC floor</b> from the plan instead of a fixed 95% gate, with its own

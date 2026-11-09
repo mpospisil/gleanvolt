@@ -188,7 +188,7 @@ public class SolaxInverterDriverTests
     private static EnergyStateReader Reader(IInverterDriver driver, GridPhase? unmetered) =>
         new(
             driver,
-            new FakeModbusClient(),
+            new SolaxChargerDriver(new FakeModbusClient()),
             NullLogger<EnergyStateReader>.Instance,
             new PvSystemInfo(
                 Id: "", Name: "", Address: "", Latitude: null, Longitude: null, AzimuthDegrees: null, TiltDegrees: null,

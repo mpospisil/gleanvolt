@@ -1,29 +1,21 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Devices;
-using Gleanvolt.Infrastructure.RegisterMaps;
 
 namespace Gleanvolt.Infrastructure;
 
 /// <summary>
-/// One telemetry poll, composed (issue #317): the inverter through its driver, the charger as before and
-/// best-effort, the correction for a grid meter blind on one phase, and the <see cref="EnergyState"/> the
-/// rest of the controller reads. Nothing here knows the inverter's brand.
+/// One telemetry poll, composed (issues #317, #348): the inverter through its driver, the charger through
+/// its own, best-effort, the correction for a grid meter blind on one phase, and the <see cref="EnergyState"/> the
+/// rest of the controller reads. Nothing here knows either brand.
 /// </summary>
 public sealed class EnergyStateReader : IEnergyStateReader
 {
-    // A RunMode value outside the register's real 0-13 range, which EvChargerStatusMapping turns into
-    // EvChargerStatus.Unknown -- exactly what the UI and Home Assistant already show for a charger
-    // whose state can't be determined. Reusing it means "the charger is unreachable" needs no new
-    // field on EnergyState, and therefore no new entity anywhere downstream.
-    private const ushort UnreachableStatusRaw = ushort.MaxValue;
-
     private readonly IInverterDriver _inverter;
-    private readonly IModbusClient _evChargerClient;
+    private readonly IEvChargerDriver _evCharger;
     private readonly ILogger<EnergyStateReader> _logger;
 
     // The phase the grid meter cannot see, or null for a meter that sees all three. Corrected here, once,
@@ -37,17 +29,18 @@ public sealed class EnergyStateReader : IEnergyStateReader
     private bool _evChargerReachable = true;
 
     /// <param name="inverter">The inverter's driver.</param>
+    /// <param name="evCharger">The charger's driver.</param>
     /// <param name="site">The installation, for its unmetered grid phase. Null reads the meter as it is.</param>
     /// <param name="limits">The car's phase count, for how its load divides between phases. Null assumes three.</param>
     public EnergyStateReader(
         IInverterDriver inverter,
-        [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient evChargerClient,
+        IEvChargerDriver evCharger,
         ILogger<EnergyStateReader> logger,
         PvSystemInfo? site = null,
         ChargingLimits? limits = null)
     {
         _inverter = inverter;
-        _evChargerClient = evChargerClient;
+        _evCharger = evCharger;
         _logger = logger;
         _unmeteredGridPhase = site?.UnmeteredGridPhase;
         _evPhases = limits?.Phases ?? 3;
@@ -68,15 +61,14 @@ public sealed class EnergyStateReader : IEnergyStateReader
         var inverter = await _inverter.ReadAsync(cancellationToken).ConfigureAwait(false);
         var evCharger = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
 
-        // Unsigned: the HAC charger doesn't support V2G.
         var state = new EnergyState(
             DateTimeOffset.UtcNow,
             inverter.BatterySocPercent,
             inverter.BatteryWatts,
             inverter.PvWatts,
             inverter.GridWatts,
-            EvChargerStatusMapping.FromRaw(evCharger.StatusRaw),
-            evCharger.PowerRaw)
+            evCharger.Status,
+            evCharger.PowerWatts)
         {
             ChargeMode = evCharger.Mode,
             ChargeCurrentAmps = evCharger.CurrentAmps,
@@ -102,22 +94,13 @@ public sealed class EnergyStateReader : IEnergyStateReader
     // The charger is optional in a way the inverter is not: it can be switched off, moved to another
     // address by DHCP, or simply absent from the installation -- and none of that should cost us the
     // inverter telemetry that was just read successfully. So everything charger-shaped is
-    // best-effort, the connect included. That connect is what the per-register Try* helpers below
-    // could never guard: they only run once a connection exists, and an absent charger fails earlier
-    // than that.
+    // best-effort, the connect included: a charger that cannot be read is reported Unknown, which is
+    // the absence of information and never a car that is gone (IsCarKnownDisconnected).
     private async Task<EvChargerReading> ReadEvChargerAsync(CancellationToken cancellationToken)
     {
         try
         {
-            if (!_evChargerClient.IsConnected)
-            {
-                await _evChargerClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            var statusRaw = await ReadAsync(_evChargerClient, EvChargerRegisterMap.RunMode, cancellationToken).ConfigureAwait(false);
-            var powerRaw = await ReadAsync(_evChargerClient, EvChargerRegisterMap.ChargePowerTotal, cancellationToken).ConfigureAwait(false);
-            var mode = await TryReadChargeModeAsync(cancellationToken).ConfigureAwait(false);
-            var currentAmps = await TryReadChargeCurrentAsync(cancellationToken).ConfigureAwait(false);
+            var reading = await _evCharger.ReadAsync(cancellationToken).ConfigureAwait(false);
 
             if (!_evChargerReachable)
             {
@@ -125,7 +108,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
                 _logger.LogInformation("EV charger is reachable again; its telemetry is live.");
             }
 
-            return new EvChargerReading(statusRaw, powerRaw, mode, currentAmps);
+            return reading;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -141,63 +124,10 @@ public sealed class EnergyStateReader : IEnergyStateReader
                     EvChargerStatus.Unknown);
             }
 
-            return new EvChargerReading(UnreachableStatusRaw, PowerRaw: 0, Mode: null, CurrentAmps: null);
+            return Unreachable;
         }
     }
 
-    private readonly record struct EvChargerReading(ushort StatusRaw, ushort PowerRaw, EvChargerMode? Mode, int? CurrentAmps);
-
-    // Reads the charger's active current setpoint (a holding register, 0.01A scale). Best-effort for
-    // the same reason as the mode: a failed read must not fail the whole telemetry poll.
-    private async Task<int?> TryReadChargeCurrentAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var values = await _evChargerClient
-                .ReadHoldingRegistersAsync(EvChargerRegisterMap.ChargeCurrentSetpoint.Address, numberOfPoints: 1, cancellationToken)
-                .ConfigureAwait(false);
-            return (int)Math.Round(values[0] * 0.01);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return null;
-        }
-    }
-
-    // Reads the charger's work/use mode (a holding register). Best-effort: this register isn't
-    // available on every charger/firmware, so a failed read yields null rather than failing the
-    // whole telemetry poll. A value outside the known enum range is also treated as unknown.
-    private async Task<EvChargerMode?> TryReadChargeModeAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var values = await _evChargerClient
-                .ReadHoldingRegistersAsync(EvChargerRegisterMap.ChargerUseMode.Address, numberOfPoints: 1, cancellationToken)
-                .ConfigureAwait(false);
-            var raw = values[0];
-            return raw <= (ushort)EvChargerMode.Green ? (EvChargerMode)raw : null;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return null;
-        }
-    }
-
-    private static async Task<ushort> ReadAsync(
-        IModbusClient client,
-        RegisterDescriptor register,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var values = await client
-                .ReadInputRegistersAsync(register.Address, numberOfPoints: 1, cancellationToken)
-                .ConfigureAwait(false);
-            return values[0];
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException($"Failed to read register '{register.Name}' at address {register.Address}.", ex);
-        }
-    }
+    private static readonly EvChargerReading Unreachable =
+        new(EvChargerStatus.Unknown, PowerWatts: 0, CurrentAmps: null, Mode: null);
 }

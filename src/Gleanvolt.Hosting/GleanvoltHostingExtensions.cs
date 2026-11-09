@@ -258,7 +258,7 @@ public static class GleanvoltHostingExtensions
             }
 
             // The charger the control path drives, under the fixed key, because [FromKeyedServices] takes a
-            // compile-time constant and EvChargerControl and EnergyStateReader are written against one. It
+            // compile-time constant and the charger driver's registration is written against one. It
             // resolves the registration above rather than constructing a second client: two clients would be
             // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
             // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
@@ -300,6 +300,26 @@ public static class GleanvoltHostingExtensions
                     HoldRetargetThresholdWatts = batteryHold.TargetChangeThresholdWatts,
                     Topology = provider.GetRequiredService<PvSystemInfo>().InverterTopology,
                     State = provider.GetRequiredService<IDriverStateStore>(),
+                });
+        });
+
+        // The charger's driver (issue #348), on the controlled charger's client as registered above --
+        // read-only in dry-run. Always SolaX until the configuration can name another (#349).
+        foreach (var make in ChargerDrivers.Factories)
+        {
+            services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
+        }
+
+        services.AddSingleton<IEvChargerDriver>(provider =>
+        {
+            var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var factory = provider.GetServices<IEvChargerDriverFactory>().Single(candidate => candidate.Id == ChargerDrivers.DefaultId);
+            return factory.Create(
+                EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger)),
+                new EvChargerDriverOptions
+                {
+                    DryRun = chargeControl.DryRun,
+                    CurrentChangeThresholdAmps = chargeControl.CurrentChangeThresholdAmps,
                 });
         });
 
@@ -370,16 +390,7 @@ public static class GleanvoltHostingExtensions
         services.Configure<ChargeControlOptions>(configuration.GetSection(ChargeControlOptions.SectionName));
 
         services.AddSingleton<IEvChargerControl>(provider =>
-        {
-            var client = provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger);
-            var logger = provider.GetRequiredService<ILogger<EvChargerControl>>();
-            var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            return new EvChargerControl(
-                client,
-                logger,
-                dryRun: options.DryRun,
-                currentChangeThresholdAmps: options.CurrentChangeThresholdAmps);
-        });
+            new EvChargerControl(provider.GetRequiredService<IEvChargerDriver>()));
 
         // The car, described once and resolved once (issue #124). An absent Ev section gives
         // EvInfo.Unknown, which narrows nothing -- so an installation that has never described its car

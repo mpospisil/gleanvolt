@@ -1,7 +1,4 @@
-using Gleanvolt.Core.Enums;
-using Gleanvolt.Devices;
-
-namespace Gleanvolt.Infrastructure.RegisterMaps;
+namespace Gleanvolt.Devices.Solax;
 
 public static class EvChargerRegisterMap
 {

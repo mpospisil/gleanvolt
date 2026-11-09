@@ -4,6 +4,7 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Web.Components.Pages;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Web.Tests;
 

@@ -17,7 +17,7 @@ public enum ChargingControlAction
     Pause,
 
     /// <summary>
-    /// Stand the charger down entirely -- write its use-mode to <see cref="EvChargerMode.Stop"/> rather
+    /// Stand the charger down entirely -- stop it (SolaX: use-mode Stop) rather
     /// than holding it at the pause current.
     ///
     /// <para>For waits measured in hours, not the seconds-to-minutes <see cref="Pause"/> is for. A SolaX

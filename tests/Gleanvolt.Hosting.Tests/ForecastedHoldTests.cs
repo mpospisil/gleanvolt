@@ -6,6 +6,8 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -35,7 +37,7 @@ public class ForecastedHoldTests
 
         // Stood down rather than paused: how long the pack takes to recover is not known (#280).
         Assert.Contains("needed to restart", _charger.ModeWrites[^1].Reason);
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal([false, false], _inverter.Applied);
 
         // A normal stop asks the hold to release: a lasting setting would otherwise outlive the process (#323).
@@ -54,7 +56,7 @@ public class ForecastedHoldTests
             Drawing(Now.AddMinutes(20), socPercent: 49, surplusWatts: 6_000));
 
         Assert.Contains("minimum run time", _writes[1].Reason);
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.Equal([false, false, false], _inverter.Applied);
     }
 

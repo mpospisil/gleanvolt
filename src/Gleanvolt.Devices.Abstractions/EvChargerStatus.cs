@@ -1,11 +1,12 @@
-namespace Gleanvolt.Core.Enums;
+namespace Gleanvolt.Devices;
 
 /// <summary>
-/// What the EV charger reports it is doing. Values match the SolaX charger's RunMode/EVSE_State
-/// register (0-13) exactly, so mapping is a direct cast rather than a lookup table.
+/// What the EV charger reports it is doing, in OCPP 1.6's status names. Each charger driver maps its own
+/// family's state onto these (issue #348). The values happen to match the SolaX charger's RunMode
+/// register (0-13), which follows the same names, so its driver maps by a cast.
 ///
 /// <para>Read carefully rather than at face value: three of these look like "the car is done" and only
-/// one of them means it — see <see cref="EvChargerStatusExtensions.IsCarKnownDisconnected"/> and the
+/// one of them means it — see <c>EvChargerStatusExtensions.IsCarKnownDisconnected</c> in Core and the
 /// members below.</para>
 /// </summary>
 public enum EvChargerStatus
@@ -68,10 +69,4 @@ public enum EvChargerStatus
 
     /// <summary>The session is stopping.</summary>
     Stopping = 13,
-}
-
-public static class EvChargerStatusMapping
-{
-    public static EvChargerStatus FromRaw(ushort raw) =>
-        raw <= (ushort)EvChargerStatus.Stopping ? (EvChargerStatus)raw : EvChargerStatus.Unknown;
 }

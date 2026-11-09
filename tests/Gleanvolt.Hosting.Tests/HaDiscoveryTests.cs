@@ -4,6 +4,7 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.HomeAssistant;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting.Tests;
 

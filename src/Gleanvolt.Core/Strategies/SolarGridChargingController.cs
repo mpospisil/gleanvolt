@@ -29,7 +29,7 @@ namespace Gleanvolt.Core.Strategies;
 ///
 /// <para>There is no battery-full gate: the car competes with the home battery for the surplus from the
 /// first watt that clears the minimum. Pure and side-effect free, like every other strategy, and it
-/// only modulates the current while the charger's own use-mode is <see cref="EvChargerMode.Fast"/>.</para>
+/// only modulates the current while the charger's allows charging (<see cref="Gleanvolt.Devices.EvChargerSettings.ChargingAllowed"/>; SolaX: use-mode Fast).</para>
 /// </summary>
 public sealed class SolarGridChargingController : IChargingController
 {

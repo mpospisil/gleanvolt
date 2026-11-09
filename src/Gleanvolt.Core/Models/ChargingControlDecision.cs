@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Core.Models;
 
@@ -54,7 +55,8 @@ namespace Gleanvolt.Core.Models;
 /// Whether the charger's use-mode reads Stop because <em>we</em> put it there for a long wait
 /// (<see cref="Enums.ChargingControlAction.StandDown"/>), rather than because its owner did.
 ///
-/// <para>Every controller refuses to touch a charger whose use-mode is not Fast, and must: a wallbox
+/// <para>Every controller refuses to touch a charger that does not allow charging (SolaX: a use-mode
+/// other than Fast), and must: a wallbox
 /// the owner has set to Eco, Green or Stop is not ours to drive. But a deferred charge that stands the
 /// charger down would then be locked out of the very charger it is waiting to arm, and would sit inert
 /// until somebody noticed. This says "that Stop is ours", and it is tracked from what the coordinator
@@ -62,9 +64,9 @@ namespace Gleanvolt.Core.Models;
 /// 45 times a day and reports transient junk use-modes on recovery (Eco has been observed), so a
 /// reading is not a statement of intent.</para>
 /// </param>
-/// <param name="ChargerNotFastFor">
-/// How long the charger's use-mode has read something other than Fast, without interruption. Zero
-/// while it reads Fast. Lets <see cref="Strategies.ChargerOwnership"/> tell a charger that has really
+/// <param name="ChargerNotAllowedFor">
+/// How long the charger has read as not allowed to charge (SolaX: a use-mode other than Fast), without
+/// interruption. Zero while it reads as allowed. Lets <see cref="Strategies.ChargerOwnership"/> tell a charger that has really
 /// left our control from the seconds-long junk values this installation's charger emits when its
 /// Modbus link recovers.
 /// </param>
@@ -128,7 +130,7 @@ public sealed record ChargingControlInput(
     TimeSpan EvIdleFor = default,
     FastChargeProgress? FastCharge = null,
     bool ChargerStoodDown = false,
-    TimeSpan ChargerNotFastFor = default,
+    TimeSpan ChargerNotAllowedFor = default,
     bool WaitAlreadyReleased = false,
     SolarGridOutlook? Outlook = null,
     bool ChargedThisMode = false,

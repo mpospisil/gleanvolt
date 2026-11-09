@@ -7,6 +7,8 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.SolarGrid;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -68,7 +70,7 @@ public class SolarGridModeTests
             Exporting(Now, 0) with { BatterySocPercent = 100 });
 
         Assert.Equal(ChargeControlMode.Solar, _mode.Mode);
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
         Assert.True(_status.Current!.ChargerStoodDown);
         Assert.Equal(Now.AddHours(2), _status.Current.WaitUntil);
     }
@@ -96,7 +98,7 @@ public class SolarGridModeTests
             Exporting(Now.AddMinutes(1), surplus));
 
         Assert.Equal(ChargeControlMode.SolarGrid, _mode.Mode);
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
         Assert.DoesNotContain(_writes, write => write.Target > 0);
         Assert.All(_inverter.Applied, hold => Assert.False(hold));
         Assert.Equal(new LowTariffStatus(Waiting: true, Until: Now.AddHours(2), Ignored: false), _status.Current!.LowTariff);
@@ -137,7 +139,7 @@ public class SolarGridModeTests
             Exporting(Now, 0));
 
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
-        Assert.Contains(_charger.ModeWrites, w => w.Mode == EvChargerMode.Stop && w.Reason.Contains("no sun was left to charge on today"));
+        Assert.Contains(_charger.ModeWrites, w => w.Mode == SolaxMode.Stop && w.Reason.Contains("no sun was left to charge on today"));
         Assert.Contains("returning to Off", _writes[^1].Reason);
 
         // 2026-09-15: this ending was recorded as "the car finished charging", with the car at 75% (#198).
@@ -152,7 +154,7 @@ public class SolarGridModeTests
             Exporting(Now, 0),
             Exporting(Now.AddHours(2), 6_000));
 
-        Assert.Equal([EvChargerMode.Stop, EvChargerMode.Fast], _charger.ModeWrites.Select(w => w.Mode));
+        Assert.Equal([SolaxMode.Stop, SolaxMode.Fast], _charger.ModeWrites.Select(w => w.Mode));
         Assert.Equal(8, _writes[^1].Target);
         Assert.Equal(ChargeControlMode.SolarGrid, _mode.Mode);
     }
@@ -163,7 +165,7 @@ public class SolarGridModeTests
         // 2026-09-13 10:37: plugged in, the charger started the car at 16A by itself, and the mode was
         // picked a minute later. Its first decision used to stop the car and wait 15 minutes to
         // "restart" a charge it never ran, with 2.3kW of surplus there.
-        _charger.CurrentSettings = new EvChargerSettings(EvChargerMode.Fast, 16);
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
 
         await RunAsync(
             new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 5_000),
