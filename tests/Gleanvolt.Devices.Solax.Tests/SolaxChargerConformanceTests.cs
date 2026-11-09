@@ -5,9 +5,10 @@ namespace Gleanvolt.Devices.Solax.Tests;
 /// <summary>
 /// The SolaX X3-HAC charger driver against the conformance tests every charger driver is held to (issue #350).
 ///
-/// <para>The idle fixture is a real Settings → charger → "Save register snapshot" of the reference
-/// installation. The plugged-in and charging ones are synthetic until real snapshots replace them: the idle
-/// one with the state changed (see <c>Fixtures/README.md</c>). The other family is the SolaX
+/// <para>The idle and plugged-in fixtures are real Settings → charger → "Save register snapshot"s of the
+/// reference installation; a waiting car with the use-mode on Stop reads Finishing. The charging one is
+/// synthetic until a real snapshot replaces it: the idle one with the state changed (see
+/// <c>Fixtures/README.md</c>). The other family is the SolaX
 /// inverter, real: the two answer Modbus on the same port, and a swapped pair of addresses once cost a day.</para>
 /// </summary>
 public class SolaxChargerConformanceTests : EvChargerDriverConformanceTests<SolaxChargerDriverFactory>
@@ -35,6 +36,22 @@ public class SolaxChargerConformanceTests : EvChargerDriverConformanceTests<Sola
         Assert.Equal(16, reading.CurrentAmps);
         Assert.Equal("Fast", reading.Mode);
         Assert.True(settings.ChargingAllowed);
+        Assert.Equal(16, settings.ChargeCurrentAmps);
+    }
+
+    [Fact]
+    public async Task A_waiting_car_on_Stop_reads_finishing_and_not_allowed()
+    {
+        // The HAC's own word for a plugged-in car it is not charging: Finishing, not Preparing. The control
+        // path already reads Finishing / Stop / 0 W as a stopped charger (#135, #280).
+        var driver = CreateDriver(new ReplayModbusClient(PluggedIn));
+
+        var reading = await driver.ReadAsync();
+        var settings = await driver.ReadSettingsAsync();
+
+        Assert.Equal(EvChargerStatus.Finishing, reading.Status);
+        Assert.Equal("Stop", reading.Mode);
+        Assert.False(settings.ChargingAllowed);
         Assert.Equal(16, settings.ChargeCurrentAmps);
     }
 
