@@ -5,11 +5,9 @@ namespace Gleanvolt.Devices.Solax.Tests;
 /// <summary>
 /// The SolaX X3-HAC charger driver against the conformance tests every charger driver is held to (issue #350).
 ///
-/// <para>The idle and plugged-in fixtures are real Settings → charger → "Save register snapshot"s of the
-/// reference installation; a waiting car with the use-mode on Stop reads Finishing. The charging one is
-/// synthetic until a real snapshot replaces it: the idle one with the state changed (see
-/// <c>Fixtures/README.md</c>). The other family is the SolaX
-/// inverter, real: the two answer Modbus on the same port, and a swapped pair of addresses once cost a day.</para>
+/// <para>Every fixture is real: the charger's are Settings → charger → "Save register snapshot"s of the
+/// reference installation, taken with the controller running; a waiting car with the use-mode on Stop reads
+/// Finishing. The other family is the SolaX inverter, real: the two answer Modbus on the same port, and a swapped pair of addresses once cost a day.</para>
 /// </summary>
 public class SolaxChargerConformanceTests : EvChargerDriverConformanceTests<SolaxChargerDriverFactory>
 {
@@ -33,6 +31,8 @@ public class SolaxChargerConformanceTests : EvChargerDriverConformanceTests<Sola
         var reading = await driver.ReadAsync();
         var settings = await driver.ReadSettingsAsync();
 
+        // The controller logged 10652-10689 W in the same seconds; the three phases add up to the total.
+        Assert.Equal(10661, reading.PowerWatts);
         Assert.Equal(16, reading.CurrentAmps);
         Assert.Equal("Fast", reading.Mode);
         Assert.True(settings.ChargingAllowed);
