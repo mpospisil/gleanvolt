@@ -1,3 +1,5 @@
+using Gleanvolt.Devices;
+
 namespace Gleanvolt.Core.Enums;
 
 /// <summary>

@@ -1,5 +1,6 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
 using static System.FormattableString;
 
 namespace Gleanvolt.Core.Strategies;
@@ -19,7 +20,7 @@ public static class ChargerOwnership
     ///
     /// <para>Comfortably longer than the transients this installation actually produces — its charger
     /// drops its Modbus link about 45 times a day and reports junk use-modes on recovery, all ten
-    /// lifetime sightings of <see cref="EvChargerMode.Eco"/> falling inside one two-minute window
+    /// lifetime sightings of SolaX's Eco falling inside one two-minute window
     /// immediately after "reachable again", interleaved with Stop. Those blips last seconds. A reading
     /// held for two minutes is the hardware's actual state.</para>
     /// </summary>
@@ -108,7 +109,7 @@ public static class ChargerOwnership
     /// </summary>
     public static ChargingControlDecision? NotOurs(ChargingControlInput input)
     {
-        if (input.CurrentSettings.Mode == EvChargerMode.Fast)
+        if (input.CurrentSettings.ChargingAllowed)
         {
             return null;
         }
@@ -128,17 +129,17 @@ public static class ChargerOwnership
         //
         // Action is None, never Pause: writing a current to a charger that is not ours is exactly what
         // the guard exists to prevent, and the orchestrator's stop path writes the use-mode anyway.
-        if (input.ChargerNotFastFor >= DropoutGrace)
+        if (input.ChargerNotAllowedFor >= DropoutGrace)
         {
             return new ChargingControlDecision(
                 ChargingControlAction.None,
                 null,
-                $"The charger has been in {input.CurrentSettings.Mode} rather than Fast for "
-                + Invariant($"{input.ChargerNotFastFor.TotalMinutes:F0} min, so it is no longer ours to drive; returning to Off."),
+                $"The charger has been in {input.CurrentSettings.ModeName} rather than allowed to charge for "
+                + Invariant($"{input.ChargerNotAllowedFor.TotalMinutes:F0} min, so it is no longer ours to drive; returning to Off."),
                 EndsSession: ChargingSessionEndReason.ChargerTakenOver);
         }
 
         return new ChargingControlDecision(
-            ChargingControlAction.None, null, $"Charger use-mode is {input.CurrentSettings.Mode}, not Fast; leaving it untouched.");
+            ChargingControlAction.None, null, $"Charger is in {input.CurrentSettings.ModeName}, not allowed to charge; leaving it untouched.");
     }
 }

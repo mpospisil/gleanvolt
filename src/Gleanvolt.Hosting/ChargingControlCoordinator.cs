@@ -2,16 +2,17 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting;
 
 /// <summary>
 /// Orchestrates one charge-control cycle: reads the charger's settings, asks the
 /// <see cref="IChargingController"/> selected by the current mode for the target current, and writes
-/// the current setpoint — nothing else. The use-mode is not this loop's business: an action put the
-/// charger into Fast when the strategy was started (see <see cref="Core.Interfaces.IChargeActions"/>)
+/// the current setpoint — nothing else. Starting and stopping the charger is not this loop's business:
+/// an action allowed it to charge when the strategy was started (see <see cref="Core.Interfaces.IChargeActions"/>)
 /// and nothing re-asserts it, so all this does is modulate the current under it (or drop it to the
-/// pause value).
+/// pause value). The one exception is a long wait's stand-down and re-arm, written on the transition.
 ///
 /// Holds every piece of cross-cycle state the strategies need but must not own themselves — whether we
 /// are charging, how long we have been in that state, energy delivered this session, and energy lent
@@ -160,7 +161,7 @@ public sealed class ChargingControlCoordinator
 
             // Timed rather than counted, because polls are not evenly spaced and a stretch of failed
             // reads must not look like a short one.
-            if (settings.Mode == EvChargerMode.Fast)
+            if (settings.ChargingAllowed)
             {
                 _chargerNotFastSince = null;
             }
@@ -195,7 +196,7 @@ public sealed class ChargingControlCoordinator
                 EvIdleFor(state.Timestamp),
                 fastCharge,
                 _stoodDown,
-                ChargerNotFastFor(state.Timestamp),
+                ChargerNotAllowedFor(state.Timestamp),
                 _waitReleased,
                 outlook,
                 ChargedThisMode: _chargedThisMode,
@@ -210,7 +211,7 @@ public sealed class ChargingControlCoordinator
                 + "Bridge={BridgeWatts:F0}W Session={SessionKWh:F1}kWh LoanedToday={LoanedKWh:F1}kWh "
                 + "Outstanding={OutstandingKWh:F1}kWh. {Reason}",
                 mode,
-                settings.Mode,
+                settings.ModeName,
                 rawSurplus,
                 averagedSurplus,
                 _surplusAverage.Count,
@@ -233,7 +234,7 @@ public sealed class ChargingControlCoordinator
                     // stale current.
                     if (_stoodDown)
                     {
-                        await _chargerControl.SetModeAsync(EvChargerMode.Fast, decision.Reason, cancellationToken).ConfigureAwait(false);
+                        await _chargerControl.SetChargingAllowedAsync(allowed: true, decision.Reason, cancellationToken).ConfigureAwait(false);
                         _stoodDown = false;
 
                         // Latched here rather than on any Charge at all, and only out of an
@@ -254,11 +255,11 @@ public sealed class ChargingControlCoordinator
 
                 case ChargingControlAction.StandDown:
                     // Idempotent: written once on the transition, not every poll for the whole wait.
-                    // SetModeAsync has no read-back and no hysteresis, so re-writing Stop hourly would
+                    // SetChargingAllowedAsync has no read-back and no hysteresis, so re-writing Stop hourly would
                     // be pure noise on a Modbus link that is already dropping ~45 times a day.
                     if (!_stoodDown)
                     {
-                        await _chargerControl.SetModeAsync(EvChargerMode.Stop, decision.Reason, cancellationToken).ConfigureAwait(false);
+                        await _chargerControl.SetChargingAllowedAsync(allowed: false, decision.Reason, cancellationToken).ConfigureAwait(false);
                         _stoodDown = true;
                     }
 
@@ -468,7 +469,7 @@ public sealed class ChargingControlCoordinator
         }
     }
 
-    private TimeSpan ChargerNotFastFor(DateTimeOffset now) =>
+    private TimeSpan ChargerNotAllowedFor(DateTimeOffset now) =>
         _chargerNotFastSince is { } since && now > since ? now - since : TimeSpan.Zero;
 
     private TimeSpan EvIdleFor(DateTimeOffset now) =>

@@ -6,6 +6,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Hosting.Tests;
 

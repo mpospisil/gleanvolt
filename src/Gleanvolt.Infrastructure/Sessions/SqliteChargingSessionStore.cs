@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Infrastructure.Sessions;
 

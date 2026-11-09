@@ -50,7 +50,7 @@ public sealed class ChargeActions : IChargeActions
 
         // The charger first: a mode selected over a charger that refused Fast would sit Idle and say
         // nothing more than "Idle", which is the failure this whole shape exists to remove.
-        var written = await WriteUseModeAsync(EvChargerMode.Fast, $"{mode} started by {source}.", cancellationToken)
+        var written = await WriteChargingAllowedAsync(allowed: true, $"{mode} started by {source}.", cancellationToken)
             .ConfigureAwait(false);
 
         if (written is not null)
@@ -75,7 +75,7 @@ public sealed class ChargeActions : IChargeActions
 
     public async Task<ChargeActionResult> StopAsync(string source, CancellationToken cancellationToken = default)
     {
-        var written = await WriteUseModeAsync(EvChargerMode.Stop, $"Charging stopped by {source}.", cancellationToken)
+        var written = await WriteChargingAllowedAsync(allowed: false, $"Charging stopped by {source}.", cancellationToken)
             .ConfigureAwait(false);
 
         // Off is set either way, unlike a failed start. A controller left driving a charger it cannot
@@ -135,17 +135,17 @@ public sealed class ChargeActions : IChargeActions
         }
     }
 
-    /// <summary>Writes the use-mode, returning null on success or the failure in words.</summary>
-    private async Task<string?> WriteUseModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken)
+    /// <summary>Starts or stops the charger, returning null on success or the failure in words.</summary>
+    private async Task<string?> WriteChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken)
     {
         try
         {
-            await _charger.SetModeAsync(mode, reason, cancellationToken).ConfigureAwait(false);
+            await _charger.SetChargingAllowedAsync(allowed, reason, cancellationToken).ConfigureAwait(false);
             return null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to write the charger's use-mode ({Mode}). {Reason}", mode, reason);
+            _logger.LogWarning(ex, "Failed to {Action} the charger. {Reason}", allowed ? "start" : "stop", reason);
             return ex.Message;
         }
     }

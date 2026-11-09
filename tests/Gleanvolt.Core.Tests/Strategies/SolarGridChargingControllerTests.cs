@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -32,7 +34,7 @@ public class SolarGridChargingControllerTests
         double surplus,
         bool charging = false,
         SolarGridOutlook? outlook = null,
-        EvChargerMode chargerMode = EvChargerMode.Fast,
+        SolaxMode chargerMode = SolaxMode.Fast,
         TimeSpan timeInState = default,
         bool evDrewPower = false,
         TimeSpan evIdleFor = default,
@@ -42,7 +44,7 @@ public class SolarGridChargingControllerTests
         new(
             new EnergyState(Now, 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, status, EvChargerPowerWatts: 0),
             surplus,
-            new EvChargerSettings(chargerMode, 6),
+            chargerMode.At(6),
             charging,
             TimeInCurrentState: timeInState,
             EvDrewPower: evDrewPower,
@@ -52,10 +54,10 @@ public class SolarGridChargingControllerTests
             ChargedThisMode: chargedThisMode);
 
     [Theory]
-    [InlineData(EvChargerMode.Green)]
-    [InlineData(EvChargerMode.Eco)]
-    [InlineData(EvChargerMode.Stop)]
-    public void NotFast_LeavesTheChargerAlone(EvChargerMode mode)
+    [InlineData(SolaxMode.Green)]
+    [InlineData(SolaxMode.Eco)]
+    [InlineData(SolaxMode.Stop)]
+    public void NotFast_LeavesTheChargerAlone(SolaxMode mode)
     {
         var result = Controller.Decide(Input(6000, chargerMode: mode));
 
@@ -193,7 +195,7 @@ public class SolarGridChargingControllerTests
     {
         // The charger reads Stop because we put it there; sun arriving is a charge, which the
         // coordinator turns back into Fast.
-        var result = Controller.Decide(Input(5000, chargerMode: EvChargerMode.Stop, stoodDown: true));
+        var result = Controller.Decide(Input(5000, chargerMode: SolaxMode.Stop, stoodDown: true));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
     }

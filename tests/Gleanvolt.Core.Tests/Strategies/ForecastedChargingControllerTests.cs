@@ -2,6 +2,8 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -87,7 +89,7 @@ public class ForecastedChargingControllerTests
         double socPercent = 80,
         SolarDayPlan? plan = null,
         bool charging = false,
-        EvChargerMode mode = EvChargerMode.Fast,
+        SolaxMode mode = SolaxMode.Fast,
         TimeSpan timeInState = default,
         double sessionEnergyWh = 0,
         double loanedTodayWh = 0,
@@ -98,7 +100,7 @@ public class ForecastedChargingControllerTests
             new EnergyState(now ?? Now, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 6000,
                 GridPowerWatts: 0, EvChargerStatus.Charging, EvChargerPowerWatts: 0),
             surplusWatts,
-            new EvChargerSettings(mode, 6),
+            mode.At(6),
             charging,
             plan ?? Plan(),
             TargetedPlan: null,
@@ -112,7 +114,7 @@ public class ForecastedChargingControllerTests
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()
     {
-        var decision = Controller().Decide(Input(8000, mode: EvChargerMode.Green));
+        var decision = Controller().Decide(Input(8000, mode: SolaxMode.Green));
 
         Assert.Equal(ChargingControlAction.None, decision.Action);
     }

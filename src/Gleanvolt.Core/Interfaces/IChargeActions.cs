@@ -6,7 +6,7 @@ namespace Gleanvolt.Core.Interfaces;
 /// <summary>
 /// Starting and stopping controlled charging. Every kind of controlled charging begins with one of
 /// these calls and with nothing else: the action puts the charger into
-/// <see cref="EvChargerMode.Fast"/> and then selects the strategy, so a press does something on a
+/// the state that allows charging (SolaX: Fast) and then selects the strategy, so a press does something on a
 /// charger sitting in Green rather than waiting for the owner to have set the wallbox by hand.
 ///
 /// <para>The seam lives in Core because both surfaces drive it — the web UI, which sees only Core,
@@ -17,8 +17,8 @@ namespace Gleanvolt.Core.Interfaces;
 public interface IChargeActions
 {
     /// <summary>
-    /// Starts <paramref name="mode"/>: writes <see cref="EvChargerMode.Fast"/> to the charger, then
-    /// selects the mode, so the next poll reads Fast back and starts modulating the current. A failed
+    /// Starts <paramref name="mode"/>: allows the charger to charge (SolaX: Fast), then
+    /// selects the mode, so the next poll reads that back and starts modulating the current. A failed
     /// write leaves the mode exactly as it was and reports why.
     ///
     /// <para><see cref="ChargeControlMode.Off"/> is a caller error — use <see cref="StopAsync"/>. So
@@ -29,7 +29,7 @@ public interface IChargeActions
     Task<ChargeActionResult> StartAsync(ChargeControlMode mode, string source, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Stops charging: writes <see cref="EvChargerMode.Stop"/> to the charger and returns the mode to
+    /// Stops charging: stops the charger (SolaX: Stop) and returns the mode to
     /// <see cref="ChargeControlMode.Off"/>, which releases any hold a mode had armed and closes the
     /// session. Always writes, even when the controller was already Off and never took control — the
     /// button says stop charging, so it stops charging.

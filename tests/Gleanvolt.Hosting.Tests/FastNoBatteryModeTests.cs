@@ -9,6 +9,7 @@ using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -68,7 +69,7 @@ public class FastNoBatteryModeTests
             lowTariffOnly: true);
 
         Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
-        Assert.Equal([EvChargerMode.Stop, EvChargerMode.Fast], _charger.ModeWrites.Select(write => write.Mode));
+        Assert.Equal([SolaxMode.Stop, SolaxMode.Fast], _charger.ModeWrites.Select(write => write.Mode));
         Assert.Contains("waiting for low tariff (Fast, low tariff only)", _charger.ModeWrites[0].Reason);
         Assert.Equal(16, LastTarget);
     }
@@ -225,7 +226,7 @@ public class FastNoBatteryModeTests
         // stopped, not sitting in Fast at the pause current, which is a different end state.
         await RunAsync(Charging(Now), Idle(Now.AddMinutes(1)), Idle(Now.AddMinutes(4)));
 
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
         Assert.Contains("the car finished charging", Assert.Single(_charger.ModeWrites).Reason);
     }
 
@@ -314,7 +315,7 @@ public class FastNoBatteryModeTests
         Assert.Equal(ChargeControlMode.Off, _mode.Mode);
         Assert.Equal(0, LastTarget);
         Assert.Contains("Fast target reached", _writes[^1].Reason);
-        Assert.Equal(EvChargerMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
+        Assert.Equal(SolaxMode.Stop, Assert.Single(_charger.ModeWrites).Mode);
         Assert.False(_inverter.Applied[^1]);
         Assert.False(_manualHold.Hold);
     }
@@ -417,19 +418,19 @@ public class FastNoBatteryModeTests
 
         // Stood down, not held at 0A: the wait is expressed as the charger's own Stop use-mode, which is
         // the state it will actually sit in for hours. The mode stays selected throughout.
-        Assert.Equal((EvChargerMode.Stop, true), (_charger.ModeWrites[^1].Mode, _charger.ModeWrites[^1].Reason.Contains("Waiting until")));
+        Assert.Equal((SolaxMode.Stop, true), (_charger.ModeWrites[^1].Mode, _charger.ModeWrites[^1].Reason.Contains("Waiting until")));
     }
 
     [Fact]
     public async Task TheStandDownIsWrittenOnceForTheWholeWait()
     {
-        // SetModeAsync has no read-back and no hysteresis, so a mode rewritten every cycle is steady
+        // SetChargingAllowedAsync has no read-back and no hysteresis, so a mode rewritten every cycle is steady
         // traffic on a link this installation already loses about 45 times a day.
         await RunAsync(
             [Charging(Now), Charging(Now.AddMinutes(1)), Charging(Now.AddMinutes(2)), Charging(Now.AddMinutes(3))],
             limit: new FastChargeLimit(30_000, Now, DepartBy: Now.AddHours(9)));
 
-        Assert.Equal(1, _charger.ModeWrites.Count(w => w.Mode == EvChargerMode.Stop));
+        Assert.Equal(1, _charger.ModeWrites.Count(w => w.Mode == SolaxMode.Stop));
     }
 
     [Fact]
@@ -445,8 +446,8 @@ public class FastNoBatteryModeTests
         // Stop for the wait, then Fast again -- and Fast is the last word, not a charger left standing
         // down through its own appointment.
         var useModes = _charger.ModeWrites.Select(w => w.Mode).ToList();
-        Assert.Contains(EvChargerMode.Stop, useModes);
-        Assert.Equal(EvChargerMode.Fast, useModes[^1]);
+        Assert.Contains(SolaxMode.Stop, useModes);
+        Assert.Equal(SolaxMode.Fast, useModes[^1]);
 
         // And a real current behind it: arming the use-mode without a setpoint charges nothing.
         Assert.Equal(16, LastTarget);
@@ -469,7 +470,7 @@ public class FastNoBatteryModeTests
 
         // And the mode is still selected and still standing down.
         Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
-        Assert.Equal(EvChargerMode.Stop, _charger.ModeWrites[^1].Mode);
+        Assert.Equal(SolaxMode.Stop, _charger.ModeWrites[^1].Mode);
     }
 
     [Fact]
@@ -495,8 +496,8 @@ public class FastNoBatteryModeTests
 
         // One Stop for the wait and no second one: the appointment is a gate, not a condition rechecked
         // on every poll.
-        Assert.Equal(1, useModes.Count(m => m == EvChargerMode.Stop));
-        Assert.Equal(EvChargerMode.Fast, useModes[^1]);
+        Assert.Equal(1, useModes.Count(m => m == SolaxMode.Stop));
+        Assert.Equal(SolaxMode.Fast, useModes[^1]);
     }
 
     [Fact]

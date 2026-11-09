@@ -8,19 +8,24 @@ using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting.Targeting;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>Records both kinds of write and reflects them back as the new settings, like hardware.</summary>
 internal sealed class FakeEvChargerControl : IEvChargerControl
 {
-    public EvChargerSettings CurrentSettings { get; set; } = new(EvChargerMode.Fast, 0);
+    public EvChargerSettings CurrentSettings { get; set; } = SolaxMode.Fast.At(0);
 
     /// <summary>Every SetCurrentAsync call, in order.</summary>
     public List<(int Active, int Target, string Reason)> CurrentWrites { get; } = [];
 
-    /// <summary>Every SetModeAsync call, in order — the use-mode writes an action made.</summary>
-    public List<(EvChargerMode Mode, string Reason)> ModeWrites { get; } = [];
+    /// <summary>
+    /// Every SetChargingAllowedAsync call, in order, as the use-mode the SolaX driver writes for it: Fast to
+    /// start, Stop to stop.
+    /// </summary>
+    public List<(SolaxMode Mode, string Reason)> ModeWrites { get; } = [];
 
     /// <summary>Makes every use-mode write fail, the way a charger that has stopped answering does.</summary>
     public string? ModeWriteFailure { get; set; }
@@ -46,15 +51,16 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
         return Task.CompletedTask;
     }
 
-    public Task SetModeAsync(EvChargerMode mode, string reason, CancellationToken cancellationToken = default)
+    public Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default)
     {
         if (ModeWriteFailure is { } failure)
         {
             return Task.FromException(new InvalidOperationException(failure));
         }
 
+        var mode = SolaxModeSettings.Written(allowed);
         ModeWrites.Add((mode, reason));
-        CurrentSettings = CurrentSettings with { Mode = mode };
+        CurrentSettings = mode.At(CurrentSettings.ChargeCurrentAmps);
         return Task.CompletedTask;
     }
 }

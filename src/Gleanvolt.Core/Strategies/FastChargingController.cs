@@ -37,7 +37,7 @@ namespace Gleanvolt.Core.Strategies;
 /// mistaken for a full car.</para>
 ///
 /// Like the other controllers it only acts while the charger's own use-mode is
-/// <see cref="EvChargerMode.Fast"/> — which starting the mode wrote, and which nothing here
+/// allowed to charge (SolaX: Fast) — which starting the mode wrote, and which nothing here
 /// re-asserts — and it only ever decides the current setpoint.
 /// </summary>
 public sealed class FastChargingController : IChargingController

@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -15,14 +17,14 @@ public class FastChargingControllerTests
         new(DateTimeOffset.UtcNow, soc, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, status, evPowerWatts);
 
     private static ChargingControlInput Input(
-        EvChargerMode chargerMode = EvChargerMode.Fast,
+        SolaxMode chargerMode = SolaxMode.Fast,
         double soc = 50,
         double surplus = 0,
         EvChargerStatus status = EvChargerStatus.Charging,
         bool evDrewPower = true,
         TimeSpan evIdleFor = default,
         FastChargeProgress? fastCharge = null) =>
-        new(State(status, soc), surplus, new EvChargerSettings(chargerMode, 6), Charging: true,
+        new(State(status, soc), surplus, chargerMode.At(6), Charging: true,
             EvDrewPower: evDrewPower, EvIdleFor: evIdleFor, FastCharge: fastCharge);
 
     /// <summary>A limit of <paramref name="requiredWh"/> with <paramref name="deliveredWh"/> against it.</summary>
@@ -50,13 +52,13 @@ public class FastChargingControllerTests
         bool evDrewPower = true,
         bool charging = true,
         TimeSpan evIdleFor = default,
-        EvChargerMode chargerMode = EvChargerMode.Fast,
+        SolaxMode chargerMode = SolaxMode.Fast,
         bool stoodDown = false,
         bool waitReleased = false) =>
         new(
             new EnergyState(now, 50, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
-            new EvChargerSettings(chargerMode, 6),
+            chargerMode.At(6),
             Charging: charging,
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
@@ -101,17 +103,17 @@ public class FastChargingControllerTests
         var appointment = deferred.Plan!.StartNoLaterThan.AddSeconds(30);
 
         var result = Controller.Decide(At(
-            appointment, deferred, charging: false, chargerMode: EvChargerMode.Stop, stoodDown: true));
+            appointment, deferred, charging: false, chargerMode: SolaxMode.Stop, stoodDown: true));
 
         Assert.Equal(ChargingControlAction.Charge, result.Action);
         Assert.Equal(16, result.ChargeCurrentAmps);
     }
 
     [Theory]
-    [InlineData(EvChargerMode.Stop)]
-    [InlineData(EvChargerMode.Eco)]
-    [InlineData(EvChargerMode.Green)]
-    public void AChargerWeDidNotStandDownIsStillLeftAlone(EvChargerMode ownersMode)
+    [InlineData(SolaxMode.Stop)]
+    [InlineData(SolaxMode.Eco)]
+    [InlineData(SolaxMode.Green)]
+    public void AChargerWeDidNotStandDownIsStillLeftAlone(SolaxMode ownersMode)
     {
         // The guard keeps every case it was written for. Only a Stop this mode commanded is arguable;
         // anything else is the owner's, and a use-mode read is never treated as intent -- this charger
@@ -168,10 +170,10 @@ public class FastChargingControllerTests
     }
 
     [Theory]
-    [InlineData(EvChargerMode.Green)]
-    [InlineData(EvChargerMode.Eco)]
-    [InlineData(EvChargerMode.Stop)]
-    public void NotFastMode_LeavesTheChargerAlone(EvChargerMode mode)
+    [InlineData(SolaxMode.Green)]
+    [InlineData(SolaxMode.Eco)]
+    [InlineData(SolaxMode.Stop)]
+    public void NotFastMode_LeavesTheChargerAlone(SolaxMode mode)
     {
         var result = Controller.Decide(Input(chargerMode: mode));
 
@@ -185,7 +187,7 @@ public class FastChargingControllerTests
         // The car is long gone, but we were never driving this session -- ending the mode on the
         // strength of a charger we don't control would be presumptuous.
         var result = Controller.Decide(Input(
-            chargerMode: EvChargerMode.Green, status: EvChargerStatus.Available, evIdleFor: TimeSpan.FromHours(1)));
+            chargerMode: SolaxMode.Green, status: EvChargerStatus.Available, evIdleFor: TimeSpan.FromHours(1)));
 
         Assert.Equal(ChargingControlAction.None, result.Action);
         Assert.False(result.SessionComplete);
@@ -355,7 +357,7 @@ public class FastChargingControllerTests
         // rule has to run before the guard, and a met limit before the car-full rule. Ending a mode
         // writes nothing a takeover would not, two minutes later.
         var result = Controller.Decide(Input(
-            chargerMode: EvChargerMode.Green, fastCharge: Progress(20_000, 25_000)));
+            chargerMode: SolaxMode.Green, fastCharge: Progress(20_000, 25_000)));
 
         Assert.Equal(ChargingSessionEndReason.TargetReached, result.EndsSession);
     }
@@ -449,7 +451,7 @@ public class FastChargingControllerTests
 
         var result = Controller.Decide(At(now, Deferred(now, now.AddHours(9))) with
         {
-            CurrentSettings = new EvChargerSettings(EvChargerMode.Green, 6),
+            CurrentSettings = SolaxMode.Green.At(6),
         });
 
         Assert.Equal(ChargingControlAction.None, result.Action);

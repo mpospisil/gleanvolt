@@ -2,6 +2,8 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -121,7 +123,7 @@ public class EveryModeWaitsAndEndsTheSameWayTests
         new(
             new EnergyState(Now, 100, 0, 0, 0, EvChargerStatus.Charging, 0),
             surplus,
-            new EvChargerSettings(stoodDown ? EvChargerMode.Stop : EvChargerMode.Fast, 0),
+            (stoodDown ? SolaxMode.Stop : SolaxMode.Fast).At(0),
             Charging: false,
             TargetedPlan: mode == ChargeControlMode.Targeted && sunFrom is { } block ? TargetedPlan(block) : null,
             TimeInCurrentState: pausedFor,
@@ -184,9 +186,9 @@ public class EveryModeWaitsAndEndsTheSameWayTests
         var input = Waiting(mode, sunFrom: Now) with
         {
             State = new EnergyState(Now, 100, 0, 0, 0, EvChargerStatus.Finishing, 0),
-            CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 16),
+            CurrentSettings = SolaxMode.Stop.At(16),
             Charging = true,
-            ChargerNotFastFor = TimeSpan.FromSeconds(8),
+            ChargerNotAllowedFor = TimeSpan.FromSeconds(8),
             EvWasDrawing = true,
             LowTariffOnly = null,
         };
@@ -205,8 +207,8 @@ public class EveryModeWaitsAndEndsTheSameWayTests
         var input = Waiting(mode, sunFrom: Now.AddMinutes(5)) with
         {
             State = new EnergyState(Now, 100, 0, 0, 0, EvChargerStatus.Finishing, 0),
-            CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 0),
-            ChargerNotFastFor = TimeSpan.FromSeconds(8),
+            CurrentSettings = SolaxMode.Stop.At(0),
+            ChargerNotAllowedFor = TimeSpan.FromSeconds(8),
             TimeInCurrentState = TimeSpan.FromMinutes(7),
         };
 
@@ -279,7 +281,7 @@ public class EveryModeWaitsAndEndsTheSameWayTests
             Charging = true,
             EvWasDrawing = true,
             State = new EnergyState(Now, 100, 0, 0, 0, EvChargerStatus.Finishing, 0),
-            CurrentSettings = new EvChargerSettings(EvChargerMode.Stop, 0),
+            CurrentSettings = SolaxMode.Stop.At(0),
         };
 
         var decision = Controller(ChargeControlMode.Forecasted).Decide(input);

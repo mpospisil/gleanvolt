@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Core.Models;
 
@@ -10,11 +11,11 @@ public sealed record EnergyState(
     double GridPowerWatts,
     EvChargerStatus EvChargerStatus,
     double EvChargerPowerWatts,
-    // The charger's work/use mode (Fast/ECO/Green/Stop), or null when it couldn't be read (the
-    // holding register isn't available on every charger/firmware).
-    EvChargerMode? ChargeMode = null,
+    // The charger family's own name for its mode (SolaX: Fast/Eco/Green/Stop), for display and the log
+    // only, or null when the family has none or it couldn't be read (EvChargerReading.Mode).
+    string? ChargeMode = null,
     // The charger's active current setpoint in amps, or null when it couldn't be read. Same story as
-    // ChargeMode: a control holding register.
+    // ChargeMode: best-effort.
     int? ChargeCurrentAmps = null,
     // What the grid meter itself read, set only while GridPowerWatts has been replaced by an estimate
     // because the meter is blind on a phase (PvSystemInfo.UnmeteredGridPhase). Null means GridPowerWatts

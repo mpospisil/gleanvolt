@@ -37,7 +37,7 @@ public class EnergyStateReaderUnmeteredPhaseTests
     private static Task<EnergyState> Read(GridPhase? unmetered) =>
         new EnergyStateReader(
             new SolaxInverterDriver(Inverter()),
-            new FakeModbusClient(),
+            new SolaxChargerDriver(new FakeModbusClient()),
             NullLogger<EnergyStateReader>.Instance,
             Site(unmetered),
             new ChargingLimits(6, 16, 3)).ReadAsync();

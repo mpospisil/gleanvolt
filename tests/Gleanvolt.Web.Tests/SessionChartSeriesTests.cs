@@ -2,6 +2,7 @@ using System.Text.Json;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Web.Components;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Web.Tests;
 

@@ -16,7 +16,7 @@ namespace Gleanvolt.Core.Strategies;
 /// arrives as a plan with a smaller grid block, and the block is never drawn.</para>
 ///
 /// <para>Pure and side-effect free, like every other strategy, and it only modulates the current while
-/// the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — written once when the target was
+/// the charger's allows charging (<see cref="Gleanvolt.Devices.EvChargerSettings.ChargingAllowed"/>; SolaX: use-mode Fast) — written once when the target was
 /// activated, and never re-asserted from here. There is still no battery loan in this mode: the home
 /// battery keeps its priority. What the mode <em>will</em> do is bridge from the <b>grid</b> — see
 /// <see cref="ChargingControlDecision.GridBridgeWatts"/> — which is the same trade the plan already

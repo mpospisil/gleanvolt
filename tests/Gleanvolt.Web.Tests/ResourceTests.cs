@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Web.Tests;
 
@@ -90,7 +91,7 @@ public sealed partial class ResourceTests
     public static TheoryData<Type> ShownEnums() =>
     [
         typeof(Gleanvolt.Core.Enums.ChargeControlState),
-        typeof(Gleanvolt.Core.Enums.EvChargerStatus),
+        typeof(Gleanvolt.Devices.EvChargerStatus),
         typeof(Gleanvolt.Core.Enums.VehicleChargeState),
         typeof(Gleanvolt.Core.Enums.VehiclePlugState),
         typeof(Gleanvolt.Core.Enums.VehicleSourceState),

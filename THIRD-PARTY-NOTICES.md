@@ -72,11 +72,11 @@ values were read from that integration's plugin maps (`plugin_solax.py`,
 `plugin_solax_ev_charger.py`) rather than from a SolaX document, because no such document is publicly
 available. The affected files say so individually and in more detail:
 
-- `Gleanvolt.Core/Enums/InverterControlRegister.cs`
-- `Gleanvolt.Core/Enums/InverterPowerControlMode.cs`
-- `Gleanvolt.Core/Enums/InverterPowerControlSetType.cs`
-- `Gleanvolt.Core/Enums/EvChargerRegister.cs`, `EvChargerMode.cs`
-- `Gleanvolt.Infrastructure/RegisterMaps/PowerControlPayload.cs`
+- `Gleanvolt.Devices.Solax/InverterControlRegister.cs`
+- `Gleanvolt.Devices.Solax/InverterPowerControlMode.cs`
+- `Gleanvolt.Devices.Solax/InverterPowerControlSetType.cs`
+- `Gleanvolt.Devices.Solax/EvChargerRegister.cs`, `SolaxChargerUseMode.cs`
+- `Gleanvolt.Devices.Solax/PowerControlPayload.cs`
 
 Individual register addresses are facts about hardware and not themselves copyrightable, and the
 implementation here is independent — different language, different architecture, different control

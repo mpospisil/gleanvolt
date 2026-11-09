@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -17,7 +19,7 @@ public class RestartDwellTests
         new(
             new EnergyState(new DateTimeOffset(2026, 9, 13, 8, 38, 0, TimeSpan.Zero), 36, 0, 0, 0, EvChargerStatus.ChargePaused, 0),
             2_300,
-            new EvChargerSettings(EvChargerMode.Fast, 0),
+            SolaxMode.Fast.At(0),
             charging,
             TimeInCurrentState: inState ?? TimeSpan.FromMinutes(5),
             EvDrewPower: evDrewPower,

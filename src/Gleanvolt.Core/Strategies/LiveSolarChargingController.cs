@@ -11,7 +11,7 @@ namespace Gleanvolt.Core.Strategies;
 /// <see cref="IChargeActions"/>), and all this does is modulate the current setpoint under it (or drop
 /// it to the pause value when there isn't enough sun).
 ///
-/// It only acts while the charger's own use-mode is <see cref="EvChargerMode.Fast"/> — in any other
+/// It only acts while the charger's allows charging (<see cref="Gleanvolt.Devices.EvChargerSettings.ChargingAllowed"/>; SolaX: use-mode Fast) — in any other
 /// mode (Green/Eco/Stop) it returns <see cref="ChargingControlAction.None"/> and leaves the charger
 /// alone. Nothing writes Fast back: a charger changed at the wallbox mid-session belongs to whoever
 /// changed it. Above the battery-SOC gate it sets the current the surplus can cover (phase-aware, whole

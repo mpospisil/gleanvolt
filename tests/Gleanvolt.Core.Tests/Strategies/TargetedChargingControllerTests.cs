@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -68,7 +70,7 @@ public class TargetedChargingControllerTests
         double surplusWatts = 0,
         double socPercent = 80,
         bool charging = false,
-        EvChargerMode mode = EvChargerMode.Fast,
+        SolaxMode mode = SolaxMode.Fast,
         TimeSpan timeInState = default,
         bool evDrewPower = false,
         TimeSpan evIdleFor = default,
@@ -79,7 +81,7 @@ public class TargetedChargingControllerTests
             new EnergyState(now ?? Now, socPercent, BatteryPowerWatts: 0, SolarPowerWatts: 0,
                 GridPowerWatts: 0, status, EvChargerPowerWatts: 0),
             surplusWatts,
-            new EvChargerSettings(mode, 6),
+            mode.At(6),
             charging,
             Plan: null,
             TargetedPlan: plan,
@@ -91,7 +93,7 @@ public class TargetedChargingControllerTests
     [Fact]
     public void OutsideFastMode_ItLeavesTheChargerAlone()
     {
-        var decision = Controller().Decide(Input(Plan(), mode: EvChargerMode.Green));
+        var decision = Controller().Decide(Input(Plan(), mode: SolaxMode.Green));
 
         Assert.Equal(ChargingControlAction.None, decision.Action);
     }
@@ -373,7 +375,7 @@ public class TargetedChargingControllerTests
         // armed against a departure long past.
         var decision = Controller().Decide(Input(
             Plan(now: DepartBy.AddMinutes(5)),
-            mode: EvChargerMode.Stop,
+            mode: SolaxMode.Stop,
             now: DepartBy.AddMinutes(5)));
 
         Assert.Equal(ChargingSessionEndReason.DeparturePassed, decision.EndsSession);

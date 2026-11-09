@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Sessions;
+using Gleanvolt.Devices;
 
 namespace Gleanvolt.Infrastructure.Tests;
 

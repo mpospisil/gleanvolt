@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -48,11 +50,11 @@ public class LowTariffOnlyTests
         TimeSpan evIdleFor = default,
         SolarGridOutlook? outlook = null,
         FastChargeProgress? fastCharge = null,
-        EvChargerMode chargerMode = EvChargerMode.Fast) =>
+        SolaxMode chargerMode = SolaxMode.Fast) =>
         new(
             new EnergyState(Now, 60, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0, EvChargerStatus.Charging, EvChargerPowerWatts: 0),
             surplus,
-            new EvChargerSettings(chargerMode, 16),
+            chargerMode.At(16),
             charging,
             EvDrewPower: evDrewPower,
             EvIdleFor: evIdleFor,
@@ -123,7 +125,7 @@ public class LowTariffOnlyTests
     [Fact]
     public void AChargerThatIsNotOursIsLeftAloneEvenInHighTariff()
     {
-        var decision = Fast.Decide(Input(High(TimeSpan.FromHours(2)), chargerMode: EvChargerMode.Green));
+        var decision = Fast.Decide(Input(High(TimeSpan.FromHours(2)), chargerMode: SolaxMode.Green));
 
         Assert.NotEqual(ChargingControlAction.StandDown, decision.Action);
     }

@@ -1,6 +1,8 @@
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Devices;
+using Gleanvolt.Tests;
 
 namespace Gleanvolt.Core.Tests.Strategies;
 
@@ -16,7 +18,7 @@ public class ChargerWaitTests
         new(
             new EnergyState(Now, 60, 0, 0, 0, EvChargerStatus.Charging, 0),
             0,
-            new EvChargerSettings(stoodDown ? EvChargerMode.Stop : EvChargerMode.Fast, 0),
+            (stoodDown ? SolaxMode.Stop : SolaxMode.Fast).At(0),
             charging,
             TimeInCurrentState: pausedFor,
             ChargerStoodDown: stoodDown,
