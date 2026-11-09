@@ -19,10 +19,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- The recordings the conformance tests replay (#319), and a SolaX inverter: the other family the probe must refuse. -->
+  <!-- The recordings the conformance tests replay (#319), and SolaX's inverter and charger: other families the probes must refuse. -->
   <ItemGroup>
     <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Gleanvolt.Devices.Solax.Tests\Fixtures\solax-night-importing.json" Link="Fixtures\solax-inverter.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Gleanvolt.Devices.Solax.Tests\Fixtures\solax-charger-idle.json" Link="Fixtures\solax-charger-idle.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -4,6 +4,40 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — Huawei's SCharger: two driver ids, no status, and a setpoint in kilowatts
+
+**Context.** [Issue #351](https://github.com/mpospisil/gleanvolt/issues/351). The register source is Huawei's
+*Northbound Modbus-TCP Interconnection Protocol for AC Chargers* V1.0 (2023-08-04). Its whole signal list
+is the phase voltages and currents, the total power in tenths of a kW, a maximum charge power in tenths of a
+kW, and a charging control (standby, pause, resume). There is no status, no model and no serial number.
+The EMMA's interface gives the model and energy, but no power, status or control. The findings are on the
+issue.
+
+**Decision — power or current reads Charging, anything else Unknown.** No car and a car waiting both read
+0 W. `Available` would say the car is gone, and the controller acts on that. `Unknown` is never taken for
+a car that is gone (`IsCarKnownDisconnected`). `EvChargerCapabilities.ReportsStatus` (default true, false for
+the SCharger) says which kind a family is. The conformance suite expects `Unknown` where it would otherwise
+expect `Available` or a plugged-in state.
+
+**Decision — one driver id per model: `huawei-7ks` and `huawei-22kt`.** A factory's capabilities are fixed,
+and the two differ in phase count. Two factories keep the contract unchanged, and the configuration check
+then refuses `ChargeControl:Phases: 3` on the single-phase model.
+
+**Decision — the setpoint converts at the control loop's phases and voltage.**
+`EvChargerDriverOptions` gains `Phases` and `NominalVoltage`, which the host fills from `ChargeControl`. A
+one-phase car on the 22KT draws on one phase. Converting at three would write three times the power, and
+the car would take up to its own limit. Writes are capped at the protocol's 22.0 kW.
+
+**Decision — the probe reads phase L1's voltage.** It is recognised when it is a mains voltage (180–265 V).
+The SUN2000 and the SolaX inverter and charger keep nothing at `0x1000`, so they refuse the read.
+
+**Decision — Expected tier, readings only.** Start, stop and the setpoint are implemented as the protocol
+describes. Nobody has confirmed them on hardware. Owners in evcc's tracker report port 502 refused on
+2023/2024 firmware. Every fixture is synthetic until a tester (#354) records one. Behind an EMMA the
+charger is the EMMA's to manage.
+
+---
+
 ## 2026-11-09 — Charger snapshots go through the controller's own connection, and every charger driver passes one suite
 
 **Context.** [Issue #350](https://github.com/mpospisil/gleanvolt/issues/350), as #319 was for inverters. The

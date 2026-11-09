@@ -91,7 +91,9 @@ site-specific number the forecast-driven mode cannot work without — see
 Other SolaX inverters and chargers that answer the same registers, and **Huawei SUN2000** hybrids (M1,
 MAP0, L1, LC0, through the SDongle or behind an EMMA), are listed with what has and has not been tested
 in [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md). A Huawei needs Modbus TCP enabled with the
-installer account first: see [Setting up a Huawei SUN2000](docs/HUAWEI_SETUP.md).
+installer account first: see [Setting up a Huawei SUN2000](docs/HUAWEI_SETUP.md). Huawei's **SCharger-7KS-S0**
+and **-22KT-S0** have drivers too (`huawei-7ks`, `huawei-22kt`), readings only and untested on hardware. Their
+Modbus reports no status, so an idle charger reads *unknown*, not *available*.
 
 ## Tech stack
 
@@ -489,7 +491,7 @@ feature.
   "Chargers": [                    // a list; exactly one entry is supported
     {
       "Id": "charger",             // slug: the charger's identity within the system
-      "Driver": "",                // which charger family it speaks to: "solax" (empty), the only one so far
+      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks" or "huawei-22kt" (readings only)
       "Name": "Garage wallbox",
       "Model": "SolaX X1/X3-HAC",
       "Host": "192.168.2.6", "Port": 502, "UnitId": 1

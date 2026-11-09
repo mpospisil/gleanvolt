@@ -62,7 +62,8 @@ public abstract class EvChargerDriverConformanceTests<TFactory>
     {
         var reading = await ReadAsync(Idle);
 
-        Assert.Equal(EvChargerStatus.Available, reading.Status);
+        // A family without a status cannot tell an idle charger from a waiting car (#351), and says so.
+        Assert.Equal(Capabilities.ReportsStatus ? EvChargerStatus.Available : EvChargerStatus.Unknown, reading.Status);
         Assert.InRange(reading.PowerWatts, 0, IdleToleranceWatts);
     }
 
@@ -72,12 +73,20 @@ public abstract class EvChargerDriverConformanceTests<TFactory>
         var reading = await ReadAsync(PluggedIn);
 
         // Whichever of the plugged-in states the family reports, it is none that says "no car", "delivering"
-        // or "could not tell".
-        Assert.DoesNotContain(reading.Status, new[]
+        // or "could not tell". A family without a status can only say the last (#351): never "no car".
+        if (Capabilities.ReportsStatus)
         {
-            EvChargerStatus.Unknown, EvChargerStatus.Available, EvChargerStatus.Charging,
-            EvChargerStatus.Faulted, EvChargerStatus.Unavailable,
-        });
+            Assert.DoesNotContain(reading.Status, new[]
+            {
+                EvChargerStatus.Unknown, EvChargerStatus.Available, EvChargerStatus.Charging,
+                EvChargerStatus.Faulted, EvChargerStatus.Unavailable,
+            });
+        }
+        else
+        {
+            Assert.Equal(EvChargerStatus.Unknown, reading.Status);
+        }
+
         Assert.InRange(reading.PowerWatts, 0, IdleToleranceWatts);
     }
 
@@ -102,7 +111,15 @@ public abstract class EvChargerDriverConformanceTests<TFactory>
             var reading = await driver.ReadAsync();
             var settings = await driver.ReadSettingsAsync();
 
-            Assert.NotEqual(EvChargerStatus.Unknown, reading.Status);
+            if (capabilities.ReportsStatus)
+            {
+                Assert.NotEqual(EvChargerStatus.Unknown, reading.Status);
+            }
+            else
+            {
+                Assert.Contains(reading.Status, new[] { EvChargerStatus.Charging, EvChargerStatus.Unknown });
+            }
+
             Assert.True(double.IsFinite(reading.PowerWatts), DumpAssertions.Describe(dump) + ": power is not finite.");
             Assert.InRange(reading.PowerWatts, 0, maxWatts);
             if (reading.CurrentAmps is { } amps)
