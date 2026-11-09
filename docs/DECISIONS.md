@@ -4,6 +4,29 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-09 — The charger driver is chosen in configuration, and the charge limits are checked against it
+
+**Context.** [Issue #349](https://github.com/mpospisil/gleanvolt/issues/349), as #318 was for inverters.
+After #348 the charger sat behind a driver contract, but the host always picked SolaX.
+
+**Decision — `Pv:Chargers:0:Driver`, beside the charger's other keys.** The issue said
+`Pv:Charger:Driver`, but chargers are a list (`Pv:Chargers:N:…`), and a driver is per charger. Empty means
+`solax`; values are lower-cased; an id no registered driver has is a configuration problem that lists the
+ones there are. The resolved id is on the charger's `PvDeviceInfo.Driver`, and the driver's
+`ModbusDefaults` fill an empty port and unit id, so `appsettings.json` no longer fixes 502 and 1 for the
+charger. Compose passes `PV_CHARGER_DRIVER` (and `PV_INVERTER_TOPOLOGY`, which #322 left out).
+
+**Decision — the charge limits are a rule on the driver's capabilities.**
+`PvSystemRules.CheckChargeLimits` refuses `ChargeControl:MinChargingCurrentAmps` below the family's lowest
+setpoint, `MaxChargingCurrentAmps` above its highest, and `ChargeControl:Phases` above the phases it
+supplies. `ChargerDrivers.CheckLimits` runs it from the resolver and the setup status, so a start, the
+setup page and a Settings save refuse the same thing. Today's defaults (6–20 A, one phase) pass for SolaX
+(6–32 A, three phases).
+
+**"Test connection" for the charger is the driver's probe,** on a read-only client, as the inverter's is.
+Settings and the wizard get a **Charger brand** drop-down; the port and unit id placeholders follow the
+selected driver. `SiteResponse` gains `ChargerDriver`.
+
 ## 2026-11-09 — The charger is a driver behind a contract, and start and stop are one switch
 
 **Context.** [Issue #348](https://github.com/mpospisil/gleanvolt/issues/348), the first step of charger

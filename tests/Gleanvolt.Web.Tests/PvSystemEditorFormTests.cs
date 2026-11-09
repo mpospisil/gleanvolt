@@ -153,6 +153,47 @@ public class PvSystemEditorFormTests : BunitContext
     }
 
     [Fact]
+    public void The_charger_brand_is_a_choice_of_the_hosts_charger_drivers()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        var select = form.Find(Field(PvSystemSettingKeys.ChargerDriver));
+        Assert.Equal(["SolaX", "Wallco"], select.QuerySelectorAll("option").Select(option => option.TextContent));
+        Assert.Equal("solax", select.GetAttribute("value"));
+    }
+
+    [Fact]
+    public void Choosing_a_charger_brand_follows_its_defaults_and_probes_with_it()
+    {
+        _editor.Running[PvSystemSettingKeys.ChargerHost] = "192.168.2.6";
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("wallco");
+
+        Assert.Equal("5020", form.Find(Field(PvSystemSettingKeys.ChargerPort)).GetAttribute("placeholder"));
+        Assert.Equal("2", form.Find(Field(PvSystemSettingKeys.ChargerUnitId)).GetAttribute("placeholder"));
+
+        form.Find("#pv-save").Click();
+
+        Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.ChargerDriver] = "wallco" }, Assert.Single(_editor.Saves));
+        var probe = Assert.Single(_editor.Probes);
+        Assert.Equal(PvDeviceRole.Charger, probe.Role);
+        Assert.Equal((5020, (byte)2), (probe.Port, probe.UnitId));
+        Assert.Equal("wallco", Assert.Single(_editor.ProbeDrivers));
+    }
+
+    [Fact]
+    public void Choosing_the_charger_brand_already_in_force_is_not_an_edit()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("wallco");
+        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("solax");
+
+        Assert.True(form.Find("#pv-save").HasAttribute("disabled"));
+    }
+
+    [Fact]
     public void The_topology_is_offered_only_for_a_driver_reached_more_than_one_way()
     {
         var form = Render<PvSystemEditorForm>();
@@ -418,7 +459,8 @@ public class PvSystemEditorFormTests : BunitContext
         var form = PseudoLocale.Render(() => Render<PvSystemEditorForm>());
 
         // The brands in the drop-down are names, and stay as they are in every language.
-        PseudoLocale.AssertTranslated(form.Markup, [.. _editor.InverterDrivers.Select(driver => driver.DisplayName)]);
+        PseudoLocale.AssertTranslated(form.Markup,
+            [.. _editor.InverterDrivers.Select(driver => driver.DisplayName), .. _editor.ChargerDrivers.Select(driver => driver.DisplayName)]);
     }
 
     [Fact]

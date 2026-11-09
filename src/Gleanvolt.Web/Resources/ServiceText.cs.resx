@@ -360,6 +360,18 @@
   <data name="Config_PvDriver" xml:space="preserve">
     <value>Pv:Inverter:Driver ('{0}') není ovladač střídače, který tento Gleanvolt zná. Známé ovladače: {1}. Prázdná hodnota znamená {2}.</value>
   </data>
+  <data name="Config_PvChargerDriver" xml:space="preserve">
+    <value>{0}:Driver ('{1}') není ovladač nabíječky, který tento Gleanvolt zná. Známé ovladače: {2}. Prázdná hodnota znamená {3}.</value>
+  </data>
+  <data name="Config_ChargerMinAmps" xml:space="preserve">
+    <value>ChargeControl:MinChargingCurrentAmps ({0} A) je pod nejnižším proudem, při kterém nabíječka {1} nabíjí ({2} A).</value>
+  </data>
+  <data name="Config_ChargerMaxAmps" xml:space="preserve">
+    <value>ChargeControl:MaxChargingCurrentAmps ({0} A) je nad nejvyšším proudem, který nabíječka {1} přijme ({2} A).</value>
+  </data>
+  <data name="Config_ChargerPhases" xml:space="preserve">
+    <value>ChargeControl:Phases ({0}) je víc fází, než nabíječka {1} dodává ({2}).</value>
+  </data>
   <data name="Config_PvTopology" xml:space="preserve">
     <value>Pv:Inverter:Topology ('{0}') není způsob, jakým ovladač {1} střídač připojuje: {2}. Prázdná hodnota znamená {3}.</value>
   </data>

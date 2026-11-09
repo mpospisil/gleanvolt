@@ -489,6 +489,7 @@ feature.
   "Chargers": [                    // a list; exactly one entry is supported
     {
       "Id": "charger",             // slug: the charger's identity within the system
+      "Driver": "",                // which charger family it speaks to: "solax" (empty), the only one so far
       "Name": "Garage wallbox",
       "Model": "SolaX X1/X3-HAC",
       "Host": "192.168.2.6", "Port": 502, "UnitId": 1
@@ -498,13 +499,19 @@ feature.
 ```
 
 **`Driver` picks how the inverter is spoken to; `Model` is only a label.** `Driver` names the inverter
-family — `solax`, the only one so far — and decides which registers are read and how the battery is held.
+family — `solax` or `huawei` — and decides which registers are read and how the battery is held.
 Empty means `solax`, so an existing configuration needs no change; a value no driver has is a startup
 failure that lists the ones there are (and a problem on the setup page, in setup mode). The driver also
 supplies the port and unit id when `Port` and `UnitId` are left out. On Settings it is the **Inverter
 brand** drop-down. `Model` selects nothing: one driver covers every model of a family that shares its
 registers, so writing another model here does not make the controller speak that device's dialect. It
 answers "what is on the other end of 192.168.2.10?" from a log line rather than an ssh session.
+
+The charger has its own `Driver` (issue #349), the **Charger brand** drop-down on Settings, with the same
+rules: empty means `solax`, a value no driver has stops the start, and the driver fills in an empty `Port`
+and `UnitId`. The charge-control limits are checked against what the selected charger can do:
+`ChargeControl:MinChargingCurrentAmps` below its lowest setpoint, `MaxChargingCurrentAmps` above its
+highest, or `ChargeControl:Phases` above the phases it supplies is refused at startup and on save.
 
 **`AzimuthDegrees` is stored, not sent.** Nothing computes from it today: the forecast is fetched by
 Solcast resource id, which already encodes the orientation inside your Solcast account. Before it is

@@ -118,8 +118,10 @@ services:
       # else's pack.
       ChargeControl__Forecast__BatteryCapacityKWh: ${HOME_BATTERY_CAPACITY_KWH:-}
 
-      # Which inverter family the controller speaks to. Unset means solax, the only driver so far.
+      # Which inverter family the controller speaks to: solax (unset) or huawei. For huawei, how it is
+      # reached: dongle (unset) or emma. See .env.example.
       Pv__Inverter__Driver: ${PV_INVERTER_DRIVER:-}
+      Pv__Inverter__Topology: ${PV_INVERTER_TOPOLOGY:-}
       Pv__Inverter__Model: ${PV_INVERTER_MODEL:-SolaX X3-HYB-G4 PRO}
       Pv__Inverter__Host: ${INVERTER_HOST:-}
       # Only for a grid meter missing a phase clamp: which phase (L1-L3, or R/S/T). Unset reads the meter
@@ -130,6 +132,8 @@ services:
       # silently ignored. The index is in the key rather than in .env so that an operator with one
       # charger never has to think about arrays.
       Pv__Chargers__0__Id: ${PV_CHARGER_ID:-charger}
+      # Which charger family the controller speaks to. Unset means solax, the only driver so far.
+      Pv__Chargers__0__Driver: ${PV_CHARGER_DRIVER:-}
       Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
       Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
 

@@ -91,6 +91,21 @@
                             }
                         </select>
                     }
+                    else if (key == PvSystemSettingKeys.ChargerDriver)
+                    {
+                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedChargerDriverId"
+                                @onchange="e => SelectChargerDriver(e.Value?.ToString() ?? string.Empty)">
+                            @foreach (var driver in Editor.ChargerDrivers)
+                            {
+                                <option value="@driver.Id">@driver.DisplayName</option>
+                            }
+                            @if (SelectedChargerDriver is null)
+                            {
+                                @* As for the inverter: an id this build does not have, shown as configured. *@
+                                <option value="@SelectedChargerDriverId">@SelectedChargerDriverId</option>
+                            }
+                        </select>
+                    }
                     else if (key == PvSystemSettingKeys.InverterTopology && SelectedDriver is { } topologyDriver)
                     {
                         <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedTopologyId"
@@ -259,7 +274,7 @@
         (PvEditorSection.Capacity, SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
         (PvEditorSection.HomeBattery, SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
         (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterTopology, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
-        (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
+        (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerDriver, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
     private static Dictionary<string, string> Labels => new(StringComparer.OrdinalIgnoreCase)
@@ -286,6 +301,7 @@
         [PvSystemSettingKeys.InverterUnitId] = SettingsText.FieldInverterUnitId,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.FieldUnmeteredPhase,
         [PvSystemSettingKeys.ChargerId] = SettingsText.FieldChargerId,
+        [PvSystemSettingKeys.ChargerDriver] = SettingsText.FieldChargerDriver,
         [PvSystemSettingKeys.ChargerModel] = SettingsText.FieldChargerModel,
         [PvSystemSettingKeys.ChargerHost] = SettingsText.FieldChargerHost,
         [PvSystemSettingKeys.ChargerPort] = SettingsText.FieldChargerPort,
@@ -318,6 +334,7 @@
         [PvSystemSettingKeys.InverterUnitId] = SettingsText.HelpUnitId,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HelpUnmeteredPhase,
         [PvSystemSettingKeys.ChargerId] = SettingsText.HelpChargerId,
+        [PvSystemSettingKeys.ChargerDriver] = SettingsText.HelpChargerDriver,
         [PvSystemSettingKeys.ChargerModel] = SettingsText.HelpChargerModel,
         [PvSystemSettingKeys.ChargerHost] = SettingsText.HelpChargerHost,
         [PvSystemSettingKeys.ChargerPort] = SettingsText.HelpPort,
@@ -398,17 +415,37 @@
                 : string.Empty;
     }
 
-    // The placeholder: what an empty field means. The inverter's port and unit id are the selected driver's.
+    // The placeholder: what an empty field means. Each device's port and unit id are its selected driver's.
     private string? Hint(string key) =>
-        (key, SelectedDriver?.Defaults) switch
+        (key, SelectedDriver?.Defaults, SelectedChargerDriver?.Defaults) switch
         {
-            (PvSystemSettingKeys.InverterPort, { } defaults) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            (PvSystemSettingKeys.InverterUnitId, { } defaults) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.InverterPort, { } defaults, _) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.InverterUnitId, { } defaults, _) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.ChargerPort, _, { } defaults) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.ChargerUnitId, _, { } defaults) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             _ => Hints.GetValueOrDefault(key),
         };
 
+    // The charger's driver, as the inverter's (#349): empty means the default, as in configuration.
+    private string SelectedChargerDriverId => NormaliseChargerDriver(_values.GetValueOrDefault(PvSystemSettingKeys.ChargerDriver));
+
+    private EvChargerDriverInfo? SelectedChargerDriver =>
+        Editor.ChargerDrivers.FirstOrDefault(driver => driver.Id == SelectedChargerDriverId);
+
+    private static string NormaliseChargerDriver(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? PvSystemRules.DefaultChargerDriver : value.Trim().ToLowerInvariant();
+
+    private void SelectChargerDriver(string id)
+    {
+        var configured = _settings[PvSystemSettingKeys.ChargerDriver].Saved ?? string.Empty;
+        _values[PvSystemSettingKeys.ChargerDriver] = NormaliseChargerDriver(id) == NormaliseChargerDriver(configured) ? configured : id;
+    }
+
     private static readonly string[] ChargerAddress =
         [PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId];
+
+    // As for the inverter: the address, or the driver, whose probe decides whether the box is one it speaks to.
+    private static readonly string[] ChargerProbeKeys = [.. ChargerAddress, PvSystemSettingKeys.ChargerDriver];
 
     private PvSystemSettings _settings = new(string.Empty, []);
     private Dictionary<string, string> _values = [];
@@ -552,9 +589,10 @@
                 _values.GetValueOrDefault(PvSystemSettingKeys.InverterTopology))));
         }
 
-        if (ChargerAddress.Any(edits.ContainsKey) && Address(ChargerAddress) is { } charger)
+        if (ChargerProbeKeys.Any(edits.ContainsKey) && Address(ChargerAddress, SelectedChargerDriver?.Defaults) is { } charger)
         {
-            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId)));
+            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(
+                PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId, SelectedChargerDriverId)));
         }
 
         return probes;

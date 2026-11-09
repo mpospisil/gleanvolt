@@ -386,6 +386,18 @@
   <data name="Config_PvDriver" xml:space="preserve">
     <value>Pv:Inverter:Driver ('{0}') is not an inverter driver this Gleanvolt knows. Known drivers: {1}. Empty means {2}.</value>
   </data>
+  <data name="Config_PvChargerDriver" xml:space="preserve">
+    <value>{0}:Driver ('{1}') is not a charger driver this Gleanvolt knows. Known drivers: {2}. Empty means {3}.</value>
+  </data>
+  <data name="Config_ChargerMinAmps" xml:space="preserve">
+    <value>ChargeControl:MinChargingCurrentAmps ({0} A) is below the lowest current the {1} charger charges at ({2} A).</value>
+  </data>
+  <data name="Config_ChargerMaxAmps" xml:space="preserve">
+    <value>ChargeControl:MaxChargingCurrentAmps ({0} A) is above the highest current the {1} charger accepts ({2} A).</value>
+  </data>
+  <data name="Config_ChargerPhases" xml:space="preserve">
+    <value>ChargeControl:Phases ({0}) is more than the {1} charger supplies ({2}).</value>
+  </data>
   <data name="Config_PvTopology" xml:space="preserve">
     <value>Pv:Inverter:Topology ('{0}') is not a way the {1} driver reaches an inverter: {2}. Empty means {3}.</value>
   </data>

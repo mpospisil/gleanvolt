@@ -31,6 +31,7 @@ public static class PvSystemSettingKeys
     public const string InverterUnitId = "Pv:Inverter:UnitId";
     public const string InverterUnmeteredGridPhase = "Pv:Inverter:UnmeteredGridPhase";
     public const string ChargerId = "Pv:Chargers:0:Id";
+    public const string ChargerDriver = "Pv:Chargers:0:Driver";
     public const string ChargerModel = "Pv:Chargers:0:Model";
     public const string ChargerHost = "Pv:Chargers:0:Host";
     public const string ChargerPort = "Pv:Chargers:0:Port";
@@ -57,7 +58,7 @@ public static class PvSystemSettingKeys
         CapacityKwp, InverterCapacityKw, LossFactor,
         HomeBatteryCapacityKWh, HomeBatteryChargeEfficiency,
         InverterDriver, InverterTopology, InverterModel, InverterHost, InverterPort, InverterUnitId, InverterUnmeteredGridPhase,
-        ChargerId, ChargerModel, ChargerHost, ChargerPort, ChargerUnitId,
+        ChargerId, ChargerDriver, ChargerModel, ChargerHost, ChargerPort, ChargerUnitId,
     ];
 
     /// <summary>Whether <paramref name="key"/> is one the web UI may edit. Case-insensitive, as configuration is.</summary>

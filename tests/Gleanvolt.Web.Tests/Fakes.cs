@@ -854,6 +854,16 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
             [new InverterTopology("hub", "Hub"), new InverterTopology("emma", "EMMA")]),
     ];
 
+    // SolaX as the host has it, and a second charger family with its own port and unit id, so a test can see
+    // the form follow the selected charger driver's defaults (#349).
+    public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; set; } =
+    [
+        new("solax", "SolaX", EvChargerTransport.Modbus, new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)),
+            new EvChargerCapabilities(6, 32, 0, 3, false, true)),
+        new("wallco", "Wallco", EvChargerTransport.Modbus, new ModbusDefaults(5020, 2, TimeSpan.Zero),
+            new EvChargerCapabilities(6, 16, 0, 3, true, false)),
+    ];
+
     public PvSystemSettings Read() => new(
         "/app/data/pv-system.json",
         [.. PvSystemSettingKeys.All.Select(key =>
@@ -897,10 +907,10 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     }
 
     public Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role, string host, int port, byte unitId, string? inverterDriver = null, string? inverterTopology = null, CancellationToken cancellationToken = default)
+        PvDeviceRole role, string host, int port, byte unitId, string? driver = null, string? inverterTopology = null, CancellationToken cancellationToken = default)
     {
         Probes.Add((role, host, port, unitId));
-        ProbeDrivers.Add(inverterDriver);
+        ProbeDrivers.Add(driver);
         ProbeTopologies.Add(inverterTopology);
         return Task.FromResult(ProbeResult);
     }

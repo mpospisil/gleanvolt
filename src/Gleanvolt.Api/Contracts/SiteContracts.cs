@@ -30,7 +30,11 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="InstallDate">Commissioning date.</param>
 /// <param name="Inverter">The inverter every figure in <c>/status</c> is read from.</param>
 /// <param name="InverterDriver">
-/// The driver that reads and controls the inverter (<c>Pv:Inverter:Driver</c>): <c>solax</c>, the only one so far.
+/// The driver that reads and controls the inverter (<c>Pv:Inverter:Driver</c>): <c>solax</c> or <c>huawei</c>.
+/// </param>
+/// <param name="ChargerDriver">
+/// The driver that reads and controls the charger Gleanvolt drives (<c>Pv:Chargers:0:Driver</c>): <c>solax</c>,
+/// the only one so far. Empty when no charger is configured.
 /// </param>
 /// <param name="Chargers">The EV chargers. Exactly one is supported today; it is a list because that will not always be true.</param>
 public sealed record SiteResponse(
@@ -47,7 +51,8 @@ public sealed record SiteResponse(
     DateOnly? InstallDate,
     SiteDeviceResponse Inverter,
     IReadOnlyList<SiteDeviceResponse> Chargers,
-    string InverterDriver)
+    string InverterDriver,
+    string ChargerDriver)
 {
     public static SiteResponse From(PvSystemInfo site) => new(
         site.Id,
@@ -63,7 +68,8 @@ public sealed record SiteResponse(
         site.InstallDate,
         SiteDeviceResponse.From(site.Inverter),
         [.. site.Chargers.Select(SiteDeviceResponse.From)],
-        site.InverterDriver);
+        site.InverterDriver,
+        site.Chargers is [var charger, ..] ? charger.Driver : string.Empty);
 }
 
 /// <summary>One Modbus device on the system: what it is, and where it is on the network.</summary>
