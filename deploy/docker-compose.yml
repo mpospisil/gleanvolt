@@ -132,7 +132,8 @@ services:
       # silently ignored. The index is in the key rather than in .env so that an operator with one
       # charger never has to think about arrays.
       Pv__Chargers__0__Id: ${PV_CHARGER_ID:-charger}
-      # Which charger family the controller speaks to. Unset means solax, the only driver so far.
+      # Which charger family the controller speaks to: solax (unset), huawei-7ks, huawei-22kt or goe.
+      # See .env.example.
       Pv__Chargers__0__Driver: ${PV_CHARGER_DRIVER:-}
       Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
       Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}

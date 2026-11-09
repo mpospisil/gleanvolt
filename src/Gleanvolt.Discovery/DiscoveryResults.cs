@@ -28,9 +28,14 @@ public enum DiscoveryFinding
 
     /// <summary>
     /// Answered Modbus with a Huawei model name (issue #324): a SUN2000 inverter, through its SDongle or
-    /// behind an EMMA, or an EMMA itself.
+    /// behind an EMMA, or an EMMA itself. Or, with no name, with the phase voltages of an SCharger (#353).
     /// </summary>
     HuaweiDevice,
+
+    /// <summary>
+    /// A go-e Charger's local HTTP API v2 answered on a web port (#353). Not Modbus: no unit id.
+    /// </summary>
+    GoeCharger,
 }
 
 /// <summary>
@@ -83,8 +88,8 @@ public sealed record SolaxModel(PvDeviceRole Role, string Model, string Family, 
 /// </param>
 /// <param name="Note">One sentence for a human: what was read, or what to do next.</param>
 /// <param name="Driver">
-/// The inverter driver that speaks to it (<c>Pv:Inverter:Driver</c>), when the scan identified a family
-/// Gleanvolt has a driver for; null otherwise.
+/// The driver that speaks to it (<c>Pv:Inverter:Driver</c>, or <c>Pv:Chargers:0:Driver</c> for a charger),
+/// when the scan identified a family Gleanvolt has a driver for; null otherwise.
 /// </param>
 /// <param name="Topology">
 /// How that driver reaches it (<c>Pv:Inverter:Topology</c>): <c>emma</c> for a Huawei inverter found
@@ -105,8 +110,8 @@ public sealed record DiscoveredDevice(
     string? Driver = null,
     string? Topology = null)
 {
-    /// <summary>Whether the scan said what the device is: a SolaX serial number or a Huawei model name.</summary>
-    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice;
+    /// <summary>Whether the scan said what the device is: a SolaX serial number, a Huawei model or a go-e's API.</summary>
+    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice or DiscoveryFinding.GoeCharger;
 }
 
 /// <summary>Everything one scan found, and what it was told to scan.</summary>

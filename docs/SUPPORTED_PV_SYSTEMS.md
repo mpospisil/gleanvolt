@@ -1,14 +1,21 @@
 # Supported PV systems
 
-Which inverters and EV chargers Gleanvolt can drive. It talks **Modbus TCP** to two devices on your
-LAN: a hybrid inverter, **SolaX** or **Huawei SUN2000**, and a SolaX EV charger. The SolaX register maps
-were written for the reference installation's **X3-HYB-G4 PRO** and **X1/X3-HAC**. The Huawei one comes
-from Huawei's interface definitions.
+Which inverters and EV chargers Gleanvolt can drive. It talks to two devices on your LAN:
 
-The inverter's register map is chosen by its driver, `Pv:Inverter:Driver`: `solax` (the default, when it
-is empty) or `huawei`. It is never chosen by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are
-documentation. So *supported* here means one thing: **the device answers the registers its driver reads,
-with the meaning the driver expects.**
+- a hybrid inverter, **SolaX** or **Huawei SUN2000**, over Modbus TCP;
+- an EV charger: a **SolaX** or a **Huawei SCharger** over Modbus TCP, or a **go-e** over its local HTTP API.
+
+The SolaX register maps were written for the reference installation's **X3-HYB-G4 PRO** and
+**X1/X3-HAC**. The Huawei and go-e drivers come from the manufacturers' documentation.
+
+Each device's driver is chosen in configuration:
+
+- the inverter's by `Pv:Inverter:Driver`: `solax` (the default, when it is empty) or `huawei`;
+- the charger's by `Pv:Chargers:0:Driver`: `solax` (the default), `huawei-7ks`, `huawei-22kt` or `goe`.
+
+A driver is never chosen by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So
+*supported* here means one thing: **the device answers what its driver reads, with the meaning the driver
+expects.**
 
 > **Last reviewed 2026-09-13.** Which SolaX families share those registers comes from the
 > [wills106/homeassistant-solax-modbus](https://github.com/wills106/homeassistant-solax-modbus)
@@ -62,6 +69,25 @@ All holding registers, 32-bit values high word first. Three reads per poll.
 |---|---|---|
 | Read (input) | `0x0B` charge power, `0x1D` run state | Every charging mode |
 | Read and write (holding) | `0x60D` use mode, `0x628` charge current | Every charging mode |
+
+### Huawei SCharger (`huawei-7ks`, `huawei-22kt`)
+
+From Huawei's *Northbound Modbus-TCP Interconnection Protocol for AC Chargers* V1.0. All holding registers.
+
+| Access | Registers | Used for |
+|---|---|---|
+| Read | `0x1000`–`0x100B` phase voltages and currents, `0x100C` total power (kW × 10) | Every charging mode; L1's voltage is "Test connection" and discovery |
+| Read and write | `0x2000` maximum charge power (kW × 10) | The setpoint, converted from amps |
+| Read and write | `0x2006` charging control: 1 pause, 2 resume | Start and stop |
+
+### go-e Charger (`goe`)
+
+From go-e's [API v2 documentation](https://github.com/goecharger/go-eCharger-API-v2). Port 80.
+
+| Access | Keys | Used for |
+|---|---|---|
+| Read, `GET /api/status?filter=…` | `car`, `alw`, `nrg` (power at index 11, W), `amp`, `frc`, `ama`, `var` | Every charging mode, "Test connection" and discovery |
+| Write, `GET /api/set?…` | `amp` current, `frc` force state (1 off, 2 on) | The setpoint, start, stop and pause |
 
 ---
 
@@ -214,8 +240,9 @@ and up), the SmartLogger, the FusionSolar cloud API, direct RS485, and Huawei's 
 
 ## EV chargers
 
-The Manufacturer column links to SolaX's page for the charger: Smart EV Charger G2 for the HAC models, Smart
-EV Charger for the EVC.
+For the SolaX rows, the Manufacturer column links to SolaX's page for the charger: Smart EV Charger G2 for
+the HAC models, Smart EV Charger for the EVC. The Huawei and go-e rows are set up as
+[Setting up a Huawei SCharger or a go-e](CHARGER_SETUP.md) describes.
 
 ### Verified
 
@@ -229,6 +256,17 @@ EV Charger for the EVC.
 |---|---|---|---|---|
 | [SolaX](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) | **X1-HAC, X3-HAC, X1-HAC-S, X3-HAC-S, A1-HAC, J1-HAC, C1-HAC, C3-HAC** — 4.6, 7.2, 11 and 22 kW | GEN2 (HAC) | `5` + model code + power code | Same four registers as the reference |
 | [SolaX](https://www.solaxpower.com/our-products/smart-ev-charger.html) | **X1-EVC 7 kW, X3-EVC 11 kW, X3-EVC 22 kW** | GEN1 (EVC) | `C107`, `C311`, `C322` | Upstream enables all four registers. With firmware 7.0 or later upstream treats the unit as a HAC. Early units were reported with Modbus TCP port 502 closed and reachable only over RS485 at address 70 ([discussion #349](https://github.com/wills106/homeassistant-solax-modbus/discussions/349), 2023) |
+
+### Other brands — Expected, not tested
+
+| Manufacturer | Model | Driver | Reached over | Notes |
+|---|---|---|---|---|
+| [Huawei](https://solar.huawei.com/) | **SCharger-7KS-S0** (7.4 kW, one phase) | `huawei-7ks` | Modbus TCP, port 502 | No status: idle reads *unknown*. Behind an EMMA, keep it in dry-run |
+| [Huawei](https://solar.huawei.com/) | **SCharger-22KT-S0** (22 kW, three phases) | `huawei-22kt` | Modbus TCP, port 502 | As the 7KS |
+| [go-e](https://go-e.com/) | **Gemini, Gemini flex, HOMEfix and HOME+** (V3 or later), 11 and 22 kW | `goe` | Local HTTP API v2, port 80 | The API is off by default. Phase switching is the go-e's own; Gleanvolt does not command it |
+
+Both drivers implement start, stop and the setpoint as documented, and every test recording is synthetic.
+A tester's snapshots ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up.
 
 ### Not supported
 
@@ -247,18 +285,28 @@ EV Charger for the EVC.
   has a limited number of write cycles. The inverter's `0x7C` command is documented as not stored; for the
   charger's `0x628` and `0x60D` this project has no answer from SolaX's protocol document yet.
 - **6–32 A, no phase switching.** On three phases the charger's 6 A floor is about 4.2 kW.
+- **One Modbus client.** The SolaX charger drops a second Modbus TCP connection on its first request. The
+  SCharger may do the same. A charger that evcc, Home Assistant or an EMMA already controls has to be
+  **handed over** to Gleanvolt, not shared. Take snapshots with the button on Settings: it uses Gleanvolt's
+  own connection.
+- **Huawei SCharger:** the protocol has no status, so no car and a waiting car both read *unknown*, and
+  the setpoint is power, written in 100 W steps. Owners in evcc's tracker report port 502 refused on
+  2023/2024 firmware.
+- **go-e:** a pause is the force state *off*, because the go-e refuses a current below 6 A. The current
+  and the force state are settings the go-e keeps; Gleanvolt writes them only when they change.
 
 ---
 
 ## Connecting
 
 - **Not sure of the address?** [`gleanvolt-discover`](../README.md#finding-your-devices) scans the LAN
-  and reports host, port and unit id for each device, from its serial number (SolaX) or model name
-  (Huawei).
+  and reports host, port and unit id for each device: from its serial number (SolaX), its model name
+  (Huawei SUN2000), its phase voltages (Huawei SCharger) or its API (go-e, on port 80).
 - **Huawei:** Modbus TCP is off by default on the SDongle and the EMMA. See
   [Setting up a Huawei SUN2000](HUAWEI_SETUP.md).
-- **Modbus TCP on port 502, unit id 1** for both devices. Both are configurable
-  (`Pv:Inverter:Port`, `Pv:Inverter:UnitId`, and the same under `Pv:Chargers:0`).
+- **Huawei SCharger and go-e:** see [Setting up a Huawei SCharger or a go-e](CHARGER_SETUP.md).
+- **Modbus TCP on port 502, unit id 1** for both devices, except a go-e: HTTP on port 80, no unit id. All
+  are configurable (`Pv:Inverter:Port`, `Pv:Inverter:UnitId`, and the same under `Pv:Chargers:0`).
 - **Inverter access.** G2 and G3 hybrids have Ethernet built in. G4 and later need the LAN port or a
   **Pocket WiFi 3.0 or newer** dongle — **PocketLAN does not provide Modbus**. Modbus is off by default on
   some firmware and is enabled in the inverter's own menu.
@@ -284,7 +332,8 @@ signs and ranges are proven against your device rather than assumed.
 
 For a charger, the same button is under the charger. Three snapshots are the most useful: no car, a car
 plugged in and waiting, and a car charging. It reads over Gleanvolt's own connection, so Gleanvolt keeps
-running; a charger that serves one Modbus client at a time would drop a second one.
+running; a charger that serves one Modbus client at a time would drop a second one. For a go-e, the file is
+a recording of its API's answers instead of registers.
 
 ## Sources
 
@@ -299,6 +348,11 @@ running; a charger that serves one Modbus client at a time would drop a second o
 - Huawei's *Solar Inverter Modbus Interface Definitions*, and evcc's
   [`huawei-sun2000-hybrid.yaml` and `huawei-emma.yaml`](https://github.com/evcc-io/evcc/tree/master/templates/definition/meter)
   (MIT)
+- Huawei's *Northbound Modbus-TCP Interconnection Protocol for AC Chargers* V1.0 (2023-08-04), attached to
+  [bolliy/ioBroker.sun2000#171](https://github.com/bolliy/ioBroker.sun2000/issues/171) and
+  [evcc discussion #8985](https://github.com/evcc-io/evcc/discussions/8985)
+- [goecharger/go-eCharger-API-v2](https://github.com/goecharger/go-eCharger-API-v2) — the HTTP API and its
+  key list
 - [Dražice inverters](https://www.dzd.cz/fotovoltaika-drazice/stridace), the
   [IN.HYBRID COMPACT PRO datasheet](https://www.dzd.cz/images/sortiment/in-hybrid-compact-pro/PL-stridace-inhybrid-compact-pro-cz.pdf),
   and SolaX's [X3-HYB G4 PRO page](https://www.solaxpower.com/our-products/x3-hyb-g4-pro.html) it was compared with

@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Net;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.GoE;
 
 namespace Gleanvolt.Discovery;
 
@@ -32,7 +34,7 @@ public sealed record ScanPlan(IReadOnlyList<string> Hosts, IReadOnlyList<string>
 }
 
 /// <summary>
-/// Finds the SolaX devices on a network (issue #267): a TCP connect to every host on the candidate
+/// Finds the inverters and chargers on a network (issue #267): a TCP connect to every host on the candidate
 /// ports, then Modbus to whatever is open, then the serial number and the role check to say what each
 /// box is. Read-only by construction: every client it speaks through is a
 /// <see cref="ReadOnlyModbusClient"/>, whatever the factory hands it, so a scan of someone's LAN cannot
@@ -45,6 +47,7 @@ public sealed class DeviceScanner
     private readonly IWebProbe _webProbe;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
     private readonly TimeProvider _timeProvider;
+    private readonly Func<DeviceConfig, HttpClient> _httpClientFactory;
 
     /// <param name="options">How to probe.</param>
     /// <param name="portProbe">The TCP connect; <see cref="TcpPortProbe"/> by default.</param>
@@ -54,12 +57,17 @@ public sealed class DeviceScanner
     /// </param>
     /// <param name="webProbe">The web page read on <see cref="DiscoveryOptions.WebPorts"/>; <see cref="HttpWebProbe"/> by default.</param>
     /// <param name="timeProvider">The clock requests are paced on.</param>
+    /// <param name="httpClientFactory">
+    /// Builds the HTTP client a web port's go-e check is made on (#353); by default one that passes only the
+    /// requests a driver marked as reads, with the scan's request timeout. The check makes only such reads.
+    /// </param>
     public DeviceScanner(
         DiscoveryOptions? options = null,
         IPortProbe? portProbe = null,
         Func<DeviceConfig, IModbusClient>? clientFactory = null,
         IWebProbe? webProbe = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<DeviceConfig, HttpClient>? httpClientFactory = null)
     {
         _options = options ?? new DiscoveryOptions();
         _portProbe = portProbe ?? new TcpPortProbe();
@@ -67,6 +75,12 @@ public sealed class DeviceScanner
         _timeProvider = timeProvider ?? TimeProvider.System;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(
             device, _timeProvider, _options.ConnectTimeout, _options.RequestTimeout, retries: 0));
+        _httpClientFactory = httpClientFactory ?? (device =>
+        {
+            var client = ChargerHttpClients.Create(device, writable: false, NullLogger<ReadOnlyHttpHandler>.Instance);
+            client.Timeout = _options.RequestTimeout;
+            return client;
+        });
     }
 
     /// <summary>
@@ -185,6 +199,11 @@ public sealed class DeviceScanner
                             "Looks like a SolaX Wi-Fi/LAN dongle: no Modbus here. Gleanvolt needs Modbus TCP: the "
                             + "inverter's own LAN port, or a Pocket WiFi 3.0+ with Modbus TCP enabled."));
                     }
+                    else if (page is not null
+                        && await GoeAsync(host, port, hostTimeout.Token).ConfigureAwait(false) is { } goe)
+                    {
+                        report(goe);
+                    }
 
                     continue;
                 }
@@ -200,6 +219,32 @@ public sealed class DeviceScanner
             warnings.Enqueue(
                 $"{host} ran out of time after {_options.HostTimeout.TotalSeconds:0} s; its results may be incomplete. "
                 + "Raise --host-timeout, or narrow --unit-ids.");
+        }
+    }
+
+    // A go-e's local HTTP API v2, asked through the driver's own probe: one filtered /api/status, a read. Anything
+    // else answering HTTP -- a router, a printer, a go-e with the API off -- is not reported: every LAN has those.
+    private async Task<DiscoveredDevice?> GoeAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var http = _httpClientFactory(new DeviceConfig { Host = host, Port = port });
+            var driver = new GoeChargerDriverFactory().Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true });
+            var probe = await driver.ProbeAsync(cancellationToken).ConfigureAwait(false);
+
+            return probe.Recognised
+                ? new DiscoveredDevice(
+                    host, port, null, DiscoveryFinding.GoeCharger, PvDeviceRole.Charger, "go-e Charger", "local HTTP API v2", null,
+                    SupportTier.Expected, true,
+                    $"Car state {probe.Reading:0} on go-e's local HTTP API v2. Untested on hardware; if evcc or the go-e "
+                    + "app's own PV surplus charging drives it, hand control over rather than adding Gleanvolt alongside.",
+                    Driver: GoeChargerDriverFactory.DriverId)
+                : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException
+            || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            return null;
         }
     }
 

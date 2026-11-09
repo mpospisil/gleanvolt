@@ -143,6 +143,43 @@ public class CliTests
     }
 
     [Fact]
+    public void A_go_e_brings_its_driver_and_no_unit_id_into_the_configuration()
+    {
+        var lines = DiscoveryConfiguration.EnvironmentLines(
+        [
+            new DiscoveredDevice("192.168.2.30", 80, null, DiscoveryFinding.GoeCharger, PvDeviceRole.Charger,
+                "go-e Charger", "local HTTP API v2", null, SupportTier.Expected, true, "note", Driver: "goe"),
+        ]);
+
+        Assert.Equal(
+        [
+            "Pv__Chargers__0__Driver=goe",
+            "Pv__Chargers__0__Model=go-e Charger",
+            "Pv__Chargers__0__Host=192.168.2.30",
+            "Pv__Chargers__0__Port=80",
+        ], lines);
+    }
+
+    [Fact]
+    public void An_sCharger_brings_its_driver_into_the_configuration()
+    {
+        var lines = DiscoveryConfiguration.EnvironmentLines(
+        [
+            new DiscoveredDevice("192.168.2.31", 502, 1, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Charger,
+                "SCharger-22KT-S0", "SCharger EV charger", null, SupportTier.Expected, true, "note", Driver: "huawei-22kt"),
+        ]);
+
+        Assert.Equal(
+        [
+            "Pv__Chargers__0__Driver=huawei-22kt",
+            "Pv__Chargers__0__Model=Huawei SCharger-22KT-S0",
+            "Pv__Chargers__0__Host=192.168.2.31",
+            "Pv__Chargers__0__Port=502",
+            "Pv__Chargers__0__UnitId=1",
+        ], lines);
+    }
+
+    [Fact]
     public void A_device_Gleanvolt_cannot_drive_is_not_offered_as_configuration()
     {
         var lines = DiscoveryConfiguration.EnvironmentLines(

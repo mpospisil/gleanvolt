@@ -66,8 +66,9 @@ public sealed record DiscoveryScan(
 /// <summary>
 /// One address that answered. <see cref="Role"/> is what the device identified as, null when it did
 /// not say; <see cref="Supported"/> is false for a model Gleanvolt cannot drive and for anything it
-/// could not identify. <see cref="Driver"/> and <see cref="Topology"/> are what choosing it as the
-/// inverter fills in (issue #324): the family's driver id, and how it is reached, null for the default.
+/// could not identify. <see cref="Driver"/> and <see cref="Topology"/> are what choosing it fills in: the
+/// family's driver id, for the inverter (#324) or the charger (#353), and how an inverter is reached, null for
+/// the default. <see cref="UnitId"/> is null for a charger reached over HTTP.
 /// </summary>
 public sealed record FoundDevice(
     string Host,

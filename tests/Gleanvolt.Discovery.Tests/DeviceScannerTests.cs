@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Devices;
+using Gleanvolt.Devices.GoE;
+using Gleanvolt.Devices.Testing;
 
 namespace Gleanvolt.Discovery.Tests;
 
@@ -358,11 +361,113 @@ public class DeviceScannerTests
             new DiscoveryOptions { Ports = [80] },
             new FakePortProbe(("192.168.1.20", 80)),
             _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
-            new FakeWebProbe(page));
+            new FakeWebProbe(page),
+            httpClientFactory: _ => Http(new HttpDump()));
 
         var report = await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.20"]));
 
         Assert.Equal(reported, report.Devices.Any(device => device.Finding == DiscoveryFinding.SolaxDongle));
+        Assert.DoesNotContain(report.Devices, device => device.Finding == DiscoveryFinding.GoeCharger);
+    }
+
+    [Fact]
+    public async Task A_go_e_is_found_on_its_web_port_by_its_api_and_brings_its_driver()
+    {
+        ReplayHttpHandler? handler = null;
+        DeviceConfig? asked = null;
+        var scanner = new DeviceScanner(
+            new DiscoveryOptions { Ports = [80] },
+            new FakePortProbe(("192.168.1.30", 80)),
+            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
+            new FakeWebProbe("<title>go-eCharger</title>"),
+            httpClientFactory: device =>
+            {
+                asked = device;
+                return Http(new HttpDump
+                {
+                    Responses = new Dictionary<string, JsonNode?>
+                    {
+                        [GoeChargerDriver.StatusRequest] = JsonNode.Parse("""{"car":3,"alw":true,"fwv":"59.4","typ":"go-eCharger"}"""),
+                    },
+                }, h => handler = h);
+            });
+
+        var device = Assert.Single((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.30"]))).Devices);
+
+        Assert.Equal(DiscoveryFinding.GoeCharger, device.Finding);
+        Assert.Equal(PvDeviceRole.Charger, device.Role);
+        Assert.Null(device.UnitId);
+        Assert.Equal(80, device.Port);
+        Assert.Equal("goe", device.Driver);
+        Assert.Equal(SupportTier.Expected, device.Tier);
+        Assert.True(device.Identified);
+        Assert.Contains("Car state 3", device.Note);
+        Assert.Equal(("192.168.1.30", 80), (asked!.Host, asked.Port));
+        Assert.Empty(handler!.Writes);
+    }
+
+    [Fact]
+    public async Task Nothing_answering_http_is_not_asked_for_a_go_e_api()
+    {
+        var asked = false;
+        var scanner = new DeviceScanner(
+            new DiscoveryOptions { Ports = [80] },
+            new FakePortProbe(("192.168.1.30", 80)),
+            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
+            new NoWebPage(),
+            httpClientFactory: _ =>
+            {
+                asked = true;
+                return Http(new HttpDump());
+            });
+
+        Assert.Empty((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.30"]))).Devices);
+        Assert.False(asked);
+    }
+
+    [Theory]
+    [InlineData(true, "huawei-22kt", "SCharger-22KT-S0")]
+    [InlineData(false, "huawei-7ks", "SCharger-7KS-S0")]
+    public async Task An_sCharger_is_found_by_its_mains_voltage_and_its_phases_pick_the_driver(bool threePhase, string driver, string model)
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[1] = FakeUnit.SCharger(threePhase);
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
+
+        Assert.Equal(DiscoveryFinding.HuaweiDevice, device.Finding);
+        Assert.Equal(PvDeviceRole.Charger, device.Role);
+        Assert.Equal(model, device.Model);
+        Assert.Equal(driver, device.Driver);
+        Assert.Equal(SupportTier.Expected, device.Tier);
+        Assert.True(device.RoleConfirmed);
+        Assert.Contains("231.1 V", device.Note);
+        Assert.Equal(0, server.Writes);
+    }
+
+    [Fact]
+    public async Task A_device_with_no_mains_voltage_at_0x1000_is_not_an_sCharger()
+    {
+        await using var server = new FakeModbusServer();
+        server.Units[1] = new FakeUnit().WithHolding(0x1000, 0).WithHolding(0x1001, 57).WithHolding(0x1002, 0)
+            .WithHolding(0x1003, 0).WithHolding(0x1004, 0).WithHolding(0x1005, 0);
+
+        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
+
+        Assert.Equal(DiscoveryFinding.NotSolax, device.Finding);
+    }
+
+    private static HttpClient Http(HttpDump dump, Action<ReplayHttpHandler>? made = null)
+    {
+        var handler = new ReplayHttpHandler(dump);
+        made?.Invoke(handler);
+        return new HttpClient(handler) { BaseAddress = new Uri("http://charger.test/") };
+    }
+
+    private sealed class NoWebPage : IWebProbe
+    {
+        public Task<string?> ReadAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>(null);
     }
 
     [Fact]
