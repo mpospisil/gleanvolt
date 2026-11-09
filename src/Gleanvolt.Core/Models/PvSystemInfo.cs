@@ -97,6 +97,13 @@ public sealed record PvSystemInfo(
 /// <param name="Connection">Where and how to reach it, as the Modbus client wants it.</param>
 public sealed record PvDeviceInfo(string Id, string Name, string Model, DeviceConfig Connection)
 {
+    /// <summary>
+    /// The id of the driver that reads and controls it, lower case: for a charger, <c>Pv:Chargers:N:Driver</c>
+    /// (issue #349), <c>solax</c> when the configuration leaves it empty. Empty for the inverter, whose driver
+    /// is <see cref="PvSystemInfo.InverterDriver"/>.
+    /// </summary>
+    public string Driver { get; init; } = string.Empty;
+
     /// <summary>The device in a log line: the model if it is known, and always the address.</summary>
     public string Describe()
     {

@@ -118,7 +118,8 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>(),
-            inverterDrivers: [.. provider.GetServices<IInverterDriverFactory>()]));
+            inverterDrivers: [.. provider.GetServices<IInverterDriverFactory>()],
+            chargerDrivers: [.. provider.GetServices<IEvChargerDriverFactory>()]));
 
         // The Home Assistant link and the API, editable on Settings and in the setup wizard. Read once at
         // startup like the installation, so the snapshot is what "running" means.
@@ -303,8 +304,9 @@ public static class GleanvoltHostingExtensions
                 });
         });
 
-        // The charger's driver (issue #348), on the controlled charger's client as registered above --
-        // read-only in dry-run. Always SolaX until the configuration can name another (#349).
+        // The charger's driver (issues #348, #349): the one Pv:Chargers:0:Driver names, which the resolver has
+        // already checked is one of these, on the controlled charger's client as registered above -- read-only
+        // in dry-run.
         foreach (var make in ChargerDrivers.Factories)
         {
             services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
@@ -313,7 +315,16 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IEvChargerDriver>(provider =>
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            var factory = provider.GetServices<IEvChargerDriverFactory>().Single(candidate => candidate.Id == ChargerDrivers.DefaultId);
+            var id = provider.GetRequiredService<PvSystemInfo>().Chargers is [var charger, ..] && charger.Driver.Length > 0
+                ? charger.Driver
+                : ChargerDrivers.DefaultId;
+            var factory = provider.GetServices<IEvChargerDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
+                ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
+            if (factory.Transport != EvChargerTransport.Modbus)
+            {
+                throw new NotSupportedException($"The {factory.DisplayName} charger is reached over {factory.Transport}, which this build cannot connect yet.");
+            }
+
             return factory.Create(
                 EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger)),
                 new EvChargerDriverOptions
@@ -1057,7 +1068,7 @@ public static class GleanvoltHostingExtensions
             pv = new PvSystemOptions();
         }
 
-        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems(), InverterDrivers.Known);
+        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems(), InverterDrivers.Known, ChargerDrivers.Known);
     }
 
     // The configured zone where it resolves, the host's own where it does not: setup mode is there to

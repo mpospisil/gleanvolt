@@ -200,4 +200,11 @@ public sealed class PvChargerOptions : PvDeviceOptions
     /// <see cref="PvSystemOptions.Id"/>, and unique within the list. Defaults to <c>charger</c>.
     /// </summary>
     public string Id { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Which charger driver reads and controls this charger: <c>solax</c>, the only one so far. Empty means
+    /// <c>solax</c>, so a configuration from before the field existed needs no change (issue #349).
+    /// Case-insensitive. An id no registered driver has is a configuration problem naming the ones there are.
+    /// </summary>
+    public string Driver { get; init; } = string.Empty;
 }

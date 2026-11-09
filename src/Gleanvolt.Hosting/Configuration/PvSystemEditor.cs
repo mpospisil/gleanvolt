@@ -32,6 +32,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly IReadOnlyDictionary<string, string?> _running;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
     private readonly IReadOnlyList<IInverterDriverFactory> _inverterDrivers;
+    private readonly IReadOnlyList<IEvChargerDriverFactory> _chargerDrivers;
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
@@ -47,7 +48,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
         IReadOnlyDictionary<string, string?> running,
         ILogger<PvSystemEditor> logger,
         Func<DeviceConfig, IModbusClient>? clientFactory = null,
-        IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null)
+        IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null,
+        IReadOnlyList<IEvChargerDriverFactory>? chargerDrivers = null)
     {
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
@@ -56,6 +58,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device));
         _inverterDrivers = inverterDrivers ?? [.. Gleanvolt.Hosting.InverterDrivers.Factories.Select(make => make(null))];
         InverterDrivers = [.. _inverterDrivers.Select(InverterDriverInfo.Of)];
+        _chargerDrivers = chargerDrivers ?? [.. Gleanvolt.Hosting.ChargerDrivers.Factories.Select(make => make(null))];
+        ChargerDrivers = [.. _chargerDrivers.Select(EvChargerDriverInfo.Of)];
     }
 
     /// <summary>Each editable key's value in <paramref name="configuration"/>, for the <c>running</c> argument.</summary>
@@ -63,6 +67,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
         PvSystemSettingKeys.All.ToDictionary(key => key, key => configuration[key], StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<InverterDriverInfo> InverterDrivers { get; }
+
+    public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
 
     public PvSystemSettings Read()
     {
@@ -140,7 +146,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         string host,
         int port,
         byte unitId,
-        string? inverterDriver = null,
+        string? driver = null,
         string? inverterTopology = null,
         CancellationToken cancellationToken = default)
     {
@@ -159,10 +165,10 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 // Through the driver, so "Test connection" asks whatever the family's own probe asks. The
                 // client refuses writes, and the probe makes none: an address nobody has confirmed yet is
                 // never written to.
-                var driver = InverterDriverFactory(inverterDriver).Create(
+                var inverter = InverterDriverFactory(driver).Create(
                     new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
-                    new InverterDriverOptions { DryRun = true, Topology = KnownTopology(inverterDriver, inverterTopology) });
-                var probe = await driver.ProbeAsync(timeout.Token).ConfigureAwait(false);
+                    new InverterDriverOptions { DryRun = true, Topology = KnownTopology(driver, inverterTopology) });
+                var probe = await inverter.ProbeAsync(timeout.Token).ConfigureAwait(false);
                 var reading = (long)Math.Round(probe.Reading);
 
                 return probe.Recognised
@@ -174,11 +180,14 @@ public sealed class PvSystemEditor : IPvSystemEditor
                         Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(reading)));
             }
 
-            var register = DeviceRoleCheck.Register(role);
-            var value = (await client.ReadInputRegistersAsync(register, 1, timeout.Token).ConfigureAwait(false))[0];
-            var plausible = DeviceRoleCheck.IsPlausible(role, value);
+            // The charger's probe is its driver's too (#349), on a client that cannot write.
+            var charger = ChargerDriverFactory(driver).Create(
+                EvChargerConnection.Over(new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance)),
+                new EvChargerDriverOptions { DryRun = true });
+            var chargerProbe = await charger.ProbeAsync(timeout.Token).ConfigureAwait(false);
+            var value = (long)Math.Round(chargerProbe.Reading);
 
-            return plausible
+            return chargerProbe.Recognised
                 ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
                     Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
                 : new DeviceProbeResult(true, false,
@@ -201,6 +210,15 @@ public sealed class PvSystemEditor : IPvSystemEditor
         return _inverterDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
             ?? _inverterDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultInverterDriver)
             ?? _inverterDrivers[0];
+    }
+
+    // As for the inverter: an id this host does not have probes with the default, and the save says why.
+    private IEvChargerDriverFactory ChargerDriverFactory(string? id)
+    {
+        var wanted = string.IsNullOrWhiteSpace(id) ? PvSystemRules.DefaultChargerDriver : id.Trim().ToLowerInvariant();
+        return _chargerDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
+            ?? _chargerDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultChargerDriver)
+            ?? _chargerDrivers[0];
     }
 
     // The topology the form has selected, if the driver has it; anything else probes the default, and the

@@ -342,7 +342,7 @@ public sealed class PvSystemEditorTests : IDisposable
             Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
             _ => client, [new SolaxInverterDriverFactory(), other]);
 
-        var result = await editor.ProbeAsync(PvDeviceRole.Inverter, "192.168.2.20", 502, 1, inverterDriver: "ACME");
+        var result = await editor.ProbeAsync(PvDeviceRole.Inverter, "192.168.2.20", 502, 1, driver: "ACME");
 
         Assert.True(result.Plausible);
         Assert.Equal(1, other.Probes);
@@ -353,6 +353,66 @@ public sealed class PvSystemEditorTests : IDisposable
     public void Without_drivers_given_the_editor_offers_the_hosts_catalog()
     {
         Assert.Equal(InverterDrivers.Known, Editor(Configuration()).InverterDrivers);
+        Assert.Equal(ChargerDrivers.Known, Editor(Configuration()).ChargerDrivers);
+    }
+
+    [Fact]
+    public async Task The_charger_probe_is_the_selected_drivers_and_writes_nothing()
+    {
+        var other = new RecordingChargerDriverFactory("wallco");
+        var client = new OneRegisterClient(2);
+        var editor = new PvSystemEditor(
+            Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
+            _ => client, chargerDrivers: [new SolaxChargerDriverFactory(), other]);
+
+        var result = await editor.ProbeAsync(PvDeviceRole.Charger, "192.168.2.6", 502, 1, driver: "WALLCO");
+
+        Assert.True(result.Plausible);
+        Assert.Equal(1, other.Probes);
+        Assert.Equal(["solax", "wallco"], editor.ChargerDrivers.Select(driver => driver.Id));
+    }
+
+    /// <summary>A charger family whose probe always recognises what answered, and counts how often it was asked.</summary>
+    private sealed class RecordingChargerDriverFactory(string id) : IEvChargerDriverFactory
+    {
+        public int Probes { get; private set; }
+
+        public string Id => id;
+
+        public string DisplayName => id;
+
+        public EvChargerTransport Transport => EvChargerTransport.Modbus;
+
+        public ModbusDefaults? Defaults { get; } = new(502, 1, TimeSpan.Zero);
+
+        public EvChargerCapabilities Capabilities { get; } = new(6, 16, 0, 3, false, false);
+
+        public RegisterSnapshotSpec? Snapshot => null;
+
+        public IEvChargerDriver Create(EvChargerConnection connection, EvChargerDriverOptions options) =>
+            new Driver(this, connection.RequireModbus(id));
+
+        private sealed class Driver(RecordingChargerDriverFactory factory, IModbusClient client) : IEvChargerDriver
+        {
+            public EvChargerCapabilities Capabilities => factory.Capabilities;
+
+            public Task<EvChargerReading> ReadAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+            public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+            public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException();
+
+            public Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException();
+
+            public async Task<EvChargerProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
+            {
+                factory.Probes++;
+                var value = (await client.ReadInputRegistersAsync(0, 1, cancellationToken))[0];
+                return new EvChargerProbeResult(true, value);
+            }
+        }
     }
 
     /// <summary>A driver family whose probe always recognises what answered, and counts how often it was asked.</summary>

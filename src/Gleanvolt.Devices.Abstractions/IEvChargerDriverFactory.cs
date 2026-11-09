@@ -38,6 +38,31 @@ public interface IEvChargerDriverFactory
     IEvChargerDriver Create(EvChargerConnection connection, EvChargerDriverOptions options);
 }
 
+/// <summary>
+/// What is known about a charger driver without creating one (issue #349): enough to check a configured id
+/// and the charge-control limits against what the family can do, name the brand in a drop-down, and fill in
+/// an address the configuration left incomplete. As <see cref="InverterDriverInfo"/> is for inverters.
+/// </summary>
+/// <param name="Id">See <see cref="IEvChargerDriverFactory.Id"/>.</param>
+/// <param name="DisplayName">See <see cref="IEvChargerDriverFactory.DisplayName"/>.</param>
+/// <param name="Transport">See <see cref="IEvChargerDriverFactory.Transport"/>.</param>
+/// <param name="Defaults">See <see cref="IEvChargerDriverFactory.Defaults"/>; null for a family reached over HTTP.</param>
+/// <param name="Capabilities">See <see cref="IEvChargerDriverFactory.Capabilities"/>.</param>
+public sealed record EvChargerDriverInfo(
+    string Id,
+    string DisplayName,
+    EvChargerTransport Transport,
+    ModbusDefaults? Defaults,
+    EvChargerCapabilities Capabilities)
+{
+    /// <summary>The description of <paramref name="factory"/>.</summary>
+    public static EvChargerDriverInfo Of(IEvChargerDriverFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        return new EvChargerDriverInfo(factory.Id, factory.DisplayName, factory.Transport, factory.Defaults, factory.Capabilities);
+    }
+}
+
 /// <summary>How a charger family is reached.</summary>
 public enum EvChargerTransport
 {

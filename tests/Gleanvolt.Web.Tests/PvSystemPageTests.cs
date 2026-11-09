@@ -475,6 +475,6 @@ public class PvSystemPageTests : BunitContext
             page.Markup,
             "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
             "curl Authorization Bearer http localhost status api openapi json home assistant availability set",
-            "SolaX Acme"); // the brands in the inverter drop-down: names, never translated
+            "SolaX Acme", "SolaX Wallco"); // the brands in the inverter and charger drop-downs: names, never translated
     }
 }

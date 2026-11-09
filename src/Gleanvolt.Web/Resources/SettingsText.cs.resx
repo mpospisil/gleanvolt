@@ -408,6 +408,9 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Značka střídače</value>
   </data>
+  <data name="FieldChargerDriver" xml:space="preserve">
+    <value>Značka nabíječky</value>
+  </data>
   <data name="FieldInverterTopology" xml:space="preserve">
     <value>Připojení přes</value>
   </data>
@@ -941,6 +944,9 @@
   </data>
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>S jakou rodinou střídačů Gleanvolt komunikuje. Určuje, které registry čte a jak drží domácí baterii. Všechny modely jedné značky se stejnými registry Modbus používají stejnou položku.</value>
+  </data>
+  <data name="HelpChargerDriver" xml:space="preserve">
+    <value>S jakou rodinou nabíječek Gleanvolt komunikuje. Určuje, které registry čte a zapisuje, aby nabíjení spustil, zastavil a nastavil nabíjecí proud. Všechny modely jedné značky se stejnými registry používají stejnou položku.</value>
   </data>
   <data name="HelpInverterTopology" xml:space="preserve">
     <value>Jak se Gleanvolt ke střídači připojuje. Přes vlastní dongle střídače čte všechno přímo ze střídače. Za správcem energie, jako je EMMA od Huawei, komunikuje Gleanvolt se správcem energie: síť čte z jeho vlastního senzoru a ke střídači se dostane přes něj, na Unit ID, které správce energie střídači přidělil. To ID zadejte do pole Unit ID střídače.</value>

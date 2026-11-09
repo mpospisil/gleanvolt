@@ -39,6 +39,20 @@ public static partial class PvSystemRules
     /// <summary>The inverter driver an empty <c>Pv:Inverter:Driver</c> means (issue #318).</summary>
     public const string DefaultInverterDriver = "solax";
 
+    /// <summary>The charger driver an empty <c>Pv:Chargers:N:Driver</c> means (issue #349).</summary>
+    public const string DefaultChargerDriver = "solax";
+
+    // As DefaultInverterDrivers, for a caller that names no charger drivers: SolaX's X3-HAC, as the host has it.
+    private static readonly IReadOnlyList<EvChargerDriverInfo> DefaultChargerDrivers =
+    [
+        new(
+            DefaultChargerDriver,
+            "SolaX",
+            EvChargerTransport.Modbus,
+            new ModbusDefaults(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250)),
+            new EvChargerCapabilities(MinCurrentAmps: 6, MaxCurrentAmps: 32, PauseCurrentAmps: 0, Phases: 3, CanSwitchPhases: false, HasUseMode: true)),
+    ];
+
     // What a caller that names no drivers is held to: the default, with DeviceConfig's defaults and SolaX's
     // capabilities. A host passes the drivers it has registered instead; this is for the portal, and for
     // the rules on their own.
@@ -79,7 +93,8 @@ public static partial class PvSystemRules
         PvSystemOptions pv,
         string inverterDeviceId,
         ConfigurationProblems problems,
-        IReadOnlyList<InverterDriverInfo>? inverterDrivers = null)
+        IReadOnlyList<InverterDriverInfo>? inverterDrivers = null,
+        IReadOnlyList<EvChargerDriverInfo>? chargerDrivers = null)
     {
         ArgumentNullException.ThrowIfNull(pv);
         ArgumentNullException.ThrowIfNull(problems);
@@ -116,7 +131,7 @@ public static partial class PvSystemRules
             LossFactor: Fraction(pv.LossFactor, "Pv:LossFactor", problems),
             InstallDate: ParseInstallDate(pv.InstallDate, problems),
             Inverter: ResolveInverter(pv, inverterDeviceId, driver?.Defaults, problems),
-            Chargers: ResolveChargers(pv, problems))
+            Chargers: ResolveChargers(pv, chargerDrivers ?? DefaultChargerDrivers, problems))
         {
             UnmeteredGridPhase = unmeteredGridPhase,
             InverterDriver = driver?.Id ?? NormaliseDriverId(pv),
@@ -185,6 +200,80 @@ public static partial class PvSystemRules
 
         return driver;
     }
+
+    // As the inverter's: empty is SolaX, anything else must be a driver this host has.
+    private static EvChargerDriverInfo? ResolveChargerDriver(
+        PvChargerOptions charger, string path, IReadOnlyList<EvChargerDriverInfo> drivers, ConfigurationProblems problems)
+    {
+        var id = NormaliseChargerDriverId(charger);
+        var driver = drivers.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+
+        if (driver is null)
+        {
+            var known = string.Join(", ", drivers.Select(candidate => candidate.Id));
+            problems.Add(
+                $"{path}:Driver ('{id}') is not a charger driver this Gleanvolt knows. Known drivers: {known}. "
+                + $"Empty means {DefaultChargerDriver}.",
+                Phrase.Of("Config.PvChargerDriver", new PhraseArg.Text(path), new PhraseArg.Text(id), new PhraseArg.Text(known),
+                    new PhraseArg.Text(DefaultChargerDriver)));
+        }
+
+        return driver;
+    }
+
+    private static string NormaliseChargerDriverId(PvChargerOptions charger)
+    {
+        var id = charger.Driver.Trim().ToLowerInvariant();
+        return id.Length == 0 ? DefaultChargerDriver : id;
+    }
+
+    /// <summary>
+    /// The charge-control limits against what the charger's driver can do (issue #349): a minimum below the
+    /// family's lowest setpoint, a maximum above its highest, or more phases than it supplies would have the
+    /// controller command something the charger cannot honour. One rule, for every host that checks them.
+    /// </summary>
+    /// <param name="driver">The charger's driver.</param>
+    /// <param name="minAmps"><c>ChargeControl:MinChargingCurrentAmps</c>.</param>
+    /// <param name="maxAmps"><c>ChargeControl:MaxChargingCurrentAmps</c>.</param>
+    /// <param name="phases"><c>ChargeControl:Phases</c>.</param>
+    /// <param name="problems">Where a refusal goes.</param>
+    public static void CheckChargeLimits(
+        EvChargerDriverInfo driver, int minAmps, int maxAmps, int phases, ConfigurationProblems problems)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(problems);
+        var capabilities = driver.Capabilities;
+
+        if (minAmps < capabilities.MinCurrentAmps)
+        {
+            problems.Add(
+                $"ChargeControl:MinChargingCurrentAmps ({minAmps} A) is below the lowest current the {driver.DisplayName} "
+                + $"charger charges at ({capabilities.MinCurrentAmps} A).",
+                Phrase.Of("Config.ChargerMinAmps", new PhraseArg.Number(minAmps), new PhraseArg.Text(driver.DisplayName),
+                    new PhraseArg.Number(capabilities.MinCurrentAmps)));
+        }
+
+        if (maxAmps > capabilities.MaxCurrentAmps)
+        {
+            problems.Add(
+                $"ChargeControl:MaxChargingCurrentAmps ({maxAmps} A) is above the highest current the {driver.DisplayName} "
+                + $"charger accepts ({capabilities.MaxCurrentAmps} A).",
+                Phrase.Of("Config.ChargerMaxAmps", new PhraseArg.Number(maxAmps), new PhraseArg.Text(driver.DisplayName),
+                    new PhraseArg.Number(capabilities.MaxCurrentAmps)));
+        }
+
+        if (phases > capabilities.Phases)
+        {
+            problems.Add(
+                $"ChargeControl:Phases ({phases}) is more than the {driver.DisplayName} charger supplies ({capabilities.Phases}).",
+                Phrase.Of("Config.ChargerPhases", new PhraseArg.Number(phases), new PhraseArg.Text(driver.DisplayName),
+                    new PhraseArg.Number(capabilities.Phases)));
+        }
+    }
+
+    /// <summary>The driver description <paramref name="id"/> names among <paramref name="drivers"/>, or null.</summary>
+    public static EvChargerDriverInfo? ChargerDriver(string id, IReadOnlyList<EvChargerDriverInfo>? drivers = null) =>
+        (drivers ?? DefaultChargerDrivers).FirstOrDefault(candidate => candidate.Id == id);
 
     private static string NormaliseDriverId(PvSystemOptions pv)
     {
@@ -293,7 +382,8 @@ public static partial class PvSystemRules
         return new PvDeviceInfo(inverterDeviceId, name, model, pv.Inverter.ToDeviceConfig(defaults));
     }
 
-    private static IReadOnlyList<PvDeviceInfo> ResolveChargers(PvSystemOptions pv, ConfigurationProblems problems)
+    private static IReadOnlyList<PvDeviceInfo> ResolveChargers(
+        PvSystemOptions pv, IReadOnlyList<EvChargerDriverInfo> drivers, ConfigurationProblems problems)
     {
         if (pv.Chargers.Length == 0)
         {
@@ -339,7 +429,11 @@ public static partial class PvSystemRules
 
             ValidateConnection(charger, path, problems);
 
-            chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), charger.ToDeviceConfig()));
+            var driver = ResolveChargerDriver(charger, path, drivers, problems);
+            chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), charger.ToDeviceConfig(driver?.Defaults))
+            {
+                Driver = driver?.Id ?? NormaliseChargerDriverId(charger),
+            });
         }
 
         return chargers;

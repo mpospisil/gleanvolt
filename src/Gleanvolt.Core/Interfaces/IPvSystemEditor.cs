@@ -29,6 +29,12 @@ public interface IPvSystemEditor
     IReadOnlyList<InverterDriverInfo> InverterDrivers { get; }
 
     /// <summary>
+    /// The charger drivers this host can run, which <c>Pv:Chargers:0:Driver</c> may name (issue #349), in
+    /// the order a drop-down shows them.
+    /// </summary>
+    IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
+
+    /// <summary>
     /// Stores <paramref name="values"/> (configuration key to value; an empty string clears a value)
     /// in the overrides file, merged with what is there already — if the merged configuration passes
     /// the startup resolver. A value equal to what the key would be without the file is not stored,
@@ -47,9 +53,9 @@ public interface IPvSystemEditor
     /// One read against a device address, to catch a swapped inverter and charger before a restart
     /// makes it look like a frozen battery and zero solar. Never throws for an unreachable device.
     /// </summary>
-    /// <param name="inverterDriver">
-    /// For the inverter, the driver whose probe asks: the one the form has selected. Null or empty means
-    /// the default driver.
+    /// <param name="driver">
+    /// The driver whose probe asks, for the inverter or the charger as <paramref name="role"/> says: the one
+    /// the form has selected. Null or empty means that role's default driver.
     /// </param>
     /// <param name="inverterTopology">
     /// For the inverter, how it is reached (<c>Pv:Inverter:Topology</c>): behind an EMMA the probe asks the
@@ -60,7 +66,7 @@ public interface IPvSystemEditor
         string host,
         int port,
         byte unitId,
-        string? inverterDriver = null,
+        string? driver = null,
         string? inverterTopology = null,
         CancellationToken cancellationToken = default);
 }

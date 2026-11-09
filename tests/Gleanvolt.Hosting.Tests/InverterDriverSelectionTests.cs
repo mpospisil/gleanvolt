@@ -124,4 +124,56 @@ public class InverterDriverSelectionTests
         Assert.NotNull(error);
         Assert.Contains("Pv:Inverter:Topology ('emma') cannot be used with the SolaX driver", error.Message);
     }
+
+    [Fact]
+    public void The_charger_catalog_has_solax()
+    {
+        Assert.Equal(["solax"], ChargerDrivers.Known.Select(driver => driver.Id));
+    }
+
+    [Fact]
+    public async Task The_container_runs_the_configured_charger_driver()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection([.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "SOLAX"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.IsType<SolaxChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Equal("solax", provider.GetRequiredService<PvSystemInfo>().Chargers[0].Driver);
+    }
+
+    [Fact]
+    public void Headless_an_unknown_charger_driver_stops_the_start_naming_the_known_drivers()
+    {
+        var error = Record.Exception(() =>
+            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "goe")])));
+
+        Assert.NotNull(error);
+        Assert.Contains("Pv:Chargers:0:Driver ('goe')", error.Message);
+        Assert.Contains("Known drivers: solax", error.Message);
+    }
+
+    [Theory]
+    [InlineData("ChargeControl:MaxChargingCurrentAmps", "40", "above the highest current the SolaX charger accepts (32 A)")]
+    [InlineData("ChargeControl:MinChargingCurrentAmps", "4", "below the lowest current the SolaX charger charges at (6 A)")]
+    [InlineData("ChargeControl:Phases", "4", "more than the SolaX charger supplies (3)")]
+    public void Headless_a_charge_limit_the_charger_cannot_honour_stops_the_start(string key, string value, string expected)
+    {
+        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, (key, value)])));
+
+        Assert.NotNull(error);
+        Assert.Contains(expected, error.Message);
+    }
+
+    [Fact]
+    public void In_setup_mode_a_charge_limit_the_charger_cannot_honour_is_a_problem_on_the_charger_step()
+    {
+        var status = SetupStatusEvaluator.Evaluate(
+            Configuration([.. UsableSite.Settings, ("ChargeControl:MaxChargingCurrentAmps", "40")]),
+            new SetupHost(TimeZoneInfo.Utc, IsWindows: false));
+
+        var problem = Assert.Single(status.MissingRequired);
+        Assert.Equal(SetupArea.Charger, problem.Area);
+    }
 }

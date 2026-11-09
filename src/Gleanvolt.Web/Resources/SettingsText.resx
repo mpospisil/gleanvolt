@@ -417,6 +417,9 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Inverter brand</value>
   </data>
+  <data name="FieldChargerDriver" xml:space="preserve">
+    <value>Charger brand</value>
+  </data>
   <data name="FieldInverterTopology" xml:space="preserve">
     <value>Connected through</value>
   </data>
@@ -955,6 +958,9 @@
   </data>
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>Which family of inverters Gleanvolt is talking to. It decides which registers are read and how the home battery is held. Every model of a brand that shares the same Modbus registers uses the same entry.</value>
+  </data>
+  <data name="HelpChargerDriver" xml:space="preserve">
+    <value>Which family of chargers Gleanvolt is talking to. It decides which registers are read and written to start, stop and set the charging current. Every model of a brand that shares the same registers uses the same entry.</value>
   </data>
   <data name="HelpInverterTopology" xml:space="preserve">
     <value>How Gleanvolt reaches the inverter. With the inverter's own dongle, everything is read from the inverter. Behind an energy manager such as Huawei's EMMA, Gleanvolt talks to the energy manager instead: the grid comes from its own sensor, and the inverter is reached through it, on the unit id the energy manager assigned to the inverter. Enter that id as the inverter unit id.</value>

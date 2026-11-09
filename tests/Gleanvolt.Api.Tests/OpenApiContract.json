@@ -537,6 +537,7 @@
     "SiteResponse": {
       "address": "string (required)",
       "azimuthDegrees": "number|string(double)? (required)",
+      "chargerDriver": "string (required)",
       "chargers": "array\u003C$SiteDeviceResponse\u003E (required)",
       "id": "string (required)",
       "installDate": "string(date)? (required)",

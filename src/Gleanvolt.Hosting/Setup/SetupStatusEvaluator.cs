@@ -44,7 +44,8 @@ public static class SetupStatusEvaluator
 
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
         var pvProblems = new ConfigurationProblems();
-        PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, pvProblems, InverterDrivers.Known);
+        var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, pvProblems, InverterDrivers.Known, ChargerDrivers.Known);
+        ChargerDrivers.CheckLimits(configuration, site, pvProblems);
 
         var phrases = pvProblems.Phrases;
         for (var index = 0; index < pvProblems.Count; index++)
@@ -176,7 +177,8 @@ public static class SetupStatusEvaluator
     // the wizard needs to know which page to send someone to, not to parse the sentence.
     private static SetupArea AreaOf(string problem) =>
         problem.Contains("Pv:Inverter", StringComparison.Ordinal) ? SetupArea.Inverter
-        : problem.Contains("Pv:Chargers", StringComparison.Ordinal) || problem.Contains("EV charger", StringComparison.Ordinal) ? SetupArea.Charger
+        : problem.Contains("Pv:Chargers", StringComparison.Ordinal) || problem.Contains("EV charger", StringComparison.Ordinal)
+            || problem.StartsWith("ChargeControl:", StringComparison.Ordinal) ? SetupArea.Charger
         : problem.Contains("Pv:Latitude", StringComparison.Ordinal) || problem.Contains("Pv:Longitude", StringComparison.Ordinal) ? SetupArea.Location
         : SetupArea.Site;
 }
