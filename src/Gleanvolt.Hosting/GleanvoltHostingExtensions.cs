@@ -331,6 +331,8 @@ public static class GleanvoltHostingExtensions
                 {
                     DryRun = chargeControl.DryRun,
                     CurrentChangeThresholdAmps = chargeControl.CurrentChangeThresholdAmps,
+                    Phases = chargeControl.Phases,
+                    NominalVoltage = chargeControl.NominalVoltage,
                 });
         });
 

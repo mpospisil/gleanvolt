@@ -1,0 +1,29 @@
+{
+  "format": "gleanvolt-register-dump",
+  "formatVersion": 1,
+  "driver": "huawei-7ks",
+  "family": "Huawei SCharger-7KS-S0",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC, written from Huawei's Northbound Modbus-TCP Interconnection Protocol for AC Chargers V1.0 until a tester's snapshot replaces it (#351, #354). Charging at 16 A on one phase: 3.7 kW, maximum power set to 3.7 kW, charging resumed.",
+  "holding": {
+    "0x1000": 0,
+    "0x1001": 2298,
+    "0x1002": 0,
+    "0x1003": 0,
+    "0x1004": 0,
+    "0x1005": 0,
+    "0x1006": 0,
+    "0x1007": 160,
+    "0x1008": 0,
+    "0x1009": 0,
+    "0x100A": 0,
+    "0x100B": 0,
+    "0x100C": 0,
+    "0x100D": 37,
+    "0x2000": 0,
+    "0x2001": 37,
+    "0x2006": 2
+  },
+  "input": {}
+}

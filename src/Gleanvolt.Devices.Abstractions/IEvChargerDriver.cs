@@ -76,10 +76,22 @@ public sealed record EvChargerCapabilities(
     int PauseCurrentAmps,
     int Phases,
     bool CanSwitchPhases,
-    bool HasUseMode);
+    bool HasUseMode)
+{
+    /// <summary>
+    /// Whether the family reports what it is doing (issue #351). A family that does not, such as Huawei's
+    /// SCharger, shows only that it is delivering: power above zero reads <see cref="EvChargerStatus.Charging"/>,
+    /// and anything else <see cref="EvChargerStatus.Unknown"/>. No car and a car plugged in and waiting both
+    /// read 0 W, and Unknown is the only status that claims neither.
+    /// </summary>
+    public bool ReportsStatus { get; init; } = true;
+}
 
 /// <summary>One charger poll in the contract's units.</summary>
-/// <param name="Status">What the charger reports it is doing, mapped by the driver.</param>
+/// <param name="Status">
+/// What the charger reports it is doing, mapped by the driver. For a family without a status
+/// (<see cref="EvChargerCapabilities.ReportsStatus"/>), Charging or Unknown.
+/// </param>
 /// <param name="PowerWatts">What it is delivering to the car, all phases together; never negative.</param>
 /// <param name="CurrentAmps">The active current setpoint, or null when it could not be read.</param>
 /// <param name="Mode">

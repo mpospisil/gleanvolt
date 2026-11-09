@@ -121,4 +121,14 @@ public sealed record EvChargerDriverOptions
 
     /// <summary>How far the current setpoint has to move before it is written again; at least 1 A.</summary>
     public int CurrentChangeThresholdAmps { get; init; } = 1;
+
+    /// <summary>
+    /// The phases the car charges on (<c>ChargeControl:Phases</c>), for a family whose setpoint is power rather
+    /// than current (Huawei's SCharger, issue #351). A one-phase car on a three-phase charger draws on one, so
+    /// its amps convert at one phase. Null means every phase the family supplies.
+    /// </summary>
+    public int? Phases { get; init; }
+
+    /// <summary>The voltage per phase that amps and watts convert at (<c>ChargeControl:NominalVoltage</c>).</summary>
+    public double NominalVoltage { get; init; } = 230;
 }

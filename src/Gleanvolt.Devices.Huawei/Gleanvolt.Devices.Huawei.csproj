@@ -15,7 +15,7 @@
 
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Devices.Huawei</PackageId>
-    <Description>The Huawei SUN2000 hybrid inverter driver for the Gleanvolt: three- and single-phase hybrids, readings through the SDongle over Modbus TCP.</Description>
+    <Description>The Huawei SUN2000 hybrid inverter driver for the Gleanvolt: three- and single-phase hybrids, readings through the SDongle over Modbus TCP; and the SCharger-7KS-S0 and -22KT-S0 EV chargers.</Description>
   </PropertyGroup>
 
   <!-- Formatting and parsing name their culture here: see the file for why (#290). -->

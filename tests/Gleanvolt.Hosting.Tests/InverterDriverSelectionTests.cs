@@ -126,9 +126,35 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void The_charger_catalog_has_solax()
+    public void The_charger_catalog_has_solax_first_then_the_two_sChargers()
     {
-        Assert.Equal(["solax"], ChargerDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt"], ChargerDrivers.Known.Select(driver => driver.Id));
+    }
+
+    [Fact]
+    public async Task The_container_runs_the_sCharger_with_the_charge_controls_phases()
+    {
+        // The SCharger's setpoint is power, so the driver has to convert at the phases the car charges on (#351).
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "huawei-22kt"), new("ChargeControl:Phases", "1"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        var driver = Assert.IsType<HuaweiSChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Equal(3, driver.Capabilities.Phases);
+        Assert.Equal(1, driver.SetpointPhases);
+        Assert.False(driver.Capabilities.ReportsStatus);
+    }
+
+    [Fact]
+    public void Headless_three_phases_on_the_single_phase_sCharger_stops_the_start()
+    {
+        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration(
+            [.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "huawei-7ks"), ("ChargeControl:Phases", "3")])));
+
+        Assert.NotNull(error);
+        Assert.Contains("more than the Huawei SCharger-7KS charger supplies (1)", error.Message);
     }
 
     [Fact]
