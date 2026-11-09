@@ -72,14 +72,14 @@ public abstract class InverterDriverConformanceTests<TFactory>
             var reading = await ReadAsync(dump);
 
             Assert.InRange(reading.BatterySocPercent, 0, 100);
-            Assert.True(double.IsFinite(reading.PvWatts), Describe(dump) + ": PV is not finite.");
-            Assert.True(double.IsFinite(reading.GridWatts), Describe(dump) + ": grid is not finite.");
-            Assert.True(double.IsFinite(reading.BatteryWatts), Describe(dump) + ": battery is not finite.");
-            Assert.True(reading.PvWatts >= 0, Describe(dump) + ": PV cannot be negative.");
+            Assert.True(double.IsFinite(reading.PvWatts), DumpAssertions.Describe(dump) + ": PV is not finite.");
+            Assert.True(double.IsFinite(reading.GridWatts), DumpAssertions.Describe(dump) + ": grid is not finite.");
+            Assert.True(double.IsFinite(reading.BatteryWatts), DumpAssertions.Describe(dump) + ": battery is not finite.");
+            Assert.True(reading.PvWatts >= 0, DumpAssertions.Describe(dump) + ": PV cannot be negative.");
 
             if (reading.InverterOutputPerPhase is { } phases)
             {
-                Assert.True(double.IsFinite(phases.L1) && double.IsFinite(phases.L2) && double.IsFinite(phases.L3), Describe(dump) + ": a phase is not finite.");
+                Assert.True(double.IsFinite(phases.L1) && double.IsFinite(phases.L2) && double.IsFinite(phases.L3), DumpAssertions.Describe(dump) + ": a phase is not finite.");
             }
         }
     }
@@ -172,7 +172,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         {
             var probe = await CreateDriver(new ReplayModbusClient(dump)).ProbeAsync();
 
-            Assert.True(probe.Recognised, Describe(dump) + " was not recognised by its own driver's probe.");
+            Assert.True(probe.Recognised, DumpAssertions.Describe(dump) + " was not recognised by its own driver's probe.");
         }
     }
 
@@ -185,7 +185,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         // nothing at the address the family is known by.
         try
         {
-            Assert.False((await driver.ProbeAsync()).Recognised, Describe(OtherFamily) + " was mistaken for this family.");
+            Assert.False((await driver.ProbeAsync()).Recognised, DumpAssertions.Describe(OtherFamily) + " was mistaken for this family.");
         }
         catch (ModbusDeviceException)
         {
@@ -202,18 +202,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         await driver.ReadAsync();
         await driver.ProbeAsync();
 
-        var covered = factory.SnapshotFor(Options).Ranges
-            .SelectMany(range => range.Addresses.Select(address => (range.UnitId, range.Table, address)))
-            .ToHashSet();
-
-        foreach (var read in client.Reads)
-        {
-            foreach (var address in read.Addresses)
-            {
-                Assert.True(covered.Contains((read.UnitId, read.Table, address)),
-                    $"The driver reads {read.Table} 0x{address:X4}{(read.UnitId is { } unit ? $" on unit {unit}" : string.Empty)}, which its snapshot does not include; a tester's snapshot could not replay it.");
-            }
-        }
+        DumpAssertions.Covers(factory.SnapshotFor(Options), client.Reads);
     }
 
     [Fact]
@@ -227,7 +216,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         var replayed = await factory.Create(new ReplayModbusClient(snapshot), Options).ReadAsync();
 
         Assert.Equal(original, replayed);
-        AssertSerialRedacted(factory.SnapshotFor(Options), snapshot);
+        DumpAssertions.SerialRedacted(factory.SnapshotFor(Options), snapshot);
     }
 
     [Fact]
@@ -237,7 +226,7 @@ public abstract class InverterDriverConformanceTests<TFactory>
         // repository.
         foreach (var dump in Dumps.Append(OtherFamily))
         {
-            AssertSerialRedacted(CreateFactory().SnapshotFor(Options), dump);
+            DumpAssertions.SerialRedacted(CreateFactory().SnapshotFor(Options), dump);
         }
     }
 
@@ -246,28 +235,4 @@ public abstract class InverterDriverConformanceTests<TFactory>
 
     private async Task<InverterReading> ReadAsync(RegisterDump dump) =>
         await CreateDriver(new ReplayModbusClient(dump)).ReadAsync();
-
-    private static void AssertSerialRedacted(RegisterSnapshotSpec spec, RegisterDump dump)
-    {
-        if (spec.SerialNumber is not { } serial)
-        {
-            return;
-        }
-
-        var unit = serial.UnitId is { } id ? dump.Units.GetValueOrDefault(id) ?? new RegisterDump() : dump;
-        var table = unit[serial.Table];
-        var characters = serial.Addresses
-            .Where(table.ContainsKey)
-            .SelectMany(address => new[] { (char)(table[address] >> 8), (char)(table[address] & 0xFF) })
-            .ToList();
-
-        for (var index = spec.SerialPrefixLength; index < characters.Count; index++)
-        {
-            Assert.True(characters[index] is '\0' or RegisterSnapshot.RedactedCharacter,
-                $"{Describe(dump)}: serial number character {index} is '{characters[index]}', past the {spec.SerialPrefixLength}-character prefix.");
-        }
-    }
-
-    private static string Describe(RegisterDump dump) =>
-        string.IsNullOrEmpty(dump.Note) ? $"The {dump.Family} dump" : $"The {dump.Family} dump ({dump.Note})";
 }

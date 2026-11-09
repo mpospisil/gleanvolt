@@ -1008,4 +1008,16 @@
   <data name="SnapshotFailed" xml:space="preserve">
     <value>Střídač se nepodařilo přečíst: {0}</value>
   </data>
+  <data name="SnapshotHelpCharger" xml:space="preserve">
+    <value>Jednou přečte všechny registry, které ovladač nabíječky používá, a uloží je do souboru. Čte přes vlastní spojení Gleanvoltu, takže není třeba nic zastavovat. Sériové číslo se zkrátí na předponu modelu. Soubor přiložte k issue, když testujete nabíječku, kterou Gleanvolt zatím nepodporuje.</value>
+  </data>
+  <data name="SnapshotNoteHintCharger" xml:space="preserve">
+    <value>například: auto připojené, nabíjí 16 A</value>
+  </data>
+  <data name="SnapshotReadingCharger" xml:space="preserve">
+    <value>Čtu nabíječku…</value>
+  </data>
+  <data name="SnapshotFailedCharger" xml:space="preserve">
+    <value>Nabíječku se nepodařilo přečíst: {0}</value>
+  </data>
 </root>

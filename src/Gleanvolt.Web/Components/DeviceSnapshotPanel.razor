@@ -1,0 +1,75 @@
+@inject IDeviceSnapshot Snapshot
+@inject IJSRuntime JS
+
+@*
+    Settings -> inverter / charger -> "Save register snapshot" (issues #319, #350). One read of every register
+    the running driver uses, handed to the browser as a JSON file. It is how a tester sends a recording of a
+    family Gleanvolt does not drive yet, and how a driver's tests get their fixtures. Reads only, on the
+    device's own client: the charger serves one Modbus client at a time, so this is the only way to record it
+    without stopping the controller. The serial number leaves the house as its model prefix.
+*@
+
+<div class="pv-fields pv-snapshot" id="@($"{Prefix}-snapshot")">
+    <div class="pv-field">
+        <div class="field-head">
+            <label for="@($"{Prefix}-snapshot-note")">@SettingsText.SnapshotNote</label>
+            <InfoTip Topic="@SettingsText.SnapshotButton" Group="settings-info">
+                <p>@(Charger ? SettingsText.SnapshotHelpCharger : SettingsText.SnapshotHelp)</p>
+            </InfoTip>
+        </div>
+        <input id="@($"{Prefix}-snapshot-note")" type="text" autocomplete="off"
+               placeholder="@(Charger ? SettingsText.SnapshotNoteHintCharger : SettingsText.SnapshotNoteHint)"
+               disabled="@_busy" value="@_note" @oninput="e => _note = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <div class="pv-field snapshot-action">
+        <button type="button" class="secondary" id="@($"{Prefix}-snapshot-save")" disabled="@_busy" @onclick="SaveAsync">
+            @(_busy ? (Charger ? SettingsText.SnapshotReadingCharger : SettingsText.SnapshotReading) : SettingsText.SnapshotButton)
+        </button>
+    </div>
+</div>
+@if (_saved is { } saved)
+{
+    <p class="muted" id="@($"{Prefix}-snapshot-saved")">@Localized.Format(SettingsText.SnapshotSaved, saved)</p>
+}
+@if (_error is { } error)
+{
+    <p class="error" id="@($"{Prefix}-snapshot-error")">@Localized.Format(Charger ? SettingsText.SnapshotFailedCharger : SettingsText.SnapshotFailed, error)</p>
+}
+
+@code {
+    /// <summary>Which device to read: the inverter, or the controlled charger.</summary>
+    [Parameter] public PvDeviceRole Role { get; set; } = PvDeviceRole.Inverter;
+
+    private bool Charger => Role == PvDeviceRole.Charger;
+
+    // The element ids: inverter-snapshot-save, charger-snapshot-save.
+    private string Prefix => Charger ? "charger" : "inverter";
+
+    private string _note = string.Empty;
+    private bool _busy;
+    private string? _saved;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _saved = null;
+        _error = null;
+
+        try
+        {
+            var file = await Snapshot.TakeAsync(Role, _note);
+            await JS.InvokeVoidAsync("gleanvolt.downloadText", file.FileName, file.Json, "application/json");
+            _saved = file.FileName;
+        }
+        catch (Exception ex) when (ex is not JSDisconnectedException)
+        {
+            // The link's own words: a timeout, a refused connection, setup mode's "not configured".
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -336,9 +336,9 @@ public static class GleanvoltHostingExtensions
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 
-        // Settings -> "Save register snapshot" (#319). Resolved per click; in setup mode the inverter's
-        // client refuses every call, and the page says so.
-        services.AddSingleton<IInverterSnapshot, InverterSnapshot>();
+        // Settings -> "Save register snapshot" (#319, #350), under the inverter and under the charger, on
+        // each one's keyed client. In setup mode both clients refuse every call, and the page says so.
+        services.AddSingleton<IDeviceSnapshot, DeviceSnapshot>();
 
         // Solcast solar-forecast integration. The account is a secret and is not stored in
         // appsettings.json -- enter it on Settings (issue #286), which keeps it in the secret store, or
