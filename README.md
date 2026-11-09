@@ -81,6 +81,7 @@ Cloud-based SolaX monitoring/control (SolaX Cloud, third-party integrations) int
 | EV charger | SolaX X1/X3-HAC | [EV chargers](#ev-chargers) below |
 | Home battery | SolaX T-BAT H 2.5 modules + BMS (**10 kWh** nominal) | Whatever the inverter manages — no connection of its own |
 | Electric vehicle | VW ID.4 Pro | Any Type 2 AC car — see [Supported electric vehicles](docs/SUPPORTED_EVS.md) |
+| Host | Raspberry Pi, 4 GB, Raspberry Pi OS Lite 64-bit | Any 64-bit (x86-64 or arm64) Linux machine running Docker, a [home NAS](deploy/README.md#running-on-a-nas) included; Debian and Ubuntu natively ([.deb](#install-on-linux)); Windows. **Not 32-bit ARM (armv7).** |
 
 ### Inverters
 
@@ -552,6 +553,11 @@ headroom — prefer **B** on 1 GB. Nothing is lost by doing so: the controller's
 [own web UI](#self-hosted-web-ui-the-web-section) drives every control Home Assistant would, and
 shows telemetry, charging-session history and the forecast plan. Switching later is a matter of
 running the other script.
+
+**On a home NAS** (Synology, QNAP, Unraid, TrueNAS SCALE, OpenMediaVault), use
+[`deploy/docker-compose.nas.yml`](deploy/docker-compose.nas.yml) in the NAS's own container UI instead
+of the scripts; [Running on a NAS](deploy/README.md#running-on-a-nas) covers each of them. The NAS must
+be 64-bit: there is no 32-bit ARM (armv7) image.
 
 The Pi never builds anything: CI builds the image and pushes it to GHCR
 (`ghcr.io/mpospisil/gleanvolt`), and the Pi pulls it. That one name is a multi-platform
