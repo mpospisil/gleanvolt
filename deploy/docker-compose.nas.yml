@@ -1,0 +1,77 @@
+# Gleanvolt on a home NAS (issue #327): the controller and its web UI, nothing else -- workflow B of
+# deploy/README.md, in a form that a NAS's own container UI can take as it is. Synology Container
+# Manager ("Project"), QNAP Container Station ("Application"), Unraid's Compose Manager, TrueNAS SCALE
+# ("Install via YAML"), Portainer and plain `docker compose up -d` all accept this file unchanged.
+# deploy/README.md's "Running on a NAS" walks through each of them.
+#
+# Nothing below has to be edited to get a running setup wizard. Three things are worth a look first:
+#
+#   TZ            your time zone. A NAS container runs in UTC unless told otherwise, and a site on UTC
+#                 files every charging session against the wrong day.
+#   GLEANVOLT_DIR where the data lives. The default, ".", is the folder this file is in -- right for
+#                 Synology, which keeps a project in a folder you choose on a share, and for plain
+#                 `docker compose`. On QNAP, Unraid and TrueNAS set it to an absolute path on your
+#                 storage (/share/Container/gleanvolt, /mnt/user/appdata/gleanvolt,
+#                 /mnt/tank/apps/gleanvolt), because there "." is somewhere else.
+#   WEB_PORT      8090 unless something else on the NAS already has it.
+#
+# Each can be set in an .env file beside this one, in the NAS UI's environment-variable list, or by
+# editing the default after ":-" directly. Everything else in deploy/.env.example works here the same
+# way, as an extra line under `environment:`.
+#
+# The data directory holds the charging-session and energy databases, the settings saved in the web UI
+# and the car-account sessions and keys, which are bearer secrets (README's "The data directory holds
+# secrets"). Put it on a share that is backed up, and that only you can read.
+
+name: gleanvolt
+
+services:
+  # Runs once, as root, before the controller and exits. The controller runs as uid 1654, not root, and
+  # a directory Docker creates for a bind mount -- or one made in a NAS file manager -- belongs to root
+  # or to the NAS user, so the controller could not write to it. On the Pi the deploy scripts chown it
+  # over ssh; on a NAS there is no such step, so the stack does it itself. It touches only these two
+  # directories, and a restart or an image update runs it again harmlessly.
+  gleanvolt-init:
+    image: busybox:1.37
+    container_name: gleanvolt-init
+    user: "0:0"
+    command: ["chown", "-R", "1654:1654", "/data", "/logs"]
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/data:/data
+      - ${GLEANVOLT_DIR:-.}/logs:/logs
+    restart: "no"
+    network_mode: none
+
+  gleanvolt-controller:
+    image: ghcr.io/mpospisil/gleanvolt:${IMAGE_TAG:-latest}
+    container_name: gleanvolt-controller
+    # `on-failure`, not `unless-stopped` or `always` -- a NAS UI's usual default. The controller exits
+    # 0 when asked to stop from the web UI and must then stay stopped; a restart from Settings exits 75,
+    # a crash or a NAS reboot anything else, and all of those bring it back. docker-compose.yml explains
+    # the exit codes.
+    restart: on-failure
+    # The host's network, not a bridge. The setup wizard's device search scans the network it finds
+    # itself on, and in a bridge that is Docker's 172.x network rather than your LAN. The web UI then
+    # binds the NAS's own WEB_PORT; there is nothing to publish.
+    network_mode: host
+    # Long enough for a stop to release the charger before Docker kills the container.
+    stop_grace_period: 60s
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Web__Port: ${WEB_PORT:-8090}
+      # Optional: the setup wizard finds and asks for both. Setting them here only saves it the asking.
+      Pv__Inverter__Host: ${INVERTER_HOST:-}
+      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/data:/app/data
+      - ${GLEANVOLT_DIR:-.}/logs:/app/logs
+    # A ceiling, not a reservation: the controller uses about 75 MB.
+    mem_limit: ${CONTROLLER_MEM_LIMIT:-512m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

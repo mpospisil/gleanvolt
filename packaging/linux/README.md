@@ -35,8 +35,12 @@ sudo apt install ./gleanvolt_1.0.7_arm64.deb
 | Debian 12 / 13 | ✅ | ✅ |
 | Ubuntu 22.04 / 24.04 and later | ✅ | ✅ |
 | Distributions based on these (Mint, DietPi, Armbian, …) | ✅ | ✅ |
+| OpenMediaVault 7 and later (Debian 12+) | ✅ | ✅ |
+| OpenMediaVault 6 (Debian 11: no OpenSSL 3) | ❌ | ❌ |
 
 **32-bit Raspberry Pi OS is not supported**, and the installer says so rather than failing half way.
+Other NAS systems (Synology, QNAP, Unraid, TrueNAS SCALE) run the container image instead, see
+[Running on a NAS](../../deploy/README.md#running-on-a-nas).
 A Pi 3B or newer runs the 64-bit OS; reinstall it with Raspberry Pi Imager. Other distributions can
 run the self-contained `linux-x64` / `linux-arm64` zip from the same release.
 
