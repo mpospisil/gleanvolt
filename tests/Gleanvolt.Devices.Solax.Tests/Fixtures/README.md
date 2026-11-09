@@ -27,16 +27,13 @@ fails on a file that keeps more, because these are committed to a public reposit
 
 | File | State | Used for |
 |---|---|---|
-| `solax-charger-idle.json` | No car (**synthetic**) | Idle reads `Available` and about 0 W |
+| `solax-charger-idle.json` | No car, use-mode Stop, setpoint 16 A (**real**, 2026-11-09 13:51 UTC) | Idle reads `Available` and about 0 W |
 | `solax-charger-plugged-in.json` | A car plugged in and waiting, use-mode Stop (**synthetic**) | A plugged-in state with no power |
 | `solax-charger-charging.json` | Charging at 16 A on three phases, use-mode Fast (**synthetic**) | `Charging` and positive power; setpoint, start/stop and snapshot checks |
 | `solax-night-importing.json` | The SolaX inverter (above) | The probe refuses the inverter at the charger's address |
 
-**The three charger files are synthetic until real ones replace them.** Their input registers `0x0000`-`0x001D`
-are the reference installation's charger, read idle on 2026-11-09 11:30 UTC (the inputs of
-`solax-ev-charger.json`), with RunMode (`0x001D`) set to the state the file names and, for the charging one,
-the total power (`0x000B`) to 11040 W. The holding registers -- the serial number's prefix (`5031`, an
-X3-HAC), the use-mode (`0x060D`) and the setpoint (`0x0628`, 1600 = 16 A) -- are made up, because that read
-used the inverter's ranges and the charger refused them. A real one is a **Settings -> charger -> Save register
-snapshot** in the state the file name describes; it reads on the controller's own connection, so the controller
-keeps running.
+The idle file is a **Settings -> charger -> Save register snapshot** of the reference installation, taken with
+the controller running. **The other two are synthetic until real ones replace them:** they are the idle
+snapshot with RunMode (`0x001D`) set to the state the file names and, for the charging one, the total power
+(`0x000B`) set to 11040 W and the use-mode (`0x060D`) to Fast. A real one is the same button, in the state the
+file name describes.

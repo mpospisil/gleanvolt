@@ -5,9 +5,9 @@ namespace Gleanvolt.Devices.Solax.Tests;
 /// <summary>
 /// The SolaX X3-HAC charger driver against the conformance tests every charger driver is held to (issue #350).
 ///
-/// <para>The three charger fixtures are synthetic until Settings → charger → "Save register snapshot" replaces
-/// them: their input registers are the reference installation's charger read idle, with the state changed,
-/// and their holding registers are made up (see <c>Fixtures/README.md</c>). The other family is the SolaX
+/// <para>The idle fixture is a real Settings → charger → "Save register snapshot" of the reference
+/// installation. The plugged-in and charging ones are synthetic until real snapshots replace them: the idle
+/// one with the state changed (see <c>Fixtures/README.md</c>). The other family is the SolaX
 /// inverter, real: the two answer Modbus on the same port, and a swapped pair of addresses once cost a day.</para>
 /// </summary>
 public class SolaxChargerConformanceTests : EvChargerDriverConformanceTests<SolaxChargerDriverFactory>
