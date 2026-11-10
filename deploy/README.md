@@ -16,14 +16,8 @@ container on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Tr
   charger  <EV_CHARGER_HOST>:502
 ```
 
-The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to GHCR; the Pi pulls it.
-
 > **On a NAS instead?** Synology, QNAP, Unraid, TrueNAS SCALE and OpenMediaVault have a section of
 > their own: [Running on a NAS](#running-on-a-nas). It uses its own compose file and none of the scripts.
-
-> **Not the dev stack.** `dev/homeassistant/` is a separate, anonymous-broker environment for
-> developing against `dotnet run`. Don't point one at the other; running both at once against the
-> same inverter is confusing at best.
 
 ## What you deploy
 
@@ -60,65 +54,25 @@ are small.
 
 ## Recording the weather with each session (optional)
 
-The controller can record **what the sky was doing** at each end of every charging session — the
-conditions, the temperature and the cloud cover when it opened and when it closed, plus that day's
-sunrise and sunset. It is what lets a finished session be read against the day it happened on rather
-than only against the forecast; see
-[the weather a session ran in](../docs/DATA.md#the-weather-a-session-ran-in).
-
-One line in `/opt/gleanvolt/.env`, plus the site's coordinates if they are not already there:
+The controller can record **what the sky was doing** at each end of every charging session; see
+[the weather a session ran in](../docs/DATA.md#the-weather-a-session-ran-in). Add the
+OpenWeatherMap key and the site's coordinates to `/opt/gleanvolt/.env`:
 
 ```bash
 WEATHER_API_KEY=<your openweathermap key>
-
-# Where the array is. Not a weather setting -- see "Describing your PV system" below.
 PV_LATITUDE=49.267803          # your site, in decimal degrees
 PV_LONGITUDE=16.529486
 ```
 
-Or leave `.env` alone and paste the key on **Settings → Installation → Weather** (or the setup
-wizard's Extras step). A key saved there is kept in the secret store, wins over `WEATHER_API_KEY`, and
-is used from the next session without a restart; the save checks it with one call. A new
-OpenWeatherMap key can take a couple of hours to start working, so a refusal right after creating it
-is expected.
-
-The key is free: this makes **two API calls per charging session**, a handful a day, which no
-OpenWeatherMap plan charges for. Leave the key out, or the coordinates unset, and the controller makes
-no weather call at all — sessions are simply recorded without it, which is also what every session
-recorded before this existed looks like.
-
-Nothing about charge control reads any of it, so turning it on cannot change what the controller
-does to your car or your battery. A refused key or an outage costs one null column and a warning in
-the log, never a delayed or missing session.
+Or paste the key on **Settings → Installation → Weather**. Without a key or coordinates, no weather
+call is made. See [Weather](../docs/CONFIGURATION.md#weather-the-weather-section-optional).
 
 ## Setting the web UI password
 
-Forgot it? Reset it from the Pi, which prints a new recovery key, then restart the controller:
-
-```bash
-cd /opt/gleanvolt
-docker compose run --rm --no-deps gleanvolt-controller set-password
-docker compose restart gleanvolt-controller
-```
-
-The whole setup can be done the same way, from a file in `data/` or by answering prompts; see the main
-README, *Setting up from the command line*.
-
-**A fresh installation serves one page: the one that asks you to set a password.** The dashboard, the
-history and every control — the charge mode, the battery hold — stay unreachable until you have. Open
+**A fresh installation serves one page: the one that asks you to set a password.** Open
 `http://192.168.2.7:8090`, choose a password, and the UI behaves normally from then on.
 
-That is the default because anyone who can reach `:8090` would otherwise get every one of those
-controls, and a warning in a log file protects nobody. You can still set `WEB_PASSWORD_HASH` ahead of
-time, in which case no setup page ever appears.
-
-If you would rather have the old open behaviour on an isolated network, set
-`WEB_REQUIRE_AUTHENTICATION=false`. It is a deliberate choice, and the controller logs a warning
-about it on every start.
-
-Adding one is a single `.env` line. Generate the hash — this runs the image with no configuration and
-no listening socket; it prints the hash and exits — then put the **hash**, never the password, in
-`.env`:
+To set it ahead of time instead, put its **hash** — never the password — in `.env`:
 
 ```bash
 docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password>'
@@ -128,15 +82,16 @@ docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password
 WEB_PASSWORD_HASH=AQAAAAIAAYagAAAAE...
 ```
 
-Redeploy (or `docker compose up -d` on the Pi) and every page redirects to a login form. There is no
-second switch: the presence of a hash is what turns the login on, so a configured password can't end
-up unenforced. One shared password gates the whole UI — there are no per-user accounts.
+**Forgot it?** Reset it from the Pi, which prints a new recovery key, then restart the controller:
 
-To take it off again, remove the line and redeploy. `WEB_REQUIRE_AUTHENTICATION` exists to override
-the inference in either direction and is rarely worth setting; the root README's
-[Authentication](../docs/WEB_UI.md#authentication) section has the full table, including the one
-combination that refuses to start (`WEB_REQUIRE_AUTHENTICATION=true` with no hash — nobody could sign
-in).
+```bash
+cd /opt/gleanvolt
+docker compose run --rm --no-deps gleanvolt-controller set-password
+docker compose restart gleanvolt-controller
+```
+
+On an isolated network you can switch the login off with `WEB_REQUIRE_AUTHENTICATION=false`; a
+warning is logged on every start. See [Authentication](../docs/WEB_UI.md#authentication).
 
 ## Describing your PV system
 
@@ -144,7 +99,7 @@ The installation is described in one place: what to call it, where it is, what t
 which boxes it is made of. All of it optional, all of it in `/opt/gleanvolt/.env`:
 
 ```bash
-PV_ID=home-roof                       # a slug; becomes this system's name on the broker, in a later phase
+PV_ID=home-roof                       # a slug: this system's id, and its MQTT topic segment
 PV_NAME=Home Roof                     # what a human sees, in the web UI
 PV_ADDRESS=Street 1, Town, Country    # display only, never parsed
 PV_LATITUDE=49.267803                 # with PV_LONGITUDE: the site the weather is fetched for
@@ -163,19 +118,9 @@ PV_CHARGER_MODEL=SolaX X1/X3-HAC
 The device **addresses** keep the names they always had — `INVERTER_HOST` and `EV_CHARGER_HOST` — and
 belong to this same description; nothing about them changes.
 
-All of it is shown, read-only, at **`/pv-system`** in the web UI. Anything left unset reads as unset
-there rather than as zero: 0,0 is a real place in the Atlantic, and it is better for the page to say
-nothing than to say something wrong.
-
-The same page carries an **MQTT** section: the broker each of the two links dials, the username and
-client id it connects with, the topic prefix everything is published under — `gleanvolt/$PV_ID`, which
-no single setting spells out — and the topics themselves. The broker password appears there too, but
-only once `WEB_PASSWORD_HASH` is set: with authentication switched off the UI is open on the LAN, and
-that password is the account that can publish to the `.../set` topics.
-
-A value that cannot be used **stops the controller at startup**, with every problem named at once — a
-latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
-one is supported). That is deliberate: a site that is quietly wrong forecasts plausibly.
+All of it is shown, and editable, on **Settings → Installation** in the web UI. A value that cannot be
+used **stops the controller at startup**, with every problem named at once. See
+[The PV system](../docs/CONFIGURATION.md#the-pv-system-the-pv-section).
 
 ## Upgrading from an older release
 
@@ -201,8 +146,7 @@ in `.env` or in Home Assistant:
 
 The controller can also expose an [HTTP API](../docs/HTTP_API.md) — the same
 telemetry, history and actions the UI has, described by OpenAPI, for a script or an MCP server rather
-than a person. It is **off** by default, and unlike the UI it is never open: two of its endpoints
-write to hardware.
+than a person. It is **off** by default.
 
 Two `.env` lines turn it on. Generate a key, name it after whatever will be calling:
 
@@ -225,27 +169,15 @@ document at `/api/v1/openapi.json`:
 curl -H "Authorization: Bearer $API_KEY" http://<pi>:8090/api/v1/status
 ```
 
-Enabled with no key set refuses to start, and says so in the log — the one combination worth failing
-loudly over, because the alternative is a charger any program on the LAN can drive. To take it off
-again, set `API_ENABLED=false` (or delete both lines) and redeploy; no route is mapped at all after
-that, so the path 404s rather than asking for a key.
-
-The name on the key matters operationally: `docker-compose.yml` passes `API_KEY` as
-`Api__Keys__client`, and *"API (client) started Targeted"* is what the log and the recorded charging
-session will say. Rename it, or add more `Api__Keys__<name>` lines, if more than one thing calls it.
-
-`/pv-system` in the web UI carries all of it: whether the API is on, the base URL **with the port**,
-links to the index and the document (both answer without a key, so opening either is the quickest proof
-it is up), the key names, and a `curl` line with this installation's own address already in it. The key
-itself appears there only once `WEB_PASSWORD_HASH` is set — with authentication switched off the UI
-admits anyone on the LAN, and a key is bearer-equivalent to the stop button on the wallbox — so with a
-password configured the key can be read back in the browser rather than only out of `.env`.
+Enabled with no key set refuses to start. `docker-compose.yml` passes `API_KEY` as
+`Api__Keys__client`, so the log and the charging sessions name the caller *client*; add more
+`Api__Keys__<name>` lines if more than one thing calls it. **Settings → Installation** shows the API's
+address and key names, with a ready `curl` line.
 
 ## Prepare the Pi (once)
 
-**1. Passwordless SSH.** Either deploy script opens close to a dozen separate SSH connections — with
-password authentication you would be prompted for every one of them, and a deploy stops being a
-single command. From your **developer machine**:
+**1. Passwordless SSH.** The deploy script opens about a dozen SSH connections, so set up a key. From
+your own computer:
 
 ```bash
 ssh-keygen -t ed25519 -C solax-deploy    # only if you don't already have a key
@@ -273,25 +205,9 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**3. Enable cgroup memory accounting.** Required on every board. This edits `cmdline.txt` on the
-partition the board boots from.
-
-Without it the `mem_limit` settings in `docker-compose.yml` are silently ignored: `docker run
---memory=…` answers `WARNING: Your kernel does not support memory limit capabilities … Limitation
-discarded`, `docker inspect` records `Memory=0`, and `docker stats` reports `0B / 0B` for every
-container forever. You lose per-container memory figures exactly when you need them, and a leak escalates to the kernel OOM killer picking a victim
-by its own heuristic instead of the guilty container hitting its own ceiling.
-
-**The parameters are not merely absent — the firmware actively disables the controller.** A fresh
-`cmdline.txt` says nothing about cgroups, yet `/proc/cmdline` contains `cgroup_disable=memory`,
-because the Raspberry Pi firmware prepends it. What you add to `cmdline.txt` lands *after* the
-firmware's copy on the kernel command line, and the later parameter wins — which is why appending is
-enough and there is nothing to delete.
-
-`cmdline.txt` is **one single line**, and the parameters go at the end of it. The bootloader reads
-only the first line, so appending them as a second line — the obvious thing to do in an editor —
-leaves them completely inert while the file *looks* correct. This flattens the file to one line and
-appends the parameters only if they are missing, so it repairs that case as well as a fresh one:
+**3. Enable cgroup memory accounting.** Without it Docker ignores the container's memory limit. The
+parameters go at the end of the **single line** in `/boot/firmware/cmdline.txt` (`/boot/cmdline.txt`
+on Bullseye and older); a second line is ignored. This appends them if they are missing:
 
 ```bash
 sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
@@ -310,59 +226,24 @@ cat  /boot/firmware/cmdline.txt       # check it before rebooting
 sudo reboot
 ```
 
-Check the file before rebooting: a mangled `cmdline.txt` means a Pi that doesn't boot, and fixing it
-means putting the boot medium — whichever one holds `/boot/firmware` — into another machine.
-`cmdline.txt.bak` is the way back.
-
-A fresh Raspberry Pi OS image may also leave `cmdline.txt` with **no trailing newline**, so `wc -l`
-prints `0` rather than `1` before you start. That is not the second-line fault this step guards
-against, and the snippet above fixes it in passing: `printf "%s\n"` writes the newline back.
-
-> Do **not** guard this with `grep -q cgroup_enable=memory cmdline.txt`. That matches the parameters
-> sitting uselessly on line 2, so the guard concludes there is nothing to do in exactly the case that
-> needs fixing.
-
-On Bullseye and older the file is `/boot/cmdline.txt` instead — `/boot/firmware/` is Bookworm's
-layout.
-
-After the reboot, check what the kernel actually booted with, which is the authoritative answer
-(`cmdline.txt` only says what *should* have been passed):
+Check the file before rebooting: a broken `cmdline.txt` means a Pi that doesn't boot, and
+`cmdline.txt.bak` is the way back. After the reboot:
 
 ```bash
 cat /proc/cmdline | tr ' ' '\n' | grep cgroup   # expect cgroup_enable=memory and cgroup_memory=1
-docker info 2>&1 | grep -i "memory limit"       # note 2>&1: these warnings go to stderr
+docker info 2>&1 | grep -i "memory limit"       # no "No memory limit support" warning
 ```
 
-The `2>&1` matters. Docker prints those warnings to stderr, so a plain `docker info | grep ...` lets
-them bypass the pipe and reach your terminal anyway — they look like grep output but aren't, and the
-command appears to "fail" even after the fix has worked.
-
-> **`WARNING: No swap limit support` is expected — ignore it.** Swap accounting is a separate
-> facility, it costs memory to enable, and nothing in this stack asks for it: the compose file sets
-> `mem_limit` and never `memswap_limit`. Only `WARNING: No memory limit support` matters, and it
-> should be gone once `/proc/cmdline` shows the two parameters above.
-
-You will see `cgroup_disable=memory` in `/proc/cmdline` and it is **not** a mistake — the Pi firmware
-injects it, and it appears in no file on the boot partition, so there is nothing to delete. The
-firmware's parameters come first and `cmdline.txt`'s follow, so the `cgroup_enable=memory` you added
-is processed later and wins. Both being present is the normal, working state.
-
-If `/proc/cmdline` still lacks `cgroup_enable=memory` after a reboot, the edit landed somewhere the
-boot process doesn't read. Check that `wc -l /boot/firmware/cmdline.txt` reports `1`, and that
-`ls /boot/firmware/cmdline.txt /boot/cmdline.txt` confirms which file this OS actually boots from —
-on Bookworm and later, `/boot/cmdline.txt` is a stub whose only content is "DO NOT EDIT THIS FILE".
+`cgroup_disable=memory` also appears in `/proc/cmdline`; the firmware adds it, and the parameter you
+added comes later and wins. `WARNING: No swap limit support` is expected; ignore it.
 
 **4. Check swap — on Trixie there is nothing to add.** Raspberry Pi OS Trixie (Debian 13) sets up
-swap itself, as **zram** — compressed swap in RAM — with writeback to `/var/swap` on disk. It no longer
-ships `dphys-swapfile`, so older instructions that use it fail with `command not found`. Check it is
+swap itself, as **zram** — compressed swap in RAM — with writeback to `/var/swap` on disk. Check it is
 there:
 
 ```bash
 cat /proc/swaps      # expect /dev/zram0
 ```
-
-`/var/swap` existing is not a leftover: it is zram's backing store, which is why only `/dev/zram0` is
-listed.
 
 **5. Directories.** The container holds no state; everything lives here:
 
@@ -372,15 +253,7 @@ sudo chown -R "$USER" /opt/gleanvolt
 sudo chown -R 1654:1654 /opt/gleanvolt/logs /opt/gleanvolt/data   # the controller image's non-root uid
 ```
 
-`data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
-the database, so that **directory** — not just the file — has to be writable by uid 1654.
-
-`logs/` and `data/` are the two the *application* writes to, and the deploy script creates them
-itself (and hands them to uid 1654) if they are missing or wrongly owned — which is what makes a
-release that adds one, as `data/` did, deploy onto an existing Pi without manual work. They do that
-through a throwaway `alpine` container, because the SSH user cannot chown to another uid but the
-Docker daemon can; the image is pulled once, on the first deploy that needs it. Listing them above is
-still worth doing on a fresh Pi, so the whole tree exists before anything runs.
+The deploy script also creates both and fixes their ownership if needed.
 
 **6. Secrets.** From your developer machine:
 
@@ -389,13 +262,7 @@ scp deploy/.env.example martin@192.168.2.7:/opt/gleanvolt/.env
 ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env && nano /opt/gleanvolt/.env'
 ```
 
-**7. GHCR access.** Only needed if the package is private — a public package needs no login:
-
-```bash
-echo '<github-pat-with-read:packages>' | docker login ghcr.io -u mpospisil --password-stdin
-```
-
-**8. Check the devices are reachable** from the Pi, before blaming the container:
+**7. Check the devices are reachable** from the Pi, before blaming the container:
 
 ```bash
 nc -vz <inverter address> 502 && nc -vz <charger address> 502
@@ -440,14 +307,12 @@ to run rather than guess. It never copies `.env`.
 **The web UI** is at `http://192.168.2.7:8090`. The first time you open it, it asks you to set a
 password; nothing else is served until you do (see
 [Setting the web UI password](#setting-the-web-ui-password)). The dashboard, the
-controls, session history and the forecast plan are all there; see the root README's
-[Self-hosted web UI](../docs/WEB_UI.md) section for what each page
-does.
+controls, session history and the forecast are all there; see [Web UI](../docs/WEB_UI.md).
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
 only once a charging button is pressed — Home Assistant or the web UI, whichever is enabled — and
-`BatteryHold` is disabled and dry-run. Change either in `.env` only after verifying the register
-addresses on your own device, per the root README's warnings.
+`BatteryHold` is disabled and dry-run. Check the readings on the Overview against your devices' own
+displays before you charge or enable the hold.
 
 ## Updating a running deployment
 
@@ -472,11 +337,6 @@ build.
 5. `docker compose up -d --remove-orphans` — recreates only what actually changed.
 6. Prints the container status and the URLs.
 
-Step 5 is why an update is usually near-instant and mostly invisible: Compose compares each
-container against the image and configuration it should have, and leaves alone the ones that already
-match. A run that changes nothing prints `Container gleanvolt-controller Running` and touches nothing. A
-run with a new image prints `Recreate` for that one container and leaves the others up.
-
 ### What survives an update
 
 Everything that is state, because none of it lives inside a container:
@@ -494,45 +354,25 @@ Everything that is state, because none of it lives inside a container:
 reason. What *is* overwritten every deploy is the compose files — so edit those
 in the repo, not on the Pi, or your change disappears at the next update.
 
-**`data/` is secret-bearing** ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)). Two
-of the files in it are passwords in all but name: a live volkswagen.de session, and the MyŠkoda API
-key that starts and stops charging. The controller writes both mode `0600` and says so at startup and
-on `/health` — `owner-only files (0600) in the data directory` — and that is a file permission, not
-encryption. It cannot be: the service has to come back from a reboot with nobody present.
-
-So a `docker cp gleanvolt:/app/data .`, an `rsync` of `/opt/gleanvolt` to a laptop, or a tarball
-attached to an issue all hand over the car. Copy `data/` the way you would copy `.env`: onto an
-encrypted volume, and nowhere public. Against a stolen SD card what actually helps is full-disk
-encryption on the Pi, which is outside this stack. **Sign out** on the web UI's Car page
-deletes the stored value rather than leaving a tombstone holding it.
+**`data/` holds secrets**: the car's sign-in and the keys entered in the web UI, protected by file
+permissions, not encryption. Copy it the way you would copy `.env`: onto an encrypted volume, and
+nowhere public. See [The data directory holds secrets](../docs/CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section).
 
 ### The controller restarts, so charge control returns to Off
 
-An update recreates the container, and the worker always boots in charge mode **Off** with the
-battery hold disabled — by design, so that a deployment never inherits control it wasn't given. If a
-mode was active when you updated, **it is not active afterwards**; the charger is left exactly as it
-was and waits for you to start charging again in Home Assistant or the web UI. Nothing writes the
-charger's use-mode either, so a charger left in Fast stays in Fast — at whatever setpoint the last
-cycle put there.
-
-Nothing is written to your hardware during the update itself, and a charging session in progress is
-not lost: on a clean stop the recorder closes it with reason `ServiceStopped` and persists it, so it
-appears in the history as a completed session. Charging after the restart is recorded as a *new*
-session, so updating mid-session splits it in two. If the container is killed rather than stopped
-cleanly, the next startup recovers the session as interrupted instead.
+An update restarts the controller, which always starts in charge mode **Off** with the battery hold
+off. **A mode active before the update is not active after it**: start charging again. The charger is
+left as it was. A session in progress is closed as `ServiceStopped`, and charging after the restart is
+a new session.
 
 ### Check what you are actually running
-
-Before and after, from your machine:
 
 ```bash
 ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose logs gleanvolt-controller | grep "starting\."'
 ```
 
-The worker logs its version and the commit it was built from — `Gleanvolt 1.0.0
-(31bf347) starting.` — so you can confirm the new build is live rather than trusting that the pull
-did something. Home Assistant shows the same string as the device's software version. A version
-ending in `-dev` with no commit means somebody deployed a local build.
+The controller logs its version and commit at startup (`Gleanvolt 1.1.0 (31bf347) starting.`); **Settings
+→ Health** and Home Assistant's device page show the same.
 
 ### Pinning a version, and rolling back
 
@@ -548,20 +388,14 @@ A rollback is just an update pointed at an older tag; `sha-` tags are immutable,
 reliable thing to roll back *to*. Setting `IMAGE_TAG` in `/opt/gleanvolt/.env` pins it for every future
 deploy that doesn't override it on the command line.
 
-**The image tag has no `v`, though the git tag does.** Releases are cut as git tag `v1.0.0`, and the
-publish workflow strips the prefix, so the image is `…/gleanvolt-controller:1.0.0`. `IMAGE_TAG=v1.0.0`
-does not exist and the pull fails with `manifest unknown`.
+**The image tag has no `v`**, though the git tag does: `IMAGE_TAG=1.0.0`. `IMAGE_TAG=v1.0.0` fails with
+`manifest unknown`.
 
-**Deploy from a checked-out tag, not your working branch.** Either script copies the *local*
-`deploy/` tree to the Pi, so otherwise the compose file and the image come from two different points
-in history:
+**Deploy from a checked-out tag**, since the script copies your *local* `deploy/` files to the Pi:
 
 ```bash
 git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy-controller-only.sh
 ```
-
-Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, `1.0.0` is the
-**image** tag you pull.
 
 ### Changing settings rather than code
 
@@ -601,15 +435,12 @@ the open charging session is closed and written as `ServiceStopped` rather than 
 as interrupted, the session store is flushed, and the Modbus and MQTT connections are closed (Home
 Assistant sees the device go unavailable).
 
-**Killing the process instead — `docker kill`, `docker rm -f`, `kill -9`, pulling the plug — skips
-all of it.** Little is lost from the database (SQLite is crash-safe here and the log file is written
-unbuffered), but the first item is the one that matters: **nothing revokes the charging current**, so
-the car keeps drawing at whatever we last wrote until something else changes it.
+**Killing the process instead — `docker kill`, `docker rm -f`, pulling the plug — skips all of it**,
+and nothing pauses the charger: the car keeps drawing at the last current written.
 
 ### Starting it again
 
-A stop from the UI or from Home Assistant is a *stop*, not a restart. Nothing brings the controller
-back on its own — that is the point of it — so starting it again means a shell on the Pi:
+A stop from the UI or Home Assistant stays stopped. Starting it again needs a shell on the Pi:
 
 ```bash
 ssh martin@192.168.2.7
@@ -629,55 +460,30 @@ the battery hold disabled, like any other restart.
 > `systemctl status gleanvolt` and `journalctl -u gleanvolt -f`. A stop from the UI stays stopped
 > across an upgrade of the package too. See [packaging/linux/README.md](../packaging/linux/README.md).
 
-> **Note.** While the controller is stopped there is no web UI and no Home Assistant integration —
-> the service *is* both of those. There is currently no way to start it back from either surface; a
-> future version may replace the stop with a standby mode that keeps the UI up so a **Start** button
-> has somewhere to live.
-
 ### Restarting it from the web UI
 
-**Health** → **Restart** (or **Apply them** in the *Saved, not applied* banner on **PV system**) runs
-the same graceful shutdown as Stop and exits with code `75`, which `restart: on-failure` — and the
-.deb's `Restart=on-failure` — treats as a failure to recover from. The container is back in a few
-seconds, reads its configuration afresh, and starts in mode **Off**; the page reloads by itself. It
-spends one Solcast call at startup, like any restart.
-
-Where nothing supervises the process — `dotnet run`, the VS Code debugger, the Windows zip — it does
-not exit at all: once the host has stopped, the same process builds a fresh one, which reads the
-configuration afresh just the same, and the debugger stays attached. The one case that stays down is
-a `docker run` without a restart policy: there is no way to detect a restart policy from inside the
-container, so the confirmation says this rather than checking.
+**Settings → Health → Restart** (or **Restart** in the *Saved, not applied* banner) stops the controller
+gracefully and Docker starts it again within seconds, reading its configuration afresh, in mode
+**Off**. The page reloads by itself. Each restart spends one Solcast call. A `docker run` without a
+restart policy stays down.
 
 ### Settings saved from the web UI
 
-Values edited on **PV system** and on **Car** are kept in `data/pv-system.json` —
-`/opt/gleanvolt/data/pv-system.json` on the Pi, on the same bind mount as the session database, so
-they survive image upgrades and `docker compose down`. One file for both pages: it is a JSON document
-keyed by configuration path, and nothing in it is `Pv`-specific but the setting's name. The file
-**overrides `.env` key by key**, and only for the keys it contains. If an `.env` edit seems to be
-ignored, the startup log names the file and every key it overrode:
+What is saved on **Settings** and **Car** is kept in `/opt/gleanvolt/data/pv-system.json`, which
+**overrides `.env` key by key**. If an `.env` edit seems to be ignored, the startup log names the keys
+the file overrode:
 
 ```
 PV system: …; overridden by /app/data/pv-system.json (saved from the web UI): Pv:Inverter:Host.
 ```
 
-Use **Revert** on the page to take a key out, or delete the file to go back to `.env` entirely. Its
-location is `Pv__OverridesPath`; the .deb sets it to `/var/lib/gleanvolt/pv-system.json`.
-
-**No password is in it.** A manufacturer account's password typed on **Car** goes to the secret store
-under `Secrets__Directory` instead — `data/vehicle-account-password.json`, written owner-only beside
-the volkswagen.de session and the MyŠkoda key, for the reason all three are kept together: hold any one
-of them and you are the owner at the other end. It wins over a `VW_PASSWORD` in `.env` the way the
-overrides file wins over everything else there, and **Remove** on the page is what clears it.
+Use **Revert** on the page to take a key out. Passwords typed in the web UI go to the
+[secret store](../docs/CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section) instead.
 
 ### How long a stop takes
 
-Usually a second or two. It can be much longer, and the reason is always the same: a Modbus read
-already in flight when the stop arrives cannot notice it until it times out, and a device that has
-gone quiet costs 5 seconds per unanswered exchange. A stop measured on a live system with nothing
-charging took **19 seconds**, entirely because the EV charger went silent for one poll.
-
-Two things keep that from turning into a killed process:
+Usually a second or two; longer when a device has stopped answering. Two things keep it from becoming
+a killed process:
 
 - `stop_grace_period: 60s` in `docker-compose.yml` — how long Docker waits before SIGKILL.
 - A 10-second deadline on the charger-release itself. If the charger isn't answering, the service
@@ -707,9 +513,8 @@ where a restart policy is watching, it will be started again and read its
 configuration afresh; where none is, start it again by hand.
 ```
 
-**A log that ends without one of those lines is a run that died** — killed, OOM-ed, or the power went.
-That is worth knowing on this Pi in particular: the journal is RAM-only, so after a reboot the
-controller's own log file in `/opt/gleanvolt/logs` is the only surviving account of what happened.
+**A log that ends without one of those lines is a run that died** — killed, out of memory, or a power
+cut.
 
 ```bash
 # how the last few runs ended
@@ -729,10 +534,9 @@ code deliberately so that policy can tell the two cases apart:
 | SIGTERM: Pi reboot, Docker daemon restart, `docker compose restart` | `143` | starts it again |
 | Crash, OOM kill, power cut | non-zero | starts it again |
 
-So the Pi coming back from a power cut, a reboot or a Docker upgrade brings the controller back with
-it, exactly as before — only a stop somebody actually asked for is respected as one. If you ever need
-the old "always come back, no matter what" behaviour, set `restart: unless-stopped` again, and accept
-that the Stop button then means "restart in about a second".
+So a power cut, a reboot or a Docker upgrade brings the controller back; only a stop somebody asked
+for keeps it down. Don't change it to `restart: unless-stopped` or `always`: **Stop service** would
+then restart it at once.
 
 ## Everyday operations
 
@@ -745,17 +549,11 @@ docker compose logs -f gleanvolt-controller    # follow the poll loop
 docker compose restart gleanvolt-controller    # comes back by itself; see "Stopping and starting"
 docker compose stop gleanvolt-controller       # stays down until you start it
 docker compose start gleanvolt-controller
-docker stats --no-stream                   # memory headroom -- the number that matters here
+docker stats --no-stream                   # memory use
 
 # which build is actually running -- version and the commit it came from
 docker compose logs gleanvolt-controller | grep "starting\."
 ```
-
-That last line is worth knowing before debugging anything. The worker logs its own version and
-commit at startup (`Gleanvolt 1.0.0 (31bf347) starting.`), so a log file is traceable to
-a build without matching it against image digests. Home Assistant shows the same string as the
-device's software version. A version ending in `-dev` with no commit means somebody deployed a
-local build.
 
 See [Updating a running deployment](#updating-a-running-deployment) for upgrades, rollbacks and
 pinning.
@@ -919,20 +717,10 @@ platform-specific to configure, and `IMAGE_TAG` never needs a suffix.
 | `1.0.0-linux-amd64` | that release, x64 Linux only |
 | `1.0.0-nanoserver-ltsc2022` | that release, Windows Nano Server only |
 
-The suffixed tags exist for pinning and for answering "which one did it actually pull"; day to day
-you want the bare name. `docker buildx imagetools inspect ghcr.io/mpospisil/gleanvolt:latest`
-lists every platform behind a tag.
+Day to day you want the bare name.
 
-**If `latest` looks stale, check the publish workflow.** The bare tags are only created once *all*
-platforms of that build exist, so one failed platform holds back the whole release — deliberately,
-since a `latest` that silently lost a platform is worse. The Windows job is the fragile one, because
-GitHub's Windows runners intermittently start without a Docker daemon
-([actions/runner-images#13729](https://github.com/actions/runner-images/issues/13729)). The
-single-platform tags are pushed regardless, so the Pi is never actually blocked:
-
-```bash
-IMAGE_TAG=sha-abc1234-linux-arm64 ./deploy/deploy-controller-only.sh
-```
+If a new release's bare tag isn't there yet, its single-platform tag usually is:
+`IMAGE_TAG=1.1.0-linux-arm64`.
 
 ### Running on Windows
 
@@ -947,18 +735,16 @@ docker run -e Controller__TimeZone="Central Europe Standard Time" `
   ghcr.io/mpospisil/gleanvolt:latest
 ```
 
-The worker logs a warning at startup if it finds itself on Windows with the zone unset. On Linux the
-setting stays empty and `TZ` keeps working exactly as before.
+The controller logs a warning at startup if it runs on Windows with the zone unset.
 
 ## Where the logs go
 
-**Every log lands on the Pi's drive; nothing is written inside a container.** Verified with
-`docker diff`, which stays empty during normal operation.
+**Every log lands on the Pi's drive**; nothing is written inside the container.
 
 | Who | Written to | Retention |
 |---|---|---|
-| Controller (Serilog file sink) | `/opt/gleanvolt/logs/solax-<date>.log` — bind mount over `/app/logs` | 14 daily files (`retainedFileCountLimit`) |
-| Controller (stdout) | Docker's `json-file` logs, `/var/lib/docker/containers/...` on the Pi | capped at 3 × 10 MB |
+| Controller's log files | `/opt/gleanvolt/logs/solax-<date>.log` | 14 daily files |
+| Controller's console | `docker compose logs gleanvolt-controller` | capped at 3 × 10 MB |
 
 Check it after a deploy — a file should appear within one poll cycle:
 
@@ -966,21 +752,9 @@ Check it after a deploy — a file should appear within one poll cycle:
 ls -l /opt/gleanvolt/logs/
 ```
 
-> **The one way this breaks is silent.** If `/opt/gleanvolt/logs` isn't writable by uid 1654 (the
-> image's non-root user — most easily caused by letting Docker auto-create the directory as root),
-> Serilog's file sink fails and *keeps running*: the container is healthy, `docker logs` looks
-> normal, and the log files simply never appear. Two things guard against it: both deploy scripts
-> create it (and fix its ownership) before deploying, and the worker enables Serilog's `SelfLog` so the
-> failure shows up in `docker logs` as `RollingFileSink: the target file could not be opened or
-> created`. If you see that line, fix the ownership:
->
-> ```bash
-> sudo chown -R 1654:1654 /opt/gleanvolt/logs
-> ```
->
-> `/opt/gleanvolt/data` has the same requirement and the same guard from either script. It fails less quietly —
-> the session worker logs an error and then records nothing for the rest of the run — but the result
-> is the same: a stack that looks healthy while quietly keeping no history.
+> **No log files?** `/opt/gleanvolt/logs` isn't writable by uid 1654, the image's user, and
+> `docker compose logs` shows `RollingFileSink: the target file could not be opened or created`.
+> Re-run the deploy script, or fix it by hand: `sudo chown -R 1654:1654 /opt/gleanvolt/logs`.
 
 ## Where the data lives
 
@@ -993,19 +767,14 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | `/opt/gleanvolt/logs` | `/app/logs` | controller log files | no |
 | `/opt/gleanvolt/docker-compose.yml` | — | redeployed from git | no |
 
-**Back up** `data/` above all: it holds `sessions.db` and `energy.db`, neither of which **can be
-regenerated** — telemetry can be re-polled, but a session that
-already happened cannot be re-lived and a quarter hour of last March cannot be measured again. Stop
-the controller first so SQLite isn't mid-write:
+**Back up** `data/` above all: `sessions.db` and `energy.db` **cannot be regenerated**. Stop the
+controller first so the databases aren't mid-write:
 
 ```bash
 cd /opt/gleanvolt && docker compose stop gleanvolt-controller
 sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/gleanvolt .env data
 docker compose start gleanvolt-controller
 ```
-
-Backing it up hot mostly works — WAL journalling makes a torn copy unlikely rather than impossible —
-but a stopped writer makes it certain, and the gap costs one poll cycle.
 
 **Restore** onto a prepared Pi:
 
@@ -1016,18 +785,15 @@ sudo chown -R 1654:1654 /opt/gleanvolt/data          # tar restores the archive'
 docker compose up -d
 ```
 
-One thing the controller deliberately doesn't persist: the **Solcast forecast cache is in-memory**,
-so every restart re-fetches and spends one call from the daily quota. Harmless normally — but a
-container stuck in a restart loop will burn through the free tier, which is a reason to watch
-`docker compose ps` restart counts rather than trusting `unless-stopped` to paper over a failure.
+The Solcast forecast is not stored: every restart fetches it again and spends one call from the daily
+quota, so a controller stuck in a restart loop uses the quota up.
 
 ## Troubleshooting
 
 **A container is `Restarting` in a loop.** `docker compose logs <service>`. If there's nothing but
 an abrupt stop, suspect memory: `dmesg -T | grep -i oom`.
 
-**Can't reach the web UI at `:8090`.** Nothing has to be configured for it to work, so this is a
-fault rather than a missing setting. Start with what the container says about itself:
+**Can't reach the web UI at `:8090`.** Start with what the container says:
 
 ```bash
 docker compose logs gleanvolt-controller | grep -i "web ui"
@@ -1054,8 +820,7 @@ explicitly, and the fix is to set a hash or drop the line (see
       SQLite Error 14: 'unable to open database file'
 ```
 
-That is `/opt/gleanvolt/data` not being writable by uid 1654. Everything else keeps running, which is why
-it is easy to miss. Re-running whichever deploy script you used repairs the ownership on its own:
+That is `/opt/gleanvolt/data` not being writable by uid 1654. Re-running the deploy script repairs it:
 
 ```bash
 ./deploy/deploy-controller-only.sh    # or deploy.sh, if that is what you deployed with
@@ -1067,14 +832,13 @@ Or, on the Pi directly:
 sudo chown -R 1654:1654 /opt/gleanvolt/data && docker compose restart gleanvolt-controller
 ```
 
-**The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 8).
+**The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 7).
 The controller is on the Pi's own network, so if the Pi can reach the inverter, the controller can.
 
 **`docker compose` says permission denied.** The ssh user isn't in the `docker` group yet, or hasn't
 logged out and back in since being added.
 
-**It asks for a password (repeatedly).** SSH key authentication isn't set up — step 1. Either script
-makes close to a dozen connections, so this is unusable without a key:
+**It asks for a password (repeatedly).** SSH key authentication isn't set up — step 1:
 
 ```bash
 ssh-copy-id martin@192.168.2.7

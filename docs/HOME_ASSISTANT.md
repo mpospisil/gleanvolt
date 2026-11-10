@@ -400,11 +400,3 @@ CI published.
 
 An availability topic tells Home Assistant to mark the device unavailable while the controller is
 stopped.
-
-## Developing against it
-
-A ready-to-run broker + Home Assistant for local development lives in [`dev/homeassistant/`](../dev/homeassistant/) (`docker compose up -d`). Watch the traffic with:
-
-```bash
-docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'gleanvolt/#' -v
-```

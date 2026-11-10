@@ -77,7 +77,7 @@ kWh; the form and Home Assistant offer only the two ends.
 ## What it does and doesn't do
 
 - **The home battery keeps its priority.** Its need is reserved out of the forecast by the same
-  backward pass [`SolarDayPlanner`](MODE_FORECASTED.md#the-shoulders-belong-to-the-battery-the-plateau-belongs-to-the-car)
+  backward pass [the `Forecasted` mode](MODE_FORECASTED.md#the-shoulders-belong-to-the-battery-the-plateau-belongs-to-the-car)
   uses, so the car is only ever offered what is left; and the discharge hold arms **whenever the car is
   drawing more than the roof is giving** — inside a grid block, while the grid bridge runs, or when a
   cloud leaves the car drawing more than `BatteryHold:BridgeShortfallWatts` (300 W) beyond the live

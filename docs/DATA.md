@@ -115,7 +115,7 @@ be grouped by in SQL.
 ### How the energy is attributed to a source
 
 Nothing measures which electron went where; power at the busbar is fungible. The split is an
-*attribution* with a fixed, documented rule (`ChargingSourceAttribution`), and its one hard guarantee
+*attribution* with a fixed rule, and its one hard guarantee
 is that the three shares always add back up to the measured draw:
 
 1. PV serves the rest of the house first; the car may take up to the **surplus** that is left — the

@@ -1,126 +1,112 @@
 # EV charge control (writes to the charger)
 
-When enabled, the worker drives the EV charger from **live solar surplus**, and only once the home battery is essentially full. Two things are written, by two different callers: the **charge-current setpoint**, by the control loop, on every cycle that calls for a change; and the charger's **use-mode**, once per action — `Fast` when a strategy is started, `Stop` when it is switched off (see "What is written, and by whom" below). It writes only current values that differ from what's already on the device and logs every change.
+Every charge mode drives the charger the same way, through two writes:
 
-The current setpoint is always constrained to what the hardware accepts (**6–32 A**): the configured min/max are clamped into that range up-front, so the controller can never even target an illegal value, and the write path clamps again as a final guard.
+- **The charging current**, set by the control loop every poll in which it should change, and only
+  when it differs from the charger's current setpoint by at least `CurrentChangeThresholdAmps`.
+- **Start and stop**, written once per action: starting a mode switches the charger to `Fast`; **Off**
+  switches it to `Stop`. Nothing else writes it, and nothing writes it back.
 
-## How the surplus is calculated
+The loop acts only while the charger is reachable, set to `Fast`, and a mode is running. If someone
+changes the charger at the wallbox mid-session, the mode goes `Idle` and leaves it alone: the owner has
+the last word.
 
-```
-Surplus = Solar production − household consumption
-```
+**Nothing is written until a button is pressed.** The service always starts with charging **off**, so
+there is no `ChargeControl:Enabled` to forget. With `ChargeControl:DryRun` set, the controller decides
+and logs what it would write, without writing.
 
-where household consumption **excludes battery charging and EV charging** — so whatever the house isn't using is what the car may have. Charging from it therefore neither imports from the grid nor discharges the battery, and the car is free to outbid battery charging.
-
-Household consumption is the "Other Loads" residual from the energy balance:
-
-```
-OtherLoads = PV + Grid − EV − Battery        (Grid +ve = importing, Battery +ve = charging)
-Surplus    = Solar − OtherLoads
-```
-
-**This requires the grid meter, not the inverter's output.** `Grid` comes from **`FeedinPower` (`0x0046`, int32, low word first, positive = export)** — the CT/meter reading at the utility connection, the only register that sees the whole house. It lives inside the telemetry block already fetched, so it costs no extra round-trip.
-
-> ⚠️ On SolaX, the per-phase registers `0x6C/0x70/0x74` (`GridPowerR/S/T`) are **not** the grid meter — they are the **inverter's AC output**, and household load computed from them is nonsense.
-
-Worked example from a live run: Solar 2498 W, exporting 388 W, battery idle, EV idle →
-`OtherLoads = 2498 − 388 = 2110 W`, so `Surplus = 2498 − 2110 = 388 W` — exactly the exported power.
-
-## Smoothing: moving average and hysteresis
-
-Raw solar generation is erratic, so the controller never reacts to instantaneous data. Two buffering strategies keep it stable:
-
-**1. The 3-minute moving average.** Every poll, the surplus (`PV − Load`) is pushed into a rolling time window and the *average* drives every decision. A single 15-second dark cloud therefore can't interrupt a 3-hour charging session — only a sustained drop moves the average enough to matter. The window is `SurplusAverageWindow` (default `00:03:00`); samples older than it are evicted each poll.
-
-**2. The 1-amp hysteresis threshold.** A Modbus write is only issued when the new target differs from the charger's active setpoint by at least `CurrentChangeThresholdAmps` (default 1 A ≈ 230 W per phase). If the car is charging at 10 A, no command is sent until the average calls for 11 A or 9 A. Raise the threshold to damp the charger further (e.g. 3 A means 10 A → 12 A is ignored, 10 A → 13 A is written).
-
-These stack with the asymmetric start/stop thresholds on the surplus and the battery SOC gate, below.
-
-You can watch all of it in the log; each control cycle prints the raw surplus, the average, the sample count, the charger's active setpoint, and the target:
+## The surplus
 
 ```
-Charge control: Mode=Fast Surplus=4180W Avg=3990W (12 samples) Setpoint=16A Action=Charge Target=17A. Live surplus 3990W -> charge at 17A.
+Surplus = Solar − house load
 ```
 
-and the telemetry line carries the full energy picture plus the charger's active current:
+House load counts neither the home battery charging nor the car, so the surplus is exactly the power
+the car can take without importing from the grid or discharging the battery. It is worked out from the
+grid meter — the meter at the grid connection, which sees the whole house:
 
 ```
-SOC=96% BatteryPower=-56W Solar=4180W Grid=-388W EvCharger=Charging EvMode=Fast EvCurrent=16A EvPower=3680W
+House load = Solar + Grid − Car − Battery        (Grid + = importing, Battery + = charging)
 ```
 
-## What is written, and by whom
+A grid meter that misses a phase gets this wrong; see
+[`UnmeteredGridPhase`](CONFIGURATION.md#the-pv-system-the-pv-section).
 
-- **The control loop writes the current setpoint (`0x628`) and only that**, from its
-  `Surplus = PV − household load` calculation. It is still the minimum it can do.
-- **An action writes the use-mode (`0x60D`), once.** Pressing a strategy button writes `Fast` and then
-  selects the mode; pressing **Off** writes `Stop` and returns the mode to `Off`. Nothing else writes
-  it, and nothing re-asserts it.
-- **The loop still only acts when all three hold**: the SolaX device is reachable, its own use-mode
-  reads **Fast**, and a strategy is running. If the charger is changed at the wallbox mid-session it
-  drops out of Fast, every controller goes `Idle`, and **nothing writes `Fast` back**: the owner has
-  the last word.
+## Smoothing
 
-## The 6 A hard cutoff — pause by dropping the current
+The controller never reacts to a single reading:
 
-An EV won't accept a 2 A or 4 A charge — **6 A is the floor** (IEC 61851). So (on the *averaged* surplus):
+- **A 3-minute average.** Every decision uses the surplus averaged over `SurplusAverageWindow`
+  (default 3 minutes), so a passing cloud can't interrupt a charge.
+- **A 1 A threshold.** The current is changed only when the new value differs by at least
+  `CurrentChangeThresholdAmps` (default 1 A, about 230 W per phase). Raise it to change the current
+  less often.
+- **Asymmetric start and stop.** A charge continues down to the 6 A floor, but only restarts once the
+  surplus clears the floor plus `ResumeHysteresisWatts`.
 
-| Surplus | Decision | Current written |
+## The 6 A floor, and pausing
+
+A car won't charge below **6 A** (IEC 61851) — about **1.4 kW** on one phase and **4.2 kW** on three.
+Left at 6 A when the surplus falls below that, the charger would make up the difference from the grid.
+So:
+
+| Average surplus | Decision | Current |
 |---|---|---|
-| ≥ 6 A equivalent | `Charge` | the computed current (whole amps, clamped to the min/max) |
-| < 6 A equivalent | `Pause`, or a stand-down for a longer wait | `PauseCurrentAmps` (default **0 A**), or use-mode `Stop` |
+| enough for 6 A or more | `Charge` | the computed current, in whole amps, between the min and max |
+| less than 6 A | `Pause`, or stand down for a longer wait | `PauseCurrentAmps` (0 A), or the charger switched to `Stop` |
 
-If it simply left the charger at its 6 A minimum when the surplus dropped below it, the charger would **make up the shortfall from the grid** — exactly what solar-only charging avoids. So the pause drops the current to `PauseCurrentAmps`: **0 A**, which suspends the car the way Green mode does, without changing the mode or ending the session — charging resumes when surplus returns. A pause is only ever short: see [How every mode waits and ends](#how-every-mode-waits-and-ends). (SolaX documents the current register as 6–32 A; if your charger doesn't accept 0, set `PauseCurrentAmps` to a sub-6 A value the car refuses instead.)
+A pause suspends the car without ending the session, and is always short; see
+[How every mode waits and ends](#how-every-mode-waits-and-ends). If your charger refuses 0 A, set
+`PauseCurrentAmps` to a value below 6 A that the car won't charge at.
 
-The threshold is **phase-aware** — the 6 A floor is ~1.4 kW single-phase but ~4.2 kW three-phase (see `Phases`), so on a three-phase charger the cutoff triggers far earlier in watt terms. Hysteresis is asymmetric on purpose: charging continues down to exactly the 6 A floor, but only *restarts* once the surplus clears `6 A + ResumeHysteresisWatts`.
+**The `Solar` mode waits for a full home battery.** It starts only at `BatteryFullSocPercent` (95%) or
+above and continues until the battery falls below `BatteryReleaseSocPercent` (90%), so the car never
+competes with the home battery. An ageing pack may never show 95%: a battery inside the band that has
+taken less than `BatteryStallWatts` for `BatteryStallDwell` counts as full, and the log says so
+(*"Battery 93% has stopped taking charge; counted as full."*).
 
-A **battery-SOC gate** with hysteresis fronts the whole thing: charging engages only at/above `BatteryFullSocPercent` (so the car never competes with charging the home battery) and, once charging, keeps going until SOC falls below `BatteryReleaseSocPercent` — the band stops the car's own draw from flapping the gate.
-
-An aging or unbalanced pack may never read `BatteryFullSocPercent`: the BMS ends the charge when its highest cell reaches the limit, and its SOC estimate drifts until a real full charge corrects it. So a battery already inside the band (at/above `BatteryReleaseSocPercent`) that has taken less than `BatteryStallWatts` for `BatteryStallDwell`, with enough sun to start the car, **counts as full**. The log says so: *"Battery 93% has stopped taking charge; counted as full."* A healthy pack in the band is still charging, so this never fires for it. The real 100 %, which the BMS needs now and then to recalibrate, comes from the evening target in `Forecasted` and `Targeted`.
+## Settings
 
 ```jsonc
 "ChargeControl": {
-  "DryRun": false,              // when Enabled: log intended writes but don't write (validation)
+  "DryRun": false,              // decide and log the writes, but don't make them
   "NominalVoltage": 230,
-  "Phases": 3,                  // 1 = single-phase, 3 = three-phase (e.g. X3-HAC)
+  "Phases": 3,                  // 1 = single-phase, 3 = three-phase
   "MinChargingCurrentAmps": 6,
-  "MaxChargingCurrentAmps": 16, // setpoint is clamped to this (see "vehicle limit" below)
-  "CurrentStepAmps": 1,         // whole-amp granularity the charger accepts
-  "PauseCurrentAmps": 0,        // current written to pause (0 = suspend like Green mode)
-  "SurplusAverageWindow": "00:03:00",  // rolling window the surplus is averaged over
-  "CurrentChangeThresholdAmps": 1,     // min amp change before re-commanding the charger
-  "ResumeHysteresisWatts": 200, // extra surplus needed to (re)start, to avoid flapping
-  "BatteryFullSocPercent": 95,  // SOC at/above which charging engages
-  "BatteryReleaseSocPercent": 90, // SOC it must fall below to disengage
+  "MaxChargingCurrentAmps": 16, // the most the charger is set to -- see below
+  "CurrentStepAmps": 1,         // whole-amp steps
+  "PauseCurrentAmps": 0,        // the current written to pause
+  "SurplusAverageWindow": "00:03:00",  // the surplus is averaged over this
+  "CurrentChangeThresholdAmps": 1,     // the smallest change worth writing
+  "ResumeHysteresisWatts": 200, // extra surplus needed to restart
+  "BatteryFullSocPercent": 95,  // Solar starts at or above this
+  "BatteryReleaseSocPercent": 90, // ...and stops below this
   "BatteryStallDwell": "00:10:00", // a battery in the band taking < BatteryStallWatts this long counts as full
   "BatteryStallWatts": 100
 }
 ```
 
-**The vehicle is usually the binding limit, not the charger.** Charging negotiates down to the *lowest shared capability*, so `MaxChargingCurrentAmps` should reflect whichever of the car and the wallbox is lower. For a **VW ID.4** (the reference setup here):
+**Set `Phases` to match your charger.** Amps are converted to watts as
+`amps × NominalVoltage × Phases`. A three-phase charger left at `Phases: 1` would start on a 1.4 kW
+surplus while the car draws 4.2 kW, importing the difference. If the car charges on fewer phases than
+the charger has, say so on the car: see [Phases and the two currents](VEHICLE.md#phases-and-the-two-currents).
+
+**Set `MaxChargingCurrentAmps` to the lower of the car's and the charger's limit.** A higher value is
+harmless — the car just won't draw it — but the controller then thinks it has more headroom than it
+has. For a VW ID.4:
 
 | Setup | Car's limit | Configure |
 |---|---|---|
-| Three-phase (X3-HAC 11/22 kW) | **16 A/phase → 11 kW** — the ID.4's onboard charger caps here even on a 22 kW/32 A wallbox | `Phases: 3`, `MaxChargingCurrentAmps: 16` |
-| Single-phase (X1-HAC-7) | **32 A → 7.2 kW** — the ID.4 pulls the wallbox's full current | `Phases: 1`, `MaxChargingCurrentAmps: 32` |
+| Three-phase (11 or 22 kW wallbox) | **16 A per phase → 11 kW**, even on a 22 kW wallbox | `Phases: 3`, `MaxChargingCurrentAmps: 16` |
+| Single-phase (7 kW wallbox) | **32 A → 7.2 kW** | `Phases: 1`, `MaxChargingCurrentAmps: 32` |
 
-Setting a max above what the car will accept isn't dangerous (it simply won't draw it), but it makes the surplus maths optimistic — the controller thinks it has more headroom than the car will use. The defaults above are the three-phase ID.4 values.
+The charger's own range also applies: the limits are checked against the selected charger's driver at
+startup and on save.
 
-**Set `Phases` to match your charger.** The 6 A EVSE minimum is a *current* limit; its power floor depends on phase count — ~1.4 kW single-phase vs **~4.2 kW three-phase** — and the watts↔amps setpoint uses `watts / (NominalVoltage × Phases)`. A three-phase charger left at `Phases: 1` would start on a ~1.4 kW surplus while the car pulls ~4.2 kW, importing the difference from the grid.
-
-The current setpoint is encoded to the SolaX hardware's requirements automatically: rounded to a whole amp, clamped to `0…32 A` (0 for pause), and written with the register's **0.01 A scale** (value = amps × 100).
-
-**Validate first with `DryRun`.** Set `DryRun: true` to run the full control loop and log exactly what it *would* write, without touching the charger — both writes, in the same shape:
-
-```
-[DRY RUN] would set charger use-mode: Fast (register 1). Solar started by Web UI.
-[DRY RUN] would set charger current setpoint: 6A -> 16A (register 1600). Charge at 16A from 3700W surplus.
-```
-
-In dry-run the "written" values stand in for the hardware on the next read, so a dry run behaves like a real one. **Nothing is ever written to the device**: each write is skipped, and the Modbus client is wrapped read-only besides.
-
-There is **no `ChargeControl:Enabled`**: the service boots in mode `Off` and writes nothing until somebody presses a button.
-
-> ⚠️ **This feature writes to your charger — two registers.** The charge-current setpoint (`ChargeCurrentSetpoint 0x628`, written by the control loop) and the use-mode (`ChargerUseMode 0x60D`, **written** by a start/stop action: `0=Stop, 1=Fast`). Both come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). Other chargers have their own registers or API, chosen by `Pv:Chargers:0:Driver`. Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Run with `DryRun: true` and check the logged register values against your hardware first.** Nothing is written until a button is pressed, which is why there is no enable flag to forget.
+> ⚠️ **This writes to your charger.** Before charging for real, check that the readings on the Overview
+> match the charger's own display, and that your charger accepts `PauseCurrentAmps`. If in doubt, run a
+> while with `DryRun` on and compare the logged writes with what the charger shows. Which models are
+> known to work, and their caveats, is in [Supported EV chargers](SUPPORTED_CHARGERS.md).
 
 ## How every mode waits and ends
 
@@ -130,29 +116,24 @@ asks for is what makes them different.
 **Waiting.** A mode decides only "not now", and until when if it knows: the next sun in the forecast,
 the next tariff edge, the end of a restart dwell. Then:
 
-- **Pause** (0 A in Fast) when the wait ends in under **15 minutes**.
-- **Stand down** (use-mode `Stop`) when it is 15 minutes or more away, or nobody knows.
+- **Pause** (0 A in `Fast`) when the wait ends in under **15 minutes**.
+- **Stand down** (the charger switched to `Stop`) when it is 15 minutes or more away, or nobody knows.
 - **Stand down** a pause that has already lasted **5 minutes**.
 
-The reason is the wallbox: held in Fast at 0 A it ends the session itself after about seven minutes,
-reports `Finishing` and switches to `Stop`, and the mode then loses its charger. A stood-down charger
-stays in `Stop` until the mode wants to charge, which switches it back to `Fast`. A running charge
-still finishes its minimum run time at 6 A before it waits. The Overview says "stood the charger down
-until 09:40", and the session records a **Charger stood down** and a **Charger switched back to Fast**
-event. A fast charge's deferred start and a targeted charge's held tail were already stood down, and
-are kept as appointments: re-arming out of a wait for sun does not cancel a held tail later that day.
+The reason is the wallbox: held in `Fast` at 0 A it ends the session itself after about seven minutes,
+and the mode then loses its charger. A stood-down charger stays in `Stop` until the mode wants to
+charge, which switches it back to `Fast`. A running charge still finishes its minimum run time at 6 A
+before it waits. The Overview says "stood the charger down until 09:40", and the session records a
+**Charger stood down** and a **Charger switched back to Fast** event.
 
-**A full car.** On a full car this wallbox reads `Charging / Fast` at full power on one poll and
-`Finishing / Stop / 0 W` on the next, with no taper. A mode that was asking the car to charge, with the
-car drawing on the poll before, ends at once as `SessionComplete`. The wallbox giving up on our own
-pause reads the same, but comes after a pause with nothing drawing, so it is not mistaken for a full car.
-A car that stays in Fast and draws nothing for `CompletionDwell` (2 min) while being asked to charge
-also counts as finished, and an unplugged car ends the mode as `CarUnplugged`. Every mode applies these,
-`Solar` and `Forecasted` included. The energy asked for and the departure are checked first.
+**A full car.** A mode ends as `SessionComplete` when the car stops drawing while being asked to
+charge: at once, if the charger closes the session straight after the car drew, or after
+`CompletionDwell` (2 minutes) of no draw. Unplugging ends it as `CarUnplugged`. Every mode applies
+these, `Solar` and `Forecasted` included; an amount asked for and a departure are checked first.
 
 **The end of the day.** `Solar`, `Forecasted` and `SolarGrid` end themselves as `NoSunLeftToday` once
-the forecast has nothing left today that clears what they can charge on: the charger's 6 A floor for
-`Solar`, the least a battery loan will bridge for `Forecasted` (the floor with the loan off), your
-minimum for `SolarGrid`. Without a usable forecast they stay on, stood down, until you switch them off.
-`Forecasted` with [**Until full**](MODE_FORECASTED.md#until-full) on stands the charger down for the night instead, and
-carries on the next morning.
+the forecast has nothing left today that clears what they can charge on: the 6 A floor for `Solar`,
+the least a battery loan will bridge for `Forecasted` (the floor with the loan off), your minimum for
+`SolarGrid`. Without a usable forecast they stay on, stood down, until you switch them off.
+`Forecasted` with [**Until full**](MODE_FORECASTED.md#until-full) on stands the charger down for the
+night instead, and carries on the next morning.

@@ -148,6 +148,42 @@ Gleanvolt.slnx
   or the configuration. `Gleanvolt.Discovery.Cli` is its console and nothing else.
 - **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
+## A local Home Assistant to develop against
+
+A ready-to-run broker + Home Assistant for local development lives in [`dev/homeassistant/`](dev/homeassistant/) (`docker compose up -d`). Watch the traffic with:
+
+```bash
+docker exec -it solax-dev-mosquitto mosquitto_sub -t 'homeassistant/#' -t 'gleanvolt/#' -v
+```
+
+## Building and testing the Linux package
+
+`release.yml` builds, installs, smoke-tests and purges the package on both architectures on every
+run, so this is only for working on the packaging itself.
+
+```bash
+# 1. A self-contained publish at the fixed path nfpm.yaml reads
+dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -c Release -r linux-x64 \
+  --self-contained true -o publish/deb
+chmod -R u=rwX,go=rX publish/deb
+
+# 2. The package (nfpm: https://nfpm.goreleaser.com/install/)
+GLEANVOLT_VERSION=1.0.0~dev GLEANVOLT_ARCH=amd64 \
+  nfpm package --config packaging/linux/nfpm.yaml --packager deb --target deb/
+
+# 3. Install it somewhere systemd runs. A throwaway container works:
+docker run -d --name gv --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+  -v "$PWD/deb:/deb:ro" <an image with systemd as PID 1>
+docker exec gv apt-get install -y /deb/gleanvolt_1.0.0~dev_amd64.deb
+```
+
+The version uses `~dev`, not `-dev`: dpkg sorts `1.0.7~dev` below `1.0.7`, so a test build never
+outranks the release that follows it.
+
+`PackagingTests` guards the one list here that drifts: every `…Path` setting in `appsettings.json`
+must be pointed at `/var/lib/gleanvolt` or `/var/log/gleanvolt` by `gleanvolt.service`, because the
+content root in `/opt/gleanvolt` is read-only to the service.
+
 ## The HTTP API's contract
 
 For a generated MCP tool surface the OpenAPI document is the *entire* interface, and its descriptions
