@@ -14,7 +14,7 @@ namespace Gleanvolt.Core.Interfaces;
 ///
 /// <para><b>Not persisted.</b> The request drops on a restart exactly as the mode does. That is
 /// consistent with every other runtime setting here, and it is the one whose loss is discovered at
-/// 05:00 with a flat car — which is why it is said out loud in the README rather than left implied.</para>
+/// 05:00 with a flat car — which is why it is said out loud in docs/MODE_TARGETED.md rather than left implied.</para>
 /// </summary>
 public interface ITargetedChargeSelector
 {

@@ -17,7 +17,7 @@ is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000). In short: re
 ## 1. Enable Modbus TCP
 
 Modbus TCP is **off by default** on both the SDongle and the EMMA. Until it is on, the port answers but
-refuses Modbus. [`gleanvolt-discover`](../README.md#finding-your-devices) and the setup wizard report such
+refuses Modbus. [`gleanvolt-discover`](DISCOVERY.md) and the setup wizard report such
 a port as *port open, no Modbus reply*.
 
 **SDongle.** In the FusionSolar app, open *Device commissioning* for the inverter and log in as the
@@ -39,7 +39,7 @@ further connection. Gleanvolt keeps one connection open all the time, so:
 
 ## 3. Find the address
 
-Run the setup wizard's device search, or [`gleanvolt-discover`](../README.md#finding-your-devices). It reads
+Run the setup wizard's device search, or [`gleanvolt-discover`](DISCOVERY.md). It reads
 the model name at register `30000` and names a SUN2000 by it, with the `huawei` driver. Behind an EMMA it
 also notices the EMMA and suggests *Connected through: EMMA*. In the wizard, **Use as inverter** fills in
 the brand and the connection as well as the address.

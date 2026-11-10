@@ -3059,7 +3059,7 @@ A closed session is still immutable; this is one more field the closing write se
 a restart at 14:00 loses that morning permanently — nothing re-fetches the past, and doing so would
 mean a second Solcast endpoint and a second call against the daily quota. The curve is `null` rather
 than empty when nothing is held, because an empty curve sums to zero and would read as a day the sun
-never came up. The [energy history](../README.md#energy-history-the-energymonitor-section) store still
+never came up. The [energy history](DATA.md#energy-history-the-energymonitor-section) store still
 holds forecast-versus-actual per quarter hour for those days, which is the fallback.
 
 ---

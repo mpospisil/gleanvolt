@@ -30,7 +30,7 @@ directly, not through the EMMA.
 
 ### 3. Find the address, and pick the model
 
-Run the setup wizard's device search, or [`gleanvolt-discover`](../README.md#finding-your-devices). The
+Run the setup wizard's device search, or [`gleanvolt-discover`](DISCOVERY.md). The
 SCharger keeps no model name or serial number in its registers, so the scan recognises it by its phase
 voltages: a mains voltage on L1 at holding register `0x1000`. It picks the model from the other phases:
 

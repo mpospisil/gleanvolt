@@ -3,7 +3,7 @@
 Hybrid inverters Gleanvolt can drive, by manufacturer. Each model links to its manufacturer's page;
 discontinued models go to the manufacturer's home page. The tiers are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance),
-and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
 
 ### SolaX inverters
@@ -64,7 +64,7 @@ The inverter is read in one request from `0x00` to `0x74`, because SolaX asks fo
 between Modbus instructions. The per-phase registers at `0x6C`–`0x74` exist only on three-phase (X3)
 models, so a single-phase inverter might refuse the whole block. Untested. A single-phase site does not
 need those registers — they serve only
-[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
+[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
 ### Huawei SUN2000
@@ -92,7 +92,7 @@ and up), the SmartLogger, the FusionSolar cloud API and direct RS485.
   assumed to be the meter's. A tester's register snapshot settles all three
   ([#325](https://github.com/mpospisil/gleanvolt/issues/325)).
 - **No output per phase**, so
-  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section)
+  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section)
   is not available.
 - **One Modbus client.** The SDongle serves very few clients, and the EMMA exactly one. Home Assistant's
   `huawei_solar` integration competes for it. See
@@ -134,7 +134,7 @@ Reviewed 2026-11-07 from [dzd.cz](https://www.dzd.cz/fotovoltaika-drazice/strida
 Dražice's own, but match SolaX models by their datasheets. Their tier is the SolaX model's **if** the unit
 is the SolaX hardware with SolaX firmware; no statement from Dražice confirms it, and no unit has been run.
 Before relying on a row, check that
-[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names the device by a SolaX serial prefix. A unit it cannot name runs firmware this page knows nothing
 about.
 

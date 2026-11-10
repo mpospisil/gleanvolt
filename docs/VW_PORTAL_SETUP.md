@@ -31,7 +31,7 @@ How to get the four settings the **Car** page needs, and what to do when it does
 **None of them requires looking anything up.** The first two are the credentials you already own; the
 third is the badge on the car.
 
-**You can fill them in from a browser instead.** [`/car`](../README.md#car--the-car-and-editing-it)
+**You can fill them in from a browser instead.** [`/car`](WEB_UI.md#car--the-car-and-editing-it)
 in the web UI asks the same four things: pick your brand from the list, fill in the VW ID, the
 password and the VIN, and save. The brand list is the client's own, the password goes to the secret
 store rather than to a file beside the configuration, and the choice disables whichever other feed it
@@ -314,7 +314,7 @@ never writes it anywhere. That is the whole of it, and it is worth saying plainl
 up: an untracked file is what a LAN appliance has to offer.
 
 Entered on `/car` instead, it goes to the
-[secret store](../README.md#the-data-directory-holds-secrets-the-secrets-section) — an owner-only file
+[secret store](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section) — an owner-only file
 in the data directory, or Windows DPAPI — and the page says which, in the store's own words. That is a
 better answer than an untracked file and still not proof against a local root, which is why the page
 says what it is rather than the word *encrypted*. It is write-only there: the box renders empty

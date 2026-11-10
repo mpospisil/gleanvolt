@@ -30,9 +30,9 @@ dotnet test Gleanvolt.slnx
 dotnet run --project src/Gleanvolt.Worker
 ```
 
-Then open `http://localhost:8090`: a fresh clone starts in [setup mode](README.md#setup-mode), which asks for
-a password and runs the [setup wizard](README.md#the-setup-wizard) for the device addresses and the site (or use
-[the command line](README.md#setting-up-from-the-command-line)). Nothing is polled until that is done. After
+Then open `http://localhost:8090`: a fresh clone starts in [setup mode](docs/WEB_UI.md#setup-mode), which asks for
+a password and runs the [setup wizard](docs/WEB_UI.md#the-setup-wizard) for the device addresses and the site (or use
+[the command line](docs/WEB_UI.md#setting-up-from-the-command-line)). Nothing is polled until that is done. After
 that, nothing is written to either device either: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.

@@ -568,7 +568,7 @@ public sealed class PollingService : BackgroundService
     /// <para>A hold the owner had switched on <em>before</em> the fast charge is released along with it.
     /// That is deliberate: the alternative is restoring a remembered prior value, which a restart loses
     /// anyway, and which leaves the pack locked out of serving the house with nothing charging. It is
-    /// said out loud in the README.</para>
+    /// said out loud in docs/MODE_FAST_NO_BATTERY.md.</para>
     /// </summary>
     private void ReleaseFastHoldIfEnded(ChargeControlMode mode)
     {

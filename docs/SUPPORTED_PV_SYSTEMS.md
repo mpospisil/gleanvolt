@@ -25,7 +25,7 @@ expects.**
 > or in dry-run until you have checked the readings against the device's own display.**
 
 The serial-number prefixes in the tables below are also what
-[`gleanvolt-discover`](../README.md#finding-your-devices) names a device by when it scans the LAN, and
+[`gleanvolt-discover`](DISCOVERY.md) names a device by when it scans the LAN, and
 the tier it prints is the tier here. The tool keeps them in one table in code
 (`src/Gleanvolt.Discovery/SolaxModels.cs`), and **the two must agree**: a prefix added to one is added to
 the other, and a test fails when the code names a device by a prefix this page does not list.
@@ -52,7 +52,7 @@ files, never the copies, and run `scripts/sync-doc-includes.sh`.
 | Read, one block `0x00`–`0x74` (input registers) | `0x0A`, `0x0B` — PV power, strings 1 and 2 | Solar, house load |
 | | `0x16` battery power, `0x1C` battery SOC | The home battery |
 | | `0x46`/`0x47` grid meter | Surplus, grid import/export |
-| | `0x6C`, `0x70`, `0x74` — inverter output per phase | Only [`UnmeteredGridPhase`](../README.md#the-pv-system-the-pv-section) |
+| | `0x6C`, `0x70`, `0x74` — inverter output per phase | Only [`UnmeteredGridPhase`](CONFIGURATION.md#the-pv-system-the-pv-section) |
 | Write (holding) | `0x7C` — the 13-register Modbus Power Control command | Only the battery discharge hold |
 
 ### Huawei SUN2000 (`huawei`)
@@ -101,7 +101,7 @@ From go-e's [API v2 documentation](https://github.com/goecharger/go-eCharger-API
 Hybrid inverters Gleanvolt can drive, by manufacturer. Each model links to its manufacturer's page;
 discontinued models go to the manufacturer's home page. The tiers are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance),
-and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
 
 ### SolaX inverters
@@ -162,7 +162,7 @@ The inverter is read in one request from `0x00` to `0x74`, because SolaX asks fo
 between Modbus instructions. The per-phase registers at `0x6C`–`0x74` exist only on three-phase (X3)
 models, so a single-phase inverter might refuse the whole block. Untested. A single-phase site does not
 need those registers — they serve only
-[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
+[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
 ### Huawei SUN2000
@@ -190,7 +190,7 @@ and up), the SmartLogger, the FusionSolar cloud API and direct RS485.
   assumed to be the meter's. A tester's register snapshot settles all three
   ([#325](https://github.com/mpospisil/gleanvolt/issues/325)).
 - **No output per phase**, so
-  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section)
+  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section)
   is not available.
 - **One Modbus client.** The SDongle serves very few clients, and the EMMA exactly one. Home Assistant's
   `huawei_solar` integration competes for it. See
@@ -232,7 +232,7 @@ Reviewed 2026-11-07 from [dzd.cz](https://www.dzd.cz/fotovoltaika-drazice/strida
 Dražice's own, but match SolaX models by their datasheets. Their tier is the SolaX model's **if** the unit
 is the SolaX hardware with SolaX firmware; no statement from Dražice confirms it, and no unit has been run.
 Before relying on a row, check that
-[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names the device by a SolaX serial prefix. A unit it cannot name runs firmware this page knows nothing
 about.
 
@@ -334,7 +334,7 @@ Not supported yet.
 
 ## Connecting
 
-- **Not sure of the address?** [`gleanvolt-discover`](../README.md#finding-your-devices) scans the LAN
+- **Not sure of the address?** [`gleanvolt-discover`](DISCOVERY.md) scans the LAN
   and reports host, port and unit id for each device: from its serial number (SolaX), its model name
   (Huawei SUN2000), its phase voltages (Huawei SCharger) or its API (go-e, on port 80).
 - **Huawei:** Modbus TCP is off by default on the SDongle and the EMMA. See

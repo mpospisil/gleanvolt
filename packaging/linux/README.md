@@ -62,7 +62,7 @@ Nothing is written to your hardware. Out of the box:
 ## Settings
 
 Everything is in **`/etc/gleanvolt/gleanvolt.env`**, one `KEY=VALUE` per line. Any setting in the
-[README's configuration reference](../../README.md#configuration) can go here, with `__` (two
+[README's configuration reference](../../docs/CONFIGURATION.md) can go here, with `__` (two
 underscores) between the sections:
 
 ```bash

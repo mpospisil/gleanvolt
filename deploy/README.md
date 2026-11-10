@@ -95,7 +95,7 @@ The controller can record **what the sky was doing** at each end of every chargi
 conditions, the temperature and the cloud cover when it opened and when it closed, plus that day's
 sunrise and sunset. It is what lets a finished session be read against the day it happened on rather
 than only against the forecast; see
-[the weather a session ran in](../README.md#the-weather-a-session-ran-in).
+[the weather a session ran in](../docs/DATA.md#the-weather-a-session-ran-in).
 
 One line in `/opt/gleanvolt/.env`, plus the site's coordinates if they are not already there:
 
@@ -165,7 +165,7 @@ up unenforced. One shared password gates the whole UI — there are no per-user 
 
 To take it off again, remove the line and redeploy. `WEB_REQUIRE_AUTHENTICATION` exists to override
 the inference in either direction and is rarely worth setting; the root README's
-[Authentication](../README.md#authentication) section has the full table, including the one
+[Authentication](../docs/WEB_UI.md#authentication) section has the full table, including the one
 combination that refuses to start (`WEB_REQUIRE_AUTHENTICATION=true` with no hash — nobody could sign
 in).
 
@@ -313,7 +313,7 @@ asks you to set a password the first time you open it.
 
 ## Letting a program drive it: the HTTP API (optional)
 
-The controller can also expose an [HTTP API](../README.md#http-api-the-api-section) — the same
+The controller can also expose an [HTTP API](../docs/HTTP_API.md) — the same
 telemetry, history and actions the UI has, described by OpenAPI, for a script or an MCP server rather
 than a person. It is **off** by default, and unlike the UI it is never open: two of its endpoints
 write to hardware.
@@ -555,7 +555,7 @@ to run rather than guess. It never copies `.env`.
 password; nothing else is served until you do (see
 [Setting the web UI password](#setting-the-web-ui-password)). The dashboard, the
 controls, session history and the forecast plan are all there; see the root README's
-[Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
+[Self-hosted web UI](../docs/WEB_UI.md) section for what each page
 does.
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
@@ -600,7 +600,7 @@ Everything that is state, because none of it lives inside a container:
 | `/opt/gleanvolt/.env` | **never copied, never overwritten** — the deploy scripts do not touch secrets |
 | `data/sessions.db` | charging-session history, with its SQLite WAL |
 | `data/energy.db` | the site's 15-minute energy history, with its SQLite WAL |
-| `data/pv-system.json`, `data/tariff.json` | what was saved on **Settings**: the installation's edits, and the [grid tariff](../README.md#grid-tariff-the-tariff-section) |
+| `data/pv-system.json`, `data/tariff.json` | what was saved on **Settings**: the installation's edits, and the [grid tariff](../docs/CONFIGURATION.md#grid-tariff-the-tariff-section) |
 | `data/vw-website-session.json`, `data/skoda-api-key.json` | **the car's sign-in.** Bearer-equivalent, mode `0600` — see below |
 | `logs/` | the controller's own log files |
 
@@ -942,7 +942,7 @@ owner (common on SMB shares): put the data on a share or dataset without them, o
 access in the NAS's own permissions editor.
 
 **The data is private.** `data/` holds the session databases, the settings saved in the web UI and the
-car-account secrets (see [The data directory holds secrets](../README.md#the-data-directory-holds-secrets-the-secrets-section)).
+car-account secrets (see [The data directory holds secrets](../docs/CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section)).
 Back the share up, and don't make it readable to every user on the NAS.
 
 **Restart policy.** Keep `restart: on-failure`. With `always` or `unless-stopped`, the default in many
