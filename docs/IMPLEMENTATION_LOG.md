@@ -4,6 +4,18 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — A flaky mDNS responder test waits for its announcements
+
+`MdnsResponderTests.Answers_nothing_for_names_that_are_not_its_own` failed on a CI run of #376 with
+*expected 1, actual 2*. It counted the responder's packets 100 ms after its first claim, assuming the
+second announcement (15 ms later with the test's timings) had gone out by then. On a busy runner it
+hadn't, so it landed after the baseline and looked like an answer to the laptop's query. The test now
+waits until both announcements have been seen before it takes the count. No change to the responder.
+
+Files: `tests/Gleanvolt.Infrastructure.Tests/Mdns/MdnsResponderTests.cs`.
+
+---
+
 ## 2026-11-10 — The manual's "Using Gleanvolt" chapter: the Overview and the charging modes (issue #329, step 4, part 1)
 
 Nine pages under `docs/manual/src/content/docs/en/using/`:

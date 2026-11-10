@@ -245,7 +245,10 @@ public class MdnsResponderTests
         var lan = new InMemoryLan();
         await using var gleanvolt = new Running(lan.Join("192.168.1.20"), Gleanvolt());
         await gleanvolt.Responder.FirstClaim.WaitAsync(Wait);
-        await Task.Delay(100); // past the second announcement
+
+        // Both announcements out before the count is taken. A fixed delay was not enough on a slow CI
+        // runner: the second one landed after the baseline and was counted as an answer to the laptop.
+        await UntilAsync(() => Answering(lan) >= 2).WaitAsync(Wait);
         var before = Answering(lan);
 
         var laptop = lan.Join("192.168.1.51");
@@ -256,6 +259,14 @@ public class MdnsResponderTests
         await Task.Delay(100);
 
         Assert.Equal(before, Answering(lan));
+    }
+
+    private static async Task UntilAsync(Func<bool> condition)
+    {
+        while (!condition())
+        {
+            await Task.Delay(5);
+        }
     }
 
     private static int Answering(InMemoryLan lan)
