@@ -226,7 +226,7 @@ So the form says how old the reading is and what the limit is, and asks for kilo
 > car again, or ask in kilowatt-hours instead.
 
 Said **under the box as well as on Start**, so a hint promising "that is about 32.5 kWh" cannot sit
-above a button that refuses. Pressing **Ask the car** on [`/car`](WEB_UI.md#car--the-car-and-editing-it) is the fix, and then the
+above a button that refuses. Pressing **Ask the car** on [`/car`](WEB_UI.md#car) is the fix, and then the
 same request again.
 
 Three things this deliberately is not:

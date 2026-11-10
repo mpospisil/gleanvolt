@@ -29,7 +29,7 @@ that belong to something else.
 **Nothing here is required, and an absent section changes nothing.** Every figure falls back to the
 installation's, which is exactly how the controller behaved before this section existed.
 
-**Or edit it on [`/car`](WEB_UI.md#car--the-car-and-editing-it)**, which covers every key above and the feed
+**Or edit it on [`/car`](WEB_UI.md#car)**, which covers every key above and the feed
 sections below it, checks a save against the same rules startup applies, and writes to the overrides
 file that wins over `.env`. The routes below still work and are what a fresh install is seeded from.
 
@@ -126,7 +126,7 @@ looks; but if you want them, leave this off.
 
 ### `Vehicle:Website` — volkswagen.de, the live source
 
-**Or set it on [`/car`](WEB_UI.md#car--the-car-and-editing-it)**: pick **Volkswagen**, and fill in the VW ID,
+**Or set it on [`/car`](WEB_UI.md#car)**: pick **Volkswagen**, and fill in the VW ID,
 the password and the VIN. The password goes to the secret store rather than to a file beside the
 configuration, and whichever feed it replaces is disabled in the same save.
 
@@ -184,7 +184,7 @@ link to it, and nothing that writes to hardware depends on the feed.
 
 ### `Vehicle:Skoda` — the MyŠkoda Public API, the live source for a Škoda
 
-**Or set it on [`/car`](WEB_UI.md#car--the-car-and-editing-it)**: pick **Škoda** and fill in the VIN. The API
+**Or set it on [`/car`](WEB_UI.md#car)**: pick **Škoda** and fill in the VIN. The API
 key is not asked for in the form — it is pasted under **Account** further down the same page,
 because keys expire and renewing one is a recurring owner action.
 
@@ -208,7 +208,7 @@ the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs) Škoda 
 | `BaseUrl`, `SourceId` | Škoda's API, `skoda` | A hedge, not an abstraction: the test environment, or another VW Group brand if one ever publishes the same API |
 
 **The key is pasted on a page, and is in no setting.** Create an API key for this car in the MySkoda
-app, then paste it under **Account** on [`/car`](WEB_UI.md#car--the-car-and-editing-it). One request (`?include=info`) proves the key, the VIN and that
+app, then paste it under **Account** on [`/car`](WEB_UI.md#car). One request (`?include=info`) proves the key, the VIN and that
 one covers the other; the page then says *Key valid until … · your car's name*, and the feed starts
 without a restart. An expired key, an unknown key, a key that does not cover the VIN and an unknown VIN
 each get their own sentence and nothing is stored. Keys expire: from a week before, the feed is
@@ -234,7 +234,7 @@ API key yet, or it has expired — paste one on the Car page*, with a link to it
 
 ## Vehicle telemetry (the `Vehicle` section)
 
-**Or set it on [`/car`](WEB_UI.md#car--the-car-and-editing-it)**: pick *A feed I publish myself* and name the
+**Or set it on [`/car`](WEB_UI.md#car)**: pick *A feed I publish myself* and name the
 topic. The broker and its credentials stay here — they are the house broker's, not the car's.
 
 The **feed** that reports on the car above — as distinct from the car itself, and from the home battery
@@ -259,7 +259,7 @@ above exist to make.
 supply them via `.env` or an environment variable (`Vehicle__Username`), never in `appsettings.json`.
 
 The feed as configured — broker, username, client id, and the topic it actually subscribed to — is
-shown at [`/pv-system`](WEB_UI.md#pv-system--the-installation-and-editing-it), which is also where a feed switched on
+shown at [`/pv-system`](WEB_UI.md#settings--installation), which is also where a feed switched on
 with no topic reads as the misconfiguration it is rather than as a car that never reports.
 
 > **Upgrading?** `Vehicle:BatteryCapacityKWh`, `Vehicle:ChargeEfficiency` and `Vehicle:Topic` have
@@ -462,7 +462,7 @@ alive. The full argument is under
 
 ### The car from the manufacturer, on a clock (the `Vehicle:DataAct` section)
 
-**Or set it on [`/car`](WEB_UI.md#car--the-car-and-editing-it)**: the brand comes from the list the client
+**Or set it on [`/car`](WEB_UI.md#car)**: the brand comes from the list the client
 itself knows, so there is no GUID to fetch out of a redirect URL, and `ClientId` is behind a
 disclosure for the day one of those ids goes stale.
 
@@ -492,7 +492,7 @@ there is no scoped token to use instead, and what protects it here is that `.env
 client never logs or renders it. That is genuinely all the protection a LAN appliance offers, and
 [#137](https://github.com/mpospisil/gleanvolt/issues/137) took the trade knowingly rather than casually.
 
-**Having credentials is not switching it on.** The **Ask the car** button on [`/car`](WEB_UI.md#car--the-car-and-editing-it)
+**Having credentials is not switching it on.** The **Ask the car** button on [`/car`](WEB_UI.md#car)
 works as soon as they are set; reading the portal *on a clock* waits for `Enabled`. Press the
 button first — that is what proves the credentials and that this car's fields are understood — and
 switch the feed on afterwards.

@@ -35,7 +35,7 @@ Type 2 AC inlet.** No manufacturer account, no cloud and no internet connection 
 dead car feed changes nothing about how the charger is driven.
 
 What does differ from car to car is what it will accept. **Describe it on
-[`/car`](WEB_UI.md#car--the-car-and-editing-it) in the web UI** — pick the manufacturer, fill in
+[`/car`](WEB_UI.md#car) in the web UI** — pick the manufacturer, fill in
 what that choice needs, and restart — or in the [`Ev` section](VEHICLE.md#the-car-the-ev-section)
 (`EV_*` in `deploy/.env`) if you would rather edit a file. Either way the controller works to the
 narrower of the car and the installation:

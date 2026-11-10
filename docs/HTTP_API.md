@@ -61,7 +61,7 @@ curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and 
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
 
-All of it is **readable back** at [`/pv-system`](WEB_UI.md#pv-system--the-installation-and-editing-it), including
+All of it is **readable back** at [`/pv-system`](WEB_UI.md#settings--installation), including
 that second line with this installation's own address and key already substituted in. The key itself is
 shown only when the UI is behind a [login](WEB_UI.md#authentication); without one the page shows the names and
 says what makes the secrets readable, because a key is bearer-equivalent to the stop button on the

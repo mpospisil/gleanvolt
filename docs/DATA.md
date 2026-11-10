@@ -114,7 +114,7 @@ Two things about how it is captured are worth knowing:
 
 It is written when the session opens and rewritten when it closes, so what ends up stored is the
 fullest version of the day known by then. Nothing in charge control reads it — the plan, not this,
-drives decisions — and the [session detail page](WEB_UI.md#browsing-charging-session-history) shows the day's
+drives decisions — and the [session detail page](WEB_UI.md#sessions) shows the day's
 total with its band beside the other header facts.
 
 This is database schema **v3** and `schemaVersion` 3, additive again: older rows keep `NULL`, which is
@@ -176,7 +176,7 @@ A closed session is immutable, which makes it safe to publish as one self-contai
 shape is deliberately independent of the database's own tables, so uploading sessions to cloud object
 storage (one object per session) can be added later without migrating anything. The
 `sessions.synced_at` column is reserved for exactly that. Reading them from a web app is already
-built — see [Browsing charging session history](WEB_UI.md#browsing-charging-session-history) above.
+built — see [Browsing charging session history](WEB_UI.md#sessions) above.
 
 ## Energy history (the `EnergyMonitor` section)
 
@@ -313,4 +313,4 @@ GROUP BY utc_slot ORDER BY utc_slot;
   untouched.
 - **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
 - **A viewer is built in.** The web UI's `/energy` page shows a day at a time, drawn as a chart and
-  printed as rows — see [Browsing the energy history](WEB_UI.md#browsing-the-energy-history) above.
+  printed as rows — see [Browsing the energy history](WEB_UI.md#energy) above.

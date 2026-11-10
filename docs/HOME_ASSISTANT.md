@@ -229,7 +229,7 @@ connection** connects once with what the form holds, under a client id of its ow
 the running link off the broker. Turning the link on needs the installation's `Pv:Id` (below), and
 the form says so rather than the next start.
 
-All of it is **readable back** at [`/pv-system`](WEB_UI.md#pv-system--the-installation-and-editing-it) — including
+All of it is **readable back** at [`/pv-system`](WEB_UI.md#settings--installation) — including
 the topic prefix, which no single setting spells out — so "what is this controller publishing, and
 where?" does not need an ssh session and a `grep` of `.env`. The password itself is shown there only
 when the UI is behind a login.
