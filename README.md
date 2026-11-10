@@ -94,6 +94,8 @@ curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/insta
 Running it again upgrades; settings and data are kept. More in
 [Install on Linux](packaging/linux/README.md).
 
+**Docker** on any 64-bit Linux host — one `docker run`; see [Running in Docker](docs/DOCKER.md).
+
 **A NAS** (Synology, QNAP, Unraid, TrueNAS SCALE) — add
 [`deploy/docker-compose.nas.yml`](deploy/docker-compose.nas.yml) in the NAS's container UI. See
 [Running on a NAS](docs/NAS.md).
@@ -166,9 +168,11 @@ your own devices, and watch the first runs.
 | [HTTP API](docs/HTTP_API.md) | The OpenAPI-described API, for programs and MCP servers |
 | [Gleanvolt with Home Assistant](docs/HOME_ASSISTANT.md) | Connecting it, running Home Assistant beside it, and every entity |
 | [Install on Linux](packaging/linux/README.md) | The one-line install: settings, files, upgrade and uninstall |
+| [Running in Docker](docs/DOCKER.md) | One container on any Docker host |
 | [Running on a NAS](docs/NAS.md) | Synology, QNAP, Unraid, TrueNAS SCALE and OpenMediaVault |
 | [Deploying to a Raspberry Pi from your computer](deploy/README.md) | Advanced: Docker on a Pi, managed over ssh; updates, logs, backup, troubleshooting |
 | [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md), [electric vehicles](docs/SUPPORTED_EVS.md) | Every model, how well it is supported, and what Gleanvolt needs from it |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Symptoms, their causes and the fixes |
 | [Privacy](docs/PRIVACY.md) | What leaves your network, and when |
 
 **Building from source or contributing?** See [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -13,7 +13,7 @@ namespace Gleanvolt.Hosting.Tests;
 /// </summary>
 /// <remarks>
 /// Links are checked in the Markdown files and in the web UI's resources, both relative ones and
-/// absolute ones to this repository's <c>blob/main</c> (which pages included into the wiki use).
+/// absolute ones to this repository's <c>blob/main</c> (which the included device lists use, so they work anywhere).
 /// Anchors follow GitHub's rule: the heading's text, lower-cased, punctuation dropped, spaces turned
 /// into hyphens.
 /// </remarks>
