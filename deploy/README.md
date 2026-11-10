@@ -138,7 +138,6 @@ This directory mirrors `/opt/gleanvolt` on the Pi, so what you edit here is what
 ```
 deploy/
 ├── docker-compose.yml              → /opt/gleanvolt/docker-compose.yml
-├── docker-compose.web.yml          → /opt/gleanvolt/docker-compose.web.yml (empty; kept for old .env files)
 ├── mosquitto/config/mosquitto.conf → /opt/gleanvolt/mosquitto/config/    (overwritten each deploy)
 ├── homeassistant/config/*.yaml     → /opt/gleanvolt/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/gleanvolt/.env
@@ -258,8 +257,8 @@ build.
 ### What the script does, in order
 
 1. Checks `/opt/gleanvolt` exists and `.env` is there — it refuses rather than guessing.
-2. Copies `docker-compose.yml` and `docker-compose.web.yml` from your **local** `deploy/` directory,
-   overwriting the Pi's copies (with `deploy.sh`, `mosquitto.conf` too).
+2. Copies `docker-compose.yml` from your **local** `deploy/` directory, overwriting the Pi's copy
+   (with `deploy.sh`, `mosquitto.conf` too).
 3. With `deploy.sh` only, seeds Home Assistant's config files if they don't already exist.
 4. `docker compose pull`.
 5. `docker compose up -d --remove-orphans` — recreates only what actually changed.
