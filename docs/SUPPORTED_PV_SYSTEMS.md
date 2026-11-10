@@ -31,8 +31,8 @@ the tier it prints is the tier here. The tool keeps them in one table in code
 the other, and a test fails when the code names a device by a prefix this page does not list.
 
 The device lists below are copied in from [Supported inverters](SUPPORTED_INVERTERS.md) and
-[Supported EV chargers](SUPPORTED_CHARGERS.md), which the README and the wiki show too. Edit those two
-files, never the copies, and run `scripts/sync-doc-includes.sh`.
+[Supported EV chargers](SUPPORTED_CHARGERS.md); the README shows their *at a glance* tables. Edit those
+two files, never the copies, and run `scripts/sync-doc-includes.sh`.
 
 ## At a glance
 
@@ -103,6 +103,16 @@ discontinued models go to the manufacturer's home page. The tiers are explained 
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance),
 and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
+
+### Inverters at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#solax-inverters) | **X3-HYB-G4 PRO**; X3/X1-Hybrid G4, X1/X3-IES, X3-Ultra, X3-Aelio, X1-VAST; G2/G3 hybrids | `solax` | **Verified** (G4 PRO); Expected; readings and charging only (G2/G3) |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#huawei-sun2000) | SUN2000 KTL-M1, K-MAP0, KTL-L1, K-LC0, also behind an EMMA | `huawei` | Expected — not yet run on a device |
+| [Tigo](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#tigo), [Qcells](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#qcells) | TSI X3, Q.VOLT HYB-G3-3P — SolaX inside | `solax` | Expected |
+| [Dražice](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#dražice-dz-dražice) | IN.HYBRID COMPACT, COMPACT PRO, COMPACT S, COMPACT M — SolaX models by datasheet | `solax` | Expected, if the unit is SolaX hardware |
+| Others | — | — | Not supported yet (GoodWe is planned) |
 
 ### SolaX inverters
 
@@ -261,6 +271,15 @@ are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance).
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
+
+### Chargers at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
+| [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| Others | — | — | Not supported yet |
 
 ### SolaX chargers
 

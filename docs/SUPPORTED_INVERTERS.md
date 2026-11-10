@@ -6,6 +6,16 @@ discontinued models go to the manufacturer's home page. The tiers are explained 
 and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
 
+### Inverters at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#solax-inverters) | **X3-HYB-G4 PRO**; X3/X1-Hybrid G4, X1/X3-IES, X3-Ultra, X3-Aelio, X1-VAST; G2/G3 hybrids | `solax` | **Verified** (G4 PRO); Expected; readings and charging only (G2/G3) |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#huawei-sun2000) | SUN2000 KTL-M1, K-MAP0, KTL-L1, K-LC0, also behind an EMMA | `huawei` | Expected — not yet run on a device |
+| [Tigo](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#tigo), [Qcells](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#qcells) | TSI X3, Q.VOLT HYB-G3-3P — SolaX inside | `solax` | Expected |
+| [Dražice](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#dražice-dz-dražice) | IN.HYBRID COMPACT, COMPACT PRO, COMPACT S, COMPACT M — SolaX models by datasheet | `solax` | Expected, if the unit is SolaX hardware |
+| Others | — | — | Not supported yet (GoodWe is planned) |
+
 ### SolaX inverters
 
 Driver `solax`, over Modbus TCP.

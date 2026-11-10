@@ -6,6 +6,15 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
+### Chargers at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
+| [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| Others | — | — | Not supported yet |
+
 ### SolaX chargers
 
 Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its

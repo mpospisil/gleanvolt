@@ -317,7 +317,7 @@ proves one of two things:
   sudo cat /var/lib/gleanvolt/password-reset-code.txt                 # .deb
   ```
 
-  On Windows, open `data\password-reset-code.txt` next to `gleanvolt.exe`, or the log in `logs\`.
+  On Windows, open `data\password-reset-code.txt` next to `Gleanvolt.Worker.exe`, or the log in `logs\`.
   Only the newest code works, once, for 15 minutes. Codes can be requested once a minute and five
   times an hour.
 
