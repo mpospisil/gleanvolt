@@ -171,7 +171,13 @@ one-way hash, not a secret.
 ## Solcast solar forecast
 
 The controller fetches your site's solar forecast from [Solcast](https://solcast.com/), caches it, and
-refreshes it every 12 hours by default.
+refreshes it every 12 hours by default. It is optional: without it every mode except `Forecasted` works
+as usual.
+
+**Getting an account.** Register at [solcast.com](https://solcast.com/) on the free home-user
+(hobbyist) plan. Create a **rooftop site** with your location, panel tilt, azimuth and capacity — take
+them from your installation, since the forecast is only as good as they are. The saved site has a
+**resource id**; your **API key** is in your account settings.
 
 **On the web UI:** **Settings → Installation → Solar forecast** — paste the API key and the rooftop
 site's resource id and press **Save and fetch**. It is used from that fetch on, with no restart, and the
@@ -201,8 +207,11 @@ Records **what the sky was doing** at the start and end of each charging session
 read against its day. Off unless configured: with no key and no
 [coordinates](#the-pv-system-the-pv-section), no weather call is ever made.
 
-**On the web UI:** paste an OpenWeatherMap API key on **Settings → Installation → Weather**, or in the
-setup wizard's Extras step. It is checked with one call and used from the next session, with no
+**Getting a key.** Register at [openweathermap.org](https://openweathermap.org/) — the free plan is
+enough — and copy the API key from your account's API keys page.
+
+**On the web UI:** paste the key on **Settings → Installation → Weather**, or in the setup wizard's
+Extras step. It is checked with one call and used from the next session, with no
 restart. A new OpenWeatherMap key can take a couple of hours to start working, so it is kept even when
 that first check fails.
 

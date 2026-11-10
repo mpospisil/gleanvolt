@@ -4,6 +4,46 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — A short README for users, the manual in docs/ (issue #365)
+
+The README had grown to 4,318 lines, 85% of it a "Configuration" section that was really the whole
+manual, written for four audiences at once. It is now 200 lines for a new user; the manual is a page
+per topic under `docs/`, trimmed as it moved. Merged as #367, with this follow-up.
+
+- **Links are tested.** `DocLinkTests` checks every relative link and every absolute `blob/main`
+  link in the Markdown files and the web UI's resources: the file must exist and the `#anchor` must be
+  a heading in it. It also fails on a heading written twice on one page (GitHub numbers the second
+  `#x-1`, so which section a link means depends on the order of the page); `IMPLEMENTATION_LOG.md` is
+  exempt. It found three broken links and duplicate headings on five pages.
+- **Section includes.** `scripts/sync-doc-includes.sh` takes `<!-- include: FILE#anchor -->` to copy
+  one section of a fragment; `DocIncludeTests` checks those copies too. The README shows the device
+  lists' new *at a glance* tables; `SUPPORTED_PV_SYSTEMS.md` still includes the full lists.
+- **The split.** A script moved each README section to its page and rewrote every link into it,
+  across the repository, the web UI's resources (the MQTT-topics hint, English and Czech) and code
+  comments. New pages: `CONFIGURATION`, `CHARGE_CONTROL`, `BATTERY_HOLD`, four `MODE_*`, `VEHICLE`,
+  `WEB_UI`, `HTTP_API`, `DATA`, `DISCOVERY`, `HOME_ASSISTANT`, `NAS`, `DOCKER`, `TROUBLESHOOTING`.
+- **Audiences.** Contributor material went to `CONTRIBUTING.md` (building, structure, layering, the
+  API contract, the Linux package, the dev Home Assistant stack); the agent instructions to a new
+  `CLAUDE.md`. Home Assistant and its broker moved to `HOME_ASSISTANT.md`, with one rule in place of
+  the RAM measurements: no Home Assistant container on a device with less than 2 GB.
+- **Priorities.** The setup wizard and the web UI are the recommended way to configure; `.env`,
+  environment variables and the CLI follow as "optionally". A clean install on the device (the
+  `.deb` one-liner, a NAS, winget) comes first; `deploy/README.md` is retitled "Deploying to a
+  Raspberry Pi from your computer" and marked advanced.
+- **Cut.** History ("until #89", "used to"), issue archaeology, measurement narratives, design
+  defences, register-level internals, the boot-medium and swap advice, and the upgrade notes for
+  changes made before v1.0.0.
+- **Removed:** `deploy/docker-compose.web.yml`, empty since #268. The deploy script now stops with a
+  one-line fix when the Pi's `.env` still names it in `COMPOSE_FILE`, and deletes the Pi's copy.
+- **Corrected on the way:** the web UI's real navigation (five plan tabs; PV system and Health are
+  the two Settings tabs); `solarGrid` on `POST /charging/start`; the Windows zip's `Gleanvolt.Worker.exe`;
+  the image name in the pinning example; a control character that had turned `C:\app\data` into
+  `C:<BEL>pp\data`; the battery-hold page, which described SolaX only.
+- **Not done here:** the wizard's search hint still says "SolaX devices" although it finds Huawei and
+  go-e too (`SetupText.resx`).
+
+---
+
 ## 2026-11-02 — The Pi's containers on the host's network, and one broker address (issue #268)
 
 The controller, Mosquitto and Home Assistant now run with `network_mode: host`, so the controller sees
