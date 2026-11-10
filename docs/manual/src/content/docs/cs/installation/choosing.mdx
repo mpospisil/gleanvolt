@@ -1,0 +1,37 @@
+---
+title: Jaký počítač použít?
+description: Vyberte, kde bude Gleanvolt běžet, Raspberry Pi, počítač s Linuxem, NAS nebo Windows.
+---
+
+Gleanvolt potřebuje počítač, který je **zapnutý ve dne i v noci** a je ve stejné domácí síti jako
+střídač a nabíječka. Když je počítač vypnutý, nabíjení nic neřídí.
+
+| Máte… | Zvolte | Obtížnost |
+|---|---|---|
+| Zatím nic | **Raspberry Pi 4 nebo 5** s Raspberry Pi OS (64bitovým), potom [Linux](../linux/) | Snadné |
+| Raspberry Pi nebo počítač s Linuxem, který je stále zapnutý | [Linux](../linux/): jeden příkaz | Snadné |
+| NAS od Synology, QNAP, Unraid nebo TrueNAS | [NAS](../nas/) | Střední |
+| NAS s OpenMediaVault 7 | [Linux](../linux/): uvnitř je Debian | Snadné |
+| Domácí server, na kterém už běží Docker | [Docker](../docker/) | Střední |
+| Počítač s Windows, který se nikdy nevypíná | [Windows](../windows/) | Snadné, ale viz níže |
+
+**Doporučujeme Raspberry Pi.** Spotřebuje zhruba tolik jako nabíječka telefonu, je tiché a Gleanvolt na
+něm běží jako služba, která se po výpadku proudu sama spustí.
+
+:::caution[Windows]
+Ve Windows běží Gleanvolt v okně terminálu a skončí, když okno zavřete, odhlásíte se nebo když se
+Windows restartují kvůli aktualizaci. Hodí se na vyzkoušení nebo na počítač, který je opravdu stále
+zapnutý.
+:::
+
+## Co počítač potřebuje
+
+- **64 bitů.** Raspberry Pi 3B a novější jsou 64bitové, pokud na nich běží 64bitový Raspberry Pi OS.
+  Starší NAS s 32bitovým procesorem ARM nefungují.
+- **Asi 100 MB paměti a 1 GB místa na disku.** Každý z počítačů výše jich má dost.
+- **Nejlepší je síťový kabel.** Wi-Fi funguje, ale kabel je spolehlivější.
+
+## Dál
+
+Před instalací zkontrolujte, že Gleanvolt se zařízeními dokáže mluvit:
+[Příprava střídače a nabíječky](../preparing-devices/).

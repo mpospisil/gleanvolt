@@ -1,0 +1,64 @@
+---
+title: Windows
+description: Nainstalujte Gleanvolt ve Windows 10 nebo 11 pomocí winget.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+:::caution[Gleanvolt skončí se zavřením okna]
+Ve Windows běží Gleanvolt v okně terminálu. Skončí, když okno zavřete, odhlásíte se nebo se Windows
+restartují kvůli aktualizaci, a pak nabíjení nic neřídí. Na počítač, který běží ve dne i v noci, je
+lepší [Raspberry Pi](../linux/).
+:::
+
+## Instalace
+
+<Steps>
+
+1. Otevřete **Terminál** (nebo **Příkazový řádek**): stiskněte klávesu Windows, napište `terminal` a
+   stiskněte **Enter**.
+
+2. Napište tento příkaz a stiskněte **Enter**:
+
+   ```powershell
+   winget install MartinPospisil.Gleanvolt
+   ```
+
+   Pokud se zeptá, souhlaste s podmínkami.
+
+3. Terminál zavřete a otevřete nový, aby Windows nový příkaz našly. Potom Gleanvolt spusťte:
+
+   ```powershell
+   gleanvolt
+   ```
+
+4. Když se Windows zeptají, zda Gleanvolt pustit přes bránu firewall, povolte ho pro **privátní sítě**.
+   Jinak se k němu telefon nedostane.
+
+5. V prohlížeči na stejném počítači otevřete **`http://localhost:8090`**. Z telefonu použijte
+   `http://gleanvolt.local:8090`. Uvidíte stránku pro nastavení hesla:
+
+   ![Stránka „Nastavte heslo“.](../../../../assets/screenshots/setup-password.png)
+
+6. Pokračujte [průvodcem nastavením](../../setting-up/setup-wizard/).
+
+</Steps>
+
+Okno terminálu nechte otevřené. Gleanvolt zastavíte klávesami **Ctrl+C** v okně, nebo jeho zavřením.
+
+:::note[Po restartu v průvodci]
+Ve Windows Gleanvolt nikdo znovu nespustí za vás. Pokud se stránka po **Restartovat** v průvodci nebo
+v Nastavení nevrátí, napište v terminálu znovu `gleanvolt`.
+:::
+
+## Bez winget
+
+Ze [stránky vydání](https://github.com/mpospisil/gleanvolt/releases) stáhněte
+`gleanvolt-<verze>-win-x64.zip`, rozbalte ho a ve složce `win-x64` spusťte `Gleanvolt.Worker.exe`.
+
+## Kde jsou vaše data
+
+Gleanvolt si nastavení a historii ukládá do složky `data` vedle programu. Při instalaci přes winget je
+v `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`, ve složce, jejíž název začíná
+`MartinPospisil.Gleanvolt`. Před aktualizací si ji zkopírujte: viz
+[Aktualizace, záloha a odinstalace](../updating/).

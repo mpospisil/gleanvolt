@@ -1,0 +1,93 @@
+---
+title: Jak Gleanvolt rozhoduje
+description: Solární přebytek, domácí baterie, minimální proud auta a proč se nabíjení občas pozastaví, srozumitelně.
+---
+
+Tuto stránku k používání Gleanvoltu číst nemusíte. Vysvětluje, proč Gleanvolt dělá to, co dělá, a to se
+hodí, když vás něco překvapí.
+
+## Gleanvolt nastavuje jen jednu věc
+
+Odkud energie přichází a kam jde, rozhoduje střídač. Auto nabíjí nabíječka. Gleanvolt s oběma mluví přes
+domácí síť a mění jen:
+
+- **jaký proud smí nabíječka dávat autu**, chvíli po chvíli, a kdy nabíjení začne a skončí;
+- **zda se smí vybíjet domácí baterie**, pokud používáte [blokaci vybíjení baterie](../../using/battery-hold/).
+
+Vše ostatní, například kdy se nabíjí domácí baterie nebo co jde do sítě, rozhoduje střídač jako vždy.
+
+## Přebytek
+
+Gleanvolt každých pár sekund přečte, co vyrábějí panely, co jde do sítě a ze sítě, co dělá domácí baterie
+a co bere auto. Z toho spočítá spotřebu domu a **přebytek**:
+
+> přebytek = co vyrábějí panely − co spotřebuje dům
+
+Přebytek je výkon, který by auto mohlo brát, aniž by se nakupovalo ze sítě nebo vybíjela domácí baterie.
+Solární režimy dávají autu přebytek a nic víc.
+
+**Přecházející mrak nabíjení nezastaví.** Gleanvolt se rozhoduje podle průměru za poslední tři minuty a
+proud mění jen po krocích alespoň jeden ampér.
+
+## Minimum auta: proč se nabíjení pozastavuje
+
+Auto neumí nabíjet z velmi malého proudu. Podle normy je minimum **6 A**, což je asi:
+
+- **1,4 kW** na jedné fázi;
+- **4,1 kW** na třech fázích.
+
+Na třech fázích tedy přebytek 3 kW auto nenabije vůbec. Kdyby Gleanvolt nechal nabíječku na 6 A,
+chybějících 1,1 kW by šlo ze sítě nebo z domácí baterie. Solární režimy místo toho auto **pozastaví** a
+pokračují, až bude přebytek zase dost velký. Auto, které se za oblačného dne několikrát pozastaví a znovu
+rozjede, je Gleanvolt, který funguje, jak má.
+
+Režimy se s touto mezerou vypořádají různě:
+
+- **Solar** se pozastaví.
+- **Forecasted** může nechat domácí baterii rozdíl půjčit, v den, kdy předpověď říká, že se jí to vrátí.
+- **Solar + grid** a **Targeted** mohou rozdíl koupit ze sítě, aby slunce, které svítí, nepřišlo nazmar.
+
+Znovu rozjeté nabíjení běží alespoň 10 minut a pozastavené chvíli čeká, než se znovu rozjede, aby se
+auto nezapínalo a nevypínalo každých pár minut.
+
+## Pozastavení a uspání nabíječky
+
+Když režim musí čekat, udělá jedno ze dvou:
+
+- **Krátké čekání** (pod 15 minut): nabíječka zůstane zapnutá na 0 A. Auto je pozastavené.
+- **Delší čekání**, například přes noc nebo do nízkého tarifu: nabíječka se přepne na **Stop**. Když
+  přijde čas, přepne se zpět.
+
+**Přehled** napíše, které z toho a do kdy.
+
+## Domácí baterie
+
+Domácí baterie i auto chtějí slunce. Každý režim to řeší jinak:
+
+| Režim | Domácí baterie |
+|---|---|
+| Solar | Plní se první; auto čeká |
+| Forecasted | Dostane slabé ranní a večerní slunce a v 19:00 je plná |
+| Solar + grid | Dělí se o slunce s autem |
+| Fast (no battery) | Do nabíjení se nezapojuje |
+| Targeted | Má přednost; auto dostane, co baterie nepotřebuje |
+
+Proč má přednost baterie nějakou cenu? Večer baterie napájí dům sluncem, které jste si uložili. Každá kWh,
+kterou si z ní během dne vzalo auto, je kWh, kterou v noci koupíte.
+
+## Předpověď
+
+S [účtem Solcast](../../setting-up/solar-forecast/) Gleanvolt zhruba ví, kolik slunce dnes a zítra ještě
+přijde. Forecasted a Targeted podle toho plánují. Předpověď se občas mýlí, proto:
+
+- Forecasted plánuje podle **opatrného** odhadu, ne podle nejpravděpodobnějšího, aby jeho slib, „domácí
+  baterie bude večer plná“, platil ve většině dní.
+- Gleanvolt porovnává předpověď s tím, co panely skutečně vyrábějí, a upravuje ji. Pokud je hodně mimo,
+  na zbytek dne jí přestane věřit.
+- Skutečné slunce se počítá vždy. Slunečná chvíle, kterou předpověď nečekala, jde do auta také.
+
+## Elektroměr
+
+Vše výše závisí na tom, aby elektroměr v místě připojení k síti měřil všechny tři fáze. Pokud jednu
+neměří, přebytek je špatně a solární režimy se nemusejí vůbec rozjet: viz
+[Když elektroměr jednu fázi neměří](../unmetered-phase/).

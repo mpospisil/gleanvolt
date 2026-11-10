@@ -1,0 +1,41 @@
+---
+title: Jaký režim zvolit?
+description: Vyberte režim nabíjení, který sedí na váš den, podle několika běžných situací.
+---
+
+Gleanvolt má pět režimů nabíjení. Liší se dvěma věcmi: **kolik elektřiny ze sítě** smějí koupit a **jak
+zacházejí s domácí baterií**. Názvy režimů jsou v aplikaci anglicky.
+
+## Podle situace
+
+| Vaše situace | Zvolte |
+|---|---|
+| „Svítí slunce, nikam nespěchám a chci mít nejdřív plnou domácí baterii.“ | [Solar](../solar/) |
+| „Svítí slunce a nespěchám, ale začni auto nabíjet dřív; jen ať je domácí baterie večer plná.“ | [Forecasted](../forecasted/) |
+| „Auto zůstane pár dní doma; nabij ho ze slunce, ať to trvá kolik dní chce.“ | [Forecasted](../forecasted/) s volbou **Do plna** |
+| „Využij dnešní slunce, i slabé, a nevadí mi koupit trochu ze sítě.“ | [Solar + grid](../solar-grid/) |
+| „Za hodinu odjíždím.“ | [Fast (no battery)](../fast/) |
+| „Potřebuju 80 % do zítřka do 7:00, a co nejlevněji.“ | [Targeted](../targeted/) |
+| „Potřebuju 80 % do 7:00, ale ať auto nestojí celou noc na 100 %.“ | [Fast (no battery)](../fast/) s časem odjezdu, nebo [Targeted](../targeted/) s volbou **Na poslední chvíli** |
+| „Nabíjej jen v levném nočním tarifu.“ | [Fast (no battery)](../fast/) s volbou **Jen nízký tarif** |
+| „Nabíjej jen ze slunce a do zítřejšího rána co nejvíc.“ | [Targeted](../targeted/) s volbou **Jen slunce** |
+
+## Vedle sebe
+
+| Režim | Kupuje ze sítě? | Domácí baterie | Skončí sám |
+|---|---|---|---|
+| **Solar** | Ne | Plní se první; auto dostane slunce, až když je plná | Auto plné, odpojené, nebo dnes už není slunce |
+| **Forecasted** | Ne | Zaručeně plná do večera; autu může trochu půjčit | Auto plné, odpojené, nebo dnes už není slunce |
+| **Solar + grid** | Trochu, aby šlo využít slabé slunce | Dělí se o slunce s autem | Auto plné, odpojené, nebo dnes už není slunce |
+| **Fast (no battery)** | Ano, vše, co nepokryje slunce | Zůstává stranou | Auto plné, odpojené, dodané množství, nebo čas odjezdu |
+| **Targeted** | Jen to, co slunce do termínu nestihne | Má přednost | Cíl splněn, auto plné, odpojené, nebo čas odjezdu |
+
+Dva režimy potřebují ke své práci [předpověď slunce](../../../setting-up/solar-forecast/):
+**Forecasted** a **Targeted**. Bez ní se Forecasted chová jako Solar a Targeted počítá s nákupem celého
+množství, i když slunce, které svítí, stejně využije.
+
+## Proč prostě nezapojit a nenabíjet?
+
+Bez Gleanvoltu nabíječka nabíjí auto plným výkonem, jakmile ho zapojíte: co nepokryje slunce, jde
+z domácí baterie a ze sítě. Režimy výše místo toho volí: víc vlastního slunce, méně ze sítě a domácí
+baterii, kterou auto nevybije.

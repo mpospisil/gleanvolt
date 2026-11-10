@@ -1,0 +1,93 @@
+---
+title: Příprava střídače a nabíječky
+description: Zapněte spojení, přes které Gleanvolt se střídačem a nabíječkou komunikuje.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Gleanvolt komunikuje se střídačem a nabíječkou přes domácí síť. Většina zařízení má tuto možnost
+z výroby **vypnutou**, takže ji před instalací zkontrolujte.
+
+Co zkontrolovat, záleží na značce:
+
+| Zařízení | Co zapnout | Kde |
+|---|---|---|
+| Střídač SolaX | Modbus TCP | V nastavení střídače |
+| Nabíječka SolaX (HAC, EVC) | Modbus TCP | V nastavení nabíječky |
+| Střídač Huawei SUN2000 | Modbus TCP, **Enable (Unrestricted)** | Aplikace FusionSolar, jako instalační technik |
+| Huawei SCharger | Modbus TCP | Aplikace FusionSolar |
+| Nabíječka go-e | **Local HTTP API v2** | Aplikace go-e |
+
+Obě zařízení musí být také **připojená k domácí síti**, kabelem nebo přes Wi-Fi, a zapnutá.
+
+## Střídač a nabíječka SolaX
+
+Zapněte **Modbus TCP** v nastavení střídače a znovu v nastavení nabíječky. Kde přesně nastavení je,
+záleží na modelu a firmwaru. Pokud ho nenajdete, zeptejte se instalačního technika: může být chráněné
+servisním heslem.
+
+:::note
+Pokud je nabíječka propojená se střídačem kvůli vlastním režimům SolaX „Green“ nebo „ECO“, propojení
+zrušte. Gleanvolt potřebuje s nabíječkou mluvit napřímo.
+:::
+
+## Střídač Huawei SUN2000
+
+Potřebujete **účet instalačního technika** do aplikace FusionSolar. Pokud ho nemáte, požádejte o něj
+instalačního technika.
+
+<Steps>
+
+1. V aplikaci FusionSolar otevřete u střídače **Device commissioning** a přihlaste se jako instalační
+   technik.
+
+2. Pokud je střídač připojený přes **SDongle**: otevřete **Settings → Communication configuration →
+   Dongle parameter settings → Modbus TCP** a zvolte **Enable (Unrestricted)**.
+
+   Pokud je připojený přes **EMMA**: otevřete místo toho stránku uvedení EMMA do provozu a zapněte
+   Modbus TCP v **Commission device → Communication settings → Modbus TCP**.
+
+</Steps>
+
+Potřebujete také **chytrý elektroměr Huawei** v místě připojení k síti (DTSU666-H nebo DDSU666-H), nebo
+EMMA, která ho má vestavěný. Bez něj Gleanvolt nevidí, kolik energie jde do sítě a ze sítě.
+
+Pokud používáte EMMA a chcete, aby Gleanvolt držel domácí baterii, vypněte v EMMA **AI energy
+optimisation** a nastavte **maximum self-consumption**. Baterii smí řídit jen jeden systém.
+
+## Huawei SCharger
+
+V aplikaci FusionSolar otevřete stránku uvedení nabíječky do provozu a zapněte Modbus TCP
+v **Settings → Communication configuration**.
+
+Pokud nabíječku řídí EMMA, nechte ji zatím EMMA: Gleanvolt ji může číst, ale neměl by ji řídit.
+
+## Nabíječka go-e
+
+<Steps>
+
+1. V aplikaci go-e otevřete svou nabíječku a potom **Internet → Advanced settings**.
+
+2. Zapněte **Local HTTP API v2**.
+
+3. Pokud používáte vlastní solární nabíjení aplikace (režim „Eco“), vypněte ho. Tuto práci teď dělá
+   Gleanvolt.
+
+</Steps>
+
+Potřebujete go-e s hardwarem verze 3 nebo novější: Gemini, Gemini flex, HOMEfix nebo HOME+ V3 či V4.
+
+## Vždy jen jeden řídicí systém
+
+Zařízení může řídit jen jeden program. Pokud některý z těchto už používáte, vypněte ho pro zařízení,
+která bude řídit Gleanvolt:
+
+- Integraci SolaX nebo Huawei Solar v **Home Assistant**. Některá zařízení přijmou jen jedno spojení a
+  Gleanvolt má své spojení otevřené pořád.
+- **evcc** nebo jiný systém řízení nabíjení.
+- Vlastní solární nebo plánované nabíjení v aplikaci nabíječky.
+
+## Dál
+
+[Nainstalujte Gleanvolt](../choosing/) na počítač, který jste vybrali, a potom projděte
+[průvodce nastavením](../../setting-up/setup-wizard/).

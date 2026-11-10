@@ -1,0 +1,72 @@
+---
+title: Linux a Raspberry Pi
+description: Nainstalujte Gleanvolt na Raspberry Pi nebo počítač s Debianem či Ubuntu jedním příkazem.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Na Raspberry Pi a na každém počítači s Debianem nebo Ubuntu nainstalujete Gleanvolt jedním příkazem.
+Běží jako služba: spustí se sám se spuštěním počítače a sám se vrátí, kdyby nečekaně skončil. Nic dalšího,
+ani Docker, předem instalovat nemusíte.
+
+## Co potřebujete
+
+- **Raspberry Pi 3B nebo novější** s **Raspberry Pi OS (64bitovým)**, nebo počítač s **Debianem 12 či
+  novějším** nebo **Ubuntu 22.04 či novějším**, 64bitovým. Funguje i OpenMediaVault 7.
+- Možnost na něm psát příkazy: klávesnici a monitor, nebo připojení z jiného počítače (u Raspberry Pi
+  například `ssh pi@raspberrypi.local`).
+
+:::tip[Nové Raspberry Pi]
+Na paměťovou kartu nahrajte Raspberry Pi OS programem **Raspberry Pi Imager** z jiného počítače.
+Zvolte **Raspberry Pi OS (64-bit)**, ne 32bitovou verzi. V nastavení Imageru můžete zadat uživatelské
+jméno a heslo a zapnout SSH, abyste se k Pi dostali ze svého počítače.
+:::
+
+## Instalace
+
+<Steps>
+
+1. Otevřete na počítači terminál a napište tento příkaz, celý na jeden řádek:
+
+   ```bash
+   curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
+   ```
+
+   Stiskněte **Enter**, a pokud se zeptá, zadejte své heslo.
+
+2. Počkejte asi minutu. Na konci vypíše, kde Gleanvolt otevřít:
+
+   ```
+     Web UI     http://gleanvolt.local:8090   or http://192.168.1.20:8090
+                (plain HTTP; a new install opens on the setup wizard)
+   ```
+
+3. V telefonu nebo počítači otevřete tuto adresu ve webovém prohlížeči. Uvidíte stránku pro nastavení
+   hesla:
+
+   ![Stránka „Nastavte heslo“.](../../../../assets/screenshots/setup-password.png)
+
+4. Pokračujte [průvodcem nastavením](../../setting-up/setup-wizard/).
+
+</Steps>
+
+:::note[Píše, že 32 bitů není podporováno]
+Na vašem Raspberry Pi běží 32bitový Raspberry Pi OS. Nahrajte na něj programem Raspberry Pi Imager
+64bitovou verzi a příkaz spusťte znovu.
+:::
+
+## Spuštění a zastavení
+
+Gleanvolt se spouští spolu s počítačem. Ručně ho ovládáte takto:
+
+```bash
+systemctl status gleanvolt          # běží?
+sudo systemctl stop gleanvolt       # zastavit
+sudo systemctl start gleanvolt      # znovu spustit
+sudo systemctl restart gleanvolt    # restartovat
+```
+
+Pokud ho zastavíte tlačítkem **Zastavit službu** v samotném Gleanvoltu, zůstane zastavený, dokud ho
+nespustíte příkazem výše nebo nerestartujete počítač.
+
+Aktualizace, zálohování a odinstalace jsou v [Aktualizace, záloha a odinstalace](../updating/).

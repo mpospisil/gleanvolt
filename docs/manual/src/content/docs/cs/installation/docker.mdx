@@ -1,0 +1,62 @@
+---
+title: Docker
+description: Spusťte Gleanvolt jako kontejner Dockeru na počítači s Linuxem.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Pokud na vašem domácím serveru už běží Docker, je Gleanvolt jeden kontejner. Na NAS postupujte podle
+stránky [NAS](../nas/); ta používá vlastní aplikaci pro kontejnery.
+
+## Instalace
+
+<Steps>
+
+1. Vytvořte složky, do kterých si Gleanvolt ukládá nastavení, historii a záznamy:
+
+   ```bash
+   sudo mkdir -p /opt/gleanvolt/data /opt/gleanvolt/logs
+   sudo chown -R 1654:1654 /opt/gleanvolt/data /opt/gleanvolt/logs
+   ```
+
+   Druhý řádek umožní Gleanvoltu do nich zapisovat: v kontejneru běží jako uživatel 1654.
+
+2. Spusťte kontejner. Místo `Europe/Prague` zadejte své časové pásmo:
+
+   ```bash
+   docker run -d --name gleanvolt-controller --restart on-failure \
+     --network host \
+     -e TZ=Europe/Prague \
+     -v /opt/gleanvolt/data:/app/data \
+     -v /opt/gleanvolt/logs:/app/logs \
+     ghcr.io/mpospisil/gleanvolt:latest
+   ```
+
+3. Otevřete **`http://gleanvolt.local:8090`**, nebo `http://`, adresu serveru a `:8090`. Uvidíte stránku
+   pro nastavení hesla:
+
+   ![Stránka „Nastavte heslo“.](../../../../assets/screenshots/setup-password.png)
+
+4. Pokračujte [průvodcem nastavením](../../setting-up/setup-wizard/).
+
+</Steps>
+
+## Proč tyto volby
+
+- **`--network host`** připojí Gleanvolt do domácí sítě, takže hledání v průvodci najde vaše zařízení
+  a telefon najde `gleanvolt.local`. Bez ní hledání vidí jen vlastní síť Dockeru.
+- **`--restart on-failure`** vrátí Gleanvolt po pádu nebo po restartu z jeho stránky. Nepoužívejte
+  `always` ani `unless-stopped`: pak ho tlačítko **Zastavit službu** v Gleanvoltu nezastaví.
+- **`TZ`** je vaše časové pásmo, aby den v historii začínal o vaší půlnoci.
+
+## Spuštění a zastavení
+
+```bash
+docker stop gleanvolt-controller     # zastavit; nejdřív se pozastaví nabíječka
+docker start gleanvolt-controller    # znovu spustit
+docker logs -f gleanvolt-controller  # sledovat, co dělá
+```
+
+Nepoužívejte `docker kill`: Gleanvolt pak nestihne nabíječku pozastavit.
+
+Aktualizace je popsaná v [Aktualizace, záloha a odinstalace](../updating/).

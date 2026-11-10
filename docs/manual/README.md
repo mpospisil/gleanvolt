@@ -21,9 +21,13 @@ npm run build      # what CI runs; fails on a broken link or anchor (scripts/che
 
 ## Pages and languages
 
-Pages are under `src/content/docs/<language>/`, `en/` and `cs/` so far. English is the source and is
-always complete. A page missing from another language shows the English one with a notice, so a new
-language never blocks a release. In Czech, *import*, *export* and the mode names stay untranslated.
+Pages are under `src/content/docs/<language>/`, `en/` and `cs/`, with the same pages in each. English is
+the source. A page missing from another language shows the English one with a notice, so a new page in
+English never blocks a release; translate it in the same pull request when you can.
+
+**Czech** quotes every button and label exactly as the Czech UI shows it (`*.cs.resx`). The mode names
+(Off, Solar, Forecasted, Solar + grid, Fast (no battery), Targeted) and *import* / *export* stay in English,
+as they do in the UI. Menus of other companies' apps (FusionSolar, Synology, …) are quoted in English.
 
 A new page goes into the `sidebar` in [`astro.config.mjs`](astro.config.mjs). Link pages to each other
 with relative paths ending in `/`, for example `../../setting-up/setup-wizard/` from

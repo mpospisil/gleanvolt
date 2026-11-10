@@ -1,0 +1,58 @@
+---
+title: Soukromí
+description: Co si Gleanvolt uchovává, kde, a co opouští vaši domácí síť a kdy.
+---
+
+Gleanvolt běží na vašem vlastním počítači, u vás doma. **Neexistuje žádný účet Gleanvolt, žádný server
+Gleanvolt a autorovi se nic neposílá.** Žádné statistiky používání, žádná hlášení o pádech, žádná
+kontrola aktualizací.
+
+To, co Gleanvolt zaznamenává, je přesto osobní: obraz vaší elektřiny minutu po minutě ukazuje, kdy je
+někdo doma, kdy auto přijíždí a odjíždí a kdy je domácnost vzhůru. Proto přesně o tom, kam to jde.
+
+## Co se uchovává na vašem počítači
+
+Všechno je ve složkách `data` a `logs` Gleanvoltu, na počítači, na kterém běží.
+
+| Co | Obsahuje | Uchovává se |
+|---|---|---|
+| Nabíjení | Každé nabíjení: kdy, kolik, z jakého zdroje, stav domácí baterie, a stav baterie auta, pokud se čte | 365 dní |
+| Historie energie | Každá čtvrthodina: slunce, síť, domácí baterie, auto | Napořád, pokud ji nesmažete |
+| Záznamy | Co Gleanvolt rozhodl a proč, a chyby | 14 dní |
+| Nastavení | Vaše nastavení, včetně polohy domu a adres zařízení | Dokud je nesmažete |
+| Hesla a klíče | Heslo k účtu auta, klíče Solcast a počasí a další | Dokud je neodstraníte |
+
+Gleanvolt se nikdy neptá na vaše jméno, e-mail, adresu, telefon ani platební údaje.
+
+**Hesla a klíče** jsou uložené tak, aby je mohl číst jen Gleanvolt (ve Windows jen váš účet Windows), ale
+nejsou zašifrované tak, aby je kopie složky nedokázala použít. Kdo má kopii složky `data`, mohl by se
+přihlásit k účtu vašeho auta. Zálohy nikomu nedávejte.
+
+**Heslo do Gleanvoltu** je uložené jen jako otisk (hash), ze kterého heslo zpátky získat nejde.
+
+**Smazání všeho**: zastavte Gleanvolt a smažte jeho složku `data`.
+
+## Co zůstává ve vaší domácí síti
+
+- **Střídač a nabíječka**: Gleanvolt s nimi mluví přímo, přes vaši síť.
+- **Stránka Gleanvoltu** (port 8090): dokud není nastavené heslo, nic neukazuje, a potom o něj žádá.
+  Spojení není šifrované (prosté HTTP), takže ji používejte jen v domácí síti, které věříte.
+- **Home Assistant**, pokud ho připojíte: živé údaje jdou do brokeru MQTT, který zadáte.
+
+## Co opouští váš domov, a kdy
+
+Jen tyto služby, a **jen pokud je nastavíte**:
+
+| Služba | Co se posílá | Kdy |
+|---|---|---|
+| **Solcast** (předpověď slunce) | Váš klíč Solcast a ID instalace, které jste u Solcastu vytvořili. Ne vaše poloha | Několikrát denně |
+| **OpenWeatherMap** (počasí) | Váš klíč a **poloha vašeho domu** | Dvakrát za nabíjení |
+| **Volkswagen, Škoda nebo portál VW Group Data Act** (stav baterie auta) | Přihlášení k vašemu účtu a VIN auta, výrobci auta | Při čtení auta |
+
+Požadavky na výrobce auta jdou k němu a řídí se jeho zásadami ochrany soukromí. Gleanvolt se přihlašuje
+jako vy, s údaji, které jste mu dali, a uchovává si jen stav baterie auta, dojezd, stav připojení a
+nabíjení a čas, kdy to auto nahlásilo. VIN se do historie neukládá.
+
+**Poloha vašeho domu** opouští vaši síť jen tehdy, když nastavíte počasí, které ji potřebuje.
+
+Nic jiného se nikdy nekontaktuje.
