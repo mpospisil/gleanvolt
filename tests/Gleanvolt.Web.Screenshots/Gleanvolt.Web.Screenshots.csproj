@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The user manual's screenshots (#329). Each test renders a real page through bUnit, inside the real
+    layout, from a curated fixture, and (when GLEANVOLT_SCREENSHOTS names a directory) writes it there
+    as a self-contained HTML file. docs/manual/scripts/screenshots.mjs runs these tests and turns each file
+    into a PNG with headless Chrome. Without the variable the tests only render, so the solution's own test
+    run catches a fixture that a UI change has broken.
+
+    The fakes are the web tests' own, compiled in rather than referenced: a test project referencing
+    another drags in its test discovery, and the fakes are internal to it.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" Version="2.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Gleanvolt.Web.Tests\Fakes.cs" Link="Shared\Fakes.cs" />
+    <Compile Include="..\Gleanvolt.Web.Tests\PageTest.cs" Link="Shared\PageTest.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gleanvolt.Web\Gleanvolt.Web.csproj" />
+    <!-- For the real driver lists, so the device forms offer what a real install offers. -->
+    <ProjectReference Include="..\..\src\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -27,6 +27,7 @@
   -->
   <ItemGroup>
     <InternalsVisibleTo Include="Gleanvolt.Web.Tests" />
+    <InternalsVisibleTo Include="Gleanvolt.Web.Screenshots" />
   </ItemGroup>
 
   <ItemGroup>

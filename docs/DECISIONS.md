@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-10 — The user manual: Starlight on gh-pages, screenshots from bUnit
+
+**Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329): a user manual for people with
+no technical background, with search, several languages and a screenshot for each step. The pages in
+`docs/` are references for technical readers and stay as they are.
+
+**Decision — Starlight (Astro) in `docs/manual`, built by its own workflow.** It gives search (Pagefind,
+built with the site, no outside service), light and dark themes, a language picker with an English
+fallback and a mobile layout. Node is used for the manual only, pinned by `package-lock.json`, and
+`docs.yml` is separate from `ci.yml` so the .NET build doesn't need it. `starlight-links-validator` fails
+the build on a broken link or anchor.
+
+**Decision — every version is a folder on a `gh-pages` branch.** `actions/deploy-pages` replaces the whole
+site on each deploy, so it can keep only one version. The workflow builds with Astro's `base` set to the
+folder and commits it: `/next/` from `main`, `/vX.Y/` and `/latest/` from a tag (one manual per minor
+version, the latest patch's). The root redirects to `/latest/`, or to `/next/` until a release has one.
+**URLs are `/<repo>/<version>/<language>/<page>/`**, which is what in-app help links would need.
+
+**Decision — screenshots rendered, not taken.** The app has no demo mode, and a running app needs devices
+and spends a Solcast call. `tests/Gleanvolt.Web.Screenshots` renders the real pages through bUnit inside
+`MainLayout`, from a fixed fixture with the real driver lists, and writes standalone HTML that loads the
+web UI's own CSS and fonts. `docs/manual/scripts/screenshots.mjs` opens each in the installed Chrome
+(`puppeteer-core`, no browser download) and saves a PNG. Without `GLEANVOLT_SCREENSHOTS` the tests only
+render, so `ci.yml` catches a fixture a UI change broke.
+
+**Decision — the check compares what a picture is made of, not its pixels.** `fingerprints.json`, written
+with the PNGs, holds a hash of each page's HTML, its framing and `site.css`. On a pull request,
+`screenshots:check` renders the HTML again and fails on any difference. Found on the first CI run: the
+runner's Chrome anti-aliases text differently from a desktop's, so 1–2 % of every picture's pixels
+differed with nothing changed, and a tolerance wide enough for that would also pass a changed word. bUnit's
+`blazor:*` attributes (element reference ids, new each run) are stripped from the HTML to make it stable.
+
+**Consequences accepted.** No scripts run in the captured pages, so a picture shows what the server
+rendered, not a state reached by JavaScript. The recovery key appears only in answer to the setup form's
+POST, which bUnit does not make, so that picture rebuilds the branch of `Setup.razor` with the same
+component and card; a change to that branch has to be mirrored in `SetupScreenshots`. The pictures are
+made on a contributor's machine, so their anti-aliasing is whatever that Chrome does. A change to the
+fonts or the uPlot stylesheet is not in the fingerprint; only `site.css` is.
+
+---
+
 ## 2026-11-10 — Found on the LAN as gleanvolt.local, by a responder of our own
 
 **Context.** [Issue #363](https://github.com/mpospisil/gleanvolt/issues/363): after an install, the user
