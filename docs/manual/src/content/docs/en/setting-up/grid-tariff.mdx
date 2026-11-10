@@ -1,0 +1,50 @@
+---
+title: Grid tariff
+description: Tell Gleanvolt when electricity from the grid is cheaper, so charging can wait for it.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Many homes pay two prices for electricity: a **low tariff** at certain hours, often at night, and a
+**high tariff** the rest of the time. In the Czech Republic this is the distributor's **HDO**.
+
+If you enter your low-tariff hours, two charging modes can wait for them before they use the grid:
+**Fast (no battery)** and **Solar + grid**, when you tick their **Low tariff only** option. Entering the
+hours on their own changes nothing about charging; the Overview just shows which tariff applies now.
+
+## Find your low-tariff hours
+
+Your distributor publishes them for your **HDO code**. The code is on the HDO receiver next to your
+electricity meter, and in your contract. ČEZ Distribuce, EG.D and PREdistribuce each have a page called
+*HDO* or *časy spínání* where you type it in.
+
+## Enter them
+
+<Steps>
+
+1. Open **Settings**, and find **Tariff**. (Or the setup wizard's **Extras** step.)
+
+2. Under **Provider**, choose **Table**.
+
+3. Under **Weekdays**, enter the low-tariff periods for Monday to Friday. Press **Add period** for each
+   one. Then do the same under **Weekend**. Public holidays follow the weekday list.
+
+4. Optionally, enter the **prices** per kWh. Without them, the tariff is shown without a price.
+
+5. Check the **Today and tomorrow** bars: the shaded parts are low tariff. Then press **Save**.
+
+</Steps>
+
+![The tariff section: weekday low tariff from 00:00 to 06:00 and 22:00 to 24:00, weekend from 00:00 to 08:00, 13:00 to 15:00 and 22:00 to 24:00, with bars for today and tomorrow and the two prices.](../../../../assets/screenshots/settings-tariff.png)
+
+It applies straight away; there is no need to restart.
+
+## Rules for the periods
+
+- **Enter only the low-tariff times.** Every other time is high tariff.
+- **A period ends on the same day it starts.** A night tariff from 22:00 to 06:00 is two rows:
+  **22:00–24:00** and **00:00–06:00**. Gleanvolt joins them across midnight, so at 23:00 it says
+  "Low tariff, until 06:00".
+- **Periods in one list must not overlap.** Touching is fine, such as 06:00–08:00 and 08:00–10:00.
+- **Summer and winter time are handled** for you.
+- If your distributor changes your hours with the season, change the table when they do.

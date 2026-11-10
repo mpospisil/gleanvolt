@@ -4,6 +4,33 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The manual's Setting up chapter (issue #329, step 3)
+
+Six pages under `docs/manual/src/content/docs/en/setting-up/`, after the setup wizard:
+
+- **Finding your devices** — the wizard's search and its columns, what "not identified" and *port open,
+  no Modbus reply* mean, a container's 172.x network, typing the addresses by hand per brand, what a save
+  checks, and DHCP reservations so a device keeps its address.
+- **Solar forecast (Solcast)** — the free account, the rooftop site and its numbers, where the resource
+  id and the API key are, **Save and fetch**, and the ~10 calls a day that restarts also spend.
+- **Weather** — the OpenWeatherMap key; a new key can take hours to start working.
+- **Grid tariff** — HDO and where to find the hours, the Table provider, a night tariff as two rows, and
+  that the tariff only matters to *Low tariff only* on Fast and Solar + grid.
+- **Your car and its battery level** — the car's own fields (with the phases warning), then one tab per
+  feed: Volkswagen (save, restart, sign in, emailed code), Škoda (MySkoda API key), the Data Act portal
+  for Audi, SEAT, Cupra and Bentley (consent, the continuous data request), and charge only.
+- **The Settings page** — what applies at once and what needs a restart, *Saved, not applied*, each
+  section of Installation, and the Health tab's Restart and Stop service.
+
+**Screenshots** — `SettingsScreenshots` adds seven: the Installation form, the Solcast, weather and
+tariff sections, the Health tab, the Car page with Volkswagen chosen, and the Account section asking
+for the emailed code (reached by clicking **Sign in** on the rendered page). The fixture is an install
+that has been running: a fetched forecast, a weather key, a Czech night tariff, a polled controller in
+mode Off, and a Linux secret store. The clock is a `FixedTimeProvider`, so "fetched at 12:30" and
+"4 s ago" give the same HTML on every run.
+
+---
+
 ## 2026-11-10 — The manual's Installation chapter (issue #329, step 2)
 
 Seven pages under `docs/manual/src/content/docs/en/installation/`, in the sidebar between Welcome and
