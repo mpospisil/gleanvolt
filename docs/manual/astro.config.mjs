@@ -40,7 +40,15 @@ export default defineConfig({
         {
           label: 'Setting up',
           translations: { cs: 'Nastavení' },
-          items: [{ slug: 'setting-up/setup-wizard' }],
+          items: [
+            { slug: 'setting-up/setup-wizard' },
+            { slug: 'setting-up/finding-devices' },
+            { slug: 'setting-up/solar-forecast' },
+            { slug: 'setting-up/weather' },
+            { slug: 'setting-up/grid-tariff' },
+            { slug: 'setting-up/car' },
+            { slug: 'setting-up/settings' },
+          ],
         },
       ],
     }),

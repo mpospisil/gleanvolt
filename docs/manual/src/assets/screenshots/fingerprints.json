@@ -1,4 +1,11 @@
 {
+  "car-sign-in-code": "132d1bfa2ded60aa1d3aacbd6a3ec397aafaf61f3c09f7f1b3b8c58df4f0a8be",
+  "car-volkswagen": "c4d85437e90a120f2032bda79f5cf475dc0e8d00f2e7ac28cb7b87e226138fbe",
+  "settings-health": "608c62dd37e77482d65d157e6bdcd17682e3b5b58591168cb277e45b5b5ce2d0",
+  "settings-installation": "f632e581e4ddb8541b13b3791bd545edb91edb7aff9b7209548aba92356dc7fb",
+  "settings-solcast": "51392dd4d7962433c52cbcc7171191aa87c28ef6e9c997b7e9c17323930468f7",
+  "settings-tariff": "4c0b50909a259883afb16a3cf2ef26a6b601db3a99b39a394e1c47e3177b8722",
+  "settings-weather": "84bd48687373508ec63093d794ac9394645da4ec58678caf5797adc90d95c1c8",
   "setup-password": "b4dce4bca9f3932cb1c57535393bef72111c42d6d90c2b34a6ff43e272ea39bf",
   "setup-recovery-key": "f88ea7929c35312d65049814e055d5627534403b302dabab209f61b918a8049a",
   "wizard-car": "e01373bab8f90dca507591f6af507c1664281df9773b646e7defabe43ff2f47c",
