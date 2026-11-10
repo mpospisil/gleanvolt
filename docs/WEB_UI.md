@@ -180,7 +180,7 @@ and API forms below it work the same way, with their secrets going to the secret
 Older configuration keys still in use are listed under *Configuration to move*.
 
 Below the devices, the **MQTT** section shows the two links — to [Home Assistant](HOME_ASSISTANT.md)
-and to the [vehicle feed](VEHICLE.md#vehicle-telemetry-the-vehicle-section) — each with the broker,
+and to the [vehicle feed](VEHICLE.md#where-the-cars-state-of-charge-comes-from) — each with the broker,
 the user and client id, and the topics actually in use (for Home Assistant, the topic prefix built
 from `HomeAssistant:BaseTopic` and `Pv:Id`). It shows the configuration read at startup, not whether a
 link is up. The **API** section says whether the [HTTP API](HTTP_API.md) is on, its base URL as this
@@ -199,10 +199,10 @@ car*. (`/vehicle-portal` redirects here.)
 
 | Choice | Feed it configures | What you fill in | Freshness |
 |---|---|---|---|
-| **Volkswagen** | [`Vehicle:Website`](VEHICLE.md#vehiclewebsite--volkswagende-the-live-source) | VW ID e-mail, password, VIN | ~20 s, plug state, live while charging |
-| **Škoda** | [`Vehicle:Skoda`](VEHICLE.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) | VIN, then an API key under **Account** | 5–15 min, plug state |
-| **Audi · SEAT · Cupra · Bentley · VW commercial** | [`Vehicle:DataAct`](VEHICLE.md#the-car-from-the-manufacturer-on-a-clock-the-vehicledataact-section) | Brand, VW ID, password, VIN | hours behind; no plug state |
-| **A feed I publish myself** | [`Vehicle`](VEHICLE.md#vehicle-telemetry-the-vehicle-section) | Topic | whatever publishes it |
+| **Volkswagen** | [`Vehicle:Website`](VEHICLE.md#volkswagende-vehiclewebsite) | VW ID e-mail, password, VIN | ~20 s, plug state, live while charging |
+| **Škoda** | [`Vehicle:Skoda`](VEHICLE.md#myškoda-vehicleskoda) | VIN, then an API key under **Account** | 5–15 min, plug state |
+| **Audi · SEAT · Cupra · Bentley · VW commercial** | [`Vehicle:DataAct`](VEHICLE.md#eu-data-act-portal-vehicledataact) | Brand, VW ID, password, VIN | hours behind; no plug state |
+| **A feed I publish myself** | [`Vehicle`](VEHICLE.md#where-the-cars-state-of-charge-comes-from) | Topic | whatever publishes it |
 | **Another manufacturer — charge only** | none | nothing | — |
 
 **Charge only is not an error.** Every car with a Type 2 inlet charges without a feed. The one thing

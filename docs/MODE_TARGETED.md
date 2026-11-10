@@ -13,7 +13,7 @@ This mode takes an **energy in kWh** and a **departure time**, and plans backwar
 The plan is rebuilt from a refreshed forecast and the **measured** delivery on every poll, and nothing
 in it is ever committed to.
 
-With [vehicle telemetry](VEHICLE.md#vehicle-telemetry-the-vehicle-section) configured you can state the target as
+With [vehicle telemetry](VEHICLE.md#where-the-cars-state-of-charge-comes-from) configured you can state the target as
 a **state of charge** instead — *"80% by seven"* — and the controller converts it to kilowatt-hours
 once, when you start it. Energy is still what is promised and still what is metered; see
 [Setting a target](#setting-a-target).
