@@ -1,5 +1,7 @@
 # Fast charge without the battery (the `FastNoBattery` mode)
 
+> **Using Gleanvolt?** The user manual has this step by step: [Fast (no battery)](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/fast/). This page is the reference behind it.
+
 The "I leave in an hour" button. Where `Solar` and `Forecasted` ration the car to what the sun can
 spare, this mode does the opposite: **charge as fast as the installation allows, and keep the home
 battery out of it.** While it is selected:

@@ -1,5 +1,7 @@
 # Forecast-driven charging (the `Forecasted` mode)
 
+> **Using Gleanvolt?** The user manual has this step by step: [Forecasted](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/forecasted/). This page is the reference behind it.
+
 `Solar` waits for the home battery to be essentially full before the car gets anything. That costs
 real energy: on a good day the battery only fills around midday, so the car starts as production is
 already falling, and on three phases the charger's **6 A floor is ~4.2 kW** (no phase switching), so

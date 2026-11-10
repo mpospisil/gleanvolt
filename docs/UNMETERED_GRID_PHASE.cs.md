@@ -1,5 +1,7 @@
 # Neměřená fáze sítě
 
+> **Používáte Gleanvolt?** Příručka to popisuje krok za krokem: [Když elektroměr jednu fázi neměří](https://mpospisil.github.io/gleanvolt/latest/cs/how-it-works/unmetered-phase/). Tato stránka je podrobný popis.
+
 *English: [UNMETERED_GRID_PHASE.md](UNMETERED_GRID_PHASE.md)*
 
 **Stručně: nechte pole prázdné.** Vyplňte ho jen tehdy, když elektroměr vaší fotovoltaické elektrárny

@@ -1,5 +1,7 @@
 # Gleanvolt privacy policy
 
+> **Using Gleanvolt?** The user manual has this step by step: [Privacy](https://mpospisil.github.io/gleanvolt/latest/en/privacy/). This page is the reference behind it.
+
 **Applies to:** Gleanvolt 1.0.5 and later.
 **Last updated:** 2026-09-28.
 

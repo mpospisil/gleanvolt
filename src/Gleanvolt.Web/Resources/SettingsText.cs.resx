@@ -984,9 +984,6 @@
   <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
     <value>Jak poznat, že elektroměr jednu fázi neměří</value>
   </data>
-  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
-    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.cs.md</value>
-  </data>
   <data name="SnapshotButton" xml:space="preserve">
     <value>Uložit snímek registrů</value>
   </data>

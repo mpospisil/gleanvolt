@@ -1,5 +1,7 @@
 # Troubleshooting
 
+> **Using Gleanvolt?** The user manual has this step by step: [Troubleshooting and FAQ](https://mpospisil.github.io/gleanvolt/latest/en/troubleshooting/). This page is the reference behind it.
+
 Most of these fail quietly rather than loudly, which is what makes them worth listing: the service
 looks healthy while doing the wrong thing. Problems specific to the Docker deployment from your
 computer are in [its own troubleshooting](../deploy/README.md#troubleshooting), and NAS ones in

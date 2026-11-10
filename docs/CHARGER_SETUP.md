@@ -1,5 +1,7 @@
 # Setting up a Huawei SCharger or a go-e
 
+> **Using Gleanvolt?** The user manual has this step by step: [Preparing your inverter and charger](https://mpospisil.github.io/gleanvolt/latest/en/installation/preparing-devices/). This page is the reference behind it.
+
 How to connect Gleanvolt to an EV charger that is not a SolaX: Huawei's **SCharger-7KS-S0** or
 **-22KT-S0**, or a **go-e Charger**. What works, and how well it has been tested, is in
 [Supported EV chargers](SUPPORTED_CHARGERS.md). In short: both are **Expected**. Their drivers

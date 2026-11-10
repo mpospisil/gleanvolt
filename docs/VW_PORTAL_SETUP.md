@@ -1,5 +1,7 @@
 # Reading your car from the VW Group EU Data Act portal
 
+> **Using Gleanvolt?** The user manual has this step by step: [Your car and its battery level](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/car/). This page is the reference behind it.
+
 How to get the four settings the **Car** page needs, and what to do when it does not work.
 
 > **Two things, in order.** Steps 1–6 below get the **Car** page showing your car when you

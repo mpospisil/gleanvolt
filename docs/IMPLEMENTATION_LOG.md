@@ -4,6 +4,25 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — Pointing users at the manual (issue #329, step 6)
+
+- **Web UI** — `ManualLinks` (the address for a page, version and language) and `ManualLink` (the
+  component). The menu's eighth link, **Manual** (`SharedText.NavManual`, *Příručka* in Czech). The
+  unmetered-phase help on Settings opens `how-it-works/unmetered-phase` in the manual; its
+  `HelpUnmeteredPhaseUrl` strings are gone. `site.css` folds the menu below 74rem instead of 64rem.
+  Tests: `ManualLinksTests`, and the two tests that named the old URL and the seven links.
+- **Czech page** — `cs/how-it-works/unmetered-phase`, from `UNMETERED_GRID_PHASE.cs.md`, so the Czech
+  help link still opens Czech.
+- **README** — the manual is named under the intro, Get started links its chapters, and the
+  documentation table is introduced as the reference.
+- **docs/** — a pointer line at the top of the 19 user pages the manual covers (and the Czech
+  unmetered-phase page). Developer, Home Assistant, API, data and deployment pages are unchanged.
+- **docs.yml** — a push to `main` also publishes `/latest/` while no release has.
+- **Wiki** — Home, Get started, the sidebar, the footer and the moved-page stubs point at the manual,
+  with the repository as the reference. Pushed after this merges, once `/latest/` exists.
+
+---
+
 ## 2026-11-10 — The manual's How it works, Troubleshooting, Privacy and Glossary (issue #329, step 5)
 
 Five pages, which complete the English manual:

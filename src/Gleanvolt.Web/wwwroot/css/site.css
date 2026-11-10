@@ -448,11 +448,11 @@ textarea {
     display: none;
 }
 
-/* Seven links (#255's Settings), the brand, the site and Sign out need about 62rem in one row at this
-   face's width -- measured, with a typical site name; a longer one is cut short with an ellipsis
-   rather than pushing the links off the bar. Below that the links fold behind the button into a
-   panel under the bar, one per row with a thumb-sized target. */
-@media (max-width: 64rem) {
+/* Eight links (#255's Settings, #329's Manual), the brand, the site and Sign out need about 72rem in one
+   row at this face's width -- measured, with a typical site name; a longer one is cut short with an
+   ellipsis rather than pushing the links off the bar. Below that the links fold behind the button into
+   a panel under the bar, one per row with a thumb-sized target. */
+@media (max-width: 74rem) {
     .topbar {
         gap: var(--space-4);
         padding: var(--space-2) var(--space-4);

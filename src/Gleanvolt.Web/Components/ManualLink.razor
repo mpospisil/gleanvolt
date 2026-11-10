@@ -1,0 +1,22 @@
+@using System.Globalization
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider Services
+
+@*
+    A link into the user manual (#329): the page for the running version, in the UI's language, in a
+    new tab. The build is looked up rather than injected, so a page rendered without one (a test, or a
+    host that registers none) still links, to the newest release's manual.
+*@
+
+<a href="@Href" target="_blank" rel="noopener" class="@Class">@ChildContent</a>
+
+@code {
+    /// <summary>The manual page, e.g. <c>how-it-works/unmetered-phase</c>; empty for the welcome page.</summary>
+    [Parameter] public string Page { get; set; } = string.Empty;
+
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string Href => ManualLinks.For(Page, Services.GetService<WebBuildInfo>(), CultureInfo.CurrentUICulture);
+}

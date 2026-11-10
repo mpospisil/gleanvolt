@@ -1,5 +1,7 @@
 # Unmetered grid phase
 
+> **Using Gleanvolt?** The user manual has this step by step: [When the grid meter misses a phase](https://mpospisil.github.io/gleanvolt/latest/en/how-it-works/unmetered-phase/). This page is the reference behind it.
+
 *Česky: [UNMETERED_GRID_PHASE.cs.md](UNMETERED_GRID_PHASE.cs.md)*
 
 **In short: leave it empty.** Set it only if the grid meter of your PV system does not measure one of

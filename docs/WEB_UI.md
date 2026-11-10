@@ -1,5 +1,7 @@
 # Self-hosted web UI (the `Web` section)
 
+> **Using Gleanvolt?** The user manual has this step by step: [The setup wizard](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/setup-wizard/) and [The Overview](https://mpospisil.github.io/gleanvolt/latest/en/using/overview/). This page is the reference behind it.
+
 The controller serves its own web UI at **`http://gleanvolt.local:8090`** — or `http://<host>:8090`,
 by the machine's address. It is on by default and needs no configuration: no broker, no Home
 Assistant, no onboarding. It shows live telemetry, the charging

@@ -77,9 +77,9 @@ public class PvSystemEditorFormTests : BunitContext
 
         var phase = form.Find(Field(PvSystemSettingKeys.InverterUnmeteredGridPhase)).ParentElement!;
         var link = phase.QuerySelector(".info-pop p a")!;
-        Assert.EndsWith("docs/UNMETERED_GRID_PHASE.md", link.GetAttribute("href"));
-        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.md")));
-        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "UNMETERED_GRID_PHASE.cs.md")));
+        // The manual's page (#329), which exists in the manual's sources; the address itself is ManualLinksTests'.
+        Assert.EndsWith("/en/how-it-works/unmetered-phase/", link.GetAttribute("href"));
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "docs", "manual", "src", "content", "docs", "en", "how-it-works", "unmetered-phase.mdx")));
     }
 
     [Fact]

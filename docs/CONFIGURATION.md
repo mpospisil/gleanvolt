@@ -1,5 +1,7 @@
 # Configuration
 
+> **Using Gleanvolt?** The user manual has this step by step: [The Settings page](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/settings/). This page is the reference behind it.
+
 **Configure Gleanvolt in the web UI.** The [setup wizard](WEB_UI.md#the-setup-wizard) covers what a
 new installation needs, and **Settings** and **Car** cover the rest of what you change day to day.
 Every value is checked as you save it. That is the recommended way, and the one this documentation

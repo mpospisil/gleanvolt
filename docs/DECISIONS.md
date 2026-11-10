@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-10 — The web UI links to the online manual for its own version; the docs/ pages stay as reference
+
+**Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), step 6, and its open question:
+should the web UI's help open the published manual for the running version and language, or should the
+app carry its own copy for use without internet?
+
+**Decision — link out, per version and language.** `ManualLinks` builds
+`https://mpospisil.github.io/gleanvolt/<folder>/<en|cs>/<page>/`, where the folder is `v<major>.<minor>`
+of the running build, `next` for a `0.0.0` development build, and `latest` when the version can't be read.
+Every release tag publishes its own folder, so a release's link always exists. The UI language picks the
+manual's language, with English for any other. `ManualLink` renders one, looking the build up optionally
+so a host or test without `WebBuildInfo` still links. The menu gets a **Manual** link, and the
+unmetered-phase help on Settings, the one link that went to GitHub Markdown, now opens its manual page.
+A bundled copy was not chosen: the app works offline, but its help is read rarely and online, and
+shipping the site would add Node to the .NET build. It can be added later behind the same `ManualLinks`.
+
+**Decision — `/latest/` is filled from `main` until the first release.** README, wiki and pointer links
+go to `/latest/`. Until a tag has published it, a push to `main` publishes there as well as to `/next/`.
+
+**Decision — the user pages in `docs/` get a pointer, not a deletion.** Each page the manual covers starts
+with a line linking its manual page and calling itself the reference. They hold the configuration keys,
+the reasoning and the edge cases the manual leaves out, other pages and the code's comments link to them,
+and the issue's approach keeps them for the advanced reader. Slimming them further can follow.
+
+**Consequences accepted.** Eight links no longer fit the bar at 64rem, so it folds behind **Menu** below
+74rem (measured: they need about 72rem). A help link from an offline browser fails. A link from a build
+whose version has no published manual (none so far: every release from now on publishes one) would 404.
+
+---
+
 ## 2026-11-10 — The manual's screenshots replay the page's charts
 
 **Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), the "Using Gleanvolt"

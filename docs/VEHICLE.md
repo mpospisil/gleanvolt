@@ -1,5 +1,7 @@
 # The car and its telemetry
 
+> **Using Gleanvolt?** The user manual has this step by step: [Your car and its battery level](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/car/). This page is the reference behind it.
+
 Two things are configured separately:
 
 - **The car** (the `Ev` section) — what the controller is charging: its pack, its phases and the

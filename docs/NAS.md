@@ -1,5 +1,7 @@
 # Running on a NAS
 
+> **Using Gleanvolt?** The user manual has this step by step: [NAS](https://mpospisil.github.io/gleanvolt/latest/en/installation/nas/). This page is the reference behind it.
+
 A NAS that is on all the time, on the same LAN as the inverter and the charger, is as good a host as the
 Pi. The controller uses about 75 MB of RAM, so any NAS that runs containers has room for it.
 
