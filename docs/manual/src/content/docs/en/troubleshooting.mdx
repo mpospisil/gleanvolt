@@ -1,0 +1,180 @@
+---
+title: Troubleshooting and FAQ
+description: What to do when Gleanvolt doesn't open, can't see your devices, or doesn't charge the car as expected.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Opening Gleanvolt
+
+**`http://gleanvolt.local:8090` doesn't open.**
+Some phones and networks can't find `.local` names: older Android phones, guest or IoT Wi-Fi networks,
+Linux without the `nss-mdns` package, Docker without `--network host`, and Windows when the firewall
+blocked Gleanvolt. Use the computer's address instead, such as `http://192.168.1.20:8090`. Your router's
+list of connected devices shows it.
+
+**It's called `gleanvolt-2.local`.**
+Another device already uses `gleanvolt.local`, usually a second Gleanvolt. That is expected.
+
+**The page doesn't open at all, even by address.**
+Check that Gleanvolt is running: see [Is it running?](#is-it-running) below.
+
+**Every page goes to the setup wizard.**
+Something required is still missing: the password, the inverter or the charger. Gleanvolt waits, and
+controls nothing, until they are set. Finish [the setup wizard](../setting-up/setup-wizard/) and press
+**Restart** on its last step.
+
+**I finished the wizard, but it still goes to the wizard.**
+Gleanvolt hasn't restarted since. On Windows nothing restarts it for you: close it and start it again.
+
+**I forgot the password.**
+Click **Forgot your password?** on the sign-in page. You can reset it with the **recovery key** you saved
+during setup. If you don't have the key, press **Write a code on the machine**: Gleanvolt writes a
+one-time code where only someone with access to the computer can read it.
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+sudo cat /var/lib/gleanvolt/password-reset-code.txt
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker logs gleanvolt-controller 2>&1 | grep "reset code"
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Open the `data` folder in the folder you made for Gleanvolt, and the file `password-reset-code.txt`.
+Or look for "reset code" in the container's log, in your NAS's container app.
+
+</TabItem>
+<TabItem label="Windows">
+
+Open `password-reset-code.txt` in the `data` folder next to the program.
+
+</TabItem>
+</Tabs>
+
+The code works once, for 15 minutes.
+
+## Devices and readings
+
+**The home battery level never changes, and solar and grid show 0.**
+The inverter's and the charger's addresses are swapped. Both answer on the same port, so Gleanvolt
+connects to either. Swap them on **Settings**, save and restart.
+
+**Everything reads zero.**
+Gleanvolt can't reach the devices. Check the addresses on **Settings**, and that
+[Modbus TCP is turned on](../installation/preparing-devices/).
+
+**The search says "port open, no Modbus reply".**
+Something else is connected to the device, such as Home Assistant's integration, evcc, or a second
+Gleanvolt. Most devices accept only one connection. Stop the other one.
+
+**The house seems to use all the sun every afternoon, and no solar mode starts.**
+Your grid meter may be missing a phase: see
+[When the grid meter misses a phase](../how-it-works/unmetered-phase/).
+
+**The figures look wrong, rather than missing.**
+Compare them with your inverter's and charger's own display or app, and keep charging **Off** until they
+agree. Report it, with your inverter's and charger's model, on
+[GitHub](https://github.com/mpospisil/gleanvolt/issues).
+
+**The forecast is empty.**
+Open **Settings → Solar forecast**: it says whether Solcast refused the key, didn't know the site, or the
+day's forecasts are used up. See [Solar forecast](../setting-up/solar-forecast/).
+
+**Charges are listed under the wrong day.**
+The time zone isn't set. Set it on **Settings** (for example `Europe/Prague`), save and restart.
+
+## Charging
+
+**I pressed a mode, but the car doesn't charge.**
+Usually Gleanvolt is waiting, and the Overview's sentence says for what: more sun, a full home battery
+(Solar), the low tariff, or the start time of a planned charge. Also check:
+
+- The car is plugged in, and its own charging isn't scheduled or limited in the car's app.
+- Nobody changed the charger on the wallbox or in its app. Gleanvolt then leaves it alone: start the mode
+  again.
+
+**The car pauses and restarts on a cloudy day.**
+That is expected: a car needs at least about 4.1 kW on three phases, and Gleanvolt pauses rather than
+buy the difference. See [How Gleanvolt decides](../how-it-works/basics/).
+
+**A charge I planned for the night didn't happen.**
+Gleanvolt restarted in between, for example for an update. Modes and plans don't survive a restart.
+Start it again after a restart.
+
+**Charging stopped and the mode is Off again.**
+Every mode stops by itself when it's done: the car is full or unplugged, the amount was delivered, the
+departure passed, or the day's sun is over. The charge's page under **Sessions** says why.
+
+**A charge pauses suddenly in the evening.**
+A big appliance such as an electric oven can take several kilowatts at once, which leaves no surplus for
+the car. The House figure on the Overview shows it.
+
+**The battery discharge hold is on, but the battery still discharges a little.**
+About 50–65 W is normal: the inverter's own use. More than that means the hold didn't take: look at the
+Overview's **Battery** figure.
+
+## Is it running?
+
+Open **Settings → Health**: **Last poll** should be a few seconds ago. If the page doesn't open:
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+systemctl status gleanvolt
+sudo systemctl start gleanvolt      # if it was stopped
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker ps -a --filter name=gleanvolt
+docker start gleanvolt-controller   # if it was stopped
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Open your NAS's container app, and check that `gleanvolt-controller` is running. Start it if it isn't.
+(`gleanvolt-init` is always shown as stopped; that is normal.)
+
+</TabItem>
+<TabItem label="Windows">
+
+Check that Gleanvolt's terminal window is still open. If not, open a terminal and type `gleanvolt`.
+
+</TabItem>
+</Tabs>
+
+If someone pressed **Stop service**, Gleanvolt stays stopped on purpose until you start it.
+
+## The log
+
+Gleanvolt writes what it decided and why to a log, one file per day, kept for 14 days. If you report a
+problem, the log of that day helps most.
+
+| Installed with | The log |
+|---|---|
+| Linux | `/var/log/gleanvolt/`, or `journalctl -u gleanvolt` |
+| Docker | the `logs` folder, or `docker logs gleanvolt-controller` |
+| NAS | the `logs` folder in the folder you made for Gleanvolt |
+| Windows | the `logs` folder next to the program |
+
+A normal stop ends the log with a line saying **stopped cleanly**. A log that just ends, without that
+line, means Gleanvolt was killed: for example by a power cut, or the computer running out of memory.
+
+## Still stuck?
+
+Ask on [GitHub](https://github.com/mpospisil/gleanvolt/issues). Say which inverter, charger and car you
+have, how you installed Gleanvolt, and what you expected to happen. Attach the log of that day, but check
+it first: it can contain your devices' addresses.

@@ -4,6 +4,26 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The manual's How it works, Troubleshooting, Privacy and Glossary (issue #329, step 5)
+
+Five pages, which complete the English manual:
+
+- **How Gleanvolt decides** (`how-it-works/basics`) — what Gleanvolt sets and what the inverter still
+  decides, the surplus and its three-minute average, the 6 A minimum and why charging pauses, pausing
+  versus standing down, the home battery mode by mode, and how the forecast is used and distrusted.
+- **When the grid meter misses a phase** (`how-it-works/unmetered-phase`) — `UNMETERED_GRID_PHASE.md`
+  for a user: the symptoms, how to check per phase, what to enter, and to empty it once the clamp is fixed.
+- **Troubleshooting and FAQ** — opening it, the password reset (the recovery key, or the one-time code per
+  platform), devices and readings, charging that didn't happen, is it running, where the log is.
+  `TROUBLESHOOTING.md`'s rows for the API, the CLI and Home Assistant stay out.
+- **Privacy** — `PRIVACY.md` for a user: what is kept and for how long, what stays on the home network,
+  and the three outside services and what each receives.
+- **Glossary** — 26 terms, each a heading, so a term has an anchor in-app help could link to.
+
+The welcome page gains a four-step **Where to start**. No new screenshots.
+
+---
+
 ## 2026-11-10 — A flaky mDNS responder test waits for its announcements
 
 `MdnsResponderTests.Answers_nothing_for_names_that_are_not_its_own` failed on a CI run of #376 with
