@@ -179,72 +179,6 @@ one is supported). That is deliberate: a site that is quietly wrong forecasts pl
 
 ## Upgrading from an older release
 
-### Upgrading a Pi deployed before the PV system had its own settings
-
-Four keys were retired when the installation moved into one place, and a retired key that is still
-set **stops the controller at startup** rather than being ignored — each one decided something real,
-and a build that ignored it would run against a default while your `.env` says otherwise.
-
-In `/opt/gleanvolt/.env`, rename:
-
-| Was | Is now |
-| --- | --- |
-| `WEATHER_LATITUDE` | `PV_LATITUDE` |
-| `WEATHER_LONGITUDE` | `PV_LONGITUDE` |
-
-**The MQTT topics move at the same time**, from `solax/solax_controller/…` to
-`gleanvolt/{PV_ID}/…`, so that two installations can share a broker. This costs nothing in Home
-Assistant: the discovery configs are republished on the same topics they always used, pointing at the
-new state topics, and every entity, its id and its history carry straight through — because
-`HA_DEVICE_ID` stays `solax_controller`. See [Changing the device id](../docs/HOME_ASSISTANT.md#changing-the-device-id)
-for why that one value is pinned.
-
-Two consequences worth acting on:
-
-- **`PV_ID` becomes required** when `HOMEASSISTANT_ENABLED=true`. It is the topic segment; without one
-  the controller refuses to start rather than publishing where another system might.
-- Set `HA_RETIRE_TOPIC_PREFIX=solax/solax_controller` for one deploy to clear the retained state the
-  old topics leave behind, then remove it. Nothing reads them either way; it keeps the broker
-  readable.
-
-`INVERTER_HOST`, `EV_CHARGER_HOST`, `WEATHER_API_KEY`, `SOLCAST_API_KEY` and `SOLCAST_RESOURCE_ID` are
-**unchanged** — the compose file maps the two addresses onto the new configuration keys for you.
-
-If you drive `docker compose` directly rather than through the deploy scripts, also drop any
-`Solax__Inverter__*`, `Solax__EvCharger__*`, `Solax__PollIntervalSeconds`, `Weather__Latitude` or
-`Weather__Longitude` you set by hand; their replacements are `Pv__Inverter__*`, `Pv__Chargers__0__*`,
-`Controller__PollIntervalSeconds`, `Pv__Latitude` and `Pv__Longitude`. The startup failure names each
-one and its replacement, so a missed key costs one restart, not a debugging session.
-
-### Upgrading a Pi deployed before the rename to Gleanvolt
-
-The project was called "SolaX Local Controller" and deployed to `/opt/solax`. Three things move with
-the name, and the deploy script cannot do the first one for you because it is the directory the
-script itself deploys into:
-
-```bash
-# On the Pi, once. Stop first so nothing is writing while the directory moves.
-cd /opt/solax && docker compose down
-sudo mv /opt/solax /opt/gleanvolt
-```
-
-Then deploy normally. What changed:
-
-- **`/opt/solax` → `/opt/gleanvolt`.** The move above carries `.env`, the session database, the logs
-  and Home Assistant's configuration with it, so nothing is lost. If you would rather not move it,
-  set `REMOTE_DIR=/opt/solax` when running the deploy script instead.
-- **Container names** are now `gleanvolt-controller`, `gleanvolt-mosquitto`, `gleanvolt-homeassistant`.
-  Compose removes the old containers and creates new ones; all state lives in bind mounts, so this
-  costs nothing but the restart.
-- **The image is now `ghcr.io/mpospisil/gleanvolt`.** The old `solax-controller` package still exists
-  and still runs, but receives no further updates.
-
-**Home Assistant is deliberately unaffected.** The MQTT device id (`solax_controller`) and base topic
-(`solax`) are unchanged, so every entity id, all recorded history, your dashboards and your
-automations keep working. Only the device's display name changes, to "Gleanvolt". Renaming the
-topics would rename every entity, and that is not worth doing outside a major version with a
-migration path.
-
 ### Upgrading to the host network
 
 Since [issue #268](https://github.com/mpospisil/gleanvolt/issues/268) all three services run on the
@@ -262,23 +196,6 @@ in `.env` or in Home Assistant:
   a second broker on 1883, see [Troubleshooting](#troubleshooting).
 - **The `solax_default` network** the old layout used may be left behind, unused and harmless;
   `docker network rm solax_default` clears it.
-
-### Upgrading a Pi deployed before the UI was on by default
-
-Earlier releases had the UI off, required `WEB_ENABLED=true`, and published its port only if `.env`
-merged a second compose file. Deploying this release onto such a Pi works, but two lines in `.env`
-are now stale and one of them is actively harmful:
-
-- **`COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml`** — delete it. The second file is now
-  empty and kept only so this line doesn't break the deploy outright; merging it does nothing.
-- **`WEB_ENABLED=true`** — harmless, now the default. Delete it or leave it.
-- **`WEB_REQUIRE_AUTHENTICATION=true`** — if you had this *and* a `WEB_PASSWORD_HASH`, nothing
-  changes and you can delete the line: the hash alone requires the login. If you had it **without** a
-  hash, the container refused to start before this release too, so it can't be the state you're
-  running.
-
-An `.env` from before the web UI existed at all needs nothing: no `WEB_*` line means the UI is on and
-asks you to set a password the first time you open it.
 
 ## Letting a program drive it: the HTTP API (optional)
 
@@ -1124,9 +1041,6 @@ A crash loop with `address already in use` in the log means something else on th
 that port; on the host's network the port is simply the Pi's, so `ss -ltnp | grep 8090` names the
 other program. Move it, or move the UI with
 `WEB_PORT` in `.env`.
-
-A `COMPOSE_FILE=` line in `.env` from an older release is obsolete and safe to delete; the file it
-names is now empty.
 
 No `Web UI enabled` line at all means `WEB_ENABLED=false` is set in `.env`. A startup failure instead
 means `WEB_REQUIRE_AUTHENTICATION=true` was set with no `WEB_PASSWORD_HASH`; the log says so

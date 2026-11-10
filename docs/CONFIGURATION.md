@@ -118,8 +118,7 @@ A configuration that still sets a retired key **stops at startup**, naming the r
 | `Weather:Longitude` | `Pv:Longitude` |
 | `HomeAssistant:DeviceName` | `Pv:Name` |
 
-The `deploy/.env` names (`INVERTER_HOST`, `EV_CHARGER_HOST`) did not change. See
-[the upgrade note](../deploy/README.md#upgrading-a-pi-deployed-before-the-pv-system-had-its-own-settings).
+The `deploy/.env` names (`INVERTER_HOST`, `EV_CHARGER_HOST`) did not change.
 
 ## The data directory holds secrets (the `Secrets` section)
 
