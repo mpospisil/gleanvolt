@@ -4,6 +4,25 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-10 — The manual's links are checked on the built site, not by starlight-links-validator
+
+**Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), the Installation chapter. The
+skeleton relied on `starlight-links-validator`, with `errorOnRelativeLinks: false`. A deliberately broken
+link proved it checked nothing: with that option it skips relative links, and the manual's links are all
+relative. It checks only absolute links, and only when they include Astro's `base`, which is different
+for every published version (`/gleanvolt/next/`, `/gleanvolt/v1.4/`, …). Written that way, a link would be
+right in one version and broken in the others.
+
+**Decision.** The plugin is removed. `docs/manual/scripts/check-links.mjs` runs after `astro build` as part
+of `npm run build`. It reads every `<a href>` in `dist/`, resolves it the way a browser would under the
+build's `MANUAL_BASE`, and fails when the page is missing or the `#anchor` is not an id on it. That covers
+the links Starlight generates (sidebar, language picker, pagination) and the Czech fallback pages too.
+
+**Consequences accepted.** A broken link is reported against the built page (`en/installation/docker/
+index.html`), not the source line. Links to other sites are not checked.
+
+---
+
 ## 2026-11-10 — The user manual: Starlight on gh-pages, screenshots from bUnit
 
 **Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329): a user manual for people with

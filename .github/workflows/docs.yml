@@ -15,6 +15,7 @@ on:
   pull_request:
     paths:
       - 'docs/manual/**'
+      - 'deploy/docker-compose.nas.yml'
       - 'src/**'
       - 'tests/Gleanvolt.Web.Screenshots/**'
       - 'tests/Gleanvolt.Web.Tests/Fakes.cs'
@@ -26,6 +27,8 @@ on:
     tags: ['v*']
     paths:
       - 'docs/manual/**'
+      # Shown on the NAS page.
+      - 'deploy/docker-compose.nas.yml'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
     inputs:
@@ -55,7 +58,7 @@ jobs:
 
       - run: npm ci
 
-      # starlight-links-validator runs as part of the build and fails it on a broken link.
+      # The build ends with scripts/check-links.mjs, which fails it on a broken link or anchor.
       - run: npm run build
 
   screenshots:

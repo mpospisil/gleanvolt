@@ -1,0 +1,155 @@
+---
+title: Updating, backup and uninstalling
+description: Keep Gleanvolt up to date, back up its data, and remove it.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Choose how you installed Gleanvolt. The tabs stay on your choice for the whole page.
+
+:::caution[After every update, charging is Off]
+Gleanvolt always starts with charging **off**. An update restarts it, so if the car was charging, choose
+the charging mode again afterwards. Update when the car isn't charging, or at night.
+:::
+
+## Updating
+
+Your settings and history are kept.
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+Run the install command again:
+
+```bash
+curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
+```
+
+To go back to an earlier version, add `GLEANVOLT_VERSION=` and its number before `sh`, for example:
+
+```bash
+curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo GLEANVOLT_VERSION=1.0.6 sh
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+Download the new version, remove the old container, and run the same `docker run` command as when you
+installed:
+
+```bash
+docker pull ghcr.io/mpospisil/gleanvolt:latest
+docker rm -f gleanvolt-controller
+```
+
+Then the `docker run …` command from [Docker](../docker/).
+
+</TabItem>
+<TabItem label="NAS">
+
+- **Synology**: in Container Manager, update the image under **Image** (it says *Update available*), then
+  rebuild the `gleanvolt` project.
+- **QNAP, Unraid**: use the application's or the stack's update or pull.
+- **TrueNAS SCALE**: use the app's **Update** or **Pull image**.
+
+</TabItem>
+<TabItem label="Windows">
+
+1. Close Gleanvolt's terminal window.
+2. Copy the `data` folder somewhere safe (see **Backup** below). An update can replace the folder it is in.
+3. Update:
+
+   ```powershell
+   winget upgrade MartinPospisil.Gleanvolt
+   ```
+
+4. Start it with `gleanvolt`. If your settings are gone, close it, copy your `data` folder back next to
+   the program, and start it again.
+
+</TabItem>
+</Tabs>
+
+## Backup
+
+Everything Gleanvolt knows is in one folder called `data`: your settings, your charging history and the
+sign-in to your car's account. A copy of that folder is a complete backup. To restore, stop Gleanvolt,
+put the folder back, and start it.
+
+:::danger[Keep the backup private]
+The `data` folder holds the sign-in to your car's account. Anyone with a copy can use it. Keep backups
+on your own encrypted drive, never in a shared folder or attached to an email.
+:::
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+The folder is `/var/lib/gleanvolt`. To copy it, with your settings file, into one archive in your home
+folder:
+
+```bash
+sudo tar czf ~/gleanvolt-backup.tar.gz /var/lib/gleanvolt /etc/gleanvolt
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+The folder is `/opt/gleanvolt/data`:
+
+```bash
+sudo tar czf ~/gleanvolt-backup.tar.gz /opt/gleanvolt/data
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+The folder is `data`, inside the folder you made for Gleanvolt when you installed it. Include that folder
+in your NAS's own backup.
+
+</TabItem>
+<TabItem label="Windows">
+
+The folder is `data`, next to the program: in `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`, in the folder
+whose name starts with `MartinPospisil.Gleanvolt`. Copy it somewhere safe.
+
+The car sign-in in it is locked to your Windows account. Restored on another PC, or under another
+account, Gleanvolt asks you to sign in to the car again; everything else works.
+
+</TabItem>
+</Tabs>
+
+## Uninstalling
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+sudo apt remove gleanvolt   # removes the program, keeps your settings and history
+sudo apt purge gleanvolt    # removes everything, including the history
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker rm -f gleanvolt-controller
+docker image rm ghcr.io/mpospisil/gleanvolt:latest
+sudo rm -rf /opt/gleanvolt   # only if you don't want your settings and history any more
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Delete the `gleanvolt` project, application, stack or app in your NAS's container app. Then delete the
+folder you made for it, if you don't want your settings and history any more.
+
+</TabItem>
+<TabItem label="Windows">
+
+Copy the `data` folder first if you want to keep your history. Then:
+
+```powershell
+winget uninstall MartinPospisil.Gleanvolt
+```
+
+</TabItem>
+</Tabs>

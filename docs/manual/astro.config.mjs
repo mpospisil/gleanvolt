@@ -4,7 +4,6 @@
 // docs.yml sets it per version. Locally it is /, for `npm run dev`.
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import starlightLinksValidator from 'starlight-links-validator';
 
 const base = process.env.MANUAL_BASE ?? '/';
 
@@ -23,9 +22,21 @@ export default defineConfig({
         cs: { label: 'Čeština', lang: 'cs' },
       },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mpospisil/gleanvolt' }],
-      plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],
       sidebar: [
         { label: 'Welcome', translations: { cs: 'Vítejte' }, slug: 'index' },
+        {
+          label: 'Installation',
+          translations: { cs: 'Instalace' },
+          items: [
+            { slug: 'installation/choosing' },
+            { slug: 'installation/preparing-devices' },
+            { slug: 'installation/linux' },
+            { slug: 'installation/windows' },
+            { slug: 'installation/docker' },
+            { slug: 'installation/nas' },
+            { slug: 'installation/updating' },
+          ],
+        },
         {
           label: 'Setting up',
           translations: { cs: 'Nastavení' },

@@ -16,7 +16,7 @@ Node 24 is needed for the manual only; nothing in the .NET build uses it.
 cd docs/manual
 npm ci
 npm run dev        # http://localhost:4321, reloads as you edit
-npm run build      # what CI runs; fails on a broken link or anchor
+npm run build      # what CI runs; fails on a broken link or anchor (scripts/check-links.mjs)
 ```
 
 ## Pages and languages
@@ -26,7 +26,12 @@ always complete. A page missing from another language shows the English one with
 language never blocks a release. In Czech, *import*, *export* and the mode names stay untranslated.
 
 A new page goes into the `sidebar` in [`astro.config.mjs`](astro.config.mjs). Link pages to each other
-with paths relative to the language, for example `../setting-up/setup-wizard/`.
+with relative paths ending in `/`, for example `../../setting-up/setup-wizard/` from
+`en/installation/linux.mdx`: every version is served under its own base, so a link starting with `/`
+would leave it. The build checks every link and anchor in the result.
+
+A file from the repository can be shown on a page without copying it, as `installation/nas.mdx` does
+with the NAS compose file: `import text from '<path>?raw'` and Starlight's `<Code>`.
 
 ## Screenshots
 

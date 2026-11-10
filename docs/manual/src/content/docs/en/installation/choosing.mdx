@@ -1,0 +1,36 @@
+---
+title: Which computer should I use?
+description: Choose where Gleanvolt runs, a Raspberry Pi, a Linux computer, a NAS or Windows.
+---
+
+Gleanvolt needs a computer that **stays on day and night**, in the same home network as your inverter and
+your charger. If the computer is off, nothing controls the charging.
+
+| You have… | Choose | Difficulty |
+|---|---|---|
+| Nothing yet | **A Raspberry Pi 4 or 5** with Raspberry Pi OS (64-bit), then [Linux](../linux/) | Easy |
+| A Raspberry Pi or a Linux computer that stays on | [Linux](../linux/): one command | Easy |
+| A NAS from Synology, QNAP, Unraid or TrueNAS | [NAS](../nas/) | Medium |
+| A NAS with OpenMediaVault 7 | [Linux](../linux/): it is Debian underneath | Easy |
+| A home server that already runs Docker | [Docker](../docker/) | Medium |
+| A Windows PC that is never switched off | [Windows](../windows/) | Easy, but see below |
+
+**Our recommendation is a Raspberry Pi.** It uses about as much power as a phone charger, it's quiet,
+and Gleanvolt runs on it as a service that starts by itself after a power cut.
+
+:::caution[Windows]
+On Windows, Gleanvolt runs in a terminal window and stops when the window is closed, when you sign out
+or when Windows restarts for an update. It suits trying Gleanvolt out, or a PC that really is always on.
+:::
+
+## What the computer needs
+
+- **64-bit.** A Raspberry Pi 3B or newer is 64-bit, as long as it runs the 64-bit Raspberry Pi OS.
+  Older NAS models with a 32-bit ARM processor don't work.
+- **About 100 MB of memory and 1 GB of disk.** Any of the computers above has plenty.
+- **A wired network connection is best.** Wi-Fi works, but a cable is more reliable.
+
+## Next
+
+Before you install, make sure Gleanvolt will be able to talk to your devices:
+[Preparing your inverter and charger](../preparing-devices/).
