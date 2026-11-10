@@ -1,5 +1,7 @@
 # Battery discharge hold (writes to the inverter)
 
+> **Using Gleanvolt?** The user manual has this step by step: [Battery discharge hold](https://mpospisil.github.io/gleanvolt/latest/en/using/battery-hold/). This page is the reference behind it.
+
 A switch that stops the home battery serving the house, so charging the car never drains it. The sun
 covers what it can, the grid covers the rest, and the battery is left alone — but it can **still
 charge** from surplus.

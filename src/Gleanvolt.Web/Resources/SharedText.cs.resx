@@ -36,6 +36,9 @@
   <data name="NavSettings" xml:space="preserve">
     <value>Nastavení</value>
   </data>
+  <data name="NavManual" xml:space="preserve">
+    <value>Příručka</value>
+  </data>
   <data name="SignOut" xml:space="preserve">
     <value>Odhlásit</value>
   </data>

@@ -1,5 +1,7 @@
 # Targeted charging (the `Targeted` mode)
 
+> **Using Gleanvolt?** The user manual has this step by step: [Targeted](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/targeted/). This page is the reference behind it.
+
 **"I need 22 kWh in the car by 07:00 — do that, and use as little grid as you can."**
 
 This mode takes an **energy in kWh** and a **departure time**, and plans backwards from the deadline.

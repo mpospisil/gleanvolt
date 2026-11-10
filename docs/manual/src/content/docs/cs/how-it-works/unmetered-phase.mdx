@@ -1,0 +1,60 @@
+---
+title: Když elektroměr jednu fázi neměří
+description: Proč elektroměr, který neměří jednu fázi, zastaví solární režimy, jak to poznat a co vyplnit.
+---
+
+**Stručně: pole „Neměřená fáze sítě“ nechte prázdné**, pokud elektroměr opravdu neměří jednu ze tří
+fází. U správně zapojené instalace by nastavení věci nezlepšilo, ale zhoršilo.
+
+## O co jde
+
+Třífázový střídač má v místě, kde se dům připojuje k síti, **elektroměr**: chytrý elektroměr nebo
+měřicí kleště na vodičích, které na každé fázi (L1, L2 a L3; SolaX je označuje R, S a T) měří, kolik
+energie teče ze sítě do domu a z domu do sítě.
+
+Podle tohoto elektroměru Gleanvolt počítá přebytek. Pokud na jedné fázi měřicí kleště chybí, jsou
+uvolněné nebo nasazené na špatném vodiči, elektroměr na ní **ukazuje 0 W**, ať tam teče cokoli. Potom:
+
+- **Zhruba třetina přetoků do sítě není vidět.** Gleanvolt si myslí, že ji spotřebuje dům, nenajde
+  skoro žádný přebytek a solární režimy auto nespustí ani za slunečného odpoledne s plnou baterií.
+- **Zhruba třetina odběru auta není vidět.** Gleanvolt si myslí, že auto pokrývá slunce, a nabíjení
+  přitom potichu bere ze sítě.
+
+## Příznaky
+
+- Slunečné odpoledne, plná domácí baterie, a přesto **Přehled** ukazuje vysokou spotřebu domu a skoro
+  žádný přebytek. Režim Solar + grid nebo Forecasted nabíjení nespustí.
+- Spotřeba domu stoupá a klesá se sluncem.
+- Během nabíjení je u spotřeby domu pomlčka, nebo je import ze sítě menší, než kolik bere samotné auto.
+- Vyúčtování ukazuje větší odběr ze sítě, než hlásí Gleanvolt nebo aplikace střídače.
+
+:::note
+Když spotřeba domu na chvíli skočí o několik kilowattů, bývá to velký spotřebič, například elektrická
+trouba.
+:::
+
+## Jak to ověřit
+
+Podívejte se na údaje elektroměru **po jednotlivých fázích**, když svítí slunce: na displeji střídače,
+v jeho aplikaci, nebo se zeptejte instalačního technika.
+
+- **Zapojeno správně:** všechny tři fáze ukazují hodnoty, které se mění.
+- **Slepá fáze:** jedna fáze ukazuje pořád **0 W**, zatímco výkon střídače na téže fázi nulový zjevně
+  není.
+
+Pokud to ověřit nemůžete, nechte pole prázdné a zeptejte se instalačního technika.
+
+## Co vyplnit
+
+V **Nastavení** u střídače zadejte slepou fázi do pole **Neměřená fáze sítě**: `L1`, `L2` nebo `L3`
+(případně podle SolaX `R`, `S` nebo `T`). Klikněte na **Uložit** a potom na **Restartovat**.
+
+Gleanvolt pak tu fázi odhadne z toho, co zná: z výkonu střídače na té fázi, z podílu auta na nabíjení
+a ze spotřeby domu na zbylých dvou fázích. Je to odhad a velký spotřebič na té fázi ho na chvíli
+rozhodí, ale je mnohem blíž skutečnosti než třetina všeho chybějící.
+
+## Skutečné řešení
+
+Nechte elektrikáře měřicí kleště doplnit nebo opravit. Jakmile elektroměr měří všechny tři fáze,
+**pole vyprázdněte** a restartujte. Kdyby zůstalo vyplněné u elektroměru, který vidí všechny fáze,
+započítala by se ta fáze dvakrát.

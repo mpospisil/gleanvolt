@@ -1,5 +1,7 @@
 # Finding your devices
 
+> **Using Gleanvolt?** The user manual has this step by step: [Finding your devices](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/finding-devices/). This page is the reference behind it.
+
 Don't know the inverter's or the charger's address, or which port and unit id they speak Modbus on?
 The setup wizard's **Search** finds them, and so does `gleanvolt discover` on an installed Gleanvolt.
 On a machine with no Gleanvolt, the standalone `gleanvolt-discover` scans your LAN — from any laptop or

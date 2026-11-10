@@ -1,5 +1,7 @@
 # Installing on Linux: the .deb package
 
+> **Using Gleanvolt?** The user manual has this step by step: [Linux and Raspberry Pi](https://mpospisil.github.io/gleanvolt/latest/en/installation/linux/). This page is the reference behind it.
+
 Gleanvolt as a native systemd service on **Debian, Ubuntu and Raspberry Pi OS (64-bit)**, with no
 Docker and no .NET installation: the runtime is inside the package. It installs **the controller and
 its web UI only**. No MQTT broker or Home Assistant is installed or needed; to connect one, see

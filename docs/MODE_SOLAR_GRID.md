@@ -1,5 +1,7 @@
 # Solar with grid help (the `SolarGrid` mode)
 
+> **Using Gleanvolt?** The user manual has this step by step: [Solar + grid](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/solar-grid/). This page is the reference behind it.
+
 For the day you want the car to take the sun as it comes, are happy to buy a little grid to make a weak
 sun usable, and want nothing to happen once the sun is gone. It is `Solar` without the battery-full
 gate, plus a grid bridge, plus an end.

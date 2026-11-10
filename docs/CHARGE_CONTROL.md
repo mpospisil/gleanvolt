@@ -1,5 +1,7 @@
 # EV charge control (writes to the charger)
 
+> **Using Gleanvolt?** The user manual has this step by step: [How Gleanvolt decides](https://mpospisil.github.io/gleanvolt/latest/en/how-it-works/basics/). This page is the reference behind it.
+
 Every charge mode drives the charger the same way, through two writes:
 
 - **The charging current**, set by the control loop every poll in which it should change, and only

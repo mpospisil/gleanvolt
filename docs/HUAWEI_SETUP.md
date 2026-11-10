@@ -1,5 +1,7 @@
 # Setting up a Huawei SUN2000
 
+> **Using Gleanvolt?** The user manual has this step by step: [Preparing your inverter and charger](https://mpospisil.github.io/gleanvolt/latest/en/installation/preparing-devices/). This page is the reference behind it.
+
 How to connect Gleanvolt to a Huawei SUN2000 hybrid inverter. What works, and how well it has been tested,
 is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000). In short: readings are **Expected**
 (written from Huawei's interface definitions, no real device yet), and the battery hold is **Untested**.

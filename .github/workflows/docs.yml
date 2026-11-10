@@ -141,6 +141,12 @@ jobs:
             git worktree add --orphan -b gh-pages "$RUNNER_TEMP/site"
           fi
 
+          # Until a release has published /latest/, main fills it, so the links to it (the README, the
+          # web UI of a build with no version) lead somewhere. The first tag replaces it.
+          if [ "$FOLDERS" = "next" ] && [ ! -d "$RUNNER_TEMP/site/latest" ]; then
+            FOLDERS="next latest"
+          fi
+
           for folder in $FOLDERS; do
             # Astro needs to know where it is served, for every link and asset.
             MANUAL_BASE="/$REPO/$folder/" npm run build

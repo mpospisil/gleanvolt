@@ -1,5 +1,7 @@
 # Running in Docker
 
+> **Using Gleanvolt?** The user manual has this step by step: [Docker](https://mpospisil.github.io/gleanvolt/latest/en/installation/docker/). This page is the reference behind it.
+
 Gleanvolt as one container on any 64-bit Linux host with Docker — a home server, a mini PC, a
 Raspberry Pi. The image is `ghcr.io/mpospisil/gleanvolt`; the same tag pulls the right build for
 x86-64, arm64 and Windows. On a NAS, see [Running on a NAS](NAS.md) instead.

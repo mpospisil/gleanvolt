@@ -998,9 +998,6 @@
   <data name="HelpUnmeteredPhaseLink" xml:space="preserve">
     <value>How to tell whether your meter misses a phase</value>
   </data>
-  <data name="HelpUnmeteredPhaseUrl" xml:space="preserve">
-    <value>https://github.com/mpospisil/gleanvolt/blob/main/docs/UNMETERED_GRID_PHASE.md</value>
-  </data>
   <data name="SnapshotButton" xml:space="preserve">
     <value>Save register snapshot</value>
   </data>

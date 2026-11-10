@@ -37,6 +37,9 @@
   <data name="NavSettings" xml:space="preserve">
     <value>Settings</value>
   </data>
+  <data name="NavManual" xml:space="preserve">
+    <value>Manual</value>
+  </data>
   <data name="SignOut" xml:space="preserve">
     <value>Sign out</value>
   </data>

@@ -11,6 +11,9 @@ vendor app, nothing leaving your network.
 It runs on a Raspberry Pi, a NAS, any 64-bit Linux machine or Windows, and you use it from its own
 web UI. An HTTP API and Home Assistant integration are there if you want them.
 
+**[The user manual](https://mpospisil.github.io/gleanvolt/latest/en/)** takes you through installing, setting up and using it, step by step,
+with screenshots. It is in English, and a Czech translation is under way.
+
 ## What it does
 
 **Charge modes** — pick one from the web UI, Home Assistant or the API:
@@ -82,7 +85,9 @@ run. Every model, its caveats and the tiers are in
 
 ### 1. Install
 
-Install Gleanvolt **on the machine that will run it**, then finish in the browser (step 2).
+Install Gleanvolt **on the machine that will run it**, then finish in the browser (step 2). The manual's
+[Installation](https://mpospisil.github.io/gleanvolt/latest/en/installation/choosing/) chapter has each of these step by step, including how to
+[prepare your inverter and charger](https://mpospisil.github.io/gleanvolt/latest/en/installation/preparing-devices/).
 
 **Raspberry Pi, Debian or Ubuntu (64-bit) — recommended.** On the device itself, one command installs
 Gleanvolt as a system service, with no Docker and no .NET to install:
@@ -125,20 +130,19 @@ can run Home Assistant and an MQTT broker beside it. See
 
 ### 2. Set it up
 
-Open **`http://gleanvolt.local:8090`** from any device on the same network — or
-`http://<the machine's address>:8090` where `.local` names don't work
-([Finding it on your network](docs/WEB_UI.md#finding-it-on-your-network)). A fresh install starts in
-[setup mode](docs/WEB_UI.md#setup-mode): choose a password, then the
-[setup wizard](docs/WEB_UI.md#the-setup-wizard) **searches your network** for the inverter and the
-charger and asks for the site — location, time zone, home battery — and, optionally, a Solcast solar
-forecast, the car and the grid tariff. Prefer a terminal? The `setup` command does the same
-([command line](docs/WEB_UI.md#setting-up-from-the-command-line)).
+Open **`http://gleanvolt.local:8090`** from any device on the same network, or
+`http://<the machine's address>:8090` where `.local` names don't work. Choose a password, then the
+**setup wizard** searches your network for the inverter and the charger and asks for the site and,
+optionally, a Solcast solar forecast, the car and the grid tariff. See
+[The setup wizard](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/setup-wizard/) in the manual. Prefer a terminal? The `setup` command
+does the same ([command line](docs/WEB_UI.md#setting-up-from-the-command-line)).
 
 ### 3. Check, then charge
 
 Gleanvolt now reads the devices and shows them on the **Overview**, but writes nothing: charging is
 **off** and the battery hold is disabled. Check the figures against your inverter's and charger's own
-displays first. Then pick a mode on **Charging plan**.
+displays first. Then pick a mode on **Charging plan**: see
+[Which mode should I choose?](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/choosing/).
 
 ## Use at your own risk
 
@@ -156,6 +160,12 @@ the [LICENSE](LICENSE). Start with the write features off or in dry-run, check t
 your own devices, and watch the first runs.
 
 ## Documentation
+
+**For using Gleanvolt, read [the user manual](https://mpospisil.github.io/gleanvolt/latest/en/).** It is versioned with the releases, and the web
+UI's **Manual** link opens the one for the version you run.
+
+The pages below are the **reference**: every setting and configuration key, the reasoning behind the
+modes, and the integrations the manual leaves out.
 
 | Page | What it covers |
 |---|---|
