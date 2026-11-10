@@ -19,8 +19,7 @@
 #   <!-- include: docs/SUPPORTED_INVERTERS.md#inverters-at-a-glance -->
 #
 # Usage: scripts/sync-doc-includes.sh [page.md ...]
-#   With no arguments it updates README.md and docs/SUPPORTED_PV_SYSTEMS.md. Pass the wiki's pages to update them too, e.g.
-#   scripts/sync-doc-includes.sh README.md ../solax-controller.wiki/Home.md
+#   With no arguments it updates README.md and docs/SUPPORTED_PV_SYSTEMS.md.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
