@@ -52,6 +52,8 @@ little differently.
 - **Charts** are drawn: the page's calls to `solaxCharts.*` that bUnit records are replayed in the captured
   page with the real `charts.js` and uPlot, and `charts.js` is part of the fingerprint.
 - **A dialog** is opened before it is captured, when the picture's selector names a `<dialog>`.
+- **A long page** can be cut off with `Capture(..., height: …)`, so a picture shows a chart and the start
+  of its table.
 - **Dates** in date fields are in the European order: Chrome runs with `LANG=en_GB.UTF-8`.
 - **A new picture**: add a test that calls `Capture(...)` in that project, then run `npm run screenshots`.
 - **A UI change** that changes a picture fails the pull request's screenshot check. Run
