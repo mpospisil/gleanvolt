@@ -1,14 +1,17 @@
 # Charging session and energy history
 
+Two local SQLite databases keep what the live figures can't:
+
+- **`data/sessions.db`** — every controlled charging session: how it ran, where its energy came from,
+  and the forecast and weather it ran under. Browse it on the web UI's [**Sessions**](WEB_UI.md#sessions)
+  page.
+- **`data/energy.db`** — the whole site in 15-minute rows, whether or not a car is plugged in. Browse it
+  on the [**Energy**](WEB_UI.md#energy) page.
+
+Both only observe — they write to no device — so both are **on by default**. Neither is published to
+Home Assistant. **Back both up**: nothing can reconstruct them.
+
 ## Charging session history (the `SessionStore` section)
-
-Everything above is *live*: the log line scrolls past and the Home Assistant entity is overwritten on
-the next poll. This section is what survives — every controlled charging session is recorded to a local
-SQLite file, so "how did last Tuesday's `Forecasted` session actually go, and did the plan hold?"
-becomes a question with an answer.
-
-It **only ever observes.** It reads no register the poll loop wasn't already reading and writes to no
-device, so unlike `ChargeControl` and `BatteryHold` it is **on by default**.
 
 ```jsonc
 "SessionStore": {
@@ -39,15 +42,10 @@ how:
 | `NoSunLeftToday` | `SolarGrid`, `Solar` or `Forecasted` ended for the day, however full the car is. Never `Forecasted` with **Until full** on, which stands down for the night instead. |
 | `ChargerTakenOver` | The charger left Fast, so the mode stopped driving it: its owner took it. |
 
-Sessions recorded before these reasons existed show `SessionComplete` for every session a mode ended
-itself.
+Switching mode mid-session does **not** start a new one: it is recorded as a `ModeChanged` event.
 
-Switching mode mid-session does **not** start a new one. "Forecasted all afternoon, then
-`FastNoBattery` at 17:00" is one story about one car, and it is recorded as one session with a
-`ModeChanged` event in it.
-
-Note this is a *different* span from the one `Session energy` reports in Home Assistant, which counts
-from the moment the car was plugged in whether or not anything is controlling it.
+This is a different span from Home Assistant's `Session energy`, which counts from plug-in whether or
+not a mode is driving.
 
 ### What is recorded
 
@@ -58,7 +56,7 @@ from the moment the car was plugged in whether or not anything is controlling it
 | **Samples** | every 30 s and on every change: all meters, the four charging figures below, the smoothed surplus, the loan, the hold, the forecast power at that instant, plan figures, the running totals, and the site-wide progress figures below |
 | **Events** | mode changed, charging started/paused, setpoint changed, hold armed/released, plan fell out of trust, session ended — each with the controller's own reason string |
 
-### The four charging figures, and why they are kept apart
+### The four charging figures
 
 | Field | What it is |
 |---|---|
@@ -69,14 +67,11 @@ from the moment the car was plugged in whether or not anything is controlling it
 
 The gaps are the diagnostic. **Target ≠ active** means the write didn't land, or was suppressed by
 `CurrentChangeThresholdAmps`. **Active ≠ actual** means the *car* is the limiter — its charge curve,
-its taper near full, its on-board charger ceiling — which is what separates "the strategy
-under-delivered" from "the car wouldn't take more".
+its taper near full, its on-board charger ceiling.
 
 ### Progress against the site, and against the car
 
-The totals above are all about the car: what it received, and which source each watt is attributed to.
-Three more are integrated over the same window and answer a different question — what the *site* did
-while the car was charging — plus the car's own view of itself:
+Beside the car's totals, what the *site* did over the same window, and the car's own view of itself:
 
 | Field | What it is |
 |---|---|
@@ -86,45 +81,25 @@ while the car was charging — plus the car's own view of itself:
 | `VehicleSocPercent` | The **car's own** battery SOC from the [vehicle feed](VEHICLE.md#where-the-cars-state-of-charge-comes-from), or `null` when none is configured or nothing has arrived. Advisory: nothing in charge control reads it. |
 | `VehicleChargeTimeRemaining` | How much longer the **car itself** reckons it needs, from `charge_time_remaining_minutes` (stored in minutes). **Zero when the car did not report it** — not an error, just a feed that doesn't publish it. Because `0` is also a legitimate reading ("done"), never read this without the flag below. |
 | `VehicleChargeTimeRemainingReported` | Whether that zero is the car's answer or the absence of one. `false` means no estimate was provided. |
-| `VehicleSocCapturedAt` | When the *vehicle* produced that reading. Stored next to it because it routinely lags by hours — a SOC without its capture time cannot be told from a live one, and a chart would silently flatten. A feed that goes quiet mid-session leaves the last reading standing with a visibly ageing capture time rather than blanking the column. |
-
-These arrived in database schema **v2**; a v1 file is migrated in place on startup and its existing
-rows keep `0` for the three totals, which is the truth for them — nothing integrated those quantities
-at the time. Published documents move to `schemaVersion` 2 for the same reason, purely additively.
+| `VehicleSocCapturedAt` | When the *vehicle* produced that reading, which often lags by hours. A feed that goes quiet mid-session leaves the last reading with an ageing capture time. |
 
 ### The day the session ran on
 
-`DayForecast` on the header is **the whole local day's forecast curve** — every 30-minute period, with
-the p10/p90 bands each one carried, from before the car was plugged in to after it was unplugged. It is
-what turns a session into an analysable one: `ForecastRemainingAtStartWh` says how much sun was left in
-one number, and this is the shape behind it. A 4 kWh session reads very differently against a day
-forecast at 6 kWh than against one forecast at 30.
+`DayForecast` on the header is **the whole local day's forecast curve** — every 30-minute period with
+its p10/p90 band. `ForecastRemainingAtStartWh` says in one number how much sun was left; this is the
+shape behind it.
 
-Two things about how it is captured are worth knowing:
-
-- **Solcast only ever forecasts forward.** Each refresh returns the periods still to come and nothing
-  behind them, so by mid-afternoon the live forecast can no longer say what the morning was predicted
-  to bring. The controller therefore **retains** every period a refresh has carried (7 days,
-  in memory) and serves the day from that. What survives for a given period is the *last* prediction
-  made about it — the closest thing to a nowcast the provider ever gave.
+- **What is kept for a period is the last forecast made for it.** Solcast only forecasts forward, so
+  the controller keeps every period it has fetched (7 days, in memory) and builds the day from that.
 - **A day the controller wasn't running for all of is short by that much.** Restart at 14:00 and the
-  morning is simply not there: nothing re-fetches the past. The curve is `null` rather than empty when
-  nothing at all is held, because an empty curve sums to zero and would read as a day the sun never
-  came up.
+  morning is missing. The curve is `null`, not empty, when nothing at all is held.
 
-It is written when the session opens and rewritten when it closes, so what ends up stored is the
-fullest version of the day known by then. Nothing in charge control reads it — the plan, not this,
-drives decisions — and the [session detail page](WEB_UI.md#sessions) shows the day's
-total with its band beside the other header facts.
-
-This is database schema **v3** and `schemaVersion` 3, additive again: older rows keep `NULL`, which is
-the truth for them.
+It is written when the session opens and again when it closes. Nothing in charge control reads it.
 
 ### The weather a session ran in
 
-The day forecast above says what the sun was *expected* to do. This says what the sky **did** — because a session that under-delivered against a confident forecast otherwise has no explanation attached to it, and cloud that rolled in, a cold morning and snow on the panels all look identical afterwards.
-
-Configured via the [`Weather` section](CONFIGURATION.md#weather-the-weather-section-optional); `NULL` throughout when it isn't, which is the default.
+What the sky **did**, beside what the forecast expected. Needs the
+[`Weather` section](CONFIGURATION.md#weather-the-weather-section-optional); `NULL` throughout without it.
 
 | Field | What it is |
 |---|---|
@@ -134,11 +109,8 @@ Configured via the [`Weather` section](CONFIGURATION.md#weather-the-weather-sect
 
 Each reading carries `TemperatureCelsius`, `PressureHpa`, `HumidityPercent`, `CloudsPercent`, `VisibilityMetres` (`null` when unreported), `Condition` (`Clear`, `Rain`, `Snow`…), `ConditionDescription` (`light rain`) and `ObservedAt` — the time the *provider* stamped the reading, since these are typically a few minutes old and a reading without its own timestamp can't be told from a live one.
 
-**Two readings, not one.** A six-hour session can finish in entirely different weather from the one it started in, and only the *pair* can say so — the same reason the header has both a start and an end SOC. **Sunrise and sunset are stored once**, because they belong to the day rather than to either reading; a session running across midnight carries the starting day's pair, the same rule `StartedAt` and the day forecast already follow.
-
-These are **columns, not a JSON document** — unlike the forecast curve, which is written once and read whole. Cloud cover and temperature are the axes the analysis groups by, and "solar share against cloud cover" should be SQL rather than a parse per row.
-
-This is database schema **v4** and `schemaVersion` 4, additive: older rows keep `NULL`.
+Sunrise and sunset belong to the day the session **started** on. These are plain columns, so they can
+be grouped by in SQL.
 
 ### How the energy is attributed to a source
 
@@ -153,41 +125,29 @@ is that the three shares always add back up to the measured draw:
    battery before grid, because that is the inverter's own priority.
 3. Whatever is still unaccounted for is **grid** import.
 
-Measured `FromBatteryWh` is kept separate from the commanded `LoanedWh` on purpose: they answer
-different questions, and the gap between them is worth being able to see.
+Measured `FromBatteryWh` is kept separate from the commanded `LoanedWh`, which is what the `Forecasted`
+mode *told* the battery to lend.
 
 ### Operating the session history
 
-- **Back up `data/sessions.db`.** It is the only history that exists; nothing reconstructs it.
-- **Sampling is coarser than polling on purpose.** Every poll still feeds the running energy totals —
-  only the stored rows are thinned, so a four-hour session is a few hundred rows rather than ~2,900,
-  and no transition is blurred because any change forces a sample.
+- **Sampling is coarser than polling.** Every poll feeds the running totals; only the stored rows are
+  thinned (every `SampleInterval`, and on any change).
 - **A crash leaves nothing dangling.** A session still open at the next startup is closed at its last
   recorded sample and marked `Interrupted`, which is why every sample carries the running totals.
 - **Failure is contained.** If the file can't be opened — a read-only mount, a bad permission —
   recording is disabled for the run with an error in the log, and polling, charge control and the Home
   Assistant integration carry on untouched.
-- **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
 
 ### Getting the data out
 
-A closed session is immutable, which makes it safe to publish as one self-contained document —
-`ChargingSessionDocument`, carrying a `schemaVersion`, the header, every sample and every event. That
-shape is deliberately independent of the database's own tables, so uploading sessions to cloud object
-storage (one object per session) can be added later without migrating anything. The
-`sessions.synced_at` column is reserved for exactly that. Reading them from a web app is already
-built — see [Browsing charging session history](WEB_UI.md#sessions) above.
+A closed session never changes. The [HTTP API](HTTP_API.md)'s `GET /sessions/{id}` returns one in
+full: the header, every sample and every event. For analysis, open `sessions.db` directly — see
+[Querying both databases](#querying-both-databases).
 
 ## Energy history (the `EnergyMonitor` section)
 
-The session store answers questions about *charges*. This one answers questions about the **site**,
-and it runs whether or not anything is plugged in — because most of the year has no session in it, and
-"how much did the roof make last March?" or "how well did the forecast track reality across the
-autumn?" are not questions session data can be made to answer.
-
-It is a **separate service with its own tables in its own database file**, and it does nothing but
-record. Like the session store it only ever observes — it reads no register the poll loop wasn't
-already reading and writes to no device — so it too is **on by default**.
+The **site**, whether or not anything is plugged in: "how much did the roof make last March?", "how
+well did the forecast track reality across the autumn?".
 
 ```jsonc
 "EnergyMonitor": {
@@ -206,8 +166,7 @@ alone, so summing a day's buckets gives the day exactly. Buckets align to the in
 the UTC epoch, so they land on :00, :15, :30 and :45 whatever time the service started, and a
 daylight-saving change cannot produce a 45- or 75-minute one.
 
-Everything is in **kWh** — the one place in this codebase that isn't in watt-hours, deliberately: this
-is the analytics surface, read by spreadsheets and notebooks rather than by control code.
+Everything is in **kWh**.
 
 | Column | Meaning |
 |---|---|
@@ -226,12 +185,8 @@ is the analytics surface, read by spreadsheets and notebooks rather than by cont
 
 ### Nothing is netted, so the balance closes
 
-Import and export are separate columns, and so are battery charge and discharge. A quarter hour that
-exported 0.4 kWh and imported 0.4 kWh is not the same event as one that did neither, and a net of zero
-cannot tell them apart afterwards.
-
-Keeping them apart is also what makes the row *balance*, so house consumption needs no column of its
-own — it is the residual:
+Import and export are separate columns, and so are battery charge and discharge, so each row
+balances and house consumption is the residual:
 
 ```
 house load = solar + import - export - battery charge + battery discharge
@@ -240,28 +195,16 @@ other loads = house load - ev
 
 ### `covered_seconds` is not optional reading
 
-Energy is integrated by holding each power reading until the next one arrives, which is how the poll
-loop observes the hardware. Beyond `MaxGap` that stops being true: the service was restarting, or the
-inverter was unreachable, and holding a reading across the gap would invent energy nobody measured.
-So the open bucket is **closed short** and a fresh one opens when polling resumes.
+A silence longer than `MaxGap` — a restart, an unreachable inverter — is not filled in: the window is
+closed short. **A row below full coverage is short on every energy figure by the same fraction**, so
+without checking `covered_seconds` a restart at 09:07 reads as "the sun went out for seven minutes".
 
-That is what leaves `covered_seconds` below the full interval, and why it is a stored column rather
-than an assumption. **A row below full coverage is short on every energy figure by the same fraction**
-— without checking it, a restart at 09:07 reads as "the sun went out for seven minutes".
+A planned stop loses nothing: the part-finished window is written on shutdown and completed by the next
+start.
 
-A *planned* stop loses nothing: the worker writes the part-finished bucket on shutdown, and an append
-for a window that already exists **adds to it rather than replacing it**. The stopping process
-contributes the minutes it saw, the starting one contributes the rest, and the row ends up whole with
-`covered_seconds` back at the full interval.
+### Querying both databases
 
-### Why its own database file
-
-The two stores have separate writers, separate retention and separate reasons to fail, and
-`SqliteChargingSessionStore` serialises its writes on an in-process lock — a second writer holding a
-*different* lock over the same file would turn that arrangement back into the `SQLITE_BUSY` retry loop
-it exists to avoid.
-
-Nothing is lost by the split. An analysis that wants both opens one and attaches the other:
+Attach one to the other:
 
 ```sql
 ATTACH DATABASE 'sessions.db' AS s;
@@ -298,19 +241,10 @@ GROUP BY utc_slot ORDER BY utc_slot;
 
 ### Operating the energy history
 
-- **Back up `data/energy.db` too.** Like the session store it is the only copy that exists, and
-  nothing reconstructs it. Both files sit under the same `./data` bind mount in `deploy/`.
-- **It is cheap.** 96 rows a day, ~35,000 a year, a few megabytes — one write per quarter hour, which
-  is why this store needs none of the batching the session recorder does.
-- **`RetentionDays` defaults to 0 (keep everything)**, the opposite of the session store's 365. This
-  table exists to be looked at years later, and at 15-minute resolution a decade of it is still a file
-  you could email.
+- **It is small.** 96 rows a day, about 35,000 a year — a few megabytes.
+- **`RetentionDays` defaults to 0, keep everything** (the session store's is 365).
 - **An interval that can't tile a day is corrected, not fatal.** Anything that doesn't divide 24 hours
   evenly would leave a short stub bucket at midnight; the service logs a warning and records at 15
   minutes instead.
 - **Failure is contained.** If the file can't be opened, this feature alone is disabled for the run
-  with an error in the log — polling, charge control, session recording and Home Assistant carry on
-  untouched.
-- **Nothing is published to Home Assistant.** No new entities; this feature is history, not telemetry.
-- **A viewer is built in.** The web UI's `/energy` page shows a day at a time, drawn as a chart and
-  printed as rows — see [Browsing the energy history](WEB_UI.md#energy) above.
+  with an error in the log; everything else carries on.
