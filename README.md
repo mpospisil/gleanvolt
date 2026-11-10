@@ -99,7 +99,19 @@ Running it again upgrades; settings and data are kept. More in
 [`deploy/docker-compose.nas.yml`](deploy/docker-compose.nas.yml) in the NAS's container UI. See
 [Running on a NAS](deploy/README.md#running-on-a-nas).
 
-**Windows** — download `gleanvolt-<version>-win-x64.zip` from
+**Windows** — every release is published to [winget](https://learn.microsoft.com/windows/package-manager/),
+the Windows Package Manager:
+
+```powershell
+winget install MartinPospisil.Gleanvolt
+gleanvolt
+```
+
+Then open `http://localhost:8090`. Gleanvolt runs in that terminal window for as long as it is open; it
+is not installed as a Windows service. Its settings, history and logs are kept in `data\` and `logs\`
+beside the program, in winget's package folder under `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`.
+Upgrade with `winget upgrade MartinPospisil.Gleanvolt`, after copying `data\` somewhere safe. Without
+winget, download `gleanvolt-<version>-win-x64.zip` from
 [Releases](https://github.com/mpospisil/gleanvolt/releases), unzip it and run `Gleanvolt.Worker.exe`.
 
 > **Home Assistant on the same device?** Don't run the Home Assistant container on a low-powered Pi
