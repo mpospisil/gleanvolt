@@ -91,7 +91,7 @@
     <value>Vyhledání zařízení</value>
   </data>
   <data name="FindDevicesIntro" xml:space="preserve">
-    <value>Prohledá tuto síť a najde zařízení SolaX, která odpovídají na Modbus TCP. Síť /24 trvá minutu nebo dvě.</value>
+    <value>Prohledá tuto síť a najde střídače a nabíječky, které Gleanvolt podporuje. Síť /24 trvá minutu nebo dvě.</value>
   </data>
   <data name="Subnet" xml:space="preserve">
     <value>Síť</value>

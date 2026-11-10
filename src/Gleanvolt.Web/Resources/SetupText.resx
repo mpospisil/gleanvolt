@@ -89,7 +89,7 @@
     <value>Find the devices</value>
   </data>
   <data name="FindDevicesIntro" xml:space="preserve">
-    <value>Searches this network for SolaX devices that answer Modbus TCP. A /24 takes a minute or two.</value>
+    <value>Searches this network for inverters and chargers Gleanvolt supports. A /24 takes a minute or two.</value>
   </data>
   <data name="Subnet" xml:space="preserve">
     <value>Network</value>
