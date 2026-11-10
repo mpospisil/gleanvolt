@@ -33,16 +33,17 @@ with paths relative to the language, for example `../setting-up/setup-wizard/`.
 The pictures in `src/assets/screenshots/` are generated, never taken by hand:
 
 ```bash
-npm run screenshots          # regenerate them
-npm run screenshots:check    # what CI runs on a pull request: fail if any no longer matches the UI
+npm run screenshots          # regenerate them, and fingerprints.json
+npm run screenshots:check    # what CI runs on a pull request: fail if a pictured page has changed
 ```
 
 [`tests/Gleanvolt.Web.Screenshots`](../../tests/Gleanvolt.Web.Screenshots) renders each page through bUnit
 from a fixed fixture, and [`scripts/screenshots.mjs`](scripts/screenshots.mjs) opens each in the installed
 Google Chrome and saves a PNG. No inverter, charger or Solcast call is involved. The pictures are in
-English and shared by every language.
+English and shared by every language. `fingerprints.json` records what each picture was made from (the
+page's HTML and the stylesheet); the check compares that, not pixels, since every Chrome draws text a
+little differently.
 
 - **A new picture**: add a test that calls `Capture(...)` in that project, then run `npm run screenshots`.
 - **A UI change** that changes a picture fails the pull request's screenshot check. Run
-  `npm run screenshots` and commit the PNGs, or download them from the failed run's
-  `screenshots-changed` artifact.
+  `npm run screenshots` and commit the PNGs with `fingerprints.json`.

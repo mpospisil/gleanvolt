@@ -23,14 +23,17 @@ page to agree on tone and picture quality. The reasoning is in `DECISIONS.md`.
   `InverterDrivers.Known` and `ChargerDrivers.Known`, so the brands are the real ones.
 - **`docs/manual/scripts/screenshots.mjs`** — runs those tests, opens each file in the installed Chrome
   with `puppeteer-core`, light scheme, 1x, and saves the PNG (cropped to `main.content` or the sign-in
-  card, at about the manual's column width). `--check` compares with `pixelmatch` instead and leaves the
-  new pictures for CI to upload.
+  card, at about the manual's column width), and `fingerprints.json`: a hash of each page's HTML, framing
+  and `site.css`. `--check` renders the HTML again and compares the hashes; it needs no Chrome.
 - **`.github/workflows/docs.yml`** — build on pull requests (and the screenshot check), `/next/` from
   `main`, `/vX.Y/` and `/latest/` from tags, a tag rebuilt by hand; committed to `gh-pages` with
   `.nojekyll`, since Jekyll drops Astro's `_astro/`.
 - **Not done here** — Pages has to be switched on once (source: the `gh-pages` branch) after the first
   publish. The README and the web UI don't link to the manual yet (plan step 6), and nothing marks
   `/next/` as unreleased.
+- **Quirk** — the first CI run compared pixels and failed every picture by 1–2 %: the runner's Chrome
+  anti-aliases text differently. Hence the fingerprints, and stripping bUnit's `blazor:*` attributes,
+  whose element reference ids are new on every run.
 - **Quirk** — the setup page shows the recovery key only after its form's POST, which bUnit doesn't make,
   so that picture rebuilds that branch around the real `RecoveryKeyPanel`.
 

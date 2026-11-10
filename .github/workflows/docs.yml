@@ -79,18 +79,10 @@ jobs:
 
       - run: npm ci
 
-      # Renders every screenshot again with the runner's Chrome and compares it with the committed one.
+      # Renders every pictured page again and compares it with what the committed pictures were made
+      # from (fingerprints.json). Exact, and independent of the runner's Chrome.
       - name: Check the screenshots against the UI
         run: npm run screenshots:check
-        env:
-          SCREENSHOTS_OUT: ${{ runner.temp }}/screenshots-changed
-
-      - name: Upload the screenshots as they are now
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-changed
-          path: ${{ runner.temp }}/screenshots-changed
 
   publish:
     if: github.event_name != 'pull_request'

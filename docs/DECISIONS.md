@@ -27,15 +27,21 @@ and spends a Solcast call. `tests/Gleanvolt.Web.Screenshots` renders the real pa
 `MainLayout`, from a fixed fixture with the real driver lists, and writes standalone HTML that loads the
 web UI's own CSS and fonts. `docs/manual/scripts/screenshots.mjs` opens each in the installed Chrome
 (`puppeteer-core`, no browser download) and saves a PNG. Without `GLEANVOLT_SCREENSHOTS` the tests only
-render, so `ci.yml` catches a fixture a UI change broke. On a pull request, `screenshots:check` renders
-again and fails when more than 0.2 % of a picture's pixels differ, uploading the new pictures.
+render, so `ci.yml` catches a fixture a UI change broke.
+
+**Decision — the check compares what a picture is made of, not its pixels.** `fingerprints.json`, written
+with the PNGs, holds a hash of each page's HTML, its framing and `site.css`. On a pull request,
+`screenshots:check` renders the HTML again and fails on any difference. Found on the first CI run: the
+runner's Chrome anti-aliases text differently from a desktop's, so 1–2 % of every picture's pixels
+differed with nothing changed, and a tolerance wide enough for that would also pass a changed word. bUnit's
+`blazor:*` attributes (element reference ids, new each run) are stripped from the HTML to make it stable.
 
 **Consequences accepted.** No scripts run in the captured pages, so a picture shows what the server
 rendered, not a state reached by JavaScript. The recovery key appears only in answer to the setup form's
 POST, which bUnit does not make, so that picture rebuilds the branch of `Setup.razor` with the same
-component and card; a change to that branch has to be mirrored in `SetupScreenshots`. Chrome builds
-anti-alias slightly differently; the tolerance absorbs that, and if the runner's Chrome moves further, the
-fix is to commit the artifact's pictures.
+component and card; a change to that branch has to be mirrored in `SetupScreenshots`. The pictures are
+made on a contributor's machine, so their anti-aliasing is whatever that Chrome does. A change to the
+fonts or the uPlot stylesheet is not in the fingerprint; only `site.css` is.
 
 ---
 

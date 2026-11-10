@@ -1,34 +1,36 @@
 // The manual's screenshots (#329).
 //
-//   npm run screenshots          regenerate src/assets/screenshots/*.png
-//   npm run screenshots:check    regenerate into a temporary folder and fail if any differs
+//   npm run screenshots          regenerate src/assets/screenshots/*.png and fingerprints.json
+//   npm run screenshots:check    fail if a picture no longer shows what the UI renders
 //
 // tests/Gleanvolt.Web.Screenshots renders each page through bUnit from a fixed fixture and writes it as
 // HTML; this script opens each file in headless Chrome and saves a PNG. No app, no devices and no
 // Solcast call are involved, so a picture changes only when the page it shows does.
 //
+// The check compares what each picture is made of -- the page's HTML, its framing and the stylesheet --
+// with fingerprints.json, not the pixels: two Chrome builds anti-alias text differently, enough that a
+// tolerance wide enough for that would also pass a changed word. Chrome is then needed only to make
+// the pictures, and the check is exact.
+//
 // Chrome is the one already installed (CHROME_PATH, or the stable channel's usual place): puppeteer-core
 // does not download one.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
 
 const manual = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = resolve(manual, '..', '..');
+const wwwroot = join(repository, 'src', 'Gleanvolt.Web', 'wwwroot');
 const committed = join(manual, 'src', 'assets', 'screenshots');
+const fingerprintsFile = join(committed, 'fingerprints.json');
 const check = process.argv.includes('--check');
 
-// Anti-aliasing differs a little between Chrome builds; a changed page differs by far more than this.
-const tolerance = 0.002;
-
 const html = mkdtempSync(join(tmpdir(), 'gleanvolt-screenshots-html-'));
-const target = check ? mkdtempSync(join(tmpdir(), 'gleanvolt-screenshots-png-')) : committed;
 
 console.log('Rendering the pages...');
 execFileSync('dotnet', ['test', join(repository, 'tests', 'Gleanvolt.Web.Screenshots'), '--configuration', 'Release', '--nologo', '--verbosity', 'quiet'], {
@@ -41,7 +43,51 @@ if (names.length === 0) {
   throw new Error(`The screenshot tests wrote nothing into ${html}.`);
 }
 
-mkdirSync(target, { recursive: true });
+// What a picture is made of. The page's link to wwwroot is a path on this machine, so it is taken out;
+// the stylesheet's content goes in instead, since a CSS change changes every picture.
+// Line endings are normalised, so a Windows checkout agrees with CI.
+const text = (path) => readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
+const styles = text(join(wwwroot, 'css', 'site.css'));
+const fingerprint = (name) => {
+  const page = text(join(html, `${name}.html`)).replaceAll(pathToFileURL(wwwroot + '/').href, 'wwwroot/');
+  return createHash('sha256')
+    .update(page)
+    .update(text(join(html, `${name}.json`)))
+    .update(styles)
+    .digest('hex');
+};
+const now = Object.fromEntries(names.map((name) => [name, fingerprint(name)]));
+
+if (check) {
+  const before = existsSync(fingerprintsFile) ? JSON.parse(readFileSync(fingerprintsFile, 'utf8')) : {};
+  const problems = [];
+  for (const name of new Set([...Object.keys(before), ...names])) {
+    if (!(name in now)) {
+      problems.push(`${name}.png: committed, but no test renders it any more`);
+    } else if (!(name in before)) {
+      problems.push(`${name}.png: rendered, but not committed`);
+    } else if (before[name] !== now[name]) {
+      problems.push(`${name}.png: the page it shows has changed`);
+    } else if (!existsSync(join(committed, `${name}.png`))) {
+      problems.push(`${name}.png: missing`);
+    }
+  }
+
+  rmSync(html, { recursive: true, force: true });
+  if (problems.length > 0) {
+    console.error('\nThe screenshots no longer show the UI:');
+    for (const problem of problems) {
+      console.error(`  ${problem}`);
+    }
+    console.error('\nRun "npm run screenshots" in docs/manual and commit the result.');
+    process.exit(1);
+  }
+
+  console.log('The screenshots show the UI as it is.');
+  process.exit(0);
+}
+
+mkdirSync(committed, { recursive: true });
 const browser = await puppeteer.launch({
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
   args: ['--no-sandbox', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars'],
@@ -56,7 +102,7 @@ try {
     await page.goto(pathToFileURL(join(html, `${name}.html`)).href, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
 
-    const path = join(target, `${name}.png`);
+    const path = join(committed, `${name}.png`);
     if (selector) {
       const element = await page.$(selector);
       if (!element) {
@@ -75,62 +121,12 @@ try {
   rmSync(html, { recursive: true, force: true });
 }
 
-if (!check) {
-  // A picture whose test is gone is a picture of nothing.
-  for (const file of readdirSync(committed).filter((file) => file.endsWith('.png'))) {
-    if (!names.includes(file.slice(0, -4))) {
-      rmSync(join(committed, file));
-      console.log(`  removed ${file}`);
-    }
-  }
-  process.exit(0);
-}
-
-const problems = [];
-const existing = existsSync(committed) ? readdirSync(committed).filter((file) => file.endsWith('.png')) : [];
-for (const file of existing) {
+// A picture whose test is gone is a picture of nothing.
+for (const file of readdirSync(committed).filter((file) => file.endsWith('.png'))) {
   if (!names.includes(file.slice(0, -4))) {
-    problems.push(`${file}: committed, but no test renders it any more`);
+    rmSync(join(committed, file));
+    console.log(`  removed ${file}`);
   }
 }
 
-for (const name of names) {
-  const file = `${name}.png`;
-  if (!existing.includes(file)) {
-    problems.push(`${file}: rendered, but not committed`);
-    continue;
-  }
-
-  const before = PNG.sync.read(readFileSync(join(committed, file)));
-  const after = PNG.sync.read(readFileSync(join(target, file)));
-  if (before.width !== after.width || before.height !== after.height) {
-    problems.push(`${file}: ${before.width}x${before.height} committed, ${after.width}x${after.height} now`);
-    continue;
-  }
-
-  const diff = new PNG({ width: after.width, height: after.height });
-  const changed = pixelmatch(before.data, after.data, diff.data, after.width, after.height, { threshold: 0.1 });
-  const share = changed / (after.width * after.height);
-  if (share > tolerance) {
-    problems.push(`${file}: ${(share * 100).toFixed(2)} % of the pixels differ`);
-    writeFileSync(join(target, `${name}.diff.png`), PNG.sync.write(diff));
-  }
-}
-
-if (problems.length > 0) {
-  // Left where CI can upload them, so the fix is to download and commit rather than to rerun locally.
-  const out = process.env.SCREENSHOTS_OUT ?? join(manual, 'screenshots-changed');
-  mkdirSync(out, { recursive: true });
-  for (const file of readdirSync(target)) {
-    copyFileSync(join(target, file), join(out, file));
-  }
-
-  console.error('\nThe screenshots no longer match the UI:');
-  for (const problem of problems) {
-    console.error(`  ${problem}`);
-  }
-  console.error(`\nThe new pictures are in ${out}. Run "npm run screenshots" in docs/manual and commit the result.`);
-  process.exit(1);
-}
-
-console.log('The screenshots match the UI.');
+writeFileSync(fingerprintsFile, JSON.stringify(now, null, 2) + '\n');

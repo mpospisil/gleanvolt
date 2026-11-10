@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Builder;
@@ -21,7 +22,7 @@ namespace Gleanvolt.Web.Screenshots;
 /// <c>wwwroot</c>. Nothing runs in the browser that takes the picture -- no Blazor, no scripts -- so what
 /// it shows is exactly what the server rendered.
 /// </summary>
-public abstract class ScreenshotTest : PageTest
+public abstract partial class ScreenshotTest : PageTest
 {
     /// <summary>Where the HTML goes; unset, nothing is written and the test only renders.</summary>
     public const string OutputVariable = "GLEANVOLT_SCREENSHOTS";
@@ -100,7 +101,7 @@ public abstract class ScreenshotTest : PageTest
         }
 
         Directory.CreateDirectory(output);
-        File.WriteAllText(Path.Combine(output, name + ".html"), Document(markup), Encoding.UTF8);
+        File.WriteAllText(Path.Combine(output, name + ".html"), Document(BunitAttributes().Replace(markup, string.Empty)), Encoding.UTF8);
         File.WriteAllText(
             Path.Combine(output, name + ".json"),
             JsonSerializer.Serialize(new { width, selector }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
@@ -125,6 +126,11 @@ public abstract class ScreenshotTest : PageTest
             </html>
             """;
     }
+
+    // bUnit's own bookkeeping (event handler numbers, element reference ids, which are new each run): no
+    // browser reads them, and leaving them in would make the same page a different file every time.
+    [GeneratedRegex(@"\s+blazor:[\w-]+(=""[^""]*"")?")]
+    private static partial Regex BunitAttributes();
 
     private static string RepositoryRoot()
     {
