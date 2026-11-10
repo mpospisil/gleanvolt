@@ -99,15 +99,7 @@ docker info 2>&1 | grep -i "memory limit"       # no "No memory limit support" w
 `cgroup_disable=memory` also appears in `/proc/cmdline`; the firmware adds it, and the parameter you
 added comes later and wins. `WARNING: No swap limit support` is expected; ignore it.
 
-**4. Check swap — on Trixie there is nothing to add.** Raspberry Pi OS Trixie (Debian 13) sets up
-swap itself, as **zram** — compressed swap in RAM — with writeback to `/var/swap` on disk. Check it is
-there:
-
-```bash
-cat /proc/swaps      # expect /dev/zram0
-```
-
-**5. Directories.** The container holds no state; everything lives here:
+**4. Directories.** The container holds no state; everything lives here:
 
 ```bash
 sudo mkdir -p /opt/gleanvolt/{logs,data}
@@ -117,7 +109,7 @@ sudo chown -R 1654:1654 /opt/gleanvolt/logs /opt/gleanvolt/data   # the controll
 
 The deploy script also creates both and fixes their ownership if needed.
 
-**6. The settings file.** The deploy script needs `/opt/gleanvolt/.env` to exist. Copy the example
+**5. The settings file.** The deploy script needs `/opt/gleanvolt/.env` to exist. Copy the example
 from your computer; editing it is optional, since the setup wizard asks for everything:
 
 ```bash
@@ -125,7 +117,7 @@ scp deploy/.env.example martin@192.168.2.7:/opt/gleanvolt/.env
 ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env'
 ```
 
-**7. Check the devices are reachable** from the Pi, before blaming the container:
+**6. Check the devices are reachable** from the Pi, before blaming the container:
 
 ```bash
 nc -vz <inverter address> 502 && nc -vz <charger address> 502
@@ -780,7 +772,7 @@ Or, on the Pi directly:
 sudo chown -R 1654:1654 /opt/gleanvolt/data && docker compose restart gleanvolt-controller
 ```
 
-**The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 7).
+**The controller logs Modbus timeouts.** Check reachability from the Pi itself (`nc -vz`, step 6).
 The controller is on the Pi's own network, so if the Pi can reach the inverter, the controller can.
 
 **`docker compose` says permission denied.** The ssh user isn't in the `docker` group yet, or hasn't
