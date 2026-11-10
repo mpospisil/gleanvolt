@@ -21,7 +21,7 @@ Surplus    = Solar − OtherLoads
 
 **This requires the grid meter, not the inverter's output.** `Grid` comes from **`FeedinPower` (`0x0046`, int32, low word first, positive = export)** — the CT/meter reading at the utility connection, the only register that sees the whole house. It lives inside the telemetry block already fetched, so it costs no extra round-trip.
 
-> ⚠️ The per-phase registers `0x6C/0x70/0x74` (mapped as `GridPowerR/S/T`) are **not** the grid meter — they report the **inverter's AC output**. Verified live: they track `Solar − Battery` at ~94–96% (inverter efficiency), while `FeedinPower` simultaneously read a genuine 388 W export. Using them for household load produces nonsense (a 2.4 kW-of-sun reading once yielded a 13 kW "surplus"). They are kept in the map for reference only.
+> ⚠️ On SolaX, the per-phase registers `0x6C/0x70/0x74` (`GridPowerR/S/T`) are **not** the grid meter — they are the **inverter's AC output**, and household load computed from them is nonsense.
 
 Worked example from a live run: Solar 2498 W, exporting 388 W, battery idle, EV idle →
 `OtherLoads = 2498 − 388 = 2110 W`, so `Surplus = 2498 − 2110 = 388 W` — exactly the exported power.
@@ -34,7 +34,7 @@ Raw solar generation is erratic, so the controller never reacts to instantaneous
 
 **2. The 1-amp hysteresis threshold.** A Modbus write is only issued when the new target differs from the charger's active setpoint by at least `CurrentChangeThresholdAmps` (default 1 A ≈ 230 W per phase). If the car is charging at 10 A, no command is sent until the average calls for 11 A or 9 A. Raise the threshold to damp the charger further (e.g. 3 A means 10 A → 12 A is ignored, 10 A → 13 A is written).
 
-These stack with the existing state hysteresis — the asymmetric start/stop thresholds on both the surplus and the battery SOC gate — so the charger is never nudged by noise.
+These stack with the asymmetric start/stop thresholds on the surplus and the battery SOC gate, below.
 
 You can watch all of it in the log; each control cycle prints the raw surplus, the average, the sample count, the charger's active setpoint, and the target:
 
@@ -50,11 +50,6 @@ SOC=96% BatteryPower=-56W Solar=4180W Grid=-388W EvCharger=Charging EvMode=Fast 
 
 ## What is written, and by whom
 
-Until #89 the controller wrote the current setpoint and nothing else: the owner was expected to have
-left the charger in Fast by hand, and a mode selected over a charger sitting in Green did nothing at
-all and said so only through **Control state** reading `Idle`. Charging is now started by an action
-instead, and the action takes responsibility for the use-mode. The two writes stay separate:
-
 - **The control loop writes the current setpoint (`0x628`) and only that**, from its
   `Surplus = PV − household load` calculation. It is still the minimum it can do.
 - **An action writes the use-mode (`0x60D`), once.** Pressing a strategy button writes `Fast` and then
@@ -62,8 +57,8 @@ instead, and the action takes responsibility for the use-mode. The two writes st
   it, and nothing re-asserts it.
 - **The loop still only acts when all three hold**: the SolaX device is reachable, its own use-mode
   reads **Fast**, and a strategy is running. If the charger is changed at the wallbox mid-session it
-  drops out of Fast, every controller goes `Idle`, and **nothing writes `Fast` back** — the owner has
-  the last word on their own hardware, and the controller does not fight them for it.
+  drops out of Fast, every controller goes `Idle`, and **nothing writes `Fast` back**: the owner has
+  the last word.
 
 ## The 6 A hard cutoff — pause by dropping the current
 
@@ -121,19 +116,16 @@ The current setpoint is encoded to the SolaX hardware's requirements automatical
 [DRY RUN] would set charger current setpoint: 6A -> 16A (register 1600). Charge at 16A from 3700W surplus.
 ```
 
-This is the safe way to confirm the register values against your device before allowing real writes. In dry-run the values that were "written" also stand in for the hardware on the next read, so a dry run behaves like a real one rather than reporting every mode `Idle` because the charger is still in Green.
+In dry-run the "written" values stand in for the hardware on the next read, so a dry run behaves like a real one. **Nothing is ever written to the device**: each write is skipped, and the Modbus client is wrapped read-only besides.
 
-There is deliberately **no `ChargeControl:Enabled`**: the service boots in mode `Off` and writes nothing at all until somebody presses a button, which is a stronger guarantee than a config flag and one nobody can leave switched on by accident.
+There is **no `ChargeControl:Enabled`**: the service boots in mode `Off` and writes nothing until somebody presses a button.
 
-In dry-run, **nothing is ever written to a SolaX device**. That's enforced twice: each write site is skipped, and the Modbus clients are wrapped in a read-only decorator that drops writes outright, so even a caller that forgot its guard cannot reach the hardware. A suppressed write logs a warning as a tripwire — it should never appear.
-
-> ⚠️ **This feature writes to your charger — two registers.** The charge-current setpoint (`ChargeCurrentSetpoint 0x628`, written by the control loop) and the use-mode (`ChargerUseMode 0x60D`, **written** by a start/stop action: `0=Stop, 1=Fast`). Both come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). `0x60D` in particular was read-only in this project until #89, so its write path has less mileage on it than the setpoint's. Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Run with `DryRun: true` and check the logged register values against your hardware first.** Nothing is written until a button is pressed, which is why there is no enable flag to forget.
+> ⚠️ **This feature writes to your charger — two registers.** The charge-current setpoint (`ChargeCurrentSetpoint 0x628`, written by the control loop) and the use-mode (`ChargerUseMode 0x60D`, **written** by a start/stop action: `0=Stop, 1=Fast`). Both come from the SolaX X1/X3-HAC protocol / the wills106 register map, but **GEN1/GEN2 and firmware differences exist** (GEN1 uses Datahub Charge Current `0x624`). Other chargers have their own registers or API, chosen by `Pv:Chargers:0:Driver`. Also confirm your charger accepts `PauseCurrentAmps` (0 A by default). **Run with `DryRun: true` and check the logged register values against your hardware first.** Nothing is written until a button is pressed, which is why there is no enable flag to forget.
 
 ## How every mode waits and ends
 
-Every mode talks to the same wallbox, so how a mode **waits** and how it **ends** are shared rules
-([#280](https://github.com/mpospisil/gleanvolt/issues/280)). How much current each mode asks for is
-not: that is what makes them different.
+How a mode **waits** and how it **ends** are rules shared by every mode. How much current each mode
+asks for is what makes them different.
 
 **Waiting.** A mode decides only "not now", and until when if it knows: the next sun in the forecast,
 the next tariff edge, the end of a restart dwell. Then:

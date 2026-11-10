@@ -10,26 +10,17 @@ battery out of it.** While it is selected:
 2. The charger is pinned at **`MaxChargingCurrentAmps`** — written by the start action itself, before
    the first poll, and then re-commanded every cycle whatever the sun, the SOC, the forecast or the
    time of day. PV covers what it can and the **grid covers the rest**.
-
-   Writing it at the press rather than leaving it to the poll loop closes a real gap: a finished
-   charge ends by writing `PauseCurrentAmps` (0 A here), so without this the next fast charge spends
-   up to a poll interval sitting in `Fast` with the car told to take nothing. A charger already at
-   the maximum is left alone — the setpoint write is skipped when it would not move anything — and a
-   setpoint write that fails does **not** fail the start, because the control loop commands the same
-   current seconds later.
 3. When the charge is over — the **amount you asked for** has been delivered, or the car stopped at
    **its own** charge limit — the setpoint drops to `PauseCurrentAmps`, the charger is written `Stop`,
    the mode returns itself to **`Off`**, and the hold is released — exactly the end state the **Off**
    button produces, in the one cycle.
 
-Point 3 is what makes it safe to press. The state it creates is expensive — maximum current, grid
-import, battery locked — and it ends by itself instead of sitting armed until somebody notices.
+So the expensive state — maximum current, grid import, battery held — ends by itself.
 
 ## How much? (the amount)
 
-By default the **car** decides when it has had enough, which is what this mode did for its whole life
-before #119. You can instead say how much to deliver, in either of the two ways the targeted tab
-already asks — and the answer is a **stopping condition and nothing else**:
+By default the **car** decides when it has had enough. You can instead say how much to deliver — a
+**stopping condition and nothing else**:
 
 | Basis | What you say | When it ends |
 |---|---|---|
@@ -38,17 +29,14 @@ already asks — and the answer is a **stopping condition and nothing else**:
 | **Battery target** | `60` % | the same, against kilowatt-hours converted from the gap |
 
 - **It does not pace the charge.** The setpoint is at the maximum from the first cycle to the last;
-  the amount only decides when to stop. Anything that waits for cheaper sun, or plans around a
-  departure, is [`Targeted`](MODE_TARGETED.md) — that is the whole difference
-  between the two modes, and the reason both exist.
+  the amount only decides when to stop. To pace a charge around the sun, use
+  [`Targeted`](MODE_TARGETED.md).
 - **A battery target is converted once**, when you press the button, using
   `Ev:Vehicles:0:BatteryCapacityKWh` and `Ev:Vehicles:0:ChargeEfficiency`. A later reading does not
-  move a charge that is already part delivered — the same rule, and the same reasoning, as
-  [a targeted SOC request](MODE_TARGETED.md#setting-a-target). It is offered only where it can be honoured:
-  a configured capacity **and** a reading from the car — and, since
-  [#179](https://github.com/mpospisil/gleanvolt/issues/179), one no older than `Vehicle:MaxAge`. A
-  reading past it is refused with its age in the sentence rather than converted. Ask in
-  kilowatt-hours, or press `Full`.
+  move a charge that is already part delivered (as with
+  [a targeted SOC request](MODE_TARGETED.md#setting-a-target)). It needs a configured capacity **and**
+  a reading from the car no older than `Vehicle:MaxAge`; an older reading is refused, with its age.
+  Ask in kilowatt-hours instead, or press `Full`.
 - **Delivery is metered from the moment you start**, not from when the car was plugged in. Energy the
   car took under an earlier mode does not count towards this amount.
 - **Whichever comes first wins.** A car that reaches its own limit at 12 kWh of the 20 asked for ends
@@ -73,32 +61,27 @@ of charge, so the 20 points above 80% are worth buying as late as possible. The 
 or three hours; it is the nine hours of *sitting* at 95% that does the damage. Pressing the button at
 22:00 for an 07:00 departure turns those nine hours into about twenty minutes.
 
-- **It changes *when*, never *how*.** When it runs, it runs at `MaxChargingCurrentAmps` exactly as it
-  always did. Nothing here paces the charge, waits for cheaper electricity, or consults a forecast —
-  that is [`Targeted`](MODE_TARGETED.md), and the difference is the whole reason
-  both exist.
+- **It changes *when*, never *how*.** When it runs, it runs at `MaxChargingCurrentAmps`. It consults no
+  forecast (with **Low tariff only**, below, it waits for low tariff).
 - **It needs an amount.** With **Until the car stops** there is no duration to work back from and so
   no such thing as the latest moment it could start; the combination is refused in words rather than
   quietly charging at once.
 - **The schedule is rebuilt every poll**, so the start time moves *later* as energy goes in — and
-  *earlier* the moment the car turns out to draw less than the charger offers. An 11 kW wallbox in
-  front of a car with a 7.4 kW on-board charger is otherwise a plan an hour short of the time it
-  needs, and this is the mode with no slack in it.
+  *earlier* the moment the car turns out to draw less than the charger offers (an 11 kW wallbox in
+  front of a car with a 7.4 kW on-board charger).
 - **Before the car draws anything, the plan is a guess.** The car's on-board limit is not knowable
   until it charges, so the first schedule uses the installation's maximum and says so — *"the
   installation's maximum, not yet measured"*.
-- **Not enough time?** It charges flat out from now and reports how far short it will fall, rather
-  than pretending. The same honesty `Targeted` commits to.
+- **Not enough time?** It charges flat out from now and reports how far short it will fall.
 - **Plugged in after the start time?** It begins at once. The plan is a "not before" gate, never a
   "not after" one.
 - **The departure passing ends the mode**, reporting what was delivered — the same rule `Targeted`
   follows. A car that is not ready at the moment you said you were leaving has run out of the window
   it was given.
 
-> ⚠️ **A deferred charge does not survive a restart.** Neither does the mode nor the amount, and the
-> reasoning is the same throughout — but this is the sharpest form of it: a charge deferred to 04:02
-> and lost to a 23:00 container restart is discovered at 07:00 with a car that never charged. If you
-> restart the stack in the evening, set it again afterwards.
+> ⚠️ **A deferred charge does not survive a restart**, nor do the mode and the amount. A charge
+> deferred to 04:02 and lost to a 23:00 restart is discovered at 07:00 with a car that never charged. If
+> you restart in the evening, set it again afterwards.
 
 ## The hold, and who owns it
 
@@ -109,18 +92,10 @@ reason: you pressed Off, the car finished, the amount was delivered, the car was
 *When it starts charging*, not when the mode is selected: a charge deferred to 04:02 would otherwise
 lock the pack out of serving the house from 22:00, all night, with nothing being charged at all.
 
-Between those two moments the switch is yours: turn **Battery discharge hold** off in Home Assistant
-or the web UI and the pack is allowed to help, while the car goes on charging at maximum. That is a
-legitimate thing to want and it is your call.
+Between those two moments the switch is yours: turn **Battery discharge hold** off and the pack helps,
+while the car goes on charging at maximum. Two things to know:
 
-> Before #119 it was not. The mode's hold was a floor OR-ed over your switch, so flipping it off
-> during a fast charge moved the switch on screen and changed nothing at all.
-
-Two consequences worth knowing:
-
-- **A hold you had switched on before starting is off when the charge ends.** The mode releases the
-  hold on the way out rather than remembering what the switch said an hour ago — the alternative
-  leaves the pack locked out of serving the house with nothing charging.
+- **A hold you had switched on before starting is off when the charge ends.**
 - **Taking the charger out of `Fast` at the wallbox is not an ending.** The mode stays selected, the
   controller goes `Idle`, and the hold stays armed. Press **Off** if that is what you meant.
 
@@ -143,8 +118,7 @@ so the rule leans on power and treats the status as a corroborating signal:
   selected;
 - **unplugging ends it immediately**, on the same path.
 
-`ChargePaused` and `SuspendedEvse` are deliberately *not* treated as "the car is done": those are the
-charger's own doing, which is exactly what our pause write produces.
+`ChargePaused` and `SuspendedEvse` are *not* "the car is done": they are what our own pause produces.
 
 ## FastNoBattery on low tariff only
 
@@ -171,10 +145,8 @@ makes the mode wait through high tariff and charge flat out once low tariff star
 
 ## What FastNoBattery doesn't do
 
-- **It doesn't survive a restart.** Like every mode, the service comes back in `Off` — a service that
-  restarted mid-session and silently resumed drawing 11 kW from the grid is not a behaviour anyone
-  wants unattended. The charger keeps its last setpoint until a mode is selected; the inverter's hold
-  lapses within `BatteryHold:Duration`.
+- **It doesn't survive a restart.** Like every mode, the service comes back in `Off`. The charger keeps
+  its last setpoint until a mode is selected; the inverter's hold lapses within `BatteryHold:Duration`.
 - **It doesn't change the charger's use-mode while it runs.** Starting it wrote `Fast` once and
   ending it writes `Stop`; in between, like every other mode, it only moves the current setpoint.
 - **It doesn't act on a charger that isn't in `Fast`.** If the read-back says anything else — someone
@@ -196,7 +168,5 @@ selection: it cannot keep the battery out of the charge, which is half of what i
 The amount and the departure are not configuration — they belong to one charge — so there is nothing
 to set here for them. A battery target reads `Ev:Vehicles:0:BatteryCapacityKWh` and
 `Ev:Vehicles:0:ChargeEfficiency`, the same two figures a targeted SOC request uses; a departure reads
-`ChargeControl:Targeted:SafetyMargin` and `ChargeControl:Targeted:MaxHorizon`. Those two are
-deliberately shared rather than duplicated: *"ready at 07:00 must not mean still charging at 07:00"*
-is a fact about your morning, not about which strategy happens to be running, and two settings for it
-would only ever drift apart.
+`ChargeControl:Targeted:SafetyMargin` and `ChargeControl:Targeted:MaxHorizon`, shared with
+`Targeted`.

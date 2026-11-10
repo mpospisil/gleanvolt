@@ -4,7 +4,7 @@ A switch that stops the home battery discharging, so charging the EV never drain
 it can, the grid covers the rest, and the battery is left alone — but it can **still charge** from PV
 surplus, which is the whole point of using this rather than simply freezing the battery.
 
-It is deliberately orthogonal to charge control, not a third charge mode:
+It is separate from the charge modes and combines with any of them:
 
 - **Hold on + charge mode `Off`** — the charger runs at whatever current you set in Fast mode. PV
   covers what it can, the grid tops up, the battery is untouched.
@@ -27,13 +27,11 @@ the hold doesn't touch the charger at all. It uses the inverter's **Modbus Power
   shortfall can only come from the grid. The battery is never asked to contribute.
 - **PV falls short and the pack is full** — push out up to `FullPackHeadroomWatts` (1 kW) more than PV
   reads, but never more than the forecast expects the roof to make right now, and never more than the
-  load. "Already at its maximum" is only true while the pack can take the PV the target leaves over. A
-  full pack can't, so a target of exactly the PV reading caps PV there. The pack's standby trickle then
-  lets the next reading come in lower, and the target follows it down. On 2026-09-16 that took PV from
-  6.1 kW to 115 W in three minutes under a clear sky, with the car on the grid. The headroom lets PV the
-  target capped climb back. If the sun really is that weak, a full pack covers up to the headroom. It
-  applies at `FullPackSocPercent` (95%) or above, while the pack takes no more than 100 W and a forecast
-  covers the moment, so a night charge never borrows from the pack.
+  load. A full pack can't absorb PV the target leaves over, so a target of exactly the PV reading would
+  cap PV there and walk it down poll by poll; the headroom lets it climb back. If the sun really is
+  that weak, a full pack covers up to the headroom. It applies at `FullPackSocPercent` (95%) or above,
+  while the pack takes no more than 100 W and a forecast covers the moment, so a night charge never
+  borrows from the pack.
 
 > **This is not the SolaX "No Discharge" mode.** That option exists in the upstream Home Assistant
 > integration but never reaches the inverter — it is a client-side strategy, and the formula above is
@@ -51,11 +49,8 @@ Turning the switch off writes a release immediately; it never waits for the dura
 
 ## Persistence and reported state
 
-The hold does **not** survive a restart, and cannot be armed by configuration: the service always
-comes back with the switch **off**, so the battery charges and discharges normally until somebody asks
-otherwise. The inverter will already have resumed normal operation by then anyway, since the armed
-command expires after `Duration`. That is deliberate — the hold is a command with a lifetime, not a
-stored setting, so an unattended restart that re-armed it would silently keep the pack idle.
+The hold does **not** survive a restart and cannot be armed by configuration: the service always
+comes back with the switch **off**.
 
 The Home Assistant switch reports **what the controller last successfully wrote**, not a reading from
 the inverter — register `0x7C` reports the firmware version when read, so the command state cannot be
@@ -64,10 +59,7 @@ assumed success. As a cross-check, the controller logs a warning if the battery 
 than 150 W while it believes the hold is armed.
 
 **A working hold still leaves a 50–65 W trickle out of the battery** — inverter standby draw, not
-load being served; measured here across house loads from 143 W to 2877 W. So the guarantee is that
-the battery stops *serving the house*, not that battery power reaches exactly zero. The 150 W
-deadband above exists for this reason: warning on any negative value fires every poll and drowns out
-the signal it is there to give.
+load being served. The battery stops *serving the house*; its power does not reach exactly zero.
 
 ## Configuring the battery hold
 
@@ -93,14 +85,10 @@ read-only so a write is structurally impossible rather than merely skipped.
 > mode values come from the wills106 homeassistant-solax-modbus map, not from a SolaX document, and
 > upstream reports behaviour differing across firmware versions.
 >
-> It **has been verified on the reference hardware** (X3-HYB-G4 PRO, 2026-07-27): arming the hold
-> moved the house from 2846 W of battery discharge to 1601 W of grid import within one poll, renewal
-> held it continuously, and PV was not curtailed. Full measurements are in
-> [docs/DECISIONS.md](DECISIONS.md). Two things remain unobserved: behaviour under strong midday
-> PV (does the battery still charge from surplus, and is PV curtailed at full output), and behaviour
-> with the EV actually charging.
->
-> None of that transfers to a different inverter or firmware, so `Enabled` stays `false` and `DryRun`
+> It has been verified on the reference hardware (X3-HYB-G4 PRO); the measurements are in
+> [docs/DECISIONS.md](DECISIONS.md). Even there, **judge whether a hold held by the battery's power,
+> every time** — on the session chart or **Battery power** — not by the switch. None of that transfers
+> to a different inverter or firmware, so `Enabled` stays `false` and `DryRun`
 > stays `true` by default. **Validate with `DryRun: true` first** — it logs the exact block it would
 > write (`[DRY RUN] would hold battery discharge: active power target -2000W for 60s (registers [...]
 > at 0x7C)`) without touching the inverter.

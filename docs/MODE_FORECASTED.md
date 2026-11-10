@@ -37,10 +37,8 @@ The evening guarantee needs no scheduling code: as the day burns down, the remai
 
 ### Not flapping on the floor
 
-The floor is where the mode is easiest to get wrong. SOC arrives as **whole percent**, so a bare
-`soc < floor` test turns on a single count — a morning that starts one percent above the floor would
-otherwise stop and restart the car every few minutes, which is a contactor cycle and a vehicle wake
-each time. Two things prevent that:
+SOC arrives as **whole percent**, so a car charging right at the floor could stop and restart every
+few minutes. Three things prevent that:
 
 - **A resume margin.** Charging continues down to `SocFloor` itself, but a paused session only comes
   back at `SocFloor + FloorResumeMarginPercent` (default 5 %) — the SOC counterpart of
@@ -51,54 +49,37 @@ each time. Two things prevent that:
   still recover a much deeper discharge — is a preference, not a physics problem, so it goes through
   the `MinRunTime` dwell timer like any other soft reason and the session is held at 6 A rather than
   cut short. Both floors are published, as `soc_floor` and `soc_floor_traj`.
-- **A guard band, so the pack recovers instead of hovering.** Not flapping is not the same as getting
-  better: a car that takes every watt the sun makes holds SOC *exactly* on the floor all morning, and
-  the pack never gets the charge the evening needs. So while SOC is inside the resume margin,
-  `FloorGuardReserveWatts` (default 750) of surplus is withheld from the car and the battery lends
-  nothing — a loan and a reserve at the same SOC would only cancel out. On a 9 kWh pack that
-  clears a 5 % band in about forty minutes and costs a three-phase session roughly one amp. Where the
-  surplus is marginal it stops the session outright, which is the intent: the pack gets the whole
-  surplus and the resume margin keeps the car off until it has climbed clear, so a morning that used to
-  produce a dozen short cycles produces one long one. Only a *running* session is ever inside the band
-  — a paused one is held below it by the resume margin itself.
+- **A guard band, so the pack recovers instead of hovering.** While SOC is inside the resume margin,
+  `FloorGuardReserveWatts` (default 750) of surplus is withheld from the car for the battery, and the
+  battery lends nothing. On a 9 kWh pack that clears a 5 % band in about forty minutes and costs a
+  three-phase session roughly one amp; where the surplus is marginal it stops the session, giving one
+  long charge instead of many short ones.
 
 ## The battery loan
 
 On three phases a 3 kW surplus charges nothing. If the forecast shows the day can repay it, the
-battery lends the difference — sized to reach **exactly** the threshold in force, never more — turning
-would-be export into charge. Lending down to the plan's SOC floor *is* lending what the day can repay,
-because that is what the floor means, so the bounds are about wear and about whether the round trip
-buys anything:
+battery lends the difference — exactly enough to reach the charger's threshold, never more — turning
+would-be export into charge. The bounds:
 
 - **never below the plan's SOC floor**, nor below `MinBatterySocFloorPercent` (default 50 %), with
-  `LoanSocMarginPercent` of clearance above it before lending starts at all. The floor rises as the day runs out, the car pauses at it,
-  and the repayment needs no scheduling: lending drops SOC, which books more of the late production for
-  the pack, which raises the floor, which squeezes the car out earlier.
+  `LoanSocMarginPercent` of clearance above it before lending starts at all. Lending lowers SOC, which
+  raises the floor, which ends the car's day earlier: the repayment needs no scheduling.
 - **`MaxLoanPowerWatts`** (default 3800) caps the bridge and the discharge rate. It has to be able to
   reach the charger's floor from the thinnest surplus a loan is granted for, or it silently imposes a
   floor of its own.
 - **`MaxDailyLoanKWh`** (default 4) caps *outstanding* lending — lent minus what the pack has charged
-  back, reset at local midnight. A backstop against wear, not the binding constraint: a pack that lent
-  2 kWh in the morning and is full again by one o'clock is physically where it started.
-- **a minimum live surplus, and which one depends on whether the pack has room for the energy.** With
-  room, `MinBridgeSurplusWatts` (default 2000): the loan tops up a genuine surplus and never funds a
-  session from the pack, which would pay a round trip and a cycle on both batteries for nothing. With
-  the pack full — or more generally with the day making more surplus than it can absorb by the
-  deadline, published as **surplus spill** — that reasoning fails, because the energy lent is not
-  energy the pack would have kept, it is energy about to be exported. There
-  `SpillBridgeSurplusWatts` (default 400) applies instead, so a thin overcast afternoon on a full pack
-  charges the car rather than giving the day to the meter
-  ([#223](https://github.com/mpospisil/gleanvolt/issues/223)). Low but not zero: cycling the pack to
-  chase noise is wear bought for nothing either way.
+  back, reset at local midnight.
+- **A minimum live surplus.** While the pack has room for the day's surplus,
+  `MinBridgeSurplusWatts` (default 2000): the loan tops up a real surplus and never funds a session
+  from the pack. When the day makes more surplus than the pack can absorb by the deadline (published as
+  **surplus spill**), the energy lent would otherwise be exported, so `SpillBridgeSurplusWatts`
+  (default 400) applies instead.
 
-The same two floors decide what the plan calls a **charge window**, so a window drawn on the Forecasted
-tab is one the controller will enter — the two used to be computed separately and disagreed by the
-width of a whole band of weather.
+The same thresholds decide what the plan calls a **charge window**, so a window drawn on the Forecasted
+tab is one the controller will enter.
 
-`Forecasted` never arms the [battery discharge hold](BATTERY_HOLD.md) by
-itself. Its job is to store as much of the sun as it can and import as little as it can, and it already
-pauses the car at the floor; a hold on top of that could only send the house, or the car, to the grid in
-place of the pack. A manual hold from HA still applies.
+`Forecasted` never arms the [battery discharge hold](BATTERY_HOLD.md) itself; a hold you switch on
+still applies.
 
 ## When the sun can't cover everything
 
@@ -106,25 +87,17 @@ The priority order is fixed and not configurable:
 
 > **1. House load → 2. Battery to 100 % by the deadline → 3. EV.**
 
-The car absorbs the entire shortfall, and **no grid charging is ever initiated**. A partial charge
-does an EV pack no harm — an NMC pack is happier at mid SOC than topped up daily — but a thin day
-discovered at dusk with a silently paused charger is unhelpful, so the plan is published instead:
+The car absorbs the entire shortfall, and **no grid charging is ever initiated**. The plan is published
+so a thin day is visible early:
 the **charge window**, the **EV energy budget** in it, the **projected shortfall** (how far the day
 falls short of the house plus a full battery — the evening 100%, which the car is never part of),
 and the **plan state** sentence, all on HA and in the log as soon as the forecast allows.
 Tomorrow's forecast rides along in the same Solcast response, so a bad day comes with the context of
 whether waiting is worth it.
 
-The mode takes no request for an amount. It reports what the day can give; it does not accept an
-answer to "how much do you want?" — that is what [`Targeted`](MODE_TARGETED.md) is for,
-and only `Targeted` paces a charge, buys grid for the remainder and reports the gap when the time
-will not stretch. Nor does it cap one: there is no per-session energy limit either. To keep the car
-from filling up, set the charge limit in the car — it stops drawing on its own, and the session ends
-the way any other does. To name an amount, give `Targeted` a departure: when the forecast covers the
-amount in time, it charges from the sun alone and buys nothing — and if the sun then falls short,
-it buys the rest rather than miss the departure, which is the one thing this mode never does. To
-forbid that too, tick **Sun only** ([below](MODE_TARGETED.md#sun-first-grid-allowed--or-sun-only)): the amount is then
-met from the roof or reported as shortfall, never bought.
+**The mode takes no amount.** To stop at a charge level, set the limit in the car. To ask for an amount
+by a time, use [`Targeted`](MODE_TARGETED.md) — with
+[**Sun only**](MODE_TARGETED.md#sun-first-grid-allowed--or-sun-only) if nothing may be bought.
 
 ## Until full
 
@@ -162,28 +135,21 @@ With it off, `Forecasted` ends with the day's sun, as before. The option itself 
 
 A plan is only as good as the forecast under it, so the controller checks continuously:
 
-- **House load is learned per hour of day**, not as one rolling average. A household's load has a
-  strong daily shape, and a trailing average of it is always wrong in the same direction: measured at
-  15:00 it reports the afternoon peak, which then gets projected across the evening. On the reference
-  site that turned a 05:00 plan of "33.6 kWh available, window 08:00–16:30" into "no EV charging
-  today" by noon, on a day whose forecast was accurate to within 5%. At startup each hour is rebuilt
+- **House load is learned per hour of day**, not as one rolling average. At startup each hour is rebuilt
   from the last `HouseLoadHistoryDays` (14) of the energy history, so a deploy doesn't send the plan
   back to guessing. An hour with less than two days of history starts from `BaselineHouseLoadWatts`.
   The profile is logged at startup and once a day (`House profile:`) so the learned shape is visible.
 - **Realised bias** — `actual ÷ forecast` over elapsed daylight, clamped to `[0.5, 1.2]` and applied
-  to the remaining forecast. Asymmetric on purpose: under-production scales the rest of the day down
-  (raising the floor, throttling the car early — the conservative direction), while a sunny morning
-  can't talk the planner into over-committing the afternoon. It stays at 1.0 until `BiasMinPeriods`
-  daylight periods have closed.
+  to the remaining forecast. The clamp is asymmetric, so a sunny morning can't talk the planner into
+  over-committing the afternoon. It stays at 1.0 until `BiasMinPeriods` daylight periods have closed.
 - **Per-period reconciliation** — one log line per closed 30-minute period.
 - **Trust guard** — if the bias leaves `[0.6, 1.4]` for `TrustBreachPeriods` consecutive periods, the
   plan is abandoned for the day with a warning and the mode falls back to `Solar` behaviour. The same
   fallback covers a missing or stale forecast: an absent forecast must never read as headroom.
 
-The plan is built on the **p10** band (`pv_estimate10`), not the median — planning a guarantee against
-a p50 forecast means missing it about half the time. The forecast refresh drops to **3 hours** and is
-skipped overnight (a fresh forecast can't change a decision made in the dark), which is ~5 calls a day
-against the free tier's 10.
+The plan is built on the **p10** band (`pv_estimate10`) by default, not the median: a guarantee planned
+on p50 is missed about half the time. While this mode is running the forecast is refreshed every **3
+hours**, and not overnight — about 5 calls a day against the free tier's 10.
 
 ## What it logs
 
@@ -194,10 +160,8 @@ Charge control: Mode=Forecasted … Action=Charge Target=6A Loan=1140W Session=8
 Day summary: ForecastToday=28.1kWh ActualToday=26.4kWh (-6%) BatterySoc@19:00=100% EvDelivered=14.2kWh …
 ```
 
-The day plan logs at `Information` only when it actually changes (at a 5-second poll, anything else
-would bury the log) and at `Debug` otherwise — a change being the plan becoming usable or unusable,
-the window appearing or going, or the budget moving by a whole kWh. The summary logs once, at the
-deadline.
+The day plan logs at `Information` when it changes (usable or not, the window appearing or going, the
+budget moving by a whole kWh) and at `Debug` otherwise. The summary logs once, at the deadline.
 
 ```jsonc
 "ChargeControl": {
@@ -256,7 +220,6 @@ deadline.
 > the SOC delta: `usable kWh = (∫ BatteryPower dt) / 0.60`. That also validates `ChargeEfficiency`,
 > since the integral is measured at the battery terminals.
 
-**Validate it read-only first.** The accuracy tracker runs in every mode, so leaving the service on
-`Off` or `Solar` for a week still fills the log with `Forecast check` and `Day summary` lines. That
-answers the two questions that decide the settings — is Solcast p10 systematically low for this roof,
-and does the shoulder/plateau split match the real curve — before anything acts on them.
+**Check the forecast before relying on it.** The accuracy tracker runs in every mode, so a week on `Off`
+or `Solar` fills the log with `Forecast check` and `Day summary` lines: is p10 systematically low for
+this roof, and does the shoulder/plateau split match the real curve?
