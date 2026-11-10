@@ -16,6 +16,27 @@ Files: `tests/Gleanvolt.Infrastructure.Tests/Mdns/MdnsResponderTests.cs`.
 
 ---
 
+## 2026-11-10 — The manual's history pages: Sessions, Energy, Forecast (issue #329, step 4, part 2)
+
+Three pages under `docs/manual/src/content/docs/en/using/`, after the battery hold:
+
+- **Sessions and history** — the list and its columns, one charge's page (the end reasons as the UI
+  words them, the weather, the energy source split and the loan), the session chart's lines and markers.
+- **Energy** — choosing the day, the chart (watts per quarter hour, signs, gaps left as gaps, partly
+  recorded quarter hours), and the table's columns.
+- **Forecast** — the expected line and the p10–p90 band, the table, and why the page never fetches and
+  why this morning can be missing after a restart.
+
+The Car page and Health are covered in Setting up, so the chapter doesn't repeat them.
+
+**Screenshots** — `HistoryScreenshots` adds four, at 18:00 on the same June Sunday: the sessions list
+(today's Forecasted charge and one of each other mode over the week before), today's session with its
+five-minute samples and chart, the day on Energy, and Forecast for today and tomorrow. Session ids are
+fixed GUIDs, since the list links to them and a random id would change the fingerprint on every run. A
+new `height` on `Capture` cuts Energy and Forecast off below the chart and the start of the table.
+
+---
+
 ## 2026-11-10 — The manual's "Using Gleanvolt" chapter: the Overview and the charging modes (issue #329, step 4, part 1)
 
 Nine pages under `docs/manual/src/content/docs/en/using/`:

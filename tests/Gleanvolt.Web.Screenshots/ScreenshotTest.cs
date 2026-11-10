@@ -92,7 +92,10 @@ public abstract partial class ScreenshotTest : PageTest
     /// <param name="name">The PNG's name in the manual, e.g. <c>wizard-devices</c>.</param>
     /// <param name="selector">Only this element, not the whole page; null for the whole page.</param>
     /// <param name="width">The browser window's width, in CSS pixels.</param>
-    protected void Capture<TComponent>(IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200)
+    /// <param name="height">Cut the picture off at this many CSS pixels, for a page whose long table the
+    /// manual needs only the start of; null for all of it.</param>
+    protected void Capture<TComponent>(
+        IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200, int? height = null)
         where TComponent : IComponent
     {
         ArgumentNullException.ThrowIfNull(rendered);
@@ -108,7 +111,7 @@ public abstract partial class ScreenshotTest : PageTest
         File.WriteAllText(Path.Combine(output, name + ".html"), Document(BunitAttributes().Replace(markup, string.Empty), Charts()), Encoding.UTF8);
         File.WriteAllText(
             Path.Combine(output, name + ".json"),
-            JsonSerializer.Serialize(new { width, selector }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            JsonSerializer.Serialize(new { width, selector, height }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 
     // The last render of each chart, by the element it draws into, as calls a browser can make.
