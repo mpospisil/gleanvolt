@@ -1,8 +1,8 @@
-# Gleanvolt on a home NAS (issue #327): the controller and its web UI, nothing else -- workflow B of
-# deploy/README.md, in a form that a NAS's own container UI can take as it is. Synology Container
+# Gleanvolt on a home NAS (issue #327): the controller and its web UI, nothing else -- what
+# deploy/README.md deploys on a Pi, in a form that a NAS's own container UI can take as it is. Synology Container
 # Manager ("Project"), QNAP Container Station ("Application"), Unraid's Compose Manager, TrueNAS SCALE
 # ("Install via YAML"), Portainer and plain `docker compose up -d` all accept this file unchanged.
-# deploy/README.md's "Running on a NAS" walks through each of them.
+# docs/NAS.md walks through each of them.
 #
 # Nothing below has to be edited to get a running setup wizard. Three things are worth a look first:
 #

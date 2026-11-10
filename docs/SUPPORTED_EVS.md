@@ -35,8 +35,8 @@ Type 2 AC inlet.** No manufacturer account, no cloud and no internet connection 
 dead car feed changes nothing about how the charger is driven.
 
 What does differ from car to car is what it will accept. **Describe it on
-[`/car`](../README.md#car--the-car-and-editing-it) in the web UI** — pick the manufacturer, fill in
-what that choice needs, and restart — or in the [`Ev` section](../README.md#the-car-the-ev-section)
+[`/car`](WEB_UI.md#car) in the web UI** — pick the manufacturer, fill in
+what that choice needs, and restart — or in the [`Ev` section](VEHICLE.md#the-car-the-ev-section)
 (`EV_*` in `deploy/.env`) if you would rather edit a file. Either way the controller works to the
 narrower of the car and the installation:
 
@@ -118,7 +118,7 @@ on volkswagen.de show, and it asks **only while a charging session is open**.
 | **Reads** | State of charge, range, charge state, charging power, **plug state** |
 | **Freshness** | About 20 seconds behind the car |
 | **Needs you** | An email one-time code on every cold sign-in, entered on **`/car` → Account → Sign in**. The remembered session survives restarts |
-| **Setup** | **`/car` → Volkswagen**: VW ID, password, VIN — or [`Vehicle:Website`](../README.md#vehiclewebsite--volkswagende-the-live-source) in the README |
+| **Setup** | **`/car` → Volkswagen**: VW ID, password, VIN — or [`Vehicle:Website`](VEHICLE.md#volkswagende-vehiclewebsite) in the README |
 
 Routes A and B complement each other and run side by side on the reference install: the portal carries
 the target SOC and time remaining, the website carries plug state and a curve while charging, and the
@@ -146,7 +146,7 @@ typed problem responses and rate-limit headers.
 | **Needs you** | An API key created in the MySkoda app, pasted once under **`/car` → Account**. It expires; renewing is pasting a new one |
 | **Quota** | 20 requests an hour per VIN, shared with *Ask the car* |
 | **Tested** | **No.** Built from the published spec with spec-built fixtures; nobody has run it against a Škoda yet. Reports in [issue #193](https://github.com/mpospisil/gleanvolt/issues/193) are very welcome |
-| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted under **Account** on the same page, not in the form. Or [`Vehicle:Skoda`](../README.md#vehicleskoda--the-myškoda-public-api-the-live-source-for-a-škoda) in the README |
+| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted under **Account** on the same page, not in the form. Or [`Vehicle:Skoda`](VEHICLE.md#myškoda-vehicleskoda) in the README |
 
 Route C and Route B cannot run together — they read two different cars, and an installation has one.
 Picking a manufacturer on `/car` makes that unarrangeable: the choice disables whichever feed it
@@ -161,7 +161,7 @@ Pi.** All three routes leave something bearer-equivalent in the data directory �
 revocable, VIN-scoped key; Route B a live volkswagen.de session; Route A the portal credentials — and
 what protects it there is a file mode on Linux and DPAPI on a Windows install, never encryption the
 controller could claim with a straight face. That is the whole argument for the ranking above, and
-[the data directory holds secrets](../README.md#the-data-directory-holds-secrets-the-secrets-section)
+[the data directory holds secrets](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section)
 is where it is written down.
 
 ### Why only VW Group is built in

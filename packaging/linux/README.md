@@ -2,8 +2,8 @@
 
 Gleanvolt as a native systemd service on **Debian, Ubuntu and Raspberry Pi OS (64-bit)**, with no
 Docker and no .NET installation: the runtime is inside the package. It installs **the controller and
-its web UI only**. No MQTT broker or Home Assistant is installed or needed; for that stack, see
-[`deploy/`](../../deploy/README.md).
+its web UI only**. No MQTT broker or Home Assistant is installed or needed; to connect one, see
+[Gleanvolt with Home Assistant](../../docs/HOME_ASSISTANT.md).
 
 ## Install
 
@@ -40,7 +40,7 @@ sudo apt install ./gleanvolt_1.0.7_arm64.deb
 
 **32-bit Raspberry Pi OS is not supported**, and the installer says so rather than failing half way.
 Other NAS systems (Synology, QNAP, Unraid, TrueNAS SCALE) run the container image instead, see
-[Running on a NAS](../../deploy/README.md#running-on-a-nas).
+[Running on a NAS](../../docs/NAS.md).
 A Pi 3B or newer runs the 64-bit OS; reinstall it with Raspberry Pi Imager. Other distributions can
 run the self-contained `linux-x64` / `linux-arm64` zip from the same release.
 
@@ -61,13 +61,21 @@ Nothing is written to your hardware. Out of the box:
 
 ## Settings
 
-Everything is in **`/etc/gleanvolt/gleanvolt.env`**, one `KEY=VALUE` per line. Any setting in the
-[README's configuration reference](../../README.md#configuration) can go here, with `__` (two
-underscores) between the sections:
+**Set it up in the web UI.** Open `http://<device>:8090`: the setup wizard sets the password, finds the
+inverter and the charger, and asks for the site and the optional extras. Later changes go on the web
+UI's **Settings** and **Car** pages, applied with **Restart** on **Settings → Health**. That is the
+recommended way; the values are checked as you save them. See
+[The setup wizard](../../docs/WEB_UI.md#the-setup-wizard).
 
-```bash
-sudo nano /etc/gleanvolt/gleanvolt.env
-```
+Forgot the password? Use **Forgot your password?** on the sign-in page, or `set-password` from the
+[command line](#setting-it-up-from-the-command-line).
+
+### Optional: the settings file
+
+Any setting in the [configuration reference](../../docs/CONFIGURATION.md) can also go in
+**`/etc/gleanvolt/gleanvolt.env`**, one `KEY=VALUE` per line with `__` (two underscores) between the
+sections — for settings the web UI doesn't cover, or to prepare an installation without a browser.
+What is saved in the web UI wins over this file, key by key.
 
 ```ini
 Pv__Inverter__Host=192.168.1.50
@@ -82,19 +90,13 @@ sudo systemctl restart gleanvolt
 systemctl status gleanvolt
 ```
 
-The file is readable only by root and the service, because API keys and the web password hash live in
-it. Upgrades never overwrite it.
-
-The web password is set in the wizard and changed on the web UI's Settings page. To set it ahead of
-time instead, so no wizard is shown, generate the hash and put it in this file:
+The file is readable only by root and the service, and upgrades never overwrite it. The web password
+can be set here ahead of time, as a hash:
 
 ```bash
 /opt/gleanvolt/Gleanvolt.Worker hash-password 'your password'
 # then in gleanvolt.env:  Web__PasswordHash=<the output>
 ```
-
-Forgot it? Use **Forgot your password?** on the sign-in page, or `set-password` from the
-[command line](#setting-it-up-from-the-command-line).
 
 ## Where things are
 
@@ -108,26 +110,12 @@ Forgot it? Use **Forgot your password?** on the sign-in page, or `set-password` 
 
 ### The data directory holds secrets
 
-`/var/lib/gleanvolt` is owned by the `gleanvolt` user and is mode `0750`, and two files in it are
-passwords in all but name ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)):
-
-| | |
-|---|---|
-| `vw-website-session.json` | a live volkswagen.de session — whoever holds it is signed in as you, with no password and no emailed code |
-| `skoda-api-key.json` | the MyŠkoda API key — reads the car, and starts and stops charging |
-
-Both are written mode `0600`, which is what the startup log and `/health` report:
-`owner-only files (0600) in the data directory`. **That is a file permission, not encryption**, and
-the controller never claims otherwise — it has to come back from a restart with nobody present, so
-anything it can undo unattended, `root` can undo too.
-
-So back the directory up, but back it up the way you would back up a password file: onto an encrypted
-volume, not into a shared drive, an issue attachment or a support bundle. A copy of
-`/var/lib/gleanvolt` hands over the car. Against a stolen SD card the effective answer is full-disk
-encryption, which is yours to arrange and not something this package can do for you.
-
-To stop handing it over, use **Sign out** on the web UI's Car page: it deletes the stored
-value rather than leaving a tombstone holding it.
+`/var/lib/gleanvolt` (owner `gleanvolt`, mode `0750`) holds the car's sign-in — a volkswagen.de
+session, a MyŠkoda API key — and the keys entered in the web UI, each file mode `0600`. **That is a file
+permission, not encryption**: a copy of the directory hands over the car. Back it up onto an encrypted
+volume, never into a shared drive or an issue attachment. **Sign out** on the web UI's Car page deletes
+the stored car sign-in. See
+[The data directory holds secrets](../../docs/CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section).
 
 ## Setting it up from the command line
 
@@ -142,8 +130,9 @@ sudo systemctl restart gleanvolt
 ```
 
 It reads the unit's `Environment=` lines and `/etc/gleanvolt/gleanvolt.env`, so it saves where the
-service looks. A setup file holding secrets must not be world-readable (`chmod 600`). See the main
-README, *Setting up from the command line*, for the file's shape.
+service looks. A setup file holding secrets must not be world-readable (`chmod 600`). See
+[Setting up from the command line](../../docs/WEB_UI.md#setting-up-from-the-command-line) for the
+file's shape.
 
 ## Running it
 
@@ -181,33 +170,3 @@ curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/insta
 sudo apt remove gleanvolt   # removes the program; keeps settings, data and logs for a reinstall
 sudo apt purge gleanvolt    # removes everything, including the charging history
 ```
-
----
-
-## For maintainers: building and testing the package locally
-
-`release.yml` builds, installs, smoke-tests and purges the package on both architectures on every
-run, so this is only for working on the packaging itself.
-
-```bash
-# 1. A self-contained publish at the fixed path nfpm.yaml reads
-dotnet publish src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -c Release -r linux-x64 \
-  --self-contained true -o publish/deb
-chmod -R u=rwX,go=rX publish/deb
-
-# 2. The package (nfpm: https://nfpm.goreleaser.com/install/)
-GLEANVOLT_VERSION=1.0.0~dev GLEANVOLT_ARCH=amd64 \
-  nfpm package --config packaging/linux/nfpm.yaml --packager deb --target deb/
-
-# 3. Install it somewhere systemd runs. A throwaway container works:
-docker run -d --name gv --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-  -v "$PWD/deb:/deb:ro" <an image with systemd as PID 1>
-docker exec gv apt-get install -y /deb/gleanvolt_1.0.0~dev_amd64.deb
-```
-
-The version uses `~dev`, not `-dev`: dpkg sorts `1.0.7~dev` below `1.0.7`, so a test build never
-outranks the release that follows it.
-
-`PackagingTests` guards the one list here that drifts: every `…Path` setting in `appsettings.json`
-must be pointed at `/var/lib/gleanvolt` or `/var/log/gleanvolt` by `gleanvolt.service`, because the
-content root in `/opt/gleanvolt` is read-only to the service.

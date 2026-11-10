@@ -469,7 +469,7 @@
     <value>Uloženo. Správce nabíjení už s těmito hodnotami běží.</value>
   </data>
   <data name="IdWarning" xml:space="preserve">
-    <value>Změna ID přesune všechna témata MQTT, pod kterými správce nabíjení publikuje, takže Home Assistant po restartu uvidí nová témata. Jak vyčistit stará, popisuje kapitola „Renaming what Home Assistant sees“ v deploy/README.md a proměnná HA_RETIRE_TOPIC_PREFIX. ID zařízení v Home Assistant se nastavuje zvlášť a nemění se.</value>
+    <value>Změna ID přesune všechna témata MQTT, pod kterými správce nabíjení publikuje, takže Home Assistant po restartu uvidí nová témata. Jak vyčistit stará, popisuje kapitola „Names, topics and the device id“ v docs/HOME_ASSISTANT.md a proměnná HA_RETIRE_TOPIC_PREFIX. ID zařízení v Home Assistant se nastavuje zvlášť a nemění se.</value>
   </data>
   <data name="CoordinatesWarning" xml:space="preserve">
     <value>Vymazáním souřadnic se přestane k nabíjení zaznamenávat počasí.</value>

@@ -3,10 +3,20 @@
 Hybrid inverters Gleanvolt can drive, by manufacturer. Each model links to its manufacturer's page;
 discontinued models go to the manufacturer's home page. The tiers are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance),
-and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
 
-### SolaX
+### Inverters at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#solax-inverters) | **X3-HYB-G4 PRO**; X3/X1-Hybrid G4, X1/X3-IES, X3-Ultra, X3-Aelio, X1-VAST; G2/G3 hybrids | `solax` | **Verified** (G4 PRO); Expected; readings and charging only (G2/G3) |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#huawei-sun2000) | SUN2000 KTL-M1, K-MAP0, KTL-L1, K-LC0, also behind an EMMA | `huawei` | Expected — not yet run on a device |
+| [Tigo](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#tigo), [Qcells](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#qcells) | TSI X3, Q.VOLT HYB-G3-3P — SolaX inside | `solax` | Expected |
+| [Dražice](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#dražice-dz-dražice) | IN.HYBRID COMPACT, COMPACT PRO, COMPACT S, COMPACT M — SolaX models by datasheet | `solax` | Expected, if the unit is SolaX hardware |
+| Others | — | — | Not supported yet (GoodWe is planned) |
+
+### SolaX inverters
 
 Driver `solax`, over Modbus TCP.
 
@@ -64,10 +74,10 @@ The inverter is read in one request from `0x00` to `0x74`, because SolaX asks fo
 between Modbus instructions. The per-phase registers at `0x6C`–`0x74` exist only on three-phase (X3)
 models, so a single-phase inverter might refuse the whole block. Untested. A single-phase site does not
 need those registers — they serve only
-[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
+[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
-### Huawei
+### Huawei SUN2000
 
 Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)), over Modbus TCP. How to
 connect it, enable Modbus TCP and set up an EMMA:
@@ -92,7 +102,7 @@ and up), the SmartLogger, the FusionSolar cloud API and direct RS485.
   assumed to be the meter's. A tester's register snapshot settles all three
   ([#325](https://github.com/mpospisil/gleanvolt/issues/325)).
 - **No output per phase**, so
-  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section)
+  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section)
   is not available.
 - **One Modbus client.** The SDongle serves very few clients, and the EMMA exactly one. Home Assistant's
   `huawei_solar` integration competes for it. See
@@ -134,7 +144,7 @@ Reviewed 2026-11-07 from [dzd.cz](https://www.dzd.cz/fotovoltaika-drazice/strida
 Dražice's own, but match SolaX models by their datasheets. Their tier is the SolaX model's **if** the unit
 is the SolaX hardware with SolaX firmware; no statement from Dražice confirms it, and no unit has been run.
 Before relying on a row, check that
-[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names the device by a SolaX serial prefix. A unit it cannot name runs firmware this page knows nothing
 about.
 
@@ -150,6 +160,6 @@ Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing abo
 port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
 Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
-### Other manufacturers
+### Other inverters
 
 Not supported yet. GoodWe is planned.

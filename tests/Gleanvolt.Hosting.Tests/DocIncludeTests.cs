@@ -31,13 +31,51 @@ public class DocIncludeTests
         foreach (Match include in includes)
         {
             var path = include.Groups["path"].Value;
-            var fragment = WithoutTitle(Normalize(File.ReadAllText(Path.Combine(Root, path))));
+            var hash = path.IndexOf('#', StringComparison.Ordinal);
+            var file = hash < 0 ? path : path[..hash];
+            var text = Normalize(File.ReadAllText(Path.Combine(Root, file)));
+            var fragment = hash < 0 ? WithoutTitle(text) : Section(text, path[(hash + 1)..], path);
 
             Assert.True(
                 include.Groups["body"].Value == fragment,
                 $"{page}'s copy of {path} differs from the fragment. Edit the fragment, then run "
                 + "scripts/sync-doc-includes.sh.");
         }
+    }
+
+    // "file#anchor" copies the lines under that heading, up to the next heading of the same or a higher
+    // level, with the blank lines at either end trimmed -- as the script does.
+    private static string Section(string text, string anchor, string path)
+    {
+        var lines = text.Split('\n');
+        var section = new List<string>();
+        var level = 0;
+        var fence = false;
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("```", StringComparison.Ordinal))
+            {
+                fence = !fence;
+            }
+
+            var heading = fence ? null : Regex.Match(line, "^(#+) (.*)$");
+            if (level > 0 && heading is { Success: true } && heading.Groups[1].Length <= level)
+            {
+                break;
+            }
+
+            if (level > 0)
+            {
+                section.Add(line);
+            }
+            else if (heading is { Success: true } && DocLinkTests.Slug(heading.Groups[2].Value) == anchor)
+            {
+                level = heading.Groups[1].Length;
+            }
+        }
+
+        Assert.True(level > 0, $"{path}: no such section.");
+        return string.Join("\n", section).Trim('\n') + "\n";
     }
 
     // The fragment's "# title" and the blank lines after it are not copied, as the script does.

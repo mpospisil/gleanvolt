@@ -25,14 +25,14 @@ expects.**
 > or in dry-run until you have checked the readings against the device's own display.**
 
 The serial-number prefixes in the tables below are also what
-[`gleanvolt-discover`](../README.md#finding-your-devices) names a device by when it scans the LAN, and
+[`gleanvolt-discover`](DISCOVERY.md) names a device by when it scans the LAN, and
 the tier it prints is the tier here. The tool keeps them in one table in code
 (`src/Gleanvolt.Discovery/SolaxModels.cs`), and **the two must agree**: a prefix added to one is added to
 the other, and a test fails when the code names a device by a prefix this page does not list.
 
 The device lists below are copied in from [Supported inverters](SUPPORTED_INVERTERS.md) and
-[Supported EV chargers](SUPPORTED_CHARGERS.md), which the README and the wiki show too. Edit those two
-files, never the copies, and run `scripts/sync-doc-includes.sh`.
+[Supported EV chargers](SUPPORTED_CHARGERS.md); the README shows their *at a glance* tables. Edit those
+two files, never the copies, and run `scripts/sync-doc-includes.sh`.
 
 ## At a glance
 
@@ -52,7 +52,7 @@ files, never the copies, and run `scripts/sync-doc-includes.sh`.
 | Read, one block `0x00`–`0x74` (input registers) | `0x0A`, `0x0B` — PV power, strings 1 and 2 | Solar, house load |
 | | `0x16` battery power, `0x1C` battery SOC | The home battery |
 | | `0x46`/`0x47` grid meter | Surplus, grid import/export |
-| | `0x6C`, `0x70`, `0x74` — inverter output per phase | Only [`UnmeteredGridPhase`](../README.md#the-pv-system-the-pv-section) |
+| | `0x6C`, `0x70`, `0x74` — inverter output per phase | Only [`UnmeteredGridPhase`](CONFIGURATION.md#the-pv-system-the-pv-section) |
 | Write (holding) | `0x7C` — the 13-register Modbus Power Control command | Only the battery discharge hold |
 
 ### Huawei SUN2000 (`huawei`)
@@ -101,10 +101,20 @@ From go-e's [API v2 documentation](https://github.com/goecharger/go-eCharger-API
 Hybrid inverters Gleanvolt can drive, by manufacturer. Each model links to its manufacturer's page;
 discontinued models go to the manufacturer's home page. The tiers are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance),
-and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names a device by the serial prefix or model name given here.
 
-### SolaX
+### Inverters at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#solax-inverters) | **X3-HYB-G4 PRO**; X3/X1-Hybrid G4, X1/X3-IES, X3-Ultra, X3-Aelio, X1-VAST; G2/G3 hybrids | `solax` | **Verified** (G4 PRO); Expected; readings and charging only (G2/G3) |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#huawei-sun2000) | SUN2000 KTL-M1, K-MAP0, KTL-L1, K-LC0, also behind an EMMA | `huawei` | Expected — not yet run on a device |
+| [Tigo](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#tigo), [Qcells](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#qcells) | TSI X3, Q.VOLT HYB-G3-3P — SolaX inside | `solax` | Expected |
+| [Dražice](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_INVERTERS.md#dražice-dz-dražice) | IN.HYBRID COMPACT, COMPACT PRO, COMPACT S, COMPACT M — SolaX models by datasheet | `solax` | Expected, if the unit is SolaX hardware |
+| Others | — | — | Not supported yet (GoodWe is planned) |
+
+### SolaX inverters
 
 Driver `solax`, over Modbus TCP.
 
@@ -162,10 +172,10 @@ The inverter is read in one request from `0x00` to `0x74`, because SolaX asks fo
 between Modbus instructions. The per-phase registers at `0x6C`–`0x74` exist only on three-phase (X3)
 models, so a single-phase inverter might refuse the whole block. Untested. A single-phase site does not
 need those registers — they serve only
-[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
+[`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
-### Huawei
+### Huawei SUN2000
 
 Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)), over Modbus TCP. How to
 connect it, enable Modbus TCP and set up an EMMA:
@@ -190,7 +200,7 @@ and up), the SmartLogger, the FusionSolar cloud API and direct RS485.
   assumed to be the meter's. A tester's register snapshot settles all three
   ([#325](https://github.com/mpospisil/gleanvolt/issues/325)).
 - **No output per phase**, so
-  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section)
+  [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/docs/CONFIGURATION.md#the-pv-system-the-pv-section)
   is not available.
 - **One Modbus client.** The SDongle serves very few clients, and the EMMA exactly one. Home Assistant's
   `huawei_solar` integration competes for it. See
@@ -232,7 +242,7 @@ Reviewed 2026-11-07 from [dzd.cz](https://www.dzd.cz/fotovoltaika-drazice/strida
 Dražice's own, but match SolaX models by their datasheets. Their tier is the SolaX model's **if** the unit
 is the SolaX hardware with SolaX firmware; no statement from Dražice confirms it, and no unit has been run.
 Before relying on a row, check that
-[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
+[`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/docs/DISCOVERY.md)
 names the device by a SolaX serial prefix. A unit it cannot name runs firmware this page knows nothing
 about.
 
@@ -248,7 +258,7 @@ Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing abo
 port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
 Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
-### Other manufacturers
+### Other inverters
 
 Not supported yet. GoodWe is planned.
 <!-- end include -->
@@ -262,7 +272,16 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
-### SolaX
+### Chargers at a glance
+
+| Manufacturer | Models | Driver | Tier |
+|---|---|---|---|
+| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
+| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
+| [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| Others | — | — | Not supported yet |
+
+### SolaX chargers
 
 Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its
 Smart EV Charger page.
@@ -293,7 +312,7 @@ Caveats:
   that evcc or Home Assistant already controls has to be **handed over** to Gleanvolt, not shared. Take
   snapshots with the button on Settings: it uses Gleanvolt's own connection.
 
-### Huawei
+### Huawei SCharger
 
 Over Modbus TCP, port 502. How to switch its Modbus server on, and what to do behind an EMMA:
 **[Setting up a Huawei SCharger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#huawei-scharger)**.
@@ -311,7 +330,7 @@ Huawei's product pages move by region, so the models link to Huawei's solar home
   already manages has to be handed over, not shared.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### go-e
+### go-e Charger
 
 Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the API on:
 **[Setting up a go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#go-e-charger)**.
@@ -325,7 +344,7 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### Other manufacturers
+### Other chargers
 
 Not supported yet.
 <!-- end include -->
@@ -334,7 +353,7 @@ Not supported yet.
 
 ## Connecting
 
-- **Not sure of the address?** [`gleanvolt-discover`](../README.md#finding-your-devices) scans the LAN
+- **Not sure of the address?** [`gleanvolt-discover`](DISCOVERY.md) scans the LAN
   and reports host, port and unit id for each device: from its serial number (SolaX), its model name
   (Huawei SUN2000), its phase voltages (Huawei SCharger) or its API (go-e, on port 80).
 - **Huawei:** Modbus TCP is off by default on the SDongle and the EMMA. See

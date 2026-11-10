@@ -130,14 +130,27 @@ EOF
         exit 1
     fi
 
+    # docker-compose.web.yml is gone. An .env from an old release may still merge it through
+    # COMPOSE_FILE, and then every docker compose command would fail with "no such file".
+    if ssh_pi "grep -q '^COMPOSE_FILE=.*docker-compose\.web\.yml' '$REMOTE_DIR/.env'"; then
+        cat >&2 <<EOF
+error: $REMOTE_DIR/.env on $PI_HOST still has a COMPOSE_FILE line naming docker-compose.web.yml.
+
+That file no longer exists. Delete the line, then deploy again:
+
+    ssh $PI_HOST "sed -i '/^COMPOSE_FILE=/d' $REMOTE_DIR/.env"
+EOF
+        exit 1
+    fi
+
     # tar over ssh rather than rsync: one less thing that has to be installed on a Lite image. This
     # directory mirrors $REMOTE_DIR exactly, so the paths need no rewriting on the way over.
-    # docker-compose.web.yml and mosquitto.conf travel unconditionally too, even for a
-    # controller-only deploy: which files git ships never depends on which script you ran, only
-    # which containers actually start.
+    # mosquitto.conf travels unconditionally too, even for a controller-only deploy: which files
+    # git ships never depends on which script you ran, only which containers actually start.
     say "Copying stack files"
-    tar -C "$script_dir" -cf - docker-compose.yml docker-compose.web.yml mosquitto/config/mosquitto.conf \
+    tar -C "$script_dir" -cf - docker-compose.yml mosquitto/config/mosquitto.conf \
         | ssh_pi "tar -C '$REMOTE_DIR' -xf - --no-same-owner"
+    ssh_pi "rm -f '$REMOTE_DIR/docker-compose.web.yml'"
 
     # Seeded once, never on top of edits made on the Pi. HA rewrites these files itself in normal
     # use. Harmless to seed even when Home Assistant is never deployed -- it's a handful of files on

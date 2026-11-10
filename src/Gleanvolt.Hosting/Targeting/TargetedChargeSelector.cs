@@ -10,7 +10,7 @@ namespace Gleanvolt.Hosting.Targeting;
 /// <para><b>Not persisted across restarts</b>, exactly like the mode selector beside it. The reasoning
 /// is the same — after a crash, a power cut or a deploy the charger is left as its owner set it rather
 /// than being grabbed by whatever was in a file — but the consequence is sharper here, because a
-/// dropped request is discovered at 05:00 with a flat car. It is documented in the README for that
+/// dropped request is discovered at 05:00 with a flat car. It is documented in docs/MODE_TARGETED.md for that
 /// reason.</para>
 /// </summary>
 public sealed class TargetedChargeSelector : ITargetedChargeSelector

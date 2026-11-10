@@ -10,7 +10,7 @@ namespace Gleanvolt.Infrastructure.Vehicles;
 ///
 /// <para>Deliberately the <b>only</b> shape this codebase understands. Per-car adaptation — mapping
 /// each integration's enum spellings and entity names onto these fields — happens in Home Assistant,
-/// which is what makes a second vehicle a YAML change rather than a release. See the README.</para>
+/// which is what makes a second vehicle a YAML change rather than a release. See docs/VEHICLE.md.</para>
 ///
 /// <code>
 /// {

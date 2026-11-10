@@ -31,8 +31,8 @@ How to get the four settings the **Car** page needs, and what to do when it does
 **None of them requires looking anything up.** The first two are the credentials you already own; the
 third is the badge on the car.
 
-**You can fill them in from a browser instead.** [`/car`](../README.md#car--the-car-and-editing-it)
-in the web UI asks the same four things: pick your brand from the list, fill in the VW ID, the
+**Fill them in on the web UI's [Car](WEB_UI.md#car) page** — the recommended way.
+It asks the same four things: pick your brand from the list, fill in the VW ID, the
 password and the VIN, and save. The brand list is the client's own, the password goes to the secret
 store rather than to a file beside the configuration, and the choice disables whichever other feed it
 replaces in the same save. Steps 1, 2 and 4 below are browser work in the portal itself and are the
@@ -132,14 +132,15 @@ VehicleNotFound: the account can see 2 vehicles (WVW…1234, TMB…5678) and non
 Those are masked for the log. Take the full VIN from the portal's own vehicle list, or from the
 windscreen.
 
-## Step 5 — Put them in `.env`, or on `/car`
+## Step 5 — Enter them on the Car page
 
-**On `/car`**, the four fields and the switch in step 7 are one save, and a restart applies them.
-Choose **Audi · SEAT · Cupra · Bentley · VW commercial** — or **Volkswagen** if you also want
-volkswagen.de's live feed, which reads a VW better. Then carry on at step 6.
+On the web UI's [**Car**](WEB_UI.md#car) page, choose **Audi · SEAT · Cupra · Bentley · VW commercial**
+— or **Volkswagen** if you also want volkswagen.de's live feed, which reads a VW better — and enter
+the brand, the VW ID, its password and, if step 4 asked for it, the VIN. The four fields and the switch
+in step 7 are one save, and a restart applies them. Then carry on at step 6.
 
-Otherwise, in the repository root — `.env` is gitignored, and the worker loads the nearest one at or above the
-working directory, so it is found from the project folder too:
+**Optionally, in `.env`** instead (`/opt/gleanvolt/.env` on the Pi). What is saved on the Car page
+wins over it:
 
 ```bash
 VW_BRAND=vw
@@ -148,13 +149,9 @@ VW_PASSWORD=<your brand ID password>
 VW_VIN=<only if step 4 asked for it>
 ```
 
-`.env.example` carries the same list with commentary.
-
-The controller reads `.env` once at startup, so **changing any of these means restarting it**.
-
-`Vehicle__DataAct__Brand` and friends work too, and are the better form for a deployment. The plain
-`VW_*` names are honoured because they are shorter and because one `.env` should not need the same
-credentials written twice; where both are set, the sectioned form wins.
+`.env.example` carries the same list with commentary, and the sectioned names
+(`Vehicle__DataAct__Brand` and friends) work too, winning where both are set. `.env` is read at
+startup, so changing it means restarting the controller.
 
 ## Step 6 — Press the button
 
@@ -314,7 +311,7 @@ never writes it anywhere. That is the whole of it, and it is worth saying plainl
 up: an untracked file is what a LAN appliance has to offer.
 
 Entered on `/car` instead, it goes to the
-[secret store](../README.md#the-data-directory-holds-secrets-the-secrets-section) — an owner-only file
+[secret store](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section) — an owner-only file
 in the data directory, or Windows DPAPI — and the page says which, in the store's own words. That is a
 better answer than an untracked file and still not proof against a local root, which is why the page
 says what it is rather than the word *encrypted*. It is write-only there: the box renders empty

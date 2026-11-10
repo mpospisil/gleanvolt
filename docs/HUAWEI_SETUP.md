@@ -1,7 +1,7 @@
 # Setting up a Huawei SUN2000
 
 How to connect Gleanvolt to a Huawei SUN2000 hybrid inverter. What works, and how well it has been tested,
-is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei). In short: readings are **Expected**
+is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000). In short: readings are **Expected**
 (written from Huawei's interface definitions, no real device yet), and the battery hold is **Untested**.
 
 ## What you need
@@ -17,7 +17,7 @@ is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei). In short: readings a
 ## 1. Enable Modbus TCP
 
 Modbus TCP is **off by default** on both the SDongle and the EMMA. Until it is on, the port answers but
-refuses Modbus. [`gleanvolt-discover`](../README.md#finding-your-devices) and the setup wizard report such
+refuses Modbus. [`gleanvolt-discover`](DISCOVERY.md) and the setup wizard report such
 a port as *port open, no Modbus reply*.
 
 **SDongle.** In the FusionSolar app, open *Device commissioning* for the inverter and log in as the
@@ -39,12 +39,12 @@ further connection. Gleanvolt keeps one connection open all the time, so:
 
 ## 3. Find the address
 
-Run the setup wizard's device search, or [`gleanvolt-discover`](../README.md#finding-your-devices). It reads
+Run the setup wizard's device search, or [`gleanvolt-discover`](DISCOVERY.md). It reads
 the model name at register `30000` and names a SUN2000 by it, with the `huawei` driver. Behind an EMMA it
 also notices the EMMA and suggests *Connected through: EMMA*. In the wizard, **Use as inverter** fills in
 the brand and the connection as well as the address.
 
-By hand, on **Settings → PV system → Inverter**:
+By hand, on **Settings → Installation → Inverter**:
 
 | Field | Through the SDongle | Behind an EMMA |
 |---|---|---|
@@ -54,7 +54,7 @@ By hand, on **Settings → PV system → Inverter**:
 | Inverter port | 502 | 502 |
 | Inverter unit id | 1 | the unit id the EMMA gave the inverter, usually 1 |
 
-In `.env`: `Pv__Inverter__Driver=huawei`, and `Pv__Inverter__Topology=emma` behind an EMMA.
+Optionally, in `.env` instead: `Pv__Inverter__Driver=huawei`, and `Pv__Inverter__Topology=emma` behind an EMMA.
 
 "Test connection" reads the model name and the battery's state of charge. Behind an EMMA it reads the
 EMMA's grid sensor first.
@@ -70,7 +70,7 @@ may schedule the battery. With the hold off, Gleanvolt only reads, and the EMMA'
 Leave `BatteryHold:Enabled` off, or on with `BatteryHold:DryRun` true, until it has been confirmed on a
 real inverter. The hold sets the battery's maximum discharging power to 0, and puts the original back
 afterwards. That is a setting the inverter keeps, so Gleanvolt keeps the original on disk until it has put
-it back. [Supported inverters](SUPPORTED_INVERTERS.md#huawei) explains how it recovers after a
+it back. [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000) explains how it recovers after a
 crash. If Gleanvolt is removed while a hold is on, set the maximum discharging power back in the
 FusionSolar app.
 
