@@ -1015,7 +1015,17 @@ public static class GleanvoltHostingExtensions
 
         builder.Services.AddGleanvolt(builder.Configuration);
 
-        if (ReadWebOptions(builder.Configuration).Enabled)
+        // Announcing the UI on the LAN as gleanvolt.local (issue #363). Here, on the host a real process
+        // builds, rather than in the service registration a test host shares: a test must not multicast
+        // on the network it runs on. Registered after setup mode has taken the workers out, since finding
+        // the machine is what a setup most needs.
+        var web = ReadWebOptions(builder.Configuration);
+        if (web is { Enabled: true, Advertise: true })
+        {
+            builder.Services.AddHostedService<Advertising.WebAdvertiser>();
+        }
+
+        if (web.Enabled)
         {
             // Assets that live in build output rather than in a wwwroot folder -- Gleanvolt.Web's stylesheet
             // and Blazor's own script -- are only wired up automatically in the Development environment.

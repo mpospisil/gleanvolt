@@ -1,7 +1,8 @@
 # Self-hosted web UI (the `Web` section)
 
-The controller serves its own web UI at `http://<host>:8090`. It is on by default and needs no
-configuration: no broker, no Home Assistant, no onboarding. It shows live telemetry, the charging
+The controller serves its own web UI at **`http://gleanvolt.local:8090`** — or `http://<host>:8090`,
+by the machine's address. It is on by default and needs no configuration: no broker, no Home
+Assistant, no onboarding. It shows live telemetry, the charging
 plan, session and energy history and the solar forecast, and it has every control Home Assistant has.
 
 The web UI, [Home Assistant](HOME_ASSISTANT.md) and the [HTTP API](HTTP_API.md) drive the same
@@ -16,6 +17,30 @@ the others show it within a poll interval. The same rules apply on every surface
   that does nothing.
 - The battery-hold switch shows the last command actually written to the inverter, not what was
   requested, so a write that fails shows the switch springing back.
+
+## Finding it on your network
+
+Gleanvolt announces itself on the LAN over multicast DNS (mDNS, also called Bonjour or zeroconf), so
+you don't need to know the machine's address:
+
+- **Type `http://gleanvolt.local:8090`** in a browser on any device on the same network.
+- **Or browse for it**: it shows up as *Gleanvolt* in any Bonjour or "network services" browser
+  (iOS and macOS, Android apps, `avahi-browse -rt _gleanvolt._tcp` on Linux), and Home Assistant's
+  zeroconf sees it. The listing says whether the setup is still pending.
+
+A second Gleanvolt on the same network becomes `gleanvolt-2.local`; the log says which name it got
+(`Advertised on the LAN as http://gleanvolt-2.local:8090`).
+
+**Where `.local` doesn't work**, use the machine's address instead. Your router's list of connected
+devices shows it, and the Linux install prints it when it finishes:
+
+- **Older Android** versions and some browsers don't resolve `.local` names; a Bonjour browser app
+  still finds it.
+- **Linux** without `nss-mdns` (`libnss-mdns`) doesn't resolve `.local` names.
+- **Guest or IoT networks** often block multicast between devices.
+- **Docker on a bridge network** never reaches the LAN with multicast: run the container with
+  `--network host`, as the provided compose files do.
+- **Windows**: allow Gleanvolt through the firewall when Windows asks, or UDP 5353 stays closed.
 
 ## Setup mode
 
@@ -429,13 +454,15 @@ The command line and the web UI never write the overrides file at the same time:
 
 ## Settings (the `Web` section, optional)
 
-The web UI needs no configuration. These keys exist for the rare case of changing its port or
-switching it off:
+The web UI needs no configuration. These keys exist for the rare case of changing its port, its name
+on the network, or switching it off:
 
 ```jsonc
 "Web": {
   "Enabled": true,      // master switch; while false the process binds no socket at all
-  "Port": 8090          // listens on every interface, plain HTTP
+  "Port": 8090,         // listens on every interface, plain HTTP
+  "Advertise": true,    // announce it on the LAN over mDNS as <AdvertiseName>.local
+  "AdvertiseName": "gleanvolt" // letters, digits and hyphens; Gleanvolt's own name, not the machine's
   // "RequireAuthentication"  // unset -- follow the password; see below, rarely worth setting
   // "PasswordHash": ""       // secret -- see below, never set it here
 }
@@ -447,3 +474,6 @@ switching it off:
   headless worker. In the Docker stack the host port stays published either way, so connections are
   refused.
 - **Plain HTTP.** This is a LAN appliance; putting TLS in front of it is your decision.
+- **`Web:Advertise=false` sends nothing on UDP 5353.** The announcement carries the name, the port,
+  the version and whether the setup is pending — nothing about your site or devices. In the Docker
+  stack the variables are `WEB_ADVERTISE` and `WEB_ADVERTISE_NAME`.

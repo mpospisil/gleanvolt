@@ -125,7 +125,9 @@ can run Home Assistant and an MQTT broker beside it. See
 
 ### 2. Set it up
 
-Open **`http://<host>:8090`**. A fresh install starts in
+Open **`http://gleanvolt.local:8090`** from any device on the same network — or
+`http://<the machine's address>:8090` where `.local` names don't work
+([Finding it on your network](docs/WEB_UI.md#finding-it-on-your-network)). A fresh install starts in
 [setup mode](docs/WEB_UI.md#setup-mode): choose a password, then the
 [setup wizard](docs/WEB_UI.md#the-setup-wizard) **searches your network** for the inverter and the
 charger and asks for the site — location, time zone, home battery — and, optionally, a Solcast solar

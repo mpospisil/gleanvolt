@@ -202,7 +202,7 @@ EOF
         # same hazard on the line before; this one needs it just as much.
         web_port=$(ssh_pi "grep -E '^WEB_PORT=' '$REMOTE_DIR/.env' 2>/dev/null" | cut -d= -f2- || true)
         next="$next
-    Web UI: http://${PI_HOST#*@}:${web_port:-8090}"
+    Web UI: http://gleanvolt.local:${web_port:-8090}  (or http://${PI_HOST#*@}:${web_port:-8090})"
     fi
 
     cat <<EOF

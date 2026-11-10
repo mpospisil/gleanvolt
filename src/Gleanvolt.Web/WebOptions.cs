@@ -30,6 +30,25 @@ public sealed class WebOptions
     public int Port { get; init; } = 8090;
 
     /// <summary>
+    /// Whether the UI announces itself on the LAN over multicast DNS (issue #363), so a phone or a laptop
+    /// reaches it as <c>http://gleanvolt.local:8090</c> and finds it in any Bonjour/DNS-SD browser without
+    /// knowing the machine's address. On by default; ignored while <see cref="Enabled"/> is false, since
+    /// there is nothing to point at then.
+    /// </summary>
+    public bool Advertise { get; init; } = true;
+
+    /// <summary>
+    /// The name announced: <c>gleanvolt</c> gives <c>gleanvolt.local</c>. Gleanvolt's own name, never the
+    /// machine's — that one belongs to avahi or Bonjour on the host, and two responders defending one name
+    /// fight. A second instance on the LAN with the same name becomes <c>gleanvolt-2.local</c>. Letters,
+    /// digits and hyphens; anything else falls back to the default, with a warning.
+    /// </summary>
+    public string AdvertiseName { get; init; } = DefaultAdvertiseName;
+
+    /// <summary>The name announced when <see cref="AdvertiseName"/> is not set.</summary>
+    public const string DefaultAdvertiseName = "gleanvolt";
+
+    /// <summary>
     /// Whether every page requires a signed-in session. Three-valued on purpose:
     /// <list type="bullet">
     /// <item><description><c>null</c> (unset, the default) — follow <see cref="PasswordHash"/>:

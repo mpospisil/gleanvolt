@@ -4,6 +4,50 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-10 — Found on the LAN as gleanvolt.local, by a responder of our own
+
+**Context.** [Issue #363](https://github.com/mpospisil/gleanvolt/issues/363): after an install, the user
+had to find the machine's IP address before opening the setup wizard. A Docker or NAS user never sees the
+.deb's banner, and DHCP can move the address.
+
+**Decision — advertise from inside the process, over mDNS.** The web host claims `gleanvolt.local` and
+registers `_http._tcp` (any Bonjour browser) and `_gleanvolt._tcp` (our own tools), with a TXT record of
+`path`, `version` and `setup=pending|done` and nothing else. In-process, so it is the same on the .deb,
+Docker with the host network, a NAS and Windows. Rejected: an avahi service file in the .deb (covers only
+the .deb, and gives no name of our own), a broadcast beacon with a finder tool (a phone with only a
+browser can't use it), and a cloud rendezvous (breaks "no cloud required").
+
+**Decision — our own name, not the machine's.** The machine's name belongs to avahi or Bonjour on the
+host; two responders defending one name fight. `Web:AdvertiseName` (default `gleanvolt`) is ours, and a
+second instance probes, finds it taken and becomes `gleanvolt-2.local`.
+
+**Decision — our own responder, not a library.** `Makaretu.Dns.Multicast` has had no release since
+2019; its fork (`Makaretu.Dns.Multicast.New`) since 2024-11. Either would decide how probing and conflicts
+behave — the part the acceptance criteria are about — from code we would have to read and then trust. For
+one host name and two services, RFC 6762/6763 is small: about 1,200 lines, comments included, in
+`Gleanvolt.Infrastructure/Mdns` (a message codec, a transport, a responder). Left out, as unneeded for one
+appliance on a home LAN: simultaneous-probe tie-breaking (two instances started in the same quarter
+second may both back off), random answer delays, truncation and the IPv6 transport (AAAA records are
+still answered, over IPv4).
+
+**Found on the real network, and the consequences accepted:**
+- **Probes are answered by multicast, never unicast to port 5353.** A unicast answer to port 5353 reaches
+  one of the sockets sharing that port on the asker's machine — often avahi's or Chrome's — so a second
+  instance on the same machine never saw the name was taken. Legacy resolvers (asking from another port)
+  still get a unicast answer.
+- **Our own echo is recognised by its bytes, remembered for one second.** Multicast loopback stays on, so
+  that avahi on the same machine hears us; comparing source addresses cannot tell our echo from a second
+  instance on the same machine. With a longer memory, that instance's probes — byte-identical, since it
+  has the same addresses — were taken for our own and ignored.
+- **An answer carries only the addresses of the interface the query came in on.** Asked from the machine
+  itself, avahi queries every interface, Docker bridges included, and may pick a 172.x address; asked
+  from the LAN, the answer is the LAN address (verified from another machine).
+- **Registered by the host a process builds** (`AddGleanvolt(WebApplicationBuilder)`), not in the
+  service registration test hosts share, so a test run never multicasts on its network; after setup
+  mode's worker removal, so it runs in setup mode.
+
+---
+
 ## 2026-11-09 — Discovery finds the SCharger by its voltages and a go-e by its API
 
 **Context.** [Issue #353](https://github.com/mpospisil/gleanvolt/issues/353), the last step of charger
