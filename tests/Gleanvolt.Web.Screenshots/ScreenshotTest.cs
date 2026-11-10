@@ -19,8 +19,8 @@ namespace Gleanvolt.Web.Screenshots;
 /// <summary>
 /// Renders a page for the user manual (#329): inside <see cref="MainLayout"/>, in English, signed in or
 /// not, then written as a standalone HTML document that loads the web UI's own stylesheet and fonts from
-/// <c>wwwroot</c>. Nothing runs in the browser that takes the picture -- no Blazor, no scripts -- so what
-/// it shows is exactly what the server rendered.
+/// <c>wwwroot</c>. No Blazor runs in the browser that takes the picture, so what it shows is what the
+/// server rendered; the one script is <c>charts.js</c>, replaying the charts the page asked for.
 /// </summary>
 public abstract partial class ScreenshotTest : PageTest
 {
@@ -84,11 +84,15 @@ public abstract partial class ScreenshotTest : PageTest
     /// <summary>
     /// Writes what <paramref name="rendered"/> shows as <c>{name}.html</c>, with a <c>{name}.json</c>
     /// beside it that tells the capture script how to frame it.
+    ///
+    /// <para>The charts are drawn by <c>charts.js</c> in the browser, from data the page hands it through
+    /// JS interop, which bUnit records. The last call for each chart is replayed in the document, with the
+    /// web UI's own uPlot and <c>charts.js</c>, so a picture shows the chart the page would.</para>
     /// </summary>
     /// <param name="name">The PNG's name in the manual, e.g. <c>wizard-devices</c>.</param>
     /// <param name="selector">Only this element, not the whole page; null for the whole page.</param>
     /// <param name="width">The browser window's width, in CSS pixels.</param>
-    protected static void Capture<TComponent>(IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200)
+    protected void Capture<TComponent>(IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200)
         where TComponent : IComponent
     {
         ArgumentNullException.ThrowIfNull(rendered);
@@ -101,15 +105,45 @@ public abstract partial class ScreenshotTest : PageTest
         }
 
         Directory.CreateDirectory(output);
-        File.WriteAllText(Path.Combine(output, name + ".html"), Document(BunitAttributes().Replace(markup, string.Empty)), Encoding.UTF8);
+        File.WriteAllText(Path.Combine(output, name + ".html"), Document(BunitAttributes().Replace(markup, string.Empty), Charts()), Encoding.UTF8);
         File.WriteAllText(
             Path.Combine(output, name + ".json"),
             JsonSerializer.Serialize(new { width, selector }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 
-    private static string Document(string markup)
+    // The last render of each chart, by the element it draws into, as calls a browser can make.
+    private string Charts()
+    {
+        var web = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var latest = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var call in JSInterop.Invocations)
+        {
+            if (!call.Identifier.StartsWith("solaxCharts.render", StringComparison.Ordinal) || call.Arguments.Count == 0)
+            {
+                continue;
+            }
+
+            var arguments = string.Join(", ", call.Arguments.Select(argument => JsonSerializer.Serialize(argument, argument?.GetType() ?? typeof(object), web)));
+            latest[call.Arguments[0]?.ToString() ?? string.Empty] = $"{call.Identifier}({arguments});";
+        }
+
+        return string.Join(Environment.NewLine, latest.Values);
+    }
+
+    private static string Document(string markup, string charts)
     {
         var wwwroot = new Uri(Path.Combine(RepositoryRoot(), "src", "Gleanvolt.Web", "wwwroot") + Path.DirectorySeparatorChar).AbsoluteUri;
+        var scripts = charts.Length == 0
+            ? string.Empty
+            : $$"""
+                <script src="{{WebUtility.HtmlEncode(wwwroot)}}lib/uplot/uPlot.iife.min.js"></script>
+                <script src="{{WebUtility.HtmlEncode(wwwroot)}}js/charts.js"></script>
+                <script>
+                window.addEventListener('load', function () {
+                {{charts}}
+                });
+                </script>
+                """;
 
         return $"""
             <!DOCTYPE html>
@@ -122,6 +156,7 @@ public abstract partial class ScreenshotTest : PageTest
             </head>
             <body>
             {markup}
+            {scripts}
             </body>
             </html>
             """;
