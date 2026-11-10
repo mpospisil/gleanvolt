@@ -52,42 +52,11 @@ first page it serves asks you to choose a password, and nothing else is reachabl
 For a **VW Group car**, `VW_ENABLED` and the credentials beside it read VW's own EU Data Act portal
 directly, every fifteen minutes — see [docs/VW_PORTAL_SETUP.md](../docs/VW_PORTAL_SETUP.md).
 
-## Storage and the boot medium
+## Storage
 
-Nothing here depends on a particular disk. Two things matter: having the space, and whether your
-board can boot the medium you want to run from.
-
-**Space.** 8 GB is enough. It grows slowly afterwards — the charging-session and energy databases
-and the log files are the only things that accumulate, and all are small.
-
-**An SD card works, and USB-attached storage lasts longer.** The controller writes continuously: log
-files, and a SQLite database with its write-ahead log. SD cards tolerate that poorly over years, so
-if this is meant to run unattended, putting root on an SSD in a USB enclosure is the single upgrade
-that most reduces the odds of a mystery failure eighteen months in. It is not required.
-
-**Not every Pi can boot from USB, and that is worth checking before you buy anything.** Recent boards
-boot USB mass storage directly, and then there is nothing to think about: one device holds both
-`/boot/firmware` and `/`. Older boards may not boot from USB at all, or may fail with particular
-USB-to-SATA/NVMe bridges — their boot ROM allows the device only a brief window to respond, which
-some adapters miss, even though the Linux kernel drives the very same adapter without complaint once
-it is running.
-
-On a board like that, use a **split boot**: the SD card holds `/boot/firmware`, and `cmdline.txt`
-hands root to the USB disk. That works well, at the cost of two things it is easy to get wrong:
-
-- **`/boot/firmware` is then on the SD card.** Every instruction below that edits `cmdline.txt` — the
-  cgroup step in particular — is editing the SD card, which is correct, because that is the partition
-  the board actually boots. The USB disk usually keeps its own boot partition from whatever image was
-  written to it; editing *that* one changes nothing at all, silently.
-- **`/etc/fstab` must point `/boot/firmware` at the SD card's PARTUUID**, not at the USB disk's
-  leftover boot partition. Get this wrong and kernel updates land somewhere that is never booted, so
-  the machine breaks at some upgrade weeks later rather than at the moment of the mistake. Note that
-  a first-boot filesystem resize rewrites the partition table signature and therefore every PARTUUID
-  on the disk: the firstboot script repairs `cmdline.txt` and the root line in `fstab` by itself, but
-  it knows nothing about the `/boot/firmware` line.
-
-Neither applies if you boot and root on the SD card in the usual way, or on a board that boots USB
-directly.
+Nothing here depends on a particular disk. 8 GB is enough. It grows slowly afterwards — the
+charging-session and energy databases and the log files are the only things that accumulate, and all
+are small.
 
 ## Recording the weather with each session (optional)
 
@@ -387,8 +356,8 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**3. Enable cgroup memory accounting.** Required on every board. On a [split boot](#storage-and-the-boot-medium) this
-edits the **SD card**; otherwise there is only one device to edit.
+**3. Enable cgroup memory accounting.** Required on every board. This edits `cmdline.txt` on the
+partition the board boots from.
 
 Without it the `mem_limit` settings in `docker-compose.yml` are silently ignored: `docker run
 --memory=…` answers `WARNING: Your kernel does not support memory limit capabilities … Limitation
