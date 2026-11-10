@@ -1,7 +1,7 @@
 # Setting up a Huawei SUN2000
 
 How to connect Gleanvolt to a Huawei SUN2000 hybrid inverter. What works, and how well it has been tested,
-is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei). In short: readings are **Expected**
+is in [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000). In short: readings are **Expected**
 (written from Huawei's interface definitions, no real device yet), and the battery hold is **Untested**.
 
 ## What you need
@@ -70,7 +70,7 @@ may schedule the battery. With the hold off, Gleanvolt only reads, and the EMMA'
 Leave `BatteryHold:Enabled` off, or on with `BatteryHold:DryRun` true, until it has been confirmed on a
 real inverter. The hold sets the battery's maximum discharging power to 0, and puts the original back
 afterwards. That is a setting the inverter keeps, so Gleanvolt keeps the original on disk until it has put
-it back. [Supported inverters](SUPPORTED_INVERTERS.md#huawei) explains how it recovers after a
+it back. [Supported inverters](SUPPORTED_INVERTERS.md#huawei-sun2000) explains how it recovers after a
 crash. If Gleanvolt is removed while a hold is on, set the maximum discharging power back in the
 FusionSolar app.
 

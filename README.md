@@ -92,7 +92,7 @@ discontinued models go to the manufacturer's home page. The tiers are explained 
 and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
 names a device by the serial prefix or model name given here.
 
-### SolaX
+### SolaX inverters
 
 Driver `solax`, over Modbus TCP.
 
@@ -153,7 +153,7 @@ need those registers — they serve only
 [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
-### Huawei
+### Huawei SUN2000
 
 Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)), over Modbus TCP. How to
 connect it, enable Modbus TCP and set up an EMMA:
@@ -236,7 +236,7 @@ Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing abo
 port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
 Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
-### Other manufacturers
+### Other inverters
 
 Not supported yet. GoodWe is planned.
 <!-- end include -->
@@ -250,7 +250,7 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
-### SolaX
+### SolaX chargers
 
 Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its
 Smart EV Charger page.
@@ -281,7 +281,7 @@ Caveats:
   that evcc or Home Assistant already controls has to be **handed over** to Gleanvolt, not shared. Take
   snapshots with the button on Settings: it uses Gleanvolt's own connection.
 
-### Huawei
+### Huawei SCharger
 
 Over Modbus TCP, port 502. How to switch its Modbus server on, and what to do behind an EMMA:
 **[Setting up a Huawei SCharger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#huawei-scharger)**.
@@ -299,7 +299,7 @@ Huawei's product pages move by region, so the models link to Huawei's solar home
   already manages has to be handed over, not shared.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### go-e
+### go-e Charger
 
 Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the API on:
 **[Setting up a go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#go-e-charger)**.
@@ -313,7 +313,7 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### Other manufacturers
+### Other chargers
 
 Not supported yet.
 <!-- end include -->
@@ -1107,7 +1107,7 @@ the battery stops *serving the house*, not that battery power reaches exactly ze
 deadband above exists for this reason: warning on any negative value fires every poll and drowns out
 the signal it is there to give.
 
-#### Configuration
+#### Configuring the battery hold
 
 ```jsonc
 "BatteryHold": {
@@ -1554,7 +1554,7 @@ so the rule leans on power and treats the status as a corroborating signal:
 `ChargePaused` and `SuspendedEvse` are deliberately *not* treated as "the car is done": those are the
 charger's own doing, which is exactly what our pause write produces.
 
-#### Low tariff only
+#### FastNoBattery on low tariff only
 
 With a [grid tariff](#grid-tariff-the-tariff-section) set up, **Low tariff only** — a checkbox on the
 *Fast* tab, the **Fast low tariff only** switch in Home Assistant, or `PUT /charging/low-tariff-only` —
@@ -1577,7 +1577,7 @@ makes the mode wait through high tariff and charge flat out once low tariff star
   so rather than hiding it.
 - **With no tariff set up the option is ignored**, and the Overview and the tab say so.
 
-#### What it doesn't do
+#### What FastNoBattery doesn't do
 
 - **It doesn't survive a restart.** Like every mode, the service comes back in `Off` — a service that
   restarted mid-session and silently resumed drawing 11 kW from the grid is not a behaviour anyone
@@ -1946,7 +1946,7 @@ It also ends itself, like `Targeted`, when the car **stops drawing** for `Comple
 asked to charge, or is **unplugged** — a full car held at a bridged 6 A would otherwise keep the pack
 held and the house on the grid for nothing.
 
-#### What it doesn't do
+#### What SolarGrid doesn't do
 
 - **No battery-full gate.** The car competes with the home battery for the surplus from the first watt
   over the minimum. Use `Forecasted` if the battery must reach 100% by evening.
@@ -1960,7 +1960,7 @@ held and the house on the grid for nothing.
   pack; a warning says so when the mode is selected.
 - **Nothing survives a restart**, the minimum set at runtime included.
 
-#### Low tariff only
+#### SolarGrid on low tariff only
 
 With a [grid tariff](#grid-tariff-the-tariff-section) set up, **Low tariff only** — on the *Solar +
 grid* tab, the **SolarGrid low tariff only** switch, or `PUT /charging/low-tariff-only` — makes **high
@@ -1984,7 +1984,7 @@ What grid energy costs at each hour, for a two-rate tariff: in Czech terms, the 
 switching between the low rate (**NT**) and the high rate (**VT**). This part only makes the tariff
 known and visible — on the Overview, in Home Assistant and on the HTTP API. **On its own it changes
 nothing about how the car charges.** That is the **Low tariff only** option of
-[`Fast`](#low-tariff-only) and [`SolarGrid`](#low-tariff-only-1), which waits for low tariff before
+[`Fast`](#fastnobattery-on-low-tariff-only) and [`SolarGrid`](#solargrid-on-low-tariff-only), which waits for low tariff before
 buying from the grid.
 
 It is set up on the web UI's **Settings** page, under *Tariff*, rather than in configuration. A save
@@ -2238,7 +2238,7 @@ same rule the forecast plan follows.
 | **Charging from** | — | When the first grid-funded charging starts. `none` while the forecast covers the whole request. |
 | **Target hold until** | — | When the held last stretch is released, under `JustInTime`. `none` whenever nothing is being held — which is every `Cheapest` plan, and any `JustInTime` one where holding would have put the departure at risk. |
 
-#### Configuration
+#### Configuring Home Assistant
 
 Disabled by default. Non-secret settings live in `appsettings.json`:
 
@@ -2368,7 +2368,7 @@ that reports on it.
 `BatteryCapacityKWh` is the **usable** capacity — the figure the car's own SOC is a percentage of, not
 the gross pack on the brochure (an ID.4 Pro is 77 usable of 82 gross). Unset by default, and it affects
 one thing: the **Battery target (%)** basis on a
-[targeted](#targeted-charging-an-amount-of-energy-by-a-time) or
+[targeted](#targeted-charging-the-targeted-mode) or
 [fast](#how-much-the-amount) charge, which cannot turn "80%" into kilowatt-hours without it and is
 simply not offered until it is set. Guessing a pack size would make every such target quietly wrong
 instead of visibly unavailable, which is the worse of the two failures.
@@ -2580,7 +2580,7 @@ with no topic reads as the misconfiguration it is rather than as a car that neve
 
 Nothing in `ChargeControl` or `BatteryHold` consumes it, and no charge decision depends on it: a feed
 that dies changes nothing about how the charger is driven. It appears on the web UI dashboard and on
-the [targeted plan](#targeted-charging-an-amount-of-energy-by-a-time), where its SOC can be *converted*
+the [targeted plan](#targeted-charging-the-targeted-mode), where its SOC can be *converted*
 into a request the owner then confirms — an input to what you ask for, never to how it is delivered.
 It is not republished to Home Assistant, since Home Assistant is where it comes from.
 
@@ -3495,12 +3495,12 @@ Where to run it:
 The command line and the web UI never write the overrides file at the same time: both take a lock on
 `pv-system.json.lock` beside it.
 
-#### Deployment
+#### Deploying the web UI
 
 The compose stack in [`deploy/`](deploy/) needs **nothing in `.env`** for the UI: `docker-compose.yml`
 publishes port 8090 and leaves `Web__Enabled` at its default, so a fresh Pi ends a deploy at a working
 `http://<pi>:8090`. See
-[deploy/README.md § Running without Home Assistant](deploy/README.md#running-without-home-assistant-controller--web-ui-only)
+[deploy/README.md § Running without Home Assistant](deploy/README.md#workflow-b--controller-and-its-web-ui-only)
 for the memory budget of running the controller and its UI **without** Home Assistant or an MQTT
 broker at all (roughly 75 MB against ~590 MB for the full stack — 8% of a 1 GB board, or 2% of a
 4 GB one).
@@ -4129,7 +4129,7 @@ is that the three shares always add back up to the measured draw:
 Measured `FromBatteryWh` is kept separate from the commanded `LoanedWh` on purpose: they answer
 different questions, and the gap between them is worth being able to see.
 
-#### Operational notes
+#### Operating the session history
 
 - **Back up `data/sessions.db`.** It is the only history that exists; nothing reconstructs it.
 - **Sampling is coarser than polling on purpose.** Every poll still feeds the running energy totals —
@@ -4269,7 +4269,7 @@ FROM energy_intervals
 GROUP BY utc_slot ORDER BY utc_slot;
 ```
 
-#### Operational notes
+#### Operating the energy history
 
 - **Back up `data/energy.db` too.** Like the session store it is the only copy that exists, and
   nothing reconstructs it. Both files sit under the same `./data` bind mount in `deploy/`.

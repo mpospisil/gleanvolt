@@ -6,7 +6,7 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
-### SolaX
+### SolaX chargers
 
 Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its
 Smart EV Charger page.
@@ -37,7 +37,7 @@ Caveats:
   that evcc or Home Assistant already controls has to be **handed over** to Gleanvolt, not shared. Take
   snapshots with the button on Settings: it uses Gleanvolt's own connection.
 
-### Huawei
+### Huawei SCharger
 
 Over Modbus TCP, port 502. How to switch its Modbus server on, and what to do behind an EMMA:
 **[Setting up a Huawei SCharger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#huawei-scharger)**.
@@ -55,7 +55,7 @@ Huawei's product pages move by region, so the models link to Huawei's solar home
   already manages has to be handed over, not shared.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### go-e
+### go-e Charger
 
 Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the API on:
 **[Setting up a go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#go-e-charger)**.
@@ -69,6 +69,6 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### Other manufacturers
+### Other chargers
 
 Not supported yet.

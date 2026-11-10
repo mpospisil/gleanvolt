@@ -2005,7 +2005,7 @@ Two lessons, and the second is the expensive one:
   so the handover loses that field outright. The charger's own view of whether a car is connected is
   unaffected, and is the one that matters.
 
-### "Own a schema, not a client" is partly walked back, for one manufacturer
+### "Own a schema, not a client" is partly walked back, for one manufacturer, after the week
 
 Worth stating plainly rather than leaving in the diff. #73 set the rule: this codebase owns a
 *schema* — `captured_at`, `soc_percent`, and the rest — and every car's adaptation happens in Home
@@ -3128,7 +3128,7 @@ daylight and buys roughly 3 kWh.
   so it must not be netted off the commanded power — doing so reported zero import, left the hold
   released, and had the pack quietly funding the pace.
 
-### The cost we accept
+### The cost we accept for rate over timing
 
 Pacing spends the slack: a charger dropout late in the window has less room than the old finish-early
 behaviour. The safety margin is the only buffer, and it is worth revisiting if a real session ever
@@ -3188,7 +3188,7 @@ consumed it as "the last thing that happens" — the controller asks `IsInGridBl
 discharge hold follows the same predicate — so the arming window moves with the block and stays
 scoped to the importing part of the plan.
 
-### The cost we accept
+### The cost we accept for importing under the sun
 
 An import placed at noon is bought eight hours earlier than one placed at 05:00, and a day that goes
 on to beat its forecast *after* noon cannot un-buy it. That is a real loss and it is smaller than the

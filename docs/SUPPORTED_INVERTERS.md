@@ -6,7 +6,7 @@ discontinued models go to the manufacturer's home page. The tiers are explained 
 and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
 names a device by the serial prefix or model name given here.
 
-### SolaX
+### SolaX inverters
 
 Driver `solax`, over Modbus TCP.
 
@@ -67,7 +67,7 @@ need those registers — they serve only
 [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
-### Huawei
+### Huawei SUN2000
 
 Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)), over Modbus TCP. How to
 connect it, enable Modbus TCP and set up an EMMA:
@@ -150,6 +150,6 @@ Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing abo
 port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
 Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
-### Other manufacturers
+### Other inverters
 
 Not supported yet. GoodWe is planned.

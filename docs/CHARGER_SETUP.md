@@ -51,7 +51,7 @@ By hand, on **Settings → PV system → Charger**:
 
 In `.env`: `PV_CHARGER_DRIVER=huawei-22kt` (or `huawei-7ks`), and `EV_CHARGER_HOST`.
 
-### 4. What to expect
+### 4. What to expect from the SCharger
 
 - **No status.** The protocol reports power, voltages and currents, nothing else. A charging car shows as
   *charging*. No car and a car plugged in and waiting both show as *unknown*, never as *available*.
@@ -104,7 +104,7 @@ In `.env`: `PV_CHARGER_DRIVER=goe`, and `EV_CHARGER_HOST`.
 "Test connection" asks the API for the car state. If it says *not with the selected charger's API*, the
 local API is still off.
 
-### 4. What to expect
+### 4. What to expect from the go-e
 
 - **Status** comes from the go-e's car state and whether it allows charging. A car that waits or has
   finished while the go-e blocks charging is the charger's doing, never "the car is full".

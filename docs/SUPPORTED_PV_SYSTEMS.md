@@ -104,7 +104,7 @@ discontinued models go to the manufacturer's home page. The tiers are explained 
 and [`gleanvolt-discover`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#finding-your-devices)
 names a device by the serial prefix or model name given here.
 
-### SolaX
+### SolaX inverters
 
 Driver `solax`, over Modbus TCP.
 
@@ -165,7 +165,7 @@ need those registers — they serve only
 [`UnmeteredGridPhase`](https://github.com/mpospisil/gleanvolt/blob/main/README.md#the-pv-system-the-pv-section),
 which is a three-phase correction.
 
-### Huawei
+### Huawei SUN2000
 
 Driver `huawei` ([#316](https://github.com/mpospisil/gleanvolt/issues/316)), over Modbus TCP. How to
 connect it, enable Modbus TCP and set up an EMMA:
@@ -248,7 +248,7 @@ Dražice's datasheets list RS485 and a "Datapoint" interface but say nothing abo
 port. The 10-year warranty requires the inverter to be connected to the DZD cloud, which suggests
 Dražice's own firmware or dongle. Whether Modbus TCP is open on these units is the open question.
 
-### Other manufacturers
+### Other inverters
 
 Not supported yet. GoodWe is planned.
 <!-- end include -->
@@ -262,7 +262,7 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
-### SolaX
+### SolaX chargers
 
 Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its
 Smart EV Charger page.
@@ -293,7 +293,7 @@ Caveats:
   that evcc or Home Assistant already controls has to be **handed over** to Gleanvolt, not shared. Take
   snapshots with the button on Settings: it uses Gleanvolt's own connection.
 
-### Huawei
+### Huawei SCharger
 
 Over Modbus TCP, port 502. How to switch its Modbus server on, and what to do behind an EMMA:
 **[Setting up a Huawei SCharger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#huawei-scharger)**.
@@ -311,7 +311,7 @@ Huawei's product pages move by region, so the models link to Huawei's solar home
   already manages has to be handed over, not shared.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### go-e
+### go-e Charger
 
 Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the API on:
 **[Setting up a go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#go-e-charger)**.
@@ -325,7 +325,7 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
-### Other manufacturers
+### Other chargers
 
 Not supported yet.
 <!-- end include -->
