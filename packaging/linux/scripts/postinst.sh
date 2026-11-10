@@ -64,11 +64,10 @@ address=$(hostname -I 2>/dev/null | awk '{print $1}')
 # The name the UI announces on the LAN over mDNS (issue #363), unless that is switched off.
 advertise=$(sed -n 's/^[[:space:]]*Web__Advertise=\([A-Za-z]*\).*/\1/p' /etc/gleanvolt/gleanvolt.env 2>/dev/null | tail -n 1)
 name=$(sed -n 's/^[[:space:]]*Web__AdvertiseName=\([A-Za-z0-9-]*\).*/\1/p' /etc/gleanvolt/gleanvolt.env 2>/dev/null | tail -n 1)
-if [ "$(printf '%s' "$advertise" | tr 'A-Z' 'a-z')" = false ]; then
-    web="http://${address:-<this machine>}:${port:-8090}"
-else
-    web="http://${name:-gleanvolt}.local:${port:-8090}   or http://${address:-<this machine>}:${port:-8090}"
-fi
+case "$advertise" in
+    [Ff][Aa][Ll][Ss][Ee]) web="http://${address:-<this machine>}:${port:-8090}" ;;
+    *) web="http://${name:-gleanvolt}.local:${port:-8090}   or http://${address:-<this machine>}:${port:-8090}" ;;
+esac
 
 cat <<EOF
 
