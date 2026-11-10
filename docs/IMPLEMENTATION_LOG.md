@@ -4,6 +4,39 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The manual's Installation chapter (issue #329, step 2)
+
+Seven pages under `docs/manual/src/content/docs/en/installation/`, in the sidebar between Welcome and
+Setting up:
+
+- **Which computer should I use?** — a table from "what you have" to the page to follow; a Raspberry Pi
+  recommended; why Windows suits a PC that is always on and little else.
+- **Preparing your inverter and charger** — what to switch on per brand: Modbus TCP on SolaX (where, by
+  model, is not documented anywhere in the repo: the page says to ask the installer), the Huawei SDongle
+  and EMMA paths and the meter, the SCharger, go-e's local API v2; and one controller at a time (Home
+  Assistant integrations, evcc, the charger app's own solar mode).
+- **Linux and Raspberry Pi**, **Windows**, **Docker** — install, open the UI, on to the setup wizard;
+  starting and stopping.
+- **NAS** — Synology, QNAP, Unraid and TrueNAS SCALE in tabs; OpenMediaVault sent to Linux. The compose
+  file is imported from `deploy/docker-compose.nas.yml` at build time (`?raw`) and shown without its
+  comments, so it cannot drift from the file the release uses.
+- **Updating, backup and uninstalling** — one tab per platform, synchronised across the page; the car
+  sign-in in `data` as a reason to keep backups private; on Windows, the DPAPI-sealed sign-in that a
+  restore on another account cannot read.
+
+Also: the setup-wizard page no longer says Modbus TCP is on by default on SolaX devices (nothing backs
+it) and links to the preparing page instead.
+
+**Links.** `starlight-links-validator` turned out to skip every relative link, so it checked nothing;
+`scripts/check-links.mjs` replaces it (see `DECISIONS.md`). Tested with a missing page and a missing
+anchor, under both `/` and `/gleanvolt/next/`.
+
+**No new screenshots.** Installation happens in terminals and in the NAS vendors' apps. Each install
+page ends on the existing password-page picture; the commands and the installer's output are code
+blocks.
+
+---
+
 ## 2026-11-10 — The user manual's skeleton, screenshots and first page (issue #329, step 1)
 
 The first step of the manual's plan: the site, its publishing, the screenshot pipeline, and one finished

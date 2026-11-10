@@ -1,0 +1,71 @@
+---
+title: Linux and Raspberry Pi
+description: Install Gleanvolt on a Raspberry Pi or a Debian or Ubuntu computer with one command.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+On a Raspberry Pi, or any Debian or Ubuntu computer, one command installs Gleanvolt. It runs as a
+service: it starts by itself when the computer starts, and comes back by itself if it ever stops
+unexpectedly. You don't need to install Docker or anything else first.
+
+## What you need
+
+- A **Raspberry Pi 3B or newer** with **Raspberry Pi OS (64-bit)**, or a computer with **Debian 12 or
+  newer** or **Ubuntu 22.04 or newer**, 64-bit. OpenMediaVault 7 works too.
+- A way to type commands on it: a keyboard and screen, or a connection from another computer
+  (on a Raspberry Pi, for example `ssh pi@raspberrypi.local`).
+
+:::tip[Setting up a new Raspberry Pi]
+Use **Raspberry Pi Imager** on another computer to put Raspberry Pi OS on the memory card. Choose
+**Raspberry Pi OS (64-bit)**, not the 32-bit version. In the Imager's settings you can set a user name and
+password and turn on SSH, so you can reach the Pi from your computer.
+:::
+
+## Install
+
+<Steps>
+
+1. Open a terminal on the computer, and type this command, all on one line:
+
+   ```bash
+   curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
+   ```
+
+   Press **Enter**, and type your password if asked.
+
+2. Wait about a minute. When it is done, it shows where to open Gleanvolt:
+
+   ```
+     Web UI     http://gleanvolt.local:8090   or http://192.168.1.20:8090
+                (plain HTTP; a new install opens on the setup wizard)
+   ```
+
+3. On your phone or computer, open that address in a web browser. You'll see the password page:
+
+   ![The "Set a password" page.](../../../../assets/screenshots/setup-password.png)
+
+4. Carry on with [the setup wizard](../../setting-up/setup-wizard/).
+
+</Steps>
+
+:::note[It says 32-bit isn't supported]
+Your Raspberry Pi runs the 32-bit Raspberry Pi OS. Put the 64-bit version on it with Raspberry Pi Imager,
+then run the command again.
+:::
+
+## Starting and stopping
+
+Gleanvolt starts with the computer. To control it by hand:
+
+```bash
+systemctl status gleanvolt          # is it running?
+sudo systemctl stop gleanvolt       # stop it
+sudo systemctl start gleanvolt      # start it again
+sudo systemctl restart gleanvolt    # restart it
+```
+
+If you stop it with **Stop service** in Gleanvolt itself, it stays stopped until you start it with the
+command above, or restart the computer.
+
+Updating, backing up and removing Gleanvolt are on [Updating, backup and uninstalling](../updating/).

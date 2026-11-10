@@ -1,0 +1,63 @@
+---
+title: Docker
+description: Run Gleanvolt as a Docker container on a Linux computer.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+If your home server already runs Docker, Gleanvolt is one container. On a NAS, follow [NAS](../nas/)
+instead; it uses the NAS's own container app.
+
+## Install
+
+<Steps>
+
+1. Make the folders where Gleanvolt keeps its settings, history and logs:
+
+   ```bash
+   sudo mkdir -p /opt/gleanvolt/data /opt/gleanvolt/logs
+   sudo chown -R 1654:1654 /opt/gleanvolt/data /opt/gleanvolt/logs
+   ```
+
+   The second line lets Gleanvolt write to them: inside the container it runs as user 1654.
+
+2. Start the container. Replace `Europe/Prague` with your time zone:
+
+   ```bash
+   docker run -d --name gleanvolt-controller --restart on-failure \
+     --network host \
+     -e TZ=Europe/Prague \
+     -v /opt/gleanvolt/data:/app/data \
+     -v /opt/gleanvolt/logs:/app/logs \
+     ghcr.io/mpospisil/gleanvolt:latest
+   ```
+
+3. Open **`http://gleanvolt.local:8090`**, or `http://` followed by the server's address and `:8090`.
+   You'll see the password page:
+
+   ![The "Set a password" page.](../../../../assets/screenshots/setup-password.png)
+
+4. Carry on with [the setup wizard](../../setting-up/setup-wizard/).
+
+</Steps>
+
+## Why these options
+
+- **`--network host`** puts Gleanvolt on your home network, so the wizard's search can find your
+  devices and your phone can find `gleanvolt.local`. Without it, the search only sees Docker's own
+  network.
+- **`--restart on-failure`** brings Gleanvolt back after a crash or a restart from its own page. Don't
+  use `always` or `unless-stopped`: then **Stop service** in Gleanvolt can't stop it.
+- **`TZ`** is your time zone, so each day's history starts at your midnight.
+
+## Starting and stopping
+
+```bash
+docker stop gleanvolt-controller     # stop it; the charger is paused first
+docker start gleanvolt-controller    # start it again
+docker logs -f gleanvolt-controller  # watch what it is doing
+```
+
+Don't use `docker kill`: it doesn't give Gleanvolt time to pause the charger.
+
+Updating is on [Updating, backup and uninstalling](../updating/).

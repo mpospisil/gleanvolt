@@ -1,0 +1,152 @@
+---
+title: NAS
+description: Run Gleanvolt on a Synology, QNAP, Unraid, TrueNAS SCALE or OpenMediaVault NAS.
+---
+
+import { Code, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import composeFile from '../../../../../../../deploy/docker-compose.nas.yml?raw';
+
+{/* The repository's file, without its comments: they are notes for developers, and Docker ignores them. */}
+export const compose = composeFile
+  .split('\n')
+  .filter((line) => !line.trimStart().startsWith('#'))
+  .join('\n')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim() + '\n';
+
+A NAS that is on all the time is a good home for Gleanvolt. It runs in the NAS's own container app, from
+a ready-made file that you paste in.
+
+## What you need
+
+- A **64-bit** NAS that can run containers (Docker). Most NAS models from 2020 onwards are. Older models
+  with a 32-bit ARM processor don't work: the NAS's specification sheet names the processor.
+- About 100 MB of free memory.
+
+**OpenMediaVault 7 or newer?** Use the [Linux](../linux/) install instead. It's simpler.
+
+## The file to paste
+
+Every NAS below asks for this file. Copy all of it with the button in its top-right corner:
+
+<Code code={compose} lang="yaml" title="docker-compose.yml" />
+
+Three settings in it may need changing. Change them in the file before you paste it, at the places
+shown:
+
+| Setting | Change it to | Why |
+|---|---|---|
+| `TZ:` `${TZ:-Europe/Prague}` | Your time zone after `:-`, e.g. `${TZ:-Europe/Berlin}` | So each day's history starts at your midnight |
+| `${GLEANVOLT_DIR:-.}` (four places) | A folder on your NAS, where your NAS's steps below say so | Where Gleanvolt keeps its settings and history |
+| `${WEB_PORT:-8090}` | Another number, only if 8090 is already used on your NAS | The port you open Gleanvolt on |
+
+## Install
+
+<Tabs syncKey="nas">
+<TabItem label="Synology">
+
+For Synology DSM 7.2 or newer, with **Container Manager** installed from the Package Center.
+
+<Steps>
+
+1. In **File Station**, make a folder for Gleanvolt, for example `docker/gleanvolt` on `volume1`.
+
+2. Open **Container Manager → Project → Create**.
+
+3. Name it `gleanvolt`, set the path to the folder you made, and choose **Create docker-compose.yml**.
+
+4. Paste the file. Change the time zone if you're not on Prague time. Leave `GLEANVOLT_DIR` as it is.
+
+5. Skip the web portal step, and finish.
+
+</Steps>
+
+If DSM's firewall is on, allow port 8090 from your home network.
+
+</TabItem>
+<TabItem label="QNAP">
+
+For QNAP with **Container Station 3**.
+
+<Steps>
+
+1. Make a folder for Gleanvolt on a share, for example `/share/Container/gleanvolt`.
+
+2. Open **Container Station → Applications → Create**, and name it `gleanvolt`.
+
+3. Paste the file. Replace each `${GLEANVOLT_DIR:-.}` with the folder's full path, for example
+   `/share/Container/gleanvolt`. Change the time zone too.
+
+4. Create it.
+
+</Steps>
+
+</TabItem>
+<TabItem label="Unraid">
+
+Install the **Compose Manager** plugin from Community Applications first.
+
+<Steps>
+
+1. Go to **Docker → Compose → Add new stack**, and name it `gleanvolt`.
+
+2. **Edit stack → Compose file**: paste the file.
+
+3. **Edit stack → Env file**: add these two lines, with your own time zone:
+
+   ```
+   GLEANVOLT_DIR=/mnt/user/appdata/gleanvolt
+   TZ=Europe/Prague
+   ```
+
+4. Press **Compose up**.
+
+</Steps>
+
+</TabItem>
+<TabItem label="TrueNAS SCALE">
+
+For TrueNAS SCALE 24.10 or newer. Older versions can't install it this way: update TrueNAS first.
+
+<Steps>
+
+1. Create a dataset for Gleanvolt, for example `tank/apps/gleanvolt`, with the **Generic** preset. Not the
+   SMB preset: its permissions can keep Gleanvolt out.
+
+2. Go to **Apps → Discover Apps → ⋮ → Install via YAML**, and name it `gleanvolt`.
+
+3. Paste the file. Replace each `${GLEANVOLT_DIR:-.}` with the dataset's path, for example
+   `/mnt/tank/apps/gleanvolt`, and change the time zone.
+
+4. Save.
+
+</Steps>
+
+</TabItem>
+</Tabs>
+
+## Open Gleanvolt
+
+Open **`http://gleanvolt.local:8090`**, or `http://` followed by your NAS's address and `:8090`. You'll see
+the password page:
+
+![The "Set a password" page.](../../../../assets/screenshots/setup-password.png)
+
+Carry on with [the setup wizard](../../setting-up/setup-wizard/).
+
+:::note[A stopped container called gleanvolt-init]
+Next to Gleanvolt you'll see a second container, `gleanvolt-init`, shown as stopped or "exited". That is
+normal: it runs once at each start, to give Gleanvolt its folders, and then stops.
+:::
+
+## If something goes wrong
+
+- **The wizard's search finds nothing.** The container must use the NAS's own network, called **host**.
+  If your NAS's app offers a network choice, pick **host**.
+- **It keeps restarting, and the log says "address already in use".** Another app has port 8090. Change
+  `WEB_PORT` to a free number, such as 8091.
+- **The log says it couldn't open the session store, or the `logs` folder stays empty.** Gleanvolt can't
+  write to its folder. Put it on a share without special permissions, or give user 1654 write access in
+  your NAS's permission settings.
+- **Stop service in Gleanvolt doesn't stop it.** The restart policy was changed to "always". Set it back to
+  `on-failure`.

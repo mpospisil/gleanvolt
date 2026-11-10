@@ -1,0 +1,91 @@
+---
+title: Preparing your inverter and charger
+description: Turn on the connection Gleanvolt uses to talk to your inverter and charger.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Gleanvolt talks to your inverter and your charger over your home network. Most devices have this
+switched **off** when they leave the factory, so check it before you install.
+
+What to check depends on the brand:
+
+| Device | What to turn on | Where |
+|---|---|---|
+| SolaX inverter | Modbus TCP | The inverter's settings |
+| SolaX charger (HAC, EVC) | Modbus TCP | The charger's settings |
+| Huawei SUN2000 inverter | Modbus TCP, **Enable (Unrestricted)** | FusionSolar app, as the installer |
+| Huawei SCharger | Modbus TCP | FusionSolar app |
+| go-e charger | **Local HTTP API v2** | go-e app |
+
+Both devices also need to be **connected to your home network**, by cable or Wi-Fi, and switched on.
+
+## SolaX inverter and charger
+
+Turn on **Modbus TCP** in the inverter's settings, and again in the charger's. Where the setting is
+depends on the model and its firmware. If you can't find it, ask your installer: it may be behind an
+installer password.
+
+:::note
+If the charger is linked to the inverter for SolaX's own "Green" or "ECO" charging, unlink it.
+Gleanvolt needs to talk to the charger directly.
+:::
+
+## Huawei SUN2000 inverter
+
+You need the **installer account** for the FusionSolar app. Ask your installer if you don't have it.
+
+<Steps>
+
+1. In the FusionSolar app, open **Device commissioning** for the inverter and sign in as the installer.
+
+2. If the inverter is connected through an **SDongle**: go to **Settings → Communication configuration →
+   Dongle parameter settings → Modbus TCP** and choose **Enable (Unrestricted)**.
+
+   If it is connected through an **EMMA**: open the EMMA's commissioning page instead, and turn on Modbus TCP
+   under **Commission device → Communication settings → Modbus TCP**.
+
+</Steps>
+
+You also need a **Huawei smart meter** at the grid connection (DTSU666-H or DDSU666-H), or an EMMA, which
+has one built in. Without it, Gleanvolt can't see how much power goes to or comes from the grid.
+
+If you use an EMMA and want Gleanvolt to hold the home battery, switch off the EMMA's **AI energy
+optimisation** and set it to **maximum self-consumption**. Only one system may control the battery.
+
+## Huawei SCharger
+
+In the FusionSolar app, open the charger's commissioning page, and turn on Modbus TCP under
+**Settings → Communication configuration**.
+
+If the charger is managed by an EMMA, leave it to the EMMA for now: Gleanvolt can read it but should not
+control it.
+
+## go-e charger
+
+<Steps>
+
+1. In the go-e app, open your charger, then **Internet → Advanced settings**.
+
+2. Switch on **Local HTTP API v2**.
+
+3. If you use the app's own solar charging ("Eco" mode), switch it off. Gleanvolt does that job now.
+
+</Steps>
+
+This needs a go-e with hardware version 3 or later: a Gemini, Gemini flex, HOMEfix or HOME+ V3 or V4.
+
+## Only one controller at a time
+
+A device can only be controlled by one program. If you already use one of these, switch it off for the
+devices Gleanvolt will control:
+
+- **Home Assistant**'s SolaX or Huawei Solar integration. Some devices accept only one connection, and
+  Gleanvolt keeps its connection open all the time.
+- **evcc**, or any other charging controller.
+- The charger app's own solar or scheduled charging.
+
+## Next
+
+[Install Gleanvolt](../choosing/) on the computer you chose, then follow
+[the setup wizard](../../setting-up/setup-wizard/).
