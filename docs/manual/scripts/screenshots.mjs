@@ -101,7 +101,7 @@ const browser = await puppeteer.launch({
 
 try {
   for (const name of names) {
-    const { width, selector } = JSON.parse(readFileSync(join(html, `${name}.json`), 'utf8'));
+    const { width, selector, height } = JSON.parse(readFileSync(join(html, `${name}.json`), 'utf8'));
     const page = await browser.newPage();
     await page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
@@ -122,7 +122,12 @@ try {
           node.showModal();
         }
       });
-      await element.screenshot({ path });
+      const box = await element.boundingBox();
+      if (height && box.height > height) {
+        await page.screenshot({ path, captureBeyondViewport: true, clip: { x: box.x, y: box.y, width: box.width, height } });
+      } else {
+        await element.screenshot({ path });
+      }
     } else {
       await page.screenshot({ path, fullPage: true });
     }
