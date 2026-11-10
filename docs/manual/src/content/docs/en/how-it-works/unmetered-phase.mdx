@@ -1,0 +1,60 @@
+---
+title: When the grid meter misses a phase
+description: Why a grid meter that doesn't measure one phase stops the solar modes, how to tell, and what to enter.
+---
+
+**In short: leave the "Unmetered grid phase" setting empty**, unless your grid meter really doesn't
+measure one of the three phases. On a correctly wired installation, setting it makes things worse.
+
+## The problem
+
+A three-phase inverter has a **grid meter** where your house connects to the grid: a smart meter, or
+current clamps on the cables, measuring what flows in and out on each phase (L1, L2 and L3; SolaX calls
+them R, S and T).
+
+Gleanvolt works out the surplus from that meter. If the clamp on one phase is missing, loose or on the
+wrong cable, the meter reads **0 W on that phase**, whatever really flows there. Then:
+
+- **About a third of the sun you export is invisible.** Gleanvolt thinks the house uses it, finds little
+  or no surplus, and the solar modes don't start the car, even on a sunny afternoon with a full battery.
+- **About a third of the car's draw is invisible.** Gleanvolt thinks the sun covers the car while it
+  quietly charges from the grid.
+
+## Signs to look for
+
+- A sunny afternoon, the home battery full, and yet the Overview shows a large **House** figure and
+  almost no surplus. Solar + grid or Forecasted doesn't start.
+- The **House** figure rises and falls with the sun.
+- While the car charges, the House figure shows a dash, or the grid import is smaller than what the car
+  alone takes.
+- Your electricity bill shows more bought electricity than Gleanvolt or your inverter's app.
+
+:::note
+A big jump in the House figure for a while is usually a big appliance. An electric oven, for example,
+takes several kilowatts.
+:::
+
+## How to check
+
+Look at the grid meter's readings **per phase** while the sun shines: on the inverter's display, in its
+app, or ask your installer.
+
+- **Wired correctly:** all three phases show values that change.
+- **One phase blind:** one phase stays at **0 W** all the time, while the inverter's own output on that
+  phase clearly isn't zero.
+
+If you can't check it, leave the setting empty and ask your installer.
+
+## What to enter
+
+On **Settings**, under the inverter, enter the blind phase in **Unmetered grid phase**: `L1`, `L2` or
+`L3` (or SolaX's `R`, `S` or `T`). Press **Save**, then **Restart**.
+
+Gleanvolt then estimates that phase from what it does know: the inverter's own output on it, the car's
+share of the charge, and the house's use on the other two phases. It is an estimate, and a big
+appliance on that phase puts it off for a while, but it is far better than a third of everything missing.
+
+## The real fix
+
+Have an electrician fit or fix the clamp. When the meter measures all three phases, **empty the
+setting** and restart. Left set on a meter that sees every phase, it counts that phase twice.

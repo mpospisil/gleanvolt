@@ -1,0 +1,59 @@
+---
+title: Privacy
+description: What Gleanvolt keeps, where, and what leaves your home network, and when.
+---
+
+Gleanvolt runs on your own computer, in your own home. **There is no Gleanvolt account, no Gleanvolt
+server, and nothing is sent to the author.** No usage statistics, no crash reports, no update checks.
+
+Still, what Gleanvolt records is personal: a minute-by-minute picture of your electricity shows when
+someone is home, when the car comes and goes, and when the household is awake. So here is exactly where
+it goes.
+
+## What is kept on your computer
+
+Everything is in Gleanvolt's `data` and `logs` folders, on the computer it runs on.
+
+| What | Contains | Kept for |
+|---|---|---|
+| Charging sessions | Each charge: when, how much, from which source, the home battery level, and the car's battery level if it is read | 365 days |
+| Energy history | Every quarter hour: solar, grid, home battery, car | Always, unless you delete it |
+| Logs | What Gleanvolt decided and why, and errors | 14 days |
+| Settings | Your settings, including your home's location and your devices' addresses | Until you delete them |
+| Passwords and keys | Your car account's password, the Solcast and weather keys, and others | Until you remove them |
+
+Gleanvolt never asks for your name, e-mail, address, phone number or payment details.
+
+**Passwords and keys** are stored so only Gleanvolt can read them (on Windows, only your Windows
+account), but they aren't encrypted in a way a copy of the folder couldn't use. Anyone with a copy of the
+`data` folder could sign in to your car's account. Keep backups private.
+
+**Your Gleanvolt password** is stored only as a scrambled hash, which can't be turned back into the
+password.
+
+**To delete everything**, stop Gleanvolt and delete its `data` folder.
+
+## What stays in your home network
+
+- **The inverter and the charger**: Gleanvolt talks to them directly, over your network.
+- **The Gleanvolt page** (port 8090): shows nothing until a password is set, and asks for it after that.
+  The connection isn't encrypted (plain HTTP), so use it only on a home network you trust.
+- **Home Assistant**, if you connect it: the live figures go to the MQTT broker you name.
+
+## What leaves your home, and when
+
+Only these, and **only if you set them up**:
+
+| Service | What is sent | When |
+|---|---|---|
+| **Solcast** (solar forecast) | Your Solcast key and the site id you created at Solcast. Not your location | A few times a day |
+| **OpenWeatherMap** (weather) | Your key, and **your home's location** | Twice per charge |
+| **Volkswagen, Škoda or the VW Group Data Act portal** (car battery level) | Your account's sign-in, and your car's VIN, to the car maker | While reading the car |
+
+Requests to your car's maker go to them, under their privacy policy. Gleanvolt signs in as you, with the
+details you gave it, and keeps only the car's battery level, range, plug and charge state, and when the
+car reported them. Your VIN isn't stored in the history.
+
+**Your home's location** leaves your network only if you set up the weather, which needs it.
+
+Nothing else is ever contacted.

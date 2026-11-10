@@ -1,0 +1,93 @@
+---
+title: Glossary
+description: The words used in Gleanvolt and in this manual, explained.
+---
+
+## A (ampere), current
+How much electricity flows. The charger is set in amperes. On three phases, each ampere is about
+690 W; on one phase, about 230 W.
+
+## Battery discharge hold
+Stops the home battery from powering the house and the car, while it can still charge from the sun.
+See [Battery discharge hold](../using/battery-hold/).
+
+## Battery loan
+In [Forecasted](../using/modes/forecasted/) mode, power the home battery gives the car when the sun is
+just short of the car's minimum, on a day the forecast says the battery will be refilled.
+
+## Charger, wallbox
+The box on the wall the car's cable plugs into. Gleanvolt sets how much current it gives the car.
+
+## Charging mode
+How Gleanvolt charges the car: Solar, Forecasted, Solar + grid, Fast (no battery) or Targeted. See
+[Which mode should I choose?](../using/modes/choosing/)
+
+## Departure, Ready by
+When you need the car. Fast and Targeted can plan a charge to finish by then.
+
+## Export, import
+Selling electricity to the grid, and buying it from the grid.
+
+## Forecast, p10, p90
+How much sun Solcast expects. The expected value is as likely to be beaten as missed; **p10** is a
+cloudier outcome (only 1 day in 10 is worse), **p90** a sunnier one.
+
+## HDO, low tariff, high tariff
+A two-price electricity contract: cheaper at certain hours (low tariff), usually at night. In the Czech
+Republic it's switched by the distributor's HDO signal. See [Grid tariff](../setting-up/grid-tariff/).
+
+## Home battery
+The battery connected to your inverter, which stores sun for the evening. Not the car's battery.
+
+## House
+What your house uses, not counting the car. Gleanvolt works it out from the other figures.
+
+## Inverter
+The device that turns your panels' power into household electricity and manages the home battery.
+
+## kW, kWh
+kW (kilowatt) is power: how fast, at this moment. kWh (kilowatt-hour) is energy: how much in total. A
+car charging at 11 kW for two hours takes 22 kWh.
+
+## Minimum current, 6 A
+The least current a car can charge on: about 4.1 kW on three phases, 1.4 kW on one. Below it, the car
+pauses. See [How Gleanvolt decides](../how-it-works/basics/).
+
+## Modbus TCP
+The way Gleanvolt talks to the inverter and the charger over your home network. It must be turned on
+in each device. See [Preparing your inverter and charger](../installation/preparing-devices/).
+
+## Phase, L1, L2, L3
+Most homes in Europe have three-phase electricity: three separate wires, called L1, L2 and L3 (SolaX:
+R, S and T). A car charges on one phase or on all three.
+
+## Recovery key
+A code shown once when you set your Gleanvolt password, to reset the password if you forget it.
+
+## Session
+One charge, from start to stop. See [Sessions and history](../using/sessions/).
+
+## SOC (state of charge)
+How full a battery is, in percent. Used for both the home battery and the car's battery.
+
+## SOC floor
+The home battery level Forecasted mode won't let the car take it below, so it can still be full by the
+evening.
+
+## Solcast
+The service that provides the solar forecast. Free for home use. See
+[Solar forecast](../setting-up/solar-forecast/).
+
+## Standing down
+Switching the charger to Stop during a long wait, such as overnight, instead of pausing it.
+
+## Surplus
+The sun your house doesn't use at this moment: what the panels make minus what the house uses. What the
+solar modes give the car.
+
+## Unmetered grid phase
+A phase your grid meter doesn't measure. Leave the setting empty unless that is really the case. See
+[When the grid meter misses a phase](../how-it-works/unmetered-phase/).
+
+## VIN
+The car's vehicle identification number, 17 letters and digits, shown in the car's papers and app.

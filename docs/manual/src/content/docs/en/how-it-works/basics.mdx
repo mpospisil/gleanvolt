@@ -1,0 +1,99 @@
+---
+title: How Gleanvolt decides
+description: Solar surplus, the home battery, the car's minimum current, and why charging sometimes pauses, in plain words.
+---
+
+You don't need to read this page to use Gleanvolt. It explains why Gleanvolt does what it does, which
+helps when something looks surprising.
+
+## Gleanvolt only sets one thing
+
+Your inverter decides where electricity comes from and goes to. Your charger charges the car. Gleanvolt
+talks to both over your home network, and changes only:
+
+- **how much current the charger may give the car**, from moment to moment, and when it starts and stops;
+- **whether the home battery may discharge**, if you use the [battery discharge hold](../../using/battery-hold/).
+
+Everything else, such as when the home battery charges or what goes to the grid, the inverter decides
+as it always has.
+
+## The surplus
+
+Gleanvolt reads, every few seconds, what the panels make, what goes to or comes from the grid, what the
+home battery does, and what the car takes. From that it works out what the house uses, and the
+**surplus**:
+
+> surplus = what the panels make − what the house uses
+
+The surplus is the power the car could take without buying from the grid or emptying the home battery.
+The solar modes give the car the surplus, and no more.
+
+**A passing cloud doesn't stop a charge.** Gleanvolt decides on the average of the last three minutes,
+and changes the current only in steps of at least one ampere.
+
+## The car's minimum: why charging pauses
+
+A car can't charge on very little current. By the charging standard, the least is **6 A**, which is
+about:
+
+- **1.4 kW** on one phase;
+- **4.1 kW** on three phases.
+
+So on three phases, a surplus of 3 kW can't charge the car at all. If Gleanvolt kept the charger on at
+6 A, the missing 1.1 kW would come from the grid or the home battery. Instead, the solar modes **pause**
+the car, and continue when the surplus is enough again. A car that pauses and restarts a few times on
+a cloudy day is Gleanvolt working as intended.
+
+The modes deal with this gap in different ways:
+
+- **Solar** pauses.
+- **Forecasted** may let the home battery lend the difference, on a day the forecast says it can pay
+  back.
+- **Solar + grid** and **Targeted** may buy the difference from the grid, so the sun that is there isn't
+  wasted.
+
+A restarted charge runs for at least 10 minutes, and a paused one waits a while before it starts again,
+so the car isn't switched on and off every few minutes.
+
+## Pausing and standing down
+
+When a mode has to wait, it does one of two things:
+
+- **A short wait** (under 15 minutes): the charger stays on, at 0 A. The car is paused.
+- **A longer wait**, such as overnight or until the low tariff: the charger is switched to **Stop**.
+  Gleanvolt calls this **standing the charger down**. When it's time, the charger is switched back on.
+
+The Overview says which, and until when.
+
+## The home battery
+
+The home battery and the car both want the sun. Each mode settles that differently:
+
+| Mode | The home battery |
+|---|---|
+| Solar | Filled first; the car waits |
+| Forecasted | Gets the weak morning and evening sun, and is full by 19:00 |
+| Solar + grid | Shares the sun with the car |
+| Fast (no battery) | Kept out of the charge |
+| Targeted | Keeps its priority; the car gets what the battery doesn't need |
+
+Why is the battery's priority worth anything? In the evening, the battery runs your house from the
+sun you stored. Every kWh the car took from it during the day is a kWh you buy at night.
+
+## The forecast
+
+With a [Solcast account](../../setting-up/solar-forecast/), Gleanvolt knows roughly how much sun is
+still to come today and tomorrow. Forecasted and Targeted use it to plan. Forecasts are wrong
+sometimes, so:
+
+- Forecasted plans on a **cautious** estimate, not the most likely one, so that its promise, "the home
+  battery is full by evening", holds on most days.
+- It compares the forecast with what the panels really make, and adjusts. If the forecast is far off,
+  it stops trusting it for the rest of the day.
+- Real sun always counts. A sunny moment the forecast missed still goes to the car.
+
+## The grid meter
+
+Everything above depends on the meter at your grid connection measuring all three phases. If it misses
+one, the surplus is wrong, and the solar modes may never start: see
+[When the grid meter misses a phase](../unmetered-phase/).
