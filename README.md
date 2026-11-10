@@ -324,147 +324,18 @@ that affects it goes through the inverter's power-control block. Its **usable** 
 site-specific number the forecast-driven mode cannot work without — see
 [`BatteryCapacityKWh`](#forecast-driven-charging-the-forecasted-mode).
 
-## Tech stack
-
-- [.NET 10](https://dotnet.microsoft.com/) — target framework
-- Hosted as a [.NET Worker Service](https://learn.microsoft.com/dotnet/core/extensions/workers) (background service)
-- Modbus TCP client for inverter/charger communication
-- [Blazor](https://learn.microsoft.com/aspnet/core/blazor/) (interactive server rendering) for the optional self-hosted UI
-- Minimal APIs and [`Microsoft.AspNetCore.OpenApi`](https://learn.microsoft.com/aspnet/core/fundamentals/openapi/overview) for the optional HTTP API
-
-## Project structure
-
-The solution is organized to keep domain/control logic testable and free of hardware and hosting concerns:
-
-```
-Gleanvolt.slnx
-├── src/
-│   ├── Gleanvolt.Devices.Abstractions/ # The driver contract: IModbusClient, IInverterDriver, the battery hold
-│   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
-│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold; and the SCharger
-│   ├── Gleanvolt.Devices.GoE/          # The go-e Charger driver, over its local HTTP API v2
-│   │
-│   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
-│   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
-│   │   ├── Enums/                  # Charger registers and modes, control states
-│   │   ├── Strategies/             # Pure decision logic (charging controller, discharge hold, smoothing)
-│   │   └── Interfaces/             # IChargingController, IEnergyStateReader, ...
-│   │
-│   ├── Gleanvolt.Infrastructure/       # External communication
-│   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
-│   │   ├── RegisterMaps/           # Hex address mappings for the SolaX EV charger
-│   │   ├── Monitoring/             # SQLite energy-interval store (the analytics tables)
-│   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
-│   │   ├── Solcast/                # Solar-forecast HTTP client
-│   │   └── Vehicles/               # The EV telemetry JSON contract and its parser
-│   │
-│   ├── Gleanvolt.Api/                  # The optional HTTP API (minimal-API endpoints + its OpenAPI document)
-│   │   ├── Contracts/              # The wire DTOs, owned here rather than shared with Core
-│   │   ├── Endpoints/              # One file per group: status, energy, sessions, forecast, plans, control
-│   │   └── ApiOptions.cs           # The "Api" configuration section
-│   │
-│   ├── Gleanvolt.Web/                  # The optional self-hosted UI (a Blazor component library)
-│   │   ├── Components/             # Pages, layout and the root document
-│   │   ├── wwwroot/                # Stylesheet and other assets, served from the library
-│   │   └── WebOptions.cs           # The "Web" configuration section
-│   │
-│   ├── Gleanvolt.Hosting/              # The composition root — everything the controller is
-│   │   ├── GleanvoltHostingExtensions.cs  # AddGleanvolt() / UseGleanvolt()
-│   │   ├── PollingService.cs  # The main background loop (IHostedService)
-│   │   ├── NoListenServer.cs       # The "server" used when the UI is switched off
-│   │   ├── Configuration/          # Options classes bound from appsettings.json
-│   │   ├── Forecasting/            # The day plan and its runtime settings
-│   │   ├── HomeAssistant/          # MQTT discovery and the HA worker
-│   │   ├── Monitoring/             # Energy-interval monitoring worker
-│   │   ├── Sessions/               # Charging-session recording worker
-│   │   └── Vehicles/               # EV telemetry MQTT subscriber
-│   │
-│   ├── Gleanvolt.Discovery/            # The LAN scan: finds the SolaX and Huawei devices and their Modbus address
-│   ├── Gleanvolt.Discovery.Cli/        # gleanvolt-discover, a thin console over Discovery's DiscoverCommand
-│   │
-│   └── Gleanvolt.Worker/               # The executable host, and nothing else
-│       ├── Program.cs              # .env, Serilog, AddGleanvolt(), the exit code
-│       ├── DotEnv.cs               # Secrets from an untracked .env, before configuration is built
-│       └── appsettings.json        # The shipped defaults
-├── tests/
-│   ├── Gleanvolt.Core.Tests/           # Unit tests for the control logic (mocking hardware)
-│   ├── Gleanvolt.Infrastructure.Tests/ # Register encoding and write-path tests
-│   ├── Gleanvolt.Api.Tests/            # The endpoints over TestServer, and the OpenAPI contract snapshot
-│   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
-│   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
-│   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
-│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: Modbus and HTTP replays, and the conformance tests
-│   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
-│   ├── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
-│   ├── Gleanvolt.Devices.Huawei.Tests/ # The Huawei drivers against the same tests, on synthetic recordings
-│   └── Gleanvolt.Devices.GoE.Tests/    # The go-e driver against the charger tests, on synthetic HTTP recordings
-├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
-├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
-├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
-└── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md (see below),
-                                    # VW_PORTAL_SETUP.md (reading the car from VW's portal)
-```
-
-### Layering rules
-
-- **Dependency direction is one-way:** `Gleanvolt.Worker` → `Gleanvolt.Hosting` → `Gleanvolt.Infrastructure` → `Gleanvolt.Core`. `Gleanvolt.Core` must never reference anything above it.
-- **`Gleanvolt.Core` has no hardware or framework dependencies.** No Modbus libraries, no `Microsoft.Extensions.Hosting` types — only plain models, enums, and interfaces (`IModbusClient`, `IChargingController`, `IBatteryDischargeControl`). This is what keeps control/decision logic unit-testable without real hardware.
-- **All decision-making logic lives in `Gleanvolt.Core`**, expressed against interfaces. Charging strategy, surplus calculations, and SOC-based rules belong here, not in `Gleanvolt.Infrastructure`, `Gleanvolt.Hosting` or `Gleanvolt.Worker`.
-- **`Gleanvolt.Infrastructure` only implements `Gleanvolt.Core` interfaces.** Modbus TCP details and register maps stay isolated here; no business/decision logic.
-- **`Gleanvolt.Hosting` is composition-only.** `AddGleanvolt()` wires up DI; `PollingService` orchestrates the poll/act loop by calling into `Gleanvolt.Core` abstractions — it should not contain control logic itself.
-- **`Gleanvolt.Worker` is a host and nothing else.** The `.env` load, the logging configuration and the exit code. Anything it grows that a second host would also need belongs in `Gleanvolt.Hosting` instead — which is why it references that assembly alone and cannot reach `Gleanvolt.Core` directly.
-- **`Gleanvolt.Api` references `Gleanvolt.Core` and nothing else**, on exactly the same terms as
-  `Gleanvolt.Web` below: it is a third reporting/control *surface*, it drives the same Core seams the
-  other two do, and it owns no decision logic. Composing a targeted request is decision logic, which
-  is why that moved into `Gleanvolt.Core` when this surface arrived rather than being written twice.
-- **`Gleanvolt.Web` references `Gleanvolt.Core` and nothing else.** It is a reporting/control *surface*, exactly like the Home Assistant integration: it reads `ChargeControlStatusHolder` and drives the Core selector interfaces, and owns no decision logic. `Gleanvolt.Hosting` hosts it; the dependency never runs the other way.
-- **`Gleanvolt.Discovery` references `Gleanvolt.Infrastructure` and nothing above it**, so the scan
-  runs with no Gleanvolt installed: the Modbus client and the register maps, never the composition root
-  or the configuration. `Gleanvolt.Discovery.Cli` is its console and nothing else.
-- **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
-
-### The libraries as packages
-
-A release is a dispatch of [`release.yml`](.github/workflows/release.yml), which decides the build number itself, publishes self-contained builds for Windows, Raspberry Pi and x64 Linux — no .NET installation needed — alongside the five libraries as `.nupkg` files, and only then tags the commit and creates the [GitHub Release](https://github.com/mpospisil/gleanvolt/releases). One job per target, on the platform it names, so a broken platform names itself and every binary is started before it ships. `Gleanvolt.Worker` is not packaged: it is the thing that runs the libraries, not one of them.
-
-Every release carries a `SHA256SUMS` file — `sha256sum -c --ignore-missing SHA256SUMS` in the directory you downloaded into — and each zip and `.nupkg` carries a build provenance attestation, so `gh attestation verify <file> --repo mpospisil/gleanvolt` says which workflow run and which commit produced it without taking the release page's word for anything.
-
-The packages are attached to the release rather than pushed to a feed. To build on the controller directly, take this repository as a git submodule and reference the projects — no feed, no credentials, and the submodule commit pins the version exactly.
-
-How a release is cut — and what to check before and after one — is [`docs/RELEASING.md`](docs/RELEASING.md). The short version: dispatch the workflow, do not reach for `git tag`.
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.AddGleanvolt();          // polling, control, sessions, Home Assistant, the web UI, the API
-
-var app = builder.Build();
-app.UseGleanvolt();              // the UI's and the API's endpoints, when they are enabled
-app.Run();
-```
-
-`AddGleanvolt` also has an `IServiceCollection` overload taking an `IConfiguration`, for a host that is not built on `WebApplicationBuilder`.
-
 ## Getting started
 
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Network access to the SolaX inverter and EV charger with Modbus TCP enabled
-
-### Build and run
-
-```bash
-dotnet build Gleanvolt.slnx
-dotnet test Gleanvolt.slnx
-dotnet run --project src/Gleanvolt.Worker
-```
-
-Then open `http://localhost:8090`: a fresh clone starts in [setup mode](#setup-mode), which asks for
+Once Gleanvolt is installed — [on Linux](#install-on-linux) or [in Docker](#deployment) — open
+`http://<host>:8090`. A fresh install starts in [setup mode](#setup-mode), which asks for
 a password and runs the [setup wizard](#the-setup-wizard) for the device addresses and the site (or use
 [the command line](#setting-up-from-the-command-line)). Nothing is polled until that is done. After
 that, nothing is written to either device either: the service always boots with the charge mode **Off** and the battery hold
 **off**, and `BatteryHold:Enabled` is `false` as well, so it only polls and logs. That is the
 recommended way to confirm the telemetry looks right before enabling anything that writes.
+
+To build and run it from source instead, see
+[Building and running from source](CONTRIBUTING.md#building-and-running-from-source).
 
 ### Finding your devices
 
@@ -593,20 +464,6 @@ again afterwards. Full detail, including settings-only changes and rollbacks, is
 
 Full instructions — choosing between the two workflows, preparing the Pi, storage, backup/restore
 and troubleshooting — are in **[deploy/README.md](deploy/README.md)**.
-
-## Workflow & Project Management
-You are authorized and expected to use the GitHub CLI (`gh`) to manage this project. 
-When asked to manage tasks or submit code, use the following commands:
-- `gh issue list`: To check current tasks.
-- `gh issue view <id>`: To read the requirements of a specific task.
-- `gh issue create -t "<title>" -b "<body>"`: To create new tasks.
-- `gh pr create -t "<title>" -b "<body>"`: To submit your implemented code for review.
-Do not use `git push` directly to the main branch; always create a branch and use `gh pr create`.
-
-## Documentation Organization
-All project notes live in the `docs/` directory. You are responsible for keeping them updated:
-1. `DECISIONS.md`: Append a record when we adopt a library or establish a core pattern — and when hardware verification contradicts a planned design, which is the more common case here. Include what was found, what was decided, and the consequences accepted.
-2. `IMPLEMENTATION_LOG.md`: Before submitting a Pull Request via `gh pr create`, you MUST add a reverse-chronological entry to the top of this file detailing the implementation specifics, hardware quirks encountered (e.g. Modbus limitations), and the files changed. Use this entry to generate a detailed PR body that explains the architecture decisions, not just the changed files.
 
 ## Configuration
 
