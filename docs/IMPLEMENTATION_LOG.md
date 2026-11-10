@@ -4,6 +4,16 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The device search hint names no brand (issue #369)
+
+The hint above the device search (`FindDevicesIntro`, shown by `DeviceDiscoveryPanel` in the setup
+wizard and on Settings) said it finds "SolaX devices that answer Modbus TCP". Since the Huawei and go-e
+drivers it also finds Huawei SUN2000 inverters and SCharger chargers, and go-e chargers — which answer
+over their HTTP API on port 80, not Modbus TCP. It now reads "Searches this network for inverters and
+chargers Gleanvolt supports", in `SetupText.resx` and `SetupText.cs.resx` together.
+
+---
+
 ## 2026-11-10 — A short README for users, the manual in docs/ (issue #365)
 
 The README had grown to 4,318 lines, 85% of it a "Configuration" section that was really the whole
