@@ -17,7 +17,7 @@
 # mosquitto and Home Assistant never start, regardless of what COMPOSE_PROFILES happens to already be
 # set to in .env on the Pi from a previous deploy.sh run.
 #
-# Preparing the Pi itself is documented in deploy/README.md ("Running without Home Assistant") and
+# Preparing the Pi itself is documented in deploy/README.md ("Prepare the Pi") and
 # deliberately not automated here, with the same two exceptions deploy.sh makes: the data and logs
 # directories the controller writes to, which this script creates and chowns itself.
 

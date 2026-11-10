@@ -18,7 +18,7 @@
 # COMPOSE_PROFILES, or `docker compose --profile ... up -d`. gleanvolt-controller never depends on either
 # being present: HomeAssistant:Enabled is its own switch (HOMEASSISTANT_ENABLED below), off by
 # default, so a controller-only run neither starts nor waits on a broker that was never asked for. See
-# deploy/README.md's "Running without Home Assistant".
+# docs/HOME_ASSISTANT.md for running the broker and Home Assistant beside it.
 #
 # All three services run on the host's network (issue #268), not on a compose bridge network. The
 # controller then sees the Pi's real interface, so anything that works out the LAN's range from the

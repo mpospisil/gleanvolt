@@ -1,25 +1,15 @@
 # Deploying to a Raspberry Pi
 
-The production stack for [issue #26](https://github.com/mpospisil/gleanvolt/issues/26): the
-controller — with its self-hosted web UI — Home Assistant, and an MQTT broker as up to three Docker
-containers on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
-
-**There are two ways to deploy this, and how much RAM your Pi has decides which one you want.** Home
-Assistant is the expensive part by a wide margin; the controller and its own web UI are not. Start at
-[Choose your deployment](#choose-your-deployment) — it is one table, and it tells you which of the
-steps further down apply to you.
+Gleanvolt — the controller, with its web UI and, when you switch it on, its HTTP API — as one Docker
+container on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Trixie).
 
 ```
-                  Raspberry Pi  (192.168.2.7, arm64)
-    ┌────────────────────────────────────────────────────────────────────┐
-    │ compose project "solax"   (all state on bind mounts,               │
-    │                            every service on the host's network)    │
-    │                                                                    │
-    │ gleanvolt-controller ──MQTT──▶ mosquitto ◀──MQTT── homeassistant   │
-    │      │                   (opt-in profile,    (opt-in profile,      │
-    │      │                    :1883, password)    :8123)               │
-    │      └── :8090, the web UI -- on by default                        │
-    └────────────────────────────────────────────────────────────────────┘
+              Raspberry Pi  (192.168.2.7, arm64)
+    ┌────────────────────────────────────────────────┐
+    │ gleanvolt-controller   (state on bind mounts,  │
+    │                         on the host's network) │
+    │      └── :8090, the web UI                     │
+    └────────────────────────────────────────────────┘
          │ Modbus TCP
          ▼
   inverter <INVERTER_HOST>:502
@@ -35,88 +25,15 @@ The Pi never builds anything. CI builds a `linux/arm64` image and pushes it to G
 > developing against `dotnet run`. Don't point one at the other; running both at once against the
 > same inverter is confusing at best.
 
-## Choose your deployment
+## What you deploy
 
-Both workflows give you full control of the inverter and charger. They differ in whether Home
-Assistant is part of it — and Home Assistant is what sets the hardware bar.
+One container, `gleanvolt-controller`. It uses about 75 MB of memory and needs 8 GB of disk, so any
+64-bit Pi runs it. Deploy it with `./deploy/deploy-controller-only.sh`.
 
-| | **A — Full stack** | **B — Controller only** |
-|---|---|---|
-| **RAM required** | **2 GB minimum, 4 GB recommended** | **1 GB is enough** |
-| **Disk** | 16 GB minimum, 32 GB recommended | 8 GB |
-| Containers | controller, broker, Home Assistant | controller |
-| `mem_limit` total | 2096 MB of ceiling, ~590 MB actually used | 512 MB of ceiling, ~75 MB actually used |
-| Deploy script | `deploy.sh` | `deploy-controller-only.sh` |
-| Control surfaces | Home Assistant `:8123` **and** web UI `:8090` | web UI `:8090` |
-| Required in `.env` | site addresses, `HOMEASSISTANT_ENABLED`, MQTT credentials | site addresses only |
-| Extra setup steps | broker password file, Home Assistant onboarding | none |
-
-**RAM is the deciding factor, and Home Assistant is why.** Measured on the reference 4 GB install,
-steady state is Home Assistant **~500 MB**, the controller with its UI **~75 MB** (a single .NET
-process), and the broker **~15 MB** — about **590 MB** for the three together.
-
-Read the `mem_limit` values as ceilings rather than as a budget: Docker's `mem_limit` is a hard cap,
-not a reservation, so raising one does not make a container use more, and the sum of the caps is not
-memory that has been committed. What the caps decide is when the kernel kills something. They are set
-well clear of the measured figures, because the moment a container actually needs its headroom —
-Home Assistant starting up, updating, or purging its recorder database — is the worst possible moment
-to be OOM-killed.
-
-So the number that matters on a small board is that **Home Assistant alone is ~500 MB**, half of a
-1 GB machine before the OS and page cache get a look in. It runs — that was the original reference
-install — but with no headroom, and a board with no headroom is one that swaps under load. Two
-gigabytes makes it comfortable; four makes it a non-issue. If your Pi has 1 GB, **choose workflow B**
-rather than trying to squeeze Home Assistant in beside it, and lower the caps to suit the board.
-
-Disk follows the same split: the Home Assistant image alone is about 3.4 GB, against roughly 375 MB
-for the controller.
-
-> The web UI is **not** a separate container and has no `mem_limit` of its own — it runs inside the
-> controller process either way. Turning it off with `WEB_ENABLED=false` frees no memory worth
-> counting; it only closes the port. Home Assistant and the broker are the only things that move the
-> numbers above.
-
-### Workflow A — full stack, with Home Assistant
-
-For a Pi with **2 GB of RAM or more**. Choose this if you already run Home Assistant, or want the
-inverter and charger to sit alongside the rest of your home automation.
-
-In `/opt/gleanvolt/.env` (the addresses can be left out and set in the web UI's setup wizard instead):
-
-```bash
-TZ=Europe/Prague               # your timezone
-INVERTER_HOST=192.168.1.10     # your inverter's address (an example; there is no default)
-EV_CHARGER_HOST=192.168.1.11   # your charger's address (an example; there is no default)
-
-HOMEASSISTANT_ENABLED=true     # the controller's own switch to publish MQTT
-MQTT_USERNAME=solax            # must match the broker's password file
-MQTT_PASSWORD=<your password>  # must match the broker's password file
-```
-
-Then work through **every** step in [Prepare the Pi](#prepare-the-pi-once), including step 7
-(broker credentials) — the broker refuses anonymous connections, so a missing or mismatched password
-file is a stack that comes up looking healthy while the controller is refused on every connect.
-Deploy with `./deploy/deploy.sh`, then complete Home Assistant's onboarding at `:8123` as described
-under [First run](#first-run).
-
-Optionally, this workflow can also read the **car's own** battery SOC back off the same broker —
-`VEHICLE_ENABLED`, `VEHICLE_TOPIC` and friends in [`.env.example`](.env.example), with the Home
-Assistant automation that feeds it in the main README's
-[Vehicle telemetry](../README.md#vehicle-telemetry-the-vehicle-section) section. It reuses
-`MQTT_USERNAME`/`MQTT_PASSWORD`, writes to nothing, and no charge decision depends on it, so it is safe
-to leave off and safe to turn on later.
-
-For a **VW Group car** there is a second route that needs no automation at all: `VW_ENABLED` and the
-credentials beside it read VW's own EU Data Act portal directly, every fifteen minutes — see
-[docs/VW_PORTAL_SETUP.md](../docs/VW_PORTAL_SETUP.md). Switching it on stops the MQTT feed above being
-subscribed, deliberately: two sources writing one reading is a race.
-
-### Workflow B — controller and its web UI only
-
-For a Pi with **1 GB of RAM**, or any board where you simply don't want Home Assistant. The
-controller's own [web UI](../README.md#self-hosted-web-ui-the-web-section) shows live telemetry,
-drives every control Home Assistant would, and browses charging-session history and the forecast
-plan — so this is a smaller deployment, not a lesser one.
+> **Home Assistant?** Don't run the Home Assistant container on a low-powered Pi (less than 2 GB of
+> RAM). To connect Gleanvolt to a Home Assistant you already run, or to run Home Assistant and a broker
+> beside it on a bigger Pi with `./deploy/deploy.sh`, see
+> [Gleanvolt with Home Assistant](../docs/HOME_ASSISTANT.md).
 
 Nothing in `/opt/gleanvolt/.env` is required: the web UI's setup wizard asks for whatever is missing.
 Setting these ahead of time leaves it less to ask:
@@ -128,62 +45,20 @@ EV_CHARGER_HOST=192.168.1.11   # your charger's address (an example; there is no
 ```
 
 Nothing about the web UI needs setting: it is on by default, on the Pi's own port 8090 (the
-controller runs on the host's network), so the deploy ends at a working `http://192.168.2.7:8090`. The first page it
-serves asks you to choose a password, and nothing else is reachable until you do — see
+controller runs on the host's network), so the deploy ends at a working `http://192.168.2.7:8090`. The
+first page it serves asks you to choose a password, and nothing else is reachable until you do — see
 [Setting the web UI password](#setting-the-web-ui-password).
 
-Deploy with `./deploy/deploy-controller-only.sh`. In [Prepare the Pi](#prepare-the-pi-once), **skip
-step 7** — this script never looks for a broker password file — and skip the Home Assistant
-onboarding under [First run](#first-run). In step 5 you can create the `mosquitto/` and
-`homeassistant/` directories anyway in case you switch later, or leave them out; neither script
-requires them to exist until it actually needs them.
-
-### Switching between the two
-
-Which containers run is decided by **which script you run**, not by a setting that can go stale.
-`docker-compose.yml` gives `mosquitto` and `homeassistant` a `profiles:` key, and both scripts set
-`COMPOSE_PROFILES` explicitly for their own `docker compose` invocations, overriding whatever
-happens to be sitting in `.env` on the Pi.
-
-To move from B to A: set `HOMEASSISTANT_ENABLED=true`, add the MQTT credentials, create the broker
-password file (step 7), and run `./deploy/deploy.sh`. To go the other way, just run
-`./deploy/deploy-controller-only.sh` — the extra containers are removed and your data is untouched.
-
-### Workflow B beside a broker and Home Assistant you already run
-
-Workflow B with `HOMEASSISTANT_ENABLED=true` adds only the controller to an existing setup: Home
-Assistant and Mosquitto stay where they are, on this Pi outside this stack or on another device, and
-the controller dials them by address. One setting says where the broker is, for both MQTT links (Home
-Assistant's and the car's):
-
-```bash
-HOMEASSISTANT_ENABLED=true
-MQTT_BROKER_HOST=192.168.2.20  # the broker's address; unset is this Pi (localhost)
-MQTT_BROKER_PORT=1883          # only if it is not 1883
-MQTT_USERNAME=solax            # an account on *that* broker
-MQTT_PASSWORD=<its password>
-```
-
-The Home Assistant link can also be set on **Settings → Installation → Home Assistant (MQTT)**, which
-wins over these lines and applies on the next start; its **Test connection** checks the broker first.
-It covers Home Assistant's link only: the car's link still takes the broker from these lines.
-
-`PV_ID` is required once Home Assistant is enabled — see [`.env.example`](.env.example). Deploy with
-`./deploy/deploy-controller-only.sh`; skip step 7, which is about this stack's own broker. The
-entities appear in the Home Assistant that broker serves, through its MQTT integration's discovery,
-exactly as they do in workflow A.
-
-An `.env` that already has `VEHICLE_BROKER_HOST`/`VEHICLE_BROKER_PORT` keeps working: they are the
-older names for the car's link alone, and still win over `MQTT_BROKER_HOST` for that link when set.
+For a **VW Group car**, `VW_ENABLED` and the credentials beside it read VW's own EU Data Act portal
+directly, every fifteen minutes — see [docs/VW_PORTAL_SETUP.md](../docs/VW_PORTAL_SETUP.md).
 
 ## Storage and the boot medium
 
 Nothing here depends on a particular disk. Two things matter: having the space, and whether your
 board can boot the medium you want to run from.
 
-**Space.** Workflow A needs about 16 GB to be comfortable, mostly because the Home Assistant image is
-around 3.4 GB; workflow B is happy with 8 GB. Both grow slowly afterwards — the charging-session
-database and the log files are the only things that accumulate, and both are small.
+**Space.** 8 GB is enough. It grows slowly afterwards — the charging-session and energy databases
+and the log files are the only things that accumulate, and all are small.
 
 **An SD card works, and USB-attached storage lasts longer.** The controller writes continuously: log
 files, and a SQLite database with its write-ahead log. SD cards tolerate that poorly over years, so
@@ -222,8 +97,7 @@ sunrise and sunset. It is what lets a finished session be read against the day i
 than only against the forecast; see
 [the weather a session ran in](../README.md#the-weather-a-session-ran-in).
 
-One line in `/opt/gleanvolt/.env`, plus the site's coordinates if they are not already there. It
-applies to both workflows:
+One line in `/opt/gleanvolt/.env`, plus the site's coordinates if they are not already there:
 
 ```bash
 WEATHER_API_KEY=<your openweathermap key>
@@ -334,43 +208,7 @@ A value that cannot be used **stops the controller at startup**, with every prob
 latitude with no longitude, a tilt outside 0–90, an unparsable install date, a second charger (only
 one is supported). That is deliberate: a site that is quietly wrong forecasts plausibly.
 
-## Renaming what Home Assistant sees
-
-Three names reach Home Assistant, and only one of them is expensive to change.
-
-| What | Set by | Changing it |
-|---|---|---|
-| The topics everything is published on | `PV_ID` | **Free.** The discovery configs are republished pointing at the new topics and Home Assistant re-subscribes. |
-| The device page's name | `PV_NAME` | **Free.** Entity ids are assigned when an entity is first created and are not recomputed. |
-| Every entity's `unique_id` | `HA_DEVICE_ID` | **Discards the history.** |
-
-Home Assistant keys an MQTT entity to its `unique_id`. A new one is a *new entity*: it is created as
-`sensor.…_2`, because the old entity id is still taken, and every graph on your dashboard starts
-again. That is why `HA_DEVICE_ID` is pinned to `solax_controller` in `docker-compose.yml` rather than
-following `PV_ID` — every deployment that already exists created its entities under that root.
-
-If you want to change it anyway — say, to match a `PV_ID` on a system whose history you do not mind
-losing — set both in the same deploy:
-
-```bash
-HA_DEVICE_ID=home-roof
-HA_RETIRE_DEVICE_ID=solax_controller     # blanks the retained configs the old id left behind
-```
-
-Without the second line, the old device comes back from the broker's retained messages on the next
-restart, permanently unavailable, and you have two of everything.
-
-**To change it and keep the history**, the procedure is manual and worth doing carefully:
-
-1. Note the current entity ids (Settings → Devices & Services → MQTT → the device).
-2. Stop the controller, and set `HA_RETIRE_DEVICE_ID` to the old id so the retained configs go.
-3. Delete the old device from Home Assistant's registry. The recorder's rows are keyed by the entity
-   id *string* and survive this; deleting frees those ids for reuse.
-4. Deploy with the new `HA_DEVICE_ID` and let discovery create the entities.
-5. Rename each new entity's entity id back to the exact old one, accepting Home Assistant's prompt to
-   migrate long-term statistics. History and statistics then continue on the same key.
-
-Automations and dashboards reference entity ids, so if step 5 is done they need no edits.
+## Upgrading from an older release
 
 ### Upgrading a Pi deployed before the PV system had its own settings
 
@@ -389,7 +227,7 @@ In `/opt/gleanvolt/.env`, rename:
 `gleanvolt/{PV_ID}/…`, so that two installations can share a broker. This costs nothing in Home
 Assistant: the discovery configs are republished on the same topics they always used, pointing at the
 new state topics, and every entity, its id and its history carry straight through — because
-`HA_DEVICE_ID` stays `solax_controller`. See [Renaming what Home Assistant sees](#renaming-what-home-assistant-sees)
+`HA_DEVICE_ID` stays `solax_controller`. See [Changing the device id](../docs/HOME_ASSISTANT.md#changing-the-device-id)
 for why that one value is pinned.
 
 Two consequences worth acting on:
@@ -538,7 +376,7 @@ Host solax-pi
     User martin
 ```
 
-...and then `PI_HOST=solax-pi ./deploy/deploy.sh`.
+...and then `PI_HOST=solax-pi ./deploy/deploy-controller-only.sh`.
 
 **2. Docker.**
 
@@ -549,16 +387,13 @@ sudo systemctl enable --now docker     # survive a reboot
 docker compose version                 # v2 plugin, included by the script above
 ```
 
-**3. Enable cgroup memory accounting.** Required on every board and in both workflows — how much
-memory the Pi has has nothing to do with it. On a [split boot](#storage-and-the-boot-medium) this
+**3. Enable cgroup memory accounting.** Required on every board. On a [split boot](#storage-and-the-boot-medium) this
 edits the **SD card**; otherwise there is only one device to edit.
 
 Without it the `mem_limit` settings in `docker-compose.yml` are silently ignored: `docker run
 --memory=…` answers `WARNING: Your kernel does not support memory limit capabilities … Limitation
 discarded`, `docker inspect` records `Memory=0`, and `docker stats` reports `0B / 0B` for every
-container forever. On a 1 GB board that is the difference between one container being killed and the
-whole box thrashing. On a 4 GB board it is milder but not harmless — you lose per-container memory
-figures exactly when you need them, and a leak escalates to the kernel OOM killer picking a victim
+container forever. You lose per-container memory figures exactly when you need them, and a leak escalates to the kernel OOM killer picking a victim
 by its own heuristic instead of the guilty container hitting its own ceiling.
 
 **The parameters are not merely absent — the firmware actively disables the controller.** A fresh
@@ -631,78 +466,31 @@ boot process doesn't read. Check that `wc -l /boot/firmware/cmdline.txt` reports
 `ls /boot/firmware/cmdline.txt /boot/cmdline.txt` confirms which file this OS actually boots from —
 on Bookworm and later, `/boot/cmdline.txt` is a stub whose only content is "DO NOT EDIT THIS FILE".
 
-**4. Check swap — on Trixie there is nothing to add.** 1 GB of RAM with no swap turns a transient
-spike into an OOM kill, so this step used to build a `dphys-swapfile`. Raspberry Pi OS **Trixie
-(Debian 13) does not ship `dphys-swapfile` at all** — those commands fail with `command not found` —
-because the image now configures swap itself, and configures it better:
+**4. Check swap — on Trixie there is nothing to add.** Raspberry Pi OS Trixie (Debian 13) sets up
+swap itself, as **zram** — compressed swap in RAM — with writeback to `/var/swap` on disk. It no longer
+ships `dphys-swapfile`, so older instructions that use it fail with `command not found`. Check it is
+there:
 
 ```bash
-cat /proc/swaps      # expect /dev/zram0 at priority 100, sized to about half your RAM
-free -h
+cat /proc/swaps      # expect /dev/zram0
 ```
 
-zram sizes itself to the board — roughly 905 MB on a 1 GB Pi, 2 GB on a 4 GB one — so the number
-differs and neither is wrong. `swapon` and `zramctl` live in `/usr/sbin`, which a non-interactive
-`ssh pi 'swapon --show'` does not have on its `PATH`; `cat /proc/swaps` answers the same question
-from anywhere.
+`/var/swap` existing is not a leftover: it is zram's backing store, which is why only `/dev/zram0` is
+listed.
 
-What you get out of the box is **zram**: a compressed block device in RAM (zstd), used as swap at
-priority 100, with **writeback to `/var/swap`** on disk for pages too cold to be worth keeping
-compressed in memory. `rpi-setup-loop@var-swap.service` puts that file on a loop device and
-`systemd-zram-setup@zram0.service` builds the swap on top. So `/var/swap` existing is not a leftover
-— it is zram's backing store, and it is why `swapon --show` lists only `/dev/zram0`.
-
-This is strictly better than the old swapfile for this workload: compressing a page costs far less
-than writing it out, and there is still a disk tier behind it. **Nothing to do here.**
-
-> **Optional, and only on a 1 GB board running workflow A.** zram lives in RAM, so it competes for
-> the resource that is already scarce: compression buys roughly 2–3× on typical data but cannot
-> manufacture capacity, and the full stack's ~590 MB of steady-state usage leaves little of the
-> roughly 905 MB usable. A plain swapfile on the root disk, at a *lower* priority than zram, is a cheap
-> overflow tier that only catches what zram cannot hold:
->
-> ```bash
-> sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
-> sudo mkswap /swapfile && sudo swapon --priority 10 /swapfile
-> echo '/swapfile none swap sw,pri=10 0 0' | sudo tee -a /etc/fstab
-> ```
->
-> Do **not** do this if root is on an SD card — that is a write-amplification machine pointed at the
-> one component most likely to fail. It is only reasonable with root on an SSD (see
-> [Storage and the boot medium](#storage-and-the-boot-medium)). Leave `vm.swappiness` at its default
-> 60 so the disk tier is a safety net rather than a first resort.
->
-> **On 2 GB or more the whole argument collapses**, and on workflow B it never applied: ~590 MB of
-> usage against 4 GB is not a scarce resource, zram scales up with the board, and it already has
-> `/var/swap` behind it. Adding a third tier below two that never fill is work for nothing. Enforced
-> `mem_limit` values (step 3) are the better answer to the same worry, because they stop a leak at
-> the container instead of absorbing it.
-
-**5. Directories.** The containers hold no state; everything lives here. `logs/` and `data/` are
-needed by every deployment; `mosquitto/` and `homeassistant/` only if you're deploying with
-`deploy.sh` rather than `deploy-controller-only.sh` (workflow A — see
-[Choose your deployment](#choose-your-deployment)) — skip those two and their `chown` if you're not;
-neither script requires them to pre-exist:
+**5. Directories.** The container holds no state; everything lives here:
 
 ```bash
-sudo mkdir -p /opt/gleanvolt/{mosquitto/config,mosquitto/data,homeassistant/config,logs,data}
+sudo mkdir -p /opt/gleanvolt/{logs,data}
 sudo chown -R "$USER" /opt/gleanvolt
-sudo chown -R 1883:1883 /opt/gleanvolt/mosquitto/data         # the broker writes here
 sudo chown -R 1654:1654 /opt/gleanvolt/logs /opt/gleanvolt/data   # the controller image's non-root uid
 ```
-
-**Do not chown `mosquitto/config` to 1883.** Only `mosquitto/data` belongs to the broker. The config
-directory is written by the deploy script (that is where `mosquitto.conf` lands, from either script —
-see [`deploy/_lib.sh`](_lib.sh)) and only *read* by the broker, whose compose mount is read-only — so
-handing it to uid 1883 locks the deploy out of it and fails with `tar: mosquitto/config/mosquitto.conf:
-Cannot open: Permission denied`. The one file in there that does belong to 1883 is `passwd`, chowned
-in step 7.
 
 `data/` holds the charging-session SQLite database. SQLite writes its `-wal` and `-shm` files next to
 the database, so that **directory** — not just the file — has to be writable by uid 1654.
 
-`logs/` and `data/` are the two the *application* writes to, and both deploy scripts create them
-themselves (and hand them to uid 1654) if they are missing or wrongly owned — which is what makes a
+`logs/` and `data/` are the two the *application* writes to, and the deploy script creates them
+itself (and hands them to uid 1654) if they are missing or wrongly owned — which is what makes a
 release that adds one, as `data/` did, deploy onto an existing Pi without manual work. They do that
 through a throwaway `alpine` container, because the SSH user cannot chown to another uid but the
 Docker daemon can; the image is pulled once, on the first deploy that needs it. Listing them above is
@@ -715,53 +503,13 @@ scp deploy/.env.example martin@192.168.2.7:/opt/gleanvolt/.env
 ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env && nano /opt/gleanvolt/.env'
 ```
 
-**7. Broker credentials.** *Only if you're deploying with `deploy.sh` (the full stack) — skip this
-entirely for a controller-only or controller-plus-UI deployment via `deploy-controller-only.sh`, which
-never checks for a password file.* The broker refuses anonymous connections,
-so this must exist before the stack will work. The username has to match `MQTT_USERNAME` **and** the
-password has to match `MQTT_PASSWORD` in `.env` — a broker password with an empty `MQTT_PASSWORD`
-beside it is a stack that comes up looking healthy while the controller is refused on every connect.
-
-`-c` **creates** the file and refuses to overwrite one that exists, reporting the bare errno
-`Error: Unable to open file ... for writing. File exists.` — which reads like a permissions problem
-and isn't. So create with `-c` the first time and update without it afterwards:
-
-```bash
-# first time (no passwd file yet)
-docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
-    mosquitto_passwd -c -b /mosquitto/config/passwd solax '<password>'
-
-# changing the password later, or adding another user -- note: no -c
-docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config eclipse-mosquitto:2 \
-    mosquitto_passwd -b /mosquitto/config/passwd solax '<password>'
-
-sudo chown 1883:1883 /opt/gleanvolt/mosquitto/config/passwd
-sudo chmod 600 /opt/gleanvolt/mosquitto/config/passwd
-```
-
-`mosquitto_passwd` warns that the file's owner is not root and that "future versions will refuse to
-load" it. Ignore it here: the broker runs as uid 1883 and has to be able to read the file, and the
-compose mount is read-only so the image's entrypoint cannot chown it back.
-
-**Check the credentials actually work** before blaming the controller. This starts a throwaway broker
-against the real password file, so it is valid even before `deploy.sh` has copied `mosquitto.conf`:
-
-```bash
-docker run --rm -v /opt/gleanvolt/mosquitto/config:/mosquitto/config:ro eclipse-mosquitto:2 sh -c '
-  printf "listener 1883\nallow_anonymous false\npassword_file /mosquitto/config/passwd\n" > /tmp/t.conf
-  mosquitto -c /tmp/t.conf -d && sleep 2
-  mosquitto_pub -h 127.0.0.1 -u solax -P "<password>" -t solax/authtest -m ok && echo ACCEPTED
-  mosquitto_pub -h 127.0.0.1 -t solax/authtest -m no 2>/dev/null && echo "ANONYMOUS ACCEPTED -- wrong" || echo "anonymous rejected -- correct"
-'
-```
-
-**8. GHCR access.** Only needed if the package is private — a public package needs no login:
+**7. GHCR access.** Only needed if the package is private — a public package needs no login:
 
 ```bash
 echo '<github-pat-with-read:packages>' | docker login ghcr.io -u mpospisil --password-stdin
 ```
 
-**9. Check the devices are reachable** from the Pi, before blaming the container:
+**8. Check the devices are reachable** from the Pi, before blaming the container:
 
 ```bash
 nc -vz <inverter address> 502 && nc -vz <charger address> 502
@@ -778,26 +526,20 @@ deploy/
 ├── mosquitto/config/mosquitto.conf → /opt/gleanvolt/mosquitto/config/    (overwritten each deploy)
 ├── homeassistant/config/*.yaml     → /opt/gleanvolt/homeassistant/config/ (seeded once, never overwritten)
 ├── .env.example                    → copied by hand, once, as /opt/gleanvolt/.env
-├── deploy.sh                       # full stack: controller, mosquitto, Home Assistant
-├── deploy-controller-only.sh       # controller alone, with its web UI on :8090
+├── deploy-controller-only.sh       # the controller, with its web UI on :8090
+├── deploy.sh                       # the same, plus Mosquitto and Home Assistant (docs/HOME_ASSISTANT.md)
 └── _lib.sh                         # shared by both scripts above; not run directly
 ```
 
-From a developer machine, with the repo checked out, pick the script for the workflow you chose in
-[Choose your deployment](#choose-your-deployment):
+From a developer machine, with the repo checked out:
 
 ```bash
-./deploy/deploy.sh                    # full stack
-./deploy/deploy-controller-only.sh    # controller only
+./deploy/deploy-controller-only.sh
 ```
 
-Either copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` to `/opt/gleanvolt`,
-seeds Home Assistant's config files only if they don't already exist, then pulls and restarts —
-setting `COMPOSE_PROFILES` itself for that restart (`mosquitto,homeassistant` or empty), which is
-what actually decides whether the other two containers run, regardless of what's already in `.env`
-on the Pi. Both create `logs/` and `data/` and hand them to uid 1654 if they are missing or wrongly
-owned; for anything else they refuse to run rather than guess. Neither copies `.env` — which still
-decides whether `HomeAssistant:Enabled` actually takes effect.
+It copies the compose files to `/opt/gleanvolt`, then pulls and restarts. It creates `logs/` and
+`data/` and hands them to uid 1654 if they are missing or wrongly owned; for anything else it refuses
+to run rather than guess. It never copies `.env`.
 
 | Variable | Default | |
 |---|---|---|
@@ -805,7 +547,7 @@ decides whether `HomeAssistant:Enabled` actually takes effect.
 | `REMOTE_DIR` | `/opt/gleanvolt` | stack location on the Pi |
 | `IMAGE_TAG` | from `.env` (`latest`) | which build to run |
 
-All three work identically on either script.
+`deploy.sh` takes the same three.
 
 ## First run
 
@@ -814,17 +556,7 @@ password; nothing else is served until you do (see
 [Setting the web UI password](#setting-the-web-ui-password)). The dashboard, the
 controls, session history and the forecast plan are all there; see the root README's
 [Self-hosted web UI](../README.md#self-hosted-web-ui-the-web-section) section for what each page
-does. This is true of either deploy script — the UI runs inside `gleanvolt-controller` itself, so Home
-Assistant's presence or absence changes nothing about it.
-
-**If you deployed with `deploy.sh`** (the full stack, Home Assistant included):
-
-1. Open `http://192.168.2.7:8123` and complete Home Assistant onboarding (local account).
-2. **Settings → Devices & Services → Add Integration → MQTT.** Broker `localhost` (Home Assistant
-   and the broker share the Pi's network; `mosquitto` also works, and is what older installs have), port `1883`, and
-   **the username and password from `.env`** — unlike the dev stack, this broker is authenticated.
-3. The controller publishes MQTT discovery configs on connect; the SolaX device and its entities
-   appear by themselves.
+does.
 
 Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
 only once a charging button is pressed — Home Assistant or the web UI, whichever is enabled — and
@@ -837,21 +569,20 @@ addresses on your own device, per the root README's warnings.
 there is no separate update path, nothing to uninstall, and no step you perform on the Pi.
 
 ```bash
-./deploy/deploy.sh                    # workflow A
-./deploy/deploy-controller-only.sh    # workflow B
+./deploy/deploy-controller-only.sh
 ```
 
-Use the script matching the workflow that is *already running*. Running the other one is how you
-[switch between them](#switching-between-the-two) — which will add or remove containers, and is not
-what you want if you only meant to pick up a new build.
+If you deployed Home Assistant beside it with `deploy.sh`, run that one instead: running the other
+script adds or removes containers, which is not what you want if you only meant to pick up a new
+build.
 
 ### What the script does, in order
 
 1. Checks `/opt/gleanvolt` exists and `.env` is there — it refuses rather than guessing.
-2. Copies `docker-compose.yml`, `docker-compose.web.yml` and `mosquitto.conf` from your **local**
-   `deploy/` directory, overwriting the Pi's copies.
-3. Seeds Home Assistant's config files only if they don't already exist.
-4. `docker compose pull` — every image in the active profiles.
+2. Copies `docker-compose.yml` and `docker-compose.web.yml` from your **local** `deploy/` directory,
+   overwriting the Pi's copies (with `deploy.sh`, `mosquitto.conf` too).
+3. With `deploy.sh` only, seeds Home Assistant's config files if they don't already exist.
+4. `docker compose pull`.
 5. `docker compose up -d --remove-orphans` — recreates only what actually changed.
 6. Prints the container status and the URLs.
 
@@ -872,11 +603,9 @@ Everything that is state, because none of it lives inside a container:
 | `data/pv-system.json`, `data/tariff.json` | what was saved on **Settings**: the installation's edits, and the [grid tariff](../README.md#grid-tariff-the-tariff-section) |
 | `data/vw-website-session.json`, `data/skoda-api-key.json` | **the car's sign-in.** Bearer-equivalent, mode `0600` — see below |
 | `logs/` | the controller's own log files |
-| `homeassistant/config/` | seeded once on first deploy, never overwritten afterwards |
-| `mosquitto/config/passwd` | broker credentials, created by hand |
 
 `docker compose down` and even `docker rm -f` on any single container are equally safe, for the same
-reason. What *is* overwritten every deploy is `mosquitto.conf` and the compose files — so edit those
+reason. What *is* overwritten every deploy is the compose files — so edit those
 in the repo, not on the Pi, or your change disappears at the next update.
 
 **`data/` is secret-bearing** ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)). Two
@@ -890,22 +619,6 @@ attached to an issue all hand over the car. Copy `data/` the way you would copy 
 encrypted volume, and nowhere public. Against a stolen SD card what actually helps is full-disk
 encryption on the Pi, which is outside this stack. **Sign out** on the web UI's Car page
 deletes the stored value rather than leaving a tombstone holding it.
-
-### Updating the controller also updates Home Assistant and the broker
-
-Step 4 pulls **every** image in the active profiles, not just the controller. On workflow A that
-means `ghcr.io/home-assistant/home-assistant:stable` and `eclipse-mosquitto:2` move to whatever those
-tags point at now. That is usually what you want, but it means "I updated the controller" can also
-mean "Home Assistant jumped a version" — worth knowing before you go looking for what changed.
-
-To move only the controller, do that one step on the Pi instead:
-
-```bash
-ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose pull gleanvolt-controller && docker compose up -d gleanvolt-controller'
-```
-
-That skips copying any updated compose files, so use it for a plain image bump, not after changing
-`deploy/`.
 
 ### The controller restarts, so charge control returns to Off
 
@@ -940,9 +653,9 @@ ending in `-dev` with no commit means somebody deployed a local build.
 `IMAGE_TAG` selects the build, and works identically on both scripts:
 
 ```bash
-./deploy/deploy.sh                              # latest from main
-IMAGE_TAG=1.0.0 ./deploy/deploy.sh              # a released version -- no "v"
-IMAGE_TAG=sha-abc1234 ./deploy/deploy.sh        # one specific build, immutable
+./deploy/deploy-controller-only.sh                         # latest from main
+IMAGE_TAG=1.0.0 ./deploy/deploy-controller-only.sh         # a released version -- no "v"
+IMAGE_TAG=sha-abc1234 ./deploy/deploy-controller-only.sh   # one specific build, immutable
 ```
 
 A rollback is just an update pointed at an older tag; `sha-` tags are immutable, which makes them the
@@ -958,7 +671,7 @@ does not exist and the pull fails with `manifest unknown`.
 in history:
 
 ```bash
-git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy.sh
+git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy-controller-only.sh
 ```
 
 Note the two forms in that one line: `v1.0.0` is the **git** tag you check out, `1.0.0` is the
@@ -979,8 +692,8 @@ the deploy script works too and is the better choice if you also changed anythin
 ### If an update goes wrong
 
 The scripts stop at the first failure rather than pressing on, and every step before the pull is
-either a check or an idempotent repair — creating `logs/` and `data/` with the right owner, or fixing
-`mosquitto/config` ownership. Re-running after fixing whatever it complained about is safe.
+either a check or an idempotent repair — creating `logs/` and `data/` with the right owner (and, with `deploy.sh`,
+fixing `mosquitto/config` ownership). Re-running after fixing whatever it complained about is safe.
 
 If a new build misbehaves, roll back to the previous tag with the same command. The database, logs
 and configuration are all still there, because the container was never where they lived.
@@ -1171,7 +884,7 @@ has no 32-bit build: **32-bit ARM (armv7) is not supported**, and on such a NAS 
 `no matching manifest for linux/arm/v7`. Older ARM models from Synology and QNAP, and most from before
 2020, are 32-bit; the vendor's spec sheet names the CPU.
 
-**What it runs:** workflow B, the controller and its web UI, from its own compose file,
+**What it runs:** the controller and its web UI, from its own compose file,
 [`docker-compose.nas.yml`](docker-compose.nas.yml). `deploy.sh` and `deploy-controller-only.sh` are for
 the Pi: they work over ssh from a developer machine and assume `/opt/gleanvolt`. On a NAS the vendor's
 container UI does their job, and the compose file does the one step they did on the Pi, giving the data
@@ -1184,7 +897,7 @@ from the Pi's `docker-compose.yml` in four ways:
 
 - **Only the controller.** No broker, no Home Assistant, no profiles. If you already run Home Assistant
   and a broker elsewhere, add their settings as in
-  [Workflow B beside a broker and Home Assistant you already run](#workflow-b-beside-a-broker-and-home-assistant-you-already-run).
+  [To a Home Assistant you already run](../docs/HOME_ASSISTANT.md#to-a-home-assistant-you-already-run).
 - **A one-shot `gleanvolt-init` container** runs before the controller, as root, and changes the owner
   of `data/` and `logs/` to uid 1654, the controller's user. It then exits, and a NAS UI shows it as
   *stopped* or *exited (0)*. That is its normal state, not a fault.
@@ -1332,7 +1045,7 @@ GitHub's Windows runners intermittently start without a Docker daemon
 single-platform tags are pushed regardless, so the Pi is never actually blocked:
 
 ```bash
-IMAGE_TAG=sha-abc1234-linux-arm64 ./deploy/deploy.sh
+IMAGE_TAG=sha-abc1234-linux-arm64 ./deploy/deploy-controller-only.sh
 ```
 
 ### Running on Windows
@@ -1354,14 +1067,12 @@ setting stays empty and `TZ` keeps working exactly as before.
 ## Where the logs go
 
 **Every log lands on the Pi's drive; nothing is written inside a container.** Verified with
-`docker diff`, which stays empty on all three services during normal operation.
+`docker diff`, which stays empty during normal operation.
 
 | Who | Written to | Retention |
 |---|---|---|
 | Controller (Serilog file sink) | `/opt/gleanvolt/logs/solax-<date>.log` — bind mount over `/app/logs` | 14 daily files (`retainedFileCountLimit`) |
-| Controller / broker / HA (stdout) | Docker's `json-file` logs, `/var/lib/docker/containers/...` on the Pi | capped at 3 × 10 MB per service (5 MB for the broker) |
-| Home Assistant | `/opt/gleanvolt/homeassistant/config/home-assistant.log` — bind mount over `/config` | HA rotates it itself |
-| Mosquitto | stdout only (`log_dest stdout`) — no second file on the card | as above |
+| Controller (stdout) | Docker's `json-file` logs, `/var/lib/docker/containers/...` on the Pi | capped at 3 × 10 MB |
 
 Check it after a deploy — a file should appear within one poll cycle:
 
@@ -1393,21 +1104,17 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 |---|---|---|---|
 | `/opt/gleanvolt/.env` | (environment) | secrets, `chmod 600` | yes |
 | `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — charging-session history; `energy.db` — the site's 15-minute energy history; `pv-system.json` and `tariff.json` — what was saved on Settings | **critical** |
-| `/opt/gleanvolt/homeassistant/config` | `/config` | HA `.storage` (account, entity registry, MQTT integration) + recorder DB | **critical** |
-| `/opt/gleanvolt/mosquitto/config` | `/mosquitto/config` | `mosquitto.conf`, password file | yes |
-| `/opt/gleanvolt/mosquitto/data` | `/mosquitto/data` | retained messages, sessions | no |
 | `/opt/gleanvolt/logs` | `/app/logs` | controller log files | no |
 | `/opt/gleanvolt/docker-compose.yml` | — | redeployed from git | no |
 
-**Back up** — two directories are irreplaceable, for different reasons. `homeassistant/config/.storage`
-costs you onboarding, the account and the MQTT integration; `data/` holds `sessions.db` and
-`energy.db`, both of which **cannot be regenerated** — telemetry can be re-polled, but a session that
+**Back up** `data/` above all: it holds `sessions.db` and `energy.db`, neither of which **can be
+regenerated** — telemetry can be re-polled, but a session that
 already happened cannot be re-lived and a quarter hour of last March cannot be measured again. Stop
-the stack first so SQLite isn't mid-write:
+the controller first so SQLite isn't mid-write:
 
 ```bash
 cd /opt/gleanvolt && docker compose stop gleanvolt-controller
-sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/gleanvolt .env data homeassistant/config mosquitto/config
+sudo tar czf "solax-backup-$(date +%F).tar.gz" -C /opt/gleanvolt .env data
 docker compose start gleanvolt-controller
 ```
 
@@ -1419,7 +1126,6 @@ but a stopped writer makes it certain, and the gap costs one poll cycle.
 ```bash
 cd /opt/gleanvolt && docker compose down
 sudo tar xzf solax-backup-2026-08-09.tar.gz -C /opt/gleanvolt
-sudo chown -R 1883:1883 /opt/gleanvolt/mosquitto
 sudo chown -R 1654:1654 /opt/gleanvolt/data          # tar restores the archive's ownership
 docker compose up -d
 ```
@@ -1433,19 +1139,6 @@ container stuck in a restart loop will burn through the free tier, which is a re
 
 **A container is `Restarting` in a loop.** `docker compose logs <service>`. If there's nothing but
 an abrupt stop, suspect memory: `dmesg -T | grep -i oom`.
-
-**Home Assistant is killed during startup.** It's the hungriest of the three. Raise `HA_MEM_LIMIT`
-in `.env`, confirm swap is on, and trim the recorder further in
-`/opt/gleanvolt/homeassistant/config/configuration.yaml`. If it can't be made to fit alongside the other
-two, the intended fallback is to move Home Assistant to another host — the three services are
-independent, so that's a compose edit, not a redesign.
-
-**Nothing connects to the broker.** `docker compose logs mosquitto` shows the rejected connections.
-Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
-being readable by uid 1883. `/pv-system` in the web UI shows what the controller is dialling and as
-whom — including the client id to search the broker's log for — so the two sides can be compared
-without an ssh session; with a `Web__PasswordHash` configured it will show the password it is actually
-using, which is the half of that comparison `.env` cannot settle on its own.
 
 **Can't reach the web UI at `:8090`.** Nothing has to be configured for it to work, so this is a
 fault rather than a missing setting. Start with what the container says about itself:
@@ -1461,10 +1154,7 @@ on the Pi shows it. If the browser still can't connect, look at the Pi's firewal
 A crash loop with `address already in use` in the log means something else on the Pi already listens on
 that port; on the host's network the port is simply the Pi's, so `ss -ltnp | grep 8090` names the
 other program. Move it, or move the UI with
-`WEB_PORT` in `.env`. The same goes for Home Assistant on `8123`, and for the broker on `1883`
-(`docker compose logs mosquitto`), which used to be unpublished and so could never clash — a Pi that already runs its own Mosquitto or Home Assistant outside this stack
-wants [workflow B beside them](#workflow-b-beside-a-broker-and-home-assistant-you-already-run), not a
-second copy.
+`WEB_PORT` in `.env`.
 
 A `COMPOSE_FILE=` line in `.env` from an older release is obsolete and safe to delete; the file it
 names is now empty.
@@ -1485,7 +1175,7 @@ That is `/opt/gleanvolt/data` not being writable by uid 1654. Everything else ke
 it is easy to miss. Re-running whichever deploy script you used repairs the ownership on its own:
 
 ```bash
-./deploy/deploy.sh                    # or deploy-controller-only.sh
+./deploy/deploy-controller-only.sh    # or deploy.sh, if that is what you deployed with
 ```
 
 Or, on the Pi directly:
@@ -1507,6 +1197,6 @@ makes close to a dozen connections, so this is unusable without a key:
 ssh-copy-id martin@192.168.2.7
 ```
 
-If the account isn't `martin`, pass your own: `PI_HOST=<user>@192.168.2.7 ./deploy/deploy.sh`.
+If the account isn't `martin`, pass your own: `PI_HOST=<user>@192.168.2.7 ./deploy/deploy-controller-only.sh`.
 
 **Locked out over SSH.** <https://connect.raspberrypi.com/> gives you a shell without the LAN.
