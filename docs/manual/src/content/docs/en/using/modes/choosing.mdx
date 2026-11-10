@@ -1,0 +1,41 @@
+---
+title: Which mode should I choose?
+description: Pick the charging mode that fits your day, from a few common situations.
+---
+
+Gleanvolt has five charging modes. They differ in two things: **how much grid electricity** they may
+buy, and **how they treat the home battery**.
+
+## By situation
+
+| Your situation | Choose |
+|---|---|
+| "It's sunny, I'm not in a hurry, and I want the home battery full first." | [Solar](../solar/) |
+| "It's sunny and I'm not in a hurry, but start the car earlier; just make sure the home battery is full by evening." | [Forecasted](../forecasted/) |
+| "The car stays at home for a few days; fill it from the sun over as many days as it takes." | [Forecasted](../forecasted/) with **Until full** |
+| "Use the sun today, even a weak sun, and I don't mind buying a little grid." | [Solar + grid](../solar-grid/) |
+| "I'm leaving in an hour." | [Fast (no battery)](../fast/) |
+| "I need 80 % by 7:00 tomorrow, and the cheaper the better." | [Targeted](../targeted/) |
+| "I need 80 % by 7:00, but don't let it sit at 100 % all night." | [Fast (no battery)](../fast/) with a departure time, or [Targeted](../targeted/) with **Just in time** |
+| "Only charge in the cheap night tariff." | [Fast (no battery)](../fast/) with **Low tariff only** |
+| "Charge only from the sun, and get as much as possible by tomorrow morning." | [Targeted](../targeted/) with **Sun only** |
+
+## Side by side
+
+| Mode | Buys from the grid? | Home battery | Stops by itself |
+|---|---|---|---|
+| **Solar** | No | Filled first; the car only gets sun once it is full | Car full, unplugged, or no sun left today |
+| **Forecasted** | No | Guaranteed full by the evening; may lend a little to the car | Car full, unplugged, or no sun left today |
+| **Solar + grid** | A little, to make a weak sun usable | Shares the sun with the car | Car full, unplugged, or no sun left today |
+| **Fast (no battery)** | Yes, whatever the sun doesn't cover | Kept out of it | Car full, unplugged, the amount reached, or the departure time |
+| **Targeted** | Only what the sun can't cover by the deadline | Keeps its priority | Target reached, car full, unplugged, or the departure time |
+
+Two of the modes need a [solar forecast](../../../setting-up/solar-forecast/) to work as described:
+**Forecasted** and **Targeted**. Without one, Forecasted behaves like Solar, and Targeted plans to buy
+the whole amount, though it still uses any sun that shines.
+
+## Why not just plug in and charge?
+
+Without Gleanvolt, the charger charges the car at full power as soon as it is plugged in: whatever the
+sun doesn't cover comes from the home battery and the grid. Each mode above chooses instead: more of your
+own sun, less from the grid, and a home battery that the car doesn't empty.

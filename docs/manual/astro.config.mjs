@@ -50,6 +50,27 @@ export default defineConfig({
             { slug: 'setting-up/settings' },
           ],
         },
+        {
+          label: 'Using Gleanvolt',
+          translations: { cs: 'Používání' },
+          items: [
+            { slug: 'using/overview' },
+            { slug: 'using/charging-plan' },
+            {
+              label: 'Charging modes',
+              translations: { cs: 'Režimy nabíjení' },
+              items: [
+                { slug: 'using/modes/choosing' },
+                { slug: 'using/modes/solar' },
+                { slug: 'using/modes/forecasted' },
+                { slug: 'using/modes/solar-grid' },
+                { slug: 'using/modes/fast' },
+                { slug: 'using/modes/targeted' },
+              ],
+            },
+            { slug: 'using/battery-hold' },
+          ],
+        },
       ],
     }),
   ],

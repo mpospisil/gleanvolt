@@ -7,7 +7,8 @@
 // HTML; this script opens each file in headless Chrome and saves a PNG. No app, no devices and no
 // Solcast call are involved, so a picture changes only when the page it shows does.
 //
-// The check compares what each picture is made of -- the page's HTML, its framing and the stylesheet --
+// The check compares what each picture is made of -- the page's HTML, its framing, the stylesheet and
+// the chart script --
 // with fingerprints.json, not the pixels: two Chrome builds anti-alias text differently, enough that a
 // tolerance wide enough for that would also pass a changed word. Chrome is then needed only to make
 // the pictures, and the check is exact.
@@ -48,12 +49,14 @@ if (names.length === 0) {
 // Line endings are normalised, so a Windows checkout agrees with CI.
 const text = (path) => readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
 const styles = text(join(wwwroot, 'css', 'site.css'));
+const charts = text(join(wwwroot, 'js', 'charts.js'));
 const fingerprint = (name) => {
   const page = text(join(html, `${name}.html`)).replaceAll(pathToFileURL(wwwroot + '/').href, 'wwwroot/');
   return createHash('sha256')
     .update(page)
     .update(text(join(html, `${name}.json`)))
     .update(styles)
+    .update(charts)
     .digest('hex');
 };
 const now = Object.fromEntries(names.map((name) => [name, fingerprint(name)]));
@@ -90,7 +93,10 @@ if (check) {
 mkdirSync(committed, { recursive: true });
 const browser = await puppeteer.launch({
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
-  args: ['--no-sandbox', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars'],
+  // Dates in the European order, as most of the manual's readers see them: Chrome formats a date input
+  // in its process's locale, whatever the page says.
+  env: { ...process.env, LANG: 'en_GB.UTF-8', LANGUAGE: 'en_GB', LC_ALL: 'en_GB.UTF-8' },
+  args: ['--lang=en-GB', '--no-sandbox', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars'],
 });
 
 try {
@@ -101,6 +107,8 @@ try {
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
     await page.goto(pathToFileURL(join(html, `${name}.html`)).href, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
+    // The charts draw on load, and uPlot sizes itself to its box on the next frame.
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 
     const path = join(committed, `${name}.png`);
     if (selector) {
@@ -108,6 +116,12 @@ try {
       if (!element) {
         throw new Error(`${name}: nothing matches ${selector}.`);
       }
+      // A dialog is closed until its script opens it, as the page's own dialog.js would.
+      await element.evaluate((node) => {
+        if (node instanceof HTMLDialogElement && !node.open) {
+          node.showModal();
+        }
+      });
       await element.screenshot({ path });
     } else {
       await page.screenshot({ path, fullPage: true });

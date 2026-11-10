@@ -4,6 +4,34 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The manual's "Using Gleanvolt" chapter: the Overview and the charging modes (issue #329, step 4, part 1)
+
+Nine pages under `docs/manual/src/content/docs/en/using/`:
+
+- **The Overview** — the sentence at the top, the five figures, Vehicle, the forecast table, This session.
+- **The Charging plan page** — the box at the top, the tabs, and what holds for every mode (starts Off,
+  stops by itself when the car is full or unplugged, doesn't survive a restart except Forecasted until
+  full, the wallbox has the last word).
+- **Charging modes** — *Which mode should I choose?* (a table by situation and one side by side), then
+  Solar, Forecasted, Solar + grid, Fast (no battery) and Targeted. Each says what it does, when to choose
+  it, how to start it, what you'll see, when it stops by itself, and what the home battery does.
+- **Battery discharge hold** — what it does and why, where the switch is (and why it may be missing),
+  which modes switch it on, and how to check that it held.
+
+**Screenshots** — `ChargingScreenshots` adds eight from one fixture: 11:30 on a sunny Sunday in June,
+the home battery at 64 %, the ID.4 plugged in at 58 %, a morning of energy intervals. The Overview while
+charging in Solar + grid (the issue's picture), and each tab of Charging plan: Solar before anything
+runs, Forecasted with a whole afternoon's day plan and its chart, Solar + grid, Fast with 80 % by 07:00,
+Targeted with 22 kWh by 07:00 and its preview dialog. The Targeted plan is built for the fixture's own
+time; the tests' `TestTargetedPlans` is built for 20:00 and read as nonsense at 11:30.
+
+**Capture changes** (see `DECISIONS.md`): chart interop calls replayed with `charts.js`, which joins the
+fingerprint; a `<dialog>` opened before it is captured; Chrome started with `LANG=en_GB.UTF-8` so date
+inputs read 15/06/2026, 07:00. A test that resolved the status holder in its constructor froze bUnit's
+container; the fixture registers its own holder instead.
+
+---
+
 ## 2026-11-10 — The manual's Setting up chapter (issue #329, step 3)
 
 Six pages under `docs/manual/src/content/docs/en/setting-up/`, after the setup wizard:

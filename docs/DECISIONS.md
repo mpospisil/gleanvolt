@@ -4,6 +4,29 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-10 — The manual's screenshots replay the page's charts
+
+**Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), the "Using Gleanvolt"
+chapter. The Overview, Forecasted, Energy, Forecast and session pages draw their charts in the browser,
+with uPlot through `charts.js`, from data the page passes over JS interop. The captured pages ran no
+scripts, so every chart would have been an empty box.
+
+**Decision.** `ScreenshotTest.Capture` takes bUnit's recorded `solaxCharts.render*` invocations (the last
+one per chart element), serialises their arguments the way Blazor does (`JsonSerializerDefaults.Web`), and
+writes them into the captured document as calls made on `load`. The page loads the web UI's own vendored
+uPlot and `charts.js`. `charts.js` joins `site.css` in the fingerprint, so a chart change is caught by
+the pull-request check like a markup change. Two smaller rules came with it: the capture opens a
+`<dialog>` it is asked to picture (the Targeted preview is one, opened by `dialog.js` in the app), and
+Chrome runs with `LANG=en_GB.UTF-8`, since a date input formats in the browser's own locale (US order
+otherwise) whatever the page says.
+
+**Consequences accepted.** The picture shows what `charts.js` draws from what the page passed, not what a
+live circuit might redraw later. A chart that the page renders only after a later event needs the test to
+raise that event before capturing. uPlot's legend under a chart shows "--" values, as it does in the app
+before the pointer is over the chart.
+
+---
+
 ## 2026-11-10 — The manual's links are checked on the built site, not by starlight-links-validator
 
 **Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), the Installation chapter. The
