@@ -23,29 +23,29 @@ charging button is pressed.
 
 ## To a Home Assistant you already run
 
-With `HOMEASSISTANT_ENABLED=true`, the controller joins an existing setup: Home
-Assistant and Mosquitto stay where they are, on this Pi outside this stack or on another device, and
-the controller dials them by address. One setting says where the broker is, for both MQTT links (Home
-Assistant's and the car's):
+Home Assistant and its broker stay where they are — on another machine, or on this one outside the
+Docker stack — and the controller connects to the broker.
+
+**In the web UI**, on **Settings → Installation → Home Assistant (MQTT)** (or in the setup wizard's
+**Extras** step): switch it on, and enter the broker's address and port, the user name and the password.
+**Test connection** checks the broker before you save. The installation needs an id (`Pv:Id`, on the
+same page); the form says so if it is missing. Then **Restart** on **Settings → Health**. The entities
+appear in Home Assistant through its MQTT integration's discovery.
+
+**Optionally, in `/opt/gleanvolt/.env`** instead — what is saved in the web UI wins over it:
 
 ```bash
 HOMEASSISTANT_ENABLED=true
-MQTT_BROKER_HOST=192.168.2.20  # the broker's address; unset is this Pi (localhost)
+PV_ID=home-roof                # the topic segment; required with Home Assistant
+MQTT_BROKER_HOST=192.168.2.20  # the broker's address; unset is this machine (localhost)
 MQTT_BROKER_PORT=1883          # only if it is not 1883
 MQTT_USERNAME=solax            # an account on *that* broker
 MQTT_PASSWORD=<its password>
 ```
 
-The Home Assistant link can also be set on **Settings → Installation → Home Assistant (MQTT)**, which
-wins over these lines and applies on the next start; its **Test connection** checks the broker first.
-It covers Home Assistant's link only: the car's link still takes the broker from these lines.
-
-`PV_ID` is required once Home Assistant is enabled — see [`.env.example`](../deploy/.env.example). Deploy
-the controller as usual, with `./deploy/deploy-controller-only.sh`. The entities appear in the Home
-Assistant that broker serves, through its MQTT integration's discovery.
-
-An `.env` that already has `VEHICLE_BROKER_HOST`/`VEHICLE_BROKER_PORT` keeps working: they are the
-older names for the car's link alone, and still win over `MQTT_BROKER_HOST` for that link when set.
+These lines also set the broker for the [car's own MQTT feed](VEHICLE.md#your-own-feed-over-mqtt-the-vehicle-section),
+which the web UI form does not cover. The older `VEHICLE_BROKER_HOST`/`VEHICLE_BROKER_PORT` still work
+for that link, and win when set.
 
 ## Home Assistant and a broker on the same Pi
 
@@ -198,7 +198,13 @@ Mosquitto you already run — has it. Use that one instead:
 
 ## Settings (the `HomeAssistant` section)
 
-Disabled by default. Non-secret settings live in `appsettings.json`:
+Disabled by default. **In the web UI**, on **Settings → Installation → Home Assistant (MQTT)** or in
+the wizard's **Extras** step: on/off, the broker's address and port, the user name, the password and the
+discovery prefix. They apply on the next start. **Test connection** connects once with what the form
+holds, without disturbing the running link. The same page shows what the controller is publishing and
+where, including the topic prefix; the password is shown only behind a login.
+
+**Optionally, in configuration** — the web UI's values win over these:
 
 ```jsonc
 "HomeAssistant": {
@@ -214,25 +220,8 @@ Disabled by default. Non-secret settings live in `appsettings.json`:
 }
 ```
 
-Broker credentials are secrets — supply via `.env` / env var, not `appsettings.json`:
-
-```
-HomeAssistant__Username=<user>
-HomeAssistant__Password=<pass>
-```
-
-Or set the link on **Settings → Installation → Home Assistant (MQTT)**, or in the setup wizard's Extras
-step: on/off, the broker's address and port, the user name, the password and the discovery prefix.
-The plain settings go to the overrides file and the password to the secret store; both win over
-`.env` and apply on the next start, since the worker connects once with what it was given. **Test
-connection** connects once with what the form holds, under a client id of its own so it never knocks
-the running link off the broker. Turning the link on needs the installation's `Pv:Id` (below), and
-the form says so rather than the next start.
-
-All of it is **readable back** at [`/pv-system`](WEB_UI.md#settings--installation) — including
-the topic prefix, which no single setting spells out — so "what is this controller publishing, and
-where?" does not need an ssh session and a `grep` of `.env`. The password itself is shown there only
-when the UI is behind a login.
+The broker credentials are secrets: `HomeAssistant__Username` and `HomeAssistant__Password` in `.env`
+or the environment, never in `appsettings.json`.
 
 ## Names, topics and the device id
 

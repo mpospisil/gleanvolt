@@ -1,9 +1,17 @@
 # Configuration
 
-Most settings can be changed in the web UI, on **Settings** and **Car**; the setup wizard covers the
-ones a new installation needs. This page is the reference behind those forms.
+**Configure Gleanvolt in the web UI.** The [setup wizard](WEB_UI.md#the-setup-wizard) covers what a
+new installation needs, and **Settings** and **Car** cover the rest of what you change day to day.
+Every value is checked as you save it. That is the recommended way, and the one this documentation
+assumes.
 
-**Where a setting comes from**, lowest to highest — a later one wins, key by key:
+This page is the reference behind those forms: what each setting means. It also gives each setting's
+configuration key, which is **optional** — for the few settings the web UI doesn't cover (the
+charge-control tuning, the battery hold, the history stores), or to prepare an installation without a
+browser.
+
+**If you do use configuration files**, a setting is read from these, lowest to highest — a later one
+wins, key by key:
 
 1. `src/Gleanvolt.Worker/appsettings.json`, the shipped defaults.
 2. Environment variables, including `.env` (Docker: `/opt/gleanvolt/.env`; .deb:
@@ -11,9 +19,9 @@ ones a new installation needs. This page is the reference behind those forms.
 3. The overrides file, `data/pv-system.json`, written by the web UI and `gleanvolt setup`.
 4. Command-line arguments.
 
-**Secrets** — API keys, passwords, the MQTT password — never go in `appsettings.json`: put them in
-`.env` or an environment variable, or enter them in the web UI, which keeps them in the
-[secret store](#the-data-directory-holds-secrets-the-secrets-section).
+**Secrets** — API keys, passwords, the MQTT password — entered in the web UI go to the
+[secret store](#the-data-directory-holds-secrets-the-secrets-section). In files they belong in `.env`
+or an environment variable, never in `appsettings.json`.
 
 The `Controller` section holds the settings that belong to no single feature:
 
@@ -48,7 +56,8 @@ The other sections are documented with their features:
 ## The PV system (the `Pv` section)
 
 One section describes the installation: where the array is, what it faces, what it is made of, and what
-to call it. On the web UI it is **Settings → Installation**.
+to call it. Set it in the setup wizard's **Devices** and **Site** steps, or later on **Settings →
+Installation**. The keys below are the reference behind those forms.
 
 ```jsonc
 "Pv": {
@@ -170,7 +179,7 @@ status line says what Solcast made of it: a refused key, an unknown site, a spen
 or unknown site is not retried until the account changes, so a typo does not burn the day's calls. The
 key goes to the secret store and wins over the environment; **Remove** hands back to the environment's.
 
-**In configuration:**
+**Optionally, in configuration:**
 
 ```jsonc
 "Solcast": {
@@ -180,10 +189,8 @@ key goes to the secret store and wins over the environment; **Remove** hands bac
 }
 ```
 
-The **API key is a secret**: `Solcast__ApiKey` in `.env` or the environment, or, for development,
-`dotnet user-secrets set "Solcast:ApiKey" "<your-api-key>"` in `src/Gleanvolt.Worker`. For
-`dotnet run`, copy `.env.example` to `.env` in the repository root: it is gitignored and loaded at
-startup.
+The API key is a secret: `Solcast__ApiKey` (`SOLCAST_API_KEY` in `deploy/.env`), never in
+`appsettings.json`.
 
 With no account, the controller logs a warning and runs without a forecast. The free hobbyist tier
 allows about ten calls a day, and every start spends one, so keep `RefreshInterval` within your plan.
@@ -194,6 +201,14 @@ Records **what the sky was doing** at the start and end of each charging session
 read against its day. Off unless configured: with no key and no
 [coordinates](#the-pv-system-the-pv-section), no weather call is ever made.
 
+**On the web UI:** paste an OpenWeatherMap API key on **Settings → Installation → Weather**, or in the
+setup wizard's Extras step. It is checked with one call and used from the next session, with no
+restart. A new OpenWeatherMap key can take a couple of hours to start working, so it is kept even when
+that first check fails.
+
+**Optionally, in configuration:** the key as `Weather__ApiKey` (`WEATHER_API_KEY` in `deploy/.env`).
+A key saved in the web UI wins over it; **Remove** goes back to it.
+
 ```jsonc
 "Weather": {
   "BaseUrl": "https://api.openweathermap.org/",
@@ -201,12 +216,6 @@ read against its day. Off unless configured: with no key and no
   "RequestTimeout": "00:00:05"  // a slow provider is abandoned, never waited for
 }
 ```
-
-The **OpenWeatherMap API key is a secret**: `WEATHER_API_KEY` in `deploy/.env`, `Weather__ApiKey` in
-the environment, or **Settings → Installation → Weather** (or the wizard's Extras step), which checks it
-with one call and is used from the next session without a restart. A new OpenWeatherMap key can take a
-couple of hours to start working, so it is kept even when that first check fails. **Remove** goes back
-to the environment's key.
 
 **Two calls per charging session**, to the free current-weather endpoint. See
 [The weather a session ran in](DATA.md#the-weather-a-session-ran-in) for what is stored.

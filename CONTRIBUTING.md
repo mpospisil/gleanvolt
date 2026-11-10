@@ -30,6 +30,11 @@ dotnet test Gleanvolt.slnx
 dotnet run --project src/Gleanvolt.Worker
 ```
 
+For local settings, copy `.env.example` to `.env` in the repository root: it is gitignored and loaded
+at startup, from `dotnet run` and the debugger alike. Secrets can also go in .NET user-secrets
+(`dotnet user-secrets set "Solcast:ApiKey" "<key>"` in `src/Gleanvolt.Worker`). Every local start
+fetches the Solcast forecast once: with your installation's key, that comes out of its daily quota.
+
 Then open `http://localhost:8090`: a fresh clone starts in [setup mode](docs/WEB_UI.md#setup-mode), which asks for
 a password and runs the [setup wizard](docs/WEB_UI.md#the-setup-wizard) for the device addresses and the site (or use
 [the command line](docs/WEB_UI.md#setting-up-from-the-command-line)). Nothing is polled until that is done. After

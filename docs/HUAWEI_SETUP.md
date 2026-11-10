@@ -44,7 +44,7 @@ the model name at register `30000` and names a SUN2000 by it, with the `huawei` 
 also notices the EMMA and suggests *Connected through: EMMA*. In the wizard, **Use as inverter** fills in
 the brand and the connection as well as the address.
 
-By hand, on **Settings → PV system → Inverter**:
+By hand, on **Settings → Installation → Inverter**:
 
 | Field | Through the SDongle | Behind an EMMA |
 |---|---|---|
@@ -54,7 +54,7 @@ By hand, on **Settings → PV system → Inverter**:
 | Inverter port | 502 | 502 |
 | Inverter unit id | 1 | the unit id the EMMA gave the inverter, usually 1 |
 
-In `.env`: `Pv__Inverter__Driver=huawei`, and `Pv__Inverter__Topology=emma` behind an EMMA.
+Optionally, in `.env` instead: `Pv__Inverter__Driver=huawei`, and `Pv__Inverter__Topology=emma` behind an EMMA.
 
 "Test connection" reads the model name and the battery's state of charge. Behind an EMMA it reads the
 EMMA's grid sensor first.

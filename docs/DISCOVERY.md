@@ -25,8 +25,8 @@ dongle's web page, which is not Modbus, or a go-e's local API), unit ids `1,0,2,
 box from its serial number (SolaX), its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of
 it), its phase voltages (Huawei SCharger) or its API (go-e), with the driver to use and the support tier
 from [SUPPORTED_PV_SYSTEMS.md](SUPPORTED_PV_SYSTEMS.md). Under the
-table it prints the configuration that would use what it found, ready to paste into `.env` or to enter on
-**Settings → Installation**:
+table it prints what it found in the form of configuration lines; enter the addresses on **Settings →
+Installation** (or in the wizard), or optionally paste the lines into `.env`:
 
 ```
 Pv__Inverter__Host=192.168.2.10

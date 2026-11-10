@@ -40,7 +40,7 @@ voltages: a mains voltage on L1 at holding register `0x1000`. It picks the model
 A 22KT wired to one phase reads like a 7KS, so check the label. In the wizard, **Use as charger** fills in
 the brand as well as the address.
 
-By hand, on **Settings → PV system → Charger**:
+By hand, on **Settings → Installation → Charger**:
 
 | Field | Value |
 |---|---|
@@ -49,7 +49,7 @@ By hand, on **Settings → PV system → Charger**:
 | Charger port | 502 |
 | Charger unit id | 1. The protocol also allows 0 or 255 on a direct connection |
 
-In `.env`: `PV_CHARGER_DRIVER=huawei-22kt` (or `huawei-7ks`), and `EV_CHARGER_HOST`.
+Optionally, in `.env` instead: `PV_CHARGER_DRIVER=huawei-22kt` (or `huawei-7ks`), and `EV_CHARGER_HOST`.
 
 ### 4. What to expect from the SCharger
 
@@ -90,7 +90,7 @@ The wizard's search and `gleanvolt-discover` try port 80 on every host. A host t
 not a SolaX dongle is asked for go-e's `/api/status`. If it answers, it is named a go-e, with the `goe`
 driver. A go-e with the API switched off answers like any other web server, and is not reported.
 
-By hand, on **Settings → PV system → Charger**:
+By hand, on **Settings → Installation → Charger**:
 
 | Field | Value |
 |---|---|
@@ -99,7 +99,7 @@ By hand, on **Settings → PV system → Charger**:
 | Charger port | 80 |
 | Charger unit id | unused: leave it as it is |
 
-In `.env`: `PV_CHARGER_DRIVER=goe`, and `EV_CHARGER_HOST`.
+Optionally, in `.env` instead: `PV_CHARGER_DRIVER=goe`, and `EV_CHARGER_HOST`.
 
 "Test connection" asks the API for the car state. If it says *not with the selected charger's API*, the
 local API is still off.

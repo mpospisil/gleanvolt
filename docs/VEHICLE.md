@@ -8,10 +8,15 @@ Two things are configured separately:
   state. Optional. It shapes what you *ask* for — a target can be a battery percentage — and never
   how a charge is delivered.
 
-The easiest way to set both is the [**Car** page](WEB_UI.md#car) of the web UI: choose the
-manufacturer and it shows the fields that feed needs. Everything below is what that page writes.
+**Set both on the [Car page](WEB_UI.md#car) of the web UI** (or in the setup wizard's **Car** step):
+choose the manufacturer and it shows the fields that feed needs. That is the recommended way. The
+configuration keys below are what that page writes, given for reference and as an optional
+alternative.
 
 ## The car (the `Ev` section)
+
+On the **Car** page: the name, make and model, phases, the two currents, the usable battery and the
+charge efficiency. In configuration:
 
 ```jsonc
 "Ev": {
@@ -33,6 +38,8 @@ manufacturer and it shows the fields that feed needs. Everything below is what t
 ```
 
 **Nothing here is required.** Every figure the car leaves out falls back to the installation's.
+
+Optionally, outside the web UI:
 
 | Where it runs | Where to set it |
 |---|---|
@@ -165,8 +172,9 @@ hour idle and twelve while charging, pauses when only three are left, and honour
 
 ### EU Data Act portal (`Vehicle:DataAct`)
 
-For a VW Group car with no live feed above. Setting up the portal — the account, the consent and the
-continuous data request — is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
+For a VW Group car with no live feed above. On the **Car** page: choose the brand (Audi, SEAT, Cupra,
+Bentley, VW commercial), and enter the VW ID, its password and the VIN. Setting up the portal itself —
+the account, the consent and the continuous data request — is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
 
 ```jsonc
 "Vehicle": {
@@ -176,9 +184,9 @@ continuous data request — is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
 }
 ```
 
-The credentials are `Vehicle__DataAct__Username`, `__Password`, `__Brand` and, with more than one car
-on the account, `__Vin` — secrets, in `.env` or an environment variable (the shorter `VW_*` names work
-too). **The password is not read-only**: the same account unlocks and locates the car, and there is no
+Optionally, in configuration: `Vehicle__DataAct__Username`, `__Password`, `__Brand` and, with more
+than one car on the account, `__Vin` — secrets, in `.env` or an environment variable (the shorter
+`VW_*` names work too). **The password is not read-only**: the same account unlocks and locates the car, and there is no
 scoped token instead.
 
 **Press *Ask the car* first, then switch the feed on.** The button on the Car page works as soon as the

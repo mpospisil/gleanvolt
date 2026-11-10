@@ -61,13 +61,21 @@ Nothing is written to your hardware. Out of the box:
 
 ## Settings
 
-Everything is in **`/etc/gleanvolt/gleanvolt.env`**, one `KEY=VALUE` per line. Any setting in the
-[configuration reference](../../docs/CONFIGURATION.md) can go here, with `__` (two
-underscores) between the sections:
+**Set it up in the web UI.** Open `http://<device>:8090`: the setup wizard sets the password, finds the
+inverter and the charger, and asks for the site and the optional extras. Later changes go on the web
+UI's **Settings** and **Car** pages, applied with **Restart** on **Settings → Health**. That is the
+recommended way; the values are checked as you save them. See
+[The setup wizard](../../docs/WEB_UI.md#the-setup-wizard).
 
-```bash
-sudo nano /etc/gleanvolt/gleanvolt.env
-```
+Forgot the password? Use **Forgot your password?** on the sign-in page, or `set-password` from the
+[command line](#setting-it-up-from-the-command-line).
+
+### Optional: the settings file
+
+Any setting in the [configuration reference](../../docs/CONFIGURATION.md) can also go in
+**`/etc/gleanvolt/gleanvolt.env`**, one `KEY=VALUE` per line with `__` (two underscores) between the
+sections — for settings the web UI doesn't cover, or to prepare an installation without a browser.
+What is saved in the web UI wins over this file, key by key.
 
 ```ini
 Pv__Inverter__Host=192.168.1.50
@@ -82,19 +90,13 @@ sudo systemctl restart gleanvolt
 systemctl status gleanvolt
 ```
 
-The file is readable only by root and the service, because API keys and the web password hash live in
-it. Upgrades never overwrite it.
-
-The web password is set in the wizard and changed on the web UI's Settings page. To set it ahead of
-time instead, so no wizard is shown, generate the hash and put it in this file:
+The file is readable only by root and the service, and upgrades never overwrite it. The web password
+can be set here ahead of time, as a hash:
 
 ```bash
 /opt/gleanvolt/Gleanvolt.Worker hash-password 'your password'
 # then in gleanvolt.env:  Web__PasswordHash=<the output>
 ```
-
-Forgot it? Use **Forgot your password?** on the sign-in page, or `set-password` from the
-[command line](#setting-it-up-from-the-command-line).
 
 ## Where things are
 

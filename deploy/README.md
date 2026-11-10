@@ -22,157 +22,19 @@ container on a Raspberry Pi running Raspberry Pi OS Lite (64-bit), Debian 13 (Tr
 ## What you deploy
 
 One container, `gleanvolt-controller`. It uses about 75 MB of memory and needs 8 GB of disk, so any
-64-bit Pi runs it. Deploy it with `./deploy/deploy-controller-only.sh`.
+64-bit Pi runs it. Deploy it with `./deploy/deploy-controller-only.sh`, then set it up in the web UI —
+see [Setting it up](#setting-it-up).
 
 > **Home Assistant?** Don't run the Home Assistant container on a low-powered Pi (less than 2 GB of
 > RAM). To connect Gleanvolt to a Home Assistant you already run, or to run Home Assistant and a broker
 > beside it on a bigger Pi with `./deploy/deploy.sh`, see
 > [Gleanvolt with Home Assistant](../docs/HOME_ASSISTANT.md).
 
-Nothing in `/opt/gleanvolt/.env` is required: the web UI's setup wizard asks for whatever is missing.
-Setting these ahead of time leaves it less to ask:
-
-```bash
-TZ=Europe/Prague               # your timezone
-INVERTER_HOST=192.168.1.10     # your inverter's address (an example; there is no default)
-EV_CHARGER_HOST=192.168.1.11   # your charger's address (an example; there is no default)
-```
-
-Nothing about the web UI needs setting: it is on by default, on the Pi's own port 8090 (the
-controller runs on the host's network), so the deploy ends at a working `http://192.168.2.7:8090`. The
-first page it serves asks you to choose a password, and nothing else is reachable until you do — see
-[Setting the web UI password](#setting-the-web-ui-password).
-
-For a **VW Group car**, `VW_ENABLED` and the credentials beside it read VW's own EU Data Act portal
-directly, every fifteen minutes — see [docs/VW_PORTAL_SETUP.md](../docs/VW_PORTAL_SETUP.md).
-
 ## Storage
 
 Nothing here depends on a particular disk. 8 GB is enough. It grows slowly afterwards — the
 charging-session and energy databases and the log files are the only things that accumulate, and all
 are small.
-
-## Recording the weather with each session (optional)
-
-The controller can record **what the sky was doing** at each end of every charging session; see
-[the weather a session ran in](../docs/DATA.md#the-weather-a-session-ran-in). Add the
-OpenWeatherMap key and the site's coordinates to `/opt/gleanvolt/.env`:
-
-```bash
-WEATHER_API_KEY=<your openweathermap key>
-PV_LATITUDE=49.267803          # your site, in decimal degrees
-PV_LONGITUDE=16.529486
-```
-
-Or paste the key on **Settings → Installation → Weather**. Without a key or coordinates, no weather
-call is made. See [Weather](../docs/CONFIGURATION.md#weather-the-weather-section-optional).
-
-## Setting the web UI password
-
-**A fresh installation serves one page: the one that asks you to set a password.** Open
-`http://192.168.2.7:8090`, choose a password, and the UI behaves normally from then on.
-
-To set it ahead of time instead, put its **hash** — never the password — in `.env`:
-
-```bash
-docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password>'
-```
-
-```
-WEB_PASSWORD_HASH=AQAAAAIAAYagAAAAE...
-```
-
-**Forgot it?** Reset it from the Pi, which prints a new recovery key, then restart the controller:
-
-```bash
-cd /opt/gleanvolt
-docker compose run --rm --no-deps gleanvolt-controller set-password
-docker compose restart gleanvolt-controller
-```
-
-On an isolated network you can switch the login off with `WEB_REQUIRE_AUTHENTICATION=false`; a
-warning is logged on every start. See [Authentication](../docs/WEB_UI.md#authentication).
-
-## Describing your PV system
-
-The installation is described in one place: what to call it, where it is, what the array does, and
-which boxes it is made of. All of it optional, all of it in `/opt/gleanvolt/.env`:
-
-```bash
-PV_ID=home-roof                       # a slug: this system's id, and its MQTT topic segment
-PV_NAME=Home Roof                     # what a human sees, in the web UI
-PV_ADDRESS=Street 1, Town, Country    # display only, never parsed
-PV_LATITUDE=49.267803                 # with PV_LONGITUDE: the site the weather is fetched for
-PV_LONGITUDE=16.529486
-PV_AZIMUTH=180                        # compass bearing: 0 north, 90 east, 180 south. -180 accepted
-PV_TILT=15                            # degrees from horizontal
-PV_CAPACITY_KWP=8.5                   # peak DC capacity of the array
-PV_INVERTER_CAPACITY_KW=8             # AC side, where it is smaller than the array
-PV_LOSS_FACTOR=0.9                    # fraction of DC yield that reaches the meter
-PV_INSTALL_DATE=2026-04-01
-
-PV_INVERTER_MODEL=SolaX X3-HYB-G4 PRO # what the box is; documentation, not a selector
-PV_CHARGER_MODEL=SolaX X1/X3-HAC
-```
-
-The device **addresses** keep the names they always had — `INVERTER_HOST` and `EV_CHARGER_HOST` — and
-belong to this same description; nothing about them changes.
-
-All of it is shown, and editable, on **Settings → Installation** in the web UI. A value that cannot be
-used **stops the controller at startup**, with every problem named at once. See
-[The PV system](../docs/CONFIGURATION.md#the-pv-system-the-pv-section).
-
-## Upgrading from an older release
-
-### Upgrading to the host network
-
-Since [issue #268](https://github.com/mpospisil/gleanvolt/issues/268) all three services run on the
-Pi's own network instead of a compose network. Redeploying is the whole upgrade, with nothing to change
-in `.env` or in Home Assistant:
-
-- **Home Assistant's MQTT integration** still says broker `mosquitto`. That name used to be resolved by
-  the compose network; the compose file now maps it to this Pi, so it keeps working. Changing it to
-  `localhost` (Settings → Devices & Services → MQTT → Reconfigure) is tidier and optional.
-- **The controller** dials `localhost`, or `MQTT_BROKER_HOST` when set. An `.env` with
-  `VEHICLE_BROKER_HOST=mosquitto` would break the car's feed, because the controller has no such name;
-  delete that line.
-- **The broker is now on the Pi's `:1883`**, reachable from the LAN. It always required a password, so
-  this exposes nothing that was open; it is also what lets another device use it. If the Pi already ran
-  a second broker on 1883, see [Troubleshooting](#troubleshooting).
-- **The `solax_default` network** the old layout used may be left behind, unused and harmless;
-  `docker network rm solax_default` clears it.
-
-## Letting a program drive it: the HTTP API (optional)
-
-The controller can also expose an [HTTP API](../docs/HTTP_API.md) — the same
-telemetry, history and actions the UI has, described by OpenAPI, for a script or an MCP server rather
-than a person. It is **off** by default.
-
-Two `.env` lines turn it on. Generate a key, name it after whatever will be calling:
-
-```bash
-openssl rand -hex 32
-```
-
-```
-API_ENABLED=true
-API_KEY=3f1c...   # the generated secret; Api__Keys__client in docker-compose.yml
-```
-
-Or skip `.env`: turn it on and create a key on **Settings → Installation → API access**, then restart
-on Health. The key is kept in the secret store under the data volume.
-
-Redeploy, and the API answers on the port the UI already uses (`:8090`), under `/api/v1/`, with the
-document at `/api/v1/openapi.json`:
-
-```bash
-curl -H "Authorization: Bearer $API_KEY" http://<pi>:8090/api/v1/status
-```
-
-Enabled with no key set refuses to start. `docker-compose.yml` passes `API_KEY` as
-`Api__Keys__client`, so the log and the charging sessions name the caller *client*; add more
-`Api__Keys__<name>` lines if more than one thing calls it. **Settings → Installation** shows the API's
-address and key names, with a ready `curl` line.
 
 ## Prepare the Pi (once)
 
@@ -255,11 +117,12 @@ sudo chown -R 1654:1654 /opt/gleanvolt/logs /opt/gleanvolt/data   # the controll
 
 The deploy script also creates both and fixes their ownership if needed.
 
-**6. Secrets.** From your developer machine:
+**6. The settings file.** The deploy script needs `/opt/gleanvolt/.env` to exist. Copy the example
+from your computer; editing it is optional, since the setup wizard asks for everything:
 
 ```bash
 scp deploy/.env.example martin@192.168.2.7:/opt/gleanvolt/.env
-ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env && nano /opt/gleanvolt/.env'
+ssh martin@192.168.2.7 'chmod 600 /opt/gleanvolt/.env'
 ```
 
 **7. Check the devices are reachable** from the Pi, before blaming the container:
@@ -302,17 +165,82 @@ to run rather than guess. It never copies `.env`.
 
 `deploy.sh` takes the same three.
 
-## First run
+## Setting it up
 
-**The web UI** is at `http://192.168.2.7:8090`. The first time you open it, it asks you to set a
-password; nothing else is served until you do (see
-[Setting the web UI password](#setting-the-web-ui-password)). The dashboard, the
-controls, session history and the forecast are all there; see [Web UI](../docs/WEB_UI.md).
+After the deploy, open **`http://192.168.2.7:8090`** (your Pi's address). The first page asks you to
+choose a password; then the **setup wizard** finds the inverter and the charger on your network and
+asks for the site — location, time zone, home battery — and, optionally, the Solcast forecast, the
+car, the grid tariff, weather, Home Assistant and the HTTP API. **This is the recommended way**: every
+value is checked as you save it, and nothing needs editing on the Pi. See
+[The setup wizard](../docs/WEB_UI.md#the-setup-wizard).
 
-Deploying writes nothing to your hardware. Charge control boots in mode **Off** and takes control
-only once a charging button is pressed — Home Assistant or the web UI, whichever is enabled — and
-`BatteryHold` is disabled and dry-run. Check the readings on the Overview against your devices' own
-displays before you charge or enable the hold.
+Later changes are made the same way, on **Settings** and **Car**, and a **Restart** on
+**Settings → Health** applies them. They are kept in `/opt/gleanvolt/data/pv-system.json` and the
+secret store, so they survive updates.
+
+Nothing is written to your hardware yet: charging is **off** until a charging button is pressed, and
+the battery hold is disabled and in dry-run. Check the readings on the Overview against your devices'
+own displays first. Every page is described in [Web UI](../docs/WEB_UI.md).
+
+**Forgot the password?** Use **Forgot your password?** on the sign-in page, or reset it from the Pi,
+which prints a new recovery key:
+
+```bash
+cd /opt/gleanvolt
+docker compose run --rm --no-deps gleanvolt-controller set-password
+docker compose restart gleanvolt-controller
+```
+
+### Optional: setting it in `.env` instead
+
+Everything the wizard sets can also be put in `/opt/gleanvolt/.env` ahead of time, for example to
+prepare an installation without a browser. The wizard then has less to ask. What is saved in the web
+UI **wins over `.env`**, key by key. [`.env.example`](.env.example) lists every variable.
+
+```bash
+TZ=Europe/Prague               # your time zone
+INVERTER_HOST=192.168.1.10     # your inverter's address (an example; there is no default)
+EV_CHARGER_HOST=192.168.1.11   # your charger's address
+```
+
+The rest of the installation:
+
+```bash
+PV_ID=home-roof                       # a slug: this system's id, and its MQTT topic segment
+PV_NAME=Home Roof                     # what a human sees, in the web UI
+PV_ADDRESS=Street 1, Town, Country    # display only, never parsed
+PV_LATITUDE=49.267803                 # with PV_LONGITUDE: the site the weather is fetched for
+PV_LONGITUDE=16.529486
+PV_AZIMUTH=180                        # compass bearing: 0 north, 90 east, 180 south. -180 accepted
+PV_TILT=15                            # degrees from horizontal
+PV_CAPACITY_KWP=8.5                   # peak DC capacity of the array
+PV_INVERTER_CAPACITY_KW=8             # AC side, where it is smaller than the array
+PV_LOSS_FACTOR=0.9                    # fraction of DC yield that reaches the meter
+PV_INSTALL_DATE=2026-04-01
+
+PV_INVERTER_MODEL=SolaX X3-HYB-G4 PRO # what the box is; documentation, not a selector
+PV_CHARGER_MODEL=SolaX X1/X3-HAC
+```
+
+
+Keys and switches, each of which the wizard's **Forecast** and **Extras** steps also cover:
+
+```bash
+SOLCAST_API_KEY=...            # the solar forecast
+SOLCAST_RESOURCE_ID=...
+WEATHER_API_KEY=...            # weather at each end of a session
+API_ENABLED=true               # the HTTP API, with one key (generate one with: openssl rand -hex 32)
+API_KEY=...                    # becomes Api__Keys__client
+```
+
+The web UI password can be set ahead of time too, as a hash — never the password itself:
+
+```bash
+docker run --rm ghcr.io/mpospisil/gleanvolt:latest hash-password '<your password>'
+# then in .env:  WEB_PASSWORD_HASH=<the output>
+```
+
+`.env` is read at startup, so after editing it run `docker compose up -d` on the Pi, or deploy again.
 
 ## Updating a running deployment
 
@@ -399,15 +327,16 @@ git switch --detach v1.0.0 && IMAGE_TAG=1.0.0 ./deploy/deploy-controller-only.sh
 
 ### Changing settings rather than code
 
-`.env` is never copied by the deploy scripts, so a settings change is a two-step job:
+Change them in the web UI, on **Settings** or **Car**, and press **Restart** on **Settings → Health**.
+
+A setting kept in `.env` instead is changed on the Pi; the deploy scripts never copy `.env`:
 
 ```bash
 ssh martin@192.168.2.7 'nano /opt/gleanvolt/.env'
 ssh martin@192.168.2.7 'cd /opt/gleanvolt && docker compose up -d'
 ```
 
-`docker compose up -d` recreates only the containers whose environment actually changed. Re-running
-the deploy script works too and is the better choice if you also changed anything in `deploy/`.
+Remember that a value saved in the web UI wins over `.env`.
 
 ### If an update goes wrong
 
@@ -417,6 +346,26 @@ fixing `mosquitto/config` ownership). Re-running after fixing whatever it compla
 
 If a new build misbehaves, roll back to the previous tag with the same command. The database, logs
 and configuration are all still there, because the container was never where they lived.
+
+## Upgrading from an older release
+
+### Upgrading to the host network
+
+Since [issue #268](https://github.com/mpospisil/gleanvolt/issues/268) all three services run on the
+Pi's own network instead of a compose network. Redeploying is the whole upgrade, with nothing to change
+in `.env` or in Home Assistant:
+
+- **Home Assistant's MQTT integration** still says broker `mosquitto`. That name used to be resolved by
+  the compose network; the compose file now maps it to this Pi, so it keeps working. Changing it to
+  `localhost` (Settings → Devices & Services → MQTT → Reconfigure) is tidier and optional.
+- **The controller** dials `localhost`, or `MQTT_BROKER_HOST` when set. An `.env` with
+  `VEHICLE_BROKER_HOST=mosquitto` would break the car's feed, because the controller has no such name;
+  delete that line.
+- **The broker is now on the Pi's `:1883`**, reachable from the LAN. It always required a password, so
+  this exposes nothing that was open; it is also what lets another device use it. If the Pi already ran
+  a second broker on 1883, see [Troubleshooting](#troubleshooting).
+- **The `solax_default` network** the old layout used may be left behind, unused and harmless;
+  `docker network rm solax_default` clears it.
 
 ## Stopping and starting the controller
 
@@ -602,7 +551,7 @@ environment variables, or by editing the default after `:-` in the file itself:
 
 Then start it. The web UI is at `http://<nas-address>:8090` and opens on the setup wizard: choose a
 password, let it find the inverter and the charger, and restart from the last step. See
-[First run](#first-run) for what to expect after that.
+[Setting it up](#setting-it-up) for what to expect after that.
 
 ### Things that go wrong on a NAS
 
@@ -617,7 +566,7 @@ so 8090 is free on most of them.
 
 **The time zone.** Set `TZ`. A controller on UTC runs, but its days start at 01:00 or 02:00 local time,
 and the setup wizard lists the zone as a recommended fix. The zone can also be set later on
-**Settings → PV system**.
+**Settings → Installation**.
 
 **Ownership.** The controller cannot write to a directory it doesn't own. The symptom is a log line
 `Could not open the charging session store`, or no files in `logs/`. `gleanvolt-init` fixes the
@@ -811,7 +760,7 @@ other program. Move it, or move the UI with
 No `Web UI enabled` line at all means `WEB_ENABLED=false` is set in `.env`. A startup failure instead
 means `WEB_REQUIRE_AUTHENTICATION=true` was set with no `WEB_PASSWORD_HASH`; the log says so
 explicitly, and the fix is to set a hash or drop the line (see
-[Setting the web UI password](#setting-the-web-ui-password)).
+[Setting it up](#setting-it-up)).
 
 **No charging sessions are being recorded.** Look for this at startup:
 

@@ -13,27 +13,27 @@ camel-cased names (`fastNoBattery`).
 
 ## Switching it on
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `Api:Enabled` | `false` | Master switch. While false **no route is mapped and no document is served** — there is nothing to find, not merely nothing permitted. |
-| `Api:Keys` | *(empty)* | The keys that may call it, as `name → secret`. Enabled with none configured is a **startup failure**. |
-| `Api:MaxQueryRange` | `31.00:00:00` | The widest span one history query may ask for. |
-| `Api:MaxSessions` | `500` | The most sessions one listing may return. |
-
 **It is off by default**, because two of its endpoints write to hardware, and anything that writes is
-switched on knowingly. It shares the web UI's port (`Web:Port`, 8090).
+switched on knowingly. It shares the web UI's port (8090).
 
-Keys are secrets, supplied through `.env` or an environment variable:
+**In the web UI**, on **Settings → Installation → API access** (or in the setup wizard's **Extras**
+step): switch it on, type the client's name, and **Create key** makes a random key and keeps it in the
+secret store. The API can't be switched on without a key. **Restart** on **Settings → Health** applies
+it.
+
+**Optionally, in configuration** — a key saved in the web UI wins over one with the same name here:
 
 ```bash
 Api__Enabled=true
-Api__Keys__claude-mcp=$(openssl rand -hex 32)
+Api__Keys__claude-mcp=<a secret; e.g. from openssl rand -hex 32>
 ```
 
-Or on **Settings → Installation → API access**, or in the setup wizard's Extras step: type the
-client's name and **Create key** makes a random one and keeps it in the secret store. A key saved there
-wins over one in `.env` with the same name. The API cannot be switched on there without a key. A
-change applies on the next start.
+| Setting | Default | Meaning |
+|---|---|---|
+| `Api:Enabled` | `false` | Master switch. While false **no route is mapped and no document is served**. |
+| `Api:Keys` | *(empty)* | The keys that may call it, as `name → secret`. Enabled with none is a **startup failure**. |
+| `Api:MaxQueryRange` | `31.00:00:00` | The widest span one history query may ask for. |
+| `Api:MaxSessions` | `500` | The most sessions one listing may return. |
 
 **The key's name** is what the log and the charging session record as the source of an action —
 `Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* — so give each client its own

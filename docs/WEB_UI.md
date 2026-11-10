@@ -8,8 +8,8 @@ The web UI, [Home Assistant](HOME_ASSISTANT.md) and the [HTTP API](HTTP_API.md) 
 controller, so they cannot disagree about what the charger is doing: the last one to press wins, and
 the others show it within a poll interval. The same rules apply on every surface:
 
-- **Nothing set at runtime persists across a restart.** The controller always starts in charge mode
-  **Off**.
+- **The charge mode and the controls on Charging plan don't survive a restart**: the controller
+  always starts in charge mode **Off**. Settings saved on **Settings** and **Car** are kept.
 - `FastNoBattery`, `Targeted` and `SolarGrid` switch the mode back to `Off` by themselves when they
   finish.
 - A charger that refuses the use-mode write says so on the page, instead of leaving a mode running
@@ -17,23 +17,60 @@ the others show it within a poll interval. The same rules apply on every surface
 - The battery-hold switch shows the last command actually written to the inverter, not what was
   requested, so a write that fails shows the switch springing back.
 
-## Settings
+## Setup mode
 
-```jsonc
-"Web": {
-  "Enabled": true,      // master switch; while false the process binds no socket at all
-  "Port": 8090          // listens on every interface, plain HTTP
-  // "RequireAuthentication"  // unset -- follow the password; see below, rarely worth setting
-  // "PasswordHash": ""       // secret -- see below, never set it here
-}
-```
+A fresh install has none of the required settings: the web UI password and the inverter's and the
+charger's addresses. Until all of them are set, Gleanvolt starts in **setup mode** instead of
+stopping:
 
-- **A password before anything is served.** A fresh installation serves only the page that sets one;
-  see [Authentication](#authentication).
-- **`Web:Enabled=false` means nothing is listening**, not "listening but empty": the process is a
-  headless worker. In the Docker stack the host port stays published either way, so connections are
-  refused.
-- **Plain HTTP.** This is a LAN appliance; putting TLS in front of it is your decision.
+- The web UI and the settings run; the controller does not. Nothing polls the inverter, drives the
+  charger, records sessions or energy, or talks to MQTT or a car.
+- The UI shows the password page (if no password is set yet), then the [setup wizard](#the-setup-wizard).
+  Pages that need the controller, such as the Overview, redirect to the wizard. both Settings tabs
+  list what is still missing.
+- The API answers every request with `503` and "Gleanvolt is not configured".
+- The log starts with a `SETUP MODE` warning listing what is missing.
+
+The site's location (`Pv:Latitude`, `Pv:Longitude`) and time zone are **recommended**: setup asks for
+them, but Gleanvolt starts without them. Without a location there is no weather. Without a time zone
+the controller runs in the host's zone, which on Windows or a host that reports UTC means days start
+and sessions are filed at UTC midnight. Each recommended setting still missing is logged at startup.
+
+When nothing required is missing, the notice offers **Start the controller**, which restarts
+Gleanvolt normally. Docker and the .deb's systemd unit bring it back by themselves; with the Windows
+zip, winget or `dotnet run`, start it again yourself.
+
+Two problems keep the controller stopped even when everything else is set: a configuration key that
+has moved (its old name is listed with the new one), and a `Controller:TimeZone` the host cannot
+resolve (on the Nano Server image use a Windows id such as `Central Europe Standard Time`).
+
+With the web UI disabled there is nothing to finish a setup in, so an unusable configuration stops
+Gleanvolt at startup, with the reason in the console and the log and exit code 78 (`EX_CONFIG`).
+
+## The setup wizard
+
+**The recommended way to configure Gleanvolt.** After the password, a fresh install continues at
+`/wizard`. Every step is one of the forms Settings uses, with the same checks and the same file, so a step skipped now can be done later on Settings.
+Each step saves as it goes, so a reload or a closed browser loses nothing that was saved.
+
+1. **Devices.** **Search** looks for inverters and chargers on this machine's own subnet (or a private
+   range you type, at most a /22) and lists what each one identified as. Choose **Use as inverter** or
+   **Use as charger**: Gleanvolt never assigns the roles itself, and warns when you pick a role the
+   device did not claim. Addresses can also be typed in. Saving reads one value from each device to
+   check it.
+2. **Site.** Location and time zone (recommended), the home battery's usable capacity and charge
+   efficiency, the array's details.
+3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it, so setup spends
+   none of the day's Solcast calls.
+4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
+5. **Extras** (optional). The tariff, the OpenWeatherMap key, the Home Assistant (MQTT) link and the
+   API with its keys.
+6. **Finish.** What is still missing, each with a link to its step; the recommended and optional
+   settings not yet set; and **Start Gleanvolt**, which restarts it out of setup mode and then opens
+   the Overview.
+
+Optional settings never block anything. A page that needs one says it is not configured and how to
+set it up.
 
 ## The pages
 
@@ -272,8 +309,8 @@ One shared password gates the whole UI (hashed with ASP.NET Core's `PasswordHash
 per-user accounts. The setup page can only set a *first* password. Change it on **Settings → Installation**,
 which asks for the current one; resetting a forgotten one is [below](#forgot-your-password).
 
-To set it ahead of time, so no setup page is ever shown, supply the hash as a secret — in `.env` or an
-environment variable, never in `appsettings.json`:
+**Optionally**, set it ahead of time, so no setup page is ever shown, by supplying the hash as a secret
+— in `.env` or an environment variable, never in `appsettings.json`:
 
 ```
 Web__PasswordHash=<hash>
@@ -331,65 +368,10 @@ Ten wrong keys, codes or current passwords in 15 minutes lock all three paths fo
 window. From a shell, `set-password` does the same without a browser — see
 [Setting up from the command line](#setting-up-from-the-command-line).
 
-## Setup mode
-
-A fresh install has none of the required settings: the web UI password and the inverter's and the
-charger's addresses. Until all of them are set, Gleanvolt starts in **setup mode** instead of
-stopping:
-
-- The web UI and the settings run; the controller does not. Nothing polls the inverter, drives the
-  charger, records sessions or energy, or talks to MQTT or a car.
-- The UI shows the password page (if no password is set yet), then the [setup wizard](#the-setup-wizard).
-  Pages that need the controller, such as the Overview, redirect to the wizard. both Settings tabs
-  list what is still missing.
-- The API answers every request with `503` and "Gleanvolt is not configured".
-- The log starts with a `SETUP MODE` warning listing what is missing.
-
-The site's location (`Pv:Latitude`, `Pv:Longitude`) and time zone are **recommended**: setup asks for
-them, but Gleanvolt starts without them. Without a location there is no weather. Without a time zone
-the controller runs in the host's zone, which on Windows or a host that reports UTC means days start
-and sessions are filed at UTC midnight. Each recommended setting still missing is logged at startup.
-
-When nothing required is missing, the notice offers **Start the controller**, which restarts
-Gleanvolt normally. Docker and the .deb's systemd unit bring it back by themselves; with the Windows
-zip, winget or `dotnet run`, start it again yourself.
-
-Two problems keep the controller stopped even when everything else is set: a configuration key that
-has moved (its old name is listed with the new one), and a `Controller:TimeZone` the host cannot
-resolve (on the Nano Server image use a Windows id such as `Central Europe Standard Time`).
-
-With the web UI disabled there is nothing to finish a setup in, so an unusable configuration stops
-Gleanvolt at startup, with the reason in the console and the log and exit code 78 (`EX_CONFIG`).
-
-## The setup wizard
-
-After the password, a fresh install continues at `/wizard`. Every step is one of the forms Settings
-uses, with the same checks and the same file, so a step skipped now can be done later on Settings.
-Each step saves as it goes, so a reload or a closed browser loses nothing that was saved.
-
-1. **Devices.** **Search** looks for inverters and chargers on this machine's own subnet (or a private
-   range you type, at most a /22) and lists what each one identified as. Choose **Use as inverter** or
-   **Use as charger**: Gleanvolt never assigns the roles itself, and warns when you pick a role the
-   device did not claim. Addresses can also be typed in. Saving reads one value from each device to
-   check it.
-2. **Site.** Location and time zone (recommended), the home battery's usable capacity and charge
-   efficiency, the array's details.
-3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it, so setup spends
-   none of the day's Solcast calls.
-4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
-5. **Extras** (optional). The tariff, the OpenWeatherMap key, the Home Assistant (MQTT) link and the
-   API with its keys.
-6. **Finish.** What is still missing, each with a link to its step; the recommended and optional
-   settings not yet set; and **Start Gleanvolt**, which restarts it out of setup mode and then opens
-   the Overview.
-
-Optional settings never block anything. A page that needs one says it is not configured and how to
-set it up.
-
 ## Setting up from the command line
 
-The same setup without a browser, for a headless install, a script, or a site described once in a
-file. It saves through the same path, with the same checks, to the same files. None of these commands
+**Optional.** The same setup without a browser, for a headless install, a script, or a site described
+once in a file. The wizard is the recommended route. It saves through the same path, with the same checks, to the same files. None of these commands
 starts Gleanvolt; each saves for the next start and says to restart.
 
 | Command | Does |
@@ -444,3 +426,24 @@ Where to run it:
 
 The command line and the web UI never write the overrides file at the same time: both take a lock on
 `pv-system.json.lock` beside it.
+
+## Settings (the `Web` section, optional)
+
+The web UI needs no configuration. These keys exist for the rare case of changing its port or
+switching it off:
+
+```jsonc
+"Web": {
+  "Enabled": true,      // master switch; while false the process binds no socket at all
+  "Port": 8090          // listens on every interface, plain HTTP
+  // "RequireAuthentication"  // unset -- follow the password; see below, rarely worth setting
+  // "PasswordHash": ""       // secret -- see below, never set it here
+}
+```
+
+- **A password before anything is served.** A fresh installation serves only the page that sets one;
+  see [Authentication](#authentication).
+- **`Web:Enabled=false` means nothing is listening**, not "listening but empty": the process is a
+  headless worker. In the Docker stack the host port stays published either way, so connections are
+  refused.
+- **Plain HTTP.** This is a LAN appliance; putting TLS in front of it is your decision.
