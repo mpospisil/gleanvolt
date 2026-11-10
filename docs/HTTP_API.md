@@ -1,26 +1,17 @@
 # HTTP API (the `Api` section)
 
-A third control surface beside Home Assistant and the web UI, for **programs rather than people**:
-everything the controller can see, and the three actions that change something, described by
-[OpenAPI](https://www.openapis.org/) so a client is generated from the document rather than written
-against a moving target.
+Everything the controller can see, and the actions that change something, for **programs rather than
+people** — a script, a dashboard, or an MCP server that lets an LLM answer questions about this
+installation and act on it. It is described by [OpenAPI](https://www.openapis.org/), so a client can be
+generated from the document. Every action is one the web UI already has; the API adds no capability
+of its own.
 
-It exists for one use case in particular — an **MCP server**, so an LLM can answer questions about
-this installation and act on it. That server is a separate process in a separate repository, and
-nothing here is specific to it: the test of whether this API is the right shape is that it would suit
-a script, a dashboard or an agent equally.
+**Every field is in a base unit, and its name says which**: power in W (`…Watts`), energy in Wh
+(`…Wh`), durations in seconds (`…Seconds`), distance in metres (`…Metres`), pressure in Pa
+(`…Pascals`), percentages 0–100 (`…Percent`). Timestamps are ISO-8601 with an offset. Enums are
+camel-cased names (`fastNoBattery`).
 
-Like the web UI, it is an adapter over the same Core seams the MQTT worker drives
-(`ChargeControlStatusHolder`, `IChargeActions`, `ITargetedChargePreview`, `ITargetedChargeSelector`,
-`IBatteryHoldSelector`) and owns no control logic of its own. It invents no capability: every action
-below is a button the web UI already has.
-
-**Every field is in a base unit, and its name says which** (issue #263): power in W (`…Watts`), energy in
-Wh (`…Wh`), durations in seconds (`…Seconds`), distance in metres (`…Metres`), pressure in Pa
-(`…Pascals`), percentages 0–100 (`…Percent`). Nothing is pre-scaled to kWh, kW or km for display: the
-client formats, as the web UI does. The settings keys keep their own units (`…KWh`, `…Kwp`).
-
-## Switched on knowingly, and never open
+## Switching it on
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -29,11 +20,10 @@ client formats, as the web UI does. The settings keys keep their own units (`…
 | `Api:MaxQueryRange` | `31.00:00:00` | The widest span one history query may ask for. |
 | `Api:MaxSessions` | `500` | The most sessions one listing may return. |
 
-The API shares the web UI's port (`Web:Port`, 8090) — this is one appliance, not two services that
-happen to be co-hosted — and either surface being enabled is what makes the process listen at all.
+**It is off by default**, because two of its endpoints write to hardware, and anything that writes is
+switched on knowingly. It shares the web UI's port (`Web:Port`, 8090).
 
-Keys are stored as the secret itself and supplied out-of-band through `.env` or an environment
-variable, exactly like the broker password and the Solcast key:
+Keys are secrets, supplied through `.env` or an environment variable:
 
 ```bash
 Api__Enabled=true
@@ -41,18 +31,13 @@ Api__Keys__claude-mcp=$(openssl rand -hex 32)
 ```
 
 Or on **Settings → Installation → API access**, or in the setup wizard's Extras step: type the
-client's name and **Create key** makes one — 24 random letters and digits, about 143 bits — keeps it in the secret
-store, and lists it beside the environment's keys (shown behind the login, with Copy). A key saved
-there under the same name as one in `.env` wins. The API cannot be turned on there without a key, and
-its last key cannot be removed while it is on, so the next start never meets a keyless API. Like
-everything the API reads, a change applies on the next start.
+client's name and **Create key** makes a random one and keeps it in the secret store. A key saved there
+wins over one in `.env` with the same name. The API cannot be switched on there without a key. A
+change applies on the next start.
 
-The web UI's password is hashed because it is a password a *human* chose and may have reused; these
-are generated, single-purpose and high-entropy, and a slow KDF on every request would buy nothing
-against an attacker who can already reach the port. The **name** is not a credential — it is what
-reaches the log and the recorded charging session as the source of an action, so
-`Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* rather than an anonymous
-write. Several clients therefore get several keys.
+**The key's name** is what the log and the charging session record as the source of an action —
+`Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* — so give each client its own
+key.
 
 Present one as a bearer token on every call that does anything:
 
@@ -61,17 +46,8 @@ curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and 
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
 
-All of it is **readable back** at [`/pv-system`](WEB_UI.md#settings--installation), including
-that second line with this installation's own address and key already substituted in. The key itself is
-shown only when the UI is behind a [login](WEB_UI.md#authentication); without one the page shows the names and
-says what makes the secrets readable, because a key is bearer-equivalent to the stop button on the
-wallbox, and the UI is reachable by anything on the LAN once its password is set.
-
-**Why the API defaults off when the UI defaults on.** Two of these endpoints write to hardware, and
-the project's rule for anything that writes is that an operator switches it on knowingly. The UI can
-afford to be an open LAN dashboard because it is a browser with a person in front of it; a
-non-interactive control surface that any program on the network can drive cannot. A key is
-bearer-equivalent to the stop button on the wallbox — treat it that way.
+**Settings → Installation** shows the API's address and keys, with that second command ready to copy.
+**Treat a key like a password**: it can stop the charger.
 
 ## What it exposes
 
@@ -90,10 +66,10 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /energy/days/{date}` | One local day added up, so "how was Tuesday?" is one call rather than 96 rows. |
 | `GET /sessions?from=&to=&limit=` | Charging sessions, newest first, with the energy split by source. Defaults to the last 30 days. |
 | `GET /sessions/{id}` | One session in full: every recorded poll and every notable moment. |
-| `GET /forecast` | Today and tomorrow **in full** — period by period plus each day's own median, p10, p90 and peak — from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. See [The forecast agrees with itself](#the-forecast-agrees-with-itself). |
+| `GET /forecast` | Today and tomorrow **in full** — period by period plus each day's own median, p10, p90 and peak — from the cached forecast the poll loop is deciding on. `?weather=true` also fetches current conditions. See [The forecast agrees with itself](#the-forecast). |
 | `GET /vehicle` | What the car last said — SOC, range, plug and charge state — **and how old the reading is**. |
 | `POST /plans/targeted/preview` | What a targeted charge *would* do. Writes to nothing. |
-| `POST /charging/start` | Start a mode (`solar`, `forecasted`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount and departure. |
+| `POST /charging/start` | Start a mode (`solar`, `forecasted`, `solarGrid`, `fastNoBattery`, `targeted`). `targeted` needs a `target`; `fastNoBattery` takes an optional `fast` amount and departure. |
 | `POST /charging/start/targeted` | Start a targeted charge under an edited plan's limits. Same body as the preview. |
 | `POST /charging/stop` | Stop charging and clear any standing target. |
 | `PUT /battery-hold` | Arm or release the battery discharge hold. |
@@ -106,29 +82,17 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
 | `PUT /tariff/settings` | Store them, applied at once. Held to the same rules as Settings: a 400 lists every problem with its field and row under `problems`, and nothing is written. Writes no hardware. |
 
-Two rules run across the read endpoints. **Ranges are bounded** — a caller will cheerfully ask for a
-year of quarter-hours, and this runs on a Raspberry Pi. And **staleness is reported rather than
-hidden**: `/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a cloud
-reading arrives hours late as a matter of course and a caller that cannot see the clock will
-otherwise treat it as current.
+**Ranges are bounded** by `Api:MaxQueryRange` and `Api:MaxSessions`. **Staleness is reported**:
+`/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a car's reading often
+arrives hours late.
 
-## The forecast agrees with itself
+## The forecast
 
-`GET /forecast` returns **two whole local days**, elapsed periods included, and every figure in the
-response comes from the same two days of retained forecast — so
-`sum(periods on a date) == days[date].expectedWh`, and `peakPowerWatts` is the peak of the periods
-beside it ([issue #221](https://github.com/mpospisil/gleanvolt/issues/221)).
+`GET /forecast` returns **two whole local days**, elapsed periods included, and every figure in it
+comes from the same forecast: the periods on a date add up to that day's `expectedWh`, and
+`peakPowerWatts` is the peak of the periods beside it.
 
-It did not used to. The period list was built from the **live cache** and the day totals from the
-**retained history**, and those are not the same forecast: a provider answers only *what is still to
-come*, so the cache at four in the afternoon has nothing to say about the morning while the history
-does. A caller summing the periods for today got a smaller number than the response's own
-`todayExpectedWh` beside it, and `peakPowerWatts` fell towards zero as the sun went down while the day
-had demonstrably peaked at six kilowatts. Both now read the history, which is what the web UI's
-`/forecast` page already read.
-
-**`days`** is a block per local day, carrying the four figures the dashboard's forecast table shows —
-worked out when the forecast landed rather than summed per request:
+**`days`** is a block per local day, with the four figures the Overview's forecast table shows:
 
 ```jsonc
 "days": [
@@ -139,22 +103,13 @@ worked out when the forecast landed rather than summed per request:
 ]
 ```
 
-`lowWh` and `highWh` are the answer to *"how sure is tomorrow?"*, which previously could not be had
-without summing forty-eight periods — the top-level `today…` fields carry the median alone.
+`lowWh` and `highWh` (p10 and p90) say how sure the day is.
 
-**Read `complete` before treating a day's periods as the whole day.** False is ordinary, not a fault:
-a controller started at 10:44 has nothing retained for today before then, and `heldFrom` says where
-that day's periods really begin. A caller that reads an incomplete day as a whole one will under-report
-production and be wrong about the day — which is why this is a field rather than something to be
-inferred from the first period's timestamp.
-
-A day nothing is held for is **absent from `days`** rather than present as zeroes, on the same terms as
-the null totals: "we don't know" and "no sun" are different facts. `todayRemainingWh` is deliberately
-the one figure that is not a whole day.
+**Read `complete` before treating a day's periods as the whole day.** A controller started at 10:44 has
+nothing for today before then; `heldFrom` says where the day's periods begin. A day nothing is held for
+is **absent from `days`**, not zeroes. `todayRemainingWh` is the one figure that is not a whole day.
 
 ## Quoting a plan without starting one
-
-The endpoint this API is worth building for:
 
 ```bash
 curl -sS -X POST http://gleanvolt.local:8090/api/v1/plans/targeted/preview \
@@ -166,9 +121,13 @@ It returns the same plan the running mode would report — the strategy, the pac
 hold, the solar and grid shares, the forecast surplus in the window, when the import would start,
 what will actually arrive and, when it cannot be met, how far short and the departure that *would*
 have covered it. Ask in `energyWh` instead of `targetSocPercent` on an installation with no vehicle
-feed; the conversion, the horizon check and the just-in-time split are the same
-[`TargetedChargeRequestFactory`](../src/Gleanvolt.Core/Strategies/TargetedChargeRequestFactory.cs) the web
-form goes through, so a quote and the promise made from it can never disagree.
+feed. The checks and conversions are the same as the web form's, so a quote and the charge started
+from it agree.
+
+The preview **sets no request, selects no mode and writes to no device**, and does not disturb a plan
+already running — so *"what does 80% by seven cost, and would leaving at eight make it free?"* is a few
+calls and no hardware writes. Under `justInTime` the response also carries the same request priced as
+cheaply as possible, so the difference in `gridEnergyWh` is what holding the last stretch back costs.
 
 ## Editing a quoted plan, and charging to it
 
@@ -196,13 +155,9 @@ curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start/targeted   -H
 The preview and the start take the **same body**, so what you quote is what you commit to — the limits
 included. Sending an unedited quote straight back is a no-op: you get the plan you were shown.
 
-> **What you edit are limits, not a schedule — and that is the feature, not a simplification of it.**
-> The plan is rebuilt on every poll from a refreshed forecast and the measured delivery, which is what
-> lets a sunnier afternoon than forecast shrink the grid block before any of it is bought. Hand back a
-> list of blocks to replay and that stops happening — and worse, the blocks go on being executed
-> against a delivered-energy figure that stopped being true the moment they were quoted, buying grid
-> for energy already in the car. So the window is yours; what happens inside it is still the
-> forecast's to decide.
+**You edit limits, not a schedule.** The plan is rebuilt on every poll from the refreshed forecast and
+what has been delivered, so a sunnier afternoon than forecast still shrinks the grid block. The window
+is yours; what happens inside it is the forecast's to decide.
 
 - **A limit may reduce what is delivered. It may never make the plan lie about what will be.** Anything
   a limit puts out of reach comes back as `shortfallWh`, exactly as a departure that is too close
@@ -216,15 +171,7 @@ included. Sending an unedited quote straight back is a no-op: you get the plan y
   expires, and a start never fails because of it.
 - **The limits follow the request's rules**: cleared by `/charging/stop`, and not surviving a restart.
 
-`POST /charging/start` with `mode: "targeted"` accepts the same `editable` inside its `target`, so an
-existing caller gains this without moving endpoints.
-
-It goes through `ITargetedChargePreview`, which **sets no request, selects no mode and writes to no
-device**, and it does not disturb a plan already running. So *"what does 80% by seven cost, and would
-leaving at eight make it free?"* is three calls and no hardware writes — a question that otherwise
-needs a person to fill in a form three times. Under `justInTime` the response also carries the same
-request priced as cheaply as possible, so what holding the last stretch back costs can be read off
-the difference in `gridEnergyWh`.
+`POST /charging/start` with `mode: "targeted"` accepts the same `editable` inside its `target`.
 
 ## Starting one
 
@@ -234,9 +181,8 @@ curl -sS -X POST http://gleanvolt.local:8090/api/v1/charging/start \
   -d '{"mode": "targeted", "target": {"energyWh": 22000, "departBy": "2026-08-24T07:00:00+02:00"}}'
 ```
 
-One call does what one button does: the charger's Fast use-mode is written and the mode is then
-selected, so it works on a charger sitting in Green. For `targeted` the request is set **before** the
-mode — the controller reads both in the same cycle — and dropped again if the charger refuses.
+One call does what one button does: the charger's Fast use-mode is written, then the mode is selected.
+For `targeted` the request is set first, and dropped again if the charger refuses.
 
 `fastNoBattery` takes an optional `fast` on the same terms — set first, dropped if the charger
 refuses. It says **when to stop**, not how to charge:
@@ -266,55 +212,18 @@ for, a departure in the past or beyond the horizon, or a departure with `full` a
 — and nothing is started. Progress comes back on the status as `fastCharge`, with the schedule under
 `fastCharge.schedule`, and a `full` start clears any amount left standing from an earlier charge.
 
-Every action returns what it did *and the controller's state afterwards*, so a caller never has to
-poll to find out what happened. A refused hardware write comes back as **200 with
-`succeeded: false`** and a message rather than an HTTP error: the call was understood and the
-controller is in a well-defined state — exactly the one it was in before. Read the flag, not the
-status code.
+Every action returns what it did *and the controller's state afterwards*. A refused hardware write is
+**200 with `succeeded: false`** and a message, not an HTTP error — the controller is in the state it
+was in before. Read the flag, not the status code.
 
-`PUT /battery-hold` is refused with 409 when `BatteryHold:Enabled` is false, rather than recording an
-intent that silently does nothing. And what comes back as `batteryHold.active` is **what was last
-written to the inverter, not a read-back** — the command register cannot be read — so judge whether a
-hold is really in force by `batteryPowerWatts`, never by the flag.
+`PUT /battery-hold` is refused with 409 when `BatteryHold:Enabled` is false. `batteryHold.active` is
+**what was last written to the inverter, not a read-back**, so judge whether a hold is in force by
+`batteryPowerWatts`.
 
-## The document is the deliverable
+## What it does not do
 
-For a human client the OpenAPI file is documentation; for a generated MCP tool surface it is the
-*entire* interface, and the descriptions are what a model reads before choosing a tool. So:
-
-- **The DTOs are the API's own**, not Core records serialised straight out. Core records change for
-  internal reasons; the wire contract must not move when they do.
-- **The XML comments are the descriptions.** What is written next to a type, a property or an enum
-  member in C# is what reaches the document. `Directory.Build.props` turns the documentation file on
-  for **every** project, unconditionally, because that is early enough for the SDK to act on — set in
-  `Directory.Build.targets` instead, the flag reads `true`, the compiler writes the `.xml` into `obj/`,
-  and nothing ever copies it next to the assembly. That is documentation which exists, reports itself
-  as enabled, and cannot be found. It is how every enum in `Gleanvolt.Core` reached the document with
-  no description at all (#126).
-- **Enums carry a legend**, because .NET's generator does not give them one: a hoisted enum arrives as
-  a bare list of values, and neither the type's summary nor any member's survives. A document
-  transformer reads the same XML at runtime and adds both, naming each value as it appears **on the
-  wire**. It only ever fills blanks — a description the generator produced is left untouched — so the
-  day the SDK does this itself, it quietly stops having anything to do.
-- **Units live in the names** (`...Wh`, `...Watts`, `...Percent`), because a model that has to guess
-  whether a number is watts or kilowatts will guess wrong. Timestamps are ISO-8601 **with an offset**:
-  a departure time here is a local-time promise.
-- **Enums cross the wire as camel-cased names**, closed, so a reordered member cannot silently change
-  what a stored request meant.
-- **The contract is pinned by a test.**
-  [`OpenApiContract.json`](../tests/Gleanvolt.Api.Tests/OpenApiContract.json) records every operation id,
-  parameter, response code and schema property with its type and nullability. An intended change shows
-  up as a reviewable diff (regenerate with
-  `GLEANVOLT_UPDATE_OPENAPI_CONTRACT=1 dotnet test tests/Gleanvolt.Api.Tests`); an accidental one — a
-  renamed property, a dropped nullable — fails the build. Formatting changes from a new SDK do not,
-  which is what keeps the check honest rather than merely noisy.
-
-## What it deliberately does not do
-
-- **Stop the service.** Stopping the whole controller is a deliberate, physical act with a deploy-stack
-  consequence (it stays stopped); it lives on the surfaces a person is looking at.
-- **Write raw Modbus registers.** That is a debugging tool, and a way to brick an inverter over the
-  network.
-- **TLS, users, per-key scopes, rate limiting.** A LAN appliance with a shared secret, as the web UI
-  already is. Scopes become interesting the day a read-only key is wanted.
-- **Bundle a Swagger or Scalar viewer.** The document plus `curl` is enough to start.
+- **Stop the service.** That is done from the web UI or Home Assistant.
+- **Write raw Modbus registers.**
+- **TLS, users, per-key scopes or rate limiting.** It is a LAN appliance with shared keys, like the web
+  UI.
+- **Serve a Swagger or Scalar viewer.** Use the document with a tool of your choice, or `curl`.

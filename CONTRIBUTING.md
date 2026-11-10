@@ -148,6 +148,28 @@ Gleanvolt.slnx
   or the configuration. `Gleanvolt.Discovery.Cli` is its console and nothing else.
 - **`Gleanvolt.Core.Tests` mocks the hardware boundary** (`IModbusClient`, etc.) to exercise control logic without a live device.
 
+## The HTTP API's contract
+
+For a generated MCP tool surface the OpenAPI document is the *entire* interface, and its descriptions
+are what a model reads before choosing a tool. So:
+
+- **The DTOs are the API's own** (`Gleanvolt.Api/Contracts`), not Core records serialised straight out:
+  the wire contract must not move when Core changes for internal reasons.
+- **The XML comments are the descriptions.** What is written on a type, a property or an enum member
+  reaches the document. `Directory.Build.props` turns the documentation file on for every project; set
+  in `Directory.Build.targets` instead, the `.xml` is written to `obj/` and never copied next to the
+  assembly, so the descriptions silently vanish.
+- **Enums get a legend** from a document transformer, which fills in the type's and members'
+  descriptions that .NET's generator drops, naming each value as it appears on the wire.
+- **Units live in the names** (`...Wh`, `...Watts`, `...Percent`); timestamps carry an offset; enums
+  cross the wire as closed camel-cased names.
+- **The contract is pinned by a test.**
+  [`OpenApiContract.json`](tests/Gleanvolt.Api.Tests/OpenApiContract.json) records every operation id,
+  parameter, response code and schema property with its type and nullability. An intended change is a
+  reviewable diff — regenerate with
+  `GLEANVOLT_UPDATE_OPENAPI_CONTRACT=1 dotnet test tests/Gleanvolt.Api.Tests` — and an accidental one
+  fails the build.
+
 ## Anything that writes to hardware
 
 `ChargeControl` and `BatteryHold` are the two features that write — to the EV charger and to the
