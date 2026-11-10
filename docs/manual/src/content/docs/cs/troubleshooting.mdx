@@ -1,0 +1,183 @@
+---
+title: Řešení potíží a časté otázky
+description: Co dělat, když se Gleanvolt neotevře, nevidí vaše zařízení nebo nenabíjí auto, jak čekáte.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Otevření Gleanvoltu
+
+**`http://gleanvolt.local:8090` se neotevře.**
+Některé telefony a sítě neumí najít jména `.local`: starší telefony s Androidem, sítě Wi-Fi pro hosty nebo
+chytrá zařízení, Linux bez balíčku `nss-mdns`, Docker bez `--network host` a Windows, když brána firewall
+Gleanvolt zablokovala. Použijte místo toho adresu počítače, například `http://192.168.1.20:8090`. Najdete
+ji v seznamu připojených zařízení ve vašem routeru.
+
+**Jmenuje se `gleanvolt-2.local`.**
+Jméno `gleanvolt.local` už používá jiné zařízení, obvykle druhý Gleanvolt. To je v pořádku.
+
+**Stránka se neotevře vůbec, ani podle adresy.**
+Zkontrolujte, že Gleanvolt běží: viz [Běží?](#běží) níže.
+
+**Každá stránka vede do průvodce nastavením.**
+Ještě chybí něco povinného: heslo, střídač nebo nabíječka. Gleanvolt čeká a nic neřídí, dokud to
+nenastavíte. Dokončete [průvodce nastavením](../setting-up/setup-wizard/) a v posledním kroku klikněte na
+**Restartovat**.
+
+**Průvodce jsem dokončil, ale pořád vede do průvodce.**
+Gleanvolt se od té doby nerestartoval. Ve Windows ho za vás nikdo nerestartuje: zavřete ho a spusťte znovu.
+
+**Zapomněl jsem heslo.**
+Na přihlašovací stránce klikněte na **Zapomněli jste heslo?**. Heslo obnovíte **klíčem pro obnovení**,
+který jste si při nastavení uložili. Pokud klíč nemáte, klikněte na **Zapsat kód na počítači**: Gleanvolt
+zapíše jednorázový kód tam, kde si ho přečte jen někdo s přístupem k počítači.
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+sudo cat /var/lib/gleanvolt/password-reset-code.txt
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker logs gleanvolt-controller 2>&1 | grep "reset code"
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Otevřete složku `data` ve složce, kterou jste pro Gleanvolt vytvořili, a soubor
+`password-reset-code.txt`. Nebo hledejte „reset code“ v záznamu kontejneru v aplikaci NAS pro kontejnery.
+
+</TabItem>
+<TabItem label="Windows">
+
+Otevřete `password-reset-code.txt` ve složce `data` vedle programu.
+
+</TabItem>
+</Tabs>
+
+Kód funguje jednou, 15 minut.
+
+## Zařízení a údaje
+
+**Stav domácí baterie se nemění a slunce i síť ukazují 0.**
+Adresy střídače a nabíječky jsou prohozené. Obě odpovídají na stejném portu, takže se Gleanvolt připojí
+k oběma. Prohoďte je v **Nastavení**, uložte a restartujte.
+
+**Všechno ukazuje nulu.**
+Gleanvolt se k zařízením nedostane. Zkontrolujte adresy v **Nastavení** a že je
+[zapnutý Modbus TCP](../installation/preparing-devices/).
+
+**Hledání píše „port open, no Modbus reply“.**
+K zařízení je připojené něco jiného, například integrace v Home Assistant, evcc nebo druhý Gleanvolt.
+Většina zařízení přijme jen jedno spojení. To druhé vypněte.
+
+**Dům jako by každé odpoledne spotřeboval všechno slunce a žádný solární režim se nespustí.**
+Váš elektroměr možná jednu fázi neměří: viz
+[Když elektroměr jednu fázi neměří](../how-it-works/unmetered-phase/).
+
+**Údaje nevypadají chybějící, ale špatné.**
+Porovnejte je s displejem nebo aplikací střídače a nabíječky a nechte nabíjení na **Off**, dokud se
+neshodují. Nahlaste to na [GitHubu](https://github.com/mpospisil/gleanvolt/issues) i s modelem střídače a
+nabíječky.
+
+**Předpověď je prázdná.**
+Otevřete **Nastavení → Předpověď solární energie**: napíše, zda Solcast odmítl klíč, neznal instalaci,
+nebo jsou dnešní předpovědi vyčerpané. Viz [Předpověď slunce](../setting-up/solar-forecast/).
+
+**Nabíjení je zapsané pod špatným dnem.**
+Není nastavené časové pásmo. Nastavte ho v **Nastavení** (například `Europe/Prague`), uložte a
+restartujte.
+
+## Nabíjení
+
+**Spustil jsem režim, ale auto nenabíjí.**
+Obvykle Gleanvolt na něco čeká a věta nahoře na **Přehledu** napíše na co: na víc slunce, na plnou domácí
+baterii (Solar), na nízký tarif nebo na začátek naplánovaného nabíjení. Zkontrolujte také:
+
+- Auto je zapojené a jeho vlastní nabíjení není v aplikaci auta naplánované nebo omezené.
+- Nikdo nezměnil nabíječku přímo na ní nebo v její aplikaci. Gleanvolt ji pak nechá být: spusťte režim
+  znovu.
+
+**Za oblačného dne se auto pozastavuje a znovu rozjíždí.**
+To je v pořádku: auto potřebuje na třech fázích alespoň asi 4,1 kW a Gleanvolt raději pozastaví, než aby
+rozdíl kupoval. Viz [Jak Gleanvolt rozhoduje](../how-it-works/basics/).
+
+**Nabíjení naplánované na noc neproběhlo.**
+Gleanvolt se mezitím restartoval, například kvůli aktualizaci. Režimy a plány restart nepřežijí. Po
+restartu ho spusťte znovu.
+
+**Nabíjení skončilo a režim je zase Off.**
+Každý režim skončí sám, když je hotovo: auto je plné nebo odpojené, množství bylo dodané, uplynul čas
+odjezdu, nebo skončilo dnešní slunce. Proč, napíše stránka nabíjení v **Nabíjení**.
+
+**Nabíjení se večer najednou pozastaví.**
+Velký spotřebič, například elektrická trouba, umí naráz vzít několik kilowattů a autu pak nezbude
+přebytek. Je to vidět na údaji **Dům** na **Přehledu**.
+
+**Blokace vybíjení baterie je zapnutá, ale baterie se trochu vybíjí.**
+Asi 50–65 W je normální: vlastní spotřeba střídače. Víc znamená, že blokace nezabrala: podívejte se na
+údaj **Baterie** na **Přehledu**.
+
+## Běží?
+
+Otevřete **Nastavení → Stav**: **Poslední čtení** by mělo být před pár sekundami. Pokud se stránka
+neotevře:
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+systemctl status gleanvolt
+sudo systemctl start gleanvolt      # pokud byl zastavený
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker ps -a --filter name=gleanvolt
+docker start gleanvolt-controller   # pokud byl zastavený
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Otevřete aplikaci NAS pro kontejnery a zkontrolujte, že `gleanvolt-controller` běží. Pokud ne, spusťte
+ho. (`gleanvolt-init` je vždy zastavený; to je v pořádku.)
+
+</TabItem>
+<TabItem label="Windows">
+
+Zkontrolujte, že okno terminálu s Gleanvoltem je pořád otevřené. Pokud ne, otevřete terminál a napište
+`gleanvolt`.
+
+</TabItem>
+</Tabs>
+
+Pokud někdo klikl na **Zastavit službu**, zůstane Gleanvolt schválně zastavený, dokud ho nespustíte.
+
+## Záznam
+
+Gleanvolt zapisuje, co rozhodl a proč, do záznamu (logu), jeden soubor na den, uchovaný 14 dní. Pokud
+hlásíte problém, nejvíc pomůže záznam z toho dne.
+
+| Instalace | Záznam |
+|---|---|
+| Linux | `/var/log/gleanvolt/`, nebo `journalctl -u gleanvolt` |
+| Docker | složka `logs`, nebo `docker logs gleanvolt-controller` |
+| NAS | složka `logs` ve složce, kterou jste pro Gleanvolt vytvořili |
+| Windows | složka `logs` vedle programu |
+
+Při normálním zastavení končí záznam řádkem **stopped cleanly**. Záznam, který prostě skončí bez tohoto
+řádku, znamená, že byl Gleanvolt ukončen násilím: například výpadkem proudu nebo nedostatkem paměti.
+
+## Pořád nevíte?
+
+Zeptejte se na [GitHubu](https://github.com/mpospisil/gleanvolt/issues). Napište, jaký máte střídač,
+nabíječku a auto, jak jste Gleanvolt nainstalovali a co jste čekali, že se stane. Přiložte záznam z toho
+dne, ale nejdřív ho projděte: může obsahovat adresy vašich zařízení.

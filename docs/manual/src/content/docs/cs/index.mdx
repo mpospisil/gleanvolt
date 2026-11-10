@@ -4,7 +4,7 @@ description: Co Gleanvolt dělá, co nedělá a co k němu potřebujete.
 ---
 
 **Gleanvolt nabíjí váš elektromobil z vašich vlastních solárních panelů.** Běží na malém počítači
-u vás doma, například na Raspberry Pi, NAS nebo počítači s Windows. Odtud komunikuje s vaším střídačem
+u vás doma, například na Raspberry Pi, NAS nebo počítači s Windows. Odtud komunikuje se střídačem
 a nabíječkou přes domácí síť a průběžně rozhoduje, jak rychle má auto nabíjet. Ovládáte ho z webové
 stránky v telefonu nebo v počítači.
 
@@ -13,19 +13,51 @@ stránky v telefonu nebo v počítači.
 - **Nabíjí auto ze slunce**, které dům zrovna nespotřebuje, místo aby šlo do sítě.
 - **Nabízí několik režimů nabíjení**: jen ze slunce, ze slunce s trochou pomoci ze sítě, co nejrychleji,
   nebo dané množství do daného času. Vyberete ho jedním klepnutím.
-- **Nechá domácí baterii stranou**, když chcete, aby auto nevybilo baterii, kterou budete potřebovat večer.
+- **Nechá domácí baterii stranou**, když chcete, aby auto nevybilo baterii, kterou budete potřebovat
+  večer.
 - **Ukazuje, co se děje**: kolik vyrábí slunce, kolik spotřebuje dům, kolik jde do auta, a historii
   každého nabíjení.
 - **Funguje bez internetu.** Všechno se odehrává v domácí síti. Internet se používá jen pro volitelnou
   předpověď výroby, počasí a stav baterie auta.
 
+## Co nedělá
+
+- Nenahrazuje aplikaci střídače ani nabíječky. Nastavuje jen to, jak rychle se auto nabíjí a zda se smí
+  vybíjet domácí baterie.
+- Neběží v cloudu a nemá žádný účet, do kterého byste se registrovali.
+- Nefunguje s každým střídačem a nabíječkou. Viz seznam níže.
+
 ## Co potřebujete
 
-- **Podporovaný střídač**: hybridní střídač SolaX nebo Huawei SUN2000.
+- **Podporovaný střídač**: hybridní střídač SolaX nebo Huawei SUN2000. Fungují i některé střídače
+  prodávané pod jiným jménem (Tigo, Qcells, Dražice), které jsou uvnitř SolaX.
 - **Podporovanou nabíječku**: SolaX HAC nebo EVC, Huawei SCharger nebo go-e.
-- **Počítač, který je stále zapnutý**, ve stejné domácí síti jako střídač a nabíječka.
-- **Jakýkoli elektromobil** se zásuvkou Type 2.
+- **Počítač, který je stále zapnutý**, ve stejné domácí síti jako střídač a nabíječka: Raspberry Pi
+  (64bitové), NAS, jakýkoli 64bitový počítač s Linuxem, nebo počítač s Windows.
+- **Domácí síť**, ke které jsou střídač a nabíječka připojené kabelem nebo přes Wi-Fi.
+- **Jakýkoli elektromobil** se zásuvkou Type 2. Čtení stavu baterie auta je volitelné; funguje pro auta
+  Volkswagen a Škoda a pro ostatní přes Home Assistant.
 
-:::note[Překlad]
-Česká verze příručky teprve vzniká. Stránky, které ještě nejsou přeložené, se zobrazují anglicky.
+## Kde začít
+
+1. [Jaký počítač použít?](installation/choosing/) Potom na něj Gleanvolt nainstalujte.
+2. [Připravte střídač a nabíječku](installation/preparing-devices/).
+3. Projděte [průvodce nastavením](setting-up/setup-wizard/).
+4. [Vyberte režim nabíjení](using/modes/choosing/) a nabíjejte.
+
+Něco nefunguje? Podívejte se do [Řešení potíží](troubleshooting/). Neznámá slova najdete ve
+[Slovníčku](glossary/).
+
+Obrázky v příručce jsou z anglické verze aplikace. Ve vašem prohlížeči uvidíte stejné stránky česky, a
+tlačítka a popisky, které příručka uvádí, jsou ty z české verze.
+
+## Na vlastní riziko
+
+Gleanvolt mění chování nabíječky a střídače. Je pečlivě vyzkoušený, ale dodává se tak, jak
+je, bez jakékoli záruky. Prvních několik nabíjení sledujte, a kdyby vám něco nesedělo, přepněte režim nabíjení
+na **Off**.
+
+:::note[Pro pokročilé]
+Home Assistant, MQTT, HTTP API a databáze historie jsou popsané v
+[repozitáři Gleanvoltu na GitHubu](https://github.com/mpospisil/gleanvolt).
 :::

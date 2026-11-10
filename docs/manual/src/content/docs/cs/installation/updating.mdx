@@ -1,0 +1,154 @@
+---
+title: Aktualizace, záloha a odinstalace
+description: Udržujte Gleanvolt aktuální, zálohujte jeho data a odinstalujte ho.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Zvolte, jak jste Gleanvolt nainstalovali. Záložky si vaši volbu pamatují po celé stránce.
+
+:::caution[Po každé aktualizaci je nabíjení Off]
+Gleanvolt se vždy spouští s vypnutým nabíjením. Aktualizace ho restartuje, takže pokud auto nabíjelo,
+zvolte potom režim nabíjení znovu. Aktualizujte, když auto nenabíjí, nebo v noci.
+:::
+
+## Aktualizace
+
+Nastavení i historie zůstanou zachované.
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+Spusťte znovu instalační příkaz:
+
+```bash
+curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
+```
+
+Návrat ke starší verzi: před `sh` přidejte `GLEANVOLT_VERSION=` a číslo verze, například:
+
+```bash
+curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo GLEANVOLT_VERSION=1.0.6 sh
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+Stáhněte novou verzi, odstraňte starý kontejner a spusťte stejný příkaz `docker run` jako při instalaci:
+
+```bash
+docker pull ghcr.io/mpospisil/gleanvolt:latest
+docker rm -f gleanvolt-controller
+```
+
+Potom příkaz `docker run …` ze stránky [Docker](../docker/).
+
+</TabItem>
+<TabItem label="NAS">
+
+- **Synology**: v Container Manageru aktualizujte obraz v části **Image** (je u něj *Update available*) a potom znovu sestavte projekt `gleanvolt`.
+- **QNAP, Unraid**: použijte aktualizaci nebo stažení (pull) aplikace či stacku.
+- **TrueNAS SCALE**: použijte u aplikace **Update** nebo **Pull image**.
+
+</TabItem>
+<TabItem label="Windows">
+
+1. Zavřete okno terminálu s Gleanvoltem.
+2. Zkopírujte složku `data` na bezpečné místo (viz **Záloha** níže). Aktualizace může složku, ve které
+   je, nahradit.
+3. Aktualizujte:
+
+   ```powershell
+   winget upgrade MartinPospisil.Gleanvolt
+   ```
+
+4. Spusťte ho příkazem `gleanvolt`. Pokud nastavení zmizelo, zavřete ho, nakopírujte svou složku `data`
+   zpět vedle programu a spusťte ho znovu.
+
+</TabItem>
+</Tabs>
+
+## Záloha
+
+Všechno, co Gleanvolt ví, je v jedné složce `data`: nastavení, historie nabíjení a přihlášení k účtu
+auta. Kopie této složky je úplná záloha. Obnovení: zastavte Gleanvolt, vraťte složku na místo a spusťte
+ho.
+
+:::danger[Zálohu nikomu nedávejte]
+Složka `data` obsahuje přihlášení k účtu vašeho auta. Kdo má její kopii, může ho použít. Zálohy mějte
+na vlastním šifrovaném disku, nikdy ve sdílené složce ani v příloze e-mailu.
+:::
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+Složka je `/var/lib/gleanvolt`. Zkopírování spolu se souborem nastavení do jednoho archivu ve vaší
+domovské složce:
+
+```bash
+sudo tar czf ~/gleanvolt-backup.tar.gz /var/lib/gleanvolt /etc/gleanvolt
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+Složka je `/opt/gleanvolt/data`:
+
+```bash
+sudo tar czf ~/gleanvolt-backup.tar.gz /opt/gleanvolt/data
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+Je to složka `data` ve složce, kterou jste pro Gleanvolt při instalaci vytvořili. Zahrňte ji do vlastní
+zálohy NAS.
+
+</TabItem>
+<TabItem label="Windows">
+
+Je to složka `data` vedle programu: v `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`, ve složce, jejíž
+název začíná `MartinPospisil.Gleanvolt`. Zkopírujte ji na bezpečné místo.
+
+Přihlášení k autu v ní je svázané s vaším účtem Windows. Po obnovení na jiném počítači nebo pod jiným
+účtem vás Gleanvolt požádá, abyste se k autu přihlásili znovu; všechno ostatní funguje.
+
+</TabItem>
+</Tabs>
+
+## Odinstalace
+
+<Tabs syncKey="platform">
+<TabItem label="Linux">
+
+```bash
+sudo apt remove gleanvolt   # odstraní program, nastavení a historii nechá
+sudo apt purge gleanvolt    # odstraní všechno, včetně historie
+```
+
+</TabItem>
+<TabItem label="Docker">
+
+```bash
+docker rm -f gleanvolt-controller
+docker image rm ghcr.io/mpospisil/gleanvolt:latest
+sudo rm -rf /opt/gleanvolt   # jen pokud už nastavení a historii nechcete
+```
+
+</TabItem>
+<TabItem label="NAS">
+
+V aplikaci NAS pro kontejnery smažte projekt, aplikaci nebo stack `gleanvolt`. Potom smažte i složku,
+kterou jste pro něj vytvořili, pokud už nastavení a historii nechcete.
+
+</TabItem>
+<TabItem label="Windows">
+
+Pokud si chcete historii nechat, nejdřív zkopírujte složku `data`. Potom:
+
+```powershell
+winget uninstall MartinPospisil.Gleanvolt
+```
+
+</TabItem>
+</Tabs>

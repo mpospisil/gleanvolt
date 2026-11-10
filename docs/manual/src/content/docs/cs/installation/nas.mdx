@@ -1,0 +1,153 @@
+---
+title: NAS
+description: Spusťte Gleanvolt na NAS Synology, QNAP, Unraid, TrueNAS SCALE nebo OpenMediaVault.
+---
+
+import { Code, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import composeFile from '../../../../../../../deploy/docker-compose.nas.yml?raw';
+
+{/* Soubor z repozitáře bez komentářů: jsou to poznámky pro vývojáře a Docker je ignoruje. */}
+export const compose = composeFile
+  .split('\n')
+  .filter((line) => !line.trimStart().startsWith('#'))
+  .join('\n')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim() + '\n';
+
+NAS, který je stále zapnutý, je pro Gleanvolt dobrý domov. Běží ve vlastní aplikaci NAS pro kontejnery,
+z hotového souboru, který do ní vložíte.
+
+## Co potřebujete
+
+- **64bitový** NAS, který umí spouštět kontejnery (Docker). Takové je většina modelů od roku 2020.
+  Starší modely s 32bitovým procesorem ARM nefungují: procesor uvádí specifikace NAS.
+- Asi 100 MB volné paměti.
+
+**OpenMediaVault 7 nebo novější?** Použijte místo toho instalaci pro [Linux](../linux/). Je
+jednodušší.
+
+## Soubor k vložení
+
+Každý NAS níže chce tento soubor. Zkopírujte ho celý tlačítkem v pravém horním rohu:
+
+<Code code={compose} lang="yaml" title="docker-compose.yml" />
+
+Tři nastavení v něm možná budete chtít změnit. Změňte je v souboru před vložením, na vyznačených
+místech:
+
+| Nastavení | Změňte na | Proč |
+|---|---|---|
+| `TZ:` `${TZ:-Europe/Prague}` | Své časové pásmo za `:-`, např. `${TZ:-Europe/Berlin}` | Aby den v historii začínal o vaší půlnoci |
+| `${GLEANVOLT_DIR:-.}` (čtyři místa) | Složku na NAS, kde to postup pro váš NAS níže uvádí | Kam si Gleanvolt ukládá nastavení a historii |
+| `${WEB_PORT:-8090}` | Jiné číslo, jen pokud port 8090 na NAS už něco používá | Port, na kterém Gleanvolt otevřete |
+
+## Instalace
+
+<Tabs syncKey="nas">
+<TabItem label="Synology">
+
+Pro Synology DSM 7.2 nebo novější s aplikací **Container Manager** z Centra balíčků.
+
+<Steps>
+
+1. Ve **File Station** vytvořte pro Gleanvolt složku, například `docker/gleanvolt` na `volume1`.
+
+2. Otevřete **Container Manager → Project → Create**.
+
+3. Pojmenujte ho `gleanvolt`, jako cestu zvolte vytvořenou složku a vyberte **Create docker-compose.yml**.
+
+4. Vložte soubor. Pokud nejste v pražském čase, změňte časové pásmo. `GLEANVOLT_DIR` nechte, jak je.
+
+5. Krok s webovým portálem přeskočte a dokončete.
+
+</Steps>
+
+Pokud je v DSM zapnutá brána firewall, povolte port 8090 z domácí sítě.
+
+</TabItem>
+<TabItem label="QNAP">
+
+Pro QNAP s **Container Station 3**.
+
+<Steps>
+
+1. Vytvořte pro Gleanvolt složku na sdílené složce, například `/share/Container/gleanvolt`.
+
+2. Otevřete **Container Station → Applications → Create** a pojmenujte aplikaci `gleanvolt`.
+
+3. Vložte soubor. Každé `${GLEANVOLT_DIR:-.}` nahraďte celou cestou ke složce, například
+   `/share/Container/gleanvolt`. Změňte i časové pásmo.
+
+4. Vytvořte ji.
+
+</Steps>
+
+</TabItem>
+<TabItem label="Unraid">
+
+Nejdřív z Community Applications nainstalujte plugin **Compose Manager**.
+
+<Steps>
+
+1. Otevřete **Docker → Compose → Add new stack** a pojmenujte ho `gleanvolt`.
+
+2. **Edit stack → Compose file**: vložte soubor.
+
+3. **Edit stack → Env file**: přidejte tyto dva řádky se svým časovým pásmem:
+
+   ```
+   GLEANVOLT_DIR=/mnt/user/appdata/gleanvolt
+   TZ=Europe/Prague
+   ```
+
+4. Stiskněte **Compose up**.
+
+</Steps>
+
+</TabItem>
+<TabItem label="TrueNAS SCALE">
+
+Pro TrueNAS SCALE 24.10 nebo novější. Starší verze takto instalovat neumí: nejdřív TrueNAS aktualizujte.
+
+<Steps>
+
+1. Vytvořte pro Gleanvolt dataset, například `tank/apps/gleanvolt`, s předvolbou **Generic**. Ne
+   s předvolbou SMB: její oprávnění mohou Gleanvolt nepustit dovnitř.
+
+2. Otevřete **Apps → Discover Apps → ⋮ → Install via YAML** a pojmenujte aplikaci `gleanvolt`.
+
+3. Vložte soubor. Každé `${GLEANVOLT_DIR:-.}` nahraďte cestou k datasetu, například
+   `/mnt/tank/apps/gleanvolt`, a změňte časové pásmo.
+
+4. Uložte.
+
+</Steps>
+
+</TabItem>
+</Tabs>
+
+## Otevřete Gleanvolt
+
+Otevřete **`http://gleanvolt.local:8090`**, nebo `http://`, adresu NAS a `:8090`. Uvidíte stránku pro
+nastavení hesla:
+
+![Stránka „Nastavte heslo“.](../../../../assets/screenshots/setup-password.png)
+
+Pokračujte [průvodcem nastavením](../../setting-up/setup-wizard/).
+
+:::note[Zastavený kontejner gleanvolt-init]
+Vedle Gleanvoltu uvidíte druhý kontejner, `gleanvolt-init`, zobrazený jako zastavený nebo „exited“. To je
+v pořádku: při každém spuštění jednou proběhne, předá Gleanvoltu jeho složky a skončí.
+:::
+
+## Když něco nejde
+
+- **Hledání v průvodci nic nenajde.** Kontejner musí používat vlastní síť NAS, nazvanou **host**. Pokud
+  aplikace NAS nabízí volbu sítě, zvolte **host**.
+- **Pořád se restartuje a v záznamu je „address already in use“.** Port 8090 používá jiná aplikace.
+  Nastavte `WEB_PORT` na volné číslo, například 8091.
+- **V záznamu je, že nejde otevřít úložiště nabíjení, nebo složka `logs` zůstává prázdná.** Gleanvolt
+  nemůže do své složky zapisovat. Dejte ji na sdílenou složku bez zvláštních oprávnění, nebo v nastavení
+  oprávnění NAS povolte zápis uživateli 1654.
+- **Zastavit službu v Gleanvoltu ho nezastaví.** Zásada restartu se změnila na „always“. Vraťte ji na
+  `on-failure`.

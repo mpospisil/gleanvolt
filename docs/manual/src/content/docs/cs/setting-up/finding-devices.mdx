@@ -1,0 +1,73 @@
+---
+title: Vyhledání zařízení
+description: Jak funguje hledání zařízení, co znamenají jeho výsledky a jak zadat adresy ručně.
+---
+
+Gleanvolt potřebuje vědět, kde ve vaší domácí síti je střídač a nabíječka. Najde je za vás tlačítko
+**Hledat** v průvodci nastavením. Tato stránka vysvětluje, co ukazuje a co dělat, když je nenajde.
+
+## Hledání
+
+V kroku průvodce **Zařízení** klikněte na **Hledat**. Gleanvolt zkusí každou adresu v domácí síti, jestli
+na ní není střídač nebo nabíječka, které zná. Domácí síť zabere minutu nebo dvě.
+
+![Výsledky hledání: střídač na 192.168.1.10 a nabíječka na 192.168.1.11, každý s tlačítky „Use as inverter“ a „Use as charger“, a nerozpoznané zařízení na 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
+
+Každý řádek je jedno zařízení, které odpovědělo:
+
+- **Adresa**: kde v síti je, například `192.168.1.10:502 · unit 1`. Číslo za dvojtečkou je port a unit je
+  číslo zařízení na tom portu. Pamatovat si je nemusíte: výběr zařízení je vyplní.
+- **Rozpoznáno jako**: model, který zařízení nahlásilo, a zda o sobě říká, že je střídač, nebo nabíječka.
+- **nerozpoznáno**: něco odpovědělo, ale není to zařízení, které Gleanvolt zná, třeba váš router.
+  Nevšímejte si ho.
+
+U svého střídače klikněte na **Použít jako střídač**, u nabíječky na **Použít jako nabíječku**. Potom
+klikněte pod seznamem na **Uložit**.
+
+:::tip[Hledat můžete i později]
+Po nastavení je průvodce stále na `http://gleanvolt.local:8090/wizard`. Otevřete ho a hledejte znovu,
+například po výměně zařízení.
+:::
+
+## Když nic nenajde
+
+| Co vidíte | Co to znamená | Co dělat |
+|---|---|---|
+| Nic, nebo jen řádky „nerozpoznáno“ | Modbus TCP (nebo místní API go-e) je vypnutý | Zapněte ho: viz [Příprava střídače a nabíječky](../../installation/preparing-devices/) |
+| *Port open, no Modbus reply* | K zařízení je připojené něco jiného | Vypněte integraci Home Assistant, evcc nebo jiný software, který s ním mluví, a hledejte znovu |
+| Píše, že prohledal síť 172.x | Gleanvolt běží v kontejneru, který domácí síť nevidí | Do pole **Síť** napište rozsah domácí sítě, například `192.168.1.0/24`, nebo spusťte kontejner v síti hostitele |
+| Zařízení je v jiné síti, třeba v oddělené Wi-Fi pro chytrá zařízení | Hledání hledá jen tam, kam mu řeknete | Napište do pole **Síť** rozsah té sítě |
+
+Rozsah v poli **Síť** jsou adresy domácí sítě ve tvaru `192.168.1.0/24`. Pokud adresy vašich zařízení
+začínají `192.168.1.`, je to rozsah, který máte napsat.
+
+## Ruční zadání adres
+
+Pokud adresy znáte, ze seznamu zařízení v routeru nebo od instalačního technika, hledání nepotřebujete.
+Vyplňte formulář pod ním:
+
+| Pole | Střídač | Nabíječka |
+|---|---|---|
+| **Značka** | SolaX nebo Huawei | SolaX, Huawei SCharger nebo go-e |
+| **Adresa** | adresa střídače, například `192.168.1.10` | adresa nabíječky |
+| **Port** | 502 | 502 (go-e: 80) |
+| **Unit ID** | obvykle 1 | jak ho uvádí nastavení nabíječky |
+
+Značka vyplní svůj obvyklý port a unit ID. Střídač Huawei za EMMA potřebuje ještě **Připojení přes:
+EMMA** a jako adresu adresu EMMA.
+
+## Při uložení
+
+Gleanvolt z každého zařízení přečte jednu hodnotu, aby ověřil, že adresa odpovídá a že zařízení je to, za
+co jste ho označili:
+
+- Pokud adresa střídače odpovídá jako nabíječka nebo naopak, upozorní vás. Obě používají stejný port,
+  takže prohozené adresy by se připojily bez potíží a potom ukazovaly zamrzlou baterii a žádné slunce.
+- Pokud zařízení neodpoví, například vypnutá nabíječka, zeptá se před uložením. Klikněte na **Přesto
+  uložit**, jen pokud jste si adresou jistí.
+
+## Pevné adresy pro zařízení
+
+Adresy přiděluje router a po výpadku proudu může zařízení dát jinou. Gleanvolt by ho pak ztratil.
+V nastavení routeru najděte **rezervaci DHCP** (nebo **statický lease**) a rezervujte současnou adresu
+pro střídač i nabíječku.

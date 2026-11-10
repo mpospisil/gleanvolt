@@ -4,6 +4,27 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The manual in Czech (issue #329, step 7)
+
+All 33 pages of the manual in `docs/manual/src/content/docs/cs/`, the same set as `en/`: no Czech page
+falls back to English any more. The welcome page was rewritten to match the English one, and the
+unmetered-phase page (from step 6) stays.
+
+- **UI words from the resources.** Every bold label the English pages quote was looked up in the English
+  `.resx` files and replaced by its value in the matching `.cs.resx` (130 of them), so a Czech page says
+  **Nabíjet z přebytku**, **Jen nízký tarif** or **Zastavit službu** exactly as the Czech UI does. The
+  headline sentence and the session end reasons are quoted from their resources too.
+- **Kept in English**: the mode names and *import* / *export*, as in the Czech UI; the menu paths of
+  other companies' apps (FusionSolar, Synology, QNAP, Unraid, TrueNAS, go-e), whose Czech translations
+  aren't certain.
+- **Screenshots** stay shared and in English, as the issue specifies; the welcome page says so.
+- `docs/manual/README.md` states the convention for keeping the two languages in step.
+
+Checked: the page sets match, the build finds no broken link or anchor in 66 pages (the Czech anchors
+included), and no built Czech page carries Starlight's "not translated" notice.
+
+---
+
 ## 2026-11-10 — Pointing users at the manual (issue #329, step 6)
 
 - **Web UI** — `ManualLinks` (the address for a page, version and language) and `ManualLink` (the

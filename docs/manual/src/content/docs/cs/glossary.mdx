@@ -1,0 +1,93 @@
+---
+title: Slovníček
+description: Slova, která používá Gleanvolt a tato příručka, vysvětlená.
+---
+
+## A (ampér), proud
+Kolik elektřiny teče. Nabíječka se nastavuje v ampérech. Na třech fázích je každý ampér asi 690 W, na
+jedné fázi asi 230 W.
+
+## Blokace vybíjení baterie
+Zabrání domácí baterii napájet dům a auto, přičemž se dál může nabíjet ze slunce. Viz
+[Blokace vybíjení baterie](../using/battery-hold/).
+
+## Čas odjezdu, Hotovo do
+Kdy auto potřebujete. Fast a Targeted umí nabíjení naplánovat tak, aby do té doby skončilo.
+
+## Domácí baterie
+Baterie připojená ke střídači, která ukládá slunce na večer. Ne baterie auta.
+
+## Dům
+Kolik spotřebuje váš dům, bez auta. Gleanvolt to dopočítá z ostatních údajů.
+
+## Fáze, L1, L2, L3
+Většina domácností v Evropě má třífázovou elektřinu: tři samostatné vodiče, L1, L2 a L3 (SolaX: R, S a T).
+Auto nabíjí jednou fází, nebo všemi třemi.
+
+## HDO, nízký tarif, vysoký tarif
+Smlouva se dvěma cenami elektřiny: v určitých hodinách levnější (nízký tarif), obvykle v noci. V Česku ho
+přepíná signál HDO distributora. Viz [Tarif](../setting-up/grid-tariff/).
+
+## Import, export
+Nákup elektřiny ze sítě a její prodej do sítě.
+
+## kW, kWh
+kW (kilowatt) je výkon: jak rychle, právě teď. kWh (kilowatthodina) je energie: kolik celkem. Auto
+nabíjené výkonem 11 kW po dvě hodiny dostane 22 kWh.
+
+## Klíč pro obnovení
+Kód, který se ukáže jednou při nastavení hesla do Gleanvoltu, abyste heslo mohli obnovit, když ho
+zapomenete.
+
+## Mez SOC
+Stav domácí baterie, pod který režim Forecasted autu nedovolí ji vybít, aby byla večer plná.
+
+## Minimální proud, 6 A
+Nejmenší proud, kterým auto umí nabíjet: asi 4,1 kW na třech fázích, 1,4 kW na jedné. Pod ním se auto
+pozastaví. Viz [Jak Gleanvolt rozhoduje](../how-it-works/basics/).
+
+## Modbus TCP
+Způsob, jakým Gleanvolt mluví se střídačem a nabíječkou přes domácí síť. Musí být v každém zařízení
+zapnutý. Viz [Příprava střídače a nabíječky](../installation/preparing-devices/).
+
+## Nabíječka, wallbox
+Skříňka na zdi, do které se zapojuje kabel auta. Gleanvolt nastavuje, jaký proud dává autu.
+
+## Nabíjení (záznam)
+Jedno nabíjení od začátku do konce. Viz [Nabíjení a historie](../using/sessions/).
+
+## Neměřená fáze sítě
+Fáze, kterou váš elektroměr neměří. Nastavení nechte prázdné, pokud tomu tak opravdu není. Viz
+[Když elektroměr jednu fázi neměří](../how-it-works/unmetered-phase/).
+
+## Předpověď, p10, p90
+Kolik slunce Solcast čeká. Očekávaná hodnota bude se stejnou pravděpodobností překonaná i nedosažená;
+**p10** je zamračenější výsledek (horší je jen 1 den z 10), **p90** slunečnější.
+
+## Přebytek
+Slunce, které váš dům právě nespotřebuje: co vyrábějí panely minus co spotřebuje dům. To, co solární
+režimy dávají autu.
+
+## Půjčka z baterie
+V režimu [Forecasted](../using/modes/forecasted/) výkon, který domácí baterie dá autu, když slunci kousek
+chybí do minima auta, v den, kdy předpověď říká, že se baterie zase nabije.
+
+## Režim nabíjení
+Jak Gleanvolt auto nabíjí: Solar, Forecasted, Solar + grid, Fast (no battery), nebo Targeted. Viz
+[Jaký režim zvolit?](../using/modes/choosing/)
+
+## SOC (stav nabití)
+Jak plná je baterie, v procentech. Používá se pro domácí baterii i pro baterii auta.
+
+## Solcast
+Služba, která poskytuje předpověď slunce. Pro domácnosti zdarma. Viz
+[Předpověď slunce](../setting-up/solar-forecast/).
+
+## Střídač
+Zařízení, které mění výkon panelů na elektřinu pro domácnost a řídí domácí baterii.
+
+## Uspání nabíječky
+Přepnutí nabíječky na Stop během dlouhého čekání, například přes noc, místo pozastavení.
+
+## VIN
+Identifikační číslo auta, 17 písmen a číslic, uvedené v dokladech auta a v jeho aplikaci.
