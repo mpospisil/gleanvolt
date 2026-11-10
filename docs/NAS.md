@@ -40,7 +40,8 @@ environment variables, or by editing the default after `:-` in the file itself:
 | `GLEANVOLT_DIR` | `.` | Where the data lives. Use an absolute path on a share that is backed up, e.g. `/volume1/docker/gleanvolt`, `/mnt/user/appdata/gleanvolt`. |
 | `WEB_PORT` | `8090` | The web UI's port on the NAS. Change it if another app already has 8090. |
 
-Then start it. The web UI is at `http://<nas-address>:8090` and opens on the setup wizard: choose a
+Then start it. The web UI is at `http://gleanvolt.local:8090` (or `http://<nas-address>:8090`) and
+opens on the setup wizard: choose a
 password, let it find the inverter and the charger, and restart from the last step. See
 [The setup wizard](WEB_UI.md#the-setup-wizard) for what to expect after that.
 

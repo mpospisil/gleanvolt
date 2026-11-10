@@ -16,7 +16,8 @@ against the release's `SHA256SUMS`, and installs it with apt. The service starts
 the default configuration, and the script prints where the web UI is:
 
 ```
-  Web UI     http://192.168.2.7:8090   (plain HTTP; a new install opens on the setup wizard)
+  Web UI     http://gleanvolt.local:8090   or http://192.168.2.7:8090
+             (plain HTTP; a new install opens on the setup wizard)
   Settings   /etc/gleanvolt/gleanvolt.env
 ```
 

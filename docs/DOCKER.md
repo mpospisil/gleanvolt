@@ -22,14 +22,15 @@ docker run -d --name gleanvolt-controller --restart on-failure \
   ghcr.io/mpospisil/gleanvolt:latest
 ```
 
-Then open **`http://<host>:8090`**, choose a password and let the
+Then open **`http://gleanvolt.local:8090`** (or `http://<host>:8090`), choose a password and let the
 [setup wizard](WEB_UI.md#the-setup-wizard) find the inverter and the charger and set up the rest.
 Everything it saves goes to `data/`, so it survives a new container. Its **Start Gleanvolt** button
 restarts the container, which `--restart on-failure` brings straight back.
 
-- **`--network host`** lets the wizard's search see your LAN, and puts the web UI on the host's port
-  8090. On Docker's default bridge network, use `-p 8090:8090` instead and type your LAN's range into
-  the search.
+- **`--network host`** lets the wizard's search see your LAN, puts the web UI on the host's port 8090,
+  and lets it announce itself as `gleanvolt.local`. On Docker's default bridge network, use
+  `-p 8090:8090` instead, type your LAN's range into the search, and reach it by the host's address:
+  multicast doesn't leave a bridge network.
 - **`--restart on-failure`**, not `unless-stopped` or `always`: with those, **Stop service** in the web
   UI restarts it at once.
 - **`TZ`** is your time zone, so days and sessions are filed correctly. The wizard asks for it too.

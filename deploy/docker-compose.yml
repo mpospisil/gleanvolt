@@ -279,6 +279,10 @@ services:
       Web__Port: ${WEB_PORT:-8090}
       Web__RequireAuthentication: ${WEB_REQUIRE_AUTHENTICATION:-}
       Web__PasswordHash: ${WEB_PASSWORD_HASH:-}
+      # Announce the UI on the LAN as http://gleanvolt.local:8090 (issue #363). Works because the
+      # controller is on the host's network; on a bridge network the multicast would go unheard.
+      Web__Advertise: ${WEB_ADVERTISE:-true}
+      Web__AdvertiseName: ${WEB_ADVERTISE_NAME:-gleanvolt}
 
       # The HTTP API (issue #103). Off by default and, unlike the UI, never open: two of its endpoints
       # write to hardware and any program on the LAN can reach a port. Enabling it with no key set is

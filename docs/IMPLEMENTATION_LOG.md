@@ -4,6 +4,35 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The web UI answers to gleanvolt.local (issue #363)
+
+Gleanvolt announces itself on the LAN over mDNS, so a phone or laptop opens `http://gleanvolt.local:8090`
+and any Bonjour browser lists it, without knowing the machine's address. The reasoning is in
+`DECISIONS.md`.
+
+- **`Gleanvolt.Infrastructure/Mdns`** — `DnsMessage` (the wire format: A, AAAA, PTR, SRV, TXT, with
+  compressed names read), `IMdnsTransport` and `UdpMdnsTransport` (IPv4 UDP 5353, shared with avahi and
+  Bonjour through `SO_REUSEADDR`; the arrival interface from the packet information), and `MdnsResponder`
+  (probing, falling back to `gleanvolt-2`, announcing, answering, defending, goodbye).
+- **`Gleanvolt.Hosting/Advertising/WebAdvertiser`** — a background service: `_http._tcp` and
+  `_gleanvolt._tcp`, TXT `path=/`, `version`, `setup=pending|done`. Registered by
+  `AddGleanvolt(WebApplicationBuilder)` when the UI is on and `Web:Advertise` is true; runs in setup mode;
+  a port it can't open is a warning, never a failure.
+- **`WebOptions`** — `Advertise` (default true) and `AdvertiseName` (default `gleanvolt`, one DNS label;
+  anything else falls back with a warning). Compose: `WEB_ADVERTISE`, `WEB_ADVERTISE_NAME`.
+- **Banners** — the .deb's postinst and the deploy script print `http://gleanvolt.local:8090` first, the
+  address second; the postinst follows `Web__Advertise` and `Web__AdvertiseName`.
+- **Docs** — `WEB_UI.md` "Finding it on your network" (and where `.local` doesn't resolve), README's
+  get-started, `DOCKER.md` (host network needed), `NAS.md`, `TROUBLESHOOTING.md`, the Linux README.
+- **Tests** — the codec (round trip, compression, malformed input); the responder on an in-memory LAN
+  (claim, browse with SRV/TXT/A, host lookup, a second instance becomes `-2` on another host and on the
+  same one, a later conflict, legacy unicast, known-answer suppression, goodbye, foreign names); over
+  real UDP on loopback; the advertiser's TXT, name rules, registration and a port it can't open.
+- **Verified on the LAN**, with a throwaway name: `avahi-browse` lists it with its TXT; the Pi resolves
+  both names of two instances on this desktop to its LAN address; after they stop, neither resolves.
+
+---
+
 ## 2026-11-10 — The device search hint names no brand (issue #369)
 
 The hint above the device search (`FindDevicesIntro`, shown by `DeviceDiscoveryPanel` in the setup
