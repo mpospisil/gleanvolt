@@ -40,7 +40,7 @@ sudo apt install ./gleanvolt_1.0.7_arm64.deb
 
 **32-bit Raspberry Pi OS is not supported**, and the installer says so rather than failing half way.
 Other NAS systems (Synology, QNAP, Unraid, TrueNAS SCALE) run the container image instead, see
-[Running on a NAS](../../deploy/README.md#running-on-a-nas).
+[Running on a NAS](../../docs/NAS.md).
 A Pi 3B or newer runs the 64-bit OS; reinstall it with Raspberry Pi Imager. Other distributions can
 run the self-contained `linux-x64` / `linux-arm64` zip from the same release.
 

@@ -82,22 +82,21 @@ run. Every model, its caveats and the tiers are in
 
 ### 1. Install
 
-**Debian, Ubuntu or Raspberry Pi OS (64-bit)** — one command installs it as a system service, with no
-Docker and no .NET:
+Install Gleanvolt **on the machine that will run it**, then finish in the browser (step 2).
+
+**Raspberry Pi, Debian or Ubuntu (64-bit) — recommended.** On the device itself, one command installs
+Gleanvolt as a system service, with no Docker and no .NET to install:
 
 ```bash
 curl -fsSL https://github.com/mpospisil/gleanvolt/releases/latest/download/install.sh | sudo sh
 ```
 
 Running it again upgrades; settings and data are kept. More in
-[packaging/linux/README.md](packaging/linux/README.md).
+[Install on Linux](packaging/linux/README.md).
 
-**Docker on a Raspberry Pi** — one container, deployed and updated from your computer with
-`./deploy/deploy-controller-only.sh`. See [Deploying to a Raspberry Pi](deploy/README.md).
-
-**A NAS** (Synology, QNAP, Unraid, TrueNAS SCALE) — use
+**A NAS** (Synology, QNAP, Unraid, TrueNAS SCALE) — add
 [`deploy/docker-compose.nas.yml`](deploy/docker-compose.nas.yml) in the NAS's container UI. See
-[Running on a NAS](deploy/README.md#running-on-a-nas).
+[Running on a NAS](docs/NAS.md).
 
 **Windows** — every release is published to [winget](https://learn.microsoft.com/windows/package-manager/),
 the Windows Package Manager:
@@ -113,6 +112,11 @@ beside the program, in winget's package folder under `%LOCALAPPDATA%\Microsoft\W
 Upgrade with `winget upgrade MartinPospisil.Gleanvolt`, after copying `data\` somewhere safe. Without
 winget, download `gleanvolt-<version>-win-x64.zip` from
 [Releases](https://github.com/mpospisil/gleanvolt/releases), unzip it and run `Gleanvolt.Worker.exe`.
+
+**Advanced: Docker on a Pi, managed from another computer.** The scripts in `deploy/` deploy, update
+and roll back a Docker container on a Raspberry Pi over ssh, from a checkout of this repository — and
+can run Home Assistant and an MQTT broker beside it. See
+[Deploying to a Raspberry Pi from your computer](deploy/README.md).
 
 > **Home Assistant on the same device?** Don't run the Home Assistant container on a low-powered Pi
 > (less than 2 GB of RAM). See [Gleanvolt with Home Assistant](docs/HOME_ASSISTANT.md).
@@ -161,8 +165,9 @@ your own devices, and watch the first runs.
 | [Charging session and energy history](docs/DATA.md) | What is recorded, and how to query it |
 | [HTTP API](docs/HTTP_API.md) | The OpenAPI-described API, for programs and MCP servers |
 | [Gleanvolt with Home Assistant](docs/HOME_ASSISTANT.md) | Connecting it, running Home Assistant beside it, and every entity |
-| [Deploying to a Raspberry Pi](deploy/README.md) | Preparing the Pi, updating, NAS, Windows containers, logs, backup, troubleshooting |
-| [Linux package](packaging/linux/README.md) | The `.deb` install: settings, files, upgrade and uninstall |
+| [Install on Linux](packaging/linux/README.md) | The one-line install: settings, files, upgrade and uninstall |
+| [Running on a NAS](docs/NAS.md) | Synology, QNAP, Unraid, TrueNAS SCALE and OpenMediaVault |
+| [Deploying to a Raspberry Pi from your computer](deploy/README.md) | Advanced: Docker on a Pi, managed over ssh; updates, logs, backup, troubleshooting |
 | [Supported PV systems](docs/SUPPORTED_PV_SYSTEMS.md), [electric vehicles](docs/SUPPORTED_EVS.md) | Every model, how well it is supported, and what Gleanvolt needs from it |
 | [Privacy](docs/PRIVACY.md) | What leaves your network, and when |
 

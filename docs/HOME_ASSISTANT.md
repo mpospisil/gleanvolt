@@ -13,10 +13,12 @@ measures and plans.
 
 There are two ways to connect them:
 
-- **[To a Home Assistant you already run](#to-a-home-assistant-you-already-run)** — the controller is
-  deployed on its own, as in [deploy/README.md](../deploy/README.md), and dials your broker.
+- **[To a Home Assistant you already run](#to-a-home-assistant-you-already-run)** — recommended.
+  Gleanvolt is installed any way (the one-line Linux install, a NAS, Windows, Docker) and connects to
+  your broker; you set the link in the web UI.
 - **[Home Assistant and a broker on the same Pi](#home-assistant-and-a-broker-on-the-same-pi)** —
-  `./deploy/deploy.sh` runs the controller, Mosquitto and Home Assistant as three containers.
+  advanced: `./deploy/deploy.sh`, run from your computer, puts the controller, Mosquitto and Home
+  Assistant on one Pi as three containers.
 
 Either way, charge control boots in mode **Off** and nothing is written to your hardware until a
 charging button is pressed.
@@ -49,9 +51,10 @@ for that link, and win when set.
 
 ## Home Assistant and a broker on the same Pi
 
-For a Pi with **2 GB of RAM or more**. Prepare the Pi as in [deploy/README.md](../deploy/README.md#prepare-the-pi-once),
-then add the three steps below, and deploy with `./deploy/deploy.sh` instead of
-`deploy-controller-only.sh`.
+For a Pi with **2 GB of RAM or more**, managed from your computer with the deploy scripts — see
+[Deploying to a Raspberry Pi from your computer](../deploy/README.md). Prepare the Pi
+[as described there](../deploy/README.md#prepare-the-pi-once), then add the three steps below, and
+deploy with `./deploy/deploy.sh` instead of `deploy-controller-only.sh`.
 
 ### 1. The settings in `.env`
 
