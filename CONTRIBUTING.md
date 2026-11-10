@@ -122,6 +122,7 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Infrastructure.Tests/ # Register encoding and write-path tests
 │   ├── Gleanvolt.Api.Tests/            # The endpoints over TestServer, and the OpenAPI contract snapshot
 │   ├── Gleanvolt.Web.Tests/            # Component rendering (bUnit) and options binding
+│   ├── Gleanvolt.Web.Screenshots/      # Renders the pages the user manual's screenshots show
 │   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 │   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
 │   ├── Gleanvolt.Devices.Testing/      # The driver test kit: Modbus and HTTP replays, and the conformance tests
@@ -133,6 +134,7 @@ Gleanvolt.slnx
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi
 └── docs/                           # DECISIONS.md, IMPLEMENTATION_LOG.md and the user guides
+    └── manual/                     # The user manual: a Starlight site, published to GitHub Pages
 ```
 
 ### Layering rules
@@ -224,6 +226,13 @@ If your change touches a write path:
 - Keep the defaults off. A feature that writes must be something the operator switched on knowingly.
 - Do not widen what a `ReadOnlyModbusClient` protects. The dry-run guarantee is structural — a client
   that may not write physically cannot — and it should stay that way.
+
+## The user manual
+
+[`docs/manual`](docs/manual/README.md) is the user manual, built with Node, separately from the .NET
+build. Its screenshots are generated from the real pages. A pull request that changes what one of them
+shows fails the manual's screenshot check: run `npm run screenshots` in `docs/manual` and commit the
+PNGs. The README there has the rest.
 
 ## Cutting a release
 

@@ -4,6 +4,38 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-10 — The user manual's skeleton, screenshots and first page (issue #329, step 1)
+
+The first step of the manual's plan: the site, its publishing, the screenshot pipeline, and one finished
+page to agree on tone and picture quality. The reasoning is in `DECISIONS.md`.
+
+- **`docs/manual`** — Starlight 0.42 on Astro 7, pinned in `package-lock.json`. `en/` and `cs/` under
+  `src/content/docs`; English is the default and the fallback, with Starlight's "not translated" notice.
+  `MANUAL_BASE` sets where a build is served. `starlight-links-validator` checks every link at build time.
+- **Pages** — the welcome page (what it does and doesn't, what you need, at your own risk, one line
+  pointing advanced readers at the repository), its Czech translation, and **The setup wizard**: opening
+  the UI, the password and the recovery key, then each wizard step, with a picture for each.
+- **`tests/Gleanvolt.Web.Screenshots`** — in the solution, so `ci.yml` renders every picture's page.
+  `ScreenshotTest` wraps a page in `MainLayout` with bUnit's authorization (signed in or out), navigates
+  bUnit to the page's address so the menu marks the right link, and writes `{name}.html` plus
+  `{name}.json` (window width, optional element to crop to). The web tests' `Fakes.cs` and `PageTest.cs`
+  are compiled in; `Gleanvolt.Web` gives the project its internals. The device forms use
+  `InverterDrivers.Known` and `ChargerDrivers.Known`, so the brands are the real ones.
+- **`docs/manual/scripts/screenshots.mjs`** — runs those tests, opens each file in the installed Chrome
+  with `puppeteer-core`, light scheme, 1x, and saves the PNG (cropped to `main.content` or the sign-in
+  card, at about the manual's column width). `--check` compares with `pixelmatch` instead and leaves the
+  new pictures for CI to upload.
+- **`.github/workflows/docs.yml`** — build on pull requests (and the screenshot check), `/next/` from
+  `main`, `/vX.Y/` and `/latest/` from tags, a tag rebuilt by hand; committed to `gh-pages` with
+  `.nojekyll`, since Jekyll drops Astro's `_astro/`.
+- **Not done here** — Pages has to be switched on once (source: the `gh-pages` branch) after the first
+  publish. The README and the web UI don't link to the manual yet (plan step 6), and nothing marks
+  `/next/` as unreleased.
+- **Quirk** — the setup page shows the recovery key only after its form's POST, which bUnit doesn't make,
+  so that picture rebuilds that branch around the real `RecoveryKeyPanel`.
+
+---
+
 ## 2026-11-10 — The web UI answers to gleanvolt.local (issue #363)
 
 Gleanvolt announces itself on the LAN over mDNS, so a phone or laptop opens `http://gleanvolt.local:8090`

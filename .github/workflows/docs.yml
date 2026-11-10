@@ -1,0 +1,177 @@
+# The user manual (#329): docs/manual, a Starlight site, published to GitHub Pages.
+#
+#   pull request   build it (a broken link or anchor fails the build) and check the screenshots
+#   push to main   publish to /next/, to review changes on the live site before a release
+#   tag v*         publish to /vX.Y/ and to /latest/, which the README and the web UI link to
+#   by hand        rebuild a tag's manual
+#
+# Separate from ci.yml so the .NET build doesn't need Node. Every version is a folder on the gh-pages
+# branch: actions/deploy-pages replaces the whole site on every deploy and could keep only one.
+# Pages serves that branch (Settings -> Pages -> Deploy from a branch -> gh-pages, / (root)).
+
+name: Manual
+
+on:
+  pull_request:
+    paths:
+      - 'docs/manual/**'
+      - 'src/**'
+      - 'tests/Gleanvolt.Web.Screenshots/**'
+      - 'tests/Gleanvolt.Web.Tests/Fakes.cs'
+      - 'tests/Gleanvolt.Web.Tests/PageTest.cs'
+      - '.github/workflows/docs.yml'
+  push:
+    branches: [main]
+    # Path filters are not applied to tags, so every release gets its manual.
+    tags: ['v*']
+    paths:
+      - 'docs/manual/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release tag whose manual to rebuild, e.g. v1.4.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/manual
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: docs/manual/package-lock.json
+
+      - run: npm ci
+
+      # starlight-links-validator runs as part of the build and fails it on a broken link.
+      - run: npm run build
+
+  screenshots:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/manual
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: docs/manual/package-lock.json
+
+      - run: npm ci
+
+      # Renders every screenshot again with the runner's Chrome and compares it with the committed one.
+      - name: Check the screenshots against the UI
+        run: npm run screenshots:check
+        env:
+          SCREENSHOTS_OUT: ${{ runner.temp }}/screenshots-changed
+
+      - name: Upload the screenshots as they are now
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-changed
+          path: ${{ runner.temp }}/screenshots-changed
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # One publish at a time: each commits to gh-pages.
+    concurrency:
+      group: manual-gh-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: docs/manual/package-lock.json
+
+      - name: Decide where it goes
+        id: target
+        env:
+          TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+        run: |
+          if [ -n "$TAG" ]; then
+            # v1.4.2 -> v1.4: one manual per minor version, the latest patch's.
+            version=$(echo "$TAG" | sed -E 's/^(v[0-9]+\.[0-9]+).*/\1/')
+            echo "folders=$version latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "folders=next" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and publish
+        env:
+          FOLDERS: ${{ steps.target.outputs.folders }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          set -eu
+          cd docs/manual
+          npm ci
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git fetch origin gh-pages
+            git worktree add "$RUNNER_TEMP/site" origin/gh-pages
+            git -C "$RUNNER_TEMP/site" checkout -B gh-pages
+          else
+            git worktree add --orphan -b gh-pages "$RUNNER_TEMP/site"
+          fi
+
+          for folder in $FOLDERS; do
+            # Astro needs to know where it is served, for every link and asset.
+            MANUAL_BASE="/$REPO/$folder/" npm run build
+            rm -rf "$RUNNER_TEMP/site/$folder"
+            cp -r dist "$RUNNER_TEMP/site/$folder"
+          done
+
+          cd "$RUNNER_TEMP/site"
+          # Folders starting with _ (Astro's _astro/) are dropped by Pages' Jekyll unless this exists.
+          touch .nojekyll
+          # The root sends a visitor to the released manual, or to /next/ until there is one.
+          home=next
+          [ -d latest ] && home=latest
+          cat > index.html <<EOF
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Gleanvolt manual</title>
+          <meta http-equiv="refresh" content="0; url=$home/">
+          <link rel="canonical" href="$home/">
+          <a href="$home/">The Gleanvolt manual</a>
+          EOF
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git commit -m "Manual: $FOLDERS from ${GITHUB_SHA::7}"
+          git push origin gh-pages

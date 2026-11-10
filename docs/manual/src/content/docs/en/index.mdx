@@ -1,0 +1,50 @@
+---
+title: Welcome
+description: What Gleanvolt does, what it doesn't, and what you need to use it.
+---
+
+**Gleanvolt charges your electric car from your own solar panels.** It runs on a small computer in
+your home, such as a Raspberry Pi, a NAS or a Windows PC. From there it talks to your inverter and your
+car charger over your home network, and decides, moment by moment, how fast the car should charge.
+You use it from a web page, on your phone or your computer.
+
+## What it does
+
+- **Charges the car from sunshine** that your house isn't using, instead of sending it to the grid.
+- **Gives you a choice of charging modes**: from the sun only, from the sun with a little help from the
+  grid, as fast as possible, or a set amount by a set time. You pick one with one tap.
+- **Keeps the home battery out of it** when you want it to, so the car doesn't empty the battery
+  you'll need tonight.
+- **Shows you what is happening**: how much the sun makes, what the house uses, what goes into the car,
+  and a history of every charge.
+- **Works without the internet.** Everything happens on your home network. The internet is only used
+  for the optional solar forecast, the weather, and your car's battery level.
+
+## What it doesn't do
+
+- It doesn't replace your inverter's or your charger's own app. It only sets how fast the car charges
+  and whether the home battery may discharge.
+- It doesn't run in the cloud, and it has no account to sign up for.
+- It doesn't work with every inverter and charger. See the list below.
+
+## What you need
+
+- **A supported inverter**: a SolaX hybrid inverter, or a Huawei SUN2000. Some inverters sold under
+  other names (Tigo, Qcells, Dražice) are SolaX inside and work too.
+- **A supported car charger**: a SolaX HAC or EVC, a Huawei SCharger, or a go-e.
+- **A computer that stays on**, in the same home network as the inverter and the charger: a Raspberry
+  Pi (64-bit), a NAS, any 64-bit Linux machine, or a Windows PC.
+- **A home network** that the inverter and the charger are connected to, by cable or Wi-Fi.
+- **Any electric car** with a Type 2 charging socket. Reading the car's battery level is optional;
+  it works for Volkswagen and Škoda cars, and for others through Home Assistant.
+
+## Use at your own risk
+
+Gleanvolt changes how your charger and your inverter behave. It has been tested carefully, but it is
+free software that comes with no warranty. Keep an eye on the first few charges, and if anything looks
+wrong, set the charging mode to **Off**.
+
+:::note[For advanced users]
+Home Assistant, MQTT, the HTTP API and the history database are documented in the
+[Gleanvolt repository on GitHub](https://github.com/mpospisil/gleanvolt).
+:::
