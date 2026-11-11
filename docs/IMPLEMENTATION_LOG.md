@@ -4,6 +4,44 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-11 — A full car that shows Stop one poll early still ends as complete
+
+**Seen on the Pi.** The first Fast charge after the driver and charger contracts were deployed
+(`d260985`) charged correctly: 16 A for 3 h 51 min, 41.2 kWh from the grid, the house battery held at
+9% with 0 Wh taken. It ended as `ChargerTakenOver`, not `SessionComplete`, and two minutes late.
+Readings at the end (local time):
+
+| Time | Status | Use-mode | Car power |
+|---|---|---|---|
+| 01:33:52 | Charging | Fast | 10.8 kW |
+| 01:33:59 | Charging | **Stop** | **6.8 kW** |
+| 01:34:07 | Finishing | Stop | 0 W |
+| 01:36:01 | — | — | "in Stop for 2 min … no longer ours" → `ChargerTakenOver` |
+
+**Hardware quirk.** On a full car the SolaX X3-HAC switches its own use-mode to Stop. This time the
+switch was seen one poll before the status went to Finishing, while the car was still slowing down.
+The logs kept since 29 October have no other `Charging` reading with use-mode Stop and real power.
+
+**Cause.** `ChargerOwnership.NotOurs` answers an early Stop with a None during its 2-minute grace, and
+`ChargingControlCoordinator` called `SetCharging(false)` on every None. On the next poll
+`input.Charging` was false, so `ChargerOwnership.Check` did not judge the Finishing reading.
+
+**Change.**
+- `ChargingControlDecision.Unconfirmed`: set only by the guard's grace-period None.
+- `ChargingControlCoordinator`: an unconfirmed None changes nothing, so `_charging` and
+  `_stateChangedAt` are kept. A side effect: junk use-mode blips no longer restart the
+  charging-state clock.
+- Tests: `AFullCarIsStillFullWhenTheWallboxShowsStopOnePollEarly` replays the three readings through
+  the coordinator with the real `FastChargingController`. `AJunkUseModeBlipDoesNotRestartTheChargingClock`
+  covers the clock. Two ownership tests check the flag. Both coordinator tests fail without the change.
+
+Files: `src/Gleanvolt.Core/Models/ChargingControlDecision.cs`,
+`src/Gleanvolt.Core/Strategies/ChargerOwnership.cs`, `src/Gleanvolt.Hosting/ChargingControlCoordinator.cs`,
+`tests/Gleanvolt.Core.Tests/Strategies/ChargerOwnershipTests.cs`,
+`tests/Gleanvolt.Hosting.Tests/ChargingControlCoordinatorTests.cs`, `docs/DECISIONS.md`.
+
+---
+
 ## 2026-11-10 — The manual in Czech (issue #329, step 7)
 
 All 33 pages of the manual in `docs/manual/src/content/docs/cs/`, the same set as `en/`: no Czech page

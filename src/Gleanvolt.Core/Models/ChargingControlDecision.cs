@@ -181,6 +181,16 @@ public sealed record ChargingControlInput(
 /// A wait for sun or for low tariff is not one: re-arming out of it must not stop a later appointment
 /// from being kept.
 /// </param>
+/// <param name="Unconfirmed">
+/// The charger reads as not allowed to charge, but not for long enough to be believed
+/// (<see cref="Strategies.ChargerOwnership.DropoutGrace"/>). Accompanies a
+/// <see cref="ChargingControlAction.None"/>, and tells the orchestrator to change nothing, its own
+/// state included: it is still asking the car to charge at the setpoint it last wrote. Treating
+/// that None as "no longer charging" cost a full car its <c>SessionComplete</c> on 2026-11-11, when
+/// the wallbox showed Stop one poll before Finishing, with the car still drawing 6.8 kW. The
+/// Finishing poll after that was no longer judged as a full car, and two minutes later the session
+/// ended as taken over.
+/// </param>
 public sealed record ChargingControlDecision(
     ChargingControlAction Action,
     int? ChargeCurrentAmps,
@@ -189,7 +199,8 @@ public sealed record ChargingControlDecision(
     ChargingSessionEndReason? EndsSession = null,
     double GridBridgeWatts = 0,
     DateTimeOffset? WaitUntil = null,
-    bool Appointment = false)
+    bool Appointment = false,
+    bool Unconfirmed = false)
 {
     /// <summary>Whether this decision ends the mode; <see cref="EndsSession"/> says why.</summary>
     public bool SessionComplete => EndsSession is not null;

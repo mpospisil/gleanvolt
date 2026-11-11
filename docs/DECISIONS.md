@@ -4,6 +4,33 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-11 — A use-mode reading not yet believed changes nothing, the charging state included
+
+**Found.** The Fast charge of 10–11 November ended as `ChargerTakenOver` when the car was in fact full
+(26% → 80%, 41.2 kWh). The full-car rule from #280 expects this wallbox to go from `Charging / Fast` at
+full power straight to `Finishing / Stop / 0 W` in one poll. That was true for every earlier ending.
+This time one poll landed between the two: `Charging / Stop / 6.8 kW`, with the car still slowing down.
+The ownership guard answered that poll with "not allowed to charge; leaving it untouched" (a None,
+within the 2-minute grace). The coordinator treated every None as "no longer charging", so on the
+Finishing poll that followed the full-car rule did not run. Two minutes later the guard ended the
+session as taken over. The Chargers 1 refactor did not cause this: it only renamed `Mode == Fast` to
+`ChargingAllowed`. It is the first such poll in the logs kept since 29 October.
+
+**Decided.** The guard's grace-period None now carries `Unconfirmed`. For an unconfirmed None the
+coordinator changes nothing, and in particular keeps counting itself as charging. The setpoint it
+wrote is still in force, and a reading not yet believed is ignored completely, not half ignored.
+
+**Consequences accepted.**
+- A full car is judged on the Finishing poll whether or not the wallbox showed Stop one poll early.
+- A junk use-mode blip after a Modbus dropout (about 45 a day) no longer restarts
+  `TimeInCurrentState`. Run-time and pause minimums now measure real changes of state only.
+- If the service stops during a grace period, the shutdown pause writes 0 A to a charger that may be
+  in Stop. That is a pause, harmless on a charger that is not charging.
+- As before, the owner pressing Stop while the car draws and the wallbox then showing Finishing would
+  read as a full car. The existing rule already accepted that ambiguity.
+
+---
+
 ## 2026-11-10 — The web UI links to the online manual for its own version; the docs/ pages stay as reference
 
 **Context.** [Issue #329](https://github.com/mpospisil/gleanvolt/issues/329), step 6, and its open question:

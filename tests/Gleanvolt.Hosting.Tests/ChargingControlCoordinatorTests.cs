@@ -447,6 +447,62 @@ public class ChargingControlCoordinatorTests
     }
 
     [Fact]
+    public async Task AFullCarIsStillFullWhenTheWallboxShowsStopOnePollEarly()
+    {
+        // 2026-11-11 01:33-01:36, a Fast charge with the real controller deciding. The car reached 80%
+        // and the wallbox switched itself to Stop one poll before Finishing, while the car was still
+        // drawing 6.8 kW. The None for that early Stop used to count as "no longer charging", so the
+        // Finishing poll after it was not judged as a full car. Two minutes later the session ended as
+        // ChargerTakenOver.
+        var charger = new FakeEvChargerControl { CurrentSettings = SolaxMode.Fast.At(16) };
+        var coordinator = new ChargingControlCoordinator(
+            new Dictionary<ChargeControlMode, IChargingController>
+            {
+                [ChargeControlMode.FastNoBattery] = new FastChargingController(16, TimeSpan.FromMinutes(2)),
+            },
+            charger,
+            new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
+            NullLogger<ChargingControlCoordinator>.Instance);
+
+        Task<ChargeControlCycleResult> Poll(DateTimeOffset at, EvChargerStatus status, double evWatts) =>
+            coordinator.RunCycleAsync(
+                new EnergyState(at, 9, 0, 0, evWatts, status, evWatts), ChargeControlMode.FastNoBattery, null, CancellationToken.None);
+
+        await Poll(Now, EvChargerStatus.Charging, 10769);
+        await Poll(Now.AddSeconds(8), EvChargerStatus.Charging, 10769);
+
+        charger.CurrentSettings = SolaxMode.Stop.At(16);
+        var early = await Poll(Now.AddSeconds(15), EvChargerStatus.Charging, 6826);
+        Assert.Null(early.EndsSession);
+
+        var finishing = await Poll(Now.AddSeconds(23), EvChargerStatus.Finishing, 0);
+        Assert.Equal(ChargingSessionEndReason.SessionComplete, finishing.EndsSession);
+    }
+
+    [Fact]
+    public async Task AJunkUseModeBlipDoesNotRestartTheChargingClock()
+    {
+        // The charger reports junk use-modes for a few seconds after a Modbus dropout. Ignoring one
+        // means ignoring it completely: the time the mode has been charging carries on through it.
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+        await _coordinator.RunCycleAsync(Charging(Now), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        _charger.CurrentSettings = SolaxMode.Eco.At(16);
+        _controller.NextDecision = new(ChargingControlAction.None, null, "leaving it untouched", Unconfirmed: true);
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(1)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        _charger.CurrentSettings = SolaxMode.Fast.At(16);
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+        await _coordinator.RunCycleAsync(Charging(Now.AddMinutes(2)), ChargeControlMode.Solar, null, CancellationToken.None);
+
+        Assert.True(_controller.LastInput!.Charging);
+        Assert.Equal(TimeSpan.FromMinutes(2), _controller.LastInput.TimeInCurrentState);
+    }
+
+    [Fact]
     public async Task ReArmingOutOfAWaitForSunLeavesALaterAppointmentToBeKept()
     {
         // A targeted charge stood down overnight for sun, re-armed when it comes, and then due to hold its
