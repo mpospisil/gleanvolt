@@ -692,6 +692,12 @@
   <data name="SunOnlyNoJustInTime" xml:space="preserve">
     <value>Just in time is off while this is ticked: holding the last part back with no grid to cover a cloudy hour can only lose sun.</value>
   </data>
+  <data name="TargetedLowTariffHint" xml:space="preserve">
+    <value>In high tariff the car waits, sun or not, and the plan counts only on low-tariff hours before the departure. Whatever does not fit in them is shown as a shortfall — the preview shows how much before you start. The charger starts a car by itself when it is plugged in, so a car plugged in during high tariff draws power briefly until the next poll stops it.</value>
+  </data>
+  <data name="SunOnlyNoLowTariff" xml:space="preserve">
+    <value>Low tariff only is off while Sun only is ticked: sun only buys nothing from the grid at any hour.</value>
+  </data>
   <data name="RestAtTopic" xml:space="preserve">
     <value>Rest at (%)</value>
   </data>

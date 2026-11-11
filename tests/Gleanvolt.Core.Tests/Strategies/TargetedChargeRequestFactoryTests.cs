@@ -82,6 +82,17 @@ public class TargetedChargeRequestFactoryTests
     }
 
     [Fact]
+    public void Carries_low_tariff_only_and_lets_sun_only_win_over_it()
+    {
+        // #382: low tariff only narrows a plan, so it is kept; beside sun only it means nothing and goes.
+        Assert.True(Create(energyWh: 22_000, constraints: TargetedChargeConstraints.LowTariff).Request!.Constraints!.LowTariffOnly);
+
+        var both = Create(energyWh: 22_000, constraints: new TargetedChargeConstraints(MaxGridEnergyWh: 0, LowTariffOnly: true)).Request!;
+        Assert.True(both.Constraints!.IsSunOnly);
+        Assert.False(both.Constraints.LowTariffOnly);
+    }
+
+    [Fact]
     public void Stores_constraints_that_narrow_nothing_as_none()
     {
         Assert.Null(Create(energyWh: 22_000).Request!.Constraints);

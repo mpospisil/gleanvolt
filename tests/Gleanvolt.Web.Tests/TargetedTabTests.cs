@@ -37,6 +37,7 @@ public class TargetedTabTests : PageTest
     private readonly FakeBatteryHoldSelector _batteryHold = new();
     private readonly FakeForecastRuntimeSettings _forecast = new();
     private readonly FakeTargetedChargePreview _preview = new(TestTargetedPlans.SolarPlusGrid(Now));
+    private readonly FakeTariffSchedule _tariff = new();
 
     // Registered empty, as an install with Vehicle:Enabled=false is: the cases below that want a car
     // set one, and everything else asserts the tab a car-less install actually sees.
@@ -51,6 +52,7 @@ public class TargetedTabTests : PageTest
         Services.AddSingleton<Core.Interfaces.IChargeControlModeSelector>(_mode);
         Services.AddSingleton<Core.Interfaces.IChargeActions>(_actions);
         Services.AddSingleton<Core.Interfaces.ITargetedChargeSelector>(_target);
+        Services.AddSingleton<Core.Interfaces.ITariffSchedule>(_tariff);
         Services.AddSingleton<Core.Interfaces.IBatteryHoldSelector>(_batteryHold);
         Services.AddSingleton<Core.Interfaces.IForecastRuntimeSettings>(_forecast);
         Services.AddSingleton<Core.Interfaces.ITargetedChargePreview>(_preview);
@@ -595,6 +597,75 @@ public class TargetedTabTests : PageTest
         var page = RenderTab();
 
         Assert.True(page.Find("#sun-only").HasAttribute("checked"));
+    }
+
+    // -- Low tariff only (#382)
+
+    private void WithATariff() => _tariff.Timeline = FakeTariffSchedule.Night(new DateOnly(2026, 8, 10), Prague);
+
+    [Fact]
+    public void Low_tariff_only_is_greyed_out_with_no_tariff_and_says_where_to_set_one_up()
+    {
+        var page = RenderTab();
+
+        Assert.True(page.Find("#low-tariff-targeted").HasAttribute("disabled"));
+        Assert.NotNull(page.Find(".low-tariff-option a[href='/settings#tariff-editor']"));
+    }
+
+    [Fact]
+    public void Low_tariff_only_with_a_tariff_goes_on_the_request()
+    {
+        WithATariff();
+        var page = RenderTab();
+
+        Assert.False(page.Find("#low-tariff-targeted").HasAttribute("disabled"));
+
+        page.Find("#target-energy").Change("22");
+        page.Find("#low-tariff-targeted").Change(true);
+        Activate(page);
+
+        var constraints = Assert.Single(_target.Sets).Request.Constraints!;
+        Assert.True(constraints.LowTariffOnly);
+        Assert.False(constraints.IsSunOnly);
+    }
+
+    [Fact]
+    public void Sun_only_clears_low_tariff_only_and_greys_it_out()
+    {
+        WithATariff();
+        var page = RenderTab();
+        page.Find("#low-tariff-targeted").Change(true);
+
+        page.Find("#sun-only").Change(true);
+
+        Assert.False(page.Find("#low-tariff-targeted").HasAttribute("checked"));
+        Assert.True(page.Find("#low-tariff-targeted").HasAttribute("disabled"));
+        Assert.Contains("Low tariff only is off while Sun only is ticked", page.Find(".low-tariff-option").TextContent);
+
+        page.Find("#target-energy").Change("22");
+        Activate(page);
+
+        var constraints = Assert.Single(_target.Sets).Request.Constraints!;
+        Assert.True(constraints.IsSunOnly);
+        Assert.False(constraints.LowTariffOnly);
+    }
+
+    [Fact]
+    public void Shows_a_running_low_tariff_request_as_ticked_and_says_it_is_waiting()
+    {
+        WithATariff();
+        _target.Set(
+            new TargetedChargeRequest(18_000, Now.AddHours(9), Now) { Constraints = TargetedChargeConstraints.LowTariff },
+            "test");
+        _holder.Set(Statuses.Sample(Now, ChargeControlMode.Targeted) with
+        {
+            LowTariff = new LowTariffStatus(Waiting: true, Until: new DateTimeOffset(2026, 8, 10, 20, 0, 0, TimeSpan.Zero), Ignored: false),
+        });
+
+        var page = RenderTab();
+
+        Assert.True(page.Find("#low-tariff-targeted").HasAttribute("checked"));
+        Assert.Contains("Waiting for low tariff, from 22:00", page.Find("#low-tariff-targeted-state").TextContent);
     }
 
     [Fact]

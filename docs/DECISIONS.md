@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-11 — Targeted's low tariff only is a request constraint, a full pause, and forbidden windows for the plan
+
+**Found.** Fast and SolarGrid have *low tariff only* as a per-mode setting (`ILowTariffSettings`, #274)
+read live through `TariffWait`. Targeted is a planner: if it only waited live, the plan would still
+count on high-tariff hours and the preview would promise energy the wait then never delivers. Targeted
+already has a per-request constraint set (`TargetedChargeConstraints`, #128), and its planner already
+honours `ForbiddenWindows` by cutting them out of the slices, with what no longer fits reported as
+shortfall.
+
+**Decided (#382).**
+- A `LowTariffOnly` flag on `TargetedChargeConstraints`, carried by the request like Sun only, not a
+  mode setting in `LowTariffModes`. The web form and the HA activate button set it together with the target.
+- The request stores the wish, not the hours. `TargetedChargeProvider` adds the tariff's high windows to
+  `ForbiddenWindows` on every plan build (`WithHighTariffForbidden`), so a tariff edited on Settings moves
+  the plan with it.
+- Live, `TargetedChargingController` uses the same `TariffWait` as Fast. PollingService opens the gate
+  for Targeted from the active request.
+- A **full pause**, sun or not, as the owner asked ("identical to Fast"). Stopping only the grid import
+  in high tariff while still taking solar would need a per-window grid budget, which the constraints
+  cannot express.
+- Sun only wins when both are set (`Normalized`), since it already buys nothing at any hour.
+
+**Consequences accepted.**
+- A sunny high-tariff afternoon is lost to a low-tariff-only target, the same trade SolarGrid's option made.
+- The tariff wins over the deadline: a plan out of time still waits in high tariff, and the shortfall is
+  shown in the preview rather than bought.
+- Past the end of the tariff timeline (end of tomorrow for the Table strategy) nothing is forbidden; a
+  36-hour target can reach slightly past it.
+- Like Sun only, the option doesn't survive a restart, because the request doesn't.
+
 ## 2026-11-11 — A use-mode reading not yet believed changes nothing, the charging state included
 
 **Found.** The Fast charge of 10–11 November ended as `ChargerTakenOver` when the car was in fact full

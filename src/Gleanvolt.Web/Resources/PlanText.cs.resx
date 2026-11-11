@@ -675,6 +675,12 @@
   <data name="SunOnlyNoJustInTime" xml:space="preserve">
     <value>Volba Na poslední chvíli je vypnutá, dokud je zaškrtnuto Jen slunce: odkládání poslední části bez sítě, která by pokryla zamračenou hodinu, by mohlo jen přijít o slunce.</value>
   </data>
+  <data name="TargetedLowTariffHint" xml:space="preserve">
+    <value>Ve vysokém tarifu auto čeká, ať svítí, nebo ne, a plán počítá jen s hodinami nízkého tarifu do odjezdu. Co se do nich nevejde, se ukáže jako deficit — náhled to ukáže ještě před spuštěním. Nabíječka po připojení auta sama spustí nabíjení, takže auto připojené ve vysokém tarifu chvíli odebírá, než ho další čtení zastaví.</value>
+  </data>
+  <data name="SunOnlyNoLowTariff" xml:space="preserve">
+    <value>Volba Jen nízký tarif je vypnutá, dokud je zaškrtnuto Jen slunce: Jen slunce nekupuje ze sítě nic v žádnou hodinu.</value>
+  </data>
   <data name="RestAtTopic" xml:space="preserve">
     <value>Klidová úroveň (%)</value>
   </data>

@@ -4,6 +4,45 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-11 — Targeted: Low tariff only (#382)
+
+**What.** A *Low tariff only* option for a targeted charge, offered only while *Sun only* is off.
+Through high tariff the charger waits, sun or not, exactly as Fast (no battery) does with the same
+option (#274). The plan counts only on low-tariff hours, and what doesn't fit shows up as shortfall
+in the preview before the charger starts.
+
+**How.**
+- `TargetedChargeConstraints.LowTariffOnly`, plus `LowTariff`, `Of(sunOnly, lowTariffOnly)`,
+  `Normalized()` (sun only wins) and `WithHighTariffForbidden(timeline)`. `IsEmpty` counts the flag, so
+  a request with only this set keeps its constraints.
+- `TargetedChargeProvider.BuildPlan` expands the flag into forbidden windows from `ITariffSchedule` on
+  every build, for the running plan and the preview alike. The planner needed no change: it already cuts
+  forbidden windows out of the slices and reports the rest as shortfall.
+- `TargetedChargingController` calls `TariffWait.For(input, "Targeted")` after the departure, target and
+  ownership checks and before the Maximum case, so a plan short of time also waits in high tariff.
+- `PollingService.LowTariff` takes Targeted's flag from the active request
+  (`TargetedChargeProvider.LowTariffOnly`), so the status's `lowTariff` block works on the Overview
+  with no other change.
+- Web: a `#low-tariff-targeted` checkbox under Sun only. It is greyed out with a hint while Sun only is
+  ticked (ticking Sun only clears it) and while no tariff is set up. It shows the waiting/ignored note
+  while a low-tariff Targeted run is driving. New strings `TargetedLowTariffHint` and
+  `SunOnlyNoLowTariff` (en + cs).
+- HA: a `target_low_tariff_only` switch, held until *Activate target* like `target_sun_only`.
+- API: `editable.lowTariffOnly`. Sent with `maxGridEnergyWh: 0`, it comes back false. OpenAPI snapshot
+  regenerated; the gleanvolt-mcp copy needs the same.
+
+**Not verified on hardware.** No Targeted run with a tariff has been made yet. The wait is the same
+`ChargerWait` stand-down Fast already uses on the Pi.
+
+**Files.** `Core/Models/TargetedChargeConstraints.cs`, `Core/Models/ChargingControlDecision.cs` (doc),
+`Core/Strategies/{TargetedChargingController,TargetedChargeRequestFactory,TariffWait}.cs`,
+`Hosting/Targeting/TargetedChargeProvider.cs`, `Hosting/PollingService.cs`,
+`Hosting/HomeAssistant/{HaDiscovery,HomeAssistantMqttWorker}.cs`, `Api/Contracts/TargetedContracts.cs`,
+`Web/Components/Plan/TargetedTab.razor`, `Web/Resources/PlanText{,.cs}.resx`; tests in Core
+(`TargetedLowTariffOnlyTests`, factory), Hosting (preview, HA buttons, discovery), Web (Targeted tab,
+plan page), the API contract; docs `MODE_TARGETED`, `HTTP_API`, `HOME_ASSISTANT`, `WEB_UI`, manual en +
+cs (targeted, choosing) and the `plan-targeted` screenshot.
+
 ## 2026-11-11 — A full car that shows Stop one poll early still ends as complete
 
 **Seen on the Pi.** The first Fast charge after the driver and charger contracts were deployed

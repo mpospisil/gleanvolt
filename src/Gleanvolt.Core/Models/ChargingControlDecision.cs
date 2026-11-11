@@ -102,8 +102,9 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 /// <param name="LowTariffOnly">
 /// The tariff, when the owner has set the mode driving to <b>low tariff only</b> and a tariff is known
-/// (issue #274); null otherwise, which means no restriction. Only
-/// <see cref="Strategies.FastChargingController"/> and <see cref="Strategies.SolarGridChargingController"/>
+/// (issue #274) — for Targeted, when the active request asks for it (#382) — and a tariff is known;
+/// null otherwise, which means no restriction. <see cref="Strategies.FastChargingController"/>,
+/// <see cref="Strategies.SolarGridChargingController"/> and <see cref="Strategies.TargetedChargingController"/>
 /// read it, through <see cref="Strategies.TariffWait"/>.
 /// </param>
 /// <param name="EvWasDrawing">

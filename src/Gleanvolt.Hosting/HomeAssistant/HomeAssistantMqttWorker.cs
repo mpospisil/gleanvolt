@@ -63,6 +63,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
     private TargetedChargePriority _pendingPriority = TargetedChargePriority.Cheapest;
     private double _pendingRestSocPercent;
     private bool _pendingSunOnly;
+    private bool _pendingLowTariffOnly;
 
     // The same arrangement for the fast charge's amount (#119). Full is the default, so a dashboard
     // nobody has touched presses the button and gets what the button has always done.
@@ -252,6 +253,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
 
         await _client.SubscribeAsync(_discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), cancellationToken: cancellationToken).ConfigureAwait(false);
+        await _client.SubscribeAsync(_discovery.SwitchCommandTopic(HaDiscovery.TargetLowTariffOnlySwitch), cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.ActivateTargetCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
         await _client.SubscribeAsync(_discovery.StopServiceCommandTopic, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -280,6 +282,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         await PublishLowTariffStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishUntilFullStateAsync(cancellationToken).ConfigureAwait(false);
         await PublishSunOnlyStateAsync(cancellationToken).ConfigureAwait(false);
+        await PublishLowTariffOnlyStateAsync(cancellationToken).ConfigureAwait(false);
         await PublishTextStatesAsync(cancellationToken).ConfigureAwait(false);
         await PublishSelectStatesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -337,6 +340,18 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         return PublishAsync(
             _discovery.SwitchStateTopic(HaDiscovery.TargetSunOnlySwitch),
             HaDiscovery.SwitchState(sunOnly),
+            retain: true,
+            cancellationToken);
+    }
+
+    // As sun only: the running request outranks the held switch.
+    private Task PublishLowTariffOnlyStateAsync(CancellationToken cancellationToken)
+    {
+        var lowTariffOnly = _target.Request is { } request ? request.Constraints?.LowTariffOnly == true : _pendingLowTariffOnly;
+
+        return PublishAsync(
+            _discovery.SwitchStateTopic(HaDiscovery.TargetLowTariffOnlySwitch),
+            HaDiscovery.SwitchState(lowTariffOnly),
             retain: true,
             cancellationToken);
     }
@@ -460,6 +475,11 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         if (topic == _discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch))
         {
             return OnSunOnlyCommandAsync(payload);
+        }
+
+        if (topic == _discovery.SwitchCommandTopic(HaDiscovery.TargetLowTariffOnlySwitch))
+        {
+            return OnLowTariffOnlyCommandAsync(payload);
         }
 
         if (topic == _discovery.SwitchCommandTopic(HaDiscovery.UntilFullSwitch))
@@ -684,6 +704,21 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         return PublishSunOnlyStateAsync(CancellationToken.None);
     }
 
+    // Held until the button, like sun only (#382).
+    private Task OnLowTariffOnlyCommandAsync(string? payload)
+    {
+        if (HaDiscovery.TryParseSwitch(payload, out var on))
+        {
+            _pendingLowTariffOnly = on;
+        }
+        else
+        {
+            _logger.LogWarning("Ignoring unknown command '{Payload}' for {ObjectId}.", payload, HaDiscovery.TargetLowTariffOnlySwitch);
+        }
+
+        return PublishLowTariffOnlyStateAsync(CancellationToken.None);
+    }
+
     private Task OnNumberCommandAsync(string objectId, string? payload)
     {
         if (!double.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
@@ -906,7 +941,8 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
                 _pack.ChargeEfficiency,
                 _targetedOptions.JustInTime.RestSocPercent),
             now: now,
-            constraints: _pendingSunOnly ? TargetedChargeConstraints.SunOnly : null);
+            // Sun only wins when both are on: it already buys nothing at any hour.
+            constraints: TargetedChargeConstraints.Of(_pendingSunOnly, _pendingLowTariffOnly));
 
         if (composed.Request is not { } request)
         {

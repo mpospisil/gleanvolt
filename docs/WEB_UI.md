@@ -146,7 +146,7 @@ note and every charger refusal appears there too.
 | **Forecasted** | Charge to the forecast | The plan's runtime numbers, then the day plan and its timeline chart. See [`Forecasted`](MODE_FORECASTED.md). |
 | **Solar + grid** | Charge from sun + grid | The minimum solar surplus. See [`SolarGrid`](MODE_SOLAR_GRID.md). |
 | **Fast (no battery)** | Charge at maximum | How much to deliver (until the car stops, kWh, or a battery target) and optionally a departure time. Then the car's draw, the setpoint, grid power and the amount delivered so far. See [`FastNoBattery`](MODE_FAST_NO_BATTERY.md). |
-| **Targeted** | Preview plan → Start charging / Cancel | What the car reports, what you want (kWh or a battery target), the charging priority, **Sun only**, the departure and the minimum battery SOC, then the plan in words *before* the charger moves. See [`Targeted`](MODE_TARGETED.md). |
+| **Targeted** | Preview plan → Start charging / Cancel | What the car reports, what you want (kWh or a battery target), the charging priority, **Sun only** or **Low tariff only**, the departure and the minimum battery SOC, then the plan in words *before* the charger moves. See [`Targeted`](MODE_TARGETED.md). |
 
 The tab is in the URL (`/charging-plan/forecasted`), so bookmarks and refreshes come back to it;
 `/charging-plan` alone opens the mode that is driving. A dot marks the running mode.
