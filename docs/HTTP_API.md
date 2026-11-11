@@ -140,7 +140,8 @@ send back.
   "notBefore": null,                 // the charger may not run before this
   "notAfter": null,                  // ...nor after it
   "forbiddenWindows": null,          // stretches that must stay idle
-  "maxGridEnergyWh": null            // the most that may be bought
+  "maxGridEnergyWh": null,           // the most that may be bought
+  "lowTariffOnly": false             // wait through high tariff, sun or not
 }
 ```
 
@@ -163,6 +164,9 @@ is yours; what happens inside it is the forecast's to decide.
   a limit puts out of reach comes back as `shortfallWh`, exactly as a departure that is too close
   already does. `maxGridEnergyWh: 0` is a real value and means *sun only* — the request is met from the
   roof or not at all, and the rest is reported rather than quietly imported.
+- **`lowTariffOnly: true`** waits through every high-tariff stretch of the tariff selected on Settings,
+  as `fastNoBattery` does with low tariff only, and the plan counts only on low-tariff hours. Ignored
+  with no tariff selected. Sent with `maxGridEnergyWh: 0`, sun only wins and this comes back `false`.
 - **Only the impossible is refused.** Limits leaving the charger no time at all to run are a 400 with
   the reason, before anything starts. Limits that merely make the request *partial* are accepted —
   "buy at most 8 kWh and I'll take what that gets me" is a legitimate thing to ask for.

@@ -168,6 +168,13 @@ public sealed class HaDiscovery
     /// </summary>
     public const string TargetSunOnlySwitch = "target_sun_only";
 
+    /// <summary>
+    /// <b>Low tariff only</b> on a targeted charge (#382): the car waits through high tariff, and the plan
+    /// counts only on low-tariff hours. Held like <see cref="TargetSunOnlySwitch"/> until <c>Activate
+    /// target</c> applies it; with sun only also on, sun only wins.
+    /// </summary>
+    public const string TargetLowTariffOnlySwitch = "target_low_tariff_only";
+
     public string SwitchCommandTopic(string objectId) => NumberCommandTopic(objectId);
     public string SwitchStateTopic(string objectId) => NumberStateTopic(objectId);
 
@@ -499,6 +506,17 @@ public sealed class HaDiscovery
             ["payload_on"] = PayloadOn,
             ["payload_off"] = PayloadOff,
             ["icon"] = "mdi:solar-power",
+        });
+
+        // Low tariff only (#382), on the same terms as sun only, which wins when both are on.
+        yield return Config("switch", TargetLowTariffOnlySwitch, new Dictionary<string, object?>
+        {
+            ["name"] = "Target low tariff only",
+            ["command_topic"] = SwitchCommandTopic(TargetLowTariffOnlySwitch),
+            ["state_topic"] = SwitchStateTopic(TargetLowTariffOnlySwitch),
+            ["payload_on"] = PayloadOn,
+            ["payload_off"] = PayloadOff,
+            ["icon"] = "mdi:clock-time-four-outline",
         });
 
         // Pressing this is what makes the two above real: it sets the request and then starts the mode,

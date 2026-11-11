@@ -37,11 +37,20 @@ namespace Gleanvolt.Core.Models;
 /// value and means "sun only" — the request is then met from the roof or not at all, and the remainder
 /// is reported as shortfall rather than silently imported.
 /// </param>
+/// <param name="LowTariffOnly">
+/// Charge in low tariff only (#382), as Fast and SolarGrid can (#274): the charger is paused through
+/// every high-tariff stretch, sun or not. The request carries only the wish; the host turns it into
+/// <see cref="ForbiddenWindows"/> from the tariff it knows (<see cref="WithHighTariffForbidden"/>), so
+/// the plan only counts on low-tariff hours, and the controller waits through high tariff live. With no
+/// tariff known it narrows nothing. Meaningless next to <see cref="IsSunOnly"/>, which buys nothing at
+/// any hour, so the two are never stored together: sun only wins (<see cref="Of"/>).
+/// </param>
 public sealed record TargetedChargeConstraints(
     DateTimeOffset? NotBefore = null,
     DateTimeOffset? NotAfter = null,
     IReadOnlyList<TimeWindow>? ForbiddenWindows = null,
-    double? MaxGridEnergyWh = null)
+    double? MaxGridEnergyWh = null,
+    bool LowTariffOnly = false)
 {
     /// <summary>The constraint set that constrains nothing — what a request without one behaves as.</summary>
     public static TargetedChargeConstraints None { get; } = new();
@@ -52,6 +61,9 @@ public sealed record TargetedChargeConstraints(
     /// </summary>
     public static TargetedChargeConstraints SunOnly { get; } = new(MaxGridEnergyWh: 0);
 
+    /// <summary>Low tariff only and nothing else (#382): the web form's and Home Assistant's other tick box.</summary>
+    public static TargetedChargeConstraints LowTariff { get; } = new(LowTariffOnly: true);
+
     /// <summary>Whether this forbids buying anything from the grid at all.</summary>
     public bool IsSunOnly => MaxGridEnergyWh is <= 0;
 
@@ -60,7 +72,40 @@ public sealed record TargetedChargeConstraints(
         NotBefore is null
         && NotAfter is null
         && MaxGridEnergyWh is null
-        && ForbiddenWindows is not { Count: > 0 };
+        && ForbiddenWindows is not { Count: > 0 }
+        && !LowTariffOnly;
+
+    /// <summary>
+    /// What the web form's and Home Assistant's two tick boxes ask for, or null for neither. Sun only
+    /// wins when both are set: it already buys nothing, at any tariff.
+    /// </summary>
+    public static TargetedChargeConstraints? Of(bool sunOnly, bool lowTariffOnly) =>
+        sunOnly ? SunOnly : lowTariffOnly ? LowTariff : null;
+
+    /// <summary>
+    /// This set with sun only winning over low tariff only (#382), so a request never carries both;
+    /// unchanged otherwise.
+    /// </summary>
+    public TargetedChargeConstraints Normalized() =>
+        IsSunOnly && LowTariffOnly ? this with { LowTariffOnly = false } : this;
+
+    /// <summary>
+    /// For <see cref="LowTariffOnly"/>: this set with every high-tariff stretch of
+    /// <paramref name="timeline"/> added to <see cref="ForbiddenWindows"/>, which is how the planner
+    /// learns not to count on them. Unchanged when the option is off or no tariff is known. Past the
+    /// timeline's end nothing is forbidden — the rate there is unknown, and the controller's live wait
+    /// reads it the same way.
+    /// </summary>
+    public TargetedChargeConstraints WithHighTariffForbidden(TariffTimeline? timeline)
+    {
+        if (!LowTariffOnly || timeline is null)
+        {
+            return this;
+        }
+
+        var high = timeline.Windows.Where(window => window.Rate == TariffRate.High).Select(window => window.Window);
+        return this with { ForbiddenWindows = [.. ForbiddenWindows ?? [], .. high] };
+    }
 
     /// <summary>Whether <paramref name="instant"/> falls inside a window that must stay idle.</summary>
     public bool IsForbiddenAt(DateTimeOffset instant) =>

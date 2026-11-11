@@ -93,7 +93,8 @@ internal static class TargetedCharge
         ChargeControlOptions chargeControl,
         IOptions<ForecastChargeOptions> forecastOptions,
         ITargetedChargeSelector? selector = null,
-        TargetedChargeOptions? options = null) =>
+        TargetedChargeOptions? options = null,
+        ITariffSchedule? tariff = null) =>
         new(
             selector ?? new TargetedChargeSelector(NullLogger<TargetedChargeSelector>.Instance),
             forecast,
@@ -102,7 +103,8 @@ internal static class TargetedCharge
             Options.Create(chargeControl),
             forecastOptions,
             Options.Create(options ?? new TargetedChargeOptions()),
-            NullLogger<TargetedChargeProvider>.Instance);
+            NullLogger<TargetedChargeProvider>.Instance,
+            tariff: tariff);
 }
 
 /// <summary>

@@ -3,7 +3,7 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Core.Strategies;
 
 /// <summary>
-/// The one rule for a mode set to <b>low tariff only</b> (issue #274), shared by Fast and SolarGrid:
+/// The one rule for a mode set to <b>low tariff only</b> (issue #274), shared by Fast, SolarGrid and Targeted (#382):
 /// in high tariff the car waits, and the decision says until when.
 ///
 /// <para><b>A wait, not a finish.</b> It is decided as a pause or a stand-down, never as a charge, so
@@ -22,7 +22,7 @@ public static class TariffWait
     /// The wait, or null when <paramref name="input"/> carries no restriction or the tariff is low.
     /// </summary>
     /// <param name="input">This cycle's input; its <see cref="ChargingControlInput.LowTariffOnly"/> decides.</param>
-    /// <param name="mode">The mode's name as the owner knows it, for the reason: "Fast", "SolarGrid".</param>
+    /// <param name="mode">The mode's name as the owner knows it, for the reason: "Fast", "SolarGrid", "Targeted".</param>
     public static ChargingControlDecision? For(ChargingControlInput input, string mode)
     {
         if (input.LowTariffOnly is not { IsHigh: true } tariff)

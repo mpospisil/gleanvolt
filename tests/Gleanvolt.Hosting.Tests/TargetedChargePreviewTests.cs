@@ -156,6 +156,43 @@ public class TargetedChargePreviewTests
         Assert.NotNull(Preview(20_000, Now.AddHours(9)));
     }
 
+    [Fact]
+    public void LowTariffOnly_PlansOnlyOnLowTariffHours()
+    {
+        // #382: high until 00:00, low until 01:00, high after. A 20 kWh request due at 01:00 gets one low
+        // hour -- 11 kWh -- and the rest is shortfall, said before the charger starts rather than bought
+        // in high tariff.
+        var midnight = Now.AddHours(2);
+        var tariff = new FixedTariffSchedule(new TariffTimeline(
+        [
+            new(new TimeWindow(Now.AddHours(-22), midnight), TariffRate.High),
+            new(new TimeWindow(midnight, midnight.AddHours(1)), TariffRate.Low),
+            new(new TimeWindow(midnight.AddHours(1), midnight.AddDays(1)), TariffRate.High),
+        ], Prices: null));
+
+        var chargeControl = new ChargeControlOptions { Phases = 3, MaxChargingCurrentAmps = 16 };
+        var forecast = new NoForecastService();
+        var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);
+        var forecastOptions = Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 });
+        var provider = TargetedCharge.Provider(
+            forecast,
+            new DayPlanProvider(forecast, forecastOptions, Options.Create(chargeControl), power, NullLogger<DayPlanProvider>.Instance),
+            power,
+            chargeControl,
+            forecastOptions,
+            options: new TargetedChargeOptions { SafetyMargin = TimeSpan.Zero },
+            tariff: tariff);
+        provider.Update(Idle(Now));
+
+        var request = new TargetedChargeRequest(20_000, midnight.AddHours(1), Now);
+        var anyHour = provider.Preview(request)!;
+        var lowOnly = provider.Preview(request with { Constraints = TargetedChargeConstraints.LowTariff })!;
+
+        Assert.Equal(0, anyHour.ShortfallWh, 0);
+        Assert.Equal(MaxPowerWatts, lowOnly.CeilingEnergyWh, 0);
+        Assert.Equal(20_000 - MaxPowerWatts, lowOnly.ShortfallWh, 0);
+    }
+
     private TargetedChargePlan? Preview(double energyWh, DateTimeOffset departBy) =>
         ((ITargetedChargePreview)_provider).Preview(new TargetedChargeRequest(energyWh, departBy, Now));
 

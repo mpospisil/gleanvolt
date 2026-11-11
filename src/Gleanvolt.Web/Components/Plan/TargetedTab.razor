@@ -7,6 +7,7 @@
 @inject IForecastRuntimeSettings ForecastSettings
 @inject TargetedDisplayOptions Display
 @inject TimeProvider Time
+@inject ITariffSchedule Tariff
 @inject IJSRuntime JS
 
 @*
@@ -186,6 +187,36 @@ else
         <span class="hint">
             @PlanText.SunOnlyNoJustInTime
         </span>
+    }
+</div>
+
+@*
+    Low tariff only (#382): the Fast and SolarGrid option, but carried on the request like Sun only
+    rather than set on the mode. Off and greyed out while Sun only is ticked -- that already buys nothing
+    at any hour -- and greyed out with no tariff to wait for, unless already on, so it can be turned off.
+*@
+<div class="control low-tariff-option">
+    <div class="control-head">
+        <label class="@(LowTariffAvailable ? null : "muted")">
+            <input type="checkbox" id="low-tariff-targeted" checked="@_lowTariffOnly"
+                   disabled="@(!LowTariffAvailable && !_lowTariffOnly)" @onchange="OnLowTariffChanged" />
+            @PlanText.LowTariffOnly
+        </label>
+        <InfoTip Topic="@PlanText.LowTariffOnlyTopic">
+            <p>@PlanText.TargetedLowTariffHint</p>
+        </InfoTip>
+    </div>
+    @if (_sunOnly)
+    {
+        <span class="hint">@PlanText.SunOnlyNoLowTariff</span>
+    }
+    else if (!HasTariff)
+    {
+        <span class="hint">@Localized.Rich(PlanText.NoTariffYet, @<a href="/settings#tariff-editor">@PlanText.NoTariffYet_0</a>)</span>
+    }
+    @if (LowTariffNote() is { } note)
+    {
+        <span class="hint @(Status?.LowTariff is { Ignored: true } ? "warning" : null)" id="low-tariff-targeted-state">@note</span>
     }
 </div>
 
@@ -381,6 +412,7 @@ else
     private TargetBasis _basis = TargetBasis.Energy;
     private TargetedChargePriority _priority = TargetedChargePriority.Cheapest;
     private bool _sunOnly;
+    private bool _lowTariffOnly;
     private double _energyKWh = 20;
     private double _targetSocPercent = 80;
     private double _restSocPercent;
@@ -474,6 +506,7 @@ else
 
             _priority = request.Priority;
             _sunOnly = request.Constraints?.IsSunOnly == true;
+            _lowTariffOnly = request.Constraints?.LowTariffOnly == true;
 
             if (request.RestSocPercent is { } rest)
             {
@@ -532,10 +565,36 @@ else
         if (_sunOnly)
         {
             _priority = TargetedChargePriority.Cheapest;
+            _lowTariffOnly = false;
         }
 
         OnFormEdited();
     }
+
+    private bool HasTariff => Tariff.Timeline is not null;
+
+    /// <summary>Whether Low tariff only can be ticked: not beside Sun only, and not with no tariff to wait for.</summary>
+    private bool LowTariffAvailable => !_sunOnly && HasTariff;
+
+    /// <summary>Low tariff only, ticked or not (#382). An edit like any other, so it drops the preview.</summary>
+    private void OnLowTariffChanged(ChangeEventArgs e)
+    {
+        _lowTariffOnly = e.Value is true && !_sunOnly;
+        OnFormEdited();
+    }
+
+    // Only while Targeted is driving on a request that asked for it: the status's low-tariff block
+    // belongs to the running mode alone.
+    private string? LowTariffNote() =>
+        Status is { Mode: ChargeControlMode.Targeted } status && Target.Request?.Constraints?.LowTariffOnly == true
+            ? status.LowTariff switch
+            {
+                { Ignored: true } => PlanText.LowTariffIgnoredNote,
+                { Waiting: true, Until: { } until } => Localized.Format(PlanText.WaitingForLowTariffFrom, TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone)),
+                { Waiting: true } => PlanText.WaitingForLowTariff,
+                _ => null,
+            }
+            : null;
 
     private void SetBasis(TargetBasis basis)
     {
@@ -664,7 +723,7 @@ else
             vehicleSoc: SocBasisAt(now),
             limits: Limits,
             now: now,
-            constraints: _sunOnly ? TargetedChargeConstraints.SunOnly : null);
+            constraints: TargetedChargeConstraints.Of(_sunOnly, _lowTariffOnly));
 
         request = result.Request!;
         error = result.Error is { } refused ? Localized.Say(result.ErrorPhrase, refused) : null;

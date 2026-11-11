@@ -474,14 +474,20 @@ public sealed class PollingService : BackgroundService
     }
 
     /// <summary>
-    /// What <b>low tariff only</b> means for <paramref name="mode"/> this cycle (#274): the gate the
+    /// What <b>low tariff only</b> means for <paramref name="mode"/> this cycle (#274; Targeted's comes
+    /// from its request, #382): the gate the
     /// controller reads, and the status the surfaces show. Both null while the mode has the option off,
     /// or has none. With the option on but no tariff to wait for, the gate stays null -- no restriction
     /// -- and the status says the option is being ignored, rather than pretending to wait.
     /// </summary>
     private (TariffGate? Gate, LowTariffStatus? Status) LowTariff(ChargeControlMode mode, DateTimeOffset now)
     {
-        if (_lowTariff?.IsLowTariffOnly(mode) != true)
+        // Targeted carries the option on its request (#382), not as a mode setting.
+        var on = mode == ChargeControlMode.Targeted
+            ? _targetedCharge.LowTariffOnly
+            : _lowTariff?.IsLowTariffOnly(mode) == true;
+
+        if (!on)
         {
             return (null, null);
         }

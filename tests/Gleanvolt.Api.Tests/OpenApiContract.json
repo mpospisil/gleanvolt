@@ -292,6 +292,7 @@
     },
     "EditablePlanBody": {
       "forbiddenWindows": "array\u003C$TimeWindowBody\u003E?",
+      "lowTariffOnly": "boolean",
       "maxGridEnergyWh": "number|string(double)?",
       "notAfter": "string(date-time)?",
       "notBefore": "string(date-time)?",

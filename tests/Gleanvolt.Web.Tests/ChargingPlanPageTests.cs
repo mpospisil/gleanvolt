@@ -234,9 +234,10 @@ public class ChargingPlanPageTests : PageTest
         var page = RenderTab("targeted");
 
         // The switch is in the header section, which the tab strip follows -- not inside any one tab. The
-        // tab's own Sun only box (#251) is the one checkbox that belongs there.
+        // tab's own Sun only (#251) and Low tariff only (#382) boxes are the checkboxes that belong there:
+        // both qualify the request, not every mode.
         Assert.NotEmpty(page.FindAll("section.controls input[type=checkbox]"));
-        Assert.Empty(page.FindAll("section.tab-panel input[type=checkbox]:not(#sun-only)"));
+        Assert.Empty(page.FindAll("section.tab-panel input[type=checkbox]:not(#sun-only):not(#low-tariff-targeted)"));
     }
 
     [Fact]

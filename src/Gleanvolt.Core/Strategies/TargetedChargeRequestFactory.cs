@@ -66,7 +66,8 @@ public static class TargetedChargeRequestFactory
     /// <param name="now">The instant the request is being made — what delivery is metered from.</param>
     /// <param name="constraints">
     /// The limits on how it may be met, or null for none. The API sends any of the four; the web form and
-    /// Home Assistant send <see cref="TargetedChargeConstraints.SunOnly"/> or nothing. An empty set is
+    /// Home Assistant send <see cref="TargetedChargeConstraints.SunOnly"/>, <see cref="TargetedChargeConstraints.LowTariff"/>
+    /// or nothing; sun only wins over low tariff only (<see cref="TargetedChargeConstraints.Normalized"/>). An empty set is
     /// stored as null, so a request that narrows nothing looks exactly like one that never said.
     /// </param>
     public static Result Create(
@@ -154,7 +155,7 @@ public static class TargetedChargeRequestFactory
         var request = new TargetedChargeRequest(askedWh, departBy, now, soc, socNow) with
         {
             Priority = priority,
-            Constraints = constraints is { IsEmpty: false } ? constraints : null,
+            Constraints = constraints is { IsEmpty: false } ? constraints.Normalized() : null,
         };
 
         // The split, made once and here — the same place and the same moment as the SOC → kWh

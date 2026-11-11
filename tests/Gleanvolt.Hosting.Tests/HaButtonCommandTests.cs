@@ -196,6 +196,38 @@ public class HaButtonCommandTests
     }
 
     [Fact]
+    public async Task LowTariffOnlyIsHeldUntilActivateTarget_AndThenGoesOnTheRequest()
+    {
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetLowTariffOnlySwitch), HaDiscovery.PayloadOn);
+
+        Assert.Null(_target.Request);
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.True(_target.Request!.Constraints!.LowTariffOnly);
+        Assert.False(_target.Request.Constraints.IsSunOnly);
+    }
+
+    [Fact]
+    public async Task SunOnlyWinsOverLowTariffOnly()
+    {
+        // #382: sun only already buys nothing at any hour, so the two are never stored together.
+        var worker = Worker();
+        await worker.HandleCommandAsync(Discovery.NumberCommandTopic(HaDiscovery.TargetEnergyNumber), "22");
+        await worker.HandleCommandAsync(Discovery.TextCommandTopic(HaDiscovery.TargetDepartureText), "07:00");
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetLowTariffOnlySwitch), HaDiscovery.PayloadOn);
+        await worker.HandleCommandAsync(Discovery.SwitchCommandTopic(HaDiscovery.TargetSunOnlySwitch), HaDiscovery.PayloadOn);
+
+        await worker.HandleCommandAsync(Discovery.ActivateTargetCommandTopic, HaDiscovery.PayloadPress);
+
+        Assert.True(_target.Request!.Constraints!.IsSunOnly);
+        Assert.False(_target.Request.Constraints.LowTariffOnly);
+    }
+
+    [Fact]
     public async Task SunOnlyOverridesJustInTime_AsTheWebFormDoes()
     {
         // A hold with no grid to make up a cloudy hour can only lose sun. The web form greys Just in time

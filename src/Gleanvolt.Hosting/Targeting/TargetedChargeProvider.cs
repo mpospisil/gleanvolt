@@ -37,6 +37,7 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
     private readonly ForecastChargeOptions _forecastOptions;
     private readonly TargetedChargeOptions _options;
     private readonly IForecastRuntimeSettings? _runtime;
+    private readonly ITariffSchedule? _tariff;
     private readonly ILogger<TargetedChargeProvider> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -64,7 +65,8 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         IOptions<TargetedChargeOptions> options,
         ILogger<TargetedChargeProvider> logger,
         IForecastRuntimeSettings? runtime = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ITariffSchedule? tariff = null)
     {
         _selector = selector;
         _forecast = forecast;
@@ -74,9 +76,16 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
         _forecastOptions = forecastOptions.Value;
         _options = options.Value;
         _runtime = runtime;
+        _tariff = tariff;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
+
+    /// <summary>
+    /// Whether the active request asks for low tariff only (#382): what opens the live tariff gate for
+    /// the Targeted mode, as the per-mode option does for Fast and SolarGrid.
+    /// </summary>
+    public bool LowTariffOnly => _selector.Request?.Constraints?.LowTariffOnly == true;
 
     /// <summary>Energy the charger has delivered since the active request was activated, in watt-hours.</summary>
     public double DeliveredWh => _delivered.EnergyWattHours;
@@ -146,6 +155,14 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
 
     private TargetedChargePlan BuildPlan(EnergyState state, TargetedChargeRequest request, double deliveredWh)
     {
+        // Low tariff only (#382) becomes forbidden windows here, every poll, from the tariff as it is
+        // now: the request stores the wish, not the hours, so a tariff edited on Settings moves the plan
+        // with it. The planner then counts only on low-tariff hours and reports the rest as shortfall.
+        if (request.Constraints is { LowTariffOnly: true } constraints)
+        {
+            request = request with { Constraints = constraints.WithHighTariffForbidden(_tariff?.Timeline) };
+        }
+
         return TargetedChargePlanner.Plan(
             state,
             request,

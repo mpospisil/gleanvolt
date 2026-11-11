@@ -76,6 +76,18 @@ to make up a cloudy hour, can only lose sun. The web form greys it out, and Home
 sun-only `JustInTime` request as `Cheapest` and says so in the log. The API takes any grid budget in
 kWh; the form and Home Assistant offer only the two ends.
 
+**Low tariff only** (#382) is the Fast (no battery) option for one request: a checkbox on the
+*Targeted* tab under Sun only, the **Target low tariff only** switch in Home Assistant,
+`lowTariffOnly: true` through the API. Through every high-tariff stretch of the tariff selected on
+Settings the charger waits, **sun or not**, exactly as Fast does. That includes a plan with no time
+left: the tariff wins over the deadline. The plan knows it: high-tariff stretches up to the departure
+are forbidden windows, rebuilt each poll from the current tariff, so it counts only on low-tariff hours,
+and what does not fit there is reported as **shortfall** in the preview before you start. Past the end
+of what the tariff knows (end of tomorrow for the Table strategy), nothing is forbidden. With no tariff
+selected it is ignored, and the status says so. It cannot be combined with Sun only, which already buys
+nothing at any hour: the form greys it out, and Home Assistant and the API keep Sun only when both are
+sent. Just in time stays available.
+
 ## What it does and doesn't do
 
 - **The home battery keeps its priority.** Its need is reserved out of the forecast by the same

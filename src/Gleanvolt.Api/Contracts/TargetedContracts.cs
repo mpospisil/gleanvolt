@@ -249,12 +249,19 @@ public sealed record TargetedPreviewResponse(
 /// means sun only: the request is met from the roof or not at all, and the rest is reported as
 /// shortfall rather than quietly imported.
 /// </param>
+/// <param name="LowTariffOnly">
+/// Charge in low tariff only: the charger waits through every high-tariff stretch of the tariff
+/// selected on Settings, sun or not, and the plan counts only on low-tariff hours. Ignored when no
+/// tariff is selected. Sent together with sun only (<paramref name="MaxGridEnergyWh"/> 0), sun only
+/// wins and this comes back false.
+/// </param>
 public sealed record EditablePlanBody(
     string? PlanId = null,
     DateTimeOffset? NotBefore = null,
     DateTimeOffset? NotAfter = null,
     IReadOnlyList<TimeWindowBody>? ForbiddenWindows = null,
-    double? MaxGridEnergyWh = null)
+    double? MaxGridEnergyWh = null,
+    bool LowTariffOnly = false)
 {
     /// <summary>What the planner takes, or null when nothing here narrows anything.</summary>
     internal TargetedChargeConstraints? ToConstraints()
@@ -263,9 +270,10 @@ public sealed record EditablePlanBody(
             NotBefore,
             NotAfter,
             ForbiddenWindows?.Select(window => new TimeWindow(window.Start, window.End)).ToList(),
-            MaxGridEnergyWh);
+            MaxGridEnergyWh,
+            LowTariffOnly);
 
-        return constraints.IsEmpty ? null : constraints;
+        return constraints.IsEmpty ? null : constraints.Normalized();
     }
 
     /// <summary>
@@ -278,7 +286,8 @@ public sealed record EditablePlanBody(
         NotAfter: constraints?.NotAfter,
         ForbiddenWindows: constraints?.ForbiddenWindows?
             .Select(window => new TimeWindowBody(window.Start, window.End)).ToList(),
-        MaxGridEnergyWh: constraints?.MaxGridEnergyWh);
+        MaxGridEnergyWh: constraints?.MaxGridEnergyWh,
+        LowTariffOnly: constraints?.LowTariffOnly == true);
 }
 
 /// <summary>A stretch of time the charger must stay idle in, <c>[start, end)</c>.</summary>

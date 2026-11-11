@@ -97,6 +97,15 @@ public sealed class TargetedChargingController : IChargingController
             return ChargerWait.For(input, null, "No target set: enter the energy and departure time to start.");
         }
 
+        // Low tariff only (#382), the rule Fast and SolarGrid already follow (#274): through high tariff
+        // the car waits, sun or not, and that includes a plan with no time left to be clever -- the
+        // owner chose the tariff over the deadline. After the departure and the target, so both still
+        // end the mode; after the ownership check, which only judges a car we are asking to charge.
+        if (TariffWait.For(input, "Targeted") is { } tariffWait)
+        {
+            return tariffWait;
+        }
+
         // The two cases that take everything: no time left to be clever, or the planned import window
         // has arrived. Both run at the maximum current with the discharge hold armed by the host.
         if (plan.Strategy == TargetedChargeStrategy.Maximum)
