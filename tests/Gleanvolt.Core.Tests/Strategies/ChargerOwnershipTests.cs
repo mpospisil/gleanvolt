@@ -59,6 +59,15 @@ public class ChargerOwnershipTests
         var decision = ChargerOwnership.NotOurs(Input(SolaxMode.Eco, notFastFor: TimeSpan.FromSeconds(8)));
 
         Assert.False(decision!.SessionComplete);
+
+        // Ignored outright: the orchestrator keeps counting us as charging, because nothing has changed.
+        Assert.True(decision.Unconfirmed);
+    }
+
+    [Fact]
+    public void AChargerThatHasReallyLeftFastIsNoLongerUnconfirmed()
+    {
+        Assert.False(ChargerOwnership.NotOurs(Input(SolaxMode.Stop, notFastFor: TimeSpan.FromMinutes(3)))!.Unconfirmed);
     }
 
     [Fact]

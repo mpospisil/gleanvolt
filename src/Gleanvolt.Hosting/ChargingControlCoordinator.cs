@@ -277,8 +277,15 @@ public sealed class ChargingControlCoordinator
                     break;
 
                 case ChargingControlAction.None:
-                    // Not in Fast mode -- we aren't controlling; leave the setpoint as it is.
-                    SetCharging(false, state.Timestamp);
+                    // Not in Fast mode -- we aren't controlling; leave the setpoint as it is. A reading not
+                    // yet believed changes nothing at all: the setpoint we wrote is still in force, and
+                    // the next poll must still see us as charging. Otherwise a full car's Finishing poll
+                    // is not judged, and each junk use-mode blip restarts the charging-state clock.
+                    if (!decision.Unconfirmed)
+                    {
+                        SetCharging(false, state.Timestamp);
+                    }
+
                     break;
             }
 

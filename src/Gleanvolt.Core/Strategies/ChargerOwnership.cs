@@ -41,7 +41,10 @@ public static class ChargerOwnership
     /// nothing drawing. Asked <em>before</em> the ownership guard, because the wallbox has already left
     /// Fast by the time it is seen, and two minutes later the guard would file it as taken
     /// over.</description></item>
-    /// <item><description><b>The charger is not ours</b> (<see cref="NotOurs"/>).</description></item>
+    /// <item><description><b>The charger is not ours</b> (<see cref="NotOurs"/>). The wallbox can show
+    /// Stop one poll early, while the car is still drawing as it slows down, and Finishing on the poll
+    /// after (2026-11-11). Within <see cref="DropoutGrace"/> that early Stop changes nothing, so rule 1
+    /// still judges the Finishing poll.</description></item>
     /// <item><description><b>The car went away</b>, positively reported: Unknown is a failed read, and
     /// ending the mode on one costs the owner the whole charge.</description></item>
     /// <item><description><b>The car stopped drawing</b> for <paramref name="completionDwell"/>: the
@@ -139,7 +142,13 @@ public static class ChargerOwnership
                 EndsSession: ChargingSessionEndReason.ChargerTakenOver);
         }
 
+        // Not believed yet, so nothing changes, including whether we count as charging (Unconfirmed).
+        // That is also what lets a full car be judged when the wallbox shows Stop one poll before
+        // Finishing, with the car still drawing as it slows down (2026-11-11).
         return new ChargingControlDecision(
-            ChargingControlAction.None, null, $"Charger is in {input.CurrentSettings.ModeName}, not allowed to charge; leaving it untouched.");
+            ChargingControlAction.None,
+            null,
+            $"Charger is in {input.CurrentSettings.ModeName}, not allowed to charge; leaving it untouched.",
+            Unconfirmed: true);
     }
 }
