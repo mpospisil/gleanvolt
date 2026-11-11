@@ -538,9 +538,19 @@ jobs:
             exit 1
           fi
 
+          # By name, like the zips and the .debs: a missing library is named, and a new packable
+          # project fails here until it is added, rather than shipping a release short of it.
+          expected="Api Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Web"
+          for package in $expected; do
+            if [ ! -f "artifacts/Gleanvolt.${package}.${VERSION}.nupkg" ]; then
+              echo "No Gleanvolt.${package}.${VERSION}.nupkg; the packable projects and this list disagree." >&2
+              exit 1
+            fi
+          done
+
           packages=$(find artifacts -name '*.nupkg' | wc -l)
-          if [ "$packages" -ne 5 ]; then
-            echo "Expected 5 .nupkg files, found $packages." >&2
+          if [ "$packages" -ne "$(echo $expected | wc -w)" ]; then
+            echo "Expected $(echo $expected | wc -w) .nupkg files, found $packages; a packable project is missing from this list." >&2
             exit 1
           fi
 

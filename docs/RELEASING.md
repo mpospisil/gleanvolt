@@ -61,7 +61,7 @@ gh workflow run release.yml --ref main -f release=true
 ```
 
 Same four jobs, and this time the `release` job runs: it collects every artifact, checks the three
-zips and five `.nupkg` all arrived, writes `SHA256SUMS`, attests build provenance, pushes the tag,
+zips, two `.deb` and nine `.nupkg` all arrived, writes `SHA256SUMS`, attests build provenance, pushes the tag,
 and creates the GitHub Release.
 
 The tag push is the backstop under the whole scheme — it is rejected if the tag already exists, so
@@ -107,7 +107,7 @@ This is the half a workflow cannot do for you, and it is the half a stranger mee
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
 | `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
 | `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract |
-| five `.nupkg` and five `.snupkg` | the libraries and their symbols, attached rather than pushed to a feed |
+| nine `.nupkg` and nine `.snupkg` | the libraries and their symbols, attached rather than pushed to a feed: Api, Core, Hosting, Infrastructure, Web, and the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE |
 | `SHA256SUMS` | covers every file above, and not itself |
 
 Each zip, `.deb`, `install.sh` and `.nupkg` also carries a build provenance attestation, verifiable with
