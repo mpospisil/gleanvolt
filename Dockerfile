@@ -29,7 +29,7 @@ ARG TARGETARCH
 # build context on purpose and this stage therefore cannot read the product line from it. A mirror
 # can drift, so DockerfileTests asserts this literal against <MajorMinorVersion> -- bumping the minor
 # there without changing it here fails the test rather than shipping an image that misreports itself.
-ARG VERSION=1.2.0-dev
+ARG VERSION=1.3.0-dev
 ARG SOURCE_REVISION=
 
 WORKDIR /source
