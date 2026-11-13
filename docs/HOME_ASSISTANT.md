@@ -2,30 +2,88 @@
 
 Gleanvolt doesn't need Home Assistant: its own [web UI](WEB_UI.md)
 and [HTTP API](HTTP_API.md) cover every control and every reading. If you use
-Home Assistant anyway, Gleanvolt can publish itself there over MQTT
-([discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)) as one device: a button
-per charge mode, switches and numbers for the settings you change day to day, and sensors for what it
-measures and plans.
+Home Assistant anyway, there are two ways to connect them, and an installation should use **one or the
+other**. With both on, it shows up in Home Assistant as two devices with the same entities.
+
+- **[The Gleanvolt integration (HACS)](#the-gleanvolt-integration-hacs)**: recommended when you have
+  no MQTT broker. Gleanvolt 1.2.0 or later. A custom integration installed through HACS that talks to
+  the HTTP API. It can show a refusal to the person who pressed the button, has a real date-time
+  entity for the departure, and has service actions with typed fields.
+- **MQTT discovery**: Gleanvolt publishes itself to a broker as one device: a button per charge mode,
+  switches and numbers for the settings you change day to day, and sensors for what it measures and
+  plans. It suits a home that already runs a broker, and it is the only way to change *Minimum battery
+  SOC*, *SOC resume margin* and *Min solar surplus* from Home Assistant until Gleanvolt 1.3. There are
+  two ways to set it up:
+  - **[To a Home Assistant you already run](#to-a-home-assistant-you-already-run)**: Gleanvolt is
+    installed any way (the one-line Linux install, a NAS, Windows, Docker) and connects to your broker;
+    you set the link in the web UI.
+  - **[Home Assistant and a broker on the same Pi](#home-assistant-and-a-broker-on-the-same-pi)**:
+    advanced. `./deploy/deploy.sh`, run from your computer, puts the controller, Mosquitto and Home
+    Assistant on one Pi as three containers.
 
 > **Don't run the Home Assistant container on a low-powered device.** On a board with less than 2 GB
 > of RAM, run the controller alone, with its web UI, and connect it to a Home Assistant running on
-> another machine — or leave Home Assistant out.
+> another machine, or leave Home Assistant out.
 
-There are two ways to connect them:
+Either way, charge control boots in mode **Off** and nothing is written to your hardware until
+charging is started.
 
-- **[To a Home Assistant you already run](#to-a-home-assistant-you-already-run)** — recommended.
-  Gleanvolt is installed any way (the one-line Linux install, a NAS, Windows, Docker) and connects to
-  your broker; you set the link in the web UI.
-- **[Home Assistant and a broker on the same Pi](#home-assistant-and-a-broker-on-the-same-pi)** —
-  advanced: `./deploy/deploy.sh`, run from your computer, puts the controller, Mosquitto and Home
-  Assistant on one Pi as three containers.
+## The Gleanvolt integration (HACS)
 
-Either way, charge control boots in mode **Off** and nothing is written to your hardware until a
-charging button is pressed.
+For Gleanvolt **1.2.0 and later**. The integration lives in its own repository,
+[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), and uses only the [HTTP API](HTTP_API.md),
+the same way the MCP server does. It needs no broker, and it adds no capability of its own: everything
+it does, the web UI and the API already do. The [user manual](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/home-assistant/)
+walks through the setup with pictures.
+
+1. **A key.** On **Settings → Installation → API access**, switch the API on, create a key named
+   `home-assistant`, and **Restart** on **Settings → Health**. The key's name is what the log and each
+   session record as the source of an action: *"API (home-assistant) started Targeted"*.
+2. **HACS → ⋮ → Custom repositories**: add `https://github.com/mpospisil/gleanvolt-ha` as an
+   *Integration*, install **Gleanvolt**, and restart Home Assistant.
+3. **Settings → Devices & services.** Gleanvolt advertises `_gleanvolt._tcp` on the LAN, so Home
+   Assistant offers *Gleanvolt discovered* with the host and port filled in. Only the key is asked
+   for. Without discovery, add it by hand: host, port (8090) and key.
+
+Setup calls `GET /api/v1/health` with the key. A 401 means the key is wrong. No answer means the host
+can't be reached. A 404 means the API is switched off, and the form names the setting. A `version`
+older than 1.2.0 is refused, and the form names the version it found. Later, a 401 starts
+*re-authenticate*. *Reconfigure* changes the host or port, and *Configure* sets the poll interval.
+*Download diagnostics* redacts the key.
+
+**One device per installation**, identified by `systemId` from `/health`. Every entity's unique id is
+derived from it, so a new address or a renamed entity keeps its history. The device's software version
+is the build from `/health`, and *Visit* opens the web UI.
+
+**It polls; nothing is pushed.** `GET /status` runs every 10 s by default (5 to 60 s under *Configure*),
+and the device goes unavailable when that fails, including the 503 before the controller's first poll.
+`/vehicle`, `/tariff`, `/charging/low-tariff-only` and `/charging/until-full` are read every minute,
+and `/health` every five. It never asks for `/forecast?weather=true`, since that fetches weather.
+
+**Charge mode is a select.** It shows `mode` from `/status`. Picking a mode calls
+`POST /charging/start` with that mode and the parameters held in the integration's own entities (see
+[The integration's entities](#the-integrations-entities)). Picking `Off` calls `POST /charging/stop`. A
+400, or a 200 with `succeeded: false`, is raised to the person who picked it with the controller's own
+message, for example *"Gleanvolt refused: …"*, and the select shows the real mode again. The held
+parameters are drafts kept in Home Assistant and restored across a Home Assistant restart. They are
+sent only when a mode is started. They are not a controller setting: Gleanvolt still boots in `Off`.
+
+**Service actions** let a script start a charge with its own fields, so nothing depends on held state:
+
+- `gleanvolt.start_charging`: `mode`, plus the fast fields (`basis`, `energy_kwh`, `target_soc`,
+  `depart_by`) or the targeted ones (`energy_kwh` or `target_soc`, `depart_by`, `priority`, `rest_soc`,
+  `sun_only`, `low_tariff_only`). Fails with the controller's reason.
+- `gleanvolt.stop_charging`.
+- `gleanvolt.preview_targeted`: the targeted fields. It **returns the plan** as response data, the
+  same answer as `POST /plans/targeted/preview`, and starts nothing.
+
+**Not in the integration yet:** *Minimum battery SOC*, *SOC resume margin* and *Min solar surplus*.
+The 1.2 API can't change them. 1.3 adds them to the API (#392), and the integration follows. Settings,
+the tariff table, Solcast, the setup wizard and **Stop service** stay in the web UI.
 
 ## To a Home Assistant you already run
 
-Home Assistant and its broker stay where they are — on another machine, or on this one outside the
+This and the next section are the MQTT way. Home Assistant and its broker stay where they are — on another machine, or on this one outside the
 Docker stack — and the controller connects to the broker.
 
 **In the web UI**, on **Settings → Installation → Home Assistant (MQTT)** (or in the setup wizard's
@@ -384,6 +442,41 @@ same rule the forecast plan follows.
 | **Target charge pace** | kW | The average the grid must sustain to keep the promise: what is still needed, less the sun forecast to reach the car, over the time left. The charger runs at this **plus** whatever the roof is giving. Zero means the forecast covers the target outright and nothing will be bought. |
 | **Charging from** | — | When the first grid-funded charging starts. `none` while the forecast covers the whole request. |
 | **Target hold until** | — | When the held last stretch is released, under `JustInTime`. `none` whenever nothing is being held — which is every `Cheapest` plan, and any `JustInTime` one where holding would have put the departure at risk. |
+
+## The integration's entities
+
+The [integration](#the-gleanvolt-integration-hacs) uses the same names as MQTT discovery wherever the
+entity is the same, so the meanings above apply. This table lists each integration entity, what it is
+read from or what it calls, and where it differs from MQTT.
+
+| Integration entity | Type | From / calls | Differs from MQTT |
+| --- | --- | --- | --- |
+| **Charge mode** | select | `mode` on `/status`; `POST /charging/start` or `/charging/stop` | Replaces the five **Charge …** buttons, **Charge off** and **Activate target**. A refusal is shown to whoever picked it. |
+| **Charge mode** | sensor | `mode` | The same. |
+| **Stop charging** | button | `POST /charging/stop` | **Charge off**. |
+| **Control state**, **Charger status**, **Solar power**, **Forecast solar power**, **Solar surplus**, **Grid power**, **Battery power**, **Battery SOC**, **EV charging power**, **EV charging current**, **Target charging current**, **Active charging current**, **Session energy**, **Battery loan power**, **Battery loaned today**, **Tomorrow forecast** | sensor | `/status` | The same. Energies in kWh. Power, energy and SOC carry device and state classes for the energy dashboard. |
+| **Car connected**, **Charging now** | binary sensor | `carConnected`, `state` = `charging` | The same. |
+| **Battery hold active** | binary sensor | `batteryHold.active` | New: what was last written to the inverter. |
+| **Dry run** | binary sensor (diagnostic) | `dryRun` | New. |
+| **Battery discharge hold** | switch | `batteryHold.requested`; `PUT /battery-hold` | Unavailable while `BatteryHold:Enabled` is false (the API answers 409). |
+| **Fast low tariff only**, **SolarGrid low tariff only** | switch | `PUT /charging/low-tariff-only` | The same. |
+| **Forecasted until full** | switch | `PUT /charging/until-full` | The same. |
+| **Fast basis**, **Fast energy**, **Fast target SOC** | select, number | held in Home Assistant | The same meaning. Restored across a Home Assistant restart. Sent when **Charge mode** starts `FastNoBattery`. |
+| **Fast departure** | datetime | held | A real date-time instead of text. It can't be emptied, so a time already past means *charge now*. |
+| **Target basis** | select | held | New: `Energy` sends **Target energy**, `Soc` sends **Target SOC**. |
+| **Target energy**, **Target SOC**, **Charge priority**, **Target rest SOC**, **Target sun only**, **Target low tariff only** | number, select, switch | held | The same meaning, sent when **Charge mode** starts `Targeted`. Sun only is `editable.maxGridEnergyWh: 0`, and low tariff only is `editable.lowTariffOnly`. **Target SOC** is new. |
+| **Departure** | datetime | held | **Departure time**, as a date-time. |
+| **Plan state**, **EV energy budget**, **Projected shortfall**, **Surplus spill**, **Loan headroom**, **Required SOC floor**, **Trajectory SOC floor**, **Forecast remaining today**, **Forecast accuracy** | sensor | `dayPlan` | The same; `unknown` outside `Forecasted`. **Charge window** isn't in the API. |
+| **Target plan state**, **Target forecast surplus**, **Target solar energy**, **Target grid energy**, **Target expected**, **Target shortfall**, **Target charge pace**, **Charging from**, **Target hold until** | sensor | `targetedPlan` | The same; `unknown` outside `Targeted`. **Charging from** and **Target hold until** are timestamps. |
+| **Fast delivered**, **Fast target**, **Fast start** | sensor | `fastCharge` | The same. **Fast start** is a timestamp. |
+| **Car SOC**, **Car range**, **Car reading age** | sensor | `/vehicle` | New. Range in km. The reading's age is the time the car reported it, shown as "… ago". |
+| **Car reading stale** | binary sensor | `stale` on `/vehicle` | New: past `Vehicle:MaxAge`. |
+| **Low tariff**, **Tariff change**, **Grid price** | binary sensor, sensor | `/tariff` | The same. **Grid price** is the energy dashboard's *current price* entity. |
+| **Last poll age**, **Forecast available**, **Version** | diagnostic | `/health` | New. |
+
+Not in the integration: **Minimum battery SOC**, **SOC resume margin**, **Min solar surplus** and **Sun
+until** (not in the 1.2 API), **Car feed**, **Battery hold target**, **Charge window** and **Stop
+service**.
 
 The device also carries the running build as its **software version** (`1.0.0 (31bf347)`), shown on
 HA's device page. That is device metadata rather than an entity, so it creates no row on any

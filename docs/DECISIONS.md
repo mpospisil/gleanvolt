@@ -4,6 +4,48 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-13 — A native Home Assistant integration, in its own repo, on the 1.2 HTTP API
+
+**Found.** Home Assistant could only reach Gleanvolt through MQTT discovery (#17), which needs a broker.
+MQTT discovery also can't report an error to the person who pressed a button, has no date-time platform
+(the departure is text), and has no service actions with typed fields. The HTTP API (1.2.0) already
+covers every reading and every action a Home Assistant user needs, apart from three runtime settings.
+
+**Decided (#391, step 1: #393).**
+- **A separate repo, `gleanvolt-ha`** (MIT, Python, domain `gleanvolt`), installed through HACS. HACS
+  wants one integration per repo with `custom_components/<domain>/` at the root, and Home Assistant
+  integrations are Python. It references nothing in this solution: HTTP is the only seam, the same one
+  `gleanvolt-mcp` uses.
+- **Gleanvolt 1.2.0 is the minimum, and the integration needs no change to Gleanvolt.** The config flow
+  reads `version` from `/health` and refuses anything older, naming what it found. Later features are
+  enabled from the version `/health` reports, so an older installation keeps working without them.
+- **The API is the only interface, and the integration adds no capability.** Anything it can't do goes
+  into the API first. Minimum battery SOC, SOC resume margin and min solar surplus are left out until
+  1.3 adds them to the API (#392, #394).
+- **Polling, not push.** `/status` every 10 s (5 to 60 s), the slower endpoints every minute, `/health`
+  every five minutes, and never `/forecast?weather=true`. SignalR push can come later, on #386.
+- **One key, named `home-assistant`**, so the log and the sessions name the source of an action.
+- **The mode is a select; parameters are held in Home Assistant.** Picking a mode calls
+  `POST /charging/start` with what the integration's own entities hold, and `Off` calls
+  `/charging/stop`. The held values are HA-side drafts, restored across an HA restart and sent only at a
+  start. They are not a controller setting, so the controller still boots in `Off`.
+- **Errors reach the user.** A 400, a 409, or a 200 with `succeeded: false` raises `HomeAssistantError`
+  with the controller's message.
+- **One device per installation**, keyed by `systemId` from `/health`, so a new host keeps the history.
+- **A drift guard.** `contract/openapi.json` from 1.2.0 is checked in, and a test checks every route,
+  field read and field sent against it, as in `gleanvolt-mcp`.
+- **MQTT discovery stays.** It suits installations with a broker. The docs say to use one or the other,
+  since both together make two devices.
+
+**Consequences accepted.**
+- Up to 10 s of lag on live data, and a minute on the car, the tariff and the option flags. An action's
+  own answer updates the entities at once.
+- *Fast departure* is a real date-time but can't be emptied, so a departure already past means "charge
+  now".
+- The three runtime settings stay MQTT-only until 1.3 and the integration release after it.
+- Screenshots of Home Assistant itself aren't generated like the web UI's; the manual page shows the web
+  UI's API access section.
+
 ## 2026-11-11 — Targeted's low tariff only is a request constraint, a full pause, and forbidden windows for the plan
 
 **Found.** Fast and SolarGrid have *low tariff only* as a per-mode setting (`ILowTariffSettings`, #274)

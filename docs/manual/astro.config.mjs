@@ -48,6 +48,7 @@ export default defineConfig({
             { slug: 'setting-up/grid-tariff' },
             { slug: 'setting-up/car' },
             { slug: 'setting-up/settings' },
+            { slug: 'setting-up/home-assistant' },
           ],
         },
         {
