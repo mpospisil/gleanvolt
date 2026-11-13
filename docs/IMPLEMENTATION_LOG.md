@@ -7,7 +7,8 @@ Reverse-chronological. Newest entry at the top.
 ## 2026-11-13 — Home Assistant integration, step 1, on the 1.2 API (#393)
 
 **What.** A native Home Assistant integration in a new repo,
-[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), installed through HACS. It needs no MQTT
+[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), installed through Home Assistant's
+Marketplace (HACS before 2026.11). It needs no MQTT
 broker and makes no change to Gleanvolt: it talks only to the HTTP API that 1.2.0 ships. This repo gets
 the docs, and one new generated screenshot.
 
@@ -33,15 +34,24 @@ the docs, and one new generated screenshot.
   mode without waiting a poll.
 - Translations en + cs: mode names stay English, as in the web UI; the Czech wording follows the web
   UI's resources.
-- CI: hassfest, HACS (brands ignored; the icon and logo ship in `brand/`), ruff, pytest. A tag
-  `v<manifest version>` publishes a release.
+- CI: hassfest, HACS (brands ignored; the icon and logo ship in `brand/`), ruff, pytest, and a
+  `node --check` of the panel. A tag `v<manifest version>` publishes a release.
+- **After the first run on the Pi:** plan figures are gated on their mode, since `/status` carries
+  them in every mode. **Mode to start** and **Start** mirror the web UI's tabs. `frontend/gleanvolt.js`,
+  served by `panel.py`, adds a **Gleanvolt** sidebar panel and a card. It loads the dashboards' card
+  helpers itself, because a panel opened straight after a refresh has none.
+- **Found on the Pi meanwhile:** switching MQTT off on Settings wrote empty overrides, and an empty
+  `BrokerPort` kept the controller from starting, while the process stayed up (#396).
 
-**Verified.** 132 tests with `pytest-homeassistant-custom-component` against HA 2026.2: config flow
+**Verified.** 140 tests (132 at first) with `pytest-homeassistant-custom-component` against HA 2026.2: config flow
 (manual, zeroconf, 401, unreachable, API off, old version, reauth, reconfigure, options), coordinator
 unavailable on 503 and on connection loss, reauth on a runtime 401, select → start and stop bodies,
 `succeeded: false` and 400 → `HomeAssistantError`, battery hold 409, held parameters restored after a
 restart, service actions and the preview response, diagnostics redaction, and the contract.
-`hassfest` passes locally. **Not yet run against the Pi**; the acceptance list in #393 is for that.
+`hassfest` passes locally and in CI. **Run on the Pi** from copied files: discovery, setup, live data,
+the panel, and remove and re-add, then installed through the Marketplace (**Add from link**) on Home
+Assistant 2026.11.1, where the HACS installer refuses to run. Still to do: a Targeted start's
+session source, and the preview action.
 
 **Files (this repo).** `docs/HOME_ASSISTANT.md` (new top section, the integration's entity table),
 `docs/HTTP_API.md` (`home-assistant` as an example key), `docs/DECISIONS.md`, the manual's

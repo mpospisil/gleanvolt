@@ -1,6 +1,6 @@
 ---
 title: Home Assistant
-description: Propojte Home Assistant integrací Gleanvolt z HACS. MQTT broker není potřeba.
+description: Propojte Home Assistant integrací Gleanvolt. MQTT broker není potřeba.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -39,12 +39,15 @@ Assistant s ním může spustit i zastavit nabíječku.
 
 <Steps>
 
-1. V Home Assistantu otevřete **HACS** a pak **⋮ → Custom repositories**. Přidejte
-   `https://github.com/mpospisil/gleanvolt-ha` s typem **Integration**.
+1. V Home Assistantu otevřete **Nastavení → Marketplace**. Poprvé potvrďte upozornění.
 
-2. Najděte v HACS **Gleanvolt**, klikněte na **Download** a restartujte Home Assistant.
+2. Klikněte na **Add from link**, zadejte `mpospisil/gleanvolt-ha` a klikněte na **Add**. Pokud se
+   zeptá na propojení s GitHubem, potvrďte ho na github.com. Pokud se zeptá na typ, zvolte
+   **Integration**.
 
-3. Otevřete **Nastavení → Zařízení a služby**. Home Assistant Gleanvolt v síti najde a nabídne
+3. Otevřete **Gleanvolt**, nainstalujte ho a restartujte Home Assistant, až o to požádá.
+
+4. Otevřete **Nastavení → Zařízení a služby**. Home Assistant Gleanvolt v síti najde a nabídne
    **Nalezen Gleanvolt**. Klikněte na **Přidat** a vložte klíč.
 
    Pokud ho nenabídne, klikněte na **Přidat integraci**, vyberte **Gleanvolt** a zadejte adresu počítače,
@@ -52,24 +55,45 @@ Assistant s ním může spustit i zastavit nabíječku.
 
 </Steps>
 
+:::note[Home Assistant starší než 2026.11]
+Před verzí 2026.11 Home Assistant Marketplace neměl a vlastní integrace se instalovaly přes **HACS**.
+Tam otevřete **HACS → ⋮ → Custom repositories**, přidejte `https://github.com/mpospisil/gleanvolt-ha`
+s typem **Integration**, stáhněte **Gleanvolt** a restartujte Home Assistant.
+:::
+
 Když je něco špatně, formulář řekne co: klíč byl odmítnut, na adrese nic neodpovídá, API je vypnuté,
 nebo je Gleanvolt starší než 1.2.0 a je potřeba ho nejdřív [aktualizovat](../../installation/updating/).
 
 ## Používání
 
-Gleanvolt se objeví jako jedno zařízení pojmenované podle vaší instalace.
+Gleanvolt se objeví jako jedno zařízení pojmenované podle vaší instalace a jako **Gleanvolt**
+v postranním panelu Home Assistantu. Ta stránka funguje jako záložky [Plánu nabíjení](../../using/charging-plan/):
 
-- **Režim nabíjení** ukazuje, v jakém režimu Gleanvolt je. Volbou jiného režimu ho spustíte, volbou
-  **Off** nabíjení zastavíte. Když Gleanvolt režim spustit nemůže, třeba *Targeted* bez času odjezdu,
-  Home Assistant ukáže důvod od Gleanvoltu a nic se nespustí.
+<Steps>
+
+1. Vyberte režim v **Režim ke spuštění**. Pod ním se ukážou jen ovládací prvky a údaje tohoto režimu.
+
+2. Nastavte, co režim potřebuje. U [Fast](../../using/modes/fast/) kolik a kdy, u
+   [Targeted](../../using/modes/targeted/) kolik, odjezd a tempo.
+
+3. Klikněte na **Spustit**.
+
+</Steps>
+
+Když Gleanvolt režim spustit nemůže, třeba *Targeted* bez času odjezdu, Home Assistant ukáže důvod od
+Gleanvoltu a nic se nespustí.
+
+- **Režim nabíjení** ukazuje, v jakém režimu Gleanvolt je. Volbou režimu tam ho spustíte hned, volbou
+  **Off** nabíjení zastavíte.
 - **Zastavit nabíjení** zastaví nabíječku a přepne režim na **Off**.
-- **Naplno: …**, **Cíl: …**, **Odjezd** a **Tempo**: co bude chtít příští nabíjení
-  [Fast](../../using/modes/fast/) nebo [Targeted](../../using/modes/targeted/). Nastavte je předem a pak
-  zvolte režim. Drží je Home Assistant a posílá je, až když se režim spouští.
+- Co nastavíte pro příští spuštění, drží Home Assistant a posílá to, až když se režim spouští.
 - **Blokace vybíjení baterie**, oba přepínače **jen nízký tarif** a **Forecasted: do plna** mění Gleanvolt
   hned, stejně jako stejné ovládací prvky v [Plánu nabíjení](../../using/charging-plan/).
 - Senzory ukazují stejné údaje jako [Přehled](../../using/overview/): slunce, síť, baterii, auto a běžící
   plán. Údaje plánu jsou prázdné, dokud jeho režim neběží.
+
+Stejná stránka je i karta: na libovolném dashboardu **Upravit → Přidat kartu → Gleanvolt**. Nic se na
+ní nenastavuje.
 
 Home Assistant čte aktuální údaje každých 10 sekund. Změnit to můžete v **Nastavit** u integrace. Když
 se Gleanvolt zastaví, zařízení se ukáže jako nedostupné, dokud znovu nenaběhne.
