@@ -1,7 +1,7 @@
 # HTTP API (the `Api` section)
 
 Everything the controller can see, and the actions that change something, for **programs rather than
-people** — a script, a dashboard, the [Home Assistant integration](HOME_ASSISTANT.md#the-gleanvolt-integration-hacs),
+people** — a script, a dashboard, the [Home Assistant integration](HOME_ASSISTANT.md#the-gleanvolt-integration),
 or an MCP server that lets an LLM answer questions about this installation and act on it. It is described by [OpenAPI](https://www.openapis.org/), so a client can be
 generated from the document. Every action is one the web UI already has; the API adds no capability
 of its own.
@@ -37,7 +37,7 @@ Api__Keys__claude-mcp=<a secret; e.g. from openssl rand -hex 32>
 
 **The key's name** is what the log and the charging session record as the source of an action —
 `Api__Keys__claude-mcp` produces *"API (claude-mcp) started Targeted"* — so give each client its own
-key. The [Home Assistant integration](HOME_ASSISTANT.md#the-gleanvolt-integration-hacs) expects one
+key. The [Home Assistant integration](HOME_ASSISTANT.md#the-gleanvolt-integration) expects one
 named `home-assistant`, so what it starts is recorded as *"API (home-assistant) started Targeted"*.
 
 Present one as a bearer token on every call that does anything:

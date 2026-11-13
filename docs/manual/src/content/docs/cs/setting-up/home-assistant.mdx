@@ -1,6 +1,6 @@
 ---
 title: Home Assistant
-description: Propojte Home Assistant integrací Gleanvolt z HACS. MQTT broker není potřeba.
+description: Propojte Home Assistant integrací Gleanvolt. MQTT broker není potřeba.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -39,18 +39,27 @@ Assistant s ním může spustit i zastavit nabíječku.
 
 <Steps>
 
-1. V Home Assistantu otevřete **HACS** a pak **⋮ → Custom repositories**. Přidejte
-   `https://github.com/mpospisil/gleanvolt-ha` s typem **Integration**.
+1. V Home Assistantu otevřete **Nastavení → Marketplace**. Poprvé potvrďte upozornění.
 
-2. Najděte v HACS **Gleanvolt**, klikněte na **Download** a restartujte Home Assistant.
+2. Klikněte na **Add from link**, zadejte `mpospisil/gleanvolt-ha` a klikněte na **Add**. Pokud se
+   zeptá na propojení s GitHubem, potvrďte ho na github.com. Pokud se zeptá na typ, zvolte
+   **Integration**.
 
-3. Otevřete **Nastavení → Zařízení a služby**. Home Assistant Gleanvolt v síti najde a nabídne
+3. Otevřete **Gleanvolt**, nainstalujte ho a restartujte Home Assistant, až o to požádá.
+
+4. Otevřete **Nastavení → Zařízení a služby**. Home Assistant Gleanvolt v síti najde a nabídne
    **Nalezen Gleanvolt**. Klikněte na **Přidat** a vložte klíč.
 
    Pokud ho nenabídne, klikněte na **Přidat integraci**, vyberte **Gleanvolt** a zadejte adresu počítače,
    na kterém Gleanvolt běží (například `gleanvolt.local`), port `8090` a klíč.
 
 </Steps>
+
+:::note[Home Assistant starší než 2026.11]
+Před verzí 2026.11 Home Assistant Marketplace neměl a vlastní integrace se instalovaly přes **HACS**.
+Tam otevřete **HACS → ⋮ → Custom repositories**, přidejte `https://github.com/mpospisil/gleanvolt-ha`
+s typem **Integration**, stáhněte **Gleanvolt** a restartujte Home Assistant.
+:::
 
 Když je něco špatně, formulář řekne co: klíč byl odmítnut, na adrese nic neodpovídá, API je vypnuté,
 nebo je Gleanvolt starší než 1.2.0 a je potřeba ho nejdřív [aktualizovat](../../installation/updating/).

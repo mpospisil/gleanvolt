@@ -5,7 +5,7 @@ and [HTTP API](HTTP_API.md) cover every control and every reading. If you use
 Home Assistant anyway, there are two ways to connect them, and an installation should use **one or the
 other**. With both on, it shows up in Home Assistant as two devices with the same entities.
 
-- **[The Gleanvolt integration (HACS)](#the-gleanvolt-integration-hacs)**: recommended when you have
+- **[The Gleanvolt integration (HACS)](#the-gleanvolt-integration)**: recommended when you have
   no MQTT broker. Gleanvolt 1.2.0 or later. A custom integration installed through HACS that talks to
   the HTTP API. It can show a refusal to the person who pressed the button, has a real date-time
   entity for the departure, and has service actions with typed fields.
@@ -28,7 +28,7 @@ other**. With both on, it shows up in Home Assistant as two devices with the sam
 Either way, charge control boots in mode **Off** and nothing is written to your hardware until
 charging is started.
 
-## The Gleanvolt integration (HACS)
+## The Gleanvolt integration
 
 For Gleanvolt **1.2.0 and later**. The integration lives in its own repository,
 [gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), and uses only the [HTTP API](HTTP_API.md),
@@ -39,8 +39,10 @@ walks through the setup with pictures.
 1. **A key.** On **Settings → Installation → API access**, switch the API on, create a key named
    `home-assistant`, and **Restart** on **Settings → Health**. The key's name is what the log and each
    session record as the source of an action: *"API (home-assistant) started Targeted"*.
-2. **HACS → ⋮ → Custom repositories**: add `https://github.com/mpospisil/gleanvolt-ha` as an
-   *Integration*, install **Gleanvolt**, and restart Home Assistant.
+2. **Install it.** On Home Assistant 2026.11 and later, open **Settings → Marketplace → Add from
+   link**, enter `mpospisil/gleanvolt-ha` (type *Integration*), install **Gleanvolt**, and restart Home
+   Assistant. The Marketplace replaced HACS in 2026.11 and reads the same `hacs.json`. On an older Home
+   Assistant, use **HACS → ⋮ → Custom repositories** with the same address.
 3. **Settings → Devices & services.** Gleanvolt advertises `_gleanvolt._tcp` on the LAN, so Home
    Assistant offers *Gleanvolt discovered* with the host and port filled in. Only the key is asked
    for. Without discovery, add it by hand: host, port (8090) and key.
@@ -463,7 +465,7 @@ same rule the forecast plan follows.
 
 ## The integration's entities
 
-The [integration](#the-gleanvolt-integration-hacs) uses the same names as MQTT discovery wherever the
+The [integration](#the-gleanvolt-integration) uses the same names as MQTT discovery wherever the
 entity is the same, so the meanings above apply. This table lists each integration entity, what it is
 read from or what it calls, and where it differs from MQTT.
 

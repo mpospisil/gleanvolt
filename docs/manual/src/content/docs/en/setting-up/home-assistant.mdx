@@ -1,6 +1,6 @@
 ---
 title: Home Assistant
-description: Connect Home Assistant with the Gleanvolt integration from HACS. No MQTT broker needed.
+description: Connect Home Assistant with the Gleanvolt integration. No MQTT broker needed.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -39,18 +39,26 @@ Home Assistant can start and stop the charger.
 
 <Steps>
 
-1. In Home Assistant, open **HACS**, then **⋮ → Custom repositories**. Add
-   `https://github.com/mpospisil/gleanvolt-ha` with the type **Integration**.
+1. In Home Assistant, open **Settings → Marketplace**. The first time, accept the warning.
 
-2. Find **Gleanvolt** in HACS, press **Download**, and restart Home Assistant.
+2. Press **Add from link**, enter `mpospisil/gleanvolt-ha`, and press **Add**. If it asks you to
+   connect GitHub, approve it on github.com. If it asks for a type, choose **Integration**.
 
-3. Open **Settings → Devices & services**. Home Assistant finds Gleanvolt on your network and offers
+3. Open **Gleanvolt**, install it, and restart Home Assistant when it asks.
+
+4. Open **Settings → Devices & services**. Home Assistant finds Gleanvolt on your network and offers
    **Gleanvolt discovered**. Press **Add** and paste the key.
 
    If it isn't offered, press **Add integration**, choose **Gleanvolt**, and enter the address of the
    computer Gleanvolt runs on (for example `gleanvolt.local`), the port `8090` and the key.
 
 </Steps>
+
+:::note[Home Assistant older than 2026.11]
+Before 2026.11, Home Assistant had no Marketplace, and custom integrations came from **HACS**. There,
+open **HACS → ⋮ → Custom repositories**, add `https://github.com/mpospisil/gleanvolt-ha` with the type
+**Integration**, download **Gleanvolt**, and restart Home Assistant.
+:::
 
 If something is wrong, the form says what: the key was refused, nothing answered at that address, the
 API is switched off, or Gleanvolt is older than 1.2.0 and needs [updating](../../installation/updating/)

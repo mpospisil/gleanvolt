@@ -7,7 +7,8 @@ Reverse-chronological. Newest entry at the top.
 ## 2026-11-13 — Home Assistant integration, step 1, on the 1.2 API (#393)
 
 **What.** A native Home Assistant integration in a new repo,
-[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), installed through HACS. It needs no MQTT
+[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), installed through Home Assistant's
+Marketplace (HACS before 2026.11). It needs no MQTT
 broker and makes no change to Gleanvolt: it talks only to the HTTP API that 1.2.0 ships. This repo gets
 the docs, and one new generated screenshot.
 
@@ -48,7 +49,8 @@ unavailable on 503 and on connection loss, reauth on a runtime 401, select → s
 `succeeded: false` and 400 → `HomeAssistantError`, battery hold 409, held parameters restored after a
 restart, service actions and the preview response, diagnostics redaction, and the contract.
 `hassfest` passes locally and in CI. **Run on the Pi** from copied files: discovery, setup, live data,
-the panel, and remove and re-add. Still to do: a HACS install from a release, a Targeted start's
+the panel, and remove and re-add, then installed through the Marketplace (**Add from link**) on Home
+Assistant 2026.11.1, where the HACS installer refuses to run. Still to do: a Targeted start's
 session source, and the preview action.
 
 **Files (this repo).** `docs/HOME_ASSISTANT.md` (new top section, the integration's entity table),

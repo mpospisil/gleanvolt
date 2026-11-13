@@ -12,7 +12,8 @@ MQTT discovery also can't report an error to the person who pressed a button, ha
 covers every reading and every action a Home Assistant user needs, apart from three runtime settings.
 
 **Decided (#391, step 1: #393).**
-- **A separate repo, `gleanvolt-ha`** (MIT, Python, domain `gleanvolt`), installed through HACS. HACS
+- **A separate repo, `gleanvolt-ha`** (MIT, Python, domain `gleanvolt`), installed through HACS, or
+  through the Marketplace that replaced it in Home Assistant 2026.11 and reads the same `hacs.json`. HACS
   wants one integration per repo with `custom_components/<domain>/` at the root, and Home Assistant
   integrations are Python. It references nothing in this solution: HTTP is the only seam, the same one
   `gleanvolt-mcp` uses.
