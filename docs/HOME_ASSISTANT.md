@@ -5,8 +5,9 @@ and [HTTP API](HTTP_API.md) cover every control and every reading. If you use
 Home Assistant anyway, there are two ways to connect them, and an installation should use **one or the
 other**. With both on, it shows up in Home Assistant as two devices with the same entities.
 
-- **[The Gleanvolt integration (HACS)](#the-gleanvolt-integration)**: recommended when you have
-  no MQTT broker. Gleanvolt 1.2.0 or later. A custom integration installed through HACS that talks to
+- **[The Gleanvolt integration](#the-gleanvolt-integration)**: recommended when you have
+  no MQTT broker. Gleanvolt 1.2.0 or later. A custom integration installed through the Marketplace
+  (HACS before Home Assistant 2026.11) that talks to
   the HTTP API. It can show a refusal to the person who pressed the button, has a real date-time
   entity for the departure, and has service actions with typed fields.
 - **MQTT discovery**: Gleanvolt publishes itself to a broker as one device: a button per charge mode,
