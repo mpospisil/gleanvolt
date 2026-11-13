@@ -4,6 +4,50 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-13 — Home Assistant integration, step 1, on the 1.2 API (#393)
+
+**What.** A native Home Assistant integration in a new repo,
+[gleanvolt-ha](https://github.com/mpospisil/gleanvolt-ha), installed through HACS. It needs no MQTT
+broker and makes no change to Gleanvolt: it talks only to the HTTP API that 1.2.0 ships. This repo gets
+the docs, and one new generated screenshot.
+
+**How (in gleanvolt-ha).**
+- `api.py`: a small typed `aiohttp` client. 401, 404 (API off), 503 (no poll yet), 400/409 (the
+  problem's `detail`) and connection loss each map to their own exception. An action reads
+  `succeeded`, not the status code. Numbers are accepted as JSON numbers or strings, as the schema allows.
+- `config_flow.py`: zeroconf on `_gleanvolt._tcp` (only the key is asked) or manual setup. Validation is
+  `GET /health` with the key, which refuses a version below 1.2.0 and names it. The unique id is
+  `systemId`. Reauth, reconfigure (aborts if a different `systemId` answers), and options for the poll
+  interval.
+- `coordinator.py`: `/status` on the configured interval; vehicle, tariff, low-tariff-only and
+  until-full every minute; `/health` every five. 401 becomes `ConfigEntryAuthFailed`, and anything else
+  makes the entities unavailable.
+- Entities are declared as descriptions that name an API path (`dayPlan.evBudgetWh`), so the contract
+  test can walk every path through `contract/openapi.json`. Mode-specific figures are `unknown` outside
+  their mode because their parent object is null.
+- `payload.py`: one builder for the start and preview bodies, used by both the select and the service
+  actions. Missing amounts or departures are left out, so the controller's own refusal reaches the user.
+- `Drafts`: the held parameters. Restore entities (select, number, datetime, switch) write into it and
+  restore it.
+- Every action's returned `status` is pushed into the status coordinator, so the select shows the new
+  mode without waiting a poll.
+- Translations en + cs: mode names stay English, as in the web UI; the Czech wording follows the web
+  UI's resources.
+- CI: hassfest, HACS (brands ignored; the icon and logo ship in `brand/`), ruff, pytest. A tag
+  `v<manifest version>` publishes a release.
+
+**Verified.** 132 tests with `pytest-homeassistant-custom-component` against HA 2026.2: config flow
+(manual, zeroconf, 401, unreachable, API off, old version, reauth, reconfigure, options), coordinator
+unavailable on 503 and on connection loss, reauth on a runtime 401, select → start and stop bodies,
+`succeeded: false` and 400 → `HomeAssistantError`, battery hold 409, held parameters restored after a
+restart, service actions and the preview response, diagnostics redaction, and the contract.
+`hassfest` passes locally. **Not yet run against the Pi**; the acceptance list in #393 is for that.
+
+**Files (this repo).** `docs/HOME_ASSISTANT.md` (new top section, the integration's entity table),
+`docs/HTTP_API.md` (`home-assistant` as an example key), `docs/DECISIONS.md`, the manual's
+`setting-up/home-assistant.mdx` (en + cs), the sidebar, the links from `settings.mdx`, and
+`tests/Gleanvolt.Web.Screenshots/SettingsScreenshots.cs` → `settings-api.png`.
+
 ## 2026-11-11 — Targeted: Low tariff only (#382)
 
 **What.** A *Low tariff only* option for a targeted charge, offered only while *Sun only* is off.

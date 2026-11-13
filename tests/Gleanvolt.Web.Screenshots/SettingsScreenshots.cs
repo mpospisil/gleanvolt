@@ -33,6 +33,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
     private readonly FakeWeatherKeyEditor _weather = new();
     private readonly FakeTariffEditor _tariff = new();
     private readonly FakeEvEditor _car = new();
+    private readonly FakeIntegrationsEditor _integrations = new();
 
     public SettingsScreenshots()
     {
@@ -70,7 +71,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Services.AddSingleton<ITariffEditor>(_tariff);
         Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
-        Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
+        Services.AddSingleton<IIntegrationsEditor>(_integrations);
         Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
         Services.AddSingleton<IDeviceDiscovery>(new NoDiscovery());
         Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
@@ -100,6 +101,16 @@ public sealed class SettingsScreenshots : ScreenshotTest
     [Fact]
     public void The_tariff_table() =>
         Capture(RenderPage<PvSystem>("/settings"), "settings-tariff", selector: "#tariff-editor");
+
+    /// <summary>The API switched on, with the key the Home Assistant integration uses (#393).</summary>
+    [Fact]
+    public void The_api_access()
+    {
+        _integrations.Stored[IntegrationSettingKeys.ApiEnabled] = "true";
+        _integrations.Running[IntegrationSettingKeys.ApiEnabled] = "true";
+        _integrations.Keys.Add(new ApiKeyEntry("home-assistant", "k3Q9xV7mT2pL8wR4nB6yC1dF", SettingSource.SecretStore, false));
+        Capture(RenderPage<PvSystem>("/settings"), "settings-api", selector: "#api-editor");
+    }
 
     [Fact]
     public void The_health_tab()
