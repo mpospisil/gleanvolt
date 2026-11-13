@@ -31,6 +31,16 @@ covers every reading and every action a Home Assistant user needs, apart from th
   start. They are not a controller setting, so the controller still boots in `Off`.
 - **Errors reach the user.** A 400, a 409, or a 200 with `succeeded: false` raises `HomeAssistantError`
   with the controller's message.
+- **Starting mirrors the web UI's tabs, in a panel the integration ships.** Testing on the Pi showed the
+  device page lists every entity at once, unlike the web UI, which shows one mode's form at a time. An
+  integration can't hide entities by another's state, but it can ship a front-end module. So a held
+  **Mode to start** select (the tab) and a **Start** button were added. A module served from the
+  integration registers a **Gleanvolt** sidebar panel and a configuration-free card. Both are built
+  from Home Assistant's own entities, conditional and vertical-stack cards, and find entities by
+  `translation_key`. A YAML card for users to paste was tried first and dropped: nobody should have to
+  edit entity ids.
+- **Plan figures follow their mode.** `/status` carries every plan in every mode, so the integration
+  gates `dayPlan`, `targetedPlan` and `fastCharge` on `mode`, as the MQTT worker does.
 - **One device per installation**, keyed by `systemId` from `/health`, so a new host keeps the history.
 - **A drift guard.** `contract/openapi.json` from 1.2.0 is checked in, and a test checks every route,
   field read and field sent against it, as in `gleanvolt-mcp`.
@@ -45,6 +55,9 @@ covers every reading and every action a Home Assistant user needs, apart from th
 - The three runtime settings stay MQTT-only until 1.3 and the integration release after it.
 - Screenshots of Home Assistant itself aren't generated like the web UI's; the manual page shows the web
   UI's API access section.
+- The panel relies on Home Assistant's front-end internals: `loadCardHelpers`, loaded through the panel
+  resolver when no dashboard has been opened. A Home Assistant release that changes them can break the
+  panel without breaking the entities. The panel then shows the error rather than a blank page.
 
 ## 2026-11-11 — Targeted's low tariff only is a request constraint, a full pause, and forbidden windows for the plan
 

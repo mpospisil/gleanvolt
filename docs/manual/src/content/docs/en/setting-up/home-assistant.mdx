@@ -58,19 +58,34 @@ first.
 
 ## Using it
 
-Gleanvolt appears as one device, named after your installation.
+Gleanvolt appears as one device, named after your installation, and as **Gleanvolt** in Home
+Assistant's sidebar. The sidebar page works like the [Charging plan](../../using/charging-plan/)'s tabs:
 
-- **Charge mode** shows the mode Gleanvolt is in. Choose another mode to start it, or **Off** to stop
-  charging. If Gleanvolt can't start it, for example *Targeted* without a departure time, Home Assistant
-  shows Gleanvolt's reason and nothing starts.
+<Steps>
+
+1. Pick a mode in **Mode to start**. Only that mode's controls and figures show below it.
+
+2. Set what the mode needs. For [Fast](../../using/modes/fast/), how much and when. For
+   [Targeted](../../using/modes/targeted/), how much, the departure and the pacing.
+
+3. Press **Start**.
+
+</Steps>
+
+If Gleanvolt can't start it, for example *Targeted* without a departure time, Home Assistant shows
+Gleanvolt's reason and nothing starts.
+
+- **Charge mode** shows the mode Gleanvolt is in. Choosing a mode there starts it straight away, and
+  **Off** stops charging.
 - **Stop charging** stops the charger and sets the mode to **Off**.
-- **Fast …** and **Target …**, **Departure**, **Charge priority**: what the next
-  [Fast](../../using/modes/fast/) or [Targeted](../../using/modes/targeted/) charge asks for. Set them
-  first, then choose the mode. They are kept in Home Assistant and sent only when a mode starts.
+- What you set for the next start is kept in Home Assistant, and sent only when a mode starts.
 - **Battery discharge hold**, the two **low tariff only** switches and **Forecasted until full** change
   Gleanvolt straight away, like the same controls on the [Charging plan](../../using/charging-plan/).
 - The sensors show the same figures as the [Overview](../../using/overview/): solar, grid, battery, the
   car and the running plan. A plan's figures are empty while its mode isn't running.
+
+The same page is also a card: on any dashboard, **Edit → Add card → Gleanvolt**. It needs no
+settings.
 
 Home Assistant reads the live figures every 10 seconds. You can change that under **Configure** on the
 integration. If Gleanvolt stops, the device shows as unavailable until it is back.

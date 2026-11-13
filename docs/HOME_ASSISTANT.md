@@ -68,6 +68,24 @@ message, for example *"Gleanvolt refused: …"*, and the select shows the real m
 parameters are drafts kept in Home Assistant and restored across a Home Assistant restart. They are
 sent only when a mode is started. They are not a controller setting: Gleanvolt still boots in `Off`.
 
+**Starting a mode, like the web UI's tabs.** On the web UI's Charging plan you open a mode's tab, set
+what it needs, and press Start. The integration mirrors that. **Mode to start** is the tab: a held
+select that starts nothing. **Start** starts that mode with its held parameters. **Charge mode** stays
+what is actually running, and picking a mode there starts it straight away.
+
+**The Gleanvolt panel.** The integration ships its own front-end module and adds a **Gleanvolt** entry
+to the sidebar, with no setup. It shows a card per installation: Charge mode and the status, then
+*Mode to start*, and under it only the picked mode's controls and figures, with its *Start* button. In
+*Fast* and *Targeted*, the energy or SOC field follows the basis, and *Target rest SOC* appears only
+with *JustInTime*, as in the web forms. The same view is in the card picker as **Gleanvolt**, with no
+configuration, for any dashboard. The card finds its entities by the integration's own keys, so
+renamed entities, an area in the entity id or a Home Assistant in Czech make no difference. The device
+page still lists every entity at once.
+
+**Plan figures follow their mode.** `/status` carries `dayPlan`, `targetedPlan` and `fastCharge` in
+every mode, because the controller keeps their meters running across a switch. The integration shows
+each only while its mode drives the charger, as MQTT does, and reports `unknown` otherwise.
+
 **Service actions** let a script start a charge with its own fields, so nothing depends on held state:
 
 - `gleanvolt.start_charging`: `mode`, plus the fast fields (`basis`, `energy_kwh`, `target_soc`,
@@ -453,6 +471,8 @@ read from or what it calls, and where it differs from MQTT.
 | --- | --- | --- | --- |
 | **Charge mode** | select | `mode` on `/status`; `POST /charging/start` or `/charging/stop` | Replaces the five **Charge …** buttons, **Charge off** and **Activate target**. A refusal is shown to whoever picked it. |
 | **Charge mode** | sensor | `mode` | The same. |
+| **Mode to start** | select | held in Home Assistant | New. Which mode **Start** starts: the web UI's tab. Starts nothing by itself. |
+| **Start** | button | `POST /charging/start` | New. Starts **Mode to start** with its held parameters. Replaces the five **Charge …** buttons and **Activate target**. |
 | **Stop charging** | button | `POST /charging/stop` | **Charge off**. |
 | **Control state**, **Charger status**, **Solar power**, **Forecast solar power**, **Solar surplus**, **Grid power**, **Battery power**, **Battery SOC**, **EV charging power**, **EV charging current**, **Target charging current**, **Active charging current**, **Session energy**, **Battery loan power**, **Battery loaned today**, **Tomorrow forecast** | sensor | `/status` | The same. Energies in kWh. Power, energy and SOC carry device and state classes for the energy dashboard. |
 | **Car connected**, **Charging now** | binary sensor | `carConnected`, `state` = `charging` | The same. |
@@ -461,7 +481,7 @@ read from or what it calls, and where it differs from MQTT.
 | **Battery discharge hold** | switch | `batteryHold.requested`; `PUT /battery-hold` | Unavailable while `BatteryHold:Enabled` is false (the API answers 409). |
 | **Fast low tariff only**, **SolarGrid low tariff only** | switch | `PUT /charging/low-tariff-only` | The same. |
 | **Forecasted until full** | switch | `PUT /charging/until-full` | The same. |
-| **Fast basis**, **Fast energy**, **Fast target SOC** | select, number | held in Home Assistant | The same meaning. Restored across a Home Assistant restart. Sent when **Charge mode** starts `FastNoBattery`. |
+| **Fast basis**, **Fast energy**, **Fast target SOC** | select, number | held in Home Assistant | The same meaning. Restored across a Home Assistant restart. Sent when `FastNoBattery` is started by **Start** or **Charge mode**. |
 | **Fast departure** | datetime | held | A real date-time instead of text. It can't be emptied, so a time already past means *charge now*. |
 | **Target basis** | select | held | New: `Energy` sends **Target energy**, `Soc` sends **Target SOC**. |
 | **Target energy**, **Target SOC**, **Charge priority**, **Target rest SOC**, **Target sun only**, **Target low tariff only** | number, select, switch | held | The same meaning, sent when **Charge mode** starts `Targeted`. Sun only is `editable.maxGridEnergyWh: 0`, and low tariff only is `editable.lowTariffOnly`. **Target SOC** is new. |
