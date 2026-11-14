@@ -3,8 +3,8 @@ name: gleanvolt-install
 description: Install, update or reinstall Gleanvolt, the solar EV-charging controller, on a Raspberry Pi, a Debian or Ubuntu computer, a Docker host, a NAS or Windows, and check that its web UI answers on port 8090. Use when the user asks to install, set up, update, upgrade or reinstall Gleanvolt, or to find out why a fresh Gleanvolt install doesn't open.
 compatibility: Runs shell commands on the machine Gleanvolt goes on (bash on Linux, PowerShell on Windows), or over ssh to it. Needs internet access to github.com and ghcr.io.
 metadata:
-  version: "1.3.0"
-  gleanvolt-checked-against: "1.3"
+  version: "1.2.0"
+  gleanvolt-checked-against: "1.2"
   homepage: https://github.com/mpospisil/gleanvolt
   manual: https://mpospisil.github.io/gleanvolt/latest/en/
 ---
