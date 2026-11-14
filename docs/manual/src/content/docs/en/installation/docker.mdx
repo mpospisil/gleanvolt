@@ -24,7 +24,7 @@ instead; it uses the NAS's own container app.
 2. Start the container. Replace `Europe/Prague` with your time zone:
 
    ```bash
-   docker run -d --name gleanvolt-controller --restart on-failure \
+   docker run -d --name gleanvolt-controller --restart on-failure --init \
      --network host \
      -e TZ=Europe/Prague \
      -v /opt/gleanvolt/data:/app/data \
@@ -48,6 +48,8 @@ instead; it uses the NAS's own container app.
   network.
 - **`--restart on-failure`** brings Gleanvolt back after a crash or a restart from its own page. Don't
   use `always` or `unless-stopped`: then **Stop service** in Gleanvolt can't stop it.
+- **`--init`** makes sure the container ends if Gleanvolt fails to start, so `on-failure` can restart
+  it. Without it, a failed start can leave the container hanging.
 - **`TZ`** is your time zone, so each day's history starts at your midnight.
 
 ## Starting and stopping

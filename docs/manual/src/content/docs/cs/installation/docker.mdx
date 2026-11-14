@@ -24,7 +24,7 @@ stránky [NAS](../nas/); ta používá vlastní aplikaci pro kontejnery.
 2. Spusťte kontejner. Místo `Europe/Prague` zadejte své časové pásmo:
 
    ```bash
-   docker run -d --name gleanvolt-controller --restart on-failure \
+   docker run -d --name gleanvolt-controller --restart on-failure --init \
      --network host \
      -e TZ=Europe/Prague \
      -v /opt/gleanvolt/data:/app/data \
@@ -47,6 +47,8 @@ stránky [NAS](../nas/); ta používá vlastní aplikaci pro kontejnery.
   a telefon najde `gleanvolt.local`. Bez ní hledání vidí jen vlastní síť Dockeru.
 - **`--restart on-failure`** vrátí Gleanvolt po pádu nebo po restartu z jeho stránky. Nepoužívejte
   `always` ani `unless-stopped`: pak ho tlačítko **Zastavit službu** v Gleanvoltu nezastaví.
+- **`--init`** zajistí, že kontejner skončí, když se Gleanvolt nepodaří spustit, a `on-failure` ho
+  může spustit znovu. Bez ní může kontejner po neúspěšném startu zůstat viset.
 - **`TZ`** je vaše časové pásmo, aby den v historii začínal o vaší půlnoci.
 
 ## Spuštění a zastavení

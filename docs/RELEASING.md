@@ -98,6 +98,32 @@ in a browser, on a machine that has never had .NET installed:
 
 This is the half a workflow cannot do for you, and it is the half a stranger meets first.
 
+## Agent skills
+
+The two skills in [`skills/`](../skills/) (#390) are listed on [Agensi](https://www.agensi.io) under the
+project's creator account. They are published by hand, and not on every release, only when something
+they describe changed:
+
+- an install path: the `.deb` or `SHA256SUMS` names, the `docker run` options, the compose file, winget;
+- the setup wizard's steps, buttons or messages, or the manual pages the skills link to;
+- a new pitfall in the troubleshooting page that belongs in `gleanvolt-setup`.
+
+Then, for each skill that changed:
+
+1. Follow it once in a fresh agent session against the new release: `gleanvolt-install` on a clean VM
+   or Pi, `gleanvolt-setup` up to a populated Overview.
+2. Set `metadata.version` in its `SKILL.md` to that release, e.g. `"1.4.0"`, and
+   `gleanvolt-checked-against` to its line. The manual's build lints the folder.
+3. Zip it as one top-level folder, without hidden files:
+
+   ```bash
+   cd skills && zip -r -X ../gleanvolt-install.zip gleanvolt-install && cd ..
+   ```
+
+4. Upload the zip to the listing in the Agensi creator dashboard. Every version goes through Agensi's
+   security scan and review again before it is live. Agensi's guides don't describe updating a listing.
+   Correct this step after the first update.
+
 ## What a release carries
 
 | | |
@@ -106,7 +132,7 @@ This is the half a workflow cannot do for you, and it is the half a stranger mee
 | `gleanvolt-<version>-linux-x64.zip` | self-contained, ~48 MB |
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
 | `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
-| `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract |
+| `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract — and so does the `gleanvolt-install` skill, which repeats those steps |
 | nine `.nupkg` and nine `.snupkg` | the libraries and their symbols, attached rather than pushed to a feed: Api, Core, Hosting, Infrastructure, Web, and the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE |
 | `SHA256SUMS` | covers every file above, and not itself |
 
