@@ -20,7 +20,11 @@ check on the Overview. The format, and Agensi's scan and packaging rules, are in
   because a foreground process started by the agent ends with its session. The check is the root's
   redirect: `302 /setup` on a fresh install, `/wizard` or `/login` when data already exists.
 - `skills/gleanvolt-setup/SKILL.md`: Modbus TCP per brand, one controller per device, DHCP
-  reservations, then the wizard step by step. Pitfalls, taken from the troubleshooting page and the
+  reservations. Then the setup file: the site's details, `discover --json` and a pick by `role`,
+  `site.json` checked with `setup --validate`, and one sudo block for the user (`setup --file` as the
+  service user, `set-password`, restart). Linux, Docker and Windows each have their own commands. The
+  browser wizard stays, condensed, for a NAS. Solcast and OpenWeatherMap keys go in only with the user's
+  agreement. The car, MQTT and API access are left to the browser. Pitfalls, taken from the troubleshooting page and the
   site's history: the inverter and the charger swapped (frozen SOC, zero solar), the charger's single
   Modbus client, the search on a `172.x` bridge network, and a Solcast 429 being the daily quota. The
   health check reads the Overview's figures and Settings → Health → Last poll.
@@ -43,6 +47,11 @@ check on the Overview. The format, and Agensi's scan and packaging rules, are in
   terminal for the password, so the skill now says to hand the commands to the user's own terminal.
   The prerequisite block ended on `dpkg-query`, so a fresh machine exited 1, and that now prints "not
   installed". The skill also says why the download folder must be `0755`.
+- The setup file route, with device addresses nothing answers on (192.0.2.x). In the test machine:
+  `discover --json` and `setup --validate` run as the normal user, and `setup --file` as that user is
+  refused for the service user. The sudo block saves, puts the weather key in the secret store, sets the
+  password, and after one restart the root gives `302 /login` with the controller polling. The same
+  route in a throwaway Docker install on port 8099 has the same result.
 - Gemini CLI as a second agent: not possible with a Google account. Google ended personal-account
   sign-in to Gemini CLI on 2026-06-18, paid plans included ("This client is no longer supported"). It
   needs a Gemini API key.

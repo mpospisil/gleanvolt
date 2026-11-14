@@ -6,11 +6,12 @@ Cursor, Gemini CLI and others). They are also listed on [Agensi](https://www.age
 | Skill | What it does |
 |---|---|
 | [`gleanvolt-install`](gleanvolt-install/SKILL.md) | Picks the install path for the host (Linux package, Docker, NAS, Windows), checks the prerequisites, installs or updates, and checks that the web UI answers on port 8090 |
-| [`gleanvolt-setup`](gleanvolt-setup/SKILL.md) | Prepares the inverter and charger, walks the user through the password page and the setup wizard, and ends with a health check on the Overview |
+| [`gleanvolt-setup`](gleanvolt-setup/SKILL.md) | Prepares the inverter and charger, finds them with Gleanvolt's device search, writes a setup file and applies it with `setup --file`, and ends with a health check on the Overview. On a NAS, the browser wizard instead |
 
 The [user manual](https://mpospisil.github.io/gleanvolt/latest/en/) is the source of truth. The
-skills link to it for each step and don't replace it. The agent never types the password or an API
-key, and the skills contain no scripts: every command is written out in `SKILL.md`.
+skills link to it for each step and don't replace it. The agent never handles the web UI password or its
+recovery key. It takes a Solcast or OpenWeatherMap key only when the user agrees to give it. The skills
+contain no scripts: every command is written out in `SKILL.md`.
 
 ## Using one without Agensi
 

@@ -37,9 +37,22 @@ they follow:
 - **The manual stays the source of truth.** Each step links to its page under `/latest/en/`, and the
   skill tells the agent to follow the manual when the two disagree. The Czech page is the same link
   with `/cs/`. Nothing is translated.
-- **The agent never handles a secret.** The user types the password, the recovery key and every API key
-  or account sign-in into the web page. The setup skill also tells the agent not to open its own
-  Modbus connection to the devices, because the charger serves one client.
+- **`gleanvolt-setup` configures through a setup file,** not by guiding clicks. The agent asks for the
+  site, finds the devices with `Gleanvolt.Worker discover --json`, and picks the inverter and the charger
+  by the `role` each one reports, which guards against a swapped pair better than a click does. It writes
+  `site.json` and checks it with `setup --validate`, which works as any user. The user then runs one sudo
+  block, because `setup --file` refuses anyone but the service user: install the file for that user,
+  `setup --file`, `set-password`, delete the copy, restart. That is one restart to a running controller,
+  where the password set in the browser afterwards would need a second one. Everything the command line
+  route needs shipped in 1.1.0 (#303). Nothing was added for the skill. The browser wizard stays as
+  the route for a NAS, or where the agent has no shell on the host.
+- **Secrets.** The agent never handles the web UI password or the recovery key: `set-password` asks and
+  prints them in the user's own terminal. The Solcast and OpenWeatherMap keys go into the file only when
+  the user agrees to give them, after being told that a key in the chat stays in the conversation and
+  passes through the AI service. The file is written under `umask 077` and deleted after it is applied.
+- **Left to the browser:** the car (its feeds include an emailed Volkswagen code and a Škoda key that
+  only the Car page takes), Home Assistant/MQTT, and API access. The setup skill also tells the agent not
+  to open its own Modbus connection to the devices, because the charger serves one client.
 - **`metadata.version` is the Gleanvolt release the skill was last checked against** (`1.3.0` now).
   Re-publishing is a manual release step, taken only when an install path, the wizard or a linked page
   changes.

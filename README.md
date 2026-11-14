@@ -122,7 +122,7 @@ winget, download `gleanvolt-<version>-win-x64.zip` from
 
 **With an AI agent.** If you use Claude Code, Codex CLI, Cursor, Gemini CLI or another agent that
 reads `SKILL.md` skills, the two [agent skills](skills/) install Gleanvolt and walk you through the
-setup wizard, following the manual: `gleanvolt-install` and `gleanvolt-setup`.
+setup, following the manual: `gleanvolt-install` and `gleanvolt-setup`.
 
 **Advanced: Docker on a Pi, managed from another computer.** The scripts in `deploy/` deploy, update
 and roll back a Docker container on a Raspberry Pi over ssh, from a checkout of this repository — and
