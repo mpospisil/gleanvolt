@@ -491,10 +491,13 @@ code deliberately so that policy can tell the two cases apart:
 | Somebody pressed **Restart** (UI) — e.g. to apply a `/pv-system` edit | `75` | starts it again |
 | `docker compose stop` | — | leaves it down (a manual stop always wins) |
 | SIGTERM: Pi reboot, Docker daemon restart, `docker compose restart` | `143` | starts it again |
+| The configuration can't be started on (the log says why: `cannot start: …`) | `78` | starts it again, so fix the setting and it comes up |
 | Crash, OOM kill, power cut | non-zero | starts it again |
 
 So a power cut, a reboot or a Docker upgrade brings the controller back; only a stop somebody asked
-for keeps it down. Don't change it to `restart: unless-stopped` or `always`: **Stop service** would
+for keeps it down. `init: true` in the compose file matters to this: it puts a real PID 1 in front of
+the controller, so that a crash ends the container for the policy to see. Without it, a controller
+that failed while starting stayed up and did nothing (#396). Don't change it to `restart: unless-stopped` or `always`: **Stop service** would
 then restart it at once.
 
 ## Everyday operations

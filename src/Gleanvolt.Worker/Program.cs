@@ -128,15 +128,7 @@ while (true)
     }
     catch (InvalidOperationException ex)
     {
-        using var refusal = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Configuration, serilogAssemblies)
-            .CreateLogger();
-
-        refusal.Fatal("Gleanvolt {Version} cannot start: {Reason}", BuildInfo.Describe(), ex.Message);
-
-        // EX_CONFIG from sysexits.h: "something was found in an unconfigured or misconfigured state".
-        // Non-zero, so systemd reports a failed start; Docker restarts it, as it always has.
-        return 78;
+        return CannotStart(builder.Configuration, ex);
     }
 
     host.UseGleanvolt();
@@ -147,6 +139,13 @@ while (true)
     // otherwise untraceable to the build that produced it. A "-dev" suffix with no commit means a
     // local build rather than anything CI published.
     log.LogInformation("Gleanvolt {Version} starting.", BuildInfo.Describe());
+
+    // Empty Home Assistant or API settings a version before 1.3 saved from Settings, left out rather
+    // than allowed to stop the start (#396). Said, because the file still holds them until the next save.
+    if (PvSystemOverrides.DescribeIgnored(builder.Configuration) is { } ignored)
+    {
+        log.LogWarning("{Ignored}", ignored);
+    }
 
     // What this process thinks it is: which installation, and which boxes it will be talking to (issue
     // #111). A log file that cannot answer that is a log file nobody can read six months later.
@@ -240,7 +239,19 @@ while (true)
     // Armed here, before Run(), because it hooks ApplicationStopped -- see LogWhenStopped().
     shutdown.LogWhenStopped();
 
-    host.Run();
+    // A failure while the host starts -- an option that cannot be bound is found here, when the services
+    // that take it are created, not by Build() above -- is caught and returned as an exit code rather
+    // than left to escape. Escaping, .NET ends the process with abort(), and in the container the worker
+    // is PID 1, which ignores the SIGABRT that relies on: the process hung, up but doing nothing, and the
+    // restart policy never saw it end (#396). A return ends it the same way everywhere.
+    try
+    {
+        host.Run();
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        return CannotStart(builder.Configuration, ex);
+    }
 
     // A restart where nothing outside would start the process again -- `dotnet run`, the debugger, the
     // Windows zip: build a fresh host in this one instead. Run() has disposed the old host by now, so the
@@ -258,4 +269,27 @@ while (true)
     // -- a reboot, a daemon restart, `docker compose restart` -- and the controller has to come back by
     // itself. .NET does not distinguish the two on its own, which is what this line is for.
     return shutdown.ExitCode;
+}
+
+// Logged through a logger of its own, because the host's is gone by now -- never built, or disposed by
+// Run() on its way out -- and the log file is where a .deb or a Windows install is looked into.
+int CannotStart(IConfiguration configuration, Exception ex)
+{
+    using var refusal = new LoggerConfiguration()
+        .ReadFrom.Configuration(configuration, serilogAssemblies)
+        .CreateLogger();
+
+    if (ex is InvalidOperationException)
+    {
+        refusal.Fatal("Gleanvolt {Version} cannot start: {Reason}", BuildInfo.Describe(), ex.Message);
+
+        // EX_CONFIG from sysexits.h: "something was found in an unconfigured or misconfigured state".
+        // Non-zero, so systemd reports a failed start; Docker restarts it, as it always has.
+        return 78;
+    }
+
+    refusal.Fatal(ex, "Gleanvolt {Version} failed while starting.", BuildInfo.Describe());
+
+    // EX_SOFTWARE: not the configuration, so a fault of this build. Non-zero, restarted like a crash.
+    return 70;
 }

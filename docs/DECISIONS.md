@@ -4,6 +4,41 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-14 — An empty Home Assistant or API setting means unset, and a failed start exits
+
+**Found (#396).** Switching off *Publish to Home Assistant* on Settings on the Pi wrote every MQTT field
+into `data/pv-system.json` as `""`, the broker settings having come from `.env` until then. The next
+start failed binding `HomeAssistant:BrokerPort` (`''` is not an `Int32`), and the controller stayed
+down. `IntegrationsEditor.Save` stored `""` as an override whenever the layer below held a value, and
+`Check` waved an empty port through while Home Assistant was off. How the form came to send the fields
+empty was not identified: it sends only fields that differ from what it loaded. The failure surfaced
+in `host.Run()`, past the `cannot start` catch around `Build()`. .NET then ends the process with
+`abort()`, and in the container the worker is PID 1, which ignores that signal. Reproduced on the Pi
+with the 1.2.0 image: without an init the container stays up indefinitely, and with `--init` it exits
+at once.
+
+**Decided.**
+- **Empty means unset for the Home Assistant link and the API.** Every key there is a flag, a port or a
+  broker setting, and none means anything empty. A save removes the key instead of storing `""`, so the
+  environment or the default applies, and it removes any empty one an earlier version left. The
+  installation's keys keep their meaning: there an empty string deliberately blanks what `.env` sets,
+  and that form's check already binds the `Pv` section the way the next start does.
+- **A file 1.2.0 wrote doesn't stop 1.3.** `PvSystemOverridesProvider` leaves out an empty value for
+  those keys and records it, and the startup log says which keys were left out and how to clear them.
+- **The port is held to being a port whenever it is set,** empty included, whether Home Assistant is on
+  or off.
+- **A failure while the host starts is returned, not thrown:** `78` when it is the configuration, with
+  the `cannot start: …` line the build path already logs, and `70` otherwise. A returned code ends the
+  process the same way as PID 1 or not.
+- **`init: true`** in both compose files, and `--init` in the `docker run` example, so that any other
+  abort also ends the container.
+
+**Consequences accepted.**
+- An empty Home Assistant field on Settings can't blank a value `.env` sets. Clearing the username
+  falls back to `.env`'s; to run without one, remove it from `.env`.
+- A configuration that can't be started on is a restart loop under `on-failure`: visible, and logged
+  each time, but a loop. The same was already true of a refusal found while building the host.
+
 ## 2026-11-13 — A native Home Assistant integration, in its own repo, on the 1.2 HTTP API
 
 **Found.** Home Assistant could only reach Gleanvolt through MQTT discovery (#17), which needs a broker.

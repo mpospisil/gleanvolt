@@ -4,6 +4,46 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-14 — Empty Home Assistant settings, and a failed start that hung (#396)
+
+**What.** Switching off Home Assistant (MQTT) on Settings, with the broker in `.env`, wrote all of its
+fields into `data/pv-system.json` as `""`. The next start failed on the empty `BrokerPort`. In Docker
+the process then hung instead of exiting, so the restart policy never acted, and the web UI that could
+have fixed it was down.
+
+**How.**
+- `IntegrationsEditor.Save`: an empty value removes the override, and any save removes empty values an
+  earlier version left. `Check` holds a set port to 1–65535 when Home Assistant is off too, empty
+  included.
+- `PvSystemOverridesProvider.Load` leaves out empty values for `IntegrationSettingKeys.Plain` and lists
+  them in `IgnoredEmptyKeys`. `PvSystemOverrides.DescribeIgnored` is the startup warning. Other keys are
+  unchanged: an empty installation value still blanks what is below it.
+- `Program.cs`: `host.Run()` is wrapped. An exception while the host starts (options are bound when
+  the hosted services are created, after `Build()`) is logged through a logger of its own, the host's
+  being disposed, and returned as `78` for configuration or `70` otherwise. The build-time refusal goes
+  through the same `CannotStart`.
+- `deploy/docker-compose.yml` and `docker-compose.nas.yml`: `init: true`. `docs/DOCKER.md`'s
+  `docker run` gains `--init`. The exit-code table and the troubleshooting page cover `78` and the hang.
+
+**Verified.**
+- The Pi's broken file, in an isolated content root (devices at `127.0.0.1`, no secrets, no mDNS):
+  1.3 starts with the warning, and the link reads as disabled.
+- An option that still can't be bound (`HomeAssistant:StatusInterval: "abc"`), run as PID 1 in a PID
+  namespace: the new build exits `78` in a second. The old build, there, segfaults (`139`) with no
+  fatal line.
+- On the Pi, the 1.2.0 image with the broken file in a throwaway container (`--network none`): it
+  stays up until killed without an init, and exits at once with `--init`.
+- Tests: the editor keeping empties out and cleaning old ones, the next start binding, the provider
+  leaving out only those keys, and the port check. 3,338 tests pass.
+
+**Not found.** Why the form sent the fields empty. It sends only fields that differ from what it
+loaded, and those showed the `.env` values. Wherever the empties come from, they no longer reach the
+file.
+
+**Files.** `Hosting/Configuration/{IntegrationsEditor,PvSystemOverrides}.cs`, `Worker/Program.cs`,
+`deploy/docker-compose{,.nas}.yml`, `deploy/README.md`, `docs/{DOCKER,TROUBLESHOOTING,DECISIONS}.md`;
+tests in `Hosting.Tests/IntegrationsEditorTests.cs`.
+
 ## 2026-11-13 — Home Assistant integration, step 1, on the 1.2 API (#393)
 
 **What.** A native Home Assistant integration in a new repo,

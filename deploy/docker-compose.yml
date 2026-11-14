@@ -64,6 +64,7 @@ services:
     #   0    an operator asked for the stop -> stays down until `docker compose start gleanvolt-controller`
     #   75   an operator asked for a restart (Health, or applying a /pv-system edit) -> comes back
     #   143  SIGTERM: a Pi reboot, a Docker daemon restart, `docker compose restart` -> comes back
+    #   78   the configuration can't be started on -> comes back, and says why in the log
     #   any other non-zero / killed  a crash or a power cut -> comes back
     #
     # That last column is the reason this is safe on a box that loses power: everything except a
@@ -71,6 +72,10 @@ services:
     # `docker compose stop` also stays stopped -- a manually stopped container ignores the policy
     # entirely, whatever it exited with.
     restart: on-failure
+    # A real PID 1 (Docker's tini) in front of the worker. The worker as PID 1 ignores the signals a
+    # crashing .NET process ends itself with, so a crash at startup left the container up and doing
+    # nothing, and the restart policy never saw it end (#396). With an init it exits, and comes back.
+    init: true
     # The host's network, not a bridge (see the top of this file): the web UI binds the Pi's own
     # :${WEB_PORT} directly, with nothing to publish, and the Modbus devices and any broker are reached
     # exactly as the Pi itself reaches them.
