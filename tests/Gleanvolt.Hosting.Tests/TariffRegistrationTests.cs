@@ -48,12 +48,12 @@ public sealed class TariffRegistrationTests : IDisposable
     }
 
     [Fact]
-    public void BothBuiltInStrategiesAreOfferedNoneFirst()
+    public void EveryBuiltInStrategyIsOfferedNoneFirst()
     {
         using var services = Start();
 
         Assert.Equal(
-            [TariffProviderIds.None, TariffProviderIds.Table],
+            [TariffProviderIds.None, TariffProviderIds.Table, TariffProviderIds.External],
             services.GetRequiredService<ITariffEditor>().Providers.Select(provider => provider.Id));
     }
 
@@ -86,5 +86,17 @@ public sealed class TariffRegistrationTests : IDisposable
 
         Assert.Equal(Path.Combine(_root, "tariff.json"), file.Path);
         Assert.Equal("EUR", file.Currency);
+    }
+
+    [Fact]
+    public void TheTariffIsAnExternalProviderKind()
+    {
+        using var services = Start();
+
+        var tariff = services.GetRequiredService<IExternalProviders>().Find("tariff");
+
+        Assert.NotNull(tariff);
+        Assert.Equal("/providers/tariff", tariff.HubPath);
+        Assert.Equal(ExternalProviderState.Off, tariff.State);
     }
 }

@@ -4,6 +4,73 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-15 — External data providers: SignalR hubs on the web port, one session per kind, the tariff first
+
+**Found (#389, #386, #401).** Gleanvolt's read-only inputs (tariff, solar forecast, weather, the car)
+each came from built-in sources only. Owners want to plug in their own: spot prices, another
+forecast, a car Gleanvolt can't read. Loading their code into the controller would let a bad
+provider stall the control loop, and would tie every provider to this repository's licence.
+
+**Decided.**
+- **Providers run outside the process and connect in.** Gleanvolt is the server; a provider is any
+  program, anywhere, that connects to the web port. A hung or crashing provider can only make its
+  own data stale.
+- **SignalR, on the existing web port.** gRPC was rejected: its two-way streaming needs HTTP/2, which
+  would mean a second port or TLS on the web UI, and gRPC-Web has no two-way streaming. SignalR is
+  already in the stack for Blazor Server, works over HTTP/1.1, and has typed hubs, a connect and
+  disconnect lifecycle, and reconnecting. The hubs are at `/providers/<kind>`, mapped wherever the
+  port is open (web UI or API), and not in setup mode.
+- **One hub and one contract per kind**, with a major/minor version each. A different major is
+  refused at the hello.
+- **Messages only, no client results.** Hub methods only receive: check, store, return. A host
+  request (`RefreshRequested`) goes out from a host-side service through `IHubContext` with a request
+  id, and the answer is an ordinary publish quoting it. A request with no answer in 2 minutes is
+  shown as unanswered. Nothing waits on the other side inside a call.
+- **One active session per kind.** The same provider id reconnecting replaces its old session (the
+  reconnect arrives before the old connection times out); a different provider is refused; a
+  disconnect from an already-replaced connection is ignored.
+- **One token per kind**, made on Settings, shown once, stored only as its SHA-256 hash in the secret
+  store. It is checked against the hub's own kind, as a bearer header or as `access_token` in the
+  query, by its own authentication scheme, so the web UI's cookie stays the default for everything
+  else. A plain hash, not a slow one: the token is 256 random bits.
+- **The kind decides when it is on.** There is no separate enable switch: the tariff is on while
+  `External` is the selected tariff, and a save that selects something else closes the session.
+- **The host owns the data.** A publish is checked against fixed rules and stored as one immutable
+  snapshot; the control loop reads the store and never awaits a client.
+- **`Gleanvolt.Providers.Contracts` and `Gleanvolt.Providers.Client` are MIT**, with their own
+  `LICENSE` and README in the package, so a provider can use any licence. `Gleanvolt.Providers.Server`
+  is a third package under the repository's licence, because `Gleanvolt.Hosting` depends on it. All
+  three target `net10.0` only for now.
+- **The tariff is the first kind, not the solar forecast.** The tariff already had a runtime-switched
+  strategy seam (`ITariffProvider`, `IRefreshingTariffProvider`, `TariffSchedule`), so an external
+  tariff is one more strategy and needs no refactor first. The forecast needs its store split from
+  Solcast (#387), so it is planned separately (#388).
+
+**Different from the issues.**
+- The host does not send a `RefreshRequested` when a session attaches. The SDK publishes after every
+  accepted hello instead. A request sent from inside the hello can reach the client before the
+  hello's answer does, and the client can't build a tariff before it knows the time zone and
+  currency.
+- "Settings refuses to enable a provider while the web listener is off" was dropped: Settings is only
+  reachable while the listener is on, and the hubs are mapped whenever it is.
+
+**Tariff rules (#401).** Windows in UTC, at least 5 minutes long, touching with no gap or overlap,
+covering the moment of publishing and no more than 7 days ahead, at most 1000, in `Tariff:Currency`,
+negative prices allowed. Neighbours on the same rate at the same price are joined; at different
+prices they are refused, because every `ITariffProvider` promises that no two neighbours share a rate.
+
+**Consequences accepted.**
+- Per-slot spot prices can't be expressed until that `ITariffProvider` rule is relaxed.
+- The external tariff is kept in memory only: after a restart there is no tariff until the provider
+  has reconnected and published.
+- A disconnected provider's windows still count until the last one ends. There is no automatic
+  fallback to the table.
+- `Microsoft.AspNetCore.SignalR.Client` is pinned at 10.0.13 or later: earlier 10.0 versions are
+  affected by CVE-2026-70159 (denial of service). The server side comes from the shared framework,
+  which the image's floating `10.0` tag and the release's `10.0.x` SDK already bring up to date.
+
+---
+
 ## 2026-11-14 — Agent skills for installing and setting up, in the Agent Skills format Agensi lists
 
 **Found (#390), from Agensi's own guides** (`/learn/skill-md-format-reference`,

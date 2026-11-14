@@ -2723,3 +2723,15 @@ label.check {
 .login-card .reveal input {
     margin-top: 0;
 }
+
+/* An external provider's address and hub (#386): label beside value, not the browser's indented list. */
+.external-provider-address {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-2) 0 var(--space-4);
+}
+
+.external-provider-address dd {
+    margin: 0;
+}

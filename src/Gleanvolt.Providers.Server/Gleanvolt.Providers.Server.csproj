@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Providers.Server</PackageId>
+    <Description>The host side of Gleanvolt's external data providers (#386): one SignalR hub per provider kind on the web port, token authentication, and one active session per kind.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Providers.Contracts\Gleanvolt.Providers.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

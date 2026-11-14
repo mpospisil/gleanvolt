@@ -77,7 +77,11 @@ public sealed record TariffContext(
 /// <param name="Windows">In time order, each starting where the one before ends.</param>
 /// <param name="Prices">What each rate costs, or null when the owner has not entered prices.</param>
 /// <param name="ProviderId">The strategy that produced it, for a surface that names it.</param>
-public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffPrices? Prices, string ProviderId = "")
+/// <param name="Origin">
+/// Where the windows came from when that is more than the strategy: an external provider and when its
+/// data arrived (#401). Null for a strategy that makes its own, such as Table.
+/// </param>
+public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffPrices? Prices, string ProviderId = "", TariffOrigin? Origin = null)
 {
     /// <summary>The window covering <paramref name="instant"/>, or null outside the timeline.</summary>
     public TariffWindow? WindowAt(DateTimeOffset instant) =>
@@ -114,3 +118,8 @@ public sealed record TariffTimeline(IReadOnlyList<TariffWindow> Windows, TariffP
     public IEnumerable<TimeWindow> LowWindows =>
         Windows.Where(window => window.Rate == TariffRate.Low).Select(window => window.Window);
 }
+
+/// <summary>Who supplied a timeline's windows, and when (#401).</summary>
+/// <param name="Name">The provider's name, as it introduced itself.</param>
+/// <param name="ReceivedAt">When the data was accepted.</param>
+public sealed record TariffOrigin(string Name, DateTimeOffset ReceivedAt);

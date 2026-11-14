@@ -589,4 +589,12 @@
   <data name="KeyCopied" xml:space="preserve">
     <value>Copied.</value>
   </data>
+  <data name="TariffFrom" xml:space="preserve">
+    <value>{0} (from {1})</value>
+    <comment>{0} the tariff line, {1} the external provider's name.</comment>
+  </data>
+  <data name="TariffFromDisconnected" xml:space="preserve">
+    <value>{0} (from {1}, disconnected; its windows run until {2})</value>
+    <comment>{0} the tariff line, {1} the provider's name, {2} when its last window ends.</comment>
+  </data>
 </root>

@@ -14,6 +14,9 @@ public static class TariffProviderIds
 
     /// <summary>The low-tariff periods the owner typed in on Settings.</summary>
     public const string Table = "Table";
+
+    /// <summary>An external provider's windows, published over the provider hub (#401).</summary>
+    public const string External = "External";
 }
 
 /// <summary>Which of the table's two lists a period is in.</summary>
@@ -134,6 +137,9 @@ public static class TariffFields
 
     /// <summary>The Table strategy's settings as a whole.</summary>
     public const string Table = "table";
+
+    /// <summary>An external provider's published windows (#401); the row is the window's index.</summary>
+    public const string Windows = "windows";
 
     /// <summary>A row of the Table strategy's weekday list; <see cref="TariffProblem.Row"/> says which.</summary>
     public const string TableWeekday = "table.weekday";

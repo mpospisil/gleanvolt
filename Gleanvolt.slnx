@@ -12,6 +12,12 @@
     <Project Path="src/Gleanvolt.Worker/Gleanvolt.Worker.csproj" />
     <Project Path="src/Gleanvolt.Discovery/Gleanvolt.Discovery.csproj" />
     <Project Path="src/Gleanvolt.Discovery.Cli/Gleanvolt.Discovery.Cli.csproj" />
+    <Project Path="src/Gleanvolt.Providers.Contracts/Gleanvolt.Providers.Contracts.csproj" />
+    <Project Path="src/Gleanvolt.Providers.Client/Gleanvolt.Providers.Client.csproj" />
+    <Project Path="src/Gleanvolt.Providers.Server/Gleanvolt.Providers.Server.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Gleanvolt.Samples.TariffMock/Gleanvolt.Samples.TariffMock.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Gleanvolt.Core.Tests/Gleanvolt.Core.Tests.csproj" />
@@ -20,6 +26,7 @@
     <Project Path="tests/Gleanvolt.Web.Tests/Gleanvolt.Web.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Web.Screenshots/Gleanvolt.Web.Screenshots.csproj" />
     <Project Path="tests/Gleanvolt.Hosting.Tests/Gleanvolt.Hosting.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Providers.Tests/Gleanvolt.Providers.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Discovery.Tests/Gleanvolt.Discovery.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Devices.Testing/Gleanvolt.Devices.Testing.csproj" />
     <Project Path="tests/Gleanvolt.Devices.Tests/Gleanvolt.Devices.Tests.csproj" />

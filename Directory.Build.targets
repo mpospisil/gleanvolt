@@ -5,7 +5,11 @@
     conditioned on IsPackable, and a project sets that in its own body, which .props (imported above
     that body) would be too early to see.
   -->
-  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+  <!--
+    Not for the MIT packages (Gleanvolt.Providers.Contracts and .Client, #386): they carry their own
+    LICENSE and README, and the repository's licence must not travel into a package that is not under it.
+  -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true' And '$(GleanvoltMitPackage)' != 'true'">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
     <!--
       Required by PackageLicenseFile: the property names the file, this is what puts it in the

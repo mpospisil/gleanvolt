@@ -31,7 +31,9 @@ public sealed class SettingsScreenshots : ScreenshotTest
 
     private readonly FakeSolcastAccountEditor _solcast = new();
     private readonly FakeWeatherKeyEditor _weather = new();
-    private readonly FakeTariffEditor _tariff = new();
+    // With the External strategy too, as the controller registers it (#401).
+    private readonly FakeTariffEditor _tariff = new(new Gleanvolt.Core.Strategies.ExternalTariffProvider());
+    private readonly FakeExternalProviders _providers = new();
     private readonly FakeEvEditor _car = new();
     private readonly FakeIntegrationsEditor _integrations = new();
 
@@ -71,6 +73,9 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Services.AddSingleton<ITariffEditor>(_tariff);
         Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
+        Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.External, typeof(ExternalTariffPanel)));
+        Services.AddSingleton<IExternalProviders>(_providers);
+        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: false, ExternalProviderState.Off));
         Services.AddSingleton<IIntegrationsEditor>(_integrations);
         Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
         Services.AddSingleton<IDeviceDiscovery>(new NoDiscovery());
@@ -101,6 +106,19 @@ public sealed class SettingsScreenshots : ScreenshotTest
     [Fact]
     public void The_tariff_table() =>
         Capture(RenderPage<PvSystem>("/settings"), "settings-tariff", selector: "#tariff-editor");
+
+    /// <summary>The External tariff (#401): a provider connected, its windows received a minute ago.</summary>
+    [Fact]
+    public void The_tariff_external()
+    {
+        _tariff.Stored = TariffSettings.None with { Provider = TariffProviderIds.External };
+        _providers.Set(new ExternalProviderStatus(
+            "tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "spot-prices", ProviderName: "Spot prices", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
+
+        Capture(RenderPage<PvSystem>("/settings"), "settings-tariff-external", selector: "#tariff-editor");
+    }
 
     /// <summary>The API switched on, with the key the Home Assistant integration uses (#393).</summary>
     [Fact]

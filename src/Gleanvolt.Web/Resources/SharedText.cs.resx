@@ -543,4 +543,10 @@
   <data name="KeyCopied" xml:space="preserve">
     <value>Zkopírováno.</value>
   </data>
+  <data name="TariffFrom" xml:space="preserve">
+    <value>{0} (zdroj {1})</value>
+  </data>
+  <data name="TariffFromDisconnected" xml:space="preserve">
+    <value>{0} (zdroj {1} je odpojený; jeho okna platí do {2})</value>
+  </data>
 </root>

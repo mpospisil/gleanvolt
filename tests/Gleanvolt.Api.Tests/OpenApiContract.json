@@ -154,6 +154,16 @@
         ]
       }
     },
+    "/api/v1/providers": {
+      "get": {
+        "operationId": "listExternalProviders",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json array\u003C$ExternalProviderResponse\u003E"
+        ]
+      }
+    },
     "/api/v1/sessions": {
       "get": {
         "operationId": "getSessions",
@@ -359,6 +369,23 @@
       "name": "string (required)",
       "phases": "integer|string(int32)? (required)"
     },
+    "ExternalProviderResponse": {
+      "hasToken": "boolean (required)",
+      "healthy": "boolean? (required)",
+      "hubPath": "string (required)",
+      "kind": "string (required)",
+      "lastDataAt": "string(date-time)? (required)",
+      "lastProblems": "array\u003Cstring\u003E (required)",
+      "name": "string (required)",
+      "providerId": "string? (required)",
+      "providerName": "string? (required)",
+      "providerVersion": "string? (required)",
+      "since": "string(date-time)? (required)",
+      "state": "$ExternalProviderState (required)",
+      "statusMessage": "string? (required)",
+      "unanswered": "boolean (required)"
+    },
+    "ExternalProviderState": "enum[off|waiting|connected|disconnected]",
     "FastChargeBasis": "enum[full|energy|soc]",
     "FastChargeLimitBody": {
       "basis": "$FastChargeBasis",
@@ -688,8 +715,10 @@
       "highPricePerKwh": "number|string(double)? (required)",
       "lowPricePerKwh": "number|string(double)? (required)",
       "now": "any (required)",
+      "origin": "string?",
       "provider": "string (required)",
       "providerName": "string? (required)",
+      "receivedAt": "string(date-time)?",
       "unavailable": "string? (required)",
       "windows": "array\u003C$TariffWindowResponse\u003E (required)"
     },

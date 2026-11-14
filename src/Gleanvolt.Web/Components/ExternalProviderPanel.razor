@@ -1,0 +1,149 @@
+@implements IDisposable
+@inject IExternalProviders Providers
+@inject NavigationManager Navigation
+@inject TimeProvider Time
+
+@*
+    One kind of external data provider (#386): where a provider connects, its token, and its session,
+    live. Any kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the
+    tariff, choosing External and saving).
+
+    The token is made here and shown once: only its hash is kept, so a lost token is replaced rather
+    than shown again. Making one needs a login, like everything else on Settings that changes what a
+    program on the network may do.
+*@
+
+@if (Providers.Find(Kind) is { } status)
+{
+    <div class="external-provider" id="external-@status.Kind">
+        <p class="muted">@SettingsText.ExternalProviderIntro</p>
+
+        <dl class="external-provider-address">
+            <dt>@SettingsText.ExternalAddress</dt>
+            <dd><code id="external-@(status.Kind)-address">@BaseAddress</code></dd>
+            <dt>@SettingsText.ExternalHub</dt>
+            <dd><code id="external-@(status.Kind)-hub">@status.HubPath</code></dd>
+        </dl>
+
+        <h3>@SettingsText.ExternalToken</h3>
+
+        @if (_token is { } token)
+        {
+            <p class="warning" id="external-@(status.Kind)-token-once">@SettingsText.ExternalTokenShownOnce</p>
+            <Secret Value="@token" />
+        }
+        else
+        {
+            <p class="muted" id="external-@(status.Kind)-token-state">
+                @(status.HasToken ? SettingsText.ExternalHasToken : SettingsText.ExternalNoToken)
+            </p>
+        }
+
+        @if (!ReadOnly)
+        {
+            <div class="control actions">
+                <button type="button" class="secondary" id="external-@(status.Kind)-token" disabled="@_busy" @onclick="CreateTokenAsync">
+                    @(status.HasToken ? SettingsText.ExternalRecreateToken : SettingsText.ExternalCreateToken)
+                </button>
+            </div>
+        }
+
+        @if (_error is { } error)
+        {
+            <p class="error">@error</p>
+        }
+
+        <h3>@SettingsText.ExternalStatus</h3>
+
+        <p id="external-@(status.Kind)-state" class="@(status.State == ExternalProviderState.Connected ? "muted" : "warning")">
+            @State(status)
+        </p>
+
+        <p class="muted" id="external-@(status.Kind)-data">
+            @(status.LastDataAt is { } at ? Localized.Format(SettingsText.ExternalLastData, When(at)) : SettingsText.ExternalNoDataYet)
+        </p>
+
+        @if (status.Unanswered)
+        {
+            <p class="warning" id="external-@(status.Kind)-unanswered">@SettingsText.ExternalUnanswered</p>
+        }
+
+        @if (status.Healthy == false)
+        {
+            <p class="warning" id="external-@(status.Kind)-unhealthy">@Localized.Format(SettingsText.ExternalUnhealthy, status.StatusMessage ?? string.Empty)</p>
+        }
+
+        @if (status.LastProblem is { Count: > 0 } problems)
+        {
+            <p class="error">@SettingsText.ExternalLastProblem</p>
+            <ul class="error" id="external-@(status.Kind)-problems">
+                @for (var i = 0; i < problems.Count; i++)
+                {
+                    <li>@Localized.Say(status.LastProblemPhrases is { } phrases && i < phrases.Count ? phrases[i] : null, problems[i], Time.LocalTimeZone)</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    private string? _token;
+    private string? _error;
+    private bool _busy;
+
+    /// <summary>The kind's id, e.g. <c>tariff</c>.</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+
+    /// <summary>True when the page has no login: show, but do not make tokens.</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    // What a provider is configured with: the SDK adds the hub path itself.
+    private string BaseAddress => Navigation.BaseUri.TrimEnd('/');
+
+    protected override void OnInitialized() => Providers.Changed += Refresh;
+
+    public void Dispose() => Providers.Changed -= Refresh;
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task CreateTokenAsync()
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            _token = await Providers.CreateTokenAsync(Kind);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            _error = SettingsText.ExternalTokenFailed;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string State(ExternalProviderStatus status) => status.State switch
+    {
+        ExternalProviderState.Off => SettingsText.ExternalState_Off,
+        ExternalProviderState.Waiting => status.HasToken ? SettingsText.ExternalState_Waiting : SettingsText.ExternalState_NoToken,
+        ExternalProviderState.Connected => Localized.Format(SettingsText.ExternalState_Connected,
+            status.ProviderName ?? status.ProviderId ?? string.Empty, status.ProviderVersion ?? string.Empty, When(status.Since)),
+        ExternalProviderState.Disconnected => Localized.Format(SettingsText.ExternalState_Disconnected,
+            status.ProviderName ?? status.ProviderId ?? string.Empty, When(status.Since)),
+        _ => string.Empty,
+    };
+
+    // In the site's zone, like every time on these pages.
+    private string When(DateTimeOffset? at) =>
+        at is { } instant
+            ? TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString(SharedText.DatePattern + " HH:mm", System.Globalization.CultureInfo.CurrentCulture)
+            : string.Empty;
+}

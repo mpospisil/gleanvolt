@@ -83,8 +83,9 @@ public static class SetupGate
 
             // The API is not redirected: it guards itself with a key, refuses to start without one,
             // and answers a program rather than a browser. A 307 to an HTML page would be a confusing
-            // answer to a JSON client, and an unnecessary one.
-            if (context.Request.Path.StartsWithSegments("/api"))
+            // answer to a JSON client, and an unnecessary one. The provider hubs (#386) are the same:
+            // a program, behind a token of its own.
+            if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/providers"))
             {
                 await next(context);
                 return;

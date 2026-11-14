@@ -48,3 +48,31 @@ It applies straight away; there is no need to restart.
 - **Periods in one list must not overlap.** Touching is fine, such as 06:00–08:00 and 08:00–10:00.
 - **Summer and winter time are handled** for you.
 - If your distributor changes your hours with the season, change the table when they do.
+
+## Or let another program supply it
+
+If your tariff changes in ways a table cannot hold, such as day-ahead spot prices, a program outside
+Gleanvolt can supply it instead. This is the **External** provider. Somebody has to write or install
+that program; Gleanvolt does not come with one. Developers can find how to write one in
+[the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
+
+<Steps>
+
+1. Open **Settings**, find **Tariff**, choose **External** under **Provider**, and press **Save**.
+
+2. Press **Make a token**, and copy the token straight away. It is shown only once.
+
+3. Give the program the **Gleanvolt address** and the token.
+
+4. When the program connects, **Status** names it, and **Last data received** says when its tariff
+   arrived. The Overview's tariff line names it too.
+
+</Steps>
+
+![The tariff section with External chosen: the address the program connects to, the token, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
+
+- **If the program disconnects**, Gleanvolt keeps using the tariff it last sent, until its last time
+  slot ends. After that there is no tariff restriction until the program is back.
+- **If the token leaks**, press **Make a new token**. The program using the old one is disconnected.
+- **Choosing Table or None** disconnects the program, and it can't connect again until you choose
+  **External**.

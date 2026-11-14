@@ -78,10 +78,11 @@ which is the thing a client is generated from. Everything else is behind the key
 | `PUT /charging/low-tariff-only` | Set either or both; a field left out is left as it is. Applies from the next poll, to a running mode too, and doesn't survive a restart. Accepted with no tariff set up, which the answer's `tariffKnown` shows. |
 | `GET /charging/until-full` | Whether `forecasted` runs [until full](MODE_FORECASTED.md#until-full), and the session running with it (`session`: `since` and `day`), if any. `/status` carries the same session as `untilFull`. |
 | `PUT /charging/until-full` | `{"untilFull": true}` or `false`. Starts nothing; applies from the next poll, to a running session too. |
-| `GET /tariff` | The [grid tariff](CONFIGURATION.md#grid-tariff-the-tariff-section): the low and high stretches as far ahead as the provider knows, the rate now with its price and next change, and the currency. Empty with no tariff — which means no restriction, never "always low". |
+| `GET /tariff` | The [grid tariff](CONFIGURATION.md#grid-tariff-the-tariff-section): the low and high stretches as far ahead as the provider knows, the rate now with its price and next change, and the currency. Empty with no tariff — which means no restriction, never "always low". With the `External` provider, `origin` names the program the windows came from and `receivedAt` says when. |
 | `GET /tariff/providers` | The tariff providers this build has, and which one is selected. |
 | `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
 | `PUT /tariff/settings` | Store them, applied at once. Held to the same rules as Settings: a 400 lists every problem with its field and row under `problems`, and nothing is written. Writes no hardware. |
+| `GET /providers` | The [external data providers](PROVIDERS.md): each kind (so far `tariff`), whether it is on, whether a provider is connected and since when, when its data last arrived, why its last data was refused, and whether it answered Gleanvolt's last request. Tokens are made on Settings, not here. |
 
 **Ranges are bounded** by `Api:MaxQueryRange` and `Api:MaxSessions`. **Staleness is reported**:
 `/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a car's reading often

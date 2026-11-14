@@ -15,6 +15,8 @@ using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Tariff;
+using Gleanvolt.Hosting.Tariff.External;
+using Gleanvolt.Providers.Server;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -138,6 +140,16 @@ public static class GleanvoltHostingExtensions
         services.Configure<TariffOptions>(configuration.GetSection(TariffOptions.SectionName));
         services.AddSingleton<ITariffProvider, NoTariffProvider>();
         services.AddSingleton<ITariffProvider, TableTariffProvider>();
+
+        // The third is fed from outside (#401): an external provider publishes windows over its hub on
+        // the web port. Choosing it on Settings is what turns the hub on, and a save that chooses
+        // something else closes the provider's session.
+        services.AddSingleton(provider => new ExternalTariffProvider(
+            new HubTariffRequests(provider, provider.GetRequiredService<TimeProvider>())));
+        services.AddSingleton<ITariffProvider>(provider => provider.GetRequiredService<ExternalTariffProvider>());
+        services.AddSingleton(new ProviderHostInfo(BuildInfo.Describe()));
+        services.AddExternalProvider<TariffHub>(TariffHub.Kind);
+        services.AddHostedService<ExternalTariffSelectionWatcher>();
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
@@ -1144,6 +1156,21 @@ public static class GleanvoltHostingExtensions
                 manifestDirectory,
                 $"{entry.GetName().Name}.staticwebassets.endpoints.json"));
             app.MapGleanvoltWebUi(web);
+        }
+
+        // The external data providers' hubs (#386), on the same port, behind their own tokens. Wherever
+        // the port is open, since a provider is a program like an API client and needs no web UI; not in
+        // setup mode, where nothing would act on what they send. Without the UI, nothing has put the
+        // authentication middleware in the pipeline yet.
+        if ((web.Enabled || api.Enabled) && !app.Services.GetRequiredService<ISetupState>().SetupMode)
+        {
+            if (!web.Enabled)
+            {
+                app.UseAuthentication();
+                app.UseAuthorization();
+            }
+
+            app.MapExternalProviders();
         }
 
         // After the UI, so its authentication and antiforgery middleware are already in the pipeline when

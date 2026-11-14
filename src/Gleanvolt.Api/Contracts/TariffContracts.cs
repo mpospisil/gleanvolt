@@ -24,6 +24,11 @@ namespace Gleanvolt.Api.Contracts;
 /// </param>
 /// <param name="LowPricePerKwh">The shared low-tariff price, or null when not entered.</param>
 /// <param name="HighPricePerKwh">The shared high-tariff price, or null when not entered.</param>
+/// <param name="Origin">
+/// The external provider the windows came from, by its name, for the <c>External</c> strategy; null
+/// for a strategy that makes its own.
+/// </param>
+/// <param name="ReceivedAt">When the external provider's windows arrived, or null.</param>
 public sealed record TariffResponse(
     string Provider,
     string? ProviderName,
@@ -32,7 +37,9 @@ public sealed record TariffResponse(
     TariffNowResponse? Now,
     IReadOnlyList<TariffWindowResponse> Windows,
     decimal? LowPricePerKwh,
-    decimal? HighPricePerKwh)
+    decimal? HighPricePerKwh,
+    string? Origin = null,
+    DateTimeOffset? ReceivedAt = null)
 {
     internal static TariffResponse From(ITariffSchedule schedule, ITariffEditor editor, DateTimeOffset now)
     {
@@ -53,7 +60,9 @@ public sealed record TariffResponse(
                     window.Window.Start, window.Window.End, window.Rate, timeline!.PriceAt(window.Window.Start))),
             ],
             settings.LowPricePerKwh,
-            settings.HighPricePerKwh);
+            settings.HighPricePerKwh,
+            timeline?.Origin?.Name,
+            timeline?.Origin?.ReceivedAt);
     }
 }
 

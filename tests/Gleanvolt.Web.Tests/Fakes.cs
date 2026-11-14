@@ -1465,3 +1465,31 @@ internal sealed class FakeDeviceSnapshot : IDeviceSnapshot
             : Task.FromResult(new RegisterSnapshotFile(name, "{\"format\":\"gleanvolt-register-dump\"}"));
     }
 }
+
+/// <summary>The external provider kinds (#386) as a test describes them.</summary>
+internal sealed class FakeExternalProviders : IExternalProviders
+{
+    public List<ExternalProviderStatus> Statuses { get; } = [];
+
+    public List<string> TokensMade { get; } = [];
+
+    public IReadOnlyList<ExternalProviderStatus> All => Statuses;
+
+    public Task<string> CreateTokenAsync(string kind)
+    {
+        TokensMade.Add(kind);
+        var index = Statuses.FindIndex(status => status.Kind == kind);
+        Statuses[index] = Statuses[index] with { HasToken = true };
+        Changed?.Invoke();
+        return Task.FromResult("gvp_" + new string('x', 43));
+    }
+
+    public void Set(ExternalProviderStatus status)
+    {
+        Statuses.RemoveAll(existing => existing.Kind == status.Kind);
+        Statuses.Add(status);
+        Changed?.Invoke();
+    }
+
+    public event Action? Changed;
+}

@@ -51,6 +51,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     internal FakeUntilFullSettings UntilFull { get; } = new();
 
+    internal FakeExternalProviders Providers { get; } = new();
+
     /// <summary>
     /// The configured car (#124) — what it <em>is</em>, as opposed to <see cref="Vehicle"/>, which is
     /// what it last <em>said</em>. Unknown unless a test describes one.
@@ -102,6 +104,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<ILowTariffSettings>(LowTariff);
         builder.Services.AddSingleton<IUntilFullSettings>(UntilFull);
         builder.Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule(Tariff, clock));
+        builder.Services.AddSingleton<IExternalProviders>(Providers);
 
         builder.Services.AddGleanvoltApi(api);
 
