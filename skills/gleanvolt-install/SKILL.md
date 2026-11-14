@@ -26,7 +26,10 @@ Czech manual: replace `/en/` with `/cs/` in any link.
 ## Rules
 
 - **Say what you will run before you run it,** especially anything with `sudo`. If `sudo` asks for a
-  password you can't type, give the user the exact command to run themselves and wait.
+  password you can't type, give the user the exact commands, complete with any `cd`, to run in a
+  terminal of their own, and wait. Don't suggest your own shell passthrough (such as a `!` prefix):
+  sudo has no terminal there to ask the password in. Gather the sudo commands into one hand-off where
+  you can.
 - **Never type a password, recovery key or API key**, and never put one in a command. The user enters
   them in the browser.
 - **Don't pipe a downloaded script into a shell.** The Linux steps below download the package, verify
@@ -72,7 +75,7 @@ getconf LONG_BIT                           # must be 64
 [ -d /run/systemd/system ] && echo systemd || echo "no systemd"
 ss -ltn 'sport = :8090'                    # only the header line means the port is free
 timedatectl show -p Timezone --value       # the host's time zone
-dpkg-query -W -f='${Version}\n' gleanvolt 2>/dev/null   # an existing package install
+dpkg-query -W -f='${Version}\n' gleanvolt 2>/dev/null || echo "gleanvolt not installed"
 ```
 
 - **32-bit Raspberry Pi OS** (`armv7l`, `LONG_BIT` 32): Gleanvolt won't run. The user has to reflash
@@ -143,6 +146,9 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-downgrades \
   later.
 - To install a specific release instead of the latest, set
   `base=https://github.com/mpospisil/gleanvolt/releases/download/v1.2.0` (with the `v`).
+- Download into the `mktemp -d` folder above, not into a private scratch or temp folder of your own.
+  apt reads the `.deb` as its unprivileged `_apt` user, so the folder must be world-readable (`0755`).
+  Otherwise apt prints a "performed unsandboxed as root" warning.
 - `--force-confold` keeps an edited `/etc/gleanvolt/gleanvolt.env` on an upgrade.
 
 The package installs a systemd service that starts at boot and restarts after a crash. Check it:

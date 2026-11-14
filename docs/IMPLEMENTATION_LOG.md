@@ -36,14 +36,24 @@ check on the Overview. The format, and Agensi's scan and packaging rules, are in
   for `amd64`, `sha256sum -c` prints `OK`.
 - The Docker command, in a throwaway container on port 8099 with scratch folders: it starts in setup
   mode, and the check returns `302 http://localhost:8099/setup`.
+- `gleanvolt-install` end to end in Claude Code, on a clean Debian 12 machine with systemd
+  (`dev/skill-test/`, host network). It found `Etc/UTC` and asked for the zone. It verified the
+  checksum, handed over the sudo commands it couldn't run, and the service came up on `302 /setup`. Two
+  fixes came from it. The agent had offered Claude Code's `!` passthrough for sudo, where sudo has no
+  terminal for the password, so the skill now says to hand the commands to the user's own terminal.
+  The prerequisite block ended on `dpkg-query`, so a fresh machine exited 1, and that now prints "not
+  installed". The skill also says why the download folder must be `0755`.
+- Gemini CLI as a second agent: not possible with a Google account. Google ended personal-account
+  sign-in to Gemini CLI on 2026-06-18, paid plans included ("This client is no longer supported"). It
+  needs a Gemini API key.
 - `npm run build`: 68 pages, and both skills are valid. A broken copy (an uppercase name, a top-level
   `version`, an unquoted version, a dead manual link) fails with each problem named.
 
-**Not done here.** These need a person or the hardware. Each skill run end to end in a fresh agent
-session: install on a clean VM and a Pi, set up against the site. The Agensi submission and review.
+**Not done here.** These need a person or the hardware. `gleanvolt-install` on a Pi, and with a second
+agent. `gleanvolt-setup` against the site. The Agensi submission and review.
 Replacing the GitHub links with the listing links.
 
-**Files.** `skills/README.md`, `skills/gleanvolt-install/SKILL.md`, `skills/gleanvolt-setup/SKILL.md`,
+**Files.** `dev/skill-test/` (the test machine), `skills/README.md`, `skills/gleanvolt-install/SKILL.md`, `skills/gleanvolt-setup/SKILL.md`,
 `docs/manual/scripts/check-skills.mjs`, `docs/manual/package.json`, `docs/manual/package-lock.json`,
 `.github/workflows/docs.yml`, `docs/manual/src/content/docs/{en,cs}/installation/{choosing,docker}.mdx`,
 `README.md`, `docs/RELEASING.md`, `docs/DECISIONS.md`.
