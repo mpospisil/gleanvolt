@@ -23,7 +23,12 @@ mkdir -p ~/.gemini/skills && cp -r /skills/gleanvolt-* ~/.gemini/skills/
 gemini
 ```
 
-To skip the browser sign-in, start `run.sh` with `GEMINI_API_KEY` set; it is passed into the container.
+**Signing in.** With a paid Gemini subscription, choose **Login with Google**. There is no browser in
+the container (`NO_BROWSER=true` is set), so Gemini prints a URL: open it on the host, sign in, and paste
+the code back. The sign-in is kept in the volume `gleanvolt-skill-test-gemini` across runs, so this is
+needed once. `docker volume rm gleanvolt-skill-test-gemini` forgets it. Without a subscription, start
+`run.sh` with `GEMINI_API_KEY` set instead; it is passed into the container.
+
 In Gemini, `/skills` should list both. If your version doesn't load skills from there, tell it
 "read /skills/gleanvolt-install/SKILL.md and follow it". Then ask it to "install Gleanvolt on this
 machine".

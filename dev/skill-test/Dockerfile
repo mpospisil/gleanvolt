@@ -50,9 +50,9 @@ RUN set -eu; \
 # asks for it, as it would on a real machine.
 RUN useradd -m -s /bin/bash -G sudo tester \
  && echo 'tester:tester' | chpasswd \
- && mkdir -p /home/tester/.npm-global \
+ && mkdir -p /home/tester/.npm-global /home/tester/.gemini \
  && echo 'export NPM_CONFIG_PREFIX=$HOME/.npm-global PATH=$HOME/.npm-global/bin:$PATH' >> /home/tester/.bashrc \
- && chown -R tester:tester /home/tester/.npm-global
+ && chown -R tester:tester /home/tester/.npm-global /home/tester/.gemini
 
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
