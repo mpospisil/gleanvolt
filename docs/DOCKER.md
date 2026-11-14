@@ -16,7 +16,7 @@ sudo chown -R 1654:1654 /opt/gleanvolt/data /opt/gleanvolt/logs
 ```
 
 ```bash
-docker run -d --name gleanvolt-controller --restart on-failure \
+docker run -d --name gleanvolt-controller --restart on-failure --init \
   --network host \
   -e TZ=Europe/Prague \
   -v /opt/gleanvolt/data:/app/data \
@@ -27,7 +27,9 @@ docker run -d --name gleanvolt-controller --restart on-failure \
 Then open **`http://gleanvolt.local:8090`** (or `http://<host>:8090`), choose a password and let the
 [setup wizard](WEB_UI.md#the-setup-wizard) find the inverter and the charger and set up the rest.
 Everything it saves goes to `data/`, so it survives a new container. Its **Start Gleanvolt** button
-restarts the container, which `--restart on-failure` brings straight back.
+restarts the container, which `--restart on-failure` brings straight back. `--init` puts a small init
+process in front of the controller, so that a crash ends the container and the restart policy sees it;
+without it, a controller that failed to start could stay up doing nothing.
 
 - **`--network host`** lets the wizard's search see your LAN, puts the web UI on the host's port 8090,
   and lets it announce itself as `gleanvolt.local`. On Docker's default bridge network, use

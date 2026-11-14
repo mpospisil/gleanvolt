@@ -50,6 +50,10 @@ services:
     # a crash or a NAS reboot anything else, and all of those bring it back. docker-compose.yml explains
     # the exit codes.
     restart: on-failure
+    # A real PID 1 (Docker's tini) in front of the worker. The worker as PID 1 ignores the signals a
+    # crashing .NET process ends itself with, so a crash at startup left the container up and doing
+    # nothing, and the restart policy never saw it end (#396). With an init it exits, and comes back.
+    init: true
     # The host's network, not a bridge. The setup wizard's device search scans the network it finds
     # itself on, and in a bridge that is Docker's 172.x network rather than your LAN. The web UI then
     # binds the NAS's own WEB_PORT; there is nothing to publish.

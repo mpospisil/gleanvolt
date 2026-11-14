@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration.CommandLine;
+using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Hosting.Configuration;
 
@@ -95,6 +96,17 @@ public static class PvSystemOverrides
 
         return $"; overridden by {provider.Path} (saved from the web UI): {string.Join(", ", provider.LoadedKeys)}";
     }
+
+    /// <summary>
+    /// The startup warning for <see cref="PvSystemOverridesProvider.IgnoredEmptyKeys"/>, or null when the
+    /// file held none, which is every file this version writes.
+    /// </summary>
+    public static string? DescribeIgnored(IConfiguration configuration) =>
+        Find(configuration) is { IgnoredEmptyKeys.Count: > 0 } provider
+            ? $"{provider.Path} holds {string.Join(", ", provider.IgnoredEmptyKeys)} empty, as Settings saved "
+                + "them before 1.3. Ignored, so each comes from the environment or its default; saving the "
+                + "Home Assistant (MQTT) form on Settings removes them from the file."
+            : null;
 
     /// <summary>
     /// The keys in the file, flattened to configuration paths. Empty when there is no file.
@@ -310,10 +322,26 @@ public sealed class PvSystemOverridesProvider(string path) : ConfigurationProvid
     /// <summary>The keys the file held when this process started, in file order.</summary>
     public IReadOnlyList<string> LoadedKeys { get; private set; } = [];
 
+    /// <summary>
+    /// Keys of the Home Assistant link and the API the file held empty, and that were left out (#396).
+    /// Settings saved them that way before 1.3, as "" rather than not at all, and an empty port then
+    /// stopped every start. None of them means anything empty, so the key reads as unset instead: the
+    /// environment or the default applies, and the next save of that form removes it from the file.
+    /// </summary>
+    public IReadOnlyList<string> IgnoredEmptyKeys { get; private set; } = [];
+
     public override void Load()
     {
         var values = PvSystemOverrides.Read(Path);
-        Data = values.ToDictionary(entry => entry.Key, entry => (string?)entry.Value, StringComparer.OrdinalIgnoreCase);
-        LoadedKeys = [.. values.Keys];
+        var ignored = values
+            .Where(entry => IntegrationSettingKeys.IsPlain(entry.Key) && entry.Value.Trim().Length == 0)
+            .Select(entry => entry.Key)
+            .ToList();
+
+        Data = values
+            .Where(entry => !ignored.Contains(entry.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(entry => entry.Key, entry => (string?)entry.Value, StringComparer.OrdinalIgnoreCase);
+        LoadedKeys = [.. values.Keys.Except(ignored, StringComparer.OrdinalIgnoreCase)];
+        IgnoredEmptyKeys = ignored;
     }
 }

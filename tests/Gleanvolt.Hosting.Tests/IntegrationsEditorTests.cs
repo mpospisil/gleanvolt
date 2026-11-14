@@ -65,6 +65,8 @@ public sealed class IntegrationsEditorTests : IDisposable
     [Fact]
     public void Home_assistant_on_without_a_broker_or_an_id_is_refused_and_writes_nothing()
     {
+        // No broker anywhere below the page, so an empty field leaves none (#396).
+        _appSettings.Remove(IntegrationSettingKeys.MqttBrokerHost);
         var editor = Editor(Configuration());
 
         var result = editor.Save(new Dictionary<string, string>
@@ -224,6 +226,116 @@ public sealed class IntegrationsEditorTests : IDisposable
 
         Assert.False(result.Connected);
         Assert.Contains($"127.0.0.1:{port}", result.Message, StringComparison.Ordinal);
+    }
+
+    // The save from #396: publishing switched off while the broker came from the environment, with the
+    // form's fields empty. Only the switch may reach the file, and the next start must bind.
+    [Fact]
+    public void Empty_fields_are_not_stored_so_the_environment_still_applies()
+    {
+        _appSettings["Pv:Id"] = "home-roof";
+        SetEnvironment(IntegrationSettingKeys.MqttEnabled, "true");
+        SetEnvironment(IntegrationSettingKeys.MqttBrokerHost, "localhost");
+        SetEnvironment(IntegrationSettingKeys.MqttBrokerPort, "1883");
+        SetEnvironment(IntegrationSettingKeys.MqttUsername, "solax");
+
+        var result = Editor(Configuration()).Save(new Dictionary<string, string>
+        {
+            [IntegrationSettingKeys.MqttEnabled] = "false",
+            [IntegrationSettingKeys.MqttBrokerHost] = "",
+            [IntegrationSettingKeys.MqttBrokerPort] = "",
+            [IntegrationSettingKeys.MqttUsername] = "",
+            [IntegrationSettingKeys.MqttDiscoveryPrefix] = " ",
+        });
+
+        Assert.True(result.Saved, string.Join("; ", result.Problems));
+        var stored = PvSystemOverrides.Read(OverridesPath);
+        Assert.Equal(new Dictionary<string, string> { [IntegrationSettingKeys.MqttEnabled] = "false" }, stored);
+
+        var next = Configuration();
+        Assert.Equal("1883", next[IntegrationSettingKeys.MqttBrokerPort]);
+        Assert.Equal("solax", next[IntegrationSettingKeys.MqttUsername]);
+        var options = next.GetSection(HomeAssistantOptions.SectionName).Get<HomeAssistantOptions>()!;
+        Assert.False(options.Enabled);
+        Assert.Equal(1883, options.BrokerPort);
+    }
+
+    [Fact]
+    public void A_save_removes_the_empty_values_an_earlier_version_left_in_the_file()
+    {
+        WriteOverrides("""{"HomeAssistant":{"BrokerHost":"","BrokerPort":"","DiscoveryPrefix":"","Enabled":"false","Username":""}}""");
+
+        var result = Editor(Configuration()).Save(new Dictionary<string, string>
+        {
+            [IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5",
+        });
+
+        Assert.True(result.Saved, string.Join("; ", result.Problems));
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                [IntegrationSettingKeys.MqttEnabled] = "false",
+                [IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5",
+            },
+            PvSystemOverrides.Read(OverridesPath));
+    }
+
+    // A file 1.2.0 wrote is read past, not allowed to stop the start: the environment or the default
+    // applies, and the startup log says which keys were left out.
+    [Fact]
+    public void The_next_start_ignores_empty_values_an_earlier_version_left_in_the_file()
+    {
+        SetEnvironment(IntegrationSettingKeys.MqttUsername, "solax");
+        WriteOverrides("""{"HomeAssistant":{"BrokerPort":"","Enabled":"false","Username":""},"Pv":{"Address":""}}""");
+
+        var configuration = Configuration();
+
+        var options = configuration.GetSection(HomeAssistantOptions.SectionName).Get<HomeAssistantOptions>()!;
+        Assert.Equal(1883, options.BrokerPort);
+        Assert.Equal("solax", options.Username);
+        Assert.False(options.Enabled);
+
+        var provider = PvSystemOverrides.Find(configuration)!;
+        Assert.Equal(
+            [IntegrationSettingKeys.MqttBrokerPort, IntegrationSettingKeys.MqttUsername],
+            provider.IgnoredEmptyKeys.Order(StringComparer.Ordinal));
+        Assert.Contains("HomeAssistant:BrokerPort", PvSystemOverrides.DescribeIgnored(configuration), StringComparison.Ordinal);
+        Assert.DoesNotContain("HomeAssistant:BrokerPort", PvSystemOverrides.DescribeLoaded(configuration), StringComparison.Ordinal);
+
+        // Outside these keys an empty value keeps its meaning: it blanks what is below it.
+        Assert.Equal(string.Empty, configuration["Pv:Address"]);
+    }
+
+    [Fact]
+    public void A_file_without_empty_values_has_nothing_to_say()
+    {
+        WriteOverrides("""{"HomeAssistant":{"Enabled":"false"}}""");
+
+        Assert.Null(PvSystemOverrides.DescribeIgnored(Configuration()));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("0")]
+    public void A_port_set_to_anything_but_a_port_is_refused_with_home_assistant_off(string port)
+    {
+        // In appsettings rather than the environment: an empty environment variable is no variable.
+        _appSettings[IntegrationSettingKeys.MqttBrokerPort] = port;
+
+        var result = Editor(Configuration()).Save(new Dictionary<string, string>
+        {
+            [IntegrationSettingKeys.MqttDiscoveryPrefix] = "ha",
+        });
+
+        Assert.False(result.Saved);
+        Assert.Contains(result.Problems, problem => problem.Contains("1 to 65535", StringComparison.Ordinal));
+    }
+
+    private void WriteOverrides(string json)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(OverridesPath)!);
+        File.WriteAllText(OverridesPath, json);
     }
 
     private sealed class InMemorySecrets : ISecretStore

@@ -121,14 +121,28 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
                 var canonical = IntegrationSettingKeys.Plain.First(
                     candidate => string.Equals(candidate, key, StringComparison.OrdinalIgnoreCase));
 
-                // The same as the key would be anyway is not an edit, as on the installation's form.
-                if (string.Equals(value, Underlying(canonical) ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                // Empty means "not set here", as for a key the form never touched: the environment or
+                // the default applies. Every key here is a flag, a port or a broker setting, none of
+                // which means anything empty -- stored as "", it overrode the environment with nothing,
+                // and an empty port stopped the next start (#396). And the same as the key would be
+                // anyway is not an edit, as on the installation's form.
+                if (value.Length == 0
+                    || string.Equals(value, Underlying(canonical) ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 {
                     stored.Remove(canonical);
                 }
                 else
                 {
                     stored[canonical] = value;
+                }
+            }
+
+            // Any empty one an earlier version saved goes with the next save, whichever field it is.
+            foreach (var key in IntegrationSettingKeys.Plain)
+            {
+                if (stored.TryGetValue(key, out var left) && left.Trim().Length == 0)
+                {
+                    stored.Remove(key);
                 }
             }
         });
@@ -369,7 +383,9 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
                     Phrase.Of("Config.MqttNeedsPvId"));
             }
         }
-        else if (Next(IntegrationSettingKeys.MqttBrokerPort, stored)?.Value?.Trim() is { Length: > 0 } port
+        // Off, the port still has to bind as a number at the next start, so anything set -- empty
+        // included -- is held to it (#396). Unset is fine: the default applies.
+        else if (Next(IntegrationSettingKeys.MqttBrokerPort, stored)?.Value?.Trim() is { } port
             && !(int.TryParse(port, NumberStyles.None, CultureInfo.InvariantCulture, out var number) && number is >= 1 and <= 65535))
         {
             problems.Add($"The broker port ('{port}') must be a number from 1 to 65535.",
