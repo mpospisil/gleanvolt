@@ -4,6 +4,50 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-14 — Agent skills: install and set up Gleanvolt (#390)
+
+**What.** Two Agent Skills, for agents that read `SKILL.md` (Claude Code, Codex CLI, Cursor, Gemini
+CLI), to be listed free on Agensi. `gleanvolt-install` picks the path for the host, checks the
+prerequisites, installs or updates, and checks that the web UI answers. `gleanvolt-setup` walks the
+user through device preparation, the password page and the six wizard steps, and ends with a health
+check on the Overview. The format, and Agensi's scan and packaging rules, are in DECISIONS.md.
+
+**How.**
+- `skills/gleanvolt-install/SKILL.md`: four paths, from the manual's *Which computer* table. The Linux
+  path does `install.sh`'s steps one by one (checksum before apt) instead of `curl | sh`. Docker uses
+  uid 1654, `--network host`, `--restart on-failure`, `--init` and `TZ`, and says why for each. On a NAS
+  the user is guided through the container app. On Windows the user starts `gleanvolt` themselves,
+  because a foreground process started by the agent ends with its session. The check is the root's
+  redirect: `302 /setup` on a fresh install, `/wizard` or `/login` when data already exists.
+- `skills/gleanvolt-setup/SKILL.md`: Modbus TCP per brand, one controller per device, DHCP
+  reservations, then the wizard step by step. Pitfalls, taken from the troubleshooting page and the
+  site's history: the inverter and the charger swapped (frozen SOC, zero solar), the charger's single
+  Modbus client, the search on a `172.x` bridge network, and a Solcast 429 being the daily quota. The
+  health check reads the Overview's figures and Settings → Health → Last poll.
+- `docs/manual/scripts/check-skills.mjs`, run at the end of `npm run build`. `docs.yml` builds on a pull
+  request that touches `skills/**`.
+- The manual's Docker page (en, cs) now has `--init`, which #396 added to `docs/DOCKER.md`. Its
+  "Why these options" says why.
+- Links: README's install section, `skills/README.md`, and a "With an AI agent" section on the manual's
+  *Which computer* page (en, cs). RELEASING.md has the re-publish step.
+
+**Verified.**
+- The Linux steps on this machine against the v1.2.0 release, without the install: one `.deb` name
+  for `amd64`, `sha256sum -c` prints `OK`.
+- The Docker command, in a throwaway container on port 8099 with scratch folders: it starts in setup
+  mode, and the check returns `302 http://localhost:8099/setup`.
+- `npm run build`: 68 pages, and both skills are valid. A broken copy (an uppercase name, a top-level
+  `version`, an unquoted version, a dead manual link) fails with each problem named.
+
+**Not done here.** These need a person or the hardware. Each skill run end to end in a fresh agent
+session: install on a clean VM and a Pi, set up against the site. The Agensi submission and review.
+Replacing the GitHub links with the listing links.
+
+**Files.** `skills/README.md`, `skills/gleanvolt-install/SKILL.md`, `skills/gleanvolt-setup/SKILL.md`,
+`docs/manual/scripts/check-skills.mjs`, `docs/manual/package.json`, `docs/manual/package-lock.json`,
+`.github/workflows/docs.yml`, `docs/manual/src/content/docs/{en,cs}/installation/{choosing,docker}.mdx`,
+`README.md`, `docs/RELEASING.md`, `docs/DECISIONS.md`.
+
 ## 2026-11-14 — Empty Home Assistant settings, and a failed start that hung (#396)
 
 **What.** Switching off Home Assistant (MQTT) on Settings, with the broker in `.env`, wrote all of its

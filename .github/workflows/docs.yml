@@ -1,6 +1,7 @@
 # The user manual (#329): docs/manual, a Starlight site, published to GitHub Pages.
 #
-#   pull request   build it (a broken link or anchor fails the build) and check the screenshots
+#   pull request   build it (a broken link or anchor fails the build) and check the screenshots; the
+#                  build also lints the agent skills in skills/ (#390) and their links into the manual
 #   push to main   publish to /next/, to review changes on the live site before a release
 #   tag v*         publish to /vX.Y/ and to /latest/, which the README and the web UI link to
 #   by hand        rebuild a tag's manual
@@ -16,6 +17,7 @@ on:
     paths:
       - 'docs/manual/**'
       - 'deploy/docker-compose.nas.yml'
+      - 'skills/**'
       - 'src/**'
       - 'tests/Gleanvolt.Web.Screenshots/**'
       - 'tests/Gleanvolt.Web.Tests/Fakes.cs'
@@ -58,7 +60,8 @@ jobs:
 
       - run: npm ci
 
-      # The build ends with scripts/check-links.mjs, which fails it on a broken link or anchor.
+      # The build ends with scripts/check-links.mjs, which fails it on a broken link or anchor, and
+      # scripts/check-skills.mjs, which fails it on a skill Agensi would reject or a dead manual link.
       - run: npm run build
 
   screenshots:

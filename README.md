@@ -120,6 +120,10 @@ Upgrade with `winget upgrade MartinPospisil.Gleanvolt`, after copying `data\` so
 winget, download `gleanvolt-<version>-win-x64.zip` from
 [Releases](https://github.com/mpospisil/gleanvolt/releases), unzip it and run `Gleanvolt.Worker.exe`.
 
+**With an AI agent.** If you use Claude Code, Codex CLI, Cursor, Gemini CLI or another agent that
+reads `SKILL.md` skills, the two [agent skills](skills/) install Gleanvolt and walk you through the
+setup wizard, following the manual: `gleanvolt-install` and `gleanvolt-setup`.
+
 **Advanced: Docker on a Pi, managed from another computer.** The scripts in `deploy/` deploy, update
 and roll back a Docker container on a Raspberry Pi over ssh, from a checkout of this repository — and
 can run Home Assistant and an MQTT broker beside it. See
