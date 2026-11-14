@@ -4,6 +4,61 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-14 — Agent skills for installing and setting up, in the Agent Skills format Agensi lists
+
+**Found (#390), from Agensi's own guides** (`/learn/skill-md-format-reference`,
+`/learn/skill-md-creator-checklist`, `/learn/how-agensi-security-scan-works`,
+`/learn/how-to-sell-skills-on-agensi`), and the [Agent Skills specification](https://agentskills.io/specification)
+they follow:
+- A skill is one folder named after it, with `SKILL.md` at its root, YAML frontmatter, and a Markdown
+  body. Only `name` and `description` are required. `name` is lowercase letters, digits and single
+  hyphens, at most 64 characters, and matches the folder. `description` is 1–1024 characters and says
+  when to use the skill. Agensi asks for one to three sentences. The other spec fields are `license`,
+  `compatibility` (at most 500), `metadata` (string to string) and `allowed-tools`. Agensi's guide
+  mentions a `version`, but the spec has no such top-level key, so the version goes under `metadata`.
+- Agensi takes a zip with a single top-level folder. No symlinks, hidden files or unexpected binaries.
+  A free listing needs no payout method.
+- Every version goes through an 8-point scan (prompt injection, exfiltration, dangerous commands,
+  hardcoded secrets, obfuscation, suspicious network access, zip structure, `SKILL.md` validity), then
+  a manual review. "Execute arbitrary code from remote URLs" and "download scripts at runtime" are
+  flagged.
+- None of the guides describes how to update a published listing. RELEASING.md records the expected
+  route (upload the new zip to the listing) until the first update confirms it.
+
+**Decided.**
+- **Two skills in `skills/<name>/`, `gleanvolt-install` and `gleanvolt-setup`, with `SKILL.md` only:**
+  no scripts and no reference files. Every command is written out, so the scan has nothing opaque to
+  read and a user can read exactly what the agent will run.
+- **The Linux path doesn't pipe `install.sh` into a shell.** The skill repeats the installer's steps
+  where they can be seen: download `SHA256SUMS`, pick the `.deb` for `dpkg --print-architecture`,
+  check it with `sha256sum -c`, and `apt-get install` it with the installer's options. That gives the
+  same result without the remote-code pattern the scan flags. The manual keeps the one-line command for
+  people typing it themselves.
+- **The manual stays the source of truth.** Each step links to its page under `/latest/en/`, and the
+  skill tells the agent to follow the manual when the two disagree. The Czech page is the same link
+  with `/cs/`. Nothing is translated.
+- **The agent never handles a secret.** The user types the password, the recovery key and every API key
+  or account sign-in into the web page. The setup skill also tells the agent not to open its own
+  Modbus connection to the devices, because the charger serves one client.
+- **`metadata.version` is the Gleanvolt release the skill was last checked against** (`1.3.0` now).
+  Re-publishing is a manual release step, taken only when an install path, the wizard or a linked page
+  changes.
+- **The manual's build lints the skills** (`scripts/check-skills.mjs`): frontmatter keys and limits,
+  folder match, no hidden files or symlinks, under 500 lines, and every manual link resolved against the
+  built `dist/`, Czech included. Running it in the manual's build, rather than in a separate job, means
+  the links are checked against the pages built from the same commit. `yaml` is now a direct dev
+  dependency, at the version Astro already pulled in.
+
+**Consequences accepted.**
+- The skill's Linux steps and `install.sh` are two copies of the same procedure. A change to the
+  release's file names or to the installer's apt options has to be made in both. RELEASING.md's
+  `install.sh` row now says so.
+- The skills link to `/latest/`, so between a release that changes a page and the skill's re-check, an
+  agent can read a page newer than the skill. The skill tells it to follow the page.
+- The README and the manual link to the `skills/` folder on GitHub until the Agensi listings exist. The
+  listing links replace them then.
+- The skills carry no `license` field, so the repository's licence applies to them.
+
 ## 2026-11-14 — An empty Home Assistant or API setting means unset, and a failed start exits
 
 **Found (#396).** Switching off *Publish to Home Assistant* on Settings on the Pi wrote every MQTT field
