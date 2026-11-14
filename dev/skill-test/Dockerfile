@@ -1,8 +1,8 @@
 # A clean Debian machine to try the agent skills in skills/ (#390) against, with systemd running, so
 # the gleanvolt-install skill takes its real path (A, the .deb as a systemd service) as on a Pi.
 #
-# Nothing of Gleanvolt is in it. Node.js is, because Gemini CLI needs Node 20+ and Debian 12's own is
-# 18; it lives in /usr/local and has nothing to do with Gleanvolt's prerequisites.
+# Nothing of Gleanvolt is in it. Node.js is, for the agent CLIs (Claude Code, Gemini CLI): Debian 12's
+# own is 18, too old. It lives in /usr/local and has nothing to do with Gleanvolt's prerequisites.
 #
 # Build and run with run.sh next to this file: systemd needs --privileged and the host network gives
 # the container the LAN. See README.md for what that shares with the host.
@@ -50,9 +50,9 @@ RUN set -eu; \
 # asks for it, as it would on a real machine.
 RUN useradd -m -s /bin/bash -G sudo tester \
  && echo 'tester:tester' | chpasswd \
- && mkdir -p /home/tester/.npm-global /home/tester/.gemini \
+ && mkdir -p /home/tester/.npm-global /home/tester/.claude \
  && echo 'export NPM_CONFIG_PREFIX=$HOME/.npm-global PATH=$HOME/.npm-global/bin:$PATH' >> /home/tester/.bashrc \
- && chown -R tester:tester /home/tester/.npm-global /home/tester/.gemini
+ && chown -R tester:tester /home/tester/.npm-global /home/tester/.claude
 
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

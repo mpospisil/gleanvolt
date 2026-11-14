@@ -4,9 +4,9 @@
 #   dev/skill-test/run.sh                 Debian 12
 #   BASE=ubuntu:24.04 dev/skill-test/run.sh
 #
-# Every run starts from a clean machine: the previous container is removed first. Only Gemini CLI's
-# sign-in and settings (~/.gemini) are kept, in the volume gleanvolt-skill-test-gemini, so a Google
-# sign-in is done once: `docker volume rm gleanvolt-skill-test-gemini` forgets it.
+# Every run starts from a clean machine: the previous container is removed first. Only Claude Code's
+# sign-in and settings (~/.claude) are kept, in the volume gleanvolt-skill-test-claude, so signing in
+# is done once: `docker volume rm gleanvolt-skill-test-claude` forgets it.
 set -eu
 
 base=${BASE:-debian:12}
@@ -23,9 +23,8 @@ docker run -d --name "$name" --hostname gleanvolt-test --add-host gleanvolt-test
   --privileged --cgroupns=private \
   --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
   --network host \
-  ${GEMINI_API_KEY:+-e GEMINI_API_KEY} \
-  -e NO_BROWSER=true \
-  -v gleanvolt-skill-test-gemini:/home/tester/.gemini \
+  ${ANTHROPIC_API_KEY:+-e ANTHROPIC_API_KEY} \
+  -v gleanvolt-skill-test-claude:/home/tester/.claude \
   -v "$here/../../skills:/skills:ro" \
   "$image" >/dev/null
 
