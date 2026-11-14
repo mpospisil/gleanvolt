@@ -4,9 +4,10 @@
 #   dev/skill-test/run.sh                 Debian 12
 #   BASE=ubuntu:24.04 dev/skill-test/run.sh
 #
-# Every run starts from a clean machine: the previous container is removed first. Only Claude Code's
-# sign-in and settings (~/.claude) are kept, in the volume gleanvolt-skill-test-claude, so signing in
-# is done once: `docker volume rm gleanvolt-skill-test-claude` forgets it.
+# Every run starts from a clean machine: the previous container is removed first. Only the agent is
+# kept: Claude Code's sign-in and settings (~/.claude) in the volume gleanvolt-skill-test-claude, and
+# what `npm install -g` put in ~/.npm-global in gleanvolt-skill-test-npm. Neither is anything Gleanvolt
+# or its skills look at. `docker volume rm` forgets either.
 set -eu
 
 base=${BASE:-debian:12}
@@ -25,6 +26,7 @@ docker run -d --name "$name" --hostname gleanvolt-test --add-host gleanvolt-test
   --network host \
   ${ANTHROPIC_API_KEY:+-e ANTHROPIC_API_KEY} \
   -v gleanvolt-skill-test-claude:/home/tester/.claude \
+  -v gleanvolt-skill-test-npm:/home/tester/.npm-global \
   -v "$here/../../skills:/skills:ro" \
   "$image" >/dev/null
 
