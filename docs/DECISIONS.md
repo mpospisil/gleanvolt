@@ -53,7 +53,7 @@ they follow:
 - **Left to the browser:** the car (its feeds include an emailed Volkswagen code and a Škoda key that
   only the Car page takes), Home Assistant/MQTT, and API access. The setup skill also tells the agent not
   to open its own Modbus connection to the devices, because the charger serves one client.
-- **`metadata.version` is the Gleanvolt release the skill was last checked against** (`1.3.0` now).
+- **`metadata.version` is the Gleanvolt release the skill was last checked against** (`gleanvolt-install` is published at `1.2.0`, the release both test runs installed; `gleanvolt-setup` stays at `1.3.0` until it is checked and published).
   Re-publishing is a manual release step, taken only when an install path, the wizard or a linked page
   changes.
 - **The manual's build lints the skills** (`scripts/check-skills.mjs`): frontmatter keys and limits,
