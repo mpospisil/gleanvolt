@@ -4,16 +4,18 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Gleanvolt.Infrastructure.Solcast;
 
 namespace Gleanvolt.Infrastructure.Tests;
 
 /// <summary>
-/// The day totals the dashboard reads, against a stubbed transport. They are worked out once per refresh
-/// rather than per read, so what has to hold is that the number taken then is the one a sum over the
-/// day's periods would give — and that it survives what a refresh can do to the periods behind it.
+/// Solcast as a forecast source, against a stubbed transport, read back through the store it publishes
+/// to (issue #387). The day totals the dashboard reads are worked out once per publish rather than per
+/// read, so what has to hold is that the number taken then is the one a sum over the day's periods would
+/// give — and that it survives what a refresh can do to the periods behind it.
 /// </summary>
-public sealed class SolcastForecastServiceTests
+public sealed class SolcastSourceTests
 {
     private static readonly TimeZoneInfo Prague = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
     private static readonly DateOnly Today = new(2026, 8, 9);
@@ -21,9 +23,9 @@ public sealed class SolcastForecastServiceTests
     [Fact]
     public void NothingIsHeldBeforeTheFirstRefresh()
     {
-        var service = NewService(new QueueHandler(), new Clock(At(6, 0)));
+        var (_, store) = NewService(new QueueHandler(), new Clock(At(6, 0)));
 
-        Assert.Null(service.GetDayEnergyWattHours(Today));
+        Assert.Null(store.GetDayEnergyWattHours(Today));
     }
 
     [Fact]
@@ -34,14 +36,14 @@ public sealed class SolcastForecastServiceTests
         var handler = new QueueHandler(
             Ok((At(6, 0), 1.0), (At(11, 0), 4.0)),
             Ok((At(13, 0), 3.0)));
-        var service = NewService(handler, clock);
+        var (source, store) = NewService(handler, clock);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
         clock.Now = At(12, 0);
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
-        Assert.Equal((1000 + 4000 + 3000) * 0.5, service.GetDayEnergyWattHours(Today)!.Value, 3);
-        Assert.Equal(service.GetDayForecast(Today)!.ExpectedEnergyWattHours, service.GetDayEnergyWattHours(Today)!.Value, 3);
+        Assert.Equal((1000 + 4000 + 3000) * 0.5, store.GetDayEnergyWattHours(Today)!.Value, 3);
+        Assert.Equal(store.GetDayForecast(Today)!.ExpectedEnergyWattHours, store.GetDayEnergyWattHours(Today)!.Value, 3);
     }
 
     [Fact]
@@ -51,12 +53,12 @@ public sealed class SolcastForecastServiceTests
         // dashboard asks for the new day, and the answer has to be there already.
         var clock = new Clock(At(17, 0));
         var handler = new QueueHandler(Ok((At(17, 30), 0.4), (At(10, 0).AddDays(1), 5.0)));
-        var service = NewService(handler, clock);
+        var (source, store) = NewService(handler, clock);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
         clock.Now = At(23, 0);
 
-        Assert.Equal(2500, service.GetDayEnergyWattHours(Today.AddDays(1))!.Value, 3);
+        Assert.Equal(2500, store.GetDayEnergyWattHours(Today.AddDays(1))!.Value, 3);
         Assert.Equal(1, handler.Calls);
     }
 
@@ -67,13 +69,13 @@ public sealed class SolcastForecastServiceTests
         var handler = new QueueHandler(
             Ok((At(11, 0), 4.0)),
             (HttpStatusCode.TooManyRequests, """{"response_status":{"error_code":"TooManyRequests"}}"""));
-        var service = NewService(handler, clock);
+        var (source, store) = NewService(handler, clock);
 
-        await service.RefreshAsync();
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(2, handler.Calls);
-        Assert.Equal(2000, service.GetDayEnergyWattHours(Today)!.Value, 3);
+        Assert.Equal(2000, store.GetDayEnergyWattHours(Today)!.Value, 3);
     }
 
     [Fact]
@@ -88,16 +90,16 @@ public sealed class SolcastForecastServiceTests
                 new { pv_estimate = 5.0, pv_estimate10 = 4.0, pv_estimate90 = 5.5, period_end = At(11, 0), period = "PT30M" },
             },
         })));
-        var service = NewService(handler, clock);
+        var (source, store) = NewService(handler, clock);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
-        var day = service.GetDaySummary(Today)!;
+        var day = store.GetDaySummary(Today)!;
         Assert.Equal((2000 + 5000) * 0.5, day.ExpectedWh, 3);
         Assert.Equal((1000 + 4000) * 0.5, day.LowWh, 3);
         Assert.Equal((3000 + 5500) * 0.5, day.HighWh, 3);
         Assert.Equal(5000, day.PeakWatts, 3);
-        Assert.Equal(day.ExpectedWh, service.GetDayEnergyWattHours(Today)!.Value, 3);
+        Assert.Equal(day.ExpectedWh, store.GetDayEnergyWattHours(Today)!.Value, 3);
     }
 
     [Fact]
@@ -106,11 +108,11 @@ public sealed class SolcastForecastServiceTests
         // Saved on Settings between two refreshes: the second has to use it, with no restart between.
         var handler = new QueueHandler(Ok((At(11, 0), 4.0)), Ok((At(11, 0), 4.0)));
         var account = Account();
-        var service = NewService(handler, new Clock(At(6, 0)), account);
+        var (source, store) = NewService(handler, new Clock(At(6, 0)), account);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
         account.Save(new SolcastAccount("new-key", "site"));
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(["key", "new-key"], handler.Keys);
     }
@@ -119,12 +121,12 @@ public sealed class SolcastForecastServiceTests
     public async Task WithNoAccountNothingIsAsked()
     {
         var handler = new QueueHandler();
-        var service = NewService(handler, new Clock(At(6, 0)), Account(new SolcastOptions()));
+        var (source, store) = NewService(handler, new Clock(At(6, 0)), Account(new SolcastOptions()));
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(0, handler.Calls);
-        Assert.Equal(SolcastFetchStatus.Never, service.Status);
+        Assert.Equal(SolcastFetchStatus.Never, source.Status);
     }
 
     [Theory]
@@ -136,36 +138,36 @@ public sealed class SolcastForecastServiceTests
         // Every retry of a refused key is a call out of ten that nothing can come of.
         var handler = new QueueHandler((refusal, "{}"), Ok((At(11, 0), 4.0)));
         var account = Account();
-        var service = NewService(handler, new Clock(At(6, 0)), account);
+        var (source, store) = NewService(handler, new Clock(At(6, 0)), account);
 
-        await service.RefreshAsync();
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(1, handler.Calls);
-        Assert.Equal(failure, service.Status.Failure);
-        Assert.Equal((int)refusal, service.Status.HttpStatus);
+        Assert.Equal(failure, source.Status.Failure);
+        Assert.Equal((int)refusal, source.Status.HttpStatus);
 
         account.Save(new SolcastAccount("new-key", "site"));
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(2, handler.Calls);
-        Assert.Equal(SolcastFetchFailure.None, service.Status.Failure);
-        Assert.Equal(At(6, 0), service.Status.FetchedAt);
+        Assert.Equal(SolcastFetchFailure.None, source.Status.Failure);
+        Assert.Equal(At(6, 0), source.Status.FetchedAt);
     }
 
     [Fact]
     public async Task AnExhaustedQuotaIsTriedAgainOnTheNextRefresh()
     {
         var handler = new QueueHandler((HttpStatusCode.TooManyRequests, "{}"), Ok((At(11, 0), 4.0)));
-        var service = NewService(handler, new Clock(At(6, 0)));
+        var (source, store) = NewService(handler, new Clock(At(6, 0)));
 
-        await service.RefreshAsync();
-        Assert.Equal(SolcastFetchFailure.QuotaExhausted, service.Status.Failure);
+        await source.RequestRefreshAsync();
+        Assert.Equal(SolcastFetchFailure.QuotaExhausted, source.Status.Failure);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(2, handler.Calls);
-        Assert.Equal(SolcastFetchFailure.None, service.Status.Failure);
+        Assert.Equal(SolcastFetchFailure.None, source.Status.Failure);
     }
 
     [Fact]
@@ -173,33 +175,59 @@ public sealed class SolcastForecastServiceTests
     {
         var clock = new Clock(At(6, 0));
         var handler = new QueueHandler(Ok((At(11, 0), 4.0)), (HttpStatusCode.InternalServerError, "{}"));
-        var service = NewService(handler, clock);
+        var (source, store) = NewService(handler, clock);
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
         clock.Now = At(9, 0);
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
-        Assert.Equal(At(6, 0), service.Status.FetchedAt);
-        Assert.Equal(At(9, 0), service.Status.FailedAt);
-        Assert.Equal(SolcastFetchFailure.Other, service.Status.Failure);
+        Assert.Equal(At(6, 0), source.Status.FetchedAt);
+        Assert.Equal(At(9, 0), source.Status.FailedAt);
+        Assert.Equal(SolcastFetchFailure.Other, source.Status.Failure);
     }
 
     [Fact]
     public async Task ForgettingDropsTheForecastButNotTheHistory()
     {
         var handler = new QueueHandler(Ok((At(11, 0), 4.0)));
-        var service = NewService(handler, new Clock(At(6, 0)));
+        var (source, store) = NewService(handler, new Clock(At(6, 0)));
         var notified = 0;
-        service.StatusChanged += () => notified++;
+        source.StatusChanged += () => notified++;
 
-        await service.RefreshAsync();
-        Assert.NotNull(service.ExpectedPowerWattsNow(At(10, 45)));
-        service.Forget();
+        await source.RequestRefreshAsync();
+        Assert.NotNull(store.ExpectedPowerWattsNow(At(10, 45)));
+        source.Forget();
 
-        Assert.Null(service.ExpectedPowerWattsNow(At(10, 45)));
-        Assert.Equal(SolcastFetchStatus.Never, service.Status);
-        Assert.NotNull(service.GetDayForecast(Today));
+        Assert.Null(store.ExpectedPowerWattsNow(At(10, 45)));
+        Assert.Equal(SolcastFetchStatus.Never, source.Status);
+        Assert.NotNull(store.GetDayForecast(Today));
         Assert.Equal(2, notified);
+    }
+
+    [Fact]
+    public async Task AFetchIsPublishedAsSolcasts()
+    {
+        var (source, store) = NewService(new QueueHandler(Ok((At(11, 0), 4.0))), new Clock(At(6, 0)));
+
+        await source.RequestRefreshAsync();
+
+        Assert.Equal(new SolarForecastOrigin(SolarForecastSourceIds.Solcast, "Solcast"), store.Current!.Origin);
+        Assert.Equal(At(6, 0), store.Current.ReceivedAt);
+    }
+
+    /// <summary>Removing the Solcast account is no reason to drop a forecast another source published.</summary>
+    [Fact]
+    public void ForgettingLeavesAnotherSourcesForecast()
+    {
+        var (source, store) = NewService(new QueueHandler(), new Clock(At(6, 0)));
+        store.Publish(
+            new SolarForecast(At(6, 0), [new SolarForecastPeriod(At(11, 0), TimeSpan.FromMinutes(30), 4000)]),
+            new SolarForecastOrigin("external", "External"));
+
+        source.Forget();
+
+        Assert.NotNull(store.Current);
+        Assert.Equal(SolcastFetchStatus.Never, source.Status);
     }
 
     private static SolcastAccountStore Account(SolcastOptions? options = null) =>
@@ -213,14 +241,18 @@ public sealed class SolcastForecastServiceTests
             forecasts = periods.Select(p => new { pv_estimate = p.Kw, period_end = p.End, period = "PT30M" }),
         }));
 
-    private static SolcastForecastService NewService(
+    private static (SolcastSource Source, SolarForecastStore Store) NewService(
         HttpMessageHandler handler, TimeProvider clock, SolcastAccountStore? account = null)
     {
-        return new SolcastForecastService(
+        var store = new SolarForecastStore(clock);
+        var source = new SolcastSource(
             new SingleClientFactory(handler, new SolcastOptions().BaseUrl),
             account ?? Account(),
-            NullLogger<SolcastForecastService>.Instance,
+            store,
+            NullLogger<SolcastSource>.Instance,
             clock);
+
+        return (source, store);
     }
 
     private sealed class Clock(DateTimeOffset now) : TimeProvider

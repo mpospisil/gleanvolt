@@ -162,7 +162,7 @@ internal sealed class FakeSolarForecastService : ISolarForecastService
 
     /// <summary>
     /// The live cache. Assigning is a refresh: the forecast replaces the cache <i>and</i> is merged into
-    /// the history, exactly as <c>SolcastForecastService.RefreshAsync</c> does.
+    /// the history, exactly as <c>SolarForecastStore.Publish</c> does.
     /// </summary>
     internal SolarForecast? Forecast
     {

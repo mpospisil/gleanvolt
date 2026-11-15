@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
+using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Hosting;
 using Gleanvolt.Infrastructure.Solcast;
 
@@ -9,11 +11,8 @@ namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
 /// The refresh worker's pacing, which is what protects the API quota: overnight a fresh forecast
-/// cannot change any decision made in the dark, and still costs a call.
-///
-/// <para>These tests exist because the worker now takes <see cref="ISolarForecastRefresh"/>. Against
-/// the concrete <c>SolcastForecastService</c> they would have needed an HTTP client factory and a
-/// live-ish forecast to say anything about scheduling, which is why there were none.</para>
+/// cannot change any decision made in the dark, and still costs a call. And since issue #387, that it
+/// asks the source <c>SolarForecast:Source</c> selects, and no other.
 /// </summary>
 public class SolarForecastRefreshWorkerTests
 {
@@ -22,26 +21,150 @@ public class SolarForecastRefreshWorkerTests
     /// <summary>Answers the two scheduling questions and nothing else, which is the whole point.</summary>
     private sealed class Stub(double? expectedNow, DateTimeOffset? nextDaylight) : ISolarForecastRefresh
     {
-        public int Refreshes { get; private set; }
-
-        public Task RefreshAsync(CancellationToken cancellationToken = default)
-        {
-            Refreshes++;
-            return Task.CompletedTask;
-        }
-
         public double? ExpectedPowerWattsNow(DateTimeOffset instant) => expectedNow;
 
         public DateTimeOffset? NextDaylightStart(DateTimeOffset after, double thresholdWatts) => nextDaylight;
     }
 
+    private sealed class Source(string id) : ISolarForecastSource
+    {
+        public string Id => id;
+
+        public int Requests { get; private set; }
+
+        public Task RequestRefreshAsync(CancellationToken cancellationToken = default)
+        {
+            Requests++;
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>An options monitor whose value the test changes, as a configuration reload would.</summary>
+    private sealed class Monitor(string source) : IOptionsMonitor<SolarForecastOptions>
+    {
+        private Action<SolarForecastOptions, string?>? _listener;
+
+        public SolarForecastOptions CurrentValue { get; private set; } = new() { Source = source };
+
+        public SolarForecastOptions Get(string? name) => CurrentValue;
+
+        public IDisposable OnChange(Action<SolarForecastOptions, string?> listener)
+        {
+            _listener = listener;
+            return new Subscription();
+        }
+
+        public void Select(string id)
+        {
+            CurrentValue = new SolarForecastOptions { Source = id };
+            _listener?.Invoke(CurrentValue, null);
+        }
+
+        private sealed class Subscription : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private static SolarForecastSources Sources(Monitor monitor, params ISolarForecastSource[] sources) =>
+        new(sources, monitor, NullLogger<SolarForecastSources>.Instance);
+
     private static SolarForecastRefreshWorker Worker(
-        double? expectedNow, DateTimeOffset? nextDaylight, SolcastOptions? options = null) =>
+        double? expectedNow, DateTimeOffset? nextDaylight, SolcastOptions? options = null, SolarForecastSources? sources = null) =>
         new(
             new Stub(expectedNow, nextDaylight),
+            sources ?? Sources(new Monitor(SolarForecastSourceIds.Solcast), new Source(SolarForecastSourceIds.Solcast)),
             Options.Create(options ?? new SolcastOptions()),
             NullLogger<SolarForecastRefreshWorker>.Instance,
             new FakeTimeProvider(Noon));
+
+    [Fact]
+    public async Task ItAsksTheSelectedSourceAndNoOther()
+    {
+        var solcast = new Source(SolarForecastSourceIds.Solcast);
+        var other = new Source("other");
+        var worker = Worker(4000, null, sources: Sources(new Monitor("other"), solcast, other));
+
+        await worker.RefreshOnceAsync(CancellationToken.None);
+
+        Assert.Equal(0, solcast.Requests);
+        Assert.Equal(1, other.Requests);
+    }
+
+    /// <summary>Unset means Solcast, as it did before there was a choice.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("SOLCAST")]
+    public async Task UnsetOrInAnyCaseItIsSolcast(string configured)
+    {
+        var solcast = new Source(SolarForecastSourceIds.Solcast);
+        var worker = Worker(4000, null, sources: Sources(new Monitor(configured), solcast));
+
+        await worker.RefreshOnceAsync(CancellationToken.None);
+
+        Assert.Equal(1, solcast.Requests);
+    }
+
+    [Fact]
+    public async Task AnUnknownSourceAsksNothingAndKeepsTheSchedule()
+    {
+        var solcast = new Source(SolarForecastSourceIds.Solcast);
+        var options = new SolcastOptions();
+        var worker = Worker(null, null, options, Sources(new Monitor("nowhere"), solcast));
+
+        var delay = await worker.RefreshOnceAsync(CancellationToken.None);
+
+        Assert.Equal(0, solcast.Requests);
+        Assert.Equal(options.RefreshInterval, delay);
+    }
+
+    /// <summary>
+    /// Switched at runtime, the way a tariff strategy is: the new source is asked at once, not after the
+    /// old one's interval or night sleep has run out.
+    /// </summary>
+    [Fact]
+    public async Task ASwitchAsksTheNewSourceAtOnce()
+    {
+        var solcast = new Source(SolarForecastSourceIds.Solcast);
+        var other = new Source("other");
+        var monitor = new Monitor(SolarForecastSourceIds.Solcast);
+        var options = new SolcastOptions { RefreshInterval = TimeSpan.FromHours(3) };
+        using var worker = Worker(4000, null, options, Sources(monitor, solcast, other));
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitFor(() => solcast.Requests == 1);
+
+        monitor.Select("other");
+        await WaitFor(() => other.Requests == 1);
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal(1, solcast.Requests);
+    }
+
+    [Fact]
+    public void AReloadThatKeepsTheSourceIsNoSwitch()
+    {
+        var monitor = new Monitor(SolarForecastSourceIds.Solcast);
+        using var sources = Sources(monitor, new Source(SolarForecastSourceIds.Solcast));
+        var switches = 0;
+        sources.Switched += () => switches++;
+
+        monitor.Select("Solcast");
+
+        Assert.Equal(0, switches);
+    }
+
+    private static async Task WaitFor(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "Timed out waiting for the worker.");
+            await Task.Delay(10);
+        }
+    }
 
     [Fact]
     public void InDaylightItWaitsTheConfiguredInterval()

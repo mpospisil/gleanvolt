@@ -200,6 +200,9 @@ key goes to the secret store and wins over the environment; **Remove** hands bac
 The API key is a secret: `Solcast__ApiKey` (`SOLCAST_API_KEY` in `deploy/.env`), never in
 `appsettings.json`.
 
+`SolarForecast:Source` chooses where the forecast comes from. `solcast` is the default and, for
+now, the only value.
+
 With no account, the controller logs a warning and runs without a forecast. The free hobbyist tier
 allows about ten calls a day, and every start spends one, so keep `RefreshInterval` within your plan.
 

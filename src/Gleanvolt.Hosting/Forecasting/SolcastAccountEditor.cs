@@ -6,7 +6,7 @@ using Gleanvolt.Infrastructure.Solcast;
 namespace Gleanvolt.Hosting.Forecasting;
 
 /// <summary>
-/// The Solcast account on Settings (issue #286): the store that holds it and the service that uses it,
+/// The Solcast account on Settings (issue #286): the store that holds it and the source that uses it,
 /// behind the one interface the page needs.
 ///
 /// <para><b>A save is a fetch.</b> There is no separate call to check the key: the fetch that puts a
@@ -16,12 +16,12 @@ namespace Gleanvolt.Hosting.Forecasting;
 public sealed class SolcastAccountEditor : ISolcastAccountEditor
 {
     private readonly SolcastAccountStore _account;
-    private readonly SolcastForecastService _forecast;
+    private readonly SolcastSource _forecast;
     private readonly ILogger<SolcastAccountEditor> _logger;
 
     public SolcastAccountEditor(
         SolcastAccountStore account,
-        SolcastForecastService forecast,
+        SolcastSource forecast,
         ILogger<SolcastAccountEditor> logger,
         ISetupState? setup = null)
     {
@@ -99,7 +99,7 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
 
         _logger.LogInformation("Solcast account saved on Settings for rooftop site {ResourceId}; fetching the forecast with it.", site);
 
-        await _forecast.RefreshAsync(cancellationToken).ConfigureAwait(false);
+        await _forecast.RequestRefreshAsync(cancellationToken).ConfigureAwait(false);
 
         return new SolcastAccountSaveResult([], persisted);
     }

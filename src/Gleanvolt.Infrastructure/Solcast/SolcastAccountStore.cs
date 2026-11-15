@@ -6,7 +6,7 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Infrastructure.Solcast;
 
 /// <summary>
-/// The Solcast account in use, shared by Settings and <see cref="SolcastForecastService"/> (issue #286).
+/// The Solcast account in use, shared by Settings and <see cref="SolcastSource"/> (issue #286).
 ///
 /// <para><b>One holder, read on every fetch.</b> The page writes it and the service reads it each time
 /// it asks Solcast, so an account saved on the page is used by the next fetch without a restart — which

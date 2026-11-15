@@ -4,6 +4,38 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-15 — The solar forecast is held by a store, and sources only publish to it
+
+**Found (#387).** `SolcastForecastService` was both the store (the cached forecast, the history and
+every `ISolarForecastService` query) and the source (the HTTP fetch, the account, a refused key). An
+external forecast (#388) needs somewhere to put its data that the planner already reads, and that
+place should not be inside the Solcast client.
+
+**Decided.**
+- **`SolarForecastStore` (Core) holds the forecast** and implements `ISolarForecastService` and
+  `ISolarForecastRefresh`. Its state (forecast, origin, received-at, the retained history as an
+  immutable forecast, the day summaries) is one value behind one volatile field, replaced whole by
+  `Publish(forecast, origin)`. Readers never take a lock; writers serialise on a lock of their own.
+  `Forget()` drops the forecast and keeps the history, as before.
+- **`ISolarForecastSource` (`Id`, `RequestRefreshAsync`) is where a forecast comes from.**
+  `SolcastSource` is what was left of `SolcastForecastService`: the account, the fetch, the refusal
+  memory, the status line. It ends with `store.Publish(...)`. Its `Forget()` drops the held forecast
+  only if Solcast published it.
+- **`ISolarForecastRefresh` loses `RefreshAsync`.** It is now only what the worker reads to pace
+  itself (`ExpectedPowerWattsNow`, `NextDaylightStart`), served by the store. Asking is the source's.
+- **The active source is `SolarForecast:Source`** (`solcast`, the default when unset; matched
+  without regard to case), read through `IOptionsMonitor` by `SolarForecastSources`, so a
+  configuration change switches it without a restart. A switch wakes the worker to ask the new source
+  at once. An unknown id is logged and nothing is fetched.
+
+**Consequences accepted.**
+- The tariff's selection lives in `tariff.json` and is saved on Settings; the forecast's is plain
+  configuration until #388 adds a control for it.
+- A switch does not drop the previous source's forecast: it is served until the new source
+  publishes, and its origin says where it came from.
+
+---
+
 ## 2026-11-15 — External data providers: SignalR hubs on the web port, one session per kind, the tariff first
 
 **Found (#389, #386, #401).** Gleanvolt's read-only inputs (tariff, solar forecast, weather, the car)

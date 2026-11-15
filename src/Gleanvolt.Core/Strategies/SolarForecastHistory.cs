@@ -84,19 +84,25 @@ public sealed class SolarForecastHistory
     {
         ArgumentNullException.ThrowIfNull(timeZone);
 
-        SolarForecast snapshot;
-        lock (_gate)
+        if (Retained() is not { } snapshot)
         {
-            if (_retrievedAt is not { } retrievedAt)
-            {
-                return null;
-            }
-
-            snapshot = new SolarForecast(retrievedAt, [.. _periods.Values]);
+            return null;
         }
 
         var day = snapshot.ForDate(localDate, timeZone);
         return day.Periods.Count > 0 ? day : null;
+    }
+
+    /// <summary>
+    /// Every retained period as one immutable forecast, in period order, or <c>null</c> before the first
+    /// <see cref="Merge"/>. A copy: later merges do not change it, so it can be held and read without a lock.
+    /// </summary>
+    public SolarForecast? Retained()
+    {
+        lock (_gate)
+        {
+            return _retrievedAt is { } retrievedAt ? new SolarForecast(retrievedAt, [.. _periods.Values]) : null;
+        }
     }
 
     /// <summary>
