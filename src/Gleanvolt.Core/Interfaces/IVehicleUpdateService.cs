@@ -61,6 +61,13 @@ public interface IVehicleUpdateService
     VehicleSourceHealth Health { get; }
 
     /// <summary>
+    /// True for a feed that pushes its readings rather than being asked on a clock: an external
+    /// provider (#408). The polling worker leaves it alone, and it is asked only when somebody presses
+    /// <i>Ask the car</i> or a plan wants a fresh reading.
+    /// </summary>
+    bool IsPushed => false;
+
+    /// <summary>
     /// How long to wait before the next <see cref="FetchAsync"/>. Re-read after every fetch, so a
     /// service can back off after a failure and return to its natural cadence after a success.
     /// </summary>

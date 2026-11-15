@@ -1146,4 +1146,14 @@
   <data name="ForecastExternalIntro" xml:space="preserve">
     <value>Forecasted and Targeted plan by the forecast this provider publishes. Solcast is not called while External is selected; its account is kept for when you choose Solcast again. Until the provider sends its first forecast, the last one stays in use.</value>
   </data>
+  <data name="ExternalKindVehicle" xml:space="preserve">
+    <value>Car</value>
+  </data>
+  <data name="ExternalNeedsOwner" xml:space="preserve">
+    <value>The provider needs you: {0}</value>
+    <comment>{0} what the provider said, in English.</comment>
+  </data>
+  <data name="ExternalState_OffVehicle" xml:space="preserve">
+    <value>Off. Choose An external provider on the Car page, save and restart to turn it on.</value>
+  </data>
 </root>

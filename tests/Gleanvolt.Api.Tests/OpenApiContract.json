@@ -377,6 +377,7 @@
       "lastDataAt": "string(date-time)? (required)",
       "lastProblems": "array\u003Cstring\u003E (required)",
       "name": "string (required)",
+      "needsOwner": "boolean",
       "providerId": "string? (required)",
       "providerName": "string? (required)",
       "providerVersion": "string? (required)",
@@ -638,7 +639,8 @@
       "targetedPlan": "any (required)",
       "timestamp": "string(date-time) (required)",
       "tomorrowForecastWh": "number|string(double)? (required)",
-      "untilFull": "any"
+      "untilFull": "any",
+      "vehicleSource": "any"
     },
     "TargetedBlockResponse": {
       "end": "string(date-time) (required)",
@@ -779,6 +781,12 @@
       "stale": "boolean (required)",
       "vehicle": "any"
     },
+    "VehicleSourceResponse": {
+      "health": "$VehicleSourceState (required)",
+      "name": "string (required)",
+      "source": "string (required)"
+    },
+    "VehicleSourceState": "enum[ok|degraded|needsOwner]",
     "WeatherResponse": {
       "cloudsPercent": "number|string(double) (required)",
       "condition": "string (required)",

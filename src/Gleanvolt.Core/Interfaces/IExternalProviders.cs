@@ -66,6 +66,7 @@ public enum ExternalProviderState
 /// <param name="Healthy">What the provider last reported about itself, or null when it has not.</param>
 /// <param name="StatusMessage">Its message with that report.</param>
 /// <param name="Unanswered">True when the host's last request got no answer in time.</param>
+/// <param name="NeedsOwner">True when the provider said only the owner can fix what is wrong: a login, a consent screen.</param>
 public sealed record ExternalProviderStatus(
     string Kind,
     string Name,
@@ -81,4 +82,5 @@ public sealed record ExternalProviderStatus(
     IReadOnlyList<Phrase?>? LastProblemPhrases = null,
     bool? Healthy = null,
     string? StatusMessage = null,
-    bool Unanswered = false);
+    bool Unanswered = false,
+    bool NeedsOwner = false);

@@ -4,6 +4,71 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — The car as an external provider, with a sample (#408)
+
+**What.** A program outside Gleanvolt can now read the car and publish what it says: SOC, range, time
+to full, charge state and plug state. It is chosen on `/car` as *An external provider*
+(`VehicleFeed.External`, `Vehicle:External:Enabled`), connects to `/providers/vehicle` with the shared
+provider token, learns the car from the welcome, and publishes whenever the car changes. Everything that
+reads a car feed today (the Overview card, the band, Health, *Ask the car*, the HA **Car feed**,
+`VehicleSocBasis`) works with it unchanged.
+
+**How.**
+- Contracts (`Gleanvolt.Providers.Contracts.Vehicle`, kind `vehicle` 1.0): `IVehicleHub.Publish`,
+  `IVehicleClient.RefreshRequested`/`VehicleChanged`, `VehicleWelcome.Car` (`VehicleInfo`),
+  `VehicleReading` with its own `CarChargeState`/`CarPlugState`, mapped to Core's by name.
+- `ProviderStatus.NeedsOwner` (optional, every kind; tariff and solar-forecast go to 1.1), carried
+  through `ProviderSessions` to `ExternalProviderStatus.NeedsOwner`, the API's `needsOwner`, and the
+  panel, which shows it in red. It only counts with `Healthy = false`.
+- SDK: `AddGleanvoltVehicleProvider<T>`, `IVehicleSource.GetReadingAsync(VehicleInfo, …)`,
+  `VehicleProviderConnection.PublishNowAsync`.
+- Core: `VehicleReadingValidator` (capture time ≤ 5 min ahead, ≤ 30 days old, not older than the held
+  reading but equal allowed; SOC 0–100, range 0–2 000 km, time to full 0–48 h, known enums, at least
+  one of SOC/range/charge/plug); `IVehicleUpdateService.IsPushed` (default false); `VehicleFeed.External`
+  and `EvSettingKeys.ExternalEnabled`, resolved after the live feeds and before the Data Act portal.
+- Hosting: `VehicleHub` (validates, writes the holder with the provider's name as `SourceId`, tells
+  the feed) and `ExternalVehicleFeed` (`FetchAsync` sends `RefreshRequested` through `IHubContext`
+  and waits up to 60 s host-side for a publish quoting it; health from the session: Ok, Degraded for
+  waiting/disconnected/unhealthy/refused/no answer, NeedsOwner as reported). The composition root
+  refuses External beside Website/Skoda, sets the Data Act portal aside with a log line, registers the
+  kind always (off unless External is the feed). `VehicleUpdateWorker` skips pushed feeds and logs it
+  once. `EvEditor` refuses the combination at the form too.
+- API: `/status` gains `vehicleSource` (`source`, `name`, `health`); `/providers` gains `needsOwner`.
+- Web: `/car` offers the feed, its account section says no account is kept, *Ask the car* goes through
+  the feed, and the provider's `ExternalProviderPanel` is shown. Settings → External providers lists the
+  Car kind and links to `/car`; its *Off* sentence says the switch is on the Car page and takes a
+  restart. The panel's token link now goes to `/settings#external-providers`, so it works from `/car`.
+- `plugins/Gleanvolt.Plugin.VehicleSample`: one car charging 40 → 80 % at 1 %/3 min, range from the
+  welcome's pack; publishes on each step; `--simulate-login-expiry` reports `NeedsOwner` every fifth
+  step for one step. Not in the image or the release.
+
+**Hardware/runtime quirks.** None: nothing here touches Modbus, and the reading stays advisory. Two
+behaviours worth knowing: with the MQTT topic beside the provider, a provider reading older than the
+topic's is refused (and shown as a problem), as the issue specifies; and the feed choice takes a
+restart, unlike the tariff and forecast selections. Tested on TestServer over long polling, not yet
+against a live installation.
+
+**Tests.** `ExternalVehicleHubTests` (sample end to end, Ask → `RefreshRequested` → reply → Fresh,
+no answer → Degraded and the reading kept, NeedsOwner → `IsBlocked` and HA `car_feed`, refused reading,
+newest wins beside MQTT, disconnect, wire format with names and TimeSpan strings, disabled hello,
+worker leaves it alone), `VehicleReadingValidatorTests` (one per rule, equal and older capture times),
+`VehicleFeedRegistrationTests` (External + Website/Skoda refused, Data Act set aside, kind on/off),
+`ReadEndpointTests` (`vehicleSource`), `CarPageTests` and `ExternalProvidersFormTests`; OpenAPI
+contract regenerated.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/{Vehicle,Handshake,Tariff,SolarForecast}.cs`,
+`src/Gleanvolt.Providers.Client/Vehicle/VehicleProvider.cs`, `src/Gleanvolt.Providers.Server/ProviderSessions.cs`,
+`src/Gleanvolt.Core/{Configuration/VehicleReadingValidator,Interfaces/IVehicleUpdateService,Interfaces/IExternalProviders,Models/EvSettings}.cs`,
+`src/Gleanvolt.Hosting/Vehicles/External/{VehicleHub,ExternalVehicleFeed}.cs`,
+`src/Gleanvolt.Hosting/{GleanvoltHostingExtensions,Vehicles/VehicleUpdateWorker,Configuration/EvEditor}.cs`,
+`src/Gleanvolt.Api/{Contracts/StatusContracts,Contracts/ProviderContracts,Endpoints/StatusEndpoints}.cs`,
+`src/Gleanvolt.Web/Components/{Pages/Car.razor,CarEditorForm.razor,VehicleAccount.razor,ExternalProviderPanel.razor,ExternalProvidersForm.razor,ExternalProviderStateText.cs}`,
+`CarText`/`SettingsText`/`ServiceText` (.cs).resx, `plugins/Gleanvolt.Plugin.VehicleSample/*`,
+`Gleanvolt.slnx`, `.vscode/launch.json`, docs (`PROVIDERS`, `VEHICLE`, `SUPPORTED_EVS`, `HTTP_API`,
+`HOME_ASSISTANT`, `DECISIONS`), the manual's car and settings pages (en, cs) and screenshots.
+
+---
+
 ## 2026-11-15 — One token for every external provider (#406)
 
 **What.** Every external provider (plugin) now connects with one token instead of one per kind. It

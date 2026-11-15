@@ -1123,4 +1123,13 @@
   <data name="ForecastExternalIntro" xml:space="preserve">
     <value>Režimy Forecasted a Targeted plánují podle předpovědi, kterou posílá tento zdroj. Dokud je vybrána volba Externí, Solcast se nevolá; jeho účet zůstává uložený pro chvíli, kdy Solcast znovu vyberete. Než zdroj pošle první předpověď, platí ta poslední.</value>
   </data>
+  <data name="ExternalKindVehicle" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="ExternalNeedsOwner" xml:space="preserve">
+    <value>Zdroj potřebuje váš zásah: {0}</value>
+  </data>
+  <data name="ExternalState_OffVehicle" xml:space="preserve">
+    <value>Vypnuto. Zapne se volbou Externí zdroj dat na stránce Auto, uložením a restartem.</value>
+  </data>
 </root>

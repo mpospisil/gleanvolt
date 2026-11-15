@@ -90,11 +90,13 @@ installation's maximum could never charge, so it is **refused at startup**, nami
 | **volkswagen.de** | Volkswagen | ~20 s; plug state; live while charging | [`Vehicle:Website`](#volkswagende-vehiclewebsite) |
 | **MyŠkoda Public API** | Škoda | 5–15 min; plug state | [`Vehicle:Skoda`](#myškoda-vehicleskoda) |
 | **EU Data Act portal** | Audi, SEAT, Cupra, Bentley, VW commercial (and any VW Group car) | hours behind; no plug state | [`Vehicle:DataAct`](#eu-data-act-portal-vehicledataact) |
+| **An external provider** | any car a program can read | whenever the provider publishes | [`Vehicle:External`](#an-external-provider-vehicleexternal) |
 | **Your own MQTT topic** | any car Home Assistant can see | whatever publishes it | [`Vehicle`](#your-own-feed-over-mqtt-the-vehicle-section) |
 | **None** | any car | — | targets in kWh only |
 
 - `Vehicle:Website` and `Vehicle:Skoda` both enabled **stops startup**: an installation has one car.
-- With either of them configured, **the Data Act portal is not started** (one log line says so).
+  So does `Vehicle:External` beside either of them.
+- With any of them configured, **the Data Act portal is not started** (one log line says so).
 - The Data Act portal and your own MQTT topic *can* both run; the most recent reading wins.
 
 **The feed is advisory.** Nothing that writes to the charger or the inverter reads it, so a feed that
@@ -206,6 +208,37 @@ credentials are set and proves them; reading the portal on a clock waits for `En
   the controller. While it is stopped, a warning is logged every six hours. Ordinary failures — a 5xx,
   a timeout, an expired session, a delivery not filled yet — are *Degraded* and back off (to at most an
   hour) and clear themselves.
+
+### An external provider (`Vehicle:External`)
+
+For any car a program outside Gleanvolt can read: a Tesla over Bluetooth, another manufacturer's cloud,
+an OBD dongle. The program is an [external provider](PROVIDERS.md#the-vehicle-kind): it connects to
+Gleanvolt's web port at `/providers/vehicle` and publishes what the car says.
+
+1. On the **Car** page choose *An external provider*, save and restart.
+2. Give the provider Gleanvolt's address and the token from **Settings → External providers**.
+
+The Car page then shows the provider's session, when it last published and anything Gleanvolt
+refused. The provider learns the car (id, name, make, model, pack size) from Gleanvolt; the pack stays
+in the `Ev` section.
+
+| Key | Default | |
+|---|---|---|
+| `Enabled` | off | **Chooses the feed.** Written by the Car page |
+
+**It pushes.** Nothing polls the provider: it publishes whenever the car has something new, and
+Gleanvolt asks it only when you press *Ask the car* or a plan wants a fresh reading. A provider that
+doesn't answer within a minute leaves the feed *Degraded* until its next reading, and the last
+reading stays. `OnDemandOnly` changes nothing for it.
+
+**Health.** *Ok* while the provider is connected and its last reading was accepted. *Degraded* while
+it is disconnected (the reading ages as usual), when it reports a problem, or when a reading was
+refused. *NeedsOwner* when the provider says only you can fix it, such as an expired login: the band
+shows on every page until the provider reports it is fine again. There is no fallback to another
+feed.
+
+Your own MQTT topic may run beside it; the most recent reading wins, and the provider's older ones are
+refused.
 
 ### Your own feed over MQTT (the `Vehicle` section)
 

@@ -626,4 +626,23 @@
   <data name="PortalFailure_Transient" xml:space="preserve">
     <value>Temporary failure</value>
   </data>
+  <data name="FeedExternal" xml:space="preserve">
+    <value>An external provider</value>
+  </data>
+  <data name="FreshExternal" xml:space="preserve">
+    <value>as often as the provider publishes</value>
+  </data>
+  <data name="NoteExternal" xml:space="preserve">
+    <value>A program outside Gleanvolt reads the car and publishes what it says: any car, through its own app, cloud or dongle. Gleanvolt does not poll it; the provider publishes whenever the car has something new. The address and token it connects with are under Settings → External providers.</value>
+  </data>
+  <data name="AccountExternal" xml:space="preserve">
+    <value>Nothing signs in here: the provider signs in to the car's account itself, and Gleanvolt keeps no account for it. When its login expires, the provider says so and the Overview asks you to act.</value>
+  </data>
+  <data name="ExternalAskIntro" xml:space="preserve">
+    <value>Asks {0} for {1} once, now. The provider has a minute to answer, and its reading reaches the dashboard card. It also publishes on its own whenever the car has something new, so there is usually no need to ask.</value>
+    <comment>{0} the provider's name, {1} the car's name.</comment>
+  </data>
+  <data name="ExternalProvider" xml:space="preserve">
+    <value>External provider</value>
+  </data>
 </root>

@@ -100,6 +100,24 @@ public sealed class VehicleUpdateWorker : BackgroundService
             _logger.LogInformation("{SetAside}", _setAside);
         }
 
+        // A feed that pushes (#408) has nothing for a clock to ask: its provider publishes whenever the
+        // car has something new, and Ask the car or a plan is what sends it a request. Said once, so
+        // the log of an installation whose car arrives that way does not read as a feed that never runs.
+        foreach (var pushed in _services.Where(service => service.IsPushed))
+        {
+            _logger.LogInformation(
+                "The {Feed} feed for {Vehicle} pushes its readings; nothing polls it, and it is asked only "
+                + "when the web UI or a plan wants a fresh reading.",
+                pushed.DisplayName, pushed.VehicleId);
+        }
+
+        var polled = _services.Where(service => !service.IsPushed).ToList();
+
+        if (polled.Count == 0 && _services.Count > 0)
+        {
+            return;
+        }
+
         if (_services.Count == 0)
         {
             // The ordinary case, and deliberately not a warning: a car with no manufacturer feed
@@ -127,7 +145,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
                 + "recently is what the dashboard shows.");
         }
 
-        await Task.WhenAll(_services.Select(service => RunAsync(service, stoppingToken))).ConfigureAwait(false);
+        await Task.WhenAll(polled.Select(service => RunAsync(service, stoppingToken))).ConfigureAwait(false);
     }
 
     private async Task RunAsync(IVehicleUpdateService service, CancellationToken stoppingToken)

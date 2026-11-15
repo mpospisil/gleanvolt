@@ -16,7 +16,7 @@ the answer to the first does not depend on the second.
 | **Volkswagen, Audi, Škoda, SEAT, Cupra, Bentley** | Yes | **Built in**: the VW Group EU Data Act portal | VW ID.4 Pro |
 | **Volkswagen** (a car in myVolkswagen) | Yes | **Built in**: volkswagen.de, live while charging | VW ID.4 Pro |
 | **Škoda** (a car in MySkoda) | Yes | **Built in**: the MyŠkoda Public API, live | **Not yet** — built from the published spec |
-| **Any other brand** | Yes | No — targets are given in kWh instead of % | — |
+| **Any other brand** | Yes | Through an [external provider](#route-d--write-a-provider) or your own MQTT topic; otherwise targets are given in kWh instead of % | — |
 
 The reference installation charges a **VW ID.4 Pro** (77 kWh usable, three-phase, 16 A). It is the
 only car Gleanvolt has been run against. Everything else below is what the design and the charging
@@ -81,7 +81,7 @@ Reading the car adds three things and removes none:
 charger delivers it. Without a feed, every kWh target, every solar mode and every fast charge works
 unchanged.
 
-There are three routes, all built into Gleanvolt.
+There are three routes built into Gleanvolt, and a fourth for any other car: a provider of your own.
 
 ### Route A — VW Group EU Data Act portal (built in)
 
@@ -184,7 +184,28 @@ Most manufacturers' EU Data Act offerings do not yet meet that bar. What owners 
 | Renault | A paid commercial data service | No |
 | Porsche, Volvo, Mazda | Manual download requests | No |
 
-Until one of those becomes a continuous feed, those cars are charged but not read.
+Until one of those becomes a continuous feed, those cars are charged but not read by Gleanvolt itself.
+Route D below reads them anyway, from outside.
+
+### Route D — write a provider
+
+Any car can be read without new code in Gleanvolt: a program outside it reads the car however it can
+and publishes what the car says over Gleanvolt's [external provider](PROVIDERS.md#the-vehicle-kind)
+contract. A Tesla over Bluetooth ([issue #194](https://github.com/mpospisil/gleanvolt/issues/194)), a
+Hyundai or Kia cloud, an OBD dongle, a community scraper: each is a provider, not a change to Gleanvolt.
+The same route lets a Škoda ([issue #193](https://github.com/mpospisil/gleanvolt/issues/193)) be read
+some other way than Route C, if MyŠkoda's API doesn't suit.
+
+| | |
+|---|---|
+| **Choose it** | On the **Car** page: *An external provider*, save, restart |
+| **Connects with** | The token under **Settings → External providers**, at `/providers/vehicle` |
+| **Freshness** | Whatever the provider publishes; Gleanvolt doesn't poll it |
+| **Gives** | Whatever the provider sends: SOC, range, time to full, charge state, plug state |
+| **Owner action** | The provider reports an expired login as *needs owner*, and the Overview asks you to act |
+| **Write one** | `Gleanvolt.Providers.Client` (MIT) in .NET, or any SignalR client; start from [`plugins/Gleanvolt.Plugin.VehicleSample`](../plugins/Gleanvolt.Plugin.VehicleSample) |
+
+Gleanvolt sends no commands to the car through it, and a provider that stops only lets the reading age.
 
 ---
 

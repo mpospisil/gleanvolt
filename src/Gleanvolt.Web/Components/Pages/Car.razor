@@ -132,6 +132,29 @@ else if (_runningFeed is VehicleFeed.Volkswagen or VehicleFeed.Skoda)
         </p>
     }
 }
+else if (_runningFeed == VehicleFeed.External)
+{
+    @*
+        An external provider (#408): it publishes on its own, so the button is the exception rather
+        than the way the car is read. The panel is the provider's session and its last problems, the
+        same one Settings shows for the tariff and the forecast; the token is on Settings.
+    *@
+    @if (Feed.Service is { } provider)
+    {
+        <p class="muted" id="car-ask-external">
+            @Localized.Format(CarText.ExternalAskIntro, provider.DisplayName, CarName)
+        </p>
+
+        <div class="actions">
+            <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="AskFeedAsync">
+                @(_busy ? CarText.AskingTheCar : CarText.AskTheCar)
+            </button>
+        </div>
+    }
+
+    <h3 id="car-external">@CarText.ExternalProvider</h3>
+    <ExternalProviderPanel Kind="vehicle" />
+}
 else if (_runningFeed == VehicleFeed.OwnTopic)
 {
     <p class="muted" id="car-ask-own-topic">

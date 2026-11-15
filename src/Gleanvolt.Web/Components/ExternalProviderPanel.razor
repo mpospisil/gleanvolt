@@ -29,7 +29,7 @@
         @* One token for every kind (#406): made and shown in the External providers section. *@
         <p class="@(status.HasToken ? "muted" : "warning")" id="external-@(status.Kind)-token-state">
             @Localized.Rich(status.HasToken ? SettingsText.ExternalTokenShared : SettingsText.ExternalTokenSharedMissing,
-                @<a href="#external-providers">@SettingsText.ExternalProviders</a>)
+                @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)
         </p>
 
         <h3>@SettingsText.ExternalStatus</h3>
@@ -49,7 +49,9 @@
 
         @if (status.Healthy == false)
         {
-            <p class="warning" id="external-@(status.Kind)-unhealthy">@Localized.Format(SettingsText.ExternalUnhealthy, status.StatusMessage ?? string.Empty)</p>
+            <p class="@(status.NeedsOwner ? "error" : "warning")" id="external-@(status.Kind)-unhealthy">
+                @Localized.Format(status.NeedsOwner ? SettingsText.ExternalNeedsOwner : SettingsText.ExternalUnhealthy, status.StatusMessage ?? string.Empty)
+            </p>
         }
 
         @if (status.LastProblem is { Count: > 0 } problems)

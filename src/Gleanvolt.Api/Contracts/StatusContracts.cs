@@ -1,4 +1,5 @@
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
 
@@ -60,6 +61,11 @@ namespace Gleanvolt.Api.Contracts;
 /// external provider by name. Null while no forecast is held, and in the status a control action
 /// answers with: read it from GET /status.
 /// </param>
+/// <param name="VehicleSource">
+/// The feed the car's readings come from (issue #408): its source (<c>external</c> for an external
+/// provider) and its name. Null when no feed reads the car, and in the status a control action answers
+/// with: read it from GET /status.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -88,9 +94,11 @@ public sealed record StatusResponse(
     FastChargeResponse? FastCharge = null,
     LowTariffStatusResponse? LowTariff = null,
     UntilFullStatusResponse? UntilFull = null,
-    ForecastOriginResponse? Forecast = null)
+    ForecastOriginResponse? Forecast = null,
+    VehicleSourceResponse? VehicleSource = null)
 {
-    internal static StatusResponse From(ChargeControlStatus status, SolarForecastSnapshot? forecast = null) => new(
+    internal static StatusResponse From(
+        ChargeControlStatus status, SolarForecastSnapshot? forecast = null, IVehicleUpdateService? vehicleFeed = null) => new(
         status.Timestamp,
         status.Mode,
         status.State,
@@ -122,8 +130,18 @@ public sealed record StatusResponse(
         status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null,
         status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null,
         status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null,
-        forecast is { } held ? new ForecastOriginResponse(held.Origin.SourceId, held.Origin.Name, held.Forecast.RetrievedAt, held.ReceivedAt) : null);
+        forecast is { } held ? new ForecastOriginResponse(held.Origin.SourceId, held.Origin.Name, held.Forecast.RetrievedAt, held.ReceivedAt) : null,
+        vehicleFeed is { } feed ? new VehicleSourceResponse(feed.Manufacturer, feed.DisplayName, feed.Health.State) : null);
 }
+
+/// <summary>The feed the car is read from.</summary>
+/// <param name="Source">
+/// Which feed: <c>external</c> for an external provider, else the manufacturer feed's id
+/// (<c>vw-website</c>, <c>skoda</c>, <c>vw-group</c>). For display and monitoring; it may grow.
+/// </param>
+/// <param name="Name">What to show for it: "volkswagen.de", "MyŠkoda", or the external provider's name.</param>
+/// <param name="Health">Whether it can currently produce a reading.</param>
+public sealed record VehicleSourceResponse(string Source, string Name, VehicleSourceState Health);
 
 /// <summary>Where the solar forecast came from.</summary>
 /// <param name="Source">The forecast source: <c>solcast</c> or <c>external</c>, as <c>SolarForecast:Source</c> names them.</param>

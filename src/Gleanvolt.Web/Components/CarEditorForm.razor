@@ -211,6 +211,7 @@
         [EvSettingKeys.DataActPassword] = CarText.FieldPassword,
         [EvSettingKeys.DataActVin] = CarText.FieldVin,
         [EvSettingKeys.MqttEnabled] = CarText.FieldOwnTopic,
+        [EvSettingKeys.ExternalEnabled] = CarText.FeedExternal,
     };
 
     private static Dictionary<string, string> Hints => new(StringComparer.OrdinalIgnoreCase)
@@ -468,6 +469,7 @@
         VehicleFeed.Skoda => "Škoda",
         VehicleFeed.DataAct => CarText.FeedDataAct,
         VehicleFeed.OwnTopic => CarText.FeedOwnTopic,
+        VehicleFeed.External => CarText.FeedExternal,
         _ => CarText.FeedNone,
     };
 
@@ -477,6 +479,7 @@
         VehicleFeed.Skoda => CarText.FreshSkoda,
         VehicleFeed.DataAct => CarText.FreshDataAct,
         VehicleFeed.OwnTopic => CarText.FreshOwnTopic,
+        VehicleFeed.External => CarText.FreshExternal,
         _ => CarText.FreshNone,
     };
 
@@ -490,6 +493,8 @@
             CarText.NoteDataAct,
         VehicleFeed.OwnTopic =>
             CarText.NoteOwnTopic,
+        VehicleFeed.External =>
+            CarText.NoteExternal,
         _ =>
             CarText.NoteNone,
     };

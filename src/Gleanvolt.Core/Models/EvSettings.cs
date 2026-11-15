@@ -47,6 +47,12 @@ public static class EvSettingKeys
     public const string DataActPassword = "Vehicle:DataAct:Password";
     public const string DataActVin = "Vehicle:DataAct:Vin";
 
+    /// <summary>
+    /// Whether an external provider reads the car (#408): a program outside Gleanvolt that connects to
+    /// <c>/providers/vehicle</c> with the provider token and publishes what the car says.
+    /// </summary>
+    public const string ExternalEnabled = "Vehicle:External:Enabled";
+
     /// <summary>Whether the owner's own MQTT topic is subscribed to at all — <c>VehicleOptions.Enabled</c>.</summary>
     public const string MqttEnabled = "Vehicle:Enabled";
 
@@ -65,6 +71,7 @@ public static class EvSettingKeys
         WebsiteEnabled, WebsiteUsername, WebsitePassword, WebsiteVin,
         SkodaEnabled, SkodaVin,
         DataActEnabled, DataActBrand, DataActClientId, DataActUsername, DataActPassword, DataActVin,
+        ExternalEnabled,
         MqttEnabled, TelemetryTopic,
     ];
 
@@ -120,6 +127,12 @@ public enum VehicleFeed
 
     /// <summary>A topic the owner publishes themselves (<c>Vehicle</c>).</summary>
     OwnTopic,
+
+    /// <summary>
+    /// An external provider (<c>Vehicle:External</c>, #408): any car, read by a program outside
+    /// Gleanvolt. Its address and token are on Settings → External providers.
+    /// </summary>
+    External,
 }
 
 /// <summary>
@@ -133,7 +146,7 @@ public static class VehicleFeeds
     public static IReadOnlyList<VehicleFeed> All { get; } =
     [
         VehicleFeed.Volkswagen, VehicleFeed.Skoda, VehicleFeed.DataAct,
-        VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly,
+        VehicleFeed.External, VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly,
     ];
 
     /// <summary>The key that switches this feed on, or null for <see cref="VehicleFeed.ChargeOnly"/>.</summary>
@@ -142,6 +155,7 @@ public static class VehicleFeeds
         VehicleFeed.Volkswagen => EvSettingKeys.WebsiteEnabled,
         VehicleFeed.Skoda => EvSettingKeys.SkodaEnabled,
         VehicleFeed.DataAct => EvSettingKeys.DataActEnabled,
+        VehicleFeed.External => EvSettingKeys.ExternalEnabled,
         VehicleFeed.OwnTopic => EvSettingKeys.MqttEnabled,
         _ => null,
     };
@@ -180,8 +194,8 @@ public static class VehicleFeeds
     /// <summary>The feed the configuration in <paramref name="isEnabled"/> selects.</summary>
     /// <param name="isEnabled">Answers whether an <c>Enabled</c> key reads true.</param>
     /// <remarks>
-    /// The order is the one the composition root resolves in (issue #212): a live feed wins over the
-    /// Data Act portal, which is set aside rather than run beside it. Two live feeds cannot both be on
+    /// The order is the one the composition root resolves in (issue #212): a live feed, or an external
+    /// provider (#408), wins over the Data Act portal, which is set aside rather than run beside it. Two live feeds cannot both be on
     /// — startup refuses that outright — so which of them is named first here never arises through this
     /// page; it matters only for an <c>.env</c> that already holds both, where naming the one that runs
     /// is better than naming neither.
@@ -190,7 +204,7 @@ public static class VehicleFeeds
     {
         ArgumentNullException.ThrowIfNull(isEnabled);
 
-        foreach (var feed in (VehicleFeed[])[VehicleFeed.Volkswagen, VehicleFeed.Skoda, VehicleFeed.DataAct, VehicleFeed.OwnTopic])
+        foreach (var feed in (VehicleFeed[])[VehicleFeed.Volkswagen, VehicleFeed.Skoda, VehicleFeed.External, VehicleFeed.DataAct, VehicleFeed.OwnTopic])
         {
             if (isEnabled(EnabledKey(feed)!))
             {

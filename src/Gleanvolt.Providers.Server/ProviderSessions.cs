@@ -99,6 +99,7 @@ public sealed class ProviderSessions
                 Since = _time.GetUtcNow(),
                 Healthy = null,
                 StatusMessage = null,
+                NeedsOwner = false,
                 Unanswered = false,
             };
         }
@@ -208,7 +209,8 @@ public sealed class ProviderSessions
     {
         lock (_gate)
         {
-            _status = _status with { Healthy = status.Healthy, StatusMessage = status.Message };
+            // Only an unhealthy provider can need its owner: "healthy, and needs you" is read as healthy.
+            _status = _status with { Healthy = status.Healthy, StatusMessage = status.Message, NeedsOwner = !status.Healthy && status.NeedsOwner };
         }
 
         Changed?.Invoke();

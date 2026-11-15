@@ -8,7 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Providers.Client</PackageId>
     <Description>Write an external data provider for Gleanvolt (#386): connects to Gleanvolt over SignalR, says hello after every reconnect, backs off after a refusal, and answers the host's requests. A provider is an ordinary worker service. MIT, so a provider can be written under any licence.</Description>
-    <PackageTags>gleanvolt;signalr;provider;tariff;solar-forecast</PackageTags>
+    <PackageTags>gleanvolt;signalr;provider;tariff;solar-forecast;vehicle</PackageTags>
 
     <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
     <GleanvoltMitPackage>true</GleanvoltMitPackage>

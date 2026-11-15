@@ -1,6 +1,6 @@
 ---
 title: Your car and its battery level
-description: Tell Gleanvolt about your car, and let it read the car's battery level from Volkswagen, Škoda or the VW Group portal.
+description: Tell Gleanvolt about your car, and let it read the car's battery level from Volkswagen, Škoda, the VW Group portal or a program of your own.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -124,10 +124,45 @@ If the portal shows a new consent screen or asks for a code, Gleanvolt stops rea
 Sign in to the portal in a browser, deal with it there, and restart Gleanvolt.
 
 </TabItem>
+<TabItem label="Through another program">
+
+Any car can be read by a program outside Gleanvolt that reads it however it can: through its own app or
+cloud, over Bluetooth, or from a dongle in the car. This is **An external provider**. Somebody has to
+write or install that program; Gleanvolt does not come with one. Developers can find how to write one
+in [the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind).
+
+<Steps>
+
+1. On the **Car** page, choose **An external provider** under **What reads this car**. Press **Save**,
+   then **Restart**.
+
+   ![The Car page with An external provider chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
+
+2. Open **Settings**. Under **External providers**, press **Make a token**, then **Copy**. If a token is
+   already there because another program uses it, copy that one: every program uses the same token.
+
+3. Give the program the **Gleanvolt address** and the token.
+
+4. Back on the **Car** page, **External provider** says when the program connected and when its last
+   reading arrived. The Overview's car card names it too.
+
+   ![The Car page's External provider section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
+
+</Steps>
+
+- **The program sends readings when the car changes.** Gleanvolt doesn't ask it on a clock. **Ask the
+  car** asks it once, and it has a minute to answer.
+- **If the program disconnects**, the last reading stays and gets older, as with any feed. Gleanvolt
+  doesn't switch to another feed by itself.
+- **If the program's login to the car's account expires**, the program can say so: a band across every
+  page asks you to deal with it, and it goes away when the program reports it is fine again.
+- **Gleanvolt never sends the car anything** through it: no start, no stop, no charge limit.
+
+</TabItem>
 <TabItem label="Other cars">
 
 Choose **Another manufacturer — charge only**. Charging works exactly the same; you ask for a charge in
-kWh rather than in percent.
+kWh rather than in percent. If a program can read your car, see **Through another program**.
 
 If Home Assistant can see your car's battery level, it can pass it on to Gleanvolt. That is described in
 the repository, with the other advanced integrations.

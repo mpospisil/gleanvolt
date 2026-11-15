@@ -1,6 +1,6 @@
 ---
 title: Auto a stav jeho baterie
-description: Řekněte Gleanvoltu o svém autě a nechte ho číst stav baterie od Volkswagenu, Škody nebo z portálu VW Group.
+description: Řekněte Gleanvoltu o svém autě a nechte ho číst stav baterie od Volkswagenu, Škody, z portálu VW Group nebo z vlastního programu.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -125,10 +125,46 @@ Pokud portál ukáže novou obrazovku se souhlasem nebo bude chtít kód, Gleanv
 vám to. Přihlaste se do portálu v prohlížeči, vyřešte to tam a Gleanvolt restartujte.
 
 </TabItem>
+<TabItem label="Přes jiný program">
+
+Jakékoli auto může číst program mimo Gleanvolt, který ho čte, jak to jde: přes aplikaci nebo cloud
+výrobce, přes Bluetooth nebo z adaptéru v autě. To je **Externí zdroj dat**. Takový program musí někdo
+napsat nebo nainstalovat; Gleanvolt žádný nemá. Vývojáři najdou postup v
+[příručce pro zdroje dat](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind) (anglicky).
+
+<Steps>
+
+1. Na stránce **Auto** zvolte u **Odkud se čtou údaje auta** možnost **Externí zdroj dat**. Stiskněte
+   **Uložit** a pak **Restartovat**.
+
+   ![Stránka Auto se zvoleným externím zdrojem dat a pod tím údaje o autě.](../../../../assets/screenshots/car-external.png)
+
+2. Otevřete **Nastavení**. V části **Externí zdroje dat** stiskněte **Vytvořit token** a pak
+   **Kopírovat**. Pokud tam token už je, protože ho používá jiný program, zkopírujte ten: všechny
+   programy používají stejný token.
+
+3. Předejte programu **Adresu Gleanvoltu** a token.
+
+4. Zpátky na stránce **Auto** část **Externí zdroj dat** říká, kdy se program připojil a kdy přišel jeho
+   poslední údaj. Jmenuje ho i karta auta na **Přehledu**.
+
+   ![Část Externí zdroj dat na stránce Auto: hub, ke kterému se program připojuje, a připojený program Vehicle sample.](../../../../assets/screenshots/car-external-provider.png)
+
+</Steps>
+
+- **Program posílá údaje, když se auto změní.** Gleanvolt se ho pravidelně neptá. **Zeptat se auta**
+  se ho zeptá jednou a program má na odpověď minutu.
+- **Když se program odpojí**, poslední údaj zůstává a stárne, jako u každého zdroje. Gleanvolt sám
+  nepřepne na jiný zdroj.
+- **Když programu vyprší přihlášení k účtu auta**, program to může nahlásit: pruh na každé stránce vás
+  požádá o zásah a zmizí, až program nahlásí, že je zase v pořádku.
+- **Gleanvolt autu přes něj nic neposílá**: žádné spuštění, zastavení ani limit nabití.
+
+</TabItem>
 <TabItem label="Ostatní auta">
 
 Zvolte **Jiný výrobce — jen nabíjení**. Nabíjení funguje úplně stejně; jen ho zadáváte v kWh místo
-v procentech.
+v procentech. Pokud vaše auto umí číst nějaký program, viz **Přes jiný program**.
 
 Pokud stav baterie vašeho auta vidí Home Assistant, může ho Gleanvoltu předávat. To je popsané
 v repozitáři, spolu s dalšími pokročilými propojeními.

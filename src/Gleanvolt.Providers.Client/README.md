@@ -2,7 +2,7 @@
 
 Write an external data provider for [Gleanvolt](https://github.com/mpospisil/gleanvolt). A provider is
 a separate process that connects to Gleanvolt's web port and supplies data Gleanvolt would otherwise
-get from a built-in source: the low tariff, or the solar forecast.
+get from a built-in source: the low tariff, the solar forecast, or the car's telemetry.
 
 ```csharp
 var builder = Host.CreateApplicationBuilder(args);

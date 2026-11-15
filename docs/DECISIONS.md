@@ -4,6 +4,46 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-15 — The car as an external provider: a feed that pushes, and `NeedsOwner` on every kind's status (#408)
+
+**Found.** Every car Gleanvolt can read so far needed code in Gleanvolt: a client per manufacturer
+(#170, #193, #140) or the owner's own MQTT topic. Tesla over BLE (#194), Hyundai/Kia clouds and OBD
+dongles each want a different stack, none of which belongs in the controller. The provider framework
+(#386) already carries the tariff and the solar forecast from outside. The car differs from both in
+two ways: its data arrives when the car changes, not on a schedule, and its commonest failure is a
+login only the owner can renew, which the framework's `Healthy = false` could not tell apart from a
+cloud that is merely down.
+
+**Decided.**
+- **External is a feed, not a new path.** `ExternalVehicleFeed` is one more `IVehicleUpdateService`
+  in `ConfiguredVehicleFeed`, chosen on `/car` as `VehicleFeed.External` (`Vehicle:External:Enabled`)
+  and, like every feed choice, applied at a restart. The Overview card, the feed band, Health, *Ask the
+  car*, the HA **Car feed** and `VehicleSocBasis` needed no change. One car, one feed: it is refused
+  beside `Vehicle:Website` or `Vehicle:Skoda` (startup and the `/car` form), sets the Data Act portal
+  aside, and may run beside the owner's MQTT topic, where the newest `CapturedAt` wins.
+- **Push, not poll.** `IVehicleUpdateService.IsPushed` (default false) tells `VehicleUpdateWorker` to
+  leave the feed alone; it logs that once. `FetchAsync` runs only for *Ask the car* or a plan: it sends
+  `RefreshRequested` through `IHubContext` and waits up to 60 s **host-side** for a publish quoting the
+  id. The hub never awaits; a missed answer ends `Degraded` "didn't answer" and keeps the reading.
+- **A reading is validated against the holder.** `VehicleReadingValidator` (Core) refuses an older
+  `CapturedAt` than the one held, from any feed, but accepts the same one: an unchanged car is a valid
+  answer to a refresh. With the MQTT topic beside it, a provider can therefore be refused for being
+  behind the topic; that is shown as a problem, not hidden.
+- **`ProviderStatus.NeedsOwner`**, an optional field, default false, for every kind: tariff and
+  solar-forecast go to contract 1.1, vehicle starts at 1.0 with it. It counts only with
+  `Healthy = false`. For the car it maps to `VehicleSourceState.NeedsOwner`, so an expired login on the
+  provider's side shows the sign-in band and sets **Car feed** = `NeedsOwner`; `Healthy = false` alone
+  is `Degraded`. The panel shows it in red for every kind.
+- **Read-only and advisory.** No commands to the car. Nothing that writes to hardware reads it, and
+  no fallback to a built-in feed while the provider is away.
+
+**Consequences accepted.** Choosing External takes a restart, unlike the tariff and the forecast,
+because the feed is composed at startup with the other feeds. `VehicleChanged` exists in the contract
+but is never sent yet: the car is read at start, so a change arrives as a new welcome. A disconnected
+provider leaves the Overview showing an ageing reading and a `Degraded` feed, never a different source.
+
+---
+
 ## 2026-11-15 — One token for every external provider (reverses #386's token per kind)
 
 **Found (#406).** With a second kind (#388), the token per kind that #386 chose meant a token to make,

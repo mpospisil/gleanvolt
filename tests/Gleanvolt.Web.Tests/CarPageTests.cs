@@ -32,6 +32,9 @@ public class CarPageTests : PageTest
 
     private readonly FakeEvEditor _editor = new();
 
+    /// <summary>The external providers' sessions, for the External feed's panel (#408).</summary>
+    private readonly FakeExternalProviders _providers = new();
+
     /// <summary>Now, for the reading ages the card prints (#178). Two hours after <see cref="Reported"/>.</summary>
     private readonly FixedTimeProvider _time =
         new(new DateTimeOffset(2026, 9, 2, 12, 29, 46, TimeSpan.Zero), Prague);
@@ -57,6 +60,7 @@ public class CarPageTests : PageTest
     {
         Services.AddSingleton<IEvEditor>(_editor);
         Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
+        Services.AddSingleton<IExternalProviders>(_providers);
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -218,6 +222,7 @@ public class CarPageTests : PageTest
     [InlineData(VehicleFeed.Skoda)]
     [InlineData(VehicleFeed.DataAct)]
     [InlineData(VehicleFeed.OwnTopic)]
+    [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void There_is_one_h1_and_it_precedes_every_h2(VehicleFeed feed)
     {
@@ -239,6 +244,7 @@ public class CarPageTests : PageTest
     [InlineData(VehicleFeed.Skoda)]
     [InlineData(VehicleFeed.DataAct)]
     [InlineData(VehicleFeed.OwnTopic)]
+    [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void Every_feed_gets_an_account_section_with_a_sentence_in_it(VehicleFeed feed)
     {
@@ -260,6 +266,7 @@ public class CarPageTests : PageTest
     [InlineData(VehicleFeed.Volkswagen)]
     [InlineData(VehicleFeed.Skoda)]
     [InlineData(VehicleFeed.OwnTopic)]
+    [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void No_other_feed_is_told_a_data_act_portal_is_not_configured(VehicleFeed feed)
     {
@@ -279,6 +286,7 @@ public class CarPageTests : PageTest
     [InlineData(VehicleFeed.Skoda)]
     [InlineData(VehicleFeed.DataAct)]
     [InlineData(VehicleFeed.OwnTopic)]
+    [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void A_render_never_signs_in_submits_or_fetches(VehicleFeed feed)
     {
@@ -468,6 +476,7 @@ public class CarPageTests : PageTest
     [Theory]
     [InlineData(VehicleFeed.DataAct, "signs in on every read")]
     [InlineData(VehicleFeed.OwnTopic, "you publish the readings yourself")]
+    [InlineData(VehicleFeed.External, "the provider signs in to the car's account itself")]
     [InlineData(VehicleFeed.ChargeOnly, "nothing reads this car")]
     public void A_feed_with_no_session_says_so_in_its_own_terms(VehicleFeed feed, string expected)
     {
@@ -489,6 +498,64 @@ public class CarPageTests : PageTest
 
         Assert.Contains("nothing to sign in to", page.Find("#account-none").TextContent);
         Assert.Empty(page.FindAll("#account-signin"));
+    }
+
+    // ---------------------------------------------------------------- an external provider (#408)
+
+    [Fact]
+    public void An_external_provider_shows_its_session_and_is_asked_through_the_feed()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            "vehicle-sample", "Vehicle sample", "1.0", Since: Reported, LastDataAt: Reported));
+        var refresh = new FakeVehicleStateRefresh(new VehicleState(Reported, SocPercent: 52, SourceId: "Vehicle sample"));
+        _refresh = refresh;
+        Services.AddSingleton<IVehicleUpdateService>(new ExternalStubFeed());
+
+        var page = Page(feed: VehicleFeed.External);
+
+        Assert.Contains("Vehicle sample", page.Find("#car-ask-external").TextContent);
+        Assert.Contains("Vehicle sample", page.Find("#external-vehicle-state").TextContent);
+        Assert.Contains("/providers/vehicle", page.Find("#external-vehicle-hub").TextContent);
+
+        page.Find("#car-ask").Click();
+
+        Assert.Equal(1, refresh.Asks);
+        Assert.Contains("52%", page.Find("#car").TextContent);
+    }
+
+    [Fact]
+    public void An_external_provider_that_needs_its_owner_says_so_on_its_panel()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            "vehicle-sample", "Vehicle sample", "1.0", Since: Reported,
+            Healthy: false, StatusMessage: "The login expired.", NeedsOwner: true));
+        Services.AddSingleton<IVehicleUpdateService>(new ExternalStubFeed());
+
+        var page = Page(feed: VehicleFeed.External);
+
+        var line = page.Find("#external-vehicle-unhealthy");
+        Assert.Contains("needs you: The login expired.", line.TextContent);
+        Assert.Contains("error", line.ClassList);
+    }
+
+    private sealed class ExternalStubFeed : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "external";
+
+        public string DisplayName => "Vehicle sample";
+
+        public bool IsPushed => true;
+
+        public VehicleSourceHealth Health { get; } = VehicleSourceHealth.Ok("Vehicle sample is connected");
+
+        public TimeSpan NextDelay => Timeout.InfiniteTimeSpan;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("A render must never fetch.");
     }
 
     // ---------------------------------------------------------------- asking a live feed (#227)

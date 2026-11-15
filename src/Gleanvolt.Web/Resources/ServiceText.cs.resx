@@ -643,4 +643,70 @@
   <data name="SolarForecast_UnknownSource" xml:space="preserve">
     <value>{0} není zdroj předpovědi solární energie.</value>
   </data>
+  <data name="ExternalVehicle_Waiting" xml:space="preserve">
+    <value>čeká se, až se připojí externí zdroj dat o autě</value>
+  </data>
+  <data name="ExternalVehicle_Disconnected" xml:space="preserve">
+    <value>externí zdroj dat o autě je odpojený, údaj je z {0} {1}</value>
+  </data>
+  <data name="ExternalVehicle_DisconnectedNoReading" xml:space="preserve">
+    <value>externí zdroj dat o autě je odpojený a zatím neposlal žádný údaj</value>
+  </data>
+  <data name="ExternalVehicle_ProviderNeedsOwner" xml:space="preserve">
+    <value>{0} potřebuje váš zásah: {1}</value>
+  </data>
+  <data name="ExternalVehicle_NeedsOwner" xml:space="preserve">
+    <value>{0} potřebuje váš zásah: {1}</value>
+  </data>
+  <data name="ExternalVehicle_ProviderUnhealthy" xml:space="preserve">
+    <value>{0} nemůže auto načíst: {1}</value>
+  </data>
+  <data name="ExternalVehicle_Refused" xml:space="preserve">
+    <value>Poslední údaj od {0} byl odmítnut; problémy jsou vypsané na stránce Auto.</value>
+  </data>
+  <data name="ExternalVehicle_NoReadingYet" xml:space="preserve">
+    <value>{0} je připojený a zatím neposlal žádný údaj</value>
+  </data>
+  <data name="ExternalVehicle_Connected" xml:space="preserve">
+    <value>{0} je připojený</value>
+  </data>
+  <data name="ExternalVehicle_NoAnswer" xml:space="preserve">
+    <value>{0} neodpověděl do {1}</value>
+  </data>
+  <data name="ExternalVehicle_AskFailed" xml:space="preserve">
+    <value>{0} se nepodařilo zeptat: {1}</value>
+  </data>
+  <data name="Vehicle_NoCaptureTime" xml:space="preserve">
+    <value>Údaj nemá čas pořízení.</value>
+  </data>
+  <data name="Vehicle_Future" xml:space="preserve">
+    <value>Údaj je pořízený {0} {1}, víc než {2} před hodinami Gleanvoltu.</value>
+  </data>
+  <data name="Vehicle_TooOld" xml:space="preserve">
+    <value>Údaj je pořízený {0}, před víc než {1}.</value>
+  </data>
+  <data name="Vehicle_OlderThanHeld" xml:space="preserve">
+    <value>Údaj je starší než ten, který Gleanvolt má, pořízený {0} {1}.</value>
+  </data>
+  <data name="Vehicle_Soc" xml:space="preserve">
+    <value>SOC je {0}; musí být 0 až 100 %.</value>
+  </data>
+  <data name="Vehicle_Range" xml:space="preserve">
+    <value>Dojezd je {0} m; musí být 0 až 2 000 km, posílaný v metrech.</value>
+  </data>
+  <data name="Vehicle_TimeRemaining" xml:space="preserve">
+    <value>Čas do nabití je {0}; musí být 0 až {1}.</value>
+  </data>
+  <data name="Vehicle_UnknownChargeState" xml:space="preserve">
+    <value>Stav nabíjení {0} Gleanvolt nezná.</value>
+  </data>
+  <data name="Vehicle_UnknownPlugState" xml:space="preserve">
+    <value>Stav kabelu {0} Gleanvolt nezná.</value>
+  </data>
+  <data name="Vehicle_Empty" xml:space="preserve">
+    <value>Údaj nic neříká: potřebuje aspoň jedno z SOC, dojezdu, stavu nabíjení nebo stavu kabelu.</value>
+  </data>
+  <data name="Config_ExternalAndLiveFeed" xml:space="preserve">
+    <value>Vehicle:External by byl zapnutý vedle živého zdroje výrobce. Instalace čte auto z jednoho zdroje.</value>
+  </data>
 </root>

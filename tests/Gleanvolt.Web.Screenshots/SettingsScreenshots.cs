@@ -79,6 +79,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Services.AddSingleton<IExternalProviders>(_providers);
         _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: false, ExternalProviderState.Off));
         _providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false, ExternalProviderState.Off));
+        _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", HasToken: false, ExternalProviderState.Off));
         Services.AddSingleton<ISolarForecastSourceSelection>(_forecastSources);
         Services.AddSingleton<IIntegrationsEditor>(_integrations);
         Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
@@ -149,6 +150,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
         _providers.Set(new ExternalProviderStatus(
             "solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: true, ExternalProviderState.Waiting));
+        _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Off));
         _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
 
         Capture(RenderPage<PvSystem>("/settings"), "settings-external-providers", selector: "#external-providers");
@@ -193,7 +195,67 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Capture(page, "car-sign-in-code", selector: "#account");
     }
 
+    /// <summary>The car read by an external provider (#408): the feed chosen, and its session on the Car page.</summary>
+    [Fact]
+    public void The_car_page_with_an_external_provider()
+    {
+        ExternalCar();
+
+        Capture(RenderPage<Car>("/car"), "car-external", selector: "#car-editor");
+    }
+
+    [Fact]
+    public void The_external_car_providers_session()
+    {
+        ExternalCar();
+
+        Capture(RenderPage<Car>("/car"), "car-external-provider", selector: "#external-vehicle");
+    }
+
     private const string Main = "main.content";
+
+    private void ExternalCar()
+    {
+        _car.RunningFeed = VehicleFeed.External;
+        _car.Running[EvSettingKeys.ExternalEnabled] = "true";
+        _car.Running[EvSettingKeys.Id] = "model3";
+        _car.Running[EvSettingKeys.Name] = "The Model 3";
+        _car.Running[EvSettingKeys.Make] = "Tesla";
+        _car.Running[EvSettingKeys.Model] = "Model 3 RWD";
+        _car.Running[EvSettingKeys.BatteryCapacityKWh] = "57.5";
+        _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "vehicle-sample", ProviderName: "Vehicle sample", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-2), LastDataAt: Now.AddMinutes(-3)));
+
+        var car = new EvInfo("model3", "The Model 3", "Tesla", "Model 3 RWD", 57_500, 0.9, 3, 6, 16, string.Empty);
+        Services.AddSingleton(car);
+        Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, car));
+        Services.AddSingleton<IVehicleAccountSignIn>(new NoVehicleAccountSignIn());
+        Services.AddSingleton<IVehiclePortalReader>(new NoPortal());
+        Services.AddSingleton<IVehicleStateRefresh>(new FakeVehicleStateRefresh(canRefresh: true));
+        Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
+        Services.AddSingleton<IVehicleUpdateService>(new SampleProviderFeed());
+    }
+
+    /// <summary>An external provider's feed, as the Car page sees it.</summary>
+    private sealed class SampleProviderFeed : IVehicleUpdateService
+    {
+        public string VehicleId => "model3";
+
+        public string Manufacturer => "external";
+
+        public string DisplayName => "Vehicle sample";
+
+        public bool IsPushed => true;
+
+        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("Vehicle sample is connected");
+
+        public TimeSpan NextDelay => Timeout.InfiniteTimeSpan;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) => Task.FromResult<VehicleState?>(null);
+    }
 
     private void VolkswagenCar(IVehicleAccountSignIn account)
     {

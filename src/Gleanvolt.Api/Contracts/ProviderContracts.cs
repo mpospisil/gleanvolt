@@ -21,6 +21,7 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="Healthy">What the provider last reported about itself, or null.</param>
 /// <param name="StatusMessage">Its message with that report.</param>
 /// <param name="Unanswered">True when it did not answer Gleanvolt's last request in time.</param>
+/// <param name="NeedsOwner">True when the provider said only the owner can fix it: an expired login, a consent screen.</param>
 public sealed record ExternalProviderResponse(
     string Kind,
     string Name,
@@ -35,7 +36,8 @@ public sealed record ExternalProviderResponse(
     IReadOnlyList<string> LastProblems,
     bool? Healthy,
     string? StatusMessage,
-    bool Unanswered)
+    bool Unanswered,
+    bool NeedsOwner = false)
 {
     internal static ExternalProviderResponse From(ExternalProviderStatus status) => new(
         status.Kind,
@@ -51,5 +53,6 @@ public sealed record ExternalProviderResponse(
         status.LastProblem ?? [],
         status.Healthy,
         status.StatusMessage,
-        status.Unanswered);
+        status.Unanswered,
+        status.NeedsOwner);
 }

@@ -332,6 +332,15 @@ public sealed class EvEditor : IEvEditor
                 Phrase.Of("Config.TwoFeeds"));
         }
 
+        // The same for an external provider beside a live feed (#408): one car, one feed.
+        if (enabled.Contains(VehicleFeed.External) && (enabled.Contains(VehicleFeed.Volkswagen) || enabled.Contains(VehicleFeed.Skoda)))
+        {
+            problems.Add(
+                "Vehicle:External would be enabled beside a manufacturer's live feed. An installation reads "
+                + "its car from one feed.",
+                Phrase.Of("Config.ExternalAndLiveFeed"));
+        }
+
         foreach (var feed in enabled)
         {
             foreach (var key in VehicleFeeds.Required(feed))

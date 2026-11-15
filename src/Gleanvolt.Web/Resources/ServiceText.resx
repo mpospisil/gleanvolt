@@ -686,4 +686,87 @@
     <value>{0} is not a solar forecast source.</value>
     <comment>{0} what was asked for.</comment>
   </data>
+  <data name="ExternalVehicle_Waiting" xml:space="preserve">
+    <value>waiting for the external car provider to connect</value>
+  </data>
+  <data name="ExternalVehicle_Disconnected" xml:space="preserve">
+    <value>external car provider disconnected, reading from {0} {1}</value>
+    <comment>{0} the reading's capture date, {1} its time.</comment>
+  </data>
+  <data name="ExternalVehicle_DisconnectedNoReading" xml:space="preserve">
+    <value>external car provider disconnected, with no reading yet</value>
+  </data>
+  <data name="ExternalVehicle_ProviderNeedsOwner" xml:space="preserve">
+    <value>{0} needs you: {1}</value>
+    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+  </data>
+  <data name="ExternalVehicle_NeedsOwner" xml:space="preserve">
+    <value>{0} needs you: {1}</value>
+    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+  </data>
+  <data name="ExternalVehicle_ProviderUnhealthy" xml:space="preserve">
+    <value>{0} cannot read the car: {1}</value>
+    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+  </data>
+  <data name="ExternalVehicle_Refused" xml:space="preserve">
+    <value>{0}'s last reading was refused; the problems are listed on the Car page.</value>
+    <comment>{0} the provider's name.</comment>
+  </data>
+  <data name="ExternalVehicle_NoReadingYet" xml:space="preserve">
+    <value>{0} is connected and has not sent a reading yet</value>
+    <comment>{0} the provider's name.</comment>
+  </data>
+  <data name="ExternalVehicle_Connected" xml:space="preserve">
+    <value>{0} is connected</value>
+    <comment>{0} the provider's name.</comment>
+  </data>
+  <data name="ExternalVehicle_NoAnswer" xml:space="preserve">
+    <value>{0} didn't answer within {1}</value>
+    <comment>{0} the provider's name, {1} a duration.</comment>
+  </data>
+  <data name="ExternalVehicle_AskFailed" xml:space="preserve">
+    <value>{0} could not be asked: {1}</value>
+    <comment>{0} the provider's name, {1} the error, in English.</comment>
+  </data>
+  <data name="Vehicle_NoCaptureTime" xml:space="preserve">
+    <value>The reading has no capture time.</value>
+  </data>
+  <data name="Vehicle_Future" xml:space="preserve">
+    <value>The reading was captured at {0} {1}, more than {2} ahead of Gleanvolt's clock.</value>
+    <comment>{0} a date, {1} a time, {2} a duration.</comment>
+  </data>
+  <data name="Vehicle_TooOld" xml:space="preserve">
+    <value>The reading was captured on {0}, more than {1} ago.</value>
+    <comment>{0} a date, {1} a duration.</comment>
+  </data>
+  <data name="Vehicle_OlderThanHeld" xml:space="preserve">
+    <value>The reading is older than the reading Gleanvolt holds, captured {0} {1}.</value>
+    <comment>{0} a date, {1} a time.</comment>
+  </data>
+  <data name="Vehicle_Soc" xml:space="preserve">
+    <value>SOC is {0}; it must be 0 to 100 %.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Vehicle_Range" xml:space="preserve">
+    <value>The range is {0} m; it must be 0 to 2,000 km, sent in metres.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Vehicle_TimeRemaining" xml:space="preserve">
+    <value>The time to full is {0}; it must be 0 to {1}.</value>
+    <comment>{0} the time sent, {1} a duration.</comment>
+  </data>
+  <data name="Vehicle_UnknownChargeState" xml:space="preserve">
+    <value>The charge state {0} is not one Gleanvolt knows.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Vehicle_UnknownPlugState" xml:space="preserve">
+    <value>The plug state {0} is not one Gleanvolt knows.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Vehicle_Empty" xml:space="preserve">
+    <value>The reading says nothing: it needs at least one of SOC, range, charge state or plug state.</value>
+  </data>
+  <data name="Config_ExternalAndLiveFeed" xml:space="preserve">
+    <value>Vehicle:External would be on beside a manufacturer's live feed. An installation reads its car from one feed.</value>
+  </data>
 </root>

@@ -13,7 +13,8 @@ public static class ExternalProviderStateText
     /// <summary>The sentence, with times in <paramref name="zone"/>.</summary>
     public static string Describe(ExternalProviderStatus status, TimeZoneInfo zone) => status.State switch
     {
-        ExternalProviderState.Off => SettingsText.ExternalState_Off,
+        // The car's feed is chosen on its own page, and like every feed choice takes a restart (#408).
+        ExternalProviderState.Off => status.Kind == "vehicle" ? SettingsText.ExternalState_OffVehicle : SettingsText.ExternalState_Off,
         ExternalProviderState.Waiting => status.HasToken ? SettingsText.ExternalState_Waiting : SettingsText.ExternalState_NoToken,
         ExternalProviderState.Connected => Localized.Format(SettingsText.ExternalState_Connected,
             status.ProviderName ?? status.ProviderId ?? string.Empty, status.ProviderVersion ?? string.Empty, When(status.Since, zone)),
