@@ -2,6 +2,7 @@ using System.Net;
 using Gleanvolt.Api;
 using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Infrastructure;
@@ -156,6 +157,35 @@ public class SetupModeRegistrationTests
             // Still setup mode -- this process started without a controller -- but nothing is missing.
             Assert.True(setup.SetupMode);
             Assert.True(setup.Current().Usable, string.Join("; ", setup.Current().MissingRequired.Select(problem => problem.English)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task An_external_solar_forecast_needs_no_Solcast_account()
+    {
+        // #388: with External chosen, the Forecast page and Settings must not ask for a Solcast account.
+        var root = Directory.CreateTempSubdirectory("gleanvolt-setup-state-").FullName;
+        try
+        {
+            var path = Path.Combine(root, "pv-system.json");
+            var builder = WebApplication.CreateSlimBuilder();
+            builder.Configuration.AddInMemoryCollection(
+                [new("Pv:OverridesPath", path), new("Controller:TimeZone", "Europe/Prague"), new("Secrets:Directory", root)]);
+            builder.Configuration.AddPvSystemOverrides(root);
+            builder.Services.AddGleanvolt(builder.Configuration, Prague);
+
+            await using var provider = builder.Services.BuildServiceProvider();
+            var setup = provider.GetRequiredService<ISetupState>();
+            Assert.Contains(OptionalSetting.Solcast, setup.Current().MissingOptional);
+
+            var chosen = provider.GetRequiredService<ISolarForecastSourceSelection>().Select(SolarForecastSourceIds.External);
+
+            Assert.True(chosen.Saved, string.Join("; ", chosen.Problems));
+            Assert.DoesNotContain(OptionalSetting.Solcast, setup.Current().MissingOptional);
         }
         finally
         {
