@@ -49,7 +49,10 @@ public sealed class SetupState : ISetupState
         }
 
         var fromConfiguration = OptionalSettings.FromConfiguration(fresh);
-        var solcast = _services.GetService<SolcastAccountStore>()?.Current is not null || fromConfiguration.Solcast;
+        // The forecast is set up with a Solcast account, or with External chosen (#388): an external
+        // provider needs no account, and without this the Forecast page and Settings would ask for one.
+        var external = _services.GetService<ISolarForecastSourceSelection>()?.Selected == SolarForecastSourceIds.External;
+        var solcast = external || _services.GetService<SolcastAccountStore>()?.Current is not null || fromConfiguration.Solcast;
         var tariff = _services.GetService<TariffSettingsFile>()?.Read().Provider is { } provider
             && provider != TariffProviderIds.None;
 
