@@ -1017,4 +1017,71 @@
   <data name="SnapshotFailedCharger" xml:space="preserve">
     <value>Nabíječku se nepodařilo přečíst: {0}</value>
   </data>
+  <!-- External data providers (#386, #401) -->
+  <data name="TariffProvider_External" xml:space="preserve">
+    <value>Externí</value>
+  </data>
+  <data name="ExternalProviderIntro" xml:space="preserve">
+    <value>Tato data dodává program mimo Gleanvolt. Připojuje se na tuto adresu s tokenem níže.</value>
+  </data>
+  <data name="ExternalAddress" xml:space="preserve">
+    <value>Adresa Gleanvoltu</value>
+  </data>
+  <data name="ExternalHub" xml:space="preserve">
+    <value>Hub</value>
+  </data>
+  <data name="ExternalToken" xml:space="preserve">
+    <value>Token</value>
+  </data>
+  <data name="ExternalNoToken" xml:space="preserve">
+    <value>Token zatím není. Vytvořte ho a předejte zdroji dat.</value>
+  </data>
+  <data name="ExternalHasToken" xml:space="preserve">
+    <value>Token existuje.</value>
+  </data>
+  <data name="ExternalCreateToken" xml:space="preserve">
+    <value>Vytvořit token</value>
+  </data>
+  <data name="ExternalRecreateToken" xml:space="preserve">
+    <value>Vytvořit nový token</value>
+  </data>
+  <data name="ExternalNewTokenDisconnects" xml:space="preserve">
+    <value>Nový token odpojí zdroj, který používá ten starý. Vytvořte ho, pokud token unikl.</value>
+  </data>
+  <data name="ExternalTokenFailed" xml:space="preserve">
+    <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete ve Stavu.</value>
+  </data>
+  <data name="ExternalStatus" xml:space="preserve">
+    <value>Stav</value>
+  </data>
+  <data name="ExternalState_Off" xml:space="preserve">
+    <value>Vypnuto. Zapnete ho volbou Externí a uložením.</value>
+  </data>
+  <data name="ExternalState_NoToken" xml:space="preserve">
+    <value>Čeká se. Nejdřív vytvořte token, bez něj se žádný zdroj nepřipojí.</value>
+  </data>
+  <data name="ExternalState_Waiting" xml:space="preserve">
+    <value>Čeká se na připojení zdroje.</value>
+  </data>
+  <data name="ExternalState_Connected" xml:space="preserve">
+    <value>{0} {1} připojen od {2}.</value>
+  </data>
+  <data name="ExternalState_Disconnected" xml:space="preserve">
+    <value>{0} se odpojil v {1}. Jeho poslední data platí, dokud nevyprší.</value>
+  </data>
+  <data name="ExternalLastData" xml:space="preserve">
+    <value>Poslední data přišla: {0}.</value>
+  </data>
+  <data name="ExternalNoDataYet" xml:space="preserve">
+    <value>Zatím nepřišla žádná data.</value>
+  </data>
+  <data name="ExternalUnanswered" xml:space="preserve">
+    <value>Zdroj neodpověděl na poslední žádost o nová data.</value>
+  </data>
+  <data name="ExternalUnhealthy" xml:space="preserve">
+    <value>Zdroj hlásí problém: {0}</value>
+  </data>
+  <data name="ExternalLastProblem" xml:space="preserve">
+    <value>Jeho poslední data byla odmítnuta:</value>
+  </data>
 </root>

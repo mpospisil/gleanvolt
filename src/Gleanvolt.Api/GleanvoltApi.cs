@@ -153,6 +153,7 @@ public static class GleanvoltApi
         group.MapPlans();
         group.MapControl();
         group.MapTariff();
+        group.MapProviders();
 
         // Unauthenticated, like the index. It was behind the key at first, on the reasoning that there is
         // no point handing the shape of a control surface to a caller who cannot use it -- but the

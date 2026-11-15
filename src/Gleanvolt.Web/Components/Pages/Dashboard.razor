@@ -84,7 +84,7 @@ else
 
             @* Read on every render, which is every poll: the schedule is cached until midnight or a save,
                so a tariff saved on Settings shows here by the next poll. *@
-            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable is { } unavailable ? Localized.Say(Tariff.UnavailablePhrase, unavailable) : null, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone) is { } tariff)
+            @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable is { } unavailable ? Localized.Say(Tariff.UnavailablePhrase, unavailable) : null, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone, TariffProviderGone) is { } tariff)
             {
                 <p class="tariff-line @(Tariff.Timeline is null ? "warning" : "muted")" id="overview-tariff">@tariff</p>
             }
@@ -565,6 +565,13 @@ else
 }
 
 @code {
+    // Whether the tariff's external provider (#401) has disconnected, so the line can say its windows
+    // still count until they run out. Optional: a host without provider kinds has nothing to say.
+    // Disconnected, or not back yet after a restart, which answers from the windows it last sent.
+    private bool TariffProviderGone =>
+        Services.GetService<IExternalProviders>() is { } providers
+        && providers.Find("tariff")?.State is ExternalProviderState.Disconnected or ExternalProviderState.Waiting;
+
     // The viewer's culture, for the renders the poll and other threads ask for (#290).
     private readonly ViewerCulture _viewer = new();
 

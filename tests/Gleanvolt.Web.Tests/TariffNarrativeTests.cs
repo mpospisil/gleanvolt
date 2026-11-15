@@ -68,6 +68,24 @@ public class TariffNarrativeTests
     }
 
     [Fact]
+    public void AnExternalProvidersWindowsNameIt()
+    {
+        var timeline = Night(21) with { Origin = new TariffOrigin("Spot prices", At(21, 11)) };
+
+        Assert.Equal("High tariff, 4.80 CZK/kWh, until 22:00 (from Spot prices)", Describe(timeline, At(21, 12)));
+    }
+
+    [Fact]
+    public void ADisconnectedProvidersWindowsSayHowLongTheyLast()
+    {
+        var timeline = Night(21) with { Origin = new TariffOrigin("Spot prices", At(21, 11)) };
+
+        var line = TariffNarrative.Describe(timeline, null, "CZK", At(21, 12), Prague, providerDisconnected: true);
+
+        Assert.Equal("High tariff, 4.80 CZK/kWh, until 22:00 (from Spot prices, disconnected; its windows run until Friday 00:00)", line);
+    }
+
+    [Fact]
     public void NoTariffIsNothingToSay()
     {
         Assert.Null(Describe(null, At(21, 12)));

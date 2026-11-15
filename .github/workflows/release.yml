@@ -173,7 +173,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting; do
+          for project in Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Server; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
@@ -540,7 +540,7 @@ jobs:
 
           # By name, like the zips and the .debs: a missing library is named, and a new packable
           # project fails here until it is added, rather than shipping a release short of it.
-          expected="Api Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Web"
+          expected="Api Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Providers.Client Providers.Contracts Providers.Server Web"
           for package in $expected; do
             if [ ! -f "artifacts/Gleanvolt.${package}.${VERSION}.nupkg" ]; then
               echo "No Gleanvolt.${package}.${VERSION}.nupkg; the packable projects and this list disagree." >&2

@@ -13,6 +13,11 @@ terms apply to every version released after that commit. Changing the licence
 cannot and does not withdraw any permission already granted for code published
 earlier.
 
+The source code in src/Gleanvolt.Providers.Contracts and src/Gleanvolt.Providers.Client,
+and the packages built from it, are licensed under the MIT Licence instead, as stated in
+the LICENSE file in each of those directories, so that programs supplying data to this
+software can be licensed as their authors choose.
+
 The container images published from this repository contain this file at
 /app/LICENSE and are covered by these terms. Components not written by the
 copyright holder -- the .NET runtime and base-image contents, and the

@@ -413,3 +413,20 @@ internal sealed class FakeUntilFullSettings : IUntilFullSettings
         UntilFull = on;
     }
 }
+
+internal sealed class FakeExternalProviders : IExternalProviders
+{
+    public List<ExternalProviderStatus> Statuses { get; } = [];
+
+    public IReadOnlyList<ExternalProviderStatus> All => Statuses;
+
+    public Task<string> CreateTokenAsync(string kind) => Task.FromResult("gvp_test");
+
+    public string? ReadToken(string kind) => null;
+
+    public event Action? Changed
+    {
+        add { }
+        remove { }
+    }
+}

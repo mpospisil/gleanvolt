@@ -1031,4 +1031,76 @@
   <data name="SnapshotFailedCharger" xml:space="preserve">
     <value>The charger could not be read: {0}</value>
   </data>
+  <!-- External data providers (#386, #401) -->
+  <data name="TariffProvider_External" xml:space="preserve">
+    <value>External</value>
+    <comment>The tariff provider whose windows another program publishes to Gleanvolt.</comment>
+  </data>
+  <data name="ExternalProviderIntro" xml:space="preserve">
+    <value>A program outside Gleanvolt supplies this data. It connects to this address with the token below.</value>
+  </data>
+  <data name="ExternalAddress" xml:space="preserve">
+    <value>Gleanvolt address</value>
+  </data>
+  <data name="ExternalHub" xml:space="preserve">
+    <value>Hub</value>
+  </data>
+  <data name="ExternalToken" xml:space="preserve">
+    <value>Token</value>
+  </data>
+  <data name="ExternalNoToken" xml:space="preserve">
+    <value>No token yet. Make one and give it to the provider.</value>
+  </data>
+  <data name="ExternalHasToken" xml:space="preserve">
+    <value>A token exists.</value>
+  </data>
+  <data name="ExternalCreateToken" xml:space="preserve">
+    <value>Make a token</value>
+  </data>
+  <data name="ExternalRecreateToken" xml:space="preserve">
+    <value>Make a new token</value>
+  </data>
+  <data name="ExternalNewTokenDisconnects" xml:space="preserve">
+    <value>A new token disconnects the provider that uses the old one. Make one if the token has leaked.</value>
+  </data>
+  <data name="ExternalTokenFailed" xml:space="preserve">
+    <value>The token could not be saved. See Health for the secret store.</value>
+  </data>
+  <data name="ExternalStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="ExternalState_Off" xml:space="preserve">
+    <value>Off. Choose External and save to turn it on.</value>
+  </data>
+  <data name="ExternalState_NoToken" xml:space="preserve">
+    <value>Waiting. Make a token first: without one, no provider can connect.</value>
+  </data>
+  <data name="ExternalState_Waiting" xml:space="preserve">
+    <value>Waiting for a provider to connect.</value>
+  </data>
+  <data name="ExternalState_Connected" xml:space="preserve">
+    <value>{0} {1} connected since {2}.</value>
+    <comment>{0} the provider name, {1} its version, {2} a date and time.</comment>
+  </data>
+  <data name="ExternalState_Disconnected" xml:space="preserve">
+    <value>{0} disconnected at {1}. Its last data is still used until it runs out.</value>
+    <comment>{0} the provider name, {1} a date and time.</comment>
+  </data>
+  <data name="ExternalLastData" xml:space="preserve">
+    <value>Last data received: {0}.</value>
+    <comment>{0} a date and time.</comment>
+  </data>
+  <data name="ExternalNoDataYet" xml:space="preserve">
+    <value>No data received yet.</value>
+  </data>
+  <data name="ExternalUnanswered" xml:space="preserve">
+    <value>The provider did not answer the last request for fresh data.</value>
+  </data>
+  <data name="ExternalUnhealthy" xml:space="preserve">
+    <value>The provider reports a problem: {0}</value>
+    <comment>{0} what the provider said, in English.</comment>
+  </data>
+  <data name="ExternalLastProblem" xml:space="preserve">
+    <value>Its last data was refused:</value>
+  </data>
 </root>

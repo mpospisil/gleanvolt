@@ -4,6 +4,111 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — External data providers: the framework and the low tariff (#389, #386, #401)
+
+**What.** A program outside Gleanvolt can now supply the low tariff. It connects to the web port at
+`/providers/tariff` with a token made on Settings, says hello, and publishes windows. Gleanvolt checks
+them and makes them the tariff, the same tariff the Overview, Home Assistant, the API and the
+low-tariff-only options read. The framework under it is kind-agnostic, so the solar forecast (#388),
+weather and the car can follow as more kinds. The decisions and the deviations from the issues are in
+DECISIONS.md.
+
+**How.**
+- `Gleanvolt.Providers.Contracts` (MIT, no dependencies): `ProviderHello`, `Welcome`, `RefusalCodes`,
+  `RequestId`, `RefreshRequest`, `ProviderStatus`, `PublishResult`, `IProviderHub<TWelcome>`,
+  `IProviderClient`. The tariff kind: `ITariffHub`, `ITariffClient`, `TariffWelcome` (time zone and
+  currency), `TariffData`, `TariffWindow`, `TariffRate`, `TariffContract` (kind, 1.0, hub path).
+- `Gleanvolt.Providers.Server`: `ProviderKind` (with the kind's own is-enabled check),
+  `ProviderHub<TClient, TWelcome>` (hello, status, disconnect), `ProviderSessions` (attach, replace,
+  refuse, detach, the pending request and its timeout on `TimeProvider`), `ExternalProviderRegistry`
+  (implements Core's new `IExternalProviders`), `ProviderTokens` (the token in the secret store, read back for Settings),
+  `ProviderTokenAuthentication` (its own scheme and policy), `AddExternalProvider<THub>` and
+  `MapExternalProviders`. Enums go over the wire as camelCase strings.
+- `Gleanvolt.Providers.Client` (MIT): `ProviderConnection<TWelcome>` as a `BackgroundService`: a
+  first connection with backoff, a hello after every reconnect, a longer wait after a refusal or a
+  goodbye, and handlers that never block the receive loop. `TariffProviderConnection`, `ITariffSource`
+  and `AddGleanvoltTariffProvider<T>`.
+- Core: `TariffProviderIds.External`; `ExternalTariffProvider`, an `IRefreshingTariffProvider` whose
+  `Expand` answers from one immutable snapshot, from the start of today until the last window ends, and
+  whose `RefreshAsync` sends a request through `IExternalTariffRequests` without waiting for the
+  answer; `ExternalTariffRules`, the checks and the joining of same-rate, same-price neighbours;
+  `TariffTimeline.Origin`.
+- Hosting: `TariffHub` (maps the contract to Core, checks, stores, invalidates the schedule),
+  `HubTariffRequests`, `ExternalTariffSelectionWatcher` (a save away from External closes the session).
+  `UseGleanvolt` maps the hubs wherever the port is open and not in setup mode, adding the
+  authentication middleware itself when the UI is off. The password gate lets `/providers` through,
+  as it does `/api`.
+- API: `GET /api/v1/providers`; `GET /tariff` gains `origin` and `receivedAt`. The OpenAPI contract
+  snapshot is regenerated.
+- Web: `ExternalProviderPanel` (address, hub, token masked with Reveal and Copy, live status, the last refusal in the
+  viewer's language), `ExternalTariffPanel` registered for External, and the Overview's tariff line
+  naming the provider and, after a disconnect, until when its windows run. Strings in
+  `SettingsText`, `ServiceText` and `SharedText`, en and cs.
+- `plugins/Gleanvolt.Plugin.TariffSample`: a fixed pattern (low 22:00–06:00 and 13:00–15:00) in the
+  welcome's zone, answering requests and publishing after local midnight. It is in the solution so it
+  builds, but not in the image or the release.
+- Packaging: three new packages in `release.yml`'s pack loop and its by-name check; both Dockerfiles
+  copy the new project files; `Directory.Build.targets` leaves the repository's LICENSE and README out of
+  the MIT packages; `LICENSE` and README say which directories are MIT.
+- Docs: `docs/PROVIDERS.md` (for provider authors, including the wire protocol for other languages),
+  CONFIGURATION, HTTP_API, HOME_ASSISTANT's *Tariff change* row, RELEASING's package count, and the
+  manual's grid tariff page (en, cs) with a new screenshot. The existing `settings-tariff` picture now
+  shows the External choice.
+
+**Start order and restarts.** A provider started before Gleanvolt, and Gleanvolt restarting under a
+connected provider, are both tested on Kestrel over a WebSocket on one fixed port, so "not running"
+is a refused TCP connection (`LifecycleTests`: start first, one restart with a second's downtime,
+three restarts in a row). The SDK no longer uses SignalR's automatic reconnect: every connection,
+first or after a loss, goes through the same loop with the provider's own backoff. The last accepted
+windows are saved in `Hosting/Tariff/External/ExternalTariffFile.cs` (`external-tariff.json` beside
+`tariff.json`), restored when the strategy is made and checked again against the time and currency
+(`ExternalTariffFileTests`, and a composition-root test in `TariffRegistrationTests`). The Overview
+treats a provider that hasn't come back since the start like a disconnected one.
+
+**Found along the way.**
+- SignalR's automatic reconnect retries at 0, 2, 10 and 30 seconds and then gives up; a restart of
+  15 seconds left the provider waiting for the 30-second try. Removed in favour of the SDK's loop.
+- Keeping the external tariff in memory only meant a restarted controller had no tariff until the
+  provider published again, which lifts every *low tariff only* restriction in that gap.
+- The SDK's closed signal was a semaphore shared across sessions: a refused session left a release
+  behind, and the next session ended right after its hello. Each session now has its own completion
+  source. The test that turns the kind on while the SDK waits caught it.
+- `Microsoft.AspNetCore.SignalR.Client` 10.0.11 is flagged for CVE-2026-70159. The client is on
+  10.0.13.
+- Sending `RefreshRequested` from inside the hello would reach the client before the hello's answer.
+  The SDK publishes after every accepted hello instead.
+
+**Verified.**
+- `tests/Gleanvolt.Providers.Tests` (22) with a test-only `test-echo` kind and the real SignalR client:
+  disabled, wrong token (401), no token, a regenerated token retiring the old one, wrong major,
+  invalid id, nothing before the hello, replace, stale disconnect, a second provider refused, turning
+  the kind off, a request timing out and an answer clearing it, refused data, status, and the SDK's
+  hello after a dropped connection, its retry until the kind is on, and its answer to a request. One
+  test runs on Kestrel over a WebSocket with the token in the query string.
+- Hosting: the tariff hub, schedule and refresh worker with the tariff sample as the client (zone and
+  currency in the welcome, the sample's windows as the timeline, a request answered and one unanswered
+  without holding the worker, refused data, enums by name, windows counting after a disconnect until
+  they end, and choosing Table closing the session). The real composition root: the hub behind its own
+  token with only the API on, past the password gate with the UI on, and the token kept in the secret store and read back.
+- Core: each tariff rule, and the External strategy against the shared `TariffProviderContract`.
+- Web: the panel (address, token revealed after a reload, neither shown nor made without a login, live updates, problems) and
+  the Overview's line.
+- The whole solution's tests pass, in Debug and the Release build. The three packages pack: Contracts
+  and Client as MIT with their own README, Server under the repository's licence.
+
+**Files.** New: `src/Gleanvolt.Providers.{Contracts,Client,Server}/`,
+`src/Gleanvolt.Core/{Interfaces/IExternalProviders.cs,Interfaces/IExternalTariffRequests.cs,Configuration/ExternalTariffRules.cs,Strategies/ExternalTariffProvider.cs}`,
+`src/Gleanvolt.Hosting/Tariff/External/`, `src/Gleanvolt.Api/{Contracts/ProviderContracts.cs,Endpoints/ProviderEndpoints.cs}`,
+`src/Gleanvolt.Web/{Components/ExternalProviderPanel.razor,Components/ExternalTariffPanel.razor,NoExternalProviders.cs}`,
+`plugins/Gleanvolt.Plugin.TariffSample/`, `tests/Gleanvolt.Providers.Tests/`, `docs/PROVIDERS.md`, and
+tests in Core, Hosting, Api and Web. Changed: `GleanvoltHostingExtensions.cs`, `SetupGate.cs`,
+`WebUiHost.cs`, `Dashboard.razor`, `TariffNarrative.cs`, `TariffTimeline.cs`, `TariffTable.cs`,
+`ISecretStore.cs`, `TariffContracts.cs`, `GleanvoltApi.cs`, the resx files, `site.css`, `Gleanvolt.slnx`,
+`Directory.Build.targets`, both Dockerfiles, `release.yml`, `LICENSE`, README, CONTRIBUTING and the docs
+above.
+
+---
+
 ## 2026-11-14 — Agent skills: install and set up Gleanvolt (#390)
 
 **What.** Two Agent Skills, for agents that read `SKILL.md` (Claude Code, Codex CLI, Cursor, Gemini

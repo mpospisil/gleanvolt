@@ -603,4 +603,41 @@
   <data name="Config_SetupKeyNotAllowed" xml:space="preserve">
     <value>{0} is not a setting a setup file can hold (see `gleanvolt setup --print-schema`).</value>
   </data>
+  <!-- An external tariff provider's refused data (#401) -->
+  <data name="ExternalTariff_Currency" xml:space="preserve">
+    <value>The prices are in {0}, and Gleanvolt's are in {1}.</value>
+    <comment>{0} and {1} are currency codes.</comment>
+  </data>
+  <data name="ExternalTariff_Empty" xml:space="preserve">
+    <value>There are no windows.</value>
+  </data>
+  <data name="ExternalTariff_TooMany" xml:space="preserve">
+    <value>There are {0} windows; at most {1} are accepted.</value>
+  </data>
+  <data name="ExternalTariff_NotUtc" xml:space="preserve">
+    <value>Window {0} is not in UTC.</value>
+  </data>
+  <data name="ExternalTariff_TooShort" xml:space="preserve">
+    <value>Window {0} is shorter than {1}.</value>
+    <comment>{1} a duration.</comment>
+  </data>
+  <data name="ExternalTariff_Price" xml:space="preserve">
+    <value>Window {0} has a price that cannot be right.</value>
+  </data>
+  <data name="ExternalTariff_Gap" xml:space="preserve">
+    <value>There is a gap before window {0}.</value>
+  </data>
+  <data name="ExternalTariff_Overlap" xml:space="preserve">
+    <value>Window {0} overlaps the one before, or is out of order.</value>
+  </data>
+  <data name="ExternalTariff_SameRateOtherPrice" xml:space="preserve">
+    <value>Window {0} is on the same rate as the one before, at another price. Neighbours on one rate must share a price.</value>
+  </data>
+  <data name="ExternalTariff_NotNow" xml:space="preserve">
+    <value>The windows do not cover the moment they were published.</value>
+  </data>
+  <data name="ExternalTariff_TooFar" xml:space="preserve">
+    <value>The windows reach more than {0} ahead.</value>
+    <comment>{0} a duration.</comment>
+  </data>
 </root>

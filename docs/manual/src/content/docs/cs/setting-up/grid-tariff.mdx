@@ -47,3 +47,34 @@ Platí to hned; restart není potřeba.
 - **Období v jednom seznamu se nesmí překrývat.** Navazovat mohou, například 06:00–08:00 a 08:00–10:00.
 - **Letní a zimní čas** vyřeší Gleanvolt za vás.
 - Pokud vám distributor mění hodiny podle ročního období, upravte tabulku, když se změní.
+
+## Nebo ho nechte dodávat jiný program
+
+Pokud se váš tarif mění tak, že se nevejde do tabulky, například podle spotových cen na další den,
+může ho místo tabulky dodávat program mimo Gleanvolt. Je to zdroj **Externí**. Takový program musí
+někdo napsat nebo nainstalovat; Gleanvolt žádný nemá. Vývojáři najdou postup v
+[příručce pro zdroje dat](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md) (anglicky).
+
+<Steps>
+
+1. Otevřete **Nastavení**, najděte **Tarif**, u **Zdroj tarifu** zvolte **Externí** a stiskněte
+   **Uložit**.
+
+2. Stiskněte **Vytvořit token** a pak **Kopírovat**. **Zobrazit** token ukáže, hned i kdykoli později.
+
+3. Předejte programu **Adresu Gleanvoltu** a token.
+
+4. Když se program připojí, **Stav** ho jmenuje a **Poslední data přišla** říká, kdy jeho tarif dorazil.
+   Jmenuje ho i řádek s tarifem na **Přehledu**.
+
+</Steps>
+
+![Sekce Tarif se zvoleným zdrojem Externí: adresa, na kterou se program připojuje, token a připojený program Spot prices.](../../../../assets/screenshots/settings-tariff-external.png)
+
+- **Když se program odpojí nebo se Gleanvolt restartuje**, Gleanvolt dál používá tarif, který program
+  naposledy poslal, dokud neskončí jeho poslední časový úsek. Potom se tarif nebere v úvahu, dokud se
+  program nevrátí.
+- **Na pořadí spuštění nezáleží.** Program se připojuje, dokud Gleanvolt neodpoví, takže ho můžete
+  spustit i před Gleanvoltem, a po restartu nebo aktualizaci Gleanvoltu se připojí sám.
+- **Když token unikne**, stiskněte **Vytvořit nový token**. Program se starým tokenem se odpojí.
+- **Volba Tabulka nebo Žádný** program odpojí a znovu se připojit může, až zase zvolíte **Externí**.

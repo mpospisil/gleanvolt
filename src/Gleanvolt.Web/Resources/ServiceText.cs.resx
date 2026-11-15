@@ -573,4 +573,38 @@
   <data name="Config_SetupKeyNotAllowed" xml:space="preserve">
     <value>{0} není nastavení, které může soubor s nastavením obsahovat (viz `gleanvolt setup --print-schema`).</value>
   </data>
+  <!-- An external tariff provider's refused data (#401) -->
+  <data name="ExternalTariff_Currency" xml:space="preserve">
+    <value>Ceny jsou v {0}, ale Gleanvolt počítá v {1}.</value>
+  </data>
+  <data name="ExternalTariff_Empty" xml:space="preserve">
+    <value>Nejsou tu žádná okna.</value>
+  </data>
+  <data name="ExternalTariff_TooMany" xml:space="preserve">
+    <value>Oken je {0}, přijme se nejvýš {1}.</value>
+  </data>
+  <data name="ExternalTariff_NotUtc" xml:space="preserve">
+    <value>Okno {0} není v UTC.</value>
+  </data>
+  <data name="ExternalTariff_TooShort" xml:space="preserve">
+    <value>Okno {0} je kratší než {1}.</value>
+  </data>
+  <data name="ExternalTariff_Price" xml:space="preserve">
+    <value>Okno {0} má cenu, která nemůže být správná.</value>
+  </data>
+  <data name="ExternalTariff_Gap" xml:space="preserve">
+    <value>Před oknem {0} je mezera.</value>
+  </data>
+  <data name="ExternalTariff_Overlap" xml:space="preserve">
+    <value>Okno {0} se překrývá s předchozím, nebo je mimo pořadí.</value>
+  </data>
+  <data name="ExternalTariff_SameRateOtherPrice" xml:space="preserve">
+    <value>Okno {0} má stejnou sazbu jako předchozí, ale jinou cenu. Sousední okna se stejnou sazbou musí mít stejnou cenu.</value>
+  </data>
+  <data name="ExternalTariff_NotNow" xml:space="preserve">
+    <value>Okna nepokrývají okamžik, kdy byla odeslána.</value>
+  </data>
+  <data name="ExternalTariff_TooFar" xml:space="preserve">
+    <value>Okna sahají dál než {0} dopředu.</value>
+  </data>
 </root>

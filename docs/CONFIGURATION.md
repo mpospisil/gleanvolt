@@ -248,6 +248,11 @@ Settings it is read-only until the UI has a login.
 - **None** — no tariff, the default. The Overview says nothing about a tariff and the Home Assistant
   entities read *unknown*. None never means "always low".
 - **Table** — the periods you type in, below.
+- **External** — windows another program publishes to Gleanvolt over its hub on the web port
+  (#401): for a tariff a table can't hold, such as day-ahead spot prices. The token for it is made on
+  the same section. The windows are saved in `external-tariff.json` beside `tariff.json`, and
+  still count after the program disconnects or Gleanvolt restarts, until the last one ends. What such a program sends, and the rules it is held to, are in
+  [PROVIDERS.md](PROVIDERS.md).
 
 **The table.** Enter **only the low-tariff periods**; every other minute is high tariff. There are two
 lists: **weekdays** (Monday to Friday) and the **weekend**. Public holidays follow the weekday list.
@@ -274,7 +279,7 @@ it; if you do:
 
 ```jsonc
 {
-  "provider": "Table",              // "None" or "Table"
+  "provider": "Table",              // "None", "Table" or "External"
   "lowPricePerKwh": 2.10,           // optional
   "highPricePerKwh": 4.80,
   "table": {                        // kept while another provider is selected

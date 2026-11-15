@@ -15,6 +15,8 @@ using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using Gleanvolt.Hosting.Tariff;
+using Gleanvolt.Hosting.Tariff.External;
+using Gleanvolt.Providers.Server;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
@@ -138,6 +140,30 @@ public static class GleanvoltHostingExtensions
         services.Configure<TariffOptions>(configuration.GetSection(TariffOptions.SectionName));
         services.AddSingleton<ITariffProvider, NoTariffProvider>();
         services.AddSingleton<ITariffProvider, TableTariffProvider>();
+
+        // The third is fed from outside (#401): an external provider publishes windows over its hub on
+        // the web port. Choosing it on Settings is what turns the hub on, and a save that chooses
+        // something else closes the provider's session. Its last windows are kept beside tariff.json,
+        // so a restart answers from them until the provider is back rather than from no tariff at all.
+        services.AddSingleton(provider =>
+        {
+            var time = provider.GetRequiredService<TimeProvider>();
+            var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
+            var tariffPath = Path.GetFullPath(Path.IsPathRooted(options.Path)
+                ? options.Path
+                : Path.Combine(provider.GetRequiredService<IHostEnvironment>().ContentRootPath, options.Path));
+
+            var tariff = new ExternalTariffProvider(new HubTariffRequests(provider, time));
+            new ExternalTariffFile(
+                    Path.Combine(Path.GetDirectoryName(tariffPath)!, "external-tariff.json"),
+                    provider.GetRequiredService<ILogger<ExternalTariffFile>>())
+                .Attach(tariff, TariffCurrency(options), time.GetUtcNow());
+            return tariff;
+        });
+        services.AddSingleton<ITariffProvider>(provider => provider.GetRequiredService<ExternalTariffProvider>());
+        services.AddSingleton(new ProviderHostInfo(BuildInfo.Describe()));
+        services.AddExternalProvider<TariffHub>(TariffHub.Kind);
+        services.AddHostedService<ExternalTariffSelectionWatcher>();
         services.AddSingleton(provider =>
         {
             var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
@@ -151,7 +177,7 @@ public static class GleanvoltHostingExtensions
 
             return new TariffSettingsFile(
                 Path.GetFullPath(path),
-                string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant(),
+                TariffCurrency(options),
                 provider.GetServices<ITariffProvider>(),
                 provider.GetRequiredService<ILogger<TariffSettingsFile>>());
         });
@@ -1146,6 +1172,21 @@ public static class GleanvoltHostingExtensions
             app.MapGleanvoltWebUi(web);
         }
 
+        // The external data providers' hubs (#386), on the same port, behind their own tokens. Wherever
+        // the port is open, since a provider is a program like an API client and needs no web UI; not in
+        // setup mode, where nothing would act on what they send. Without the UI, nothing has put the
+        // authentication middleware in the pipeline yet.
+        if ((web.Enabled || api.Enabled) && !app.Services.GetRequiredService<ISetupState>().SetupMode)
+        {
+            if (!web.Enabled)
+            {
+                app.UseAuthentication();
+                app.UseAuthorization();
+            }
+
+            app.MapExternalProviders();
+        }
+
         // After the UI, so its authentication and antiforgery middleware are already in the pipeline when
         // both are on. Neither applies to these routes -- the API carries its own key check and speaks
         // JSON rather than forms -- and the order is what keeps that true rather than incidental.
@@ -1393,4 +1434,8 @@ public static class GleanvoltHostingExtensions
         writable
             ? client
             : new ReadOnlyModbusClient(client, services.GetRequiredService<ILogger<ReadOnlyModbusClient>>());
+
+    // Tariff:Currency as every price is labelled with it: upper case, CZK when unset.
+    private static string TariffCurrency(TariffOptions options) =>
+        string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant();
 }

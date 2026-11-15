@@ -20,8 +20,13 @@ public static class TariffNarrative
     /// <param name="currency">What prices are in.</param>
     /// <param name="now">The instant the line is about.</param>
     /// <param name="zone">The zone times are shown in — the site's, never the browser's.</param>
+    /// <param name="providerDisconnected">
+    /// True when the windows came from an external provider (#401) that has since disconnected: they
+    /// still count, until the last one ends, and the line says so.
+    /// </param>
     public static string? Describe(
-        TariffTimeline? timeline, string? unavailable, string currency, DateTimeOffset now, TimeZoneInfo zone)
+        TariffTimeline? timeline, string? unavailable, string currency, DateTimeOffset now, TimeZoneInfo zone,
+        bool providerDisconnected = false)
     {
         ArgumentNullException.ThrowIfNull(zone);
 
@@ -39,7 +44,17 @@ public static class TariffNarrative
 
         var line = string.Join(SharedText.ListSeparator, parts);
 
-        return timeline.NextChangeAfter(now) is { } change ? Localized.Format(SharedText.TariffUntil, line, When(change, now, zone)) : line;
+        line = timeline.NextChangeAfter(now) is { } change ? Localized.Format(SharedText.TariffUntil, line, When(change, now, zone)) : line;
+
+        // Where an external provider's windows came from, and whether it is still there.
+        if (timeline.Origin is { } origin)
+        {
+            line = providerDisconnected && timeline.Windows.Count > 0
+                ? Localized.Format(SharedText.TariffFromDisconnected, line, origin.Name, When(timeline.Windows[^1].Window.End, now, zone))
+                : Localized.Format(SharedText.TariffFrom, line, origin.Name);
+        }
+
+        return line;
     }
 
     // Today's change by its time alone; a later one with the day, since "until 06:00" said on a
