@@ -1,0 +1,151 @@
+@implements IDisposable
+@inject IExternalProviders Providers
+@inject NavigationManager Navigation
+@inject TimeProvider Time
+@inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+
+@*
+    External providers (#406): the one token every plugin connects with, and each kind's session at a
+    glance. The token was one per kind (#386), made in each kind's section; with more than one plugin
+    that was a token to make, copy and keep for each. The kinds' own panels keep their hub and the
+    session in detail, and point here for the token.
+
+    The token is kept in the secret store, so a signed-in owner can reveal and copy it again later, the
+    way the API keys are shown. Without a login the page only says that one exists, and no token can be
+    made: like everything else on Settings that changes what a program on the network may do.
+*@
+
+@if (Providers.All is { Count: > 0 } kinds)
+{
+    <section class="controls pv-editor external-providers" id="external-providers">
+        <div class="section-head tip-head">
+            <h2>@SettingsText.ExternalProviders</h2>
+            <InfoTip Topic="@SettingsText.ExternalProvidersTopic" Group="settings-info" Wide="true">
+                <p>@SettingsText.ExternalProvidersTip1</p>
+                <p>@SettingsText.ExternalProvidersTip2</p>
+            </InfoTip>
+        </div>
+
+        <p class="muted">@SettingsText.ExternalProvidersIntro</p>
+
+        <dl class="external-provider-address">
+            <dt>@SettingsText.ExternalAddress</dt>
+            <dd><code id="external-providers-address">@BaseAddress</code></dd>
+        </dl>
+
+        <h3>@SettingsText.ExternalToken</h3>
+
+        @if (!ReadOnly && Providers.HasToken && Providers.ReadToken() is { } token)
+        {
+            <div id="external-providers-token-value"><Secret Value="@token" /></div>
+        }
+        else
+        {
+            <p class="@(Providers.HasToken ? "muted" : "warning")" id="external-providers-token-state">
+                @(Providers.HasToken ? SettingsText.ExternalHasToken : SettingsText.ExternalNoToken)
+            </p>
+        }
+
+        @if (!ReadOnly)
+        {
+            <div class="control actions">
+                <button type="button" class="secondary" id="external-providers-token" disabled="@_busy" @onclick="CreateTokenAsync">
+                    @(Providers.HasToken ? SettingsText.ExternalRecreateToken : SettingsText.ExternalCreateToken)
+                </button>
+            </div>
+
+            @if (Providers.HasToken)
+            {
+                <p class="muted" id="external-providers-token-replaces">@SettingsText.ExternalNewTokenDisconnects</p>
+            }
+        }
+
+        @if (_error is { } error)
+        {
+            <p class="error" id="external-providers-error">@error</p>
+        }
+
+        <table class="sessions external-provider-kinds" id="external-providers-kinds">
+            <thead>
+                <tr>
+                    <th>@SettingsText.ExternalKind</th>
+                    <th>@SettingsText.ExternalHub</th>
+                    <th>@SettingsText.ExternalStatus</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var status in kinds)
+                {
+                    <tr id="external-providers-@status.Kind">
+                        <td><a href="#@Section(status.Kind)">@KindName(status)</a></td>
+                        <td><code>@status.HubPath</code></td>
+                        <td class="@(status.State == ExternalProviderState.Connected ? null : "muted")">
+                            @ExternalProviderStateText.Describe(status, Time.LocalTimeZone)
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    // The viewer's culture, for the renders a session change asks for (#290).
+    private readonly ViewerCulture _viewer = new();
+
+    private string? _error;
+    private bool _busy;
+
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
+
+    // What a provider is configured with: the SDK adds the hub path itself.
+    private string BaseAddress => Navigation.BaseUri.TrimEnd('/');
+
+    protected override void OnInitialized() => Providers.Changed += Refresh;
+
+    public void Dispose() => Providers.Changed -= Refresh;
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
+
+    private async Task CreateTokenAsync()
+    {
+        if (ReadOnly || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            await Providers.CreateTokenAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            _error = SettingsText.ExternalTokenFailed;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // The kind in the page's language; a kind this page does not know by name keeps its English one.
+    private static string KindName(ExternalProviderStatus status) => status.Kind switch
+    {
+        "tariff" => SettingsText.Tariff,
+        "solar-forecast" => SettingsText.SolarForecast,
+        _ => status.Name,
+    };
+
+    // Where the kind is turned on.
+    private static string Section(string kind) => kind switch
+    {
+        "tariff" => "tariff-editor",
+        "solar-forecast" => "solcast-editor",
+        _ => "external-providers",
+    };
+}

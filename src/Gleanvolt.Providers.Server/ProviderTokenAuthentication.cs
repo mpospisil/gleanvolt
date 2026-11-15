@@ -7,10 +7,10 @@ using Microsoft.Extensions.Options;
 namespace Gleanvolt.Providers.Server;
 
 /// <summary>
-/// Authenticates a provider by its kind's token (#386), separately from the web password and the API
-/// keys. The token comes as <c>Authorization: Bearer</c>, or as <c>access_token</c> in the query, which
-/// is the only way a browser-style WebSocket can carry it. The identity says which kind the token is
-/// for; the hub checks that against its own kind.
+/// Authenticates a provider by the provider token (#386, one for every kind since #406), separately
+/// from the web password and the API keys. The token comes as <c>Authorization: Bearer</c>, or as
+/// <c>access_token</c> in the query, which is the only way a browser-style WebSocket can carry it. The
+/// identity says which kind's hub was asked for; the hub checks that against its own kind.
 /// </summary>
 internal sealed class ProviderTokenAuthentication(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -34,10 +34,10 @@ internal sealed class ProviderTokenAuthentication(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        // The kind is the one whose hub is asked for: a token is checked against that kind alone.
-        if (registry.KindAt(Request.Path) is not { } kind || !registry.Tokens.Matches(kind.Id, token))
+        // The kind is the one whose hub is asked for; the token is the same for all of them.
+        if (registry.KindAt(Request.Path) is not { } kind || !registry.Tokens.Matches(token))
         {
-            return Task.FromResult(AuthenticateResult.Fail("Not this kind's provider token."));
+            return Task.FromResult(AuthenticateResult.Fail("Not the provider token."));
         }
 
         var identity = new ClaimsIdentity([new Claim(KindClaim, kind.Id)], SchemeName);

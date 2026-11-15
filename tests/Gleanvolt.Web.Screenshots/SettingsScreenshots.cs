@@ -112,7 +112,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             "solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: true, ExternalProviderState.Connected,
             ProviderId: "solar-forecast-sample", ProviderName: "Solar forecast sample", ProviderVersion: "1.0.0",
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
-        _providers.Tokens["solar-forecast"] = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
+        _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
 
         Capture(RenderPage<PvSystem>("/settings"), "settings-solar-forecast-external", selector: "#solcast-editor");
     }
@@ -134,9 +134,24 @@ public sealed class SettingsScreenshots : ScreenshotTest
             "tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Connected,
             ProviderId: "spot-prices", ProviderName: "Spot prices", ProviderVersion: "1.0.0",
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
-        _providers.Tokens["tariff"] = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
+        _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
 
         Capture(RenderPage<PvSystem>("/settings"), "settings-tariff-external", selector: "#tariff-editor");
+    }
+
+    /// <summary>External providers (#406): the one token, the tariff's provider connected, the forecast's awaited.</summary>
+    [Fact]
+    public void The_external_providers()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "spot-prices", ProviderName: "Spot prices", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
+        _providers.Set(new ExternalProviderStatus(
+            "solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: true, ExternalProviderState.Waiting));
+        _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
+
+        Capture(RenderPage<PvSystem>("/settings"), "settings-external-providers", selector: "#external-providers");
     }
 
     /// <summary>The API switched on, with the key the Home Assistant integration uses (#393).</summary>

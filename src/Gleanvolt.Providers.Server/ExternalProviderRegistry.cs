@@ -28,13 +28,20 @@ public sealed class ExternalProviderRegistry : IExternalProviders
         IEnumerable<ProviderKindRegistration> registrations)
     {
         _services = services;
-        Tokens = new ProviderTokens(secrets);
-        var logger = loggers.CreateLogger("Gleanvolt.Providers");
         var list = registrations.ToList();
+        Tokens = new ProviderTokens(secrets, list.Select(registration => registration.Kind.Id));
+        var logger = loggers.CreateLogger("Gleanvolt.Providers");
+
+        if (Tokens.AdoptedFrom is { } adopted)
+        {
+            logger.LogInformation(
+                "External providers now share one token (#406): the {Kind} provider's token is it, so that provider keeps connecting; every other provider needs it too.",
+                adopted);
+        }
 
         _sessions = [.. list.Select(registration => new ProviderSessions(
             registration.Kind,
-            Tokens.Exists(registration.Kind.Id),
+            Tokens.Exists,
             time,
             logger,
             connectionId => registration.Client(services, connectionId)))];
@@ -46,8 +53,10 @@ public sealed class ExternalProviderRegistry : IExternalProviders
         }
     }
 
-    /// <summary>The tokens.</summary>
+    /// <summary>The token every kind shares (#406).</summary>
     public ProviderTokens Tokens { get; }
+
+    public bool HasToken => Tokens.Exists;
 
     public IReadOnlyList<ExternalProviderStatus> All =>
         [.. _sessions.Select(sessions => IsEnabled(sessions.Kind)
@@ -77,16 +86,20 @@ public sealed class ExternalProviderRegistry : IExternalProviders
     internal ProviderKind? KindAt(PathString path) =>
         _sessions.Select(sessions => sessions.Kind).FirstOrDefault(kind => path.StartsWithSegments(kind.HubPath, StringComparison.OrdinalIgnoreCase));
 
-    public string? ReadToken(string kind) => For(kind) is { } sessions ? Tokens.Read(sessions.Kind.Id) : null;
+    public string? ReadToken() => Tokens.Read();
 
-    public async Task<string> CreateTokenAsync(string kind)
+    public async Task<string> CreateTokenAsync()
     {
-        var sessions = For(kind) ?? throw new ArgumentException($"There is no provider kind '{kind}'.", nameof(kind));
-        var token = Tokens.Create(sessions.Kind.Id)
+        var token = Tokens.Create()
             ?? throw new InvalidOperationException("The secret store did not keep the token.");
 
-        sessions.TokenChanged(hasToken: true);
-        await sessions.CloseAsync("token-replaced", "The owner made a new token; this connection used the old one.").ConfigureAwait(false);
+        // One token, so every session used the old one.
+        foreach (var sessions in _sessions)
+        {
+            sessions.TokenChanged(hasToken: true);
+            await sessions.CloseAsync("token-replaced", "The owner made a new token; this connection used the old one.").ConfigureAwait(false);
+        }
+
         return token;
     }
 

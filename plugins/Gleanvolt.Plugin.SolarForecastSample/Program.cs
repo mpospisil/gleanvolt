@@ -19,7 +19,7 @@ builder.Services.AddGleanvoltSolarForecastProvider<SampleForecast>(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
     options.Token = builder.Configuration["Gleanvolt:Token"]
-        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Settings → Solar forecast → External.");
+        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Settings → External providers.");
     options.ProviderId = "solar-forecast-sample";
     options.Name = "Solar forecast sample";
 });

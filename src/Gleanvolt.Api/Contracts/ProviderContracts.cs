@@ -10,7 +10,7 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="Kind">The kind's id, e.g. <c>tariff</c>.</param>
 /// <param name="Name">The kind's name.</param>
 /// <param name="HubPath">Where its SignalR hub is on the web port.</param>
-/// <param name="HasToken">Whether a token exists; without one nothing can connect.</param>
+/// <param name="HasToken">Whether the provider token exists: one for every kind (#406), so the same for all. Without it nothing can connect.</param>
 /// <param name="State">off, waiting, connected or disconnected.</param>
 /// <param name="ProviderId">The connected or last provider's id.</param>
 /// <param name="ProviderName">Its name.</param>

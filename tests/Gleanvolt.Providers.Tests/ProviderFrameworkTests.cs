@@ -71,7 +71,7 @@ public sealed class ProviderFrameworkTests : IAsyncLifetime
     public async Task ARegeneratedTokenRetiresTheOldOne()
     {
         var old = _host.Token;
-        await _host.Registry.CreateTokenAsync(EchoHub.Kind);
+        await _host.Registry.CreateTokenAsync();
 
         var failure = await Assert.ThrowsAsync<HttpRequestException>(() => _host.ConnectAsync(old));
 

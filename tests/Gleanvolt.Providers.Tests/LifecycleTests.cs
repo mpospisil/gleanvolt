@@ -27,7 +27,7 @@ public sealed class LifecycleTests : IAsyncDisposable
 
     public LifecycleTests()
     {
-        _token = new ProviderTokens(_secrets).Create(EchoHub.Kind)!;
+        _token = new ProviderTokens(_secrets).Create()!;
     }
 
     private ExternalProviderRegistry Registry => _gleanvolt!.Services.GetRequiredService<ExternalProviderRegistry>();

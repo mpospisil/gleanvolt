@@ -15,7 +15,7 @@ Some sections apply at once. Others are read only when Gleanvolt starts:
 
 | Applies at once | Needs a restart |
 |---|---|
-| Solar forecast, Weather, Tariff, Change password | Installation (the devices and the site), Car, Home Assistant, API access |
+| Solar forecast, Weather, Tariff, External providers, Change password | Installation (the devices and the site), Car, Home Assistant, API access |
 
 When a change needs a restart, the section says **Saved, not applied** and lists what changed, with a
 **Restart** button next to it. Restarting takes about half a minute. It pauses a charge in progress, and
@@ -37,6 +37,9 @@ From top to bottom:
 - **Solar forecast**: the Solcast account. See [Solar forecast](../solar-forecast/).
 - **Weather**: the OpenWeatherMap key. See [Weather](../weather/).
 - **Tariff**: your low-tariff hours. See [Grid tariff](../grid-tariff/).
+- **External providers**: shown when this Gleanvolt can take data from other programs. The one token
+  every such program connects with, and whether each one is connected. See the External steps in
+  [Grid tariff](../grid-tariff/) and [Solar forecast](../solar-forecast/).
 - **Change password**: the password for the Gleanvolt page. You get a new recovery key, and every
   browser is signed out.
 - **Home Assistant (MQTT)** and **API access**: for connecting other software. Leave them off if you

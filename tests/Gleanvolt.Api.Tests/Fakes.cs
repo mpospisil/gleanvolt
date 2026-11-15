@@ -423,9 +423,11 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public IReadOnlyList<ExternalProviderStatus> All => Statuses;
 
-    public Task<string> CreateTokenAsync(string kind) => Task.FromResult("gvp_test");
+    public bool HasToken => false;
 
-    public string? ReadToken(string kind) => null;
+    public Task<string> CreateTokenAsync() => Task.FromResult("gvp_test");
+
+    public string? ReadToken() => null;
 
     public event Action? Changed
     {

@@ -1022,7 +1022,7 @@
     <value>Externí</value>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>Tato data dodává program mimo Gleanvolt. Připojuje se na tuto adresu s tokenem níže.</value>
+    <value>Tato data dodává program mimo Gleanvolt. Připojuje se na tuto adresu s tokenem pro zdroje dat.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Adresa Gleanvoltu</value>
@@ -1034,7 +1034,7 @@
     <value>Token</value>
   </data>
   <data name="ExternalNoToken" xml:space="preserve">
-    <value>Token zatím není. Vytvořte ho a předejte zdroji dat.</value>
+    <value>Token zatím není. Vytvořte ho a předejte ho každému zdroji dat.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
     <value>Token existuje.</value>
@@ -1046,7 +1046,7 @@
     <value>Vytvořit nový token</value>
   </data>
   <data name="ExternalNewTokenDisconnects" xml:space="preserve">
-    <value>Nový token odpojí zdroj, který používá ten starý. Vytvořte ho, pokud token unikl.</value>
+    <value>Nový token odpojí všechny zdroje, dokud nedostanou ten nový. Vytvořte ho, pokud token unikl.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete ve Stavu.</value>
@@ -1058,7 +1058,7 @@
     <value>Vypnuto. Zapnete ho volbou Externí a uložením.</value>
   </data>
   <data name="ExternalState_NoToken" xml:space="preserve">
-    <value>Čeká se. Nejdřív vytvořte token, bez něj se žádný zdroj nepřipojí.</value>
+    <value>Čeká se. Nejdřív vytvořte token pro zdroje dat, bez něj se žádný zdroj nepřipojí.</value>
   </data>
   <data name="ExternalState_Waiting" xml:space="preserve">
     <value>Čeká se na připojení zdroje.</value>
@@ -1083,6 +1083,30 @@
   </data>
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Jeho poslední data byla odmítnuta:</value>
+  </data>
+  <data name="ExternalProviders" xml:space="preserve">
+    <value>Externí zdroje dat</value>
+  </data>
+  <data name="ExternalProvidersTopic" xml:space="preserve">
+    <value>externí zdroje dat</value>
+  </data>
+  <data name="ExternalProvidersTip1" xml:space="preserve">
+    <value>Programy mimo Gleanvolt, pluginy, mohou dodávat data místo vestavěného zdroje: tarif a předpověď výroby. Každý se připojuje k hubu svého druhu na této adrese.</value>
+  </data>
+  <data name="ExternalProvidersTip2" xml:space="preserve">
+    <value>Druh se zapíná ve své vlastní části, volbou Externí a uložením.</value>
+  </data>
+  <data name="ExternalProvidersIntro" xml:space="preserve">
+    <value>Všechny zdroje se připojují jedním tokenem níže. Předejte ho každému pluginu, který spouštíte.</value>
+  </data>
+  <data name="ExternalKind" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="ExternalTokenShared" xml:space="preserve">
+    <value>Token pro zdroje dat je v části {0}.</value>
+  </data>
+  <data name="ExternalTokenSharedMissing" xml:space="preserve">
+    <value>Token pro zdroje dat zatím není. Vytvořte ho v části {0}, bez něj se žádný zdroj nepřipojí.</value>
   </data>
   <data name="ForecastSource" xml:space="preserve">
     <value>Zdroj předpovědi</value>

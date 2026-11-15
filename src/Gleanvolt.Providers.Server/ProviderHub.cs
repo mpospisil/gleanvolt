@@ -94,7 +94,7 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
         if (Context.User?.FindFirst(ProviderTokenAuthentication.KindClaim)?.Value is not { } claimed
             || !string.Equals(claimed, kind.Id, StringComparison.OrdinalIgnoreCase))
         {
-            return (RefusalCodes.WrongKind, $"The token is not for the {kind.Name} provider.");
+            return (RefusalCodes.WrongKind, $"The connection was not authenticated for the {kind.Name} hub.");
         }
 
         if (!_registry.IsEnabled(kind))

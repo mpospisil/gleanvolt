@@ -60,7 +60,11 @@ that program; Gleanvolt does not come with one. Developers can find how to write
 
 1. Open **Settings**, find **Tariff**, choose **External** under **Provider**, and press **Save**.
 
-2. Press **Make a token**, then **Copy**. **Reveal** shows the token, now or any time later.
+2. Further down the page, under **External providers**, press **Make a token**, then **Copy**. If
+   a token is already there because another program uses it, copy that one: every program uses the
+   same token. **Reveal** shows it, now or any time later.
+
+   ![The External providers section: the Gleanvolt address, the token, and each kind of data with its hub and status.](../../../../assets/screenshots/settings-external-providers.png)
 
 3. Give the program the **Gleanvolt address** and the token.
 
@@ -69,13 +73,14 @@ that program; Gleanvolt does not come with one. Developers can find how to write
 
 </Steps>
 
-![The tariff section with External chosen: the address the program connects to, the token, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
+![The tariff section with External chosen: the address the program connects to, where the token is, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
 
 - **If the program disconnects, or Gleanvolt restarts**, Gleanvolt keeps using the tariff the program
   last sent, until its last time slot ends. After that there is no tariff restriction until the
   program is back.
 - **Starting order doesn't matter.** The program keeps trying until Gleanvolt answers, so it can be
   started before Gleanvolt, and it reconnects by itself after Gleanvolt restarts or is updated.
-- **If the token leaks**, press **Make a new token**. The program using the old one is disconnected.
+- **If the token leaks**, press **Make a new token** under **External providers**. Every program is
+  disconnected until you give it the new token.
 - **Choosing Table or None** disconnects the program, and it can't connect again until you choose
   **External**.

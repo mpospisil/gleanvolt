@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-15 — One token for every external provider (reverses #386's token per kind)
+
+**Found (#406).** With a second kind (#388), the token per kind that #386 chose meant a token to make,
+copy and keep for each plugin, made in each kind's own Settings section. The owner wants one key for
+all of Gleanvolt's plugins. The per-kind token bought only this: a leaked tariff token could not
+publish a forecast. In practice the plugins run side by side on the same machine and their tokens
+are kept in the same place, so whoever reads one reads both.
+
+**Decided.**
+- **One secret, `provider-token`.** `ProviderTokens` has no kind; `IExternalProviders` has
+  `HasToken`, `ReadToken()` and `CreateTokenAsync()`. A new token closes every kind's session with
+  `token-replaced`.
+- **The hub path still decides the kind.** The authentication handler puts the kind of the hub that
+  was asked for into the identity, as before, so a connection can only reach the hub it connected to.
+  `wrong-kind` stays in contract 1.x but is no longer sent.
+- **Migration at start.** When there is no shared token, the first kind's own token found
+  (registration order: the tariff, then the solar forecast) becomes it, so a plugin already set up
+  keeps connecting; then every `provider-token-<kind>` secret is deleted. A second plugin with its own
+  old token has to be given the shared one. The adoption is logged.
+- **Settings → External providers**, after the tariff: the address, the token behind Reveal/Copy,
+  Make a new token, and a table of the kinds with their hub and session. The kinds' own panels keep
+  their hub and session in detail and link there for the token, as a warning while there is none.
+- **The API is unchanged**: `hasToken` stays on each kind in `GET /providers`, now the same for all.
+
+**Consequences accepted.** A leaked token lets its holder publish any kind's data, not one. Making a
+new token disconnects every plugin, not just the leaked one's. A host with no kinds shows no section.
+
+---
+
 ## 2026-11-15 — The solar forecast as an external provider kind; provider hubs take 1 MiB messages
 
 **Found (#388).** With the store split from its sources (#387), an external forecast is one more

@@ -54,14 +54,17 @@ Two complete providers send fixed data:
 and [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
 a sunny bell curve. Don't run either against a live installation: Gleanvolt acts on what they send.
 
-## Tokens
+## The token
 
-Each kind has its own token, made on Settings with **Make a token**. Gleanvolt keeps it in the secret
-store, like the API keys, and Settings shows it masked, with **Reveal** and **Copy**, to a signed-in
-owner. Without a web login it is never shown. A new token disconnects the provider that used the old
-one.
+Every provider connects with one token, made on Settings under **External providers** with **Make a
+token**. Gleanvolt keeps it in the secret store, like the API keys, and Settings shows it masked, with
+**Reveal** and **Copy**, to a signed-in owner. Without a web login it is never shown. A new token
+disconnects every provider until each is given the new one.
 
-A token is separate from the web password and the API keys. It can only publish its own kind's data.
+The token is separate from the web password and the API keys. The hub a provider connects to decides
+which kind's data it can publish; the token lets it connect to any of them. Before #406 each kind had
+its own token: the first start after the upgrade keeps the tariff's (or, without one, the solar
+forecast's) as the shared token, so a provider already set up keeps connecting.
 
 The token goes in `Authorization: Bearer <token>`. A WebSocket from a browser-style client can't set
 headers, so the token is also accepted as `access_token` in the query string. A wrong or missing
@@ -88,14 +91,14 @@ changes when somebody changes a setting. The SDK waits 5 minutes.
 | `reasonCode` | Why |
 | --- | --- |
 | `disabled` | The owner hasn't turned the kind on. |
-| `wrong-kind` | The token is another kind's. |
+| `wrong-kind` | The connection was authenticated for another kind's hub. Not sent since one token serves every kind (#406). |
 | `contract-major` | The provider speaks another major version of the contract. |
 | `another-provider` | A different provider is connected for this kind. |
 | `invalid` | The id or the name is missing or malformed. |
 
 **Goodbye.** Before Gleanvolt closes a session itself, it sends `Goodbye(reasonCode, reason)`: the kind
 was turned off (`disabled`), a newer connection of the same provider replaced this one (`replaced`),
-or the owner made a new token (`token-replaced`).
+or the owner made a new token (`token-replaced`), which closes every kind's session.
 
 **Requests.** Gleanvolt never waits for a provider inside a call. When it wants fresh data, it sends a
 request with an id, and the provider answers with an ordinary publish that quotes that id. A request

@@ -87,7 +87,7 @@ public sealed class ExternalSolarForecastHubTests : IAsyncLifetime
         _app.MapExternalProviders();
         await _app.StartAsync();
 
-        _token = await Registry.CreateTokenAsync(SolarForecastContract.Kind);
+        _token = await Registry.CreateTokenAsync();
     }
 
     public async Task DisposeAsync()
