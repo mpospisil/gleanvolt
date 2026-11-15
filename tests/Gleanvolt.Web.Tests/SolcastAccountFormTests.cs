@@ -195,6 +195,29 @@ public class SolcastAccountFormTests : BunitContext
     }
 
     [Fact]
+    public void DisposingAfterTheServicesAreGoneDoesNotThrow()
+    {
+        // A prerender's request scope is disposed before its components, and a lookup in it then throws
+        // (#388, seen debugging). A transient that throws once the services are "gone" stands in for that:
+        // Dispose must use what was resolved at the start, not look it up again.
+        var sources = new FakeSolarForecastSourceSelection();
+        var gone = false;
+        Services.AddTransient<ISolarForecastSourceSelection>(_ =>
+            gone ? throw new ObjectDisposedException("IServiceProvider") : sources);
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false, ExternalProviderState.Off));
+        Services.AddSingleton<IExternalProviders>(providers);
+        var form = Render<SolcastAccountForm>();
+
+        gone = true;
+        form.Instance.Dispose();
+
+        // And it let go of the selection's event.
+        sources.Select(SolarForecastSourceIds.External);
+        Assert.Equal(1, form.RenderCount);
+    }
+
+    [Fact]
     public void WithoutTheSelectionNoSourceIsOffered()
     {
         var form = Render<SolcastAccountForm>();

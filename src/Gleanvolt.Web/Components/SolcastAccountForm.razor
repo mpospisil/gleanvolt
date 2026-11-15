@@ -177,8 +177,10 @@
     /// <summary>Whether to offer the choice of source. Not in the setup wizard, where no provider can connect yet.</summary>
     [Parameter] public bool OfferSource { get; set; } = true;
 
-    // Optional: a host without the selection (setup mode, a test host) offers Solcast alone.
-    private ISolarForecastSourceSelection? Sources => Services.GetService<ISolarForecastSourceSelection>();
+    // Optional: a host without the selection (setup mode, a test host) offers Solcast alone. Resolved
+    // once, in OnInitialized: Dispose runs after the prerender's request scope is disposed, and a lookup
+    // there throws ObjectDisposedException.
+    private ISolarForecastSourceSelection? Sources { get; set; }
 
     private bool ShowsExternal => OfferSource && Sources is not null && _source == SolarForecastSourceIds.External;
 
@@ -192,6 +194,7 @@
 
     protected override void OnInitialized()
     {
+        Sources = Services.GetService<ISolarForecastSourceSelection>();
         Reload();
         _source = Sources?.Selected ?? SolarForecastSourceIds.Solcast;
         Editor.Changed += OnChanged;
