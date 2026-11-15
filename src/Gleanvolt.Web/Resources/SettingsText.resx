@@ -1052,7 +1052,7 @@
     <value>No token yet. Make one and give it to the provider.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
-    <value>A token exists. It was shown once, when it was made. If it is lost or leaked, make a new one.</value>
+    <value>A token exists.</value>
   </data>
   <data name="ExternalCreateToken" xml:space="preserve">
     <value>Make a token</value>
@@ -1060,8 +1060,8 @@
   <data name="ExternalRecreateToken" xml:space="preserve">
     <value>Make a new token</value>
   </data>
-  <data name="ExternalTokenShownOnce" xml:space="preserve">
-    <value>Copy the token now. It is not shown again, and a provider using the old token is disconnected.</value>
+  <data name="ExternalNewTokenDisconnects" xml:space="preserve">
+    <value>A new token disconnects the provider that uses the old one. Make one if the token has leaked.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>The token could not be saved. See Health for the secret store.</value>

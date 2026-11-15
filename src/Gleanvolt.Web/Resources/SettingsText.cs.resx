@@ -1037,7 +1037,7 @@
     <value>Token zatím není. Vytvořte ho a předejte zdroji dat.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
-    <value>Token existuje. Zobrazil se jen jednou, při vytvoření. Pokud se ztratil nebo unikl, vytvořte nový.</value>
+    <value>Token existuje.</value>
   </data>
   <data name="ExternalCreateToken" xml:space="preserve">
     <value>Vytvořit token</value>
@@ -1045,8 +1045,8 @@
   <data name="ExternalRecreateToken" xml:space="preserve">
     <value>Vytvořit nový token</value>
   </data>
-  <data name="ExternalTokenShownOnce" xml:space="preserve">
-    <value>Token si teď zkopírujte. Znovu se nezobrazí a zdroj se starým tokenem se odpojí.</value>
+  <data name="ExternalNewTokenDisconnects" xml:space="preserve">
+    <value>Nový token odpojí zdroj, který používá ten starý. Vytvořte ho, pokud token unikl.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete ve Stavu.</value>

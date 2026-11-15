@@ -21,7 +21,7 @@ DECISIONS.md.
 - `Gleanvolt.Providers.Server`: `ProviderKind` (with the kind's own is-enabled check),
   `ProviderHub<TClient, TWelcome>` (hello, status, disconnect), `ProviderSessions` (attach, replace,
   refuse, detach, the pending request and its timeout on `TimeProvider`), `ExternalProviderRegistry`
-  (implements Core's new `IExternalProviders`), `ProviderTokens` (SHA-256 hash in the secret store),
+  (implements Core's new `IExternalProviders`), `ProviderTokens` (the token in the secret store, read back for Settings),
   `ProviderTokenAuthentication` (its own scheme and policy), `AddExternalProvider<THub>` and
   `MapExternalProviders`. Enums go over the wire as camelCase strings.
 - `Gleanvolt.Providers.Client` (MIT): `ProviderConnection<TWelcome>` as a `BackgroundService`: a
@@ -40,7 +40,7 @@ DECISIONS.md.
   as it does `/api`.
 - API: `GET /api/v1/providers`; `GET /tariff` gains `origin` and `receivedAt`. The OpenAPI contract
   snapshot is regenerated.
-- Web: `ExternalProviderPanel` (address, hub, token shown once, live status, the last refusal in the
+- Web: `ExternalProviderPanel` (address, hub, token masked with Reveal and Copy, live status, the last refusal in the
   viewer's language), `ExternalTariffPanel` registered for External, and the Overview's tariff line
   naming the provider and, after a disconnect, until when its windows run. Strings in
   `SettingsText`, `ServiceText` and `SharedText`, en and cs.
@@ -75,9 +75,9 @@ DECISIONS.md.
   currency in the welcome, the sample's windows as the timeline, a request answered and one unanswered
   without holding the worker, refused data, enums by name, windows counting after a disconnect until
   they end, and choosing Table closing the session). The real composition root: the hub behind its own
-  token with only the API on, past the password gate with the UI on, and the token stored as a hash.
+  token with only the API on, past the password gate with the UI on, and the token kept in the secret store and read back.
 - Core: each tariff rule, and the External strategy against the shared `TariffProviderContract`.
-- Web: the panel (address, token shown once, read-only without a login, live updates, problems) and
+- Web: the panel (address, token revealed after a reload, neither shown nor made without a login, live updates, problems) and
   the Overview's line.
 - The whole solution's tests pass, in Debug and the Release build. The three packages pack: Contracts
   and Client as MIT with their own README, Server under the repository's licence.

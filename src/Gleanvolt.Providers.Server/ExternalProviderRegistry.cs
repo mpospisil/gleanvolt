@@ -77,6 +77,8 @@ public sealed class ExternalProviderRegistry : IExternalProviders
     internal ProviderKind? KindAt(PathString path) =>
         _sessions.Select(sessions => sessions.Kind).FirstOrDefault(kind => path.StartsWithSegments(kind.HubPath, StringComparison.OrdinalIgnoreCase));
 
+    public string? ReadToken(string kind) => For(kind) is { } sessions ? Tokens.Read(sessions.Kind.Id) : null;
+
     public async Task<string> CreateTokenAsync(string kind)
     {
         var sessions = For(kind) ?? throw new ArgumentException($"There is no provider kind '{kind}'.", nameof(kind));

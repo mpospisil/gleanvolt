@@ -1473,16 +1473,23 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public List<string> TokensMade { get; } = [];
 
+    /// <summary>The tokens by kind, as the secret store would hold them.</summary>
+    public Dictionary<string, string> Tokens { get; } = [];
+
     public IReadOnlyList<ExternalProviderStatus> All => Statuses;
 
     public Task<string> CreateTokenAsync(string kind)
     {
         TokensMade.Add(kind);
+        var token = "gvp_" + new string((char)('a' + TokensMade.Count % 26), 43);
+        Tokens[kind] = token;
         var index = Statuses.FindIndex(status => status.Kind == kind);
         Statuses[index] = Statuses[index] with { HasToken = true };
         Changed?.Invoke();
-        return Task.FromResult("gvp_" + new string('x', 43));
+        return Task.FromResult(token);
     }
+
+    public string? ReadToken(string kind) => Tokens.GetValueOrDefault(kind);
 
     public void Set(ExternalProviderStatus status)
     {

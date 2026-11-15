@@ -89,15 +89,15 @@ public sealed class ProviderHubRegistrationTests : IDisposable
     }
 
     [Fact]
-    public async Task TheTokenIsKeptOnlyAsItsHash()
+    public async Task TheTokenIsKeptInTheSecretStoreSoSettingsCanRevealIt()
     {
         await using var app = Build(("Web:Enabled", "false"), ("Api:Enabled", "true"), ("Api:Keys:test", "an-api-key-0123456789"));
-        var token = await app.Services.GetRequiredService<IExternalProviders>().CreateTokenAsync("tariff");
+        var providers = app.Services.GetRequiredService<IExternalProviders>();
+        var token = await providers.CreateTokenAsync("tariff");
 
-        var stored = app.Services.GetRequiredService<ISecretStore>().Read(SecretNames.ProviderToken("tariff"));
-
-        Assert.StartsWith("sha256:", stored);
-        Assert.DoesNotContain(token, stored);
-        Assert.True(app.Services.GetRequiredService<IExternalProviders>().Find("tariff")!.HasToken);
+        Assert.Equal(token, app.Services.GetRequiredService<ISecretStore>().Read(SecretNames.ProviderToken("tariff")));
+        Assert.Equal(token, providers.ReadToken("tariff"));
+        Assert.Null(providers.ReadToken("no-such-kind"));
+        Assert.True(providers.Find("tariff")!.HasToken);
     }
 }

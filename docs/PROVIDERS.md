@@ -47,9 +47,10 @@ what it sends.
 
 ## Tokens
 
-Each kind has its own token, made on Settings with **Make a token**. It is shown once. Gleanvolt keeps
-only its SHA-256 hash, in the secret store, so a lost token is replaced rather than shown again. A
-new token disconnects the provider that used the old one.
+Each kind has its own token, made on Settings with **Make a token**. Gleanvolt keeps it in the secret
+store, like the API keys, and Settings shows it masked, with **Reveal** and **Copy**, to a signed-in
+owner. Without a web login it is never shown. A new token disconnects the provider that used the old
+one.
 
 A token is separate from the web password and the API keys. It can only publish its own kind's data.
 

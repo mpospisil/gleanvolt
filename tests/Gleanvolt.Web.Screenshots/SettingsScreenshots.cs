@@ -116,6 +116,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             "tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Connected,
             ProviderId: "spot-prices", ProviderName: "Spot prices", ProviderVersion: "1.0.0",
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
+        _providers.Tokens["tariff"] = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
 
         Capture(RenderPage<PvSystem>("/settings"), "settings-tariff-external", selector: "#tariff-editor");
     }

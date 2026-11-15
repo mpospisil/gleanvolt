@@ -16,11 +16,16 @@ public interface IExternalProviders
     ExternalProviderStatus? Find(string kind) => All.FirstOrDefault(status => string.Equals(status.Kind, kind, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Makes a new token for <paramref name="kind"/> and returns it. Only its hash is kept, so this is
-    /// the one time it can be shown. Replaces the old token and closes the current session, since the
-    /// usual reason to regenerate is a token that leaked.
+    /// Makes a new token for <paramref name="kind"/> and returns it. Replaces the old token and closes
+    /// the current session, since the usual reason to regenerate is a token that leaked.
     /// </summary>
     Task<string> CreateTokenAsync(string kind);
+
+    /// <summary>
+    /// <paramref name="kind"/>'s token, or null when it has none. For Settings to reveal to a
+    /// signed-in owner, like the API keys; never for the API.
+    /// </summary>
+    string? ReadToken(string kind);
 
     /// <summary>Raised when any kind's status changes: a session, its data, its token.</summary>
     event Action? Changed;

@@ -8,9 +8,10 @@
     live. Any kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the
     tariff, choosing External and saving).
 
-    The token is made here and shown once: only its hash is kept, so a lost token is replaced rather
-    than shown again. Making one needs a login, like everything else on Settings that changes what a
-    program on the network may do.
+    The token is made here and kept in the secret store, so a signed-in owner can reveal and copy it
+    again later, the way the API keys are shown. Without a login the page only says that one exists,
+    and no token can be made: like everything else on Settings that changes what a program on the
+    network may do.
 *@
 
 @if (Providers.Find(Kind) is { } status)
@@ -27,10 +28,9 @@
 
         <h3>@SettingsText.ExternalToken</h3>
 
-        @if (_token is { } token)
+        @if (!ReadOnly && status.HasToken && Providers.ReadToken(status.Kind) is { } token)
         {
-            <p class="warning" id="external-@(status.Kind)-token-once">@SettingsText.ExternalTokenShownOnce</p>
-            <Secret Value="@token" />
+            <div id="external-@(status.Kind)-token-value"><Secret Value="@token" /></div>
         }
         else
         {
@@ -46,6 +46,11 @@
                     @(status.HasToken ? SettingsText.ExternalRecreateToken : SettingsText.ExternalCreateToken)
                 </button>
             </div>
+
+            @if (status.HasToken)
+            {
+                <p class="muted" id="external-@(status.Kind)-token-replaces">@SettingsText.ExternalNewTokenDisconnects</p>
+            }
         }
 
         @if (_error is { } error)
@@ -87,7 +92,6 @@
 }
 
 @code {
-    private string? _token;
     private string? _error;
     private bool _busy;
 
@@ -118,7 +122,7 @@
 
         try
         {
-            _token = await Providers.CreateTokenAsync(Kind);
+            await Providers.CreateTokenAsync(Kind);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {

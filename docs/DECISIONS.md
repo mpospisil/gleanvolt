@@ -29,10 +29,13 @@ provider stall the control loop, and would tie every provider to this repository
 - **One active session per kind.** The same provider id reconnecting replaces its old session (the
   reconnect arrives before the old connection times out); a different provider is refused; a
   disconnect from an already-replaced connection is ignored.
-- **One token per kind**, made on Settings, shown once, stored only as its SHA-256 hash in the secret
-  store. It is checked against the hub's own kind, as a bearer header or as `access_token` in the
-  query, by its own authentication scheme, so the web UI's cookie stays the default for everything
-  else. A plain hash, not a slow one: the token is 256 random bits.
+- **One token per kind**, made on Settings and kept as it is in the secret store, like the API keys,
+  so a signed-in owner can reveal and copy it again behind the same masked control. It was first
+  kept only as a SHA-256 hash and shown once; the owner wanted to read it back when setting up a
+  provider, and the secret store already protects the API keys, which grant more. It is never shown
+  without a web login, and never by the API. It is checked, in constant time, against the hub's own
+  kind, as a bearer header or as `access_token` in the query, by its own authentication scheme, so
+  the web UI's cookie stays the default for everything else.
 - **The kind decides when it is on.** There is no separate enable switch: the tariff is on while
   `External` is the selected tariff, and a save that selects something else closes the session.
 - **The host owns the data.** A publish is checked against fixed rules and stored as one immutable

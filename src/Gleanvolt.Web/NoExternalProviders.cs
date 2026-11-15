@@ -10,6 +10,8 @@ internal sealed class NoExternalProviders : IExternalProviders
     public Task<string> CreateTokenAsync(string kind) =>
         throw new InvalidOperationException($"There is no external provider kind '{kind}' in this host.");
 
+    public string? ReadToken(string kind) => null;
+
     public event Action? Changed
     {
         add { }
