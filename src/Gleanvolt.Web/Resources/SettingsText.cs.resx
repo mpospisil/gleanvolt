@@ -1084,4 +1084,19 @@
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Jeho poslední data byla odmítnuta:</value>
   </data>
+  <data name="ForecastSource" xml:space="preserve">
+    <value>Zdroj předpovědi</value>
+  </data>
+  <data name="ForecastSource_External" xml:space="preserve">
+    <value>Externí</value>
+  </data>
+  <data name="ForecastSourceUnsaved" xml:space="preserve">
+    <value>Neuloženo: stále se používá {0}.</value>
+  </data>
+  <data name="ForecastSourceSaved" xml:space="preserve">
+    <value>Uloženo. Zdroj předpovědi: {0}.</value>
+  </data>
+  <data name="ForecastExternalIntro" xml:space="preserve">
+    <value>Režimy Forecasted a Targeted plánují podle předpovědi, kterou posílá tento zdroj. Dokud je vybrána volba Externí, Solcast se nevolá; jeho účet zůstává uložený pro chvíli, kdy Solcast znovu vyberete. Než zdroj pošle první předpověď, platí ta poslední.</value>
+  </data>
 </root>

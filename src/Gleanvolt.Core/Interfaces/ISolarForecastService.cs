@@ -58,4 +58,10 @@ public interface ISolarForecastService
     /// </summary>
     SolarDayForecastSummary? GetDaySummary(DateOnly localDate) =>
         GetDayForecast(localDate) is { } day ? SolarDayForecastSummary.Of(day) : null;
+
+    /// <summary>
+    /// The forecast held with where it came from and when it arrived (#388), for the Overview and the
+    /// API to name its source; null while nothing is held. The default knows no origin.
+    /// </summary>
+    SolarForecastSnapshot? Current => null;
 }

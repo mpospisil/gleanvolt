@@ -23,6 +23,14 @@ public static class ExternalProviderExtensions
     public const string PathPrefix = "/providers";
 
     /// <summary>
+    /// The largest message a provider may send, 1 MiB: SignalR's default of 32 KB is less than a week
+    /// of half-hour solar forecast periods (#388), and a message over the limit closes the connection
+    /// rather than failing the call. 14 days of 5-minute periods with both bands fit. Only these hubs,
+    /// which a token guards; the web UI's circuit keeps the default.
+    /// </summary>
+    public const long MaximumMessageBytes = 1024 * 1024;
+
+    /// <summary>
     /// Registers <typeparamref name="THub"/> as <paramref name="kind"/>'s hub. The first call also
     /// registers what every kind shares: the registry, the token scheme and the policy.
     /// </summary>
@@ -37,6 +45,7 @@ public static class ExternalProviderExtensions
             typeof(THub),
             (provider, connectionId) => provider.GetRequiredService<IHubContext<THub>>().Clients.Client(connectionId)));
         services.AddSingleton(new HubMapping(kind.HubPath, endpoints => endpoints.MapHub<THub>(kind.HubPath)));
+        services.AddSignalR().AddHubOptions<THub>(options => options.MaximumReceiveMessageSize = MaximumMessageBytes);
 
         return services;
     }

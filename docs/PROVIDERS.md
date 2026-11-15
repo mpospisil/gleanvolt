@@ -5,11 +5,12 @@ otherwise get from a built-in source. It runs in its own process, on the same ma
 one, connects to Gleanvolt's web port, and sends its data over a public, versioned contract. A
 provider that crashes or hangs can only make its own data stale. It cannot slow the controller down.
 
-There is one **kind** of provider so far:
+There are two **kinds** of provider:
 
 | Kind | Replaces | Hub | Turned on by |
 | --- | --- | --- | --- |
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
+| `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -44,9 +45,14 @@ refresh request, and waits longer after a refusal.
 To publish at other times, for example when day-ahead prices come out, resolve
 `TariffProviderConnection` and call `PublishNowAsync`.
 
-[`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) is a complete
-provider that sends a fixed pattern. Don't run it against a live installation: Gleanvolt acts on
-what it sends.
+A solar forecast provider is the same, with `AddGleanvoltSolarForecastProvider<T>` and an
+`ISolarForecastSource` whose `GetForecastAsync(PvSite site, …)` returns a `SolarForecastData`. Its
+connection is `SolarForecastProviderConnection`.
+
+Two complete providers send fixed data:
+[`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
+and [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
+a sunny bell curve. Don't run either against a live installation: Gleanvolt acts on what they send.
 
 ## Tokens
 
@@ -107,6 +113,7 @@ and the `Welcome` says which version the host speaks.
 | Kind | Major | Minor |
 | --- | --- | --- |
 | `tariff` | 1 | 0 |
+| `solar-forecast` | 1 | 0 |
 
 ## The tariff kind
 
@@ -161,6 +168,75 @@ the *low tariff only* options of the charging modes. They are saved in
 or a restart, the windows still count until the last one ends. After that, there is no tariff
 restriction until the provider publishes again.
 
+## The solar forecast kind
+
+Hub: `/providers/solar-forecast`.
+
+**`Hello(hello)` → `SolarForecastWelcome`.** On top of the common fields, the welcome carries the
+installation as `site`, so it is not configured twice. Anything the owner has not entered is `null`.
+
+```json
+"site": {
+  "latitude": 50.08, "longitude": 14.42,
+  "installedKwp": 9.6,
+  "azimuthDegrees": 180, "tiltDegrees": 35,
+  "timeZone": "Europe/Prague"
+}
+```
+
+`azimuthDegrees` is the compass bearing the array faces: 0 north, 90 east, 180 south, 270 west.
+`tiltDegrees` is from horizontal.
+
+**`Publish(data)` → `PublishResult`.** Replaces the forecast Gleanvolt holds, if the data passes every
+check. If any check fails, nothing changes, and the result lists the problems in English.
+
+```json
+{
+  "issuedAt": "2026-11-15T09:00:00Z",
+  "inReplyTo": null,
+  "periods": [
+    { "end": "2026-11-15T09:30:00Z", "length": "00:30:00", "powerWatts": 2100, "powerWattsP10": 1400, "powerWattsP90": 2600 },
+    { "end": "2026-11-15T10:00:00Z", "length": "00:30:00", "powerWatts": 2600 }
+  ]
+}
+```
+
+- A period is the expected **average** power over the `length` before its `end`, as Solcast stamps
+  its periods. `length` is a .NET `TimeSpan`: `"hh:mm:ss"`.
+- `powerWatts` is the median (P50). `powerWattsP10` and `powerWattsP90` are optional. Forecasted
+  and Targeted plan their guarantees on P10, and use P50 where it is missing.
+- `issuedAt` is when the forecast was made. Gleanvolt judges its age by it, as it judges Solcast's by
+  the fetch: a forecast older than `ChargeControl:Forecast:StaleForecastAfter` is not planned on.
+
+The data must meet these rules:
+
+- At least one period, and at most 5000.
+- Every time is in UTC (`Z` or `+00:00`).
+- Each period is 5 to 60 minutes long.
+- Periods are in order and don't overlap. Gaps are allowed, for example a night left out.
+- Every power is a number of at least 0, and P10 ≤ P50 ≤ P90 where the bands are given.
+- The last period ends after the moment of publishing, and no more than 14 days ahead.
+- The highest P50 is at most 1.2 × the installed kWp, when Gleanvolt knows it.
+
+Gleanvolt lists up to ten problems with single periods and counts the rest.
+
+**`RefreshRequested(request)`**, from Gleanvolt, asks for a fresh forecast: answer with `Publish`,
+with `inReplyTo` set to `request.id`. Gleanvolt asks on the forecast refresh schedule
+(`Solcast:RefreshInterval`, 3 hours by default), not through the night, and once when External is
+chosen. A request with no answer in 2 minutes shows on Settings. Publish unprompted whenever your
+forecast changes.
+
+**`SiteChanged(site)`**, from Gleanvolt, says the installation changed while connected. The
+installation is read at start, so for now a change arrives as a new welcome after the restart.
+
+**What Gleanvolt does with it.** The forecast replaces Solcast's for everything: the Forecasted and
+Targeted plans, the Overview's forecast table and the Forecast page, the forecast entities in Home
+Assistant, and `GET /api/v1/forecast`. The line under the Overview's table and `forecast` in
+`GET /api/v1/status` name where it came from. While External is selected, Solcast is not called.
+After a disconnect the last forecast stays in use, and the Overview says it is from a disconnected
+provider. There is no automatic fallback to Solcast. Unlike the tariff, the forecast is not kept
+across a restart of Gleanvolt: the provider's publish after its hello replaces it.
+
 ## The protocol, for a client in another language
 
 The hubs are [ASP.NET Core SignalR](https://learn.microsoft.com/aspnet/core/signalr/introduction)
@@ -184,7 +260,7 @@ are official ones for JavaScript and Java, and community ones for Python, Go and
      host. A connection that hears nothing for 30 seconds is closed.
 
 Property names are camelCase. Enums are strings (`"low"`), though numbers are read too. Times are
-ISO 8601.
+ISO 8601. One message may be up to 1 MiB; a larger one closes the connection.
 
-The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested` and `Goodbye` on
-the provider.
+The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
+(solar forecast only) and `Goodbye` on the provider.

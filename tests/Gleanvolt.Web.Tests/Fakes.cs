@@ -701,6 +701,9 @@ internal sealed class FakeSolarForecastService : ISolarForecastService
         Days.TryGetValue(localDate, out var day) ? day : null;
 
     public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
+
+    /// <summary>Where the forecast came from (#388); null for none held.</summary>
+    public SolarForecastSnapshot? Current { get; set; }
 }
 
 /// <summary>
@@ -1496,6 +1499,34 @@ internal sealed class FakeExternalProviders : IExternalProviders
         Statuses.RemoveAll(existing => existing.Kind == status.Kind);
         Statuses.Add(status);
         Changed?.Invoke();
+    }
+
+    public event Action? Changed;
+}
+
+/// <summary>The solar forecast source choice (#388) as a test describes it.</summary>
+internal sealed class FakeSolarForecastSourceSelection : ISolarForecastSourceSelection
+{
+    public string Selected { get; set; } = SolarForecastSourceIds.Solcast;
+
+    public IReadOnlyList<string> Available { get; set; } = [SolarForecastSourceIds.Solcast, SolarForecastSourceIds.External];
+
+    public List<string> Chosen { get; } = [];
+
+    /// <summary>When set, every choice is refused with it.</summary>
+    public SettingsSaveResult? Refusal { get; set; }
+
+    public SettingsSaveResult Select(string sourceId)
+    {
+        if (Refusal is { } refused)
+        {
+            return refused;
+        }
+
+        Chosen.Add(sourceId);
+        Selected = sourceId;
+        Changed?.Invoke();
+        return SettingsSaveResult.Success;
     }
 
     public event Action? Changed;

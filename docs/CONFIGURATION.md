@@ -200,8 +200,10 @@ key goes to the secret store and wins over the environment; **Remove** hands bac
 The API key is a secret: `Solcast__ApiKey` (`SOLCAST_API_KEY` in `deploy/.env`), never in
 `appsettings.json`.
 
-`SolarForecast:Source` chooses where the forecast comes from. `solcast` is the default and, for
-now, the only value.
+`SolarForecast:Source` chooses where the forecast comes from: `solcast`, the default, or `external`,
+a [provider](PROVIDERS.md#the-solar-forecast-kind) that publishes to Gleanvolt. **Settings → Solar
+forecast** sets it, at once and for the next start (saved in `pv-system.json`). While `external` is
+selected, Solcast is not called.
 
 With no account, the controller logs a warning and runs without a forecast. The free hobbyist tier
 allows about ten calls a day, and every start spends one, so keep `RefreshInterval` within your plan.

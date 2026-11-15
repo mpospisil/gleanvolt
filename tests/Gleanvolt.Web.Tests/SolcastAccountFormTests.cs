@@ -180,4 +180,161 @@ public class SolcastAccountFormTests : BunitContext
 
         PseudoLocale.AssertTranslated(form.Markup);
     }
+
+    // The source picker (#388): offered only where the host has the selection.
+    private (FakeSolarForecastSourceSelection Sources, FakeExternalProviders Providers) WithSources(string selected = SolarForecastSourceIds.Solcast)
+    {
+        var sources = new FakeSolarForecastSourceSelection { Selected = selected };
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false,
+            selected == SolarForecastSourceIds.External ? ExternalProviderState.Waiting : ExternalProviderState.Off));
+        Services.AddSingleton<ISolarForecastSourceSelection>(sources);
+        Services.AddSingleton<IExternalProviders>(providers);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        return (sources, providers);
+    }
+
+    [Fact]
+    public void DisposingAfterTheServicesAreGoneDoesNotThrow()
+    {
+        // A prerender's request scope is disposed before its components, and a lookup in it then throws
+        // (#388, seen debugging). A transient that throws once the services are "gone" stands in for that:
+        // Dispose must use what was resolved at the start, not look it up again.
+        var sources = new FakeSolarForecastSourceSelection();
+        var gone = false;
+        Services.AddTransient<ISolarForecastSourceSelection>(_ =>
+            gone ? throw new ObjectDisposedException("IServiceProvider") : sources);
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false, ExternalProviderState.Off));
+        Services.AddSingleton<IExternalProviders>(providers);
+        var form = Render<SolcastAccountForm>();
+
+        gone = true;
+        form.Instance.Dispose();
+
+        // And it let go of the selection's event.
+        sources.Select(SolarForecastSourceIds.External);
+        Assert.Equal(1, form.RenderCount);
+    }
+
+    [Fact]
+    public void WithoutTheSelectionNoSourceIsOffered()
+    {
+        var form = Render<SolcastAccountForm>();
+
+        Assert.Empty(form.FindAll("#forecast-source"));
+        Assert.NotNull(form.Find("#solcast-status"));
+    }
+
+    [Fact]
+    public void TheSourcesAreOfferedWithTheSelectedOneChecked()
+    {
+        WithSources();
+
+        var form = Render<SolcastAccountForm>();
+
+        Assert.True(form.Find("#forecast-source-solcast").HasAttribute("checked"));
+        Assert.False(form.Find("#forecast-source-external").HasAttribute("checked"));
+        Assert.Empty(form.FindAll("#forecast-source-save"));
+        Assert.Empty(form.FindAll("#external-solar-forecast"));
+    }
+
+    [Fact]
+    public void PickingExternalShowsItsPanelAndSavesOnlyWhenAsked()
+    {
+        var (sources, _) = WithSources();
+        var form = Render<SolcastAccountForm>();
+
+        form.Find("#forecast-source-external").Change(true);
+
+        Assert.Empty(sources.Chosen);
+        Assert.Contains("Solcast is still in use", form.Find("#forecast-source-unsaved").TextContent);
+        Assert.NotNull(form.Find("#external-solar-forecast"));
+        Assert.Empty(form.FindAll("#solcast-api-key"));
+
+        form.Find("#forecast-source-save").Click();
+
+        Assert.Equal([SolarForecastSourceIds.External], sources.Chosen);
+        Assert.Equal("Saved. Forecast source: External.", form.Find("#solcast-message").TextContent.Trim());
+        Assert.Empty(form.FindAll("#forecast-source-save"));
+    }
+
+    [Fact]
+    public void CancelGoesBackToTheSourceInUse()
+    {
+        var (sources, _) = WithSources();
+        var form = Render<SolcastAccountForm>();
+
+        form.Find("#forecast-source-external").Change(true);
+        form.Find("#forecast-source-cancel").Click();
+
+        Assert.Empty(sources.Chosen);
+        Assert.NotNull(form.Find("#solcast-api-key"));
+        Assert.Empty(form.FindAll("#external-solar-forecast"));
+    }
+
+    [Fact]
+    public void ARefusedChoiceSaysWhy()
+    {
+        var (sources, _) = WithSources();
+        sources.Refusal = SettingsSaveResult.Refused(["Could not write data/pv-system.json: disk full"]);
+        var form = Render<SolcastAccountForm>();
+
+        form.Find("#forecast-source-external").Change(true);
+        form.Find("#forecast-source-save").Click();
+
+        Assert.Contains("disk full", form.Find("#solcast-errors").TextContent);
+        Assert.NotNull(form.Find("#forecast-source-save"));
+    }
+
+    [Fact]
+    public void WithExternalSelectedTheProvidersPanelReplacesTheAccount()
+    {
+        WithSources(SolarForecastSourceIds.External);
+
+        var form = Render<SolcastAccountForm>();
+
+        Assert.True(form.Find("#forecast-source-external").HasAttribute("checked"));
+        Assert.Contains("Solcast is not called", form.Find("#forecast-external-intro").TextContent);
+        Assert.Contains("Waiting", form.Find("#external-solar-forecast-state").TextContent);
+        Assert.Empty(form.FindAll("#solcast-status"));
+    }
+
+    [Fact]
+    public void TheWizardDoesNotOfferTheSource()
+    {
+        WithSources(SolarForecastSourceIds.External);
+
+        var form = Render<SolcastAccountForm>(parameters => parameters.Add(component => component.OfferSource, false));
+
+        Assert.Empty(form.FindAll("#forecast-source"));
+        Assert.NotNull(form.Find("#solcast-status"));
+    }
+
+    [Fact]
+    public void WithoutALoginTheSourceCannotBeChanged()
+    {
+        using var open = new BunitContext();
+        open.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor { Settings = Account() });
+        open.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(Now, Prague));
+        open.Services.AddSingleton(Options.Create(new WebOptions()));
+        open.Services.AddSingleton(new WebPasswordState(null));
+        open.Services.AddSingleton<ISolarForecastSourceSelection>(new FakeSolarForecastSourceSelection());
+
+        var form = open.Render<SolcastAccountForm>();
+
+        Assert.True(form.Find("#forecast-source-external").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Every_string_of_the_external_source_comes_from_a_resource()
+    {
+        var (_, providers) = WithSources(SolarForecastSourceIds.External);
+        providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: true,
+            ExternalProviderState.Disconnected, "solar-forecast-sample", "Sample", "1.0", Now.AddHours(-1), Now.AddHours(-2), Unanswered: true));
+
+        var form = PseudoLocale.Render(() => Render<SolcastAccountForm>());
+
+        PseudoLocale.AssertTranslated(form.Markup, "Sample", "http://localhost", "/providers/solar-forecast", "gvp");
+    }
 }

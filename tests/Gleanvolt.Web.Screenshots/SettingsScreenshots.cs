@@ -34,6 +34,8 @@ public sealed class SettingsScreenshots : ScreenshotTest
     // With the External strategy too, as the controller registers it (#401).
     private readonly FakeTariffEditor _tariff = new(new Gleanvolt.Core.Strategies.ExternalTariffProvider());
     private readonly FakeExternalProviders _providers = new();
+    // Solcast, with External on offer, as the controller registers them (#388).
+    private readonly FakeSolarForecastSourceSelection _forecastSources = new();
     private readonly FakeEvEditor _car = new();
     private readonly FakeIntegrationsEditor _integrations = new();
 
@@ -76,6 +78,8 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.External, typeof(ExternalTariffPanel)));
         Services.AddSingleton<IExternalProviders>(_providers);
         _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: false, ExternalProviderState.Off));
+        _providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false, ExternalProviderState.Off));
+        Services.AddSingleton<ISolarForecastSourceSelection>(_forecastSources);
         Services.AddSingleton<IIntegrationsEditor>(_integrations);
         Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
         Services.AddSingleton<IDeviceDiscovery>(new NoDiscovery());
@@ -98,6 +102,20 @@ public sealed class SettingsScreenshots : ScreenshotTest
     [Fact]
     public void The_solar_forecast() =>
         Capture(RenderPage<PvSystem>("/settings"), "settings-solcast", selector: "#solcast-editor");
+
+    /// <summary>The External solar forecast (#388): the sample connected, its forecast received a minute ago.</summary>
+    [Fact]
+    public void The_solar_forecast_external()
+    {
+        _forecastSources.Selected = SolarForecastSourceIds.External;
+        _providers.Set(new ExternalProviderStatus(
+            "solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "solar-forecast-sample", ProviderName: "Solar forecast sample", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
+        _providers.Tokens["solar-forecast"] = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
+
+        Capture(RenderPage<PvSystem>("/settings"), "settings-solar-forecast-external", selector: "#solcast-editor");
+    }
 
     [Fact]
     public void The_weather() =>

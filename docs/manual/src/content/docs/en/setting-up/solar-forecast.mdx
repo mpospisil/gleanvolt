@@ -65,3 +65,38 @@ time it starts. So:
 - Restarting Gleanvolt many times in one day can use up the day's forecasts. It works again the next
   day.
 - If Solcast says the limit is reached, nothing is broken. Wait until tomorrow.
+
+## Or let another program supply it
+
+A program outside Gleanvolt can supply the forecast instead of Solcast, for example one that reads
+another forecast service. This is the **External** source. Somebody has to write or install that
+program; Gleanvolt does not come with one. Developers can find how to write one in
+[the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
+
+<Steps>
+
+1. Open **Settings**, find **Solar forecast**, choose **External** under **Source**, and press
+   **Save**.
+
+2. Press **Make a token**, then **Copy**. **Reveal** shows the token, now or any time later.
+
+3. Give the program the **Gleanvolt address** and the token.
+
+4. When the program connects, **Status** names it, and **Last data received** says when its forecast
+   arrived. The line under the Overview's forecast table names it too.
+
+</Steps>
+
+![The solar forecast section with External chosen: the address the program connects to, the token, and the Solar forecast sample program connected.](../../../../assets/screenshots/settings-solar-forecast-external.png)
+
+- **Solcast is not called while External is chosen.** Your Solcast account stays saved, so choosing
+  **Solcast** again needs nothing else.
+- **If the program disconnects**, Gleanvolt keeps planning on the forecast it last sent, and the
+  Overview says it is from a disconnected program. It does not go back to Solcast by itself.
+- **After Gleanvolt restarts**, there is no forecast until the program sends one, which it does as
+  soon as it reconnects.
+- **Starting order doesn't matter.** The program keeps trying until Gleanvolt answers, and it
+  reconnects by itself after Gleanvolt restarts or is updated.
+- **If the token leaks**, press **Make a new token**. The program using the old one is disconnected.
+- **Choosing Solcast** disconnects the program, and it can't connect again until you choose
+  **External**.

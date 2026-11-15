@@ -192,6 +192,9 @@ internal sealed class FakeSolarForecastService : ISolarForecastService
         _summaries.TryGetValue(localDate, out var summary) ? summary : null;
 
     public double? GetDayEnergyWattHours(DateOnly localDate) => GetDaySummary(localDate)?.ExpectedWh;
+
+    /// <summary>Where the forecast came from (#388); null unless a test sets it.</summary>
+    public SolarForecastSnapshot? Current { get; set; }
 }
 
 internal sealed class FakeWeatherService : IWeatherService

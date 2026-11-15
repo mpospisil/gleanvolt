@@ -607,4 +607,40 @@
   <data name="ExternalTariff_TooFar" xml:space="preserve">
     <value>Okna sahají dál než {0} dopředu.</value>
   </data>
+  <data name="SolarForecast_Empty" xml:space="preserve">
+    <value>Předpověď neobsahuje žádné úseky.</value>
+  </data>
+  <data name="SolarForecast_TooMany" xml:space="preserve">
+    <value>Úseků je {0}; přijme se nejvýš {1}.</value>
+  </data>
+  <data name="SolarForecast_NotUtc" xml:space="preserve">
+    <value>Úsek {0} není v UTC.</value>
+  </data>
+  <data name="SolarForecast_Length" xml:space="preserve">
+    <value>Úsek {0} má špatnou délku: úsek trvá {1} až {2}.</value>
+  </data>
+  <data name="SolarForecast_Negative" xml:space="preserve">
+    <value>Úsek {0} má výkon menší než nula, nebo výkon, který není číslo.</value>
+  </data>
+  <data name="SolarForecast_Bands" xml:space="preserve">
+    <value>V úseku {0} nejdou P10, P50 a P90 po sobě: P10 smí být nejvýš P50 a P90 nejméně P50.</value>
+  </data>
+  <data name="SolarForecast_Overlap" xml:space="preserve">
+    <value>Úsek {0} se překrývá s předchozím, nebo je mimo pořadí.</value>
+  </data>
+  <data name="SolarForecast_More" xml:space="preserve">
+    <value>Dalších {0} problémů s jednotlivými úseky není vypsáno.</value>
+  </data>
+  <data name="SolarForecast_Past" xml:space="preserve">
+    <value>Všechny úseky už skončily: předpověď neříká nic o tom, co teprve přijde.</value>
+  </data>
+  <data name="SolarForecast_TooFar" xml:space="preserve">
+    <value>Předpověď sahá dál než {0} dopředu.</value>
+  </data>
+  <data name="SolarForecast_Peak" xml:space="preserve">
+    <value>Předpověď vrcholí na {0}, víc než 1,2násobek instalovaného výkonu {1}.</value>
+  </data>
+  <data name="SolarForecast_UnknownSource" xml:space="preserve">
+    <value>{0} není zdroj předpovědi solární energie.</value>
+  </data>
 </root>

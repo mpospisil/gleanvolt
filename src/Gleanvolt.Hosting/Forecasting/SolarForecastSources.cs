@@ -17,6 +17,10 @@ public sealed class SolarForecastOptions
 /// names, read again whenever the configuration changes, so a switch needs no restart — the way a
 /// tariff strategy is switched. The refresh worker asks only the active source, and
 /// <see cref="Switched"/> wakes it to ask the new one at once.
+///
+/// <para>Settings chooses through <see cref="Select"/> (#388), which wins over the configuration for the
+/// rest of the process: the choice is saved to the overrides file, which is read only at the next
+/// start, so a configuration reload in between would otherwise bring the old source back.</para>
 /// </summary>
 public sealed class SolarForecastSources : IDisposable
 {
@@ -24,6 +28,7 @@ public sealed class SolarForecastSources : IDisposable
     private readonly ILogger<SolarForecastSources> _logger;
     private readonly IDisposable? _subscription;
     private volatile ISolarForecastSource? _active;
+    private volatile string? _chosen;
 
     public SolarForecastSources(
         IEnumerable<ISolarForecastSource> sources,
@@ -32,23 +37,52 @@ public sealed class SolarForecastSources : IDisposable
     {
         _sources = [.. sources];
         _logger = logger;
-        _active = Find(options.CurrentValue.Source);
-        _subscription = options.OnChange(Select);
+        Configured = options.CurrentValue.Source;
+        _active = Find(Configured);
+        _subscription = options.OnChange(next =>
+        {
+            Configured = next.Source;
+            if (_chosen is null)
+            {
+                Apply(next.Source);
+            }
+        });
     }
 
-    /// <summary>Raised when a configuration change selects a different source.</summary>
+    /// <summary>Raised when a configuration change or <see cref="Select"/> makes a different source active.</summary>
     public event Action? Switched;
 
     /// <summary>The source to ask, or null when <c>SolarForecast:Source</c> names none that is registered.</summary>
     public ISolarForecastSource? Active => _active;
 
+    /// <summary>What is selected: Settings' choice, or the configuration's, or <c>solcast</c> when neither says.</summary>
+    public string Selected => _active?.Id ?? Normalise(_chosen ?? Configured);
+
+    /// <summary>Every registered source's id, in registration order.</summary>
+    public IReadOnlyList<string> Ids => [.. _sources.Select(source => source.Id)];
+
+    private string? Configured { get; set; }
+
+    /// <summary>Whether <paramref name="id"/> names a registered source.</summary>
+    public bool Has(string? id) => _sources.Any(source => string.Equals(source.Id, Normalise(id), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Makes <paramref name="id"/> the active source for the rest of the process, over the
+    /// configuration, and raises <see cref="Switched"/> when that is a change.
+    /// </summary>
+    public void Select(string id)
+    {
+        _chosen = Normalise(id);
+        Apply(_chosen);
+    }
+
     public void Dispose() => _subscription?.Dispose();
 
     // A reload fires for any change to the configuration, often twice per save: only a different
     // source is news.
-    private void Select(SolarForecastOptions options)
+    private void Apply(string? id)
     {
-        var next = Find(options.Source);
+        var next = Find(id);
         var previous = Interlocked.Exchange(ref _active, next);
 
         if (ReferenceEquals(previous, next))
@@ -61,9 +95,12 @@ public sealed class SolarForecastSources : IDisposable
         Switched?.Invoke();
     }
 
+    private static string Normalise(string? id) =>
+        string.IsNullOrWhiteSpace(id) ? SolarForecastSourceIds.Solcast : id.Trim().ToLowerInvariant();
+
     private ISolarForecastSource? Find(string? id)
     {
-        var wanted = string.IsNullOrWhiteSpace(id) ? SolarForecastSourceIds.Solcast : id.Trim();
+        var wanted = Normalise(id);
         var source = _sources.FirstOrDefault(s => string.Equals(s.Id, wanted, StringComparison.OrdinalIgnoreCase));
 
         if (source is null)

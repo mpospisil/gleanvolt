@@ -12,13 +12,14 @@
   "plan-targeted-preview": "42cc93dd9d6433c8f0ac222e026a0b40e71051bc39f21f38cfb3733a50cc6441",
   "session-detail": "3e07b63d9cc7998c4c1c71c48c5a0ce481c150c12b991e7c213c9dc8536578a9",
   "sessions": "8325d7112791a59ecc10db6d9c623fd9ff45941214d21720e4a5be7e6abba31a",
-  "settings-api": "d4583b7b613f04bbbcc700970e7011fedf621d09ade3f06f90aa11a0264ae40e",
+  "settings-api": "cdbdd52f8cbde825ab66986fdad4d4cc28a139d52b73eeaa27d277201ea7e1cc",
   "settings-health": "85321623715f4fea38da93cee61dbd2adde4274ed259d5798db8c8b0efd12e3d",
-  "settings-installation": "6fefa604e6771cfdebdc18064c41241b03bd7eb27b94253c47a196c3cf522339",
-  "settings-solcast": "ab05ba12dbf29b6b0404c51806f920d6a2ad56cc2bbc0ed2d49096770a7da89c",
-  "settings-tariff": "57f66622232ee5fa89e16034368027387a3cb84e24657884da272018e0cfee98",
-  "settings-tariff-external": "18759d00e3c5e70d3436e92166c9371ae38d724ec3f21e9caf1dfd2ee8bf65ad",
-  "settings-weather": "0fae7c62f24062f090e87303ed9a4c66f7df3f20f40e86dfbe01d45b07e0d38e",
+  "settings-installation": "c4a8477fa3f4726b32e48fcf0270cba015d9af93a4cf7cfcdfce88465f32987d",
+  "settings-solar-forecast-external": "e35ac92e144ec2d2496b63091cf0a847c173fc3ecd570c354a9c3c39f6f01069",
+  "settings-solcast": "ce6e14fa3a43f600845c50dbd6bdd9e762d4723a797fa26593896fa3e085e235",
+  "settings-tariff": "20bfedf460e82cc165ec8e47670f7082db785db1a3d5fb61da6e8807022d73be",
+  "settings-tariff-external": "b4e21e2cf5667b6321468dbf0c92412a2abdf731b4b5fbb929248504228253fc",
+  "settings-weather": "4a40703615b842304229183ba5eb4563b3939d0579a5cc50f7c9e4345caf9c9a",
   "setup-password": "d5da1ddb0bc1f497929be7e20878de1e65ec68fce5816442fdf3d49f238bc3d2",
   "setup-recovery-key": "f472e28aaa9aae041600f9073e672559f23a4c52e7e3443c8f2a01926446685a",
   "wizard-car": "82b1b29559961cb166076e7c54eb0bb47137cc2c82418e9d4012fcfe6617c257",
@@ -27,5 +28,5 @@
   "wizard-finish": "6209cd952c05a1f9d17fe43d24ec7d0bdc7e1b2b33591533dc228e7d37e9c2c5",
   "wizard-search": "a951c761c4063231e0cc34847ecf94966414cf67bf0d3ce5b095cbf1acec90ee",
   "wizard-site": "73030151dc0a2e937f5ae96826a5616cc466f17dfb6e8a172039df6d34245ae6",
-  "wizard-solcast": "780382969dedf0d5b2507f0d3d5f95bc6bfdb3b5300dcdc41ab7cd8309ea1497"
+  "wizard-solcast": "637c0770701c9c4cc323631127930895d7665a399b5e28ef6cdf3c35c0d3c54a"
 }

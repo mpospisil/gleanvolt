@@ -775,6 +775,38 @@ public class DashboardPageTests : PageTest
     }
 
     [Fact]
+    public void Says_where_the_forecast_came_from_and_nothing_without_one()
+    {
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+        Assert.Empty(Render<Dashboard>().FindAll("#overview-forecast-origin"));
+
+        _forecast.Current = new SolarForecastSnapshot(
+            new SolarForecast(_time.Now, []), new SolarForecastOrigin(SolarForecastSourceIds.Solcast, "Solcast"), _time.Now);
+
+        var line = Render<Dashboard>().Find("#overview-forecast-origin");
+
+        Assert.StartsWith("Forecast from Solcast, received", line.TextContent);
+        Assert.Contains("muted", line.ClassList);
+    }
+
+    [Fact]
+    public void Warns_when_the_external_forecast_provider_is_gone()
+    {
+        // #388: the last forecast stays in use, and the line says whose it is.
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", true, ExternalProviderState.Disconnected));
+        Services.AddSingleton<IExternalProviders>(providers);
+        _forecast.Current = new SolarForecastSnapshot(
+            new SolarForecast(_time.Now, []), new SolarForecastOrigin(SolarForecastSourceIds.External, "Solar forecast sample"), _time.Now);
+        _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));
+
+        var line = Render<Dashboard>().Find("#overview-forecast-origin");
+
+        Assert.StartsWith("The external forecast provider Solar forecast sample is disconnected.", line.TextContent);
+        Assert.Contains("warning", line.ClassList);
+    }
+
+    [Fact]
     public void Explains_the_forecast_columns_in_the_tip_beside_the_heading()
     {
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Solar));

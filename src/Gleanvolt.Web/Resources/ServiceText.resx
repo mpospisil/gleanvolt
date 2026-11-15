@@ -640,4 +640,50 @@
     <value>The windows reach more than {0} ahead.</value>
     <comment>{0} a duration.</comment>
   </data>
+  <data name="SolarForecast_Empty" xml:space="preserve">
+    <value>There are no periods.</value>
+  </data>
+  <data name="SolarForecast_TooMany" xml:space="preserve">
+    <value>There are {0} periods; at most {1} are accepted.</value>
+    <comment>{0} how many were sent, {1} the limit.</comment>
+  </data>
+  <data name="SolarForecast_NotUtc" xml:space="preserve">
+    <value>Period {0} is not in UTC.</value>
+    <comment>{0} the period's number, from 1.</comment>
+  </data>
+  <data name="SolarForecast_Length" xml:space="preserve">
+    <value>Period {0} has the wrong length: a period is {1} to {2} long.</value>
+    <comment>{0} the period's number, {1} and {2} durations.</comment>
+  </data>
+  <data name="SolarForecast_Negative" xml:space="preserve">
+    <value>Period {0} has a power below zero, or one that is not a number.</value>
+    <comment>{0} the period's number.</comment>
+  </data>
+  <data name="SolarForecast_Bands" xml:space="preserve">
+    <value>In period {0}, P10, P50 and P90 are not in order: P10 must be at most P50, and P90 at least P50.</value>
+    <comment>{0} the period's number.</comment>
+  </data>
+  <data name="SolarForecast_Overlap" xml:space="preserve">
+    <value>Period {0} overlaps the one before, or is out of order.</value>
+    <comment>{0} the period's number.</comment>
+  </data>
+  <data name="SolarForecast_More" xml:space="preserve">
+    <value>{0} more problems with single periods are not listed.</value>
+    <comment>{0} a count.</comment>
+  </data>
+  <data name="SolarForecast_Past" xml:space="preserve">
+    <value>Every period has already ended: the forecast has nothing still to come.</value>
+  </data>
+  <data name="SolarForecast_TooFar" xml:space="preserve">
+    <value>The forecast reaches more than {0} ahead.</value>
+    <comment>{0} a duration.</comment>
+  </data>
+  <data name="SolarForecast_Peak" xml:space="preserve">
+    <value>The forecast peaks at {0}, more than 1.2 times the installed {1}.</value>
+    <comment>{0} the forecast's highest power, {1} the installation's peak power.</comment>
+  </data>
+  <data name="SolarForecast_UnknownSource" xml:space="preserve">
+    <value>{0} is not a solar forecast source.</value>
+    <comment>{0} what was asked for.</comment>
+  </data>
 </root>

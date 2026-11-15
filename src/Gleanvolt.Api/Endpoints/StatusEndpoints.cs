@@ -12,9 +12,9 @@ internal static class StatusEndpoints
 {
     internal static void MapStatus(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/status", (ChargeControlStatusHolder holder) =>
+        api.MapGet("/status", (ChargeControlStatusHolder holder, ISolarForecastService forecast) =>
             holder.Current is { } status
-                ? Results.Ok(StatusResponse.From(status))
+                ? Results.Ok(StatusResponse.From(status, forecast.Current))
                 : ApiResults.NotPolled())
             .WithName("getStatus")
             .WithSummary("The live state of the site")

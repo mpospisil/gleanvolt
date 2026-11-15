@@ -1103,4 +1103,23 @@
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Its last data was refused:</value>
   </data>
+  <data name="ForecastSource" xml:space="preserve">
+    <value>Source</value>
+    <comment>Label above the choice of where the solar forecast comes from: Solcast or External.</comment>
+  </data>
+  <data name="ForecastSource_External" xml:space="preserve">
+    <value>External</value>
+    <comment>The solar forecast source whose forecast another program publishes to Gleanvolt.</comment>
+  </data>
+  <data name="ForecastSourceUnsaved" xml:space="preserve">
+    <value>Not saved: {0} is still in use.</value>
+    <comment>{0} the source in use.</comment>
+  </data>
+  <data name="ForecastSourceSaved" xml:space="preserve">
+    <value>Saved. Forecast source: {0}.</value>
+    <comment>{0} the source now in use.</comment>
+  </data>
+  <data name="ForecastExternalIntro" xml:space="preserve">
+    <value>Forecasted and Targeted plan by the forecast this provider publishes. Solcast is not called while External is selected; its account is kept for when you choose Solcast again. Until the provider sends its first forecast, the last one stays in use.</value>
+  </data>
 </root>

@@ -61,7 +61,7 @@ which is the thing a client is generated from. Everything else is behind the key
 |---|---|
 | `GET /` | What this is, where the document is, how to authenticate, and every operation this build serves. **No key.** |
 | `GET /site` | Which installation this is: name, id, address, coordinates, the array's bearing, tilt, capacity and loss factor, and the devices it is made of with their models and addresses. Ask it first — every other endpoint reports what the controller is *doing*, and two installations answer those identically. |
-| `GET /status` | The live snapshot: mode, state, PV, grid, battery power and SOC, EV power and current, the hold, session energy, the running plan. 503 until the first poll completes. |
+| `GET /status` | The live snapshot: mode, state, PV, grid, battery power and SOC, EV power and current, the hold, session energy, the running plan, and where the solar forecast came from (`forecast`: `source`, `name`, `issuedAt`, `receivedAt`; `null` with no forecast). 503 until the first poll completes. |
 | `GET /health` | Which system is answering, the build version, age of the last poll, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read, and what protects the secrets in the data directory (`secretStore`). |
 | `GET /energy/intervals?from=&to=` | The recorded series — solar, forecast solar, import, export, EV, battery in and out, the SOC band, and each window's **coverage**. Defaults to the last 24 hours. |
 | `GET /energy/days/{date}` | One local day added up, so "how was Tuesday?" is one call rather than 96 rows. |

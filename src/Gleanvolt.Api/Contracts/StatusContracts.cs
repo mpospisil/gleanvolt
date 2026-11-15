@@ -55,6 +55,11 @@ namespace Gleanvolt.Api.Contracts;
 /// A <c>forecasted</c> session running <i>until full</i> (issue #279): since when, and which day of it this
 /// is. Null while another mode drives, or the option is off.
 /// </param>
+/// <param name="Forecast">
+/// Where the solar forecast behind the forecast figures came from and when (issue #388): Solcast, or an
+/// external provider by name. Null while no forecast is held, and in the status a control action
+/// answers with: read it from GET /status.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -82,9 +87,10 @@ public sealed record StatusResponse(
     TargetedPlanResponse? TargetedPlan,
     FastChargeResponse? FastCharge = null,
     LowTariffStatusResponse? LowTariff = null,
-    UntilFullStatusResponse? UntilFull = null)
+    UntilFullStatusResponse? UntilFull = null,
+    ForecastOriginResponse? Forecast = null)
 {
-    internal static StatusResponse From(ChargeControlStatus status) => new(
+    internal static StatusResponse From(ChargeControlStatus status, SolarForecastSnapshot? forecast = null) => new(
         status.Timestamp,
         status.Mode,
         status.State,
@@ -115,8 +121,16 @@ public sealed record StatusResponse(
         status.TargetedPlan is { } targeted ? TargetedPlanResponse.From(targeted) : null,
         status.FastCharge is { } fast ? FastChargeResponse.From(fast) : null,
         status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null,
-        status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null);
+        status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null,
+        forecast is { } held ? new ForecastOriginResponse(held.Origin.SourceId, held.Origin.Name, held.Forecast.RetrievedAt, held.ReceivedAt) : null);
 }
+
+/// <summary>Where the solar forecast came from.</summary>
+/// <param name="Source">The forecast source: <c>solcast</c> or <c>external</c>, as <c>SolarForecast:Source</c> names them.</param>
+/// <param name="Name">What to show for it: "Solcast", or the external provider's name.</param>
+/// <param name="IssuedAt">When the forecast was made: Solcast's fetch, or the time the provider stamped on it.</param>
+/// <param name="ReceivedAt">When Gleanvolt received it.</param>
+public sealed record ForecastOriginResponse(string Source, string Name, DateTimeOffset IssuedAt, DateTimeOffset ReceivedAt);
 
 /// <summary>What <i>low tariff only</i> is doing for the mode driving.</summary>
 /// <param name="Waiting">True while the mode holds the car back through high tariff.</param>

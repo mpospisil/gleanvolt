@@ -17,4 +17,7 @@ public static class SolarForecastSourceIds
 {
     /// <summary>The Solcast rooftop-sites API, and the default.</summary>
     public const string Solcast = "solcast";
+
+    /// <summary>An external provider connected to the solar forecast hub (#388).</summary>
+    public const string External = "external";
 }
