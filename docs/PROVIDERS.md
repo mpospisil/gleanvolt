@@ -5,12 +5,13 @@ otherwise get from a built-in source. It runs in its own process, on the same ma
 one, connects to Gleanvolt's web port, and sends its data over a public, versioned contract. A
 provider that crashes or hangs can only make its own data stale. It cannot slow the controller down.
 
-There are two **kinds** of provider:
+There are three **kinds** of provider:
 
 | Kind | Replaces | Hub | Turned on by |
 | --- | --- | --- | --- |
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
+| `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -49,10 +50,17 @@ A solar forecast provider is the same, with `AddGleanvoltSolarForecastProvider<T
 `ISolarForecastSource` whose `GetForecastAsync(PvSite site, …)` returns a `SolarForecastData`. Its
 connection is `SolarForecastProviderConnection`.
 
-Two complete providers send fixed data:
+A car provider uses `AddGleanvoltVehicleProvider<T>` and an `IVehicleSource` whose
+`GetReadingAsync(VehicleInfo car, …)` returns a `VehicleReading`, or null when it has nothing yet. Its
+connection is `VehicleProviderConnection`: call `PublishNowAsync` whenever the car reports something
+new, since Gleanvolt doesn't poll a car provider.
+
+Three complete providers send fixed data:
 [`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
-and [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
-a sunny bell curve. Don't run either against a live installation: Gleanvolt acts on what they send.
+[`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
+a sunny bell curve, and [`plugins/Gleanvolt.Plugin.VehicleSample`](../plugins/Gleanvolt.Plugin.VehicleSample)
+a car charging from 40 % to 80 %. Don't run any of them against a live installation: Gleanvolt acts on
+what they send.
 
 ## The token
 
@@ -104,8 +112,12 @@ or the owner made a new token (`token-replaced`), which closes every kind's sess
 request with an id, and the provider answers with an ordinary publish that quotes that id. A request
 that gets no answer within 2 minutes shows as "did not answer" on Settings. It changes nothing else.
 
-**Status.** `ReportStatus({ healthy, message })` tells the owner how the provider is doing, for
-example that its own source is down. It is shown next to the session.
+**Status.** `ReportStatus({ healthy, message, needsOwner })` tells the owner how the provider is
+doing, for example that its own source is down. It is shown next to the session. Set `needsOwner`
+with `healthy: false` when only the owner can fix it: an expired login, a consent screen, a code
+sent by email. For the car, that shows the sign-in band on every page and sets the Home Assistant
+**Car feed** entity to `NeedsOwner`. `needsOwner` was added in tariff and solar-forecast 1.1; an
+older host ignores it.
 
 ## Contract versions
 
@@ -115,8 +127,9 @@ and the `Welcome` says which version the host speaks.
 
 | Kind | Major | Minor |
 | --- | --- | --- |
-| `tariff` | 1 | 0 |
-| `solar-forecast` | 1 | 0 |
+| `tariff` | 1 | 1 |
+| `solar-forecast` | 1 | 1 |
+| `vehicle` | 1 | 0 |
 
 ## The tariff kind
 
@@ -240,6 +253,98 @@ After a disconnect the last forecast stays in use, and the Overview says it is f
 provider. There is no automatic fallback to Solcast. Unlike the tariff, the forecast is not kept
 across a restart of Gleanvolt: the provider's publish after its hello replaces it.
 
+## The vehicle kind
+
+Hub: `/providers/vehicle`. A program outside Gleanvolt reads the car and publishes what it says, so any
+car can be read without new code in Gleanvolt: a Tesla over BLE, a Hyundai or Kia cloud, an OBD
+dongle, a provider's own scraper. It takes the place of the built-in feeds: an installation reads its
+car from one feed, so External can't be combined with `Vehicle:Website` or `Vehicle:Skoda` (startup
+refuses), and sets the Data Act portal aside. The owner's MQTT topic may still run next to it.
+
+Turned on by `Vehicle:External:Enabled`, which the Car page writes. Like every feed choice, it takes a
+restart.
+
+**`Hello(hello)` → `VehicleWelcome`.** On top of the common fields, the welcome carries the car as
+Gleanvolt knows it, as `car`. A provider that serves one of several cars on an account picks the right
+one by it. Anything the owner hasn't entered is empty or `null`.
+
+```json
+"car": {
+  "id": "id4", "name": "Rosie",
+  "make": "Volkswagen", "model": "ID.4",
+  "batteryCapacityKWh": 77,
+  "timeZone": "Europe/Prague"
+}
+```
+
+The pack (capacity, efficiency, phases, currents) stays in Gleanvolt's `Ev:Vehicles[0]`. A provider
+never supplies it.
+
+**`Publish(reading)` → `PublishResult`.** Offers what the car last said about itself. It is stored if
+it passes every check; if any check fails, nothing changes, and the result lists the problems in
+English.
+
+```json
+{
+  "capturedAt": "2026-11-15T10:12:40+01:00",
+  "inReplyTo": null,
+  "socPercent": 64,
+  "rangeMetres": 281000,
+  "chargeTimeRemaining": "01:30:00",
+  "chargeState": "charging",
+  "plugState": "connected"
+}
+```
+
+- `capturedAt` is required, with its offset. It is when **the car** produced the reading, not when the
+  provider sent it: Gleanvolt judges the reading's age by it.
+- Everything else is optional, and absent means unknown, never zero. `chargeState` is `unknown`,
+  `idle`, `charging` or `complete`; `plugState` is `unknown`, `disconnected` or `connected`.
+  `chargeTimeRemaining` is a .NET `TimeSpan`: `"hh:mm:ss"`.
+
+The reading must meet these rules:
+
+- `capturedAt` is no more than 5 minutes ahead of Gleanvolt's clock and no older than 30 days.
+- `capturedAt` isn't older than the reading Gleanvolt holds, from any feed. The same time is
+  accepted: a car that hasn't reported since is a valid answer to a refresh.
+- `socPercent` is 0 to 100, `rangeMetres` 0 to 2 000 000 (2 000 km), `chargeTimeRemaining` 0 to 48
+  hours.
+- `chargeState` and `plugState` are values Gleanvolt knows.
+- At least one of `socPercent`, `rangeMetres`, `chargeState` or `plugState` is there.
+
+**Push, not poll.** Publish whenever the car has something new: plugging in, a charge starting or
+ending, a step in SOC. Gleanvolt doesn't ask on a clock.
+
+**`RefreshRequested(request)`**, from Gleanvolt, comes only when somebody presses *Ask the car* or a
+plan wants a fresh reading. Answer with `Publish`, with `inReplyTo` set to `request.id`, within 60
+seconds. Gleanvolt waits that long, on its own side, and then shows the feed as *didn't answer* and
+keeps the last reading.
+
+**`VehicleChanged(car)`**, from Gleanvolt, says the car changed while connected. The car is read at
+start, so for now a change arrives as a new welcome after the restart.
+
+**Read-only.** The kind carries no commands to the car: no start or stop, no target SOC, no wake-up.
+
+**What Gleanvolt does with it.** The reading goes where every feed's goes: the Overview's vehicle card
+("via" the provider's name), *Ask the car*, the Health page, the Home Assistant vehicle entities and
+**Car feed**, `GET /api/v1/vehicle`, and the conversion of a percentage target. `vehicleSource` in
+`GET /api/v1/status` says `external` and the provider's name. The reading stays advisory: nothing that
+writes to the charger or the inverter reads it, and `Vehicle:MaxAge` and the stale refusal for
+percentage targets apply unchanged.
+
+The feed's health, as the Overview, Health and **Car feed** show it:
+
+| Situation | Health |
+| --- | --- |
+| Connected, and the last reading was accepted | `Ok` |
+| Connected, nothing sent yet; or the last reading was refused | `Degraded` |
+| The provider didn't answer a refresh within 60 seconds | `Degraded`, until its next accepted reading |
+| `ReportStatus` with `healthy: false` | `Degraded` |
+| `ReportStatus` with `healthy: false, needsOwner: true` | `NeedsOwner` |
+| Waiting for a provider, or disconnected | `Degraded`; the last reading stays and ages |
+
+There is no fallback to another feed while the provider is away.
+
 ## The protocol, for a client in another language
 
 The hubs are [ASP.NET Core SignalR](https://learn.microsoft.com/aspnet/core/signalr/introduction)
@@ -266,4 +371,4 @@ Property names are camelCase. Enums are strings (`"low"`), though numbers are re
 ISO 8601. One message may be up to 1 MiB; a larger one closes the connection.
 
 The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
-(solar forecast only) and `Goodbye` on the provider.
+(solar forecast only), `VehicleChanged` (vehicle only) and `Goodbye` on the provider.

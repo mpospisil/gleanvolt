@@ -228,6 +228,49 @@ public class VehicleFeedRegistrationTests
         Assert.Null(configured.SetAside);
     }
 
+    private static readonly (string Key, string? Value)[] TheExternalProvider = [("Vehicle:External:Enabled", "true")];
+
+    [Theory]
+    [InlineData("Vehicle:Website:Enabled", "Vehicle:Website")]
+    [InlineData("Vehicle:Skoda:Enabled", "Vehicle:Skoda")]
+    public void An_external_provider_beside_a_live_feed_is_refused(string liveFeed, string named)
+    {
+        // One car, one feed (#408), as for the two live feeds.
+        var error = Assert.Throws<InvalidOperationException>(() => Services(
+            TheCar.Concat(TheExternalProvider).Concat([(liveFeed, "true")]).ToArray()));
+
+        Assert.Contains("Vehicle:External", error.Message);
+        Assert.Contains(named, error.Message);
+    }
+
+    [Fact]
+    public async Task An_external_provider_is_the_feed_and_sets_the_portal_aside()
+    {
+        var services = Services(TheCar.Concat(TheExternalProvider).Concat(ThePortalSwitchedOn).ToArray());
+
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
+
+        await using var provider = services.BuildServiceProvider();
+        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
+
+        var feed = Assert.IsType<Gleanvolt.Hosting.Vehicles.External.ExternalVehicleFeed>(configured.Service);
+        Assert.Equal("external", feed.Manufacturer);
+        Assert.True(feed.IsPushed);
+        Assert.StartsWith("Vehicle:External is enabled, so the Data Act portal is not used", configured.SetAside);
+
+        // The kind is on, and listed beside the tariff and the forecast.
+        var providers = provider.GetRequiredService<IExternalProviders>();
+        Assert.Equal(ExternalProviderState.Waiting, providers.Find("vehicle")!.State);
+    }
+
+    [Fact]
+    public async Task Without_the_external_provider_its_kind_is_listed_off()
+    {
+        await using var provider = Services(TheCar).BuildServiceProvider();
+
+        Assert.Equal(ExternalProviderState.Off, provider.GetRequiredService<IExternalProviders>().Find("vehicle")!.State);
+    }
+
     [Fact]
     public async Task With_no_feed_the_configured_feed_is_none()
     {

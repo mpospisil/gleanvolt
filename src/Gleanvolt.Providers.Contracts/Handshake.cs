@@ -90,7 +90,12 @@ public sealed record RefreshRequest(RequestId Id, DateTimeOffset RequestedAt);
 /// </summary>
 /// <param name="Healthy">False when the provider cannot currently get its data.</param>
 /// <param name="Message">What to show the owner, in English, or null.</param>
-public sealed record ProviderStatus(bool Healthy, string? Message = null);
+/// <param name="NeedsOwner">
+/// True when only the owner can fix it: an expired login, a consent screen, a code sent by email.
+/// Gleanvolt then asks the owner to act rather than waiting for it to clear. Added in tariff 1.1 and
+/// solar-forecast 1.1, and in vehicle from 1.0; a host that does not know it reads the status as unhealthy.
+/// </param>
+public sealed record ProviderStatus(bool Healthy, string? Message = null, bool NeedsOwner = false);
 
 /// <summary>What the host made of published data.</summary>
 /// <param name="Accepted">Whether it was stored. Data with any problem is refused as a whole.</param>
@@ -140,4 +145,5 @@ public static class ProviderMethods
     public const string Goodbye = "Goodbye";
     public const string RefreshRequested = "RefreshRequested";
     public const string SiteChanged = "SiteChanged";
+    public const string VehicleChanged = "VehicleChanged";
 }

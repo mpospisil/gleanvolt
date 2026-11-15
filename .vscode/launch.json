@@ -66,6 +66,22 @@
             }
         },
         {
+            "name": "Gleanvolt.Plugin.VehicleSample",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/plugins/Gleanvolt.Plugin.VehicleSample/bin/Debug/net10.0/Gleanvolt.Plugin.VehicleSample.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/plugins/Gleanvolt.Plugin.VehicleSample",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ROOT": "${env:HOME}/.dotnet",
+                "DOTNET_ENVIRONMENT": "Development",
+                "DOTNET_USE_POLLING_FILE_WATCHER": "true"
+            }
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"

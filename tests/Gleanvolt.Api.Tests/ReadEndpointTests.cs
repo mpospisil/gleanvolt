@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Net;
 using Gleanvolt.Core.Enums;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 
 namespace Gleanvolt.Api.Tests;
@@ -50,6 +51,45 @@ public sealed class ReadEndpointTests : IAsyncDisposable
         Assert.Equal("Solar forecast sample", forecast.Text("name"));
         Assert.Equal(issued, forecast.GetProperty("issuedAt").GetDateTimeOffset());
         Assert.Equal(issued.AddMinutes(2), forecast.GetProperty("receivedAt").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task Status_names_the_feed_the_car_is_read_from()
+    {
+        _host.VehicleFeed = new ConfiguredVehicleFeed(new ExternalFeed());
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var source = (await (await client.GetAsync("/api/v1/status")).ReadAsync()).GetProperty("vehicleSource");
+
+        Assert.Equal("external", source.Text("source"));
+        Assert.Equal("Vehicle sample", source.Text("name"));
+        Assert.Equal("ok", source.Text("health"));
+    }
+
+    [Fact]
+    public async Task Status_has_no_vehicle_source_without_a_feed()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        Assert.Equal(JsonValueKind.Null, (await (await client.GetAsync("/api/v1/status")).ReadAsync()).GetProperty("vehicleSource").ValueKind);
+    }
+
+    /// <summary>An external provider's feed as /status sees it.</summary>
+    private sealed class ExternalFeed : IVehicleUpdateService
+    {
+        public string VehicleId => "id4";
+
+        public string Manufacturer => "external";
+
+        public string DisplayName => "Vehicle sample";
+
+        public VehicleSourceHealth Health => VehicleSourceHealth.Ok("Vehicle sample is connected");
+
+        public TimeSpan NextDelay => Timeout.InfiniteTimeSpan;
+
+        public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) => Task.FromResult<VehicleState?>(null);
     }
 
     [Fact]

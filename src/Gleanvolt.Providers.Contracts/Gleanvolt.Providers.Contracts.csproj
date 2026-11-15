@@ -8,7 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Providers.Contracts</PackageId>
     <Description>The wire contract between Gleanvolt and an external data provider (#386): the handshake, the per-kind hub and client interfaces and their data. No dependencies. MIT, so a provider can be written under any licence.</Description>
-    <PackageTags>gleanvolt;signalr;provider;tariff;solar-forecast</PackageTags>
+    <PackageTags>gleanvolt;signalr;provider;tariff;solar-forecast;vehicle</PackageTags>
 
     <!--
       MIT, unlike the rest of the repository (see docs/DECISIONS.md): a provider author references only

@@ -68,6 +68,19 @@ public class ExternalProvidersFormTests : BunitContext
     }
 
     [Fact]
+    public void TheCarIsListedAndLinksToTheCarPage()
+    {
+        _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", false, ExternalProviderState.Off));
+
+        var form = RenderForm();
+
+        Assert.Contains("/providers/vehicle", form.Find("#external-providers-vehicle").TextContent);
+        Assert.Contains("on the Car page, save and restart", form.Find("#external-providers-vehicle").TextContent);
+        Assert.Equal("Car", form.Find("#external-providers-vehicle a").TextContent);
+        Assert.Equal("/car#car-editor", form.Find("#external-providers-vehicle a").GetAttribute("href"));
+    }
+
+    [Fact]
     public void WithoutATokenItSaysToMakeOne()
     {
         var form = RenderForm();

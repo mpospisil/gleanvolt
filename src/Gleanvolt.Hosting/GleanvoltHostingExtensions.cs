@@ -19,6 +19,7 @@ using Gleanvolt.Hosting.Tariff;
 using Gleanvolt.Hosting.Tariff.External;
 using Gleanvolt.Providers.Server;
 using Gleanvolt.Hosting.Vehicles;
+using Gleanvolt.Hosting.Vehicles.External;
 using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
@@ -878,8 +879,23 @@ public static class GleanvoltHostingExtensions
         var skoda = configuration.GetSection(SkodaApiOptions.SectionName).Get<SkodaApiOptions>()
             ?? new SkodaApiOptions();
 
+        // An external provider (#408): any car, read by a program outside Gleanvolt. One car, one feed,
+        // so it is refused beside a live feed and sets the Data Act portal aside, as a live feed does.
+        var external = configuration.GetValue<bool>(EvSettingKeys.ExternalEnabled);
+
+        if (external && (website.Enabled || skoda.Enabled))
+        {
+            throw new InvalidOperationException(
+                $"Vehicle:External and {(website.Enabled ? "Vehicle:Website" : "Vehicle:Skoda")} are both enabled, but an "
+                + "installation reads its car from one feed. Pick one on the Car page, or switch off "
+                + $"{(website.Enabled ? "VW_WEBSITE_ENABLED" : "SKODA_ENABLED")} or Vehicle__External__Enabled.");
+        }
+
         var portalSetAside = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration)
-            ? LiveFeedSettingAside(website, skoda)
+            ? external
+                ? "Vehicle:External is enabled, so the Data Act portal is not used: an external provider reads "
+                  + "this car. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
+                : LiveFeedSettingAside(website, skoda)
             : null;
 
         if (VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null)
@@ -954,6 +970,22 @@ public static class GleanvoltHostingExtensions
                 provider.GetRequiredService<TimeProvider>(),
                 provider.GetService<ILogger<SkodaApiUpdateService>>()));
         }
+
+        // The provider pushes over its hub on the web port; the feed is what Ask the car and a plan ask,
+        // and the hub is on only while this is the installation's feed. The kind is registered either
+        // way, so Settings lists it (off) beside the tariff and the forecast.
+        if (external)
+        {
+            services.AddSingleton(provider => new ExternalVehicleFeed(
+                provider,
+                provider.GetRequiredService<VehicleStateHolder>(),
+                provider.GetRequiredService<EvInfo>().Id,
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetRequiredService<ILogger<ExternalVehicleFeed>>()));
+            services.AddSingleton<IVehicleUpdateService>(provider => provider.GetRequiredService<ExternalVehicleFeed>());
+        }
+
+        services.AddExternalProvider<VehicleHub>(VehicleHub.Kind);
 
         // Registered whether or not a service exists: with none it logs that fact once and stops, which
         // is a supported installation rather than a misconfigured one.

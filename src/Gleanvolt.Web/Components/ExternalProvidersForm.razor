@@ -78,7 +78,7 @@
                 @foreach (var status in kinds)
                 {
                     <tr id="external-providers-@status.Kind">
-                        <td><a href="#@Section(status.Kind)">@KindName(status)</a></td>
+                        <td><a href="@Section(status.Kind)">@KindName(status)</a></td>
                         <td><code>@status.HubPath</code></td>
                         <td class="@(status.State == ExternalProviderState.Connected ? null : "muted")">
                             @ExternalProviderStateText.Describe(status, Time.LocalTimeZone)
@@ -138,14 +138,16 @@
     {
         "tariff" => SettingsText.Tariff,
         "solar-forecast" => SettingsText.SolarForecast,
+        "vehicle" => SettingsText.ExternalKindVehicle,
         _ => status.Name,
     };
 
-    // Where the kind is turned on.
+    // Where the kind is turned on: a section of this page, or the car's own page (#408).
     private static string Section(string kind) => kind switch
     {
-        "tariff" => "tariff-editor",
-        "solar-forecast" => "solcast-editor",
-        _ => "external-providers",
+        "tariff" => "#tariff-editor",
+        "solar-forecast" => "#solcast-editor",
+        "vehicle" => "/car#car-editor",
+        _ => "#external-providers",
     };
 }

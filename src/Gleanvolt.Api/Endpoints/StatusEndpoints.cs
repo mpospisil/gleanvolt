@@ -4,6 +4,7 @@ using Gleanvolt.Core.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Gleanvolt.Api.Endpoints;
 
@@ -12,9 +13,10 @@ internal static class StatusEndpoints
 {
     internal static void MapStatus(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/status", (ChargeControlStatusHolder holder, ISolarForecastService forecast) =>
+        api.MapGet("/status", (ChargeControlStatusHolder holder, ISolarForecastService forecast, IServiceProvider services) =>
             holder.Current is { } status
-                ? Results.Ok(StatusResponse.From(status, forecast.Current))
+                // The feed is looked up rather than injected: a host without a car has none registered.
+                ? Results.Ok(StatusResponse.From(status, forecast.Current, services.GetService<ConfiguredVehicleFeed>()?.Service))
                 : ApiResults.NotPolled())
             .WithName("getStatus")
             .WithSummary("The live state of the site")

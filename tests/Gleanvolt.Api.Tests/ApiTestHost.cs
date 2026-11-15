@@ -59,6 +59,9 @@ internal sealed class ApiTestHost : IAsyncDisposable
     /// </summary>
     internal EvInfo Car { get; set; } = EvInfo.Unknown;
 
+    /// <summary>The car's feed, or null for a host that registers none.</summary>
+    internal ConfiguredVehicleFeed? VehicleFeed { get; set; }
+
     internal TimeZoneInfo Zone { get; } = TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague");
 
     /// <summary>Starts the host and returns a client that already presents a valid key.</summary>
@@ -93,6 +96,11 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton(new ApiHostInfo("1.2.3-test", TimeSpan.FromHours(12)));
         builder.Services.AddSingleton(Fixtures.Site);
         builder.Services.AddSingleton(Car);
+        if (VehicleFeed is { } feed)
+        {
+            builder.Services.AddSingleton(feed);
+        }
+
         builder.Services.AddSingleton(new TargetedChargeRequestLimits(
             MaxHorizon: TimeSpan.FromHours(36),
             BatteryCapacityWh: batteryCapacityWh,

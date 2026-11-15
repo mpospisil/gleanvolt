@@ -31,6 +31,7 @@
     <!-- The tariff hub's tests drive it with the sample provider (#401), as a provider author would. -->
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.TariffSample\Gleanvolt.Plugin.TariffSample.csproj" />
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.SolarForecastSample\Gleanvolt.Plugin.SolarForecastSample.csproj" />
+    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.VehicleSample\Gleanvolt.Plugin.VehicleSample.csproj" />
   </ItemGroup>
 
 </Project>
