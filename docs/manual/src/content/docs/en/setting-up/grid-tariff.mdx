@@ -71,8 +71,11 @@ that program; Gleanvolt does not come with one. Developers can find how to write
 
 ![The tariff section with External chosen: the address the program connects to, the token, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
 
-- **If the program disconnects**, Gleanvolt keeps using the tariff it last sent, until its last time
-  slot ends. After that there is no tariff restriction until the program is back.
+- **If the program disconnects, or Gleanvolt restarts**, Gleanvolt keeps using the tariff the program
+  last sent, until its last time slot ends. After that there is no tariff restriction until the
+  program is back.
+- **Starting order doesn't matter.** The program keeps trying until Gleanvolt answers, so it can be
+  started before Gleanvolt, and it reconnects by itself after Gleanvolt restarts or is updated.
 - **If the token leaks**, press **Make a new token**. The program using the old one is disconnected.
 - **Choosing Table or None** disconnects the program, and it can't connect again until you choose
   **External**.

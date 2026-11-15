@@ -64,8 +64,17 @@ prices they are refused, because every `ITariffProvider` promises that no two ne
 
 **Consequences accepted.**
 - Per-slot spot prices can't be expressed until that `ITariffProvider` rule is relaxed.
-- The external tariff is kept in memory only: after a restart there is no tariff until the provider
-  has reconnected and published.
+- **Start order and restarts.** A provider and Gleanvolt start and stop independently. The SDK
+  treats "Gleanvolt is not running" like any lost connection: it connects again with its backoff
+  (2 s doubling to 1 minute), for as long as it runs, and says hello and publishes on each new
+  connection. SignalR's automatic reconnect is not used: it gives up after four tries in about 40
+  seconds and ignores the provider's delays, and a reconnect needs a new hello anyway.
+- **The external tariff survives a restart.** The last accepted windows are kept in
+  `external-tariff.json` beside `tariff.json` and restored before anything reads the tariff, checked
+  again against the current time and currency. Kept in memory only, a restarted controller would have
+  had no tariff until the provider was back, and no tariff is no restriction: a *low tariff only*
+  charge could have run at the high price in that gap. Until the provider reconnects, the Overview
+  says it is disconnected and when its windows run out.
 - A disconnected provider's windows still count until the last one ends. There is no automatic
   fallback to the table.
 - `Microsoft.AspNetCore.SignalR.Client` is pinned at 10.0.13 or later: earlier 10.0 versions are

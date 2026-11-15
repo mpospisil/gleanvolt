@@ -36,8 +36,11 @@ sealed class MyTariff : ITariffSource
 }
 ```
 
-The SDK connects with a backoff until Gleanvolt answers, says hello after every reconnect, publishes
-once after every accepted hello, answers every refresh request, and waits longer after a refusal.
+The SDK connects with a backoff (2 seconds, doubling to 1 minute) until Gleanvolt answers, and does
+the same whenever the connection is lost, for as long as the provider runs. So the provider can start
+before Gleanvolt, and Gleanvolt can restart or be updated under it, with nothing to do on either side.
+It says hello on every new connection, publishes once after every accepted hello, answers every
+refresh request, and waits longer after a refusal.
 To publish at other times, for example when day-ahead prices come out, resolve
 `TariffProviderConnection` and call `PublishNowAsync`.
 
@@ -65,8 +68,8 @@ token gets `401` before any connection is made.
 3. Gleanvolt answers with a `Welcome`. Until a hello is accepted, every other call on the connection
    is refused.
 4. The provider publishes its data, whenever it likes and in reply to Gleanvolt's requests.
-5. When the connection drops, the provider reconnects and says hello again: a reconnect is a new
-   connection to Gleanvolt.
+5. When the connection drops, or Gleanvolt isn't running yet or is restarting, the provider keeps
+   trying, and says hello again once connected: a reconnect is a new connection to Gleanvolt.
 
 **One session per kind.** The same provider id reconnecting replaces its old session, since a
 reconnect can arrive before the old connection has timed out. A different provider id is refused
@@ -153,10 +156,10 @@ unprompted whenever your data changes.
 
 **What Gleanvolt does with it.** The windows become the tariff: the Overview's tariff line, the
 `Low tariff`, `Tariff change` and `Grid price` entities in Home Assistant, `GET /api/v1/tariff`, and
-the *low tariff only* options of the charging modes. They are kept in memory: after a restart,
-Gleanvolt has no tariff until the provider has said hello and published again. After a disconnect,
-the windows still count until the last one ends. After that, there is no tariff restriction until the
-provider publishes again.
+the *low tariff only* options of the charging modes. They are saved in
+`external-tariff.json` beside `tariff.json`, so a restart of Gleanvolt keeps them. After a disconnect
+or a restart, the windows still count until the last one ends. After that, there is no tariff
+restriction until the provider publishes again.
 
 ## The protocol, for a client in another language
 

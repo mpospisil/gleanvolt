@@ -143,9 +143,23 @@ public static class GleanvoltHostingExtensions
 
         // The third is fed from outside (#401): an external provider publishes windows over its hub on
         // the web port. Choosing it on Settings is what turns the hub on, and a save that chooses
-        // something else closes the provider's session.
-        services.AddSingleton(provider => new ExternalTariffProvider(
-            new HubTariffRequests(provider, provider.GetRequiredService<TimeProvider>())));
+        // something else closes the provider's session. Its last windows are kept beside tariff.json,
+        // so a restart answers from them until the provider is back rather than from no tariff at all.
+        services.AddSingleton(provider =>
+        {
+            var time = provider.GetRequiredService<TimeProvider>();
+            var options = provider.GetRequiredService<IOptions<TariffOptions>>().Value;
+            var tariffPath = Path.GetFullPath(Path.IsPathRooted(options.Path)
+                ? options.Path
+                : Path.Combine(provider.GetRequiredService<IHostEnvironment>().ContentRootPath, options.Path));
+
+            var tariff = new ExternalTariffProvider(new HubTariffRequests(provider, time));
+            new ExternalTariffFile(
+                    Path.Combine(Path.GetDirectoryName(tariffPath)!, "external-tariff.json"),
+                    provider.GetRequiredService<ILogger<ExternalTariffFile>>())
+                .Attach(tariff, TariffCurrency(options), time.GetUtcNow());
+            return tariff;
+        });
         services.AddSingleton<ITariffProvider>(provider => provider.GetRequiredService<ExternalTariffProvider>());
         services.AddSingleton(new ProviderHostInfo(BuildInfo.Describe()));
         services.AddExternalProvider<TariffHub>(TariffHub.Kind);
@@ -163,7 +177,7 @@ public static class GleanvoltHostingExtensions
 
             return new TariffSettingsFile(
                 Path.GetFullPath(path),
-                string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant(),
+                TariffCurrency(options),
                 provider.GetServices<ITariffProvider>(),
                 provider.GetRequiredService<ILogger<TariffSettingsFile>>());
         });
@@ -1420,4 +1434,8 @@ public static class GleanvoltHostingExtensions
         writable
             ? client
             : new ReadOnlyModbusClient(client, services.GetRequiredService<ILogger<ReadOnlyModbusClient>>());
+
+    // Tariff:Currency as every price is labelled with it: upper case, CZK when unset.
+    private static string TariffCurrency(TariffOptions options) =>
+        string.IsNullOrWhiteSpace(options.Currency) ? "CZK" : options.Currency.Trim().ToUpperInvariant();
 }

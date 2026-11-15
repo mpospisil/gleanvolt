@@ -16,7 +16,9 @@ namespace Gleanvolt.Core.Strategies;
 /// <para><b>Asks without waiting.</b> <see cref="RefreshAsync"/> sends the request and returns; the
 /// answer arrives as a publish of its own. The refresh worker is never held by a provider.</para>
 ///
-/// <para>Not persisted: after a restart the provider reconnects and publishes again.</para>
+/// <para>Kept across a restart by Hosting's <c>ExternalTariffFile</c>, which restores the last
+/// windows before anything reads them and saves every publish: a restarted controller answers from
+/// them until the provider is back, as it does after a disconnect.</para>
 /// </summary>
 public sealed class ExternalTariffProvider : IRefreshingTariffProvider
 {

@@ -99,4 +99,29 @@ public sealed class TariffRegistrationTests : IDisposable
         Assert.Equal("/providers/tariff", tariff.HubPath);
         Assert.Equal(ExternalProviderState.Off, tariff.State);
     }
+
+    /// <summary>#401: the external windows are kept beside tariff.json, and a restart answers from them.</summary>
+    [Fact]
+    public void TheExternalWindowsAreKeptBesideTheTariffFileAcrossARestart()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var start = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, TimeSpan.Zero);
+        IReadOnlyList<TariffWindow> windows =
+        [
+            new(new TimeWindow(start, start.AddHours(2)), TariffRate.Low),
+            new(new TimeWindow(start.AddHours(2), start.AddHours(8)), TariffRate.High),
+        ];
+
+        using (var first = Start())
+        {
+            first.GetRequiredService<Gleanvolt.Core.Strategies.ExternalTariffProvider>().Publish(windows, new TariffOrigin("Spot prices", now));
+        }
+
+        Assert.True(File.Exists(Path.Combine(_root, "external-tariff.json")));
+
+        using var restarted = Start();
+        var tariff = restarted.GetRequiredService<Gleanvolt.Core.Strategies.ExternalTariffProvider>();
+        Assert.Equal(windows, tariff.Windows);
+        Assert.Equal("Spot prices", tariff.Origin!.Name);
+    }
 }

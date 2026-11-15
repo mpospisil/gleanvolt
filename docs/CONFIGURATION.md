@@ -250,8 +250,8 @@ Settings it is read-only until the UI has a login.
 - **Table** — the periods you type in, below.
 - **External** — windows another program publishes to Gleanvolt over its hub on the web port
   (#401): for a tariff a table can't hold, such as day-ahead spot prices. The token for it is made on
-  the same section. The windows are kept in memory and still count after the program disconnects,
-  until the last one ends. What such a program sends, and the rules it is held to, are in
+  the same section. The windows are saved in `external-tariff.json` beside `tariff.json`, and
+  still count after the program disconnects or Gleanvolt restarts, until the last one ends. What such a program sends, and the rules it is held to, are in
   [PROVIDERS.md](PROVIDERS.md).
 
 **The table.** Enter **only the low-tariff periods**; every other minute is high tariff. There are two

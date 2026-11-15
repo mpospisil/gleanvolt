@@ -10,9 +10,14 @@ using Microsoft.Extensions.Logging;
 namespace Gleanvolt.Providers.Client;
 
 /// <summary>
-/// One provider's connection to Gleanvolt, for any kind: connects, retries with a backoff (including
-/// the first connection, which SignalR's automatic reconnect does not cover), says hello after every
-/// connect and reconnect, and waits longer after a refusal. A kind derives from it, registers its own
+/// One provider's connection to Gleanvolt, for any kind: connects, says hello, and when the connection
+/// is lost or can't be made, connects again with a backoff, for as long as the provider runs. The
+/// provider can start before Gleanvolt, and Gleanvolt can restart under it: either is a connection
+/// that fails until Gleanvolt answers. It waits longer after a refusal.
+///
+/// <para>One path for every connection, rather than SignalR's automatic reconnect: that one gives up
+/// after four tries in about 40 seconds, ignores the options' delays, and a reconnect needs a new hello
+/// anyway, since it is a new connection to Gleanvolt.</para> A kind derives from it, registers its own
 /// handlers in <see cref="OnConfigure"/> and publishes from <see cref="OnWelcomedAsync"/>.
 ///
 /// <para>Handlers never block the receive loop: a host request is answered from a task of its own, so
@@ -126,7 +131,6 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
                 options.AccessTokenProvider = () => Task.FromResult<string?>(_options.Token);
                 _options.ConfigureHttp?.Invoke(options);
             })
-            .WithAutomaticReconnect()
             // Enums by name, as the host writes them and as the protocol page describes them.
             .AddJsonProtocol(json => json.PayloadSerializerOptions.Converters.Add(
                 new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)))
@@ -141,18 +145,14 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
             return Task.CompletedTask;
         });
 
-        connection.Reconnecting += _ =>
+        connection.Closed += error =>
         {
             _welcome = null;
-            Logger.LogInformation("Lost the connection to Gleanvolt; reconnecting.");
-            return Task.CompletedTask;
-        };
+            if (error is not null && !_goodbye)
+            {
+                Logger.LogInformation("Lost the connection to Gleanvolt ({Reason}); connecting again.", error.Message);
+            }
 
-        // A reconnect is a new connection to the host: the session has to be attached again.
-        connection.Reconnected += _ => HelloAsync(stoppingToken);
-
-        connection.Closed += _ =>
-        {
             closed.TrySetResult();
             return Task.CompletedTask;
         };
@@ -171,22 +171,8 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
         await closed.Task.WaitAsync(stoppingToken).ConfigureAwait(false);
 
         // Closed after a goodbye: the owner turned the kind off, or something replaced this session.
+        // Otherwise the connection was lost, Gleanvolt restarting for one: try again soon.
         return _goodbye ? _options.RefusedRetryDelay : _options.InitialRetryDelay;
-    }
-
-    private async Task HelloAsync(CancellationToken stoppingToken)
-    {
-        try
-        {
-            if (!await HelloCoreAsync(stoppingToken).ConfigureAwait(false))
-            {
-                await Connection.StopAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            Logger.LogWarning("The hello after a reconnect failed ({Reason}).", ex.Message);
-        }
     }
 
     // True when accepted.
@@ -212,7 +198,7 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
         Logger.LogInformation("Gleanvolt {Version} accepted the provider {Provider}.", welcome.HostVersion, _options.ProviderId);
         Welcomed?.Invoke(welcome);
 
-        // Its own task, so a slow source does not hold up the receive loop or the reconnect handler.
+        // Its own task, so a slow source does not hold up the receive loop or the session.
         _ = Task.Run(async () =>
         {
             try

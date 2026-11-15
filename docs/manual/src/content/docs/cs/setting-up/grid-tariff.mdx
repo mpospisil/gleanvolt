@@ -71,7 +71,10 @@ někdo napsat nebo nainstalovat; Gleanvolt žádný nemá. Vývojáři najdou po
 
 ![Sekce Tarif se zvoleným zdrojem Externí: adresa, na kterou se program připojuje, token a připojený program Spot prices.](../../../../assets/screenshots/settings-tariff-external.png)
 
-- **Když se program odpojí**, Gleanvolt dál používá tarif, který naposledy poslal, dokud neskončí jeho
-  poslední časový úsek. Potom se tarif nebere v úvahu, dokud se program nevrátí.
+- **Když se program odpojí nebo se Gleanvolt restartuje**, Gleanvolt dál používá tarif, který program
+  naposledy poslal, dokud neskončí jeho poslední časový úsek. Potom se tarif nebere v úvahu, dokud se
+  program nevrátí.
+- **Na pořadí spuštění nezáleží.** Program se připojuje, dokud Gleanvolt neodpoví, takže ho můžete
+  spustit i před Gleanvoltem, a po restartu nebo aktualizaci Gleanvoltu se připojí sám.
 - **Když token unikne**, stiskněte **Vytvořit nový token**. Program se starým tokenem se odpojí.
 - **Volba Tabulka nebo Žádný** program odpojí a znovu se připojit může, až zase zvolíte **Externí**.

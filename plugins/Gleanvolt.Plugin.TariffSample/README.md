@@ -26,6 +26,9 @@ It is not part of the container image or the release packages.
 The panel on Settings shows "Tariff sample connected", and the Overview's tariff line says
 "(from Tariff sample)".
 
+The order doesn't matter: started before Gleanvolt, the sample keeps trying until Gleanvolt answers,
+and it connects again by itself after Gleanvolt restarts.
+
 To write a real provider, start from `SampleTariff.cs`: implement `ITariffSource.GetTariffAsync` and
 register it with `AddGleanvoltTariffProvider<T>`. The rules the data must meet are in
 [docs/PROVIDERS.md](../../docs/PROVIDERS.md).

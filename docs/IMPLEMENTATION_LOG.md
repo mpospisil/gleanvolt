@@ -55,7 +55,21 @@ DECISIONS.md.
   manual's grid tariff page (en, cs) with a new screenshot. The existing `settings-tariff` picture now
   shows the External choice.
 
+**Start order and restarts.** A provider started before Gleanvolt, and Gleanvolt restarting under a
+connected provider, are both tested on Kestrel over a WebSocket on one fixed port, so "not running"
+is a refused TCP connection (`LifecycleTests`: start first, one restart with a second's downtime,
+three restarts in a row). The SDK no longer uses SignalR's automatic reconnect: every connection,
+first or after a loss, goes through the same loop with the provider's own backoff. The last accepted
+windows are saved in `Hosting/Tariff/External/ExternalTariffFile.cs` (`external-tariff.json` beside
+`tariff.json`), restored when the strategy is made and checked again against the time and currency
+(`ExternalTariffFileTests`, and a composition-root test in `TariffRegistrationTests`). The Overview
+treats a provider that hasn't come back since the start like a disconnected one.
+
 **Found along the way.**
+- SignalR's automatic reconnect retries at 0, 2, 10 and 30 seconds and then gives up; a restart of
+  15 seconds left the provider waiting for the 30-second try. Removed in favour of the SDK's loop.
+- Keeping the external tariff in memory only meant a restarted controller had no tariff until the
+  provider published again, which lifts every *low tariff only* restriction in that gap.
 - The SDK's closed signal was a semaphore shared across sessions: a refused session left a release
   behind, and the next session ended right after its hello. Each session now has its own completion
   source. The test that turns the kind on while the SDK waits caught it.
