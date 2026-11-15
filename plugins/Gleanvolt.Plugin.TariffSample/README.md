@@ -23,6 +23,16 @@ It is not part of the container image or the release packages.
      --Gleanvolt:Token=gvp_...
    ```
 
+To keep the token out of the command line and the shell history, store it once as a user secret.
+The sample reads user secrets however it is started, from `dotnet run`, VS Code's
+*Gleanvolt.Plugin.TariffSample* launch entry or another debugger:
+
+```sh
+dotnet user-secrets set Gleanvolt:Token gvp_... --project plugins/Gleanvolt.Plugin.TariffSample
+```
+
+Environment variables and command-line arguments still win over it.
+
 The panel on Settings shows "Tariff sample connected", and the Overview's tariff line says
 "(from Tariff sample)".
 
