@@ -139,4 +139,5 @@ public static class ProviderMethods
     public const string Publish = "Publish";
     public const string Goodbye = "Goodbye";
     public const string RefreshRequested = "RefreshRequested";
+    public const string SiteChanged = "SiteChanged";
 }

@@ -4,6 +4,51 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-15 — The solar forecast as an external provider kind; provider hubs take 1 MiB messages
+
+**Found (#388).** With the store split from its sources (#387), an external forecast is one more
+source plus a hub, following the tariff's pattern (#401). Two things did not carry over as planned.
+First, SignalR's default receive limit is 32 KB, and a week of half-hour periods with both bands is
+about 45 KB: the sample's first publish closed its connection ("Connection closed with an error"),
+and the SDK reconnected and tried again forever. The tariff's few windows never came near the limit.
+Second, `SolarForecast:Source` was plain configuration, and the overrides file Settings writes
+(`pv-system.json`) is read only at start, so saving there alone could not switch the source at once.
+
+**Decided.**
+- **A `solar-forecast` kind** at `/providers/solar-forecast`, contract 1.0. The welcome carries the
+  site (`PvSite`: coordinates, kWp, azimuth, tilt, IANA zone) so it is not configured twice. A
+  period is stamped by its end and carries its length, P50 and optional P10/P90, as Solcast's are.
+  The client may also receive `SiteChanged`, which this host does not send yet: the site is resolved
+  once at start, and a change arrives as a new welcome after the restart.
+- **`SolarForecastValidator` (Core)** refuses a forecast whole: empty, over 5000 periods, not UTC,
+  a period outside 5–60 min, a negative or non-finite power, bands out of order, an overlap or wrong
+  order, nothing still to come, beyond 14 days, or a P50 peak over 1.2 × the installed kWp. Gaps are
+  allowed. Single-period problems are listed up to ten and the rest counted.
+- **`ExternalSolarForecastSource`** sends `RefreshRequested` through `IHubContext` and returns; the
+  worker's schedule is unchanged. The hub publishes to the store with origin `external` and the
+  provider's name, dated by the provider's `issuedAt` (clamped to now), so the planner's staleness
+  rule judges a provider's forecast the way it judges Solcast's fetch.
+- **The selection is the switch.** Settings → Solar forecast writes `SolarForecast:Source` to
+  `pv-system.json` for the next start and calls `SolarForecastSources.Select`, which wins over the
+  configuration for the rest of the process. The kind is on while `external` is active; choosing
+  another source closes the session. While External is active, Solcast is not called, including by a
+  save of the Solcast account.
+- **Provider hubs accept messages up to 1 MiB** (`ExternalProviderExtensions.MaximumMessageBytes`),
+  set per hub, so the web UI's circuit keeps SignalR's default. 14 days of 5-minute periods with
+  both bands fit.
+
+**Consequences accepted.**
+- No automatic fallback to Solcast when the provider disconnects: the last forecast stays in use and
+  the Overview says it is from a disconnected provider.
+- Unlike the external tariff, the forecast is not saved across a restart. A restarted Gleanvolt has
+  no forecast until the provider's publish after its hello, which is seconds when it is running.
+- A choice saved on Settings outlives a reload of other configuration until the next start, when the
+  saved value is read anyway. A key set in the environment for `SolarForecast:Source` is overridden
+  by the saved one, as every key in `pv-system.json` overrides the environment.
+- The status a control action answers with has `forecast` null; `GET /status` fills it.
+
+---
+
 ## 2026-11-15 — The solar forecast is held by a store, and sources only publish to it
 
 **Found (#387).** `SolcastForecastService` was both the store (the cached forecast, the history and

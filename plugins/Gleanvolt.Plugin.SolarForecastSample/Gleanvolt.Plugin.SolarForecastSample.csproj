@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!--
+    A sample, not a product: never packed, never in the image or the release (#388). Built with the
+    solution so a change to the SDK that breaks it is seen.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>gleanvolt-plugin-solarforecastsample</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+  </ItemGroup>
+
+</Project>

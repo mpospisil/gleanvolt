@@ -560,6 +560,12 @@ else
         </tbody>
     </table>
 
+    @* Where the forecast came from (#388): Solcast or an external provider, and whether that provider is gone. *@
+    @if (ForecastOriginNarrative.Describe(Forecasts.Current, ForecastProviderState, Time.GetUtcNow(), Time.LocalTimeZone) is { } origin)
+    {
+        <p class="table-note @(origin.Stale ? "warning" : "muted")" id="overview-forecast-origin">@origin.Text</p>
+    }
+
         </div>
     </div>
 }
@@ -571,6 +577,10 @@ else
     private bool TariffProviderGone =>
         Services.GetService<IExternalProviders>() is { } providers
         && providers.Find("tariff")?.State is ExternalProviderState.Disconnected or ExternalProviderState.Waiting;
+
+    // The solar forecast provider's session (#388), for the line under the forecast table.
+    private ExternalProviderState? ForecastProviderState =>
+        Services.GetService<IExternalProviders>()?.Find("solar-forecast")?.State;
 
     // The viewer's culture, for the renders the poll and other threads ask for (#290).
     private readonly ViewerCulture _viewer = new();

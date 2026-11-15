@@ -64,3 +64,37 @@ při každém spuštění. Proto:
 
 - Mnoho restartů za jeden den může denní předpovědi vyčerpat. Další den to zase funguje.
 - Pokud Solcast hlásí vyčerpaný limit, nic není rozbité. Počkejte do zítřka.
+
+## Nebo ji nechte dodávat jiný program
+
+Předpověď může místo Solcastu dodávat program mimo Gleanvolt, například takový, který čte jinou
+předpovědní službu. Je to zdroj **Externí**. Takový program musí někdo napsat nebo nainstalovat;
+Gleanvolt žádný nemá. Vývojáři najdou postup v
+[příručce pro zdroje dat](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md) (anglicky).
+
+<Steps>
+
+1. Otevřete **Nastavení**, najděte **Předpověď solární energie**, u **Zdroj předpovědi** zvolte
+   **Externí** a stiskněte **Uložit**.
+
+2. Stiskněte **Vytvořit token** a pak **Kopírovat**. **Zobrazit** token ukáže, hned i kdykoli později.
+
+3. Předejte programu **Adresu Gleanvoltu** a token.
+
+4. Když se program připojí, **Stav** ho jmenuje a **Poslední data přišla** říká, kdy jeho předpověď
+   dorazila. Jmenuje ho i řádek pod tabulkou předpovědi na **Přehledu**.
+
+</Steps>
+
+![Sekce předpovědi se zvoleným zdrojem Externí: adresa, na kterou se program připojuje, token a připojený program Solar forecast sample.](../../../../assets/screenshots/settings-solar-forecast-external.png)
+
+- **Dokud je zvolen zdroj Externí, Solcast se nevolá.** Účet Solcastu zůstává uložený, takže pro
+  návrat stačí zvolit **Solcast**.
+- **Když se program odpojí**, Gleanvolt dál plánuje podle předpovědi, kterou program naposledy poslal,
+  a **Přehled** napíše, že je od odpojeného programu. Sám se k Solcastu nevrací.
+- **Po restartu Gleanvoltu** není žádná předpověď, dokud ji program nepošle. To udělá hned, jak se
+  znovu připojí.
+- **Na pořadí spuštění nezáleží.** Program se připojuje, dokud Gleanvolt neodpoví, a po restartu nebo
+  aktualizaci Gleanvoltu se připojí sám.
+- **Když token unikne**, stiskněte **Vytvořit nový token**. Program se starým tokenem se odpojí.
+- **Volba Solcast** program odpojí a znovu se připojit může, až zase zvolíte **Externí**.

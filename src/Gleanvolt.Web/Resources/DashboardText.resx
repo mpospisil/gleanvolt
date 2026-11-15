@@ -547,4 +547,12 @@
   <data name="LowTariffIgnored" xml:space="preserve">
     <value>Low tariff only is on, but no tariff is configured, so it charges at any hour.</value>
   </data>
+  <data name="ForecastFrom" xml:space="preserve">
+    <value>Forecast from {0}, received {1}.</value>
+    <comment>{0} the source: Solcast or an external provider's name; {1} a time, or a day and time.</comment>
+  </data>
+  <data name="ForecastFromDisconnected" xml:space="preserve">
+    <value>The external forecast provider {0} is disconnected. This forecast is its last, received {1}.</value>
+    <comment>{0} the provider's name; {1} a time, or a day and time.</comment>
+  </data>
 </root>

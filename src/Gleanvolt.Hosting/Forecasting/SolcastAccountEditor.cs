@@ -19,24 +19,34 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
     private readonly SolcastSource _forecast;
     private readonly ILogger<SolcastAccountEditor> _logger;
 
+    private readonly SolarForecastSources? _sources;
+
     public SolcastAccountEditor(
         SolcastAccountStore account,
         SolcastSource forecast,
         ILogger<SolcastAccountEditor> logger,
-        ISetupState? setup = null)
+        ISetupState? setup = null,
+        SolarForecastSources? sources = null)
     {
-        FetchesOnSave = setup?.SetupMode != true;
+        _setupMode = setup?.SetupMode == true;
         _account = account;
         _forecast = forecast;
         _logger = logger;
+        _sources = sources;
 
         // Every fetch, the worker's included, is news to a page showing the status.
         _forecast.StatusChanged += () => Changed?.Invoke();
     }
 
+    private readonly bool _setupMode;
+
     public event Action? Changed;
 
-    public bool FetchesOnSave { get; }
+    /// <summary>
+    /// Not in setup mode, and not while another source is selected (#388): Solcast is not called then,
+    /// so the account is kept for when it is chosen again.
+    /// </summary>
+    public bool FetchesOnSave => !_setupMode && (_sources?.Active is null or SolcastSource);
 
     public SolcastAccountSettings Read()
     {
@@ -91,7 +101,9 @@ public sealed class SolcastAccountEditor : ISolcastAccountEditor
         if (!FetchesOnSave)
         {
             _logger.LogInformation(
-                "Solcast account saved in setup mode for rooftop site {ResourceId}; the forecast is fetched when the controller starts.",
+                _setupMode
+                    ? "Solcast account saved in setup mode for rooftop site {ResourceId}; the forecast is fetched when the controller starts."
+                    : "Solcast account saved for rooftop site {ResourceId}; another forecast source is selected, so it is used once Solcast is chosen.",
                 site);
 
             return new SolcastAccountSaveResult([], persisted);

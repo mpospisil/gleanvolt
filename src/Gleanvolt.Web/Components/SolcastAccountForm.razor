@@ -1,8 +1,10 @@
+@using Microsoft.Extensions.DependencyInjection
 @implements IDisposable
 @inject ISolcastAccountEditor Editor
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
 @inject TimeProvider Time
+@inject IServiceProvider Services
 
 @*
     The Solcast account (issue #286): the API key and the rooftop site the forecast is fetched for.
@@ -17,6 +19,13 @@
     The key box is always empty, on every load and after every save, as the car's password is: a field
     that rendered its value back would put the key on the wire for every browser that opened the page.
     The key in use is behind Secret instead, and only behind a login.
+*@
+
+@*
+    Above the account, the source (#388): Solcast, or an external provider that publishes over its hub.
+    Choosing one and saving applies at once, and the section below follows the choice: the Solcast
+    account, or the provider's address, token and session. While External is selected Solcast is not
+    called, and the account stays for when it is chosen again.
 *@
 
 <section class="controls pv-editor solcast-editor" id="solcast-editor">
@@ -35,62 +44,102 @@
         </InfoTip>
     </div>
 
-    <p class="muted">
-        @(Editor.FetchesOnSave ? SettingsText.SolcastIntro : SettingsText.SolcastIntroSetupMode)
-    </p>
-
-    <p class="@(_settings.Status.Failure == SolcastFetchFailure.None ? "muted" : "error")" id="solcast-status" role="status">
-        @StatusLine()
-    </p>
-
-    @if (ReadOnly)
+    @if (OfferSource && Sources is { Available.Count: > 1 } sources)
     {
-        <p class="muted" id="solcast-readonly">
-            @Localized.Rich(SettingsText.SolcastReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>SOLCAST_API_KEY</code>, @<code>SOLCAST_RESOURCE_ID</code>, @<code>.env</code>)
-        </p>
+        <div class="control">
+            <span class="control-label" id="forecast-source-label">@SettingsText.ForecastSource</span>
+            <div class="seg" role="radiogroup" id="forecast-source" aria-labelledby="forecast-source-label">
+                @foreach (var id in sources.Available)
+                {
+                    var source = id;
+
+                    <label class="seg-opt">
+                        <input type="radio" name="forecast-source" id="forecast-source-@source" disabled="@(ReadOnly || _busy)"
+                               checked="@(source == _source)" @onchange="() => PickSource(source)" />
+                        @SourceLabel(source)
+                    </label>
+                }
+            </div>
+            @if (_source != sources.Selected)
+            {
+                <span class="hint" id="forecast-source-unsaved">@Localized.Format(SettingsText.ForecastSourceUnsaved, SourceLabel(sources.Selected))</span>
+            }
+        </div>
+
+        @if (!ReadOnly && _source != sources.Selected)
+        {
+            <div class="control actions">
+                <button type="button" class="primary" id="forecast-source-save" disabled="@_busy" @onclick="SaveSource">@SettingsText.SaveButton</button>
+                <button type="button" class="secondary" id="forecast-source-cancel" disabled="@_busy" @onclick="CancelSource">@SettingsText.Cancel</button>
+            </div>
+        }
+    }
+
+    @if (ShowsExternal)
+    {
+        <p class="muted" id="forecast-external-intro">@SettingsText.ForecastExternalIntro</p>
+
+        <ExternalProviderPanel Kind="solar-forecast" ReadOnly="ReadOnly" />
     }
     else
     {
-        <div class="pv-fields">
-            <div class="pv-field">
-                <label for="solcast-api-key">@SettingsText.ApiKey</label>
-                <RevealInput>
-                    <input id="solcast-api-key" type="password" autocomplete="new-password" spellcheck="false"
-                           placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
+        <p class="muted">
+            @(Editor.FetchesOnSave ? SettingsText.SolcastIntro : SettingsText.SolcastIntroSetupMode)
+        </p>
+
+        <p class="@(_settings.Status.Failure == SolcastFetchFailure.None ? "muted" : "error")" id="solcast-status" role="status">
+            @StatusLine()
+        </p>
+
+        @if (ReadOnly)
+        {
+            <p class="muted" id="solcast-readonly">
+                @Localized.Rich(SettingsText.SolcastReadOnly, @<code>Web__PasswordHash</code>, @<code>hash-password</code>, @<code>SOLCAST_API_KEY</code>, @<code>SOLCAST_RESOURCE_ID</code>, @<code>.env</code>)
+            </p>
+        }
+        else
+        {
+            <div class="pv-fields">
+                <div class="pv-field">
+                    <label for="solcast-api-key">@SettingsText.ApiKey</label>
+                    <RevealInput>
+                        <input id="solcast-api-key" type="password" autocomplete="new-password" spellcheck="false"
+                               placeholder="@(_settings.IsConfigured ? SettingsText.Unchanged : SettingsText.NotSet)"
+                               disabled="@_busy"
+                               value="@_apiKey"
+                               @oninput="e => Edit(() => _apiKey = Text(e))" />
+                    </RevealInput>
+                    <span class="source @(_settings.Source == SolcastAccountSource.Page ? "edited" : null)" id="solcast-source">
+                        @SourceName()
+                    </span>
+                    @if (_settings.IsConfigured)
+                    {
+                        <div id="solcast-key-in-use"><Secret Value="@_settings.ApiKey" /></div>
+                    }
+                    <span class="hint">
+                        @Localized.Format(SettingsText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
+                    </span>
+                </div>
+
+                <div class="pv-field">
+                    <label for="solcast-resource-id">@SettingsText.ResourceId</label>
+                    <input id="solcast-resource-id" type="text" autocomplete="off" spellcheck="false"
                            disabled="@_busy"
-                           value="@_apiKey"
-                           @oninput="e => Edit(() => _apiKey = Text(e))" />
-                </RevealInput>
-                <span class="source @(_settings.Source == SolcastAccountSource.Page ? "edited" : null)" id="solcast-source">
-                    @SourceName()
-                </span>
-                @if (_settings.IsConfigured)
+                           value="@_resourceId"
+                           @oninput="e => Edit(() => _resourceId = Text(e))" />
+                </div>
+            </div>
+
+            <div class="control actions">
+                <button type="button" class="primary" id="solcast-save" disabled="@(_busy || !HasChanges)" @onclick="SaveAsync">
+                    @(_busy ? SettingsText.Fetching : Editor.FetchesOnSave ? SettingsText.SaveAndFetch : SettingsText.SaveButton)
+                </button>
+                @if (_settings.Source == SolcastAccountSource.Page)
                 {
-                    <div id="solcast-key-in-use"><Secret Value="@_settings.ApiKey" /></div>
+                    <button type="button" class="secondary" id="solcast-remove" disabled="@_busy" @onclick="Remove">@SettingsText.Remove</button>
                 }
-                <span class="hint">
-                    @Localized.Format(SettingsText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
-                </span>
             </div>
-
-            <div class="pv-field">
-                <label for="solcast-resource-id">@SettingsText.ResourceId</label>
-                <input id="solcast-resource-id" type="text" autocomplete="off" spellcheck="false"
-                       disabled="@_busy"
-                       value="@_resourceId"
-                       @oninput="e => Edit(() => _resourceId = Text(e))" />
-            </div>
-        </div>
-
-        <div class="control actions">
-            <button type="button" class="primary" id="solcast-save" disabled="@(_busy || !HasChanges)" @onclick="SaveAsync">
-                @(_busy ? SettingsText.Fetching : Editor.FetchesOnSave ? SettingsText.SaveAndFetch : SettingsText.SaveButton)
-            </button>
-            @if (_settings.Source == SolcastAccountSource.Page)
-            {
-                <button type="button" class="secondary" id="solcast-remove" disabled="@_busy" @onclick="Remove">@SettingsText.Remove</button>
-            }
-        </div>
+        }
     }
 
     @if (_errors.Count > 0)
@@ -122,6 +171,17 @@
     private string? _message;
     private bool _busy;
 
+    // The source picked on the page, saved or not; the saved one is Sources.Selected.
+    private string _source = SolarForecastSourceIds.Solcast;
+
+    /// <summary>Whether to offer the choice of source. Not in the setup wizard, where no provider can connect yet.</summary>
+    [Parameter] public bool OfferSource { get; set; } = true;
+
+    // Optional: a host without the selection (setup mode, a test host) offers Solcast alone.
+    private ISolarForecastSourceSelection? Sources => Services.GetService<ISolarForecastSourceSelection>();
+
+    private bool ShowsExternal => OfferSource && Sources is not null && _source == SolarForecastSourceIds.External;
+
     // The password in force, not the startup one, so a password set on /setup unlocks this at once.
     private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
@@ -133,10 +193,63 @@
     protected override void OnInitialized()
     {
         Reload();
+        _source = Sources?.Selected ?? SolarForecastSourceIds.Solcast;
         Editor.Changed += OnChanged;
+
+        if (Sources is { } sources)
+        {
+            sources.Changed += OnChanged;
+        }
     }
 
-    public void Dispose() => Editor.Changed -= OnChanged;
+    public void Dispose()
+    {
+        Editor.Changed -= OnChanged;
+
+        if (Sources is { } sources)
+        {
+            sources.Changed -= OnChanged;
+        }
+    }
+
+    private void PickSource(string id)
+    {
+        _source = id;
+        _message = null;
+        _errors = [];
+    }
+
+    private void CancelSource()
+    {
+        _source = Sources?.Selected ?? SolarForecastSourceIds.Solcast;
+        _errors = [];
+    }
+
+    private void SaveSource()
+    {
+        if (ReadOnly || _busy || Sources is not { } sources)
+        {
+            return;
+        }
+
+        var result = sources.Select(_source);
+
+        if (!result.Saved)
+        {
+            _errors = Localized.Say(result.Problems, result.ProblemPhrases);
+            return;
+        }
+
+        _errors = [];
+        _message = Localized.Format(SettingsText.ForecastSourceSaved, SourceLabel(sources.Selected));
+    }
+
+    private static string SourceLabel(string id) => id switch
+    {
+        SolarForecastSourceIds.Solcast => "Solcast",
+        SolarForecastSourceIds.External => SettingsText.ForecastSource_External,
+        _ => id,
+    };
 
     // Only the status and the source move under the owner's feet; what is typed in the boxes stays.
     private void OnChanged() => _ = InvokeAsync(_viewer.Wrap(() =>

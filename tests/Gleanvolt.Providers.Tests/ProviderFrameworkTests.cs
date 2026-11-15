@@ -101,6 +101,20 @@ public sealed class ProviderFrameworkTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AMessageLargerThanSignalRsDefaultIsAccepted()
+    {
+        // #388: a week of half-hour forecast periods is past SignalR's 32 KB default, and a message over
+        // the limit closes the connection instead of failing the call.
+        await using var connection = await _host.ConnectAsync();
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+
+        var result = await connection.InvokeAsync<PublishResult>("Publish", new string('x', 200 * 1024), (RequestId?)null);
+
+        Assert.True(result.Accepted);
+        Assert.Equal(HubConnectionState.Connected, connection.State);
+    }
+
+    [Fact]
     public async Task NothingIsAcceptedBeforeTheHello()
     {
         await using var connection = await _host.ConnectAsync();

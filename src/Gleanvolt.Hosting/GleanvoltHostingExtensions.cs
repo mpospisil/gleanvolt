@@ -8,6 +8,7 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.Forecasting.External;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Monitoring;
 using Gleanvolt.Hosting.Sessions;
@@ -411,7 +412,15 @@ public static class GleanvoltHostingExtensions
         services.Configure<SolarForecastOptions>(configuration.GetSection(SolarForecastOptions.SectionName));
         services.AddSingleton<SolcastSource>();
         services.AddSingleton<ISolarForecastSource>(provider => provider.GetRequiredService<SolcastSource>());
+
+        // The second is fed from outside (#388): an external provider publishes over its hub on the web
+        // port. Choosing it on Settings is what turns the hub on, as for the tariff, and while it is
+        // chosen Solcast is not called. Without a provider, the last forecast stays, shown as stale.
+        services.AddSingleton<ISolarForecastSource, ExternalSolarForecastSource>();
         services.AddSingleton<SolarForecastSources>();
+        services.AddSingleton<ISolarForecastSourceSelection, SolarForecastSourceEditor>();
+        services.AddExternalProvider<SolarForecastHub>(SolarForecastHub.Kind);
+        services.AddHostedService<ExternalSolarForecastSelectionWatcher>();
         services.AddHostedService<SolarForecastRefreshWorker>();
         services.AddSingleton<ISolcastAccountEditor, SolcastAccountEditor>();
 

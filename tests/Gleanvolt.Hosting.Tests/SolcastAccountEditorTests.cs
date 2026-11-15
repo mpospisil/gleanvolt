@@ -25,7 +25,8 @@ public class SolcastAccountEditorTests
     private readonly SolarForecastStore _forecast =
         new(new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 8, 9, 6, 0, 0, TimeSpan.Zero)));
 
-    private (SolcastAccountEditor Editor, SolcastSource Source) Create(SolcastOptions? environment = null, ISetupState? setup = null)
+    private (SolcastAccountEditor Editor, SolcastSource Source) Create(
+        SolcastOptions? environment = null, ISetupState? setup = null, string selected = SolarForecastSourceIds.Solcast)
     {
         var options = Options.Create(environment ?? new SolcastOptions());
         var store = new SolcastAccountStore(new InMemorySecretStore(), options);
@@ -33,7 +34,42 @@ public class SolcastAccountEditorTests
             new Factory(_handler), store, _forecast, NullLogger<SolcastSource>.Instance,
             new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 8, 9, 6, 0, 0, TimeSpan.Zero)));
 
-        return (new SolcastAccountEditor(store, source, NullLogger<SolcastAccountEditor>.Instance, setup), source);
+        var sources = new SolarForecastSources(
+            [source, new OtherSource(SolarForecastSourceIds.External)],
+            new StaticOptionsMonitor(new SolarForecastOptions { Source = selected }),
+            NullLogger<SolarForecastSources>.Instance);
+
+        return (new SolcastAccountEditor(store, source, NullLogger<SolcastAccountEditor>.Instance, setup, sources), source);
+    }
+
+    [Fact]
+    public async Task WhileAnotherSourceIsSelectedASaveStoresTheAccountAndSpendsNoCall()
+    {
+        // #388: Solcast is not called while External is selected; the account waits for Solcast's return.
+        var (editor, _) = Create(selected: SolarForecastSourceIds.External);
+
+        var result = await editor.SaveAsync("page-key", "page-site");
+
+        Assert.True(result.Saved);
+        Assert.False(editor.FetchesOnSave);
+        Assert.Equal(0, _handler.Calls);
+        Assert.Equal("page-site", editor.Read().ResourceId);
+    }
+
+    private sealed class OtherSource(string id) : ISolarForecastSource
+    {
+        public string Id => id;
+
+        public Task RequestRefreshAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class StaticOptionsMonitor(SolarForecastOptions value) : IOptionsMonitor<SolarForecastOptions>
+    {
+        public SolarForecastOptions CurrentValue => value;
+
+        public SolarForecastOptions Get(string? name) => value;
+
+        public IDisposable? OnChange(Action<SolarForecastOptions, string?> listener) => null;
     }
 
     [Fact]

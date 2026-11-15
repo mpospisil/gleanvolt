@@ -531,4 +531,10 @@
   <data name="LowTariffIgnored" xml:space="preserve">
     <value>Je zapnuto Jen nízký tarif, ale žádný tarif není nastaven, takže se nabíjí kdykoli.</value>
   </data>
+  <data name="ForecastFrom" xml:space="preserve">
+    <value>Zdroj předpovědi: {0}, přijato {1}.</value>
+  </data>
+  <data name="ForecastFromDisconnected" xml:space="preserve">
+    <value>Externí zdroj předpovědi {0} je odpojený. Toto je jeho poslední předpověď, přijatá {1}.</value>
+  </data>
 </root>

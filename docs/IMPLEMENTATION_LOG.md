@@ -4,6 +4,70 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — The solar forecast as an external provider, with a sample (#388)
+
+**What.** A program outside Gleanvolt can supply the solar forecast instead of Solcast. It connects
+to `/providers/solar-forecast` with a token made on Settings, learns the site from the welcome, and
+publishes periods, which become the forecast every planner reads once they pass every check.
+Settings → Solar forecast chooses Solcast or External, at once and for the next start. The Overview
+says where the forecast came from, and `GET /status` carries it as `forecast`. A sample provider sends
+a sunny bell curve scaled to the installation. The decision is in DECISIONS.md.
+
+**How.**
+- Contracts: `SolarForecastContract` (kind `solar-forecast`, 1.0), `ISolarForecastHub.Publish`,
+  `ISolarForecastClient` (`RefreshRequested`, `SiteChanged`), `SolarForecastWelcome` with `PvSite`,
+  `ForecastPeriod` and `SolarForecastData`. `ProviderMethods.SiteChanged`.
+- Client SDK: `SolarForecastProviderConnection` and `AddGleanvoltSolarForecastProvider<T>`, the
+  tariff's pattern. It keeps the site from the welcome or `SiteChanged`, and republishes on a change.
+- Server: provider hubs accept 1 MiB messages, set per hub (`AddHubOptions<THub>`).
+- Core: `SolarForecastValidator`; `SolarForecastSourceIds.External`; `ISolarForecastSourceSelection`;
+  `ISolarForecastService.Current`, a default member the store already satisfies.
+- Hosting: `SolarForecastHub`, `ExternalSolarForecastSource`, `ExternalSolarForecastSelectionWatcher`
+  and `SolarForecastSourceEditor` (writes `SolarForecast:Source` to `pv-system.json`, then applies
+  it). `SolarForecastSources.Select` wins over the configuration until the next start.
+  `SolcastAccountEditor` does not fetch while another source is active. `TariffHub.IanaId` is shared.
+- API: `StatusResponse.Forecast` (`ForecastOriginResponse`: source, name, issuedAt, receivedAt).
+- Web: the source picker in `SolcastAccountForm` (not in the wizard, where no hub is mapped); with
+  External chosen it shows `ExternalProviderPanel` instead of the Solcast account.
+  `ForecastOriginNarrative` is the line under the Overview's forecast table; a warning while the
+  provider that sent it is disconnected. Strings in en and cs.
+- `plugins/Gleanvolt.Plugin.SolarForecastSample`: a sin² bell from sunrise to sunset (from the
+  site's latitude, longitude and the day of the year), peaking at 70 % of the kWp, 30-minute periods
+  for seven days from local midnight; answers requests and publishes every hour. Not in the image or
+  the release.
+
+**Hardware and protocol quirks.**
+- SignalR's 32 KB receive limit closes the connection rather than failing the call, so an oversize
+  publish shows on the provider as a lost connection, and the SDK retries the same publish forever.
+  The sample's week of half-hour periods with bands is about 45 KB. Found by the end-to-end test.
+- A period ending at local midnight belongs to the next day (`SolarForecast.ForDate` goes by the
+  end), so a day from the sample has 47 periods for today, as Solcast's has.
+
+**Tests.** `SolarForecastValidatorTests` (each rule, the boundaries, the listing limit).
+`ExternalSolarForecastHubTests` on a TestServer with the sample as the provider: welcome and site,
+the forecast through `ISolarForecastService`, worker → `RefreshRequested` → reply quoting it, a missing
+reply marked unanswered, a late reply clearing it, refused data with its phrase, `length` from a raw
+client, the last forecast kept after a disconnect, choosing Solcast closing the session and asking
+Solcast, an unknown source refused. `SolarForecastRefreshWorkerTests`: Settings' choice outlives a
+reload. `SolcastAccountEditorTests`: no fetch while External is chosen. `ProviderFrameworkTests`: a
+200 KB message is accepted (fails without the limit change). Web: `ForecastOriginNarrativeTests`, the
+picker in `SolcastAccountFormTests` (pseudo-locale included), the Overview's line in
+`DashboardPageTests`. API: `forecast` on `/status`; `OpenApiContract.json` regenerated. Full solution
+in Release: all passing.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/{SolarForecast.cs,Handshake.cs}`,
+`src/Gleanvolt.Providers.Client/SolarForecast/SolarForecastProvider.cs`,
+`src/Gleanvolt.Providers.Server/ExternalProviderExtensions.cs`,
+`src/Gleanvolt.Core/{Configuration/SolarForecastValidator.cs,Interfaces/ISolarForecastSourceSelection.cs,Interfaces/ISolarForecastService.cs,Models/SolarForecastSnapshot.cs}`,
+`src/Gleanvolt.Hosting/{Forecasting/External/*,Forecasting/SolarForecastSourceEditor.cs,Forecasting/SolarForecastSources.cs,Forecasting/SolcastAccountEditor.cs,Tariff/External/TariffHub.cs,GleanvoltHostingExtensions.cs}`,
+`src/Gleanvolt.Api/{Contracts/StatusContracts.cs,Endpoints/StatusEndpoints.cs}`,
+`src/Gleanvolt.Web/{Components/SolcastAccountForm.razor,Components/ForecastOriginNarrative.cs,Components/Pages/Dashboard.razor,Components/Pages/Wizard.razor,Resources/*}`,
+`plugins/Gleanvolt.Plugin.SolarForecastSample/`, tests as above,
+`docs/{PROVIDERS.md,CONFIGURATION.md,HTTP_API.md,DECISIONS.md}`, the manual's solar forecast page in
+en and cs with `settings-solar-forecast-external.png` (and the Settings pictures the picker changed).
+
+---
+
 ## 2026-11-15 — Solar forecast: the store split from its sources (#387)
 
 **What.** A refactor with no visible change. The solar forecast now has a host-side store that every

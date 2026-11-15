@@ -34,6 +34,25 @@ public sealed class ReadEndpointTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Status_names_where_the_forecast_came_from()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+        Assert.Equal(JsonValueKind.Null, (await (await client.GetAsync("/api/v1/status")).ReadAsync()).GetProperty("forecast").ValueKind);
+
+        var issued = new DateTimeOffset(2026, 11, 15, 8, 0, 0, TimeSpan.Zero);
+        _host.Forecast.Current = new SolarForecastSnapshot(
+            new SolarForecast(issued, []), new SolarForecastOrigin("external", "Solar forecast sample"), issued.AddMinutes(2));
+
+        var forecast = (await (await client.GetAsync("/api/v1/status")).ReadAsync()).GetProperty("forecast");
+
+        Assert.Equal("external", forecast.Text("source"));
+        Assert.Equal("Solar forecast sample", forecast.Text("name"));
+        Assert.Equal(issued, forecast.GetProperty("issuedAt").GetDateTimeOffset());
+        Assert.Equal(issued.AddMinutes(2), forecast.GetProperty("receivedAt").GetDateTimeOffset());
+    }
+
+    [Fact]
     public async Task Status_says_so_rather_than_inventing_zeroes_before_the_first_poll()
     {
         var client = await _host.StartAsync();

@@ -50,6 +50,22 @@
             }
         },
         {
+            "name": "Gleanvolt.Plugin.SolarForecastSample",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/plugins/Gleanvolt.Plugin.SolarForecastSample/bin/Debug/net10.0/Gleanvolt.Plugin.SolarForecastSample.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/plugins/Gleanvolt.Plugin.SolarForecastSample",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ROOT": "${env:HOME}/.dotnet",
+                "DOTNET_ENVIRONMENT": "Development",
+                "DOTNET_USE_POLLING_FILE_WATCHER": "true"
+            }
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"

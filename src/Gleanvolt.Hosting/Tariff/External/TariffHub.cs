@@ -64,7 +64,7 @@ public sealed class TariffHub(
     }
 
     // What the provider can look up in any language: Linux and the container already use these ids.
-    private static string IanaId(TimeZoneInfo zone) =>
+    internal static string IanaId(TimeZoneInfo zone) =>
         zone.HasIanaId ? zone.Id
         : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var iana) ? iana
         : zone.Id;

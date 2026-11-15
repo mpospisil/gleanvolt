@@ -421,6 +421,12 @@
       "lowWh": "number|string(double) (required)",
       "peakWatts": "number|string(double) (required)"
     },
+    "ForecastOriginResponse": {
+      "issuedAt": "string(date-time) (required)",
+      "name": "string (required)",
+      "receivedAt": "string(date-time) (required)",
+      "source": "string (required)"
+    },
     "ForecastPeriodResponse": {
       "energyWh": "number|string(double) (required)",
       "estimatedPowerWatts": "number|string(double) (required)",
@@ -616,6 +622,7 @@
       "evChargerPowerWatts": "number|string(double) (required)",
       "evChargingCurrentAmps": "integer|string(int32) (required)",
       "fastCharge": "any",
+      "forecast": "any",
       "forecastSolarPowerWatts": "number|string(double) (required)",
       "gridPowerWatts": "number|string(double) (required)",
       "holdingControl": "boolean (required)",

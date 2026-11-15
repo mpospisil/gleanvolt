@@ -217,6 +217,39 @@ public class SolarForecastRefreshWorkerTests
     }
 
     [Fact]
+    public async Task SettingsChoiceSwitchesAtOnceAndOutlivesAConfigurationReload()
+    {
+        // #388: the choice is saved for the next start, so a reload until then must not undo it.
+        var solcast = new Source(SolarForecastSourceIds.Solcast);
+        var external = new Source(SolarForecastSourceIds.External);
+        var monitor = new Monitor(SolarForecastSourceIds.Solcast);
+        var sources = Sources(monitor, solcast, external);
+        var switches = 0;
+        sources.Switched += () => switches++;
+
+        sources.Select("External");
+        monitor.Select(SolarForecastSourceIds.Solcast);
+        await Worker(expectedNow: 500, nextDaylight: null, sources: sources).RefreshOnceAsync(CancellationToken.None);
+
+        Assert.Equal(1, switches);
+        Assert.Equal(SolarForecastSourceIds.External, sources.Selected);
+        Assert.Equal(1, external.Requests);
+        Assert.Equal(0, solcast.Requests);
+    }
+
+    [Fact]
+    public void SelectedAndHasNameOnlyRegisteredSources()
+    {
+        var sources = Sources(new Monitor("nonsense"), new Source(SolarForecastSourceIds.Solcast), new Source(SolarForecastSourceIds.External));
+
+        Assert.Null(sources.Active);
+        Assert.Equal("nonsense", sources.Selected);
+        Assert.Equal([SolarForecastSourceIds.Solcast, SolarForecastSourceIds.External], sources.Ids);
+        Assert.True(sources.Has(" EXTERNAL "));
+        Assert.False(sources.Has("nonsense"));
+    }
+
+    [Fact]
     public void ADaylightStartAlreadyPastDoesNotProduceANegativeSleep()
     {
         var options = new SolcastOptions();
