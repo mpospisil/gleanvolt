@@ -101,6 +101,7 @@ public sealed class ProviderSessions
                 StatusMessage = null,
                 NeedsOwner = false,
                 Unanswered = false,
+                PageUrl = hello.PageUrl,
             };
         }
 

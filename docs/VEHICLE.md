@@ -222,6 +222,18 @@ The Car page then shows the provider's session, when it last published and anyth
 refused. The provider learns the car (id, name, make, model, pack size) from Gleanvolt; the pack stays
 in the `Ev` section.
 
+**Its own page.** A provider that needs you (to sign in, enter an emailed code, pair a device) can
+serve a page of its own. The Car page shows it in a frame under *External provider*, with *Open in a
+new tab* beside it, and only to someone signed in to Gleanvolt: the frame goes through Gleanvolt, which
+adds a short-lived ticket the provider checks. How a provider does it is in
+[PROVIDERS.md](PROVIDERS.md#the-providers-own-page).
+
+**Volkswagen as a plugin.** [`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen)
+is the volkswagen.de feed below, copied into an external provider with its own page for the account,
+the sign-in and the code (#410). It is a test of moving car feeds out of Gleanvolt, not part of the
+image or the release: run it only with *An external provider* chosen, so it and `Vehicle:Website` never
+use the VW account at the same time. Its README says how to run it and what differs from the built-in.
+
 | Key | Default | |
 |---|---|---|
 | `Enabled` | off | **Chooses the feed.** Written by the Car page |

@@ -1,0 +1,47 @@
+@implements IDisposable
+@inject IExternalProviders Providers
+
+@*
+    A provider's own page, in a frame (#410). A provider that needs the owner (to sign in, enter an
+    emailed code, pair a device) serves its own page, and Gleanvolt draws nothing of it: the protocol
+    carries no sign-in messages.
+
+    Both the frame and the link point at Gleanvolt's own /external/<kind>/page, behind the web login,
+    which redirects to the provider with a fresh ticket. The ticket is never in this page's HTML, and the
+    frame's address stays the same across renders, so a status change does not reload the provider's
+    page under the owner in the middle of a sign-in.
+
+    The link beside it is for a page that refuses to run in a frame, and for an http page that a
+    Gleanvolt opened over https would block as mixed content.
+*@
+
+@if (Providers.Find(Kind) is { HasPage: true } status)
+{
+    var name = status.ProviderName ?? status.Name;
+
+    <div class="external-provider-page" id="external-@(status.Kind)-page">
+        <p class="muted">@Localized.Format(CarText.ExternalPageIntro, name)</p>
+
+        <iframe id="external-@(status.Kind)-frame" src="@status.PagePath" title="@Localized.Format(CarText.ExternalPageFrameTitle, name)"
+                referrerpolicy="no-referrer"></iframe>
+
+        <p class="hint">
+            @CarText.ExternalPageNewTabHint
+            <a id="external-@(status.Kind)-page-link" href="@status.PagePath" target="_blank" rel="noopener">@CarText.ExternalPageNewTab</a>
+        </p>
+    </div>
+}
+
+@code {
+    // The viewer's culture, for the renders a session change asks for (#290).
+    private readonly ViewerCulture _viewer = new();
+
+    /// <summary>The kind's id, e.g. <c>vehicle</c>.</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+
+    protected override void OnInitialized() => Providers.Changed += Refresh;
+
+    public void Dispose() => Providers.Changed -= Refresh;
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
+}

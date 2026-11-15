@@ -59,8 +59,12 @@ Three complete providers send fixed data:
 [`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
 [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
 a sunny bell curve, and [`plugins/Gleanvolt.Plugin.VehicleSample`](../plugins/Gleanvolt.Plugin.VehicleSample)
-a car charging from 40 % to 80 %. Don't run any of them against a live installation: Gleanvolt acts on
-what they send.
+a car charging from 40 % to 80 %, with a small page of its own. Don't run any of them against a live
+installation: Gleanvolt acts on what they send.
+
+[`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen) is a real one: a copy
+of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
+(#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
 
 ## The token
 
@@ -119,6 +123,62 @@ sent by email. For the car, that shows the sign-in band on every page and sets t
 **Car feed** entity to `NeedsOwner`. `needsOwner` was added in tariff and solar-forecast 1.1; an
 older host ignores it.
 
+## The provider's own page
+
+A provider that needs the owner (to sign in to an account, enter a code sent by email, pair a device)
+serves its own web page, and Gleanvolt shows it (#410). Gleanvolt draws nothing of it, and the protocol
+carries no sign-in messages: the page is entirely the provider's.
+
+**Saying where it is.** The hello's optional `pageUrl` is the page's address, absolute, `http` or
+`https`. With the SDK, set `options.PageUrl`. An address that is not `http` or `https` is refused as
+`invalid`. `pageUrl` was added in tariff 1.2, solar-forecast 1.2 and vehicle 1.1; an older host
+ignores it, and an older provider simply doesn't send it.
+
+**Where the owner sees it.** For a car provider, the Car page shows the page in a frame under
+*External provider*, with an **Open in a new tab** link beside it. **Settings → External providers**
+links to the page of each kind's provider that has one. Both show only while the provider is
+connected.
+
+**The ticket.** The browser reaches the provider directly, so anyone on the network could open the
+page's address, and on a page with a *Sign in* button, pressing it over and over is how a car account
+gets locked. So the frame and the link point at Gleanvolt's own `/external/<kind>/page`, behind the
+web login, which redirects to `pageUrl` with three query parameters added:
+
+| Parameter | Value |
+| --- | --- |
+| `gvticket` | `<expiry>.<signature>`: the expiry in Unix seconds, and HMAC-SHA256 of `gleanvolt-page-ticket/v1\n<providerId>\n<expiry>` under the provider token, in base64url without padding. Good for 2 minutes. |
+| `theme` | `auto` (follow the browser's `prefers-color-scheme`, as Gleanvolt does), `light` or `dark`. Gleanvolt has no theme switch today, so it sends `auto`. |
+| `culture` | The viewer's language in Gleanvolt, e.g. `en` or `cs`. |
+
+The ticket is never in a Gleanvolt page's HTML, and a ticket for one provider opens no other's page.
+`ProviderPage.CreateTicket` and `VerifyTicket` in `Gleanvolt.Providers.Contracts` implement it for a
+.NET provider.
+
+**Checking it, with the SDK.** `app.UseGleanvoltProviderPage()` in the provider's ASP.NET Core app
+guards everything after it. A request with a valid ticket is let through and given the provider's own
+cookie, `gleanvolt-page-<providerId>`, good for 8 hours, so a reload works without Gleanvolt. A request
+with that cookie is let through. Anything else gets `403`. The page needs no login of its own.
+
+Some paths need no ticket, since nothing of the owner's is in them: files with an extension
+(stylesheets, scripts, images) fetched with `GET`, and Blazor's `/_framework`, `/_content` and
+`/_blazor`. The Blazor circuit is safe without one because an interactive component can only start from
+markers the server rendered into a page, and that page needed the ticket. A provider whose page posts
+forms keeps the ticket in the form's address, since the cookie may not be sent in the frame (below).
+
+**Known limits:**
+
+- The page's address must be reachable from the **browser**, not just from Gleanvolt. A provider in a
+  container publishes its port to the LAN and sets `pageUrl` to the LAN address.
+- If Gleanvolt is opened over HTTPS, an `http://` page is blocked as mixed content, in the frame and
+  through the redirect. Use **Open in a new tab**, or serve the page over HTTPS too.
+- A page that wants to be framed must not send `X-Frame-Options: DENY` or a `frame-ancestors` that
+  leaves Gleanvolt out. Gleanvolt sends no CSP today, so nothing on its side blocks the frame.
+- In the frame, a page on another host than Gleanvolt's (another IP address, not just another port)
+  is a third party. Browsers send its cookie there only over HTTPS (`SameSite=None; Secure`), so an
+  `http` page on another host works for as long as the ticket does, and a reload inside the frame may
+  answer `403`. Opening the page again from Gleanvolt brings a new ticket. On the same host, the
+  cookie works over `http`.
+
 ## Contract versions
 
 Each kind has a major and a minor version. A provider sends the version it was built for in its hello.
@@ -127,9 +187,11 @@ and the `Welcome` says which version the host speaks.
 
 | Kind | Major | Minor |
 | --- | --- | --- |
-| `tariff` | 1 | 1 |
-| `solar-forecast` | 1 | 1 |
-| `vehicle` | 1 | 0 |
+| `tariff` | 1 | 2 |
+| `solar-forecast` | 1 | 2 |
+| `vehicle` | 1 | 1 |
+
+The minors grew with `pageUrl` in the hello (#410).
 
 ## The tariff kind
 
@@ -369,6 +431,9 @@ are official ones for JavaScript and Java, and community ones for Python, Go and
 
 Property names are camelCase. Enums are strings (`"low"`), though numbers are read too. Times are
 ISO 8601. One message may be up to 1 MiB; a larger one closes the connection.
+
+The hello may carry `"pageUrl":"http://…"`; see [the provider's own page](#the-providers-own-page).
+A provider in another language checks the ticket itself, as described there.
 
 The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
 (solar forecast only), `VehicleChanged` (vehicle only) and `Goodbye` on the provider.

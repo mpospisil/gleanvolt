@@ -94,12 +94,23 @@ public abstract partial class ScreenshotTest : PageTest
     /// <param name="width">The browser window's width, in CSS pixels.</param>
     /// <param name="height">Cut the picture off at this many CSS pixels, for a page whose long table the
     /// manual needs only the start of; null for all of it.</param>
+    /// <param name="frames">
+    /// What an iframe shows, by its <c>src</c>: a whole HTML document, put in as <c>srcdoc</c>. For a
+    /// provider's page (#410), which lives in another program the picture can't reach.
+    /// </param>
     protected void Capture<TComponent>(
-        IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200, int? height = null)
+        IRenderedComponent<TComponent> rendered, string name, string? selector = null, int width = 1200, int? height = null,
+        IReadOnlyDictionary<string, string>? frames = null)
         where TComponent : IComponent
     {
         ArgumentNullException.ThrowIfNull(rendered);
         var markup = rendered.Markup;
+
+        foreach (var (src, document) in frames ?? new Dictionary<string, string>())
+        {
+            markup = markup.Replace($" src=\"{src}\"", $" srcdoc=\"{WebUtility.HtmlEncode(document)}\"", StringComparison.Ordinal);
+        }
+
         Assert.False(string.IsNullOrWhiteSpace(markup));
 
         if (Environment.GetEnvironmentVariable(OutputVariable) is not { Length: > 0 } output)

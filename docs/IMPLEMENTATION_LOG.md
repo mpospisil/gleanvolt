@@ -4,6 +4,90 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-16 — A provider's own page in a frame, and the Volkswagen feed as a plugin (#410)
+
+**What.** Part 1: a provider can bring its own web page, and Gleanvolt shows it. The hello carries
+`PageUrl`; the Car page frames it under *External provider* with *Open in a new tab*, and Settings →
+External providers links to it. Gleanvolt opens it through `/external/<kind>/page`, behind the web
+login, which redirects with a short-lived ticket signed with the provider token plus `theme` and
+`culture`; the SDK's `UseGleanvoltProviderPage()` checks the ticket, sets the plugin's own cookie and
+answers 403 otherwise. The vehicle sample got a page. Part 2: `plugins/Gleanvolt.Plugin.Volkswagen`,
+a copy of the built-in volkswagen.de feed as an external provider with an interactive Blazor page for
+the account, the sign-in and the emailed code, the last reading and *Forget the session*.
+
+**How.**
+- Contracts: `ProviderHello.PageUrl` (optional, last parameter); minors tariff 1.2, solar-forecast 1.2,
+  vehicle 1.1. `ProviderPage`: parameter names, `CreateTicket`/`VerifyTicket` and the generic
+  `Sign`/`Verify` (HMAC-SHA256 over purpose, provider id and expiry; base64url; 2-minute tickets;
+  expiries over a day ahead not believed). BCL only, so the contracts stay dependency-free.
+- SDK: `ProviderOptions.PageUrl` (validated: absolute http/https), sent in the hello.
+  `ProviderPageMiddleware` + `UseGleanvoltProviderPage()`: ticket → pass and set
+  `gleanvolt-page-<providerId>` (HttpOnly, 8 h, `Lax`, or `None; Secure` over https), cookie → pass,
+  else 403; public: GETs of paths with an extension, `/_framework`, `/_content`, `/_blazor`. The client
+  package now has a `FrameworkReference` to `Microsoft.AspNetCore.App`, and drops the redundant
+  `Microsoft.Extensions.Hosting.Abstractions` package.
+- Server: the hub refuses a non-http(s) `PageUrl` as `invalid`; `ProviderSessions` keeps it in
+  `ExternalProviderStatus.PageUrl` (Core; with `HasPage` and `PagePath`); `ExternalProviderRegistry.PageLink`
+  builds the address with a fresh ticket; `MapExternalProviderPages()` maps the redirect (404 without a
+  connected provider with a page). Hosting maps it with `RequireAuthorization()` when the web UI is on.
+  `VehicleHub.ToState` factored out of `Publish` for the plugin's tests.
+- Web: `ExternalProviderPage.razor` (frame + link, both to Gleanvolt's redirect; `src` never changes, so
+  a status change doesn't reload the plugin's page), on `/car` above the provider panel; a *Page* column
+  in Settings → External providers; `AccountExternal` mentions the page; strings in `CarText` and
+  `SettingsText`, en and cs; the frame's CSS.
+- Vehicle sample: now an ASP.NET Core app (`Microsoft.NET.Sdk.Web`) on `http://localhost:8096`, with a
+  plain HTML page (SOC, *Fake an expired login*, *Sign in again*) behind the guard; `SampleLogin` holds
+  the pretend login and `StepPublisher` publishes nothing while it is expired.
+- Volkswagen plugin: `VwWebsiteClient`, `VwWebsiteLoginPage`, `VwWebsiteChargingStatus`,
+  `VwWebsiteSessionStore` and `VwWebsiteSignIn` copied, `VolkswagenOptions` from `VwWebsiteOptions`,
+  `VolkswagenFeed` (the SDK's `IVehicleSource`, with the update service's lockout rule) and
+  `VolkswagenPoller` from the update service and worker, `AccountStore` and `DataFiles` (atomic `0600`
+  files in `0700`, the page's Data Protection keys beside them). Its own Dockerfile, cross-built like the
+  main one, non-root, `/data` volume. The README lists every change from the built-in and why.
+- Manual (en, cs): the Car page's *Through another program* gets a step for the provider's page and a
+  new screenshot, `car-external-page.png`, of the plugin's page rendered by bUnit into the Car page's
+  frame (`Capture` takes `frames`: iframe `src` → `srcdoc`). Two pictures re-rendered after the CSS
+  change.
+
+**Quirks.** No Modbus here. Browser ones, recorded as limits: a frame on another host than Gleanvolt's is
+a third party, and over `http` its cookie isn't sent, so a plain-HTML plugin page there lives on the
+ticket alone (the sample's forms keep it in their action) while a Blazor page keeps its circuit; an
+`http` page inside an `https` Gleanvolt is mixed content; `X-Frame-Options: DENY` can't be framed.
+Gleanvolt has no theme switch, so `theme` is always `auto` for now. The built-in's `TargetSocPercent`
+had no caller and was not copied.
+
+**Not done.** The test against the real ID.4 through a charge, and a Czech plugin page.
+
+**Tests.** `ProviderPageTests` (ticket accepted until expiry; forged, moved expiry, other provider and
+far-future refused; `PageUrl` reaches the status; non-http refused; the redirect adds a valid fresh
+ticket, theme and culture, and keeps the page's own query; 404 without a page; the guard: 403 without,
+200 and a cookie with a ticket, the cookie admits, an expired or forged ticket and a ticket used as a
+cookie refused, static files and `/_blazor` public, a POST not). `CarPageTests` (frame and link go to
+the redirect, the provider's address is not in the markup; no frame when disconnected or without a
+page), `ExternalProvidersFormTests` (the link). `VolkswagenPluginMappingTests` on the built-in's real
+capture (the reading, the car's capture time, Gleanvolt's validator passes it, charge and plug states,
+over 48 h left out, unusable bodies) and `VolkswagenPluginFeedTests` on a loopback volkswagen.de (idle
+and charging cadence, stop on no reading or unreachable, nothing sent while stopped, sign-in resumes,
+*Forget the session*, the 30-second gap, no account, a new VIN stops it and a new password doesn't,
+`0600`). The sample's page and the plugin's container were also checked by hand: 403 without a ticket,
+200 with one, 200 on the cookie.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/{Handshake,ProviderPage,Tariff,SolarForecast,Vehicle}.cs`,
+`src/Gleanvolt.Providers.Client/{ProviderOptions,ProviderConnection,ProviderPageMiddleware}.cs`, its
+csproj and README, `src/Gleanvolt.Providers.Server/{ProviderHub,ProviderSessions,ExternalProviderRegistry,ExternalProviderExtensions}.cs`,
+`src/Gleanvolt.Core/Interfaces/IExternalProviders.cs`, `src/Gleanvolt.Hosting/GleanvoltHostingExtensions.cs`,
+`src/Gleanvolt.Hosting/Vehicles/External/VehicleHub.cs`, `src/Gleanvolt.Web/Components/{ExternalProviderPage,ExternalProvidersForm}.razor`,
+`src/Gleanvolt.Web/Components/Pages/Car.razor`, `src/Gleanvolt.Web/Resources/{CarText,SettingsText}{,.cs}.resx`,
+`src/Gleanvolt.Web/wwwroot/css/site.css`, `plugins/Gleanvolt.Plugin.VehicleSample/*`,
+`plugins/Gleanvolt.Plugin.Volkswagen/*` (new), `Gleanvolt.slnx`, `tests/Gleanvolt.Providers.Tests/{ProviderPageTests,TestHost}.cs`,
+`tests/Gleanvolt.Web.Tests/{CarPageTests,ExternalProvidersFormTests}.cs`,
+`tests/Gleanvolt.Hosting.Tests/VolkswagenPluginTests.cs` and its csproj,
+`tests/Gleanvolt.Web.Screenshots/{ScreenshotTest,SettingsScreenshots,ProviderPageScreenshot}.cs` and its
+csproj, `docs/{PROVIDERS,VEHICLE,DECISIONS,IMPLEMENTATION_LOG}.md`,
+`docs/manual/src/content/docs/{en,cs}/setting-up/car.mdx`, `docs/manual/src/assets/screenshots/*`.
+
+---
+
 ## 2026-11-15 — The car as an external provider, with a sample (#408)
 
 **What.** A program outside Gleanvolt can now read the car and publish what it says: SOC, range, time

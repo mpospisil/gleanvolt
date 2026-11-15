@@ -1230,6 +1230,12 @@ public static class GleanvoltHostingExtensions
             }
 
             app.MapExternalProviders();
+
+            // A provider's own page (#410): only through the web UI's login, which is what the ticket vouches for.
+            if (web.Enabled)
+            {
+                app.MapExternalProviderPages().RequireAuthorization();
+            }
         }
 
         // After the UI, so its authentication and antiforgery middleware are already in the pipeline when

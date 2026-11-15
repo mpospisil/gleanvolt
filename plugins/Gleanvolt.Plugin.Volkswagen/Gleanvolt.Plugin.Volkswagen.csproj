@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    The volkswagen.de car feed as an external provider (#410): a copy of the built-in Vehicle:Website
+    feed, run outside Gleanvolt to find out what moving a car integration into a plugin costs. Built with
+    the solution, never packed, never in the image or the release packages. It references only the
+    provider SDK: nothing of Gleanvolt.Core or Gleanvolt.Infrastructure.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>gleanvolt-plugin-volkswagen</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Hosting.Tests" />
+    <InternalsVisibleTo Include="Gleanvolt.Web.Screenshots" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+  </ItemGroup>
+
+</Project>

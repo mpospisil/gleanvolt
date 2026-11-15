@@ -10,7 +10,7 @@ public static class TariffContract
     public const int Major = 1;
 
     /// <summary>Grows with every addition an older provider can ignore.</summary>
-    public const int Minor = 1;
+    public const int Minor = 2;
 
     /// <summary>The hub's path on Gleanvolt's web port.</summary>
     public const string HubPath = "/providers/tariff";

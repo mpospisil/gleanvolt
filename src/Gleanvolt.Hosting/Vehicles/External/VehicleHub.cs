@@ -51,16 +51,7 @@ public sealed class VehicleHub(
 
         var feed = configured.Service as ExternalVehicleFeed;
         var name = Sessions.Status.ProviderName ?? Sessions.Status.ProviderId ?? ExternalVehicleFeed.Id;
-        var state = reading is null
-            ? new VehicleState(default, SourceId: name)
-            : new VehicleState(
-                reading.CapturedAt,
-                reading.SocPercent,
-                reading.RangeMetres,
-                reading.ChargeTimeRemaining,
-                Map(reading.ChargeState),
-                Map(reading.PlugState),
-                name);
+        var state = reading is null ? new VehicleState(default, SourceId: name) : ToState(reading, name);
 
         var problems = VehicleReadingValidator.Check(state, holder.GetCurrentState(), time.GetUtcNow());
 
@@ -78,6 +69,16 @@ public sealed class VehicleHub(
         feed?.Accepted(reading.InReplyTo, state);
         return Task.FromResult(PublishResult.Ok);
     }
+
+    /// <summary>A published reading as Gleanvolt holds it, named after <paramref name="name"/>, the provider.</summary>
+    internal static VehicleState ToState(VehicleReading reading, string name) => new(
+        reading.CapturedAt,
+        reading.SocPercent,
+        reading.RangeMetres,
+        reading.ChargeTimeRemaining,
+        Map(reading.ChargeState),
+        Map(reading.PlugState),
+        name);
 
     // By name, not by number: the two enums are separate contracts that happen to agree today. A value
     // neither knows stays out of range, and the validator refuses it.

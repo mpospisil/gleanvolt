@@ -45,6 +45,7 @@ internal sealed class TestHost : IAsyncDisposable
         _app.UseAuthentication();
         _app.UseAuthorization();
         _app.MapExternalProviders();
+        _app.MapExternalProviderPages();
         await _app.StartAsync();
 
         Token = await Registry.CreateTokenAsync();

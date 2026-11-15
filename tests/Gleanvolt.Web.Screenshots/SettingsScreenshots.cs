@@ -212,6 +212,23 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Capture(RenderPage<Car>("/car"), "car-external-provider", selector: "#external-vehicle");
     }
 
+    /// <summary>
+    /// The Volkswagen plugin connected, with its own page in the Car page's frame (#410): where the owner
+    /// signs in to the car's account.
+    /// </summary>
+    [Fact]
+    public void The_external_car_providers_page()
+    {
+        ExternalCar();
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "volkswagen", ProviderName: "Volkswagen", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-2), LastDataAt: Now.AddMinutes(-2), PageUrl: new Uri("http://192.168.2.7:8095/")));
+
+        Capture(RenderPage<Car>("/car"), "car-external-page", selector: "#external-vehicle-page",
+            frames: new Dictionary<string, string> { ["/external/vehicle/page"] = ProviderPageScreenshot.Volkswagen(Now) });
+    }
+
     private const string Main = "main.content";
 
     private void ExternalCar()

@@ -540,6 +540,48 @@ public class CarPageTests : PageTest
         Assert.Contains("error", line.ClassList);
     }
 
+    [Fact]
+    public void An_external_provider_with_a_page_shows_it_in_a_frame_with_a_link_to_a_new_tab()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            "volkswagen", "Volkswagen", "1.0", Since: Reported, PageUrl: new Uri("http://192.168.2.7:8095/")));
+        Services.AddSingleton<IVehicleUpdateService>(new ExternalStubFeed());
+
+        var page = Page(feed: VehicleFeed.External);
+
+        // Gleanvolt's own redirect, never the provider's address with a ticket in it.
+        var frame = page.Find("#external-vehicle-frame");
+        Assert.Equal("/external/vehicle/page", frame.GetAttribute("src"));
+        Assert.Equal("The page of Volkswagen", frame.GetAttribute("title"));
+
+        var link = page.Find("#external-vehicle-page-link");
+        Assert.Equal("/external/vehicle/page", link.GetAttribute("href"));
+        Assert.Equal("_blank", link.GetAttribute("target"));
+        Assert.Equal("Open in a new tab", link.TextContent);
+        Assert.DoesNotContain("192.168.2.7", page.Markup);
+    }
+
+    [Fact]
+    public void A_provider_without_a_page_or_not_connected_shows_no_frame()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Disconnected,
+            "volkswagen", "Volkswagen", "1.0", Since: Reported, PageUrl: new Uri("http://192.168.2.7:8095/")));
+        Services.AddSingleton<IVehicleUpdateService>(new ExternalStubFeed());
+
+        var page = Page(feed: VehicleFeed.External);
+
+        Assert.Empty(page.FindAll("#external-vehicle-frame"));
+
+        _providers.Set(new ExternalProviderStatus(
+            "vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            "vehicle-sample", "Vehicle sample", "1.0", Since: Reported));
+
+        page.WaitForAssertion(() => Assert.Contains("Vehicle sample", page.Find("#external-vehicle-state").TextContent));
+        Assert.Empty(page.FindAll("#external-vehicle-frame"));
+    }
+
     private sealed class ExternalStubFeed : IVehicleUpdateService
     {
         public string VehicleId => "id4";
