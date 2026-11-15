@@ -29,7 +29,7 @@
     <ProjectReference Include="..\..\src\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
     <ProjectReference Include="..\Gleanvolt.Devices.Testing\Gleanvolt.Devices.Testing.csproj" />
     <!-- The tariff hub's tests drive it with the sample provider (#401), as a provider author would. -->
-    <ProjectReference Include="..\..\samples\Gleanvolt.Samples.TariffMock\Gleanvolt.Samples.TariffMock.csproj" />
+    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.TariffSample\Gleanvolt.Plugin.TariffSample.csproj" />
   </ItemGroup>
 
 </Project>

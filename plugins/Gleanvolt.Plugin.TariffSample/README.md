@@ -1,4 +1,4 @@
-# Tariff mock: a sample external tariff provider
+# Tariff sample: an external tariff provider plugin
 
 A minimal provider built on `Gleanvolt.Providers.Client` (#401). It sends Gleanvolt the same fake
 pattern every time: **low tariff 22:00–06:00 and 13:00–15:00**, high otherwise, for today and
@@ -15,17 +15,17 @@ It is not part of the container image or the release packages.
 
 1. In Gleanvolt, open **Settings → Tariff**, choose **External** and save.
 2. Under **Token**, make a token and copy it.
-3. Run the mock:
+3. Run the sample:
 
    ```sh
-   dotnet run --project samples/Gleanvolt.Samples.TariffMock -- \
+   dotnet run --project plugins/Gleanvolt.Plugin.TariffSample -- \
      --Gleanvolt:Endpoint=http://localhost:8090 \
      --Gleanvolt:Token=gvp_...
    ```
 
-The panel on Settings shows "Tariff mock connected", and the Overview's tariff line says
-"(from Tariff mock)".
+The panel on Settings shows "Tariff sample connected", and the Overview's tariff line says
+"(from Tariff sample)".
 
-To write a real provider, start from `MockTariff.cs`: implement `ITariffSource.GetTariffAsync` and
+To write a real provider, start from `SampleTariff.cs`: implement `ITariffSource.GetTariffAsync` and
 register it with `AddGleanvoltTariffProvider<T>`. The rules the data must meet are in
 [docs/PROVIDERS.md](../../docs/PROVIDERS.md).

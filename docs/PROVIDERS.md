@@ -41,7 +41,7 @@ once after every accepted hello, answers every refresh request, and waits longer
 To publish at other times, for example when day-ahead prices come out, resolve
 `TariffProviderConnection` and call `PublishNowAsync`.
 
-[`samples/Gleanvolt.Samples.TariffMock`](../samples/Gleanvolt.Samples.TariffMock) is a complete
+[`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) is a complete
 provider that sends a fixed pattern. Don't run it against a live installation: Gleanvolt acts on
 what it sends.
 

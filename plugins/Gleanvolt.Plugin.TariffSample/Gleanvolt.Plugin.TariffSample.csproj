@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <UserSecretsId>gleanvolt-samples-tariffmock</UserSecretsId>
+    <UserSecretsId>gleanvolt-plugin-tariffsample</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

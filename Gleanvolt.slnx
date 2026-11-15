@@ -16,8 +16,8 @@
     <Project Path="src/Gleanvolt.Providers.Client/Gleanvolt.Providers.Client.csproj" />
     <Project Path="src/Gleanvolt.Providers.Server/Gleanvolt.Providers.Server.csproj" />
   </Folder>
-  <Folder Name="/samples/">
-    <Project Path="samples/Gleanvolt.Samples.TariffMock/Gleanvolt.Samples.TariffMock.csproj" />
+  <Folder Name="/plugins/">
+    <Project Path="plugins/Gleanvolt.Plugin.TariffSample/Gleanvolt.Plugin.TariffSample.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Gleanvolt.Core.Tests/Gleanvolt.Core.Tests.csproj" />

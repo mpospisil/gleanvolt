@@ -44,7 +44,7 @@ DECISIONS.md.
   viewer's language), `ExternalTariffPanel` registered for External, and the Overview's tariff line
   naming the provider and, after a disconnect, until when its windows run. Strings in
   `SettingsText`, `ServiceText` and `SharedText`, en and cs.
-- `samples/Gleanvolt.Samples.TariffMock`: a fixed pattern (low 22:00–06:00 and 13:00–15:00) in the
+- `plugins/Gleanvolt.Plugin.TariffSample`: a fixed pattern (low 22:00–06:00 and 13:00–15:00) in the
   welcome's zone, answering requests and publishing after local midnight. It is in the solution so it
   builds, but not in the image or the release.
 - Packaging: three new packages in `release.yml`'s pack loop and its by-name check; both Dockerfiles
@@ -71,8 +71,8 @@ DECISIONS.md.
   the kind off, a request timing out and an answer clearing it, refused data, status, and the SDK's
   hello after a dropped connection, its retry until the kind is on, and its answer to a request. One
   test runs on Kestrel over a WebSocket with the token in the query string.
-- Hosting: the tariff hub, schedule and refresh worker with the mock sample as the client (zone and
-  currency in the welcome, the mock's windows as the timeline, a request answered and one unanswered
+- Hosting: the tariff hub, schedule and refresh worker with the tariff sample as the client (zone and
+  currency in the welcome, the sample's windows as the timeline, a request answered and one unanswered
   without holding the worker, refused data, enums by name, windows counting after a disconnect until
   they end, and choosing Table closing the session). The real composition root: the hub behind its own
   token with only the API on, past the password gate with the UI on, and the token stored as a hash.
@@ -86,7 +86,7 @@ DECISIONS.md.
 `src/Gleanvolt.Core/{Interfaces/IExternalProviders.cs,Interfaces/IExternalTariffRequests.cs,Configuration/ExternalTariffRules.cs,Strategies/ExternalTariffProvider.cs}`,
 `src/Gleanvolt.Hosting/Tariff/External/`, `src/Gleanvolt.Api/{Contracts/ProviderContracts.cs,Endpoints/ProviderEndpoints.cs}`,
 `src/Gleanvolt.Web/{Components/ExternalProviderPanel.razor,Components/ExternalTariffPanel.razor,NoExternalProviders.cs}`,
-`samples/Gleanvolt.Samples.TariffMock/`, `tests/Gleanvolt.Providers.Tests/`, `docs/PROVIDERS.md`, and
+`plugins/Gleanvolt.Plugin.TariffSample/`, `tests/Gleanvolt.Providers.Tests/`, `docs/PROVIDERS.md`, and
 tests in Core, Hosting, Api and Web. Changed: `GleanvoltHostingExtensions.cs`, `SetupGate.cs`,
 `WebUiHost.cs`, `Dashboard.razor`, `TariffNarrative.cs`, `TariffTimeline.cs`, `TariffTable.cs`,
 `ISecretStore.cs`, `TariffContracts.cs`, `GleanvoltApi.cs`, the resx files, `site.css`, `Gleanvolt.slnx`,

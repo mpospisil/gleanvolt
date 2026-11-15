@@ -12,7 +12,7 @@ using Gleanvolt.Providers.Client.Tariff;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Tariff;
 using Gleanvolt.Providers.Server;
-using Gleanvolt.Samples.TariffMock;
+using Gleanvolt.Plugin.TariffSample;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
@@ -25,7 +25,7 @@ namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
 /// The low tariff as an external provider (#401), end to end: the real hub, schedule and refresh worker
-/// on a TestServer, and the mock sample as the provider, connecting the way a provider author's would.
+/// on a TestServer, and the tariff sample as the provider, connecting the way a provider author's would.
 /// </summary>
 public sealed class ExternalTariffHubTests : IAsyncLifetime
 {
@@ -33,7 +33,7 @@ public sealed class ExternalTariffHubTests : IAsyncLifetime
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "gleanvolt-external-tariff-" + Guid.NewGuid().ToString("N"));
 
-    // 10:00 in Prague on a Sunday: high tariff in the mock's pattern, low from 13:00.
+    // 10:00 in Prague on a Sunday: high tariff in the sample's pattern, low from 13:00.
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 15, 9, 0, 0, TimeSpan.Zero));
 
     private WebApplication? _app;
@@ -94,47 +94,47 @@ public sealed class ExternalTariffHubTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TheMockConnectsLearnsTheSiteAndItsWindowsBecomeTheTariff()
+    public async Task TheSampleConnectsLearnsTheSiteAndItsWindowsBecomeTheTariff()
     {
-        using var mock = Mock();
+        using var sample = Sample();
         TariffWelcome? welcome = null;
-        mock.Welcomed += site => welcome = site;
+        sample.Welcomed += site => welcome = site;
 
-        await mock.StartAsync(CancellationToken.None);
-        await Eventually(() => Schedule.Timeline is not null, "the mock's windows should become the timeline");
+        await sample.StartAsync(CancellationToken.None);
+        await Eventually(() => Schedule.Timeline is not null, "the sample's windows should become the timeline");
 
         Assert.Equal("Europe/Prague", welcome!.TimeZone);
         Assert.Equal("CZK", welcome.Currency);
 
         var timeline = Schedule.Timeline!;
         Assert.Equal(TariffProviderIds.External, timeline.ProviderId);
-        Assert.Equal("Tariff mock", timeline.Origin!.Name);
+        Assert.Equal("Tariff sample", timeline.Origin!.Name);
         Assert.Equal(TariffRate.High, timeline.RateAt(_time.GetUtcNow()));
         Assert.Equal(At(13), timeline.NextChangeAfter(_time.GetUtcNow()));
         Assert.Equal(ExternalProviderState.Connected, Status.State);
         Assert.Equal(_time.GetUtcNow(), Status.LastDataAt);
 
-        await mock.StopAsync(CancellationToken.None);
+        await sample.StopAsync(CancellationToken.None);
     }
 
     [Fact]
-    public async Task TheRefreshWorkerAsksAndTheMockAnswersQuotingTheRequest()
+    public async Task TheRefreshWorkerAsksAndTheSampleAnswersQuotingTheRequest()
     {
-        using var mock = Mock();
-        await mock.StartAsync(CancellationToken.None);
-        await Eventually(() => Status.LastDataAt is not null, "the mock should publish after its hello");
+        using var sample = Sample();
+        await sample.StartAsync(CancellationToken.None);
+        await Eventually(() => Status.LastDataAt is not null, "the sample should publish after its hello");
 
         _time.Advance(TimeSpan.FromMinutes(10));
         var wait = await _app!.Services.GetRequiredService<TariffRefreshWorker>().RefreshOnceAsync(CancellationToken.None);
 
         Assert.Equal(TimeSpan.FromHours(1), wait);
-        await Eventually(() => Status.LastDataAt == _time.GetUtcNow(), "the mock should answer the request");
+        await Eventually(() => Status.LastDataAt == _time.GetUtcNow(), "the sample should answer the request");
 
         _time.Advance(TimeSpan.FromMinutes(3));
         await Task.Delay(100);
         Assert.False(Status.Unanswered);
 
-        await mock.StopAsync(CancellationToken.None);
+        await sample.StopAsync(CancellationToken.None);
     }
 
     [Fact]
@@ -192,12 +192,12 @@ public sealed class ExternalTariffHubTests : IAsyncLifetime
     [Fact]
     public async Task AfterADisconnectTheWindowsCountUntilTheLastOneEnds()
     {
-        using var mock = Mock();
-        await mock.StartAsync(CancellationToken.None);
-        await Eventually(() => Schedule.Timeline is not null, "the mock should publish");
+        using var sample = Sample();
+        await sample.StartAsync(CancellationToken.None);
+        await Eventually(() => Schedule.Timeline is not null, "the sample should publish");
         var lastEnd = Schedule.Timeline!.Windows[^1].Window.End;
 
-        await mock.StopAsync(CancellationToken.None);
+        await sample.StopAsync(CancellationToken.None);
         await Eventually(() => Status.State == ExternalProviderState.Disconnected, "the session should end");
 
         Assert.NotNull(Schedule.Timeline);
@@ -225,20 +225,20 @@ public sealed class ExternalTariffHubTests : IAsyncLifetime
         Assert.Equal(RefusalCodes.Disabled, (await again.InvokeAsync<TariffWelcome>("Hello", Hello())).ReasonCode);
     }
 
-    private TariffProviderConnection Mock() => new(
+    private TariffProviderConnection Sample() => new(
         Options.Create(new ProviderOptions
         {
             Endpoint = _app!.GetTestServer().BaseAddress,
             Token = _token,
-            ProviderId = "tariff-mock",
-            Name = "Tariff mock",
+            ProviderId = "tariff-sample",
+            Name = "Tariff sample",
             Version = "1.0",
             InitialRetryDelay = TimeSpan.FromMilliseconds(50),
             MaxRetryDelay = TimeSpan.FromMilliseconds(200),
             RefusedRetryDelay = TimeSpan.FromMilliseconds(100),
             ConfigureHttp = Configure,
         }),
-        new MockTariff(_time),
+        new SampleTariff(_time),
         NullLogger<TariffProviderConnection>.Instance);
 
     private async Task<HubConnection> ConnectAsync()

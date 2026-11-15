@@ -1,6 +1,6 @@
 using Gleanvolt.Providers.Client.Tariff;
 
-namespace Gleanvolt.Samples.TariffMock;
+namespace Gleanvolt.Plugin.TariffSample;
 
 /// <summary>
 /// Publishes unprompted a minute after every local midnight, so tomorrow is always in what Gleanvolt

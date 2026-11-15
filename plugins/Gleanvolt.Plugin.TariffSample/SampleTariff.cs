@@ -1,14 +1,14 @@
 using Gleanvolt.Providers.Client.Tariff;
 using Gleanvolt.Providers.Contracts.Tariff;
 
-namespace Gleanvolt.Samples.TariffMock;
+namespace Gleanvolt.Plugin.TariffSample;
 
 /// <summary>
 /// The same pattern every time: low tariff 22:00–06:00 and 13:00–15:00, high otherwise, for today and
 /// tomorrow in the installation's time zone (from the welcome), so the windows always cover the moment
 /// they are sent. Prices are fixed, in the installation's currency, when <see cref="WithPrices"/> is on.
 /// </summary>
-public sealed class MockTariff(TimeProvider time) : ITariffSource
+public sealed class SampleTariff(TimeProvider time) : ITariffSource
 {
     private static readonly (TimeOnly Start, TimeOnly End)[] LowPeriods =
     [
