@@ -62,10 +62,14 @@ public static class SecretNames
     /// <summary>The vehicle account password, when it is entered in the web UI rather than in the environment (#214).</summary>
     public const string VehicleAccountPassword = "vehicle-account-password";
 
+    /// <summary>The one token every external provider connects with (#406).</summary>
+    public const string ProviderToken = "provider-token";
+
     /// <summary>
-    /// The hash of an external provider kind's token (#386), never the token itself: <c>provider-token-tariff</c>.
+    /// A kind's own token from before #406, <c>provider-token-tariff</c>: adopted as the shared token
+    /// at the first start that has none, then removed.
     /// </summary>
-    public static string ProviderToken(string kind) => "provider-token-" + kind.ToLowerInvariant();
+    public static string LegacyProviderToken(string kind) => "provider-token-" + kind.ToLowerInvariant();
 
     /// <summary>The Solcast API key and rooftop site, when entered on Settings rather than in the environment (#286).</summary>
     public const string SolcastAccount = "solcast-account";

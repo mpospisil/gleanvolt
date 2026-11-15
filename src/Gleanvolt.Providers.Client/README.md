@@ -9,7 +9,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddGleanvoltTariffProvider<MyTariff>(options =>
 {
     options.Endpoint = new Uri("http://gleanvolt.local:8090");
-    options.Token = builder.Configuration["Gleanvolt:Token"]!;   // generated on Settings → Tariff
+    options.Token = builder.Configuration["Gleanvolt:Token"]!;   // made on Settings → External providers
     options.ProviderId = "my-tariff";
     options.Name = "My tariff";
 });

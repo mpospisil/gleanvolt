@@ -1037,7 +1037,7 @@
     <comment>The tariff provider whose windows another program publishes to Gleanvolt.</comment>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>A program outside Gleanvolt supplies this data. It connects to this address with the token below.</value>
+    <value>A program outside Gleanvolt supplies this data. It connects to this address with the provider token.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Gleanvolt address</value>
@@ -1049,7 +1049,7 @@
     <value>Token</value>
   </data>
   <data name="ExternalNoToken" xml:space="preserve">
-    <value>No token yet. Make one and give it to the provider.</value>
+    <value>No token yet. Make one and give it to each provider.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
     <value>A token exists.</value>
@@ -1061,7 +1061,7 @@
     <value>Make a new token</value>
   </data>
   <data name="ExternalNewTokenDisconnects" xml:space="preserve">
-    <value>A new token disconnects the provider that uses the old one. Make one if the token has leaked.</value>
+    <value>A new token disconnects every provider until it is given the new one. Make one if the token has leaked.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>The token could not be saved. See Health for the secret store.</value>
@@ -1073,7 +1073,7 @@
     <value>Off. Choose External and save to turn it on.</value>
   </data>
   <data name="ExternalState_NoToken" xml:space="preserve">
-    <value>Waiting. Make a token first: without one, no provider can connect.</value>
+    <value>Waiting. Make the provider token first: without it, no provider can connect.</value>
   </data>
   <data name="ExternalState_Waiting" xml:space="preserve">
     <value>Waiting for a provider to connect.</value>
@@ -1102,6 +1102,30 @@
   </data>
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Its last data was refused:</value>
+  </data>
+  <data name="ExternalProviders" xml:space="preserve">
+    <value>External providers</value>
+  </data>
+  <data name="ExternalProvidersTopic" xml:space="preserve">
+    <value>external providers</value>
+  </data>
+  <data name="ExternalProvidersTip1" xml:space="preserve">
+    <value>Programs outside Gleanvolt, plugins, can supply data in place of a built-in source: the tariff and the solar forecast. Each connects to its kind's hub at this address.</value>
+  </data>
+  <data name="ExternalProvidersTip2" xml:space="preserve">
+    <value>A kind is turned on in its own section, by choosing External and saving.</value>
+  </data>
+  <data name="ExternalProvidersIntro" xml:space="preserve">
+    <value>Every provider connects with the one token below. Give it to each plugin you run.</value>
+  </data>
+  <data name="ExternalKind" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="ExternalTokenShared" xml:space="preserve">
+    <value>The provider token is under {0}.</value>
+  </data>
+  <data name="ExternalTokenSharedMissing" xml:space="preserve">
+    <value>No provider token yet. Make one under {0}: without it, no provider can connect.</value>
   </data>
   <data name="ForecastSource" xml:space="preserve">
     <value>Source</value>

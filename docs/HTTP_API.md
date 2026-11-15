@@ -82,7 +82,7 @@ which is the thing a client is generated from. Everything else is behind the key
 | `GET /tariff/providers` | The tariff providers this build has, and which one is selected. |
 | `GET /tariff/settings` | The tariff settings as stored: the selection, the prices, and each provider's own settings by key. |
 | `PUT /tariff/settings` | Store them, applied at once. Held to the same rules as Settings: a 400 lists every problem with its field and row under `problems`, and nothing is written. Writes no hardware. |
-| `GET /providers` | The [external data providers](PROVIDERS.md): each kind (so far `tariff`), whether it is on, whether a provider is connected and since when, when its data last arrived, why its last data was refused, and whether it answered Gleanvolt's last request. Tokens are made on Settings, not here. |
+| `GET /providers` | The [external data providers](PROVIDERS.md): each kind (`tariff`, `solar-forecast`), whether it is on, whether a provider is connected and since when, when its data last arrived, why its last data was refused, and whether it answered Gleanvolt's last request. Tokens are made on Settings, not here. |
 
 **Ranges are bounded** by `Api:MaxQueryRange` and `Api:MaxSessions`. **Staleness is reported**:
 `/vehicle` carries `ageSeconds` and `stale` beside the state of charge, because a car's reading often

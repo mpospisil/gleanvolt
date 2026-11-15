@@ -4,14 +4,12 @@
 @inject TimeProvider Time
 
 @*
-    One kind of external data provider (#386): where a provider connects, its token, and its session,
-    live. Any kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the
-    tariff, choosing External and saving).
+    One kind of external data provider (#386): where a provider connects and its session, live. Any
+    kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the tariff,
+    choosing External and saving).
 
-    The token is made here and kept in the secret store, so a signed-in owner can reveal and copy it
-    again later, the way the API keys are shown. Without a login the page only says that one exists,
-    and no token can be made: like everything else on Settings that changes what a program on the
-    network may do.
+    The token is one for every kind (#406) and lives in ExternalProvidersForm; this panel only points
+    there, as a warning while there is none.
 *@
 
 @if (Providers.Find(Kind) is { } status)
@@ -28,35 +26,11 @@
 
         <h3>@SettingsText.ExternalToken</h3>
 
-        @if (!ReadOnly && status.HasToken && Providers.ReadToken(status.Kind) is { } token)
-        {
-            <div id="external-@(status.Kind)-token-value"><Secret Value="@token" /></div>
-        }
-        else
-        {
-            <p class="muted" id="external-@(status.Kind)-token-state">
-                @(status.HasToken ? SettingsText.ExternalHasToken : SettingsText.ExternalNoToken)
-            </p>
-        }
-
-        @if (!ReadOnly)
-        {
-            <div class="control actions">
-                <button type="button" class="secondary" id="external-@(status.Kind)-token" disabled="@_busy" @onclick="CreateTokenAsync">
-                    @(status.HasToken ? SettingsText.ExternalRecreateToken : SettingsText.ExternalCreateToken)
-                </button>
-            </div>
-
-            @if (status.HasToken)
-            {
-                <p class="muted" id="external-@(status.Kind)-token-replaces">@SettingsText.ExternalNewTokenDisconnects</p>
-            }
-        }
-
-        @if (_error is { } error)
-        {
-            <p class="error">@error</p>
-        }
+        @* One token for every kind (#406): made and shown in the External providers section. *@
+        <p class="@(status.HasToken ? "muted" : "warning")" id="external-@(status.Kind)-token-state">
+            @Localized.Rich(status.HasToken ? SettingsText.ExternalTokenShared : SettingsText.ExternalTokenSharedMissing,
+                @<a href="#external-providers">@SettingsText.ExternalProviders</a>)
+        </p>
 
         <h3>@SettingsText.ExternalStatus</h3>
 
@@ -92,13 +66,10 @@
 }
 
 @code {
-    private string? _error;
-    private bool _busy;
-
     /// <summary>The kind's id, e.g. <c>tariff</c>.</summary>
     [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
 
-    /// <summary>True when the page has no login: show, but do not make tokens.</summary>
+    /// <summary>True when the page has no login. Kept for the hosts that pass it; nothing here changes anything.</summary>
     [Parameter] public bool ReadOnly { get; set; }
 
     // What a provider is configured with: the SDK adds the hub path itself.
@@ -110,44 +81,7 @@
 
     private void Refresh() => _ = InvokeAsync(StateHasChanged);
 
-    private async Task CreateTokenAsync()
-    {
-        if (ReadOnly)
-        {
-            return;
-        }
+    private string State(ExternalProviderStatus status) => ExternalProviderStateText.Describe(status, Time.LocalTimeZone);
 
-        _busy = true;
-        _error = null;
-
-        try
-        {
-            await Providers.CreateTokenAsync(Kind);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            _error = SettingsText.ExternalTokenFailed;
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    private string State(ExternalProviderStatus status) => status.State switch
-    {
-        ExternalProviderState.Off => SettingsText.ExternalState_Off,
-        ExternalProviderState.Waiting => status.HasToken ? SettingsText.ExternalState_Waiting : SettingsText.ExternalState_NoToken,
-        ExternalProviderState.Connected => Localized.Format(SettingsText.ExternalState_Connected,
-            status.ProviderName ?? status.ProviderId ?? string.Empty, status.ProviderVersion ?? string.Empty, When(status.Since)),
-        ExternalProviderState.Disconnected => Localized.Format(SettingsText.ExternalState_Disconnected,
-            status.ProviderName ?? status.ProviderId ?? string.Empty, When(status.Since)),
-        _ => string.Empty,
-    };
-
-    // In the site's zone, like every time on these pages.
-    private string When(DateTimeOffset? at) =>
-        at is { } instant
-            ? TimeZoneInfo.ConvertTime(instant, Time.LocalTimeZone).ToString(SharedText.DatePattern + " HH:mm", System.Globalization.CultureInfo.CurrentCulture)
-            : string.Empty;
+    private string When(DateTimeOffset? at) => ExternalProviderStateText.When(at, Time.LocalTimeZone);
 }

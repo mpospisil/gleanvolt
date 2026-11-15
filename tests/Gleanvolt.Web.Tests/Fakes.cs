@@ -1474,25 +1474,32 @@ internal sealed class FakeExternalProviders : IExternalProviders
 {
     public List<ExternalProviderStatus> Statuses { get; } = [];
 
-    public List<string> TokensMade { get; } = [];
+    /// <summary>How many tokens were made.</summary>
+    public int TokensMade { get; private set; }
 
-    /// <summary>The tokens by kind, as the secret store would hold them.</summary>
-    public Dictionary<string, string> Tokens { get; } = [];
+    /// <summary>The one token every kind shares (#406), as the secret store would hold it.</summary>
+    public string? Token { get; set; }
 
     public IReadOnlyList<ExternalProviderStatus> All => Statuses;
 
-    public Task<string> CreateTokenAsync(string kind)
+    public bool HasToken => Token is not null;
+
+    public Task<string> CreateTokenAsync()
     {
-        TokensMade.Add(kind);
-        var token = "gvp_" + new string((char)('a' + TokensMade.Count % 26), 43);
-        Tokens[kind] = token;
-        var index = Statuses.FindIndex(status => status.Kind == kind);
-        Statuses[index] = Statuses[index] with { HasToken = true };
+        TokensMade++;
+        var token = "gvp_" + new string((char)('a' + TokensMade % 26), 43);
+        Token = token;
+
+        for (var i = 0; i < Statuses.Count; i++)
+        {
+            Statuses[i] = Statuses[i] with { HasToken = true };
+        }
+
         Changed?.Invoke();
         return Task.FromResult(token);
     }
 
-    public string? ReadToken(string kind) => Tokens.GetValueOrDefault(kind);
+    public string? ReadToken() => Token;
 
     public void Set(ExternalProviderStatus status)
     {

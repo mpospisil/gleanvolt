@@ -38,7 +38,7 @@ public sealed class WebSocketTests : IAsyncLifetime
         await _app.StartAsync();
 
         _address = new Uri(_app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First());
-        _token = await _app.Services.GetRequiredService<ExternalProviderRegistry>().CreateTokenAsync(EchoHub.Kind);
+        _token = await _app.Services.GetRequiredService<ExternalProviderRegistry>().CreateTokenAsync();
     }
 
     public async Task DisposeAsync()

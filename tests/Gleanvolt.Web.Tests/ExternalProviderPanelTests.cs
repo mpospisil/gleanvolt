@@ -6,8 +6,8 @@ using Gleanvolt.Web.Components;
 namespace Gleanvolt.Web.Tests;
 
 /// <summary>
-/// The external provider panel on Settings (#386): where a provider connects, its token behind Reveal,
-/// and the session as it changes, without a reload.
+/// The external provider panel on Settings (#386): where a provider connects, where the token is (one
+/// for every kind since #406), and the session as it changes, without a reload.
 /// </summary>
 public class ExternalProviderPanelTests : BunitContext
 {
@@ -38,54 +38,27 @@ public class ExternalProviderPanelTests : BunitContext
     }
 
     [Fact]
-    public void WithoutATokenItSaysToMakeOne()
+    public void WithoutATokenItSendsTheOwnerToTheExternalProvidersSection()
     {
         var panel = RenderPanel();
 
-        Assert.Contains("Make a token first", panel.Find("#external-tariff-state").TextContent);
-        Assert.Equal("Make a token", panel.Find("#external-tariff-token").TextContent.Trim());
-    }
-
-    [Fact]
-    public void ANewTokenIsMaskedAndRevealedOnRequest()
-    {
-        var panel = RenderPanel();
-
-        panel.Find("#external-tariff-token").Click();
-
-        Assert.Equal(["tariff"], _providers.TokensMade);
-        var token = _providers.Tokens["tariff"];
-        Assert.DoesNotContain(token, panel.Markup);
-        Assert.Equal("Make a new token", panel.Find("#external-tariff-token").TextContent.Trim());
-        Assert.Contains("disconnects", panel.Find("#external-tariff-token-replaces").TextContent);
-
-        panel.Find("#external-tariff-token-value button").Click();
-        Assert.Contains(token, panel.Find("#external-tariff-token-value code").TextContent);
-    }
-
-    [Fact]
-    public void TheTokenCanBeRevealedAgainAfterAReload()
-    {
-        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Waiting));
-        _providers.Tokens["tariff"] = "gvp_kept-in-the-secret-store";
-
-        var panel = RenderPanel();
-        panel.Find("#external-tariff-token-value button").Click();
-
-        Assert.Contains("gvp_kept-in-the-secret-store", panel.Find("#external-tariff-token-value code").TextContent);
-    }
-
-    [Fact]
-    public void WithoutALoginTheTokenIsNeitherShownNorMade()
-    {
-        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Waiting));
-        _providers.Tokens["tariff"] = "gvp_kept-in-the-secret-store";
-
-        var panel = RenderPanel(readOnly: true);
-
+        Assert.Contains("Make the provider token first", panel.Find("#external-tariff-state").TextContent);
+        var pointer = panel.Find("#external-tariff-token-state");
+        Assert.Contains("warning", pointer.ClassList);
+        Assert.Equal("#external-providers", pointer.QuerySelector("a")!.GetAttribute("href"));
         Assert.Empty(panel.FindAll("#external-tariff-token"));
+    }
+
+    [Fact]
+    public void WithATokenItSaysWhereItIsAndNeverShowsIt()
+    {
+        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Waiting));
+        _providers.Token = "gvp_kept-in-the-secret-store";
+
+        var panel = RenderPanel();
+
+        Assert.Equal("The provider token is under External providers.", panel.Find("#external-tariff-token-state").TextContent.Trim());
         Assert.DoesNotContain("gvp_kept-in-the-secret-store", panel.Markup);
-        Assert.Equal("A token exists.", panel.Find("#external-tariff-token-state").TextContent.Trim());
     }
 
     [Fact]

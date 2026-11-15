@@ -4,6 +4,46 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — One token for every external provider (#406)
+
+**What.** Every external provider (plugin) now connects with one token instead of one per kind. It
+is made and shown in a new **External providers** section on Settings, which also lists each kind
+with its hub and session. The tariff's and the solar forecast's panels point there for the token.
+
+**How.**
+- `ProviderTokens` (Providers.Server) keeps one secret, `SecretNames.ProviderToken`. Its constructor
+  takes the registered kinds and migrates: no shared token yet → the first `provider-token-<kind>`
+  found is adopted (`AdoptedFrom`, logged by the registry), then all of them are deleted. If the store
+  will not keep the adopted token, nothing is deleted and the next start tries again.
+- `ExternalProviderRegistry.CreateTokenAsync()` makes the token, marks every session as having one and
+  closes each with `token-replaced`. `ProviderTokenAuthentication` matches the one token; the kind
+  claim still comes from the request path, so the hub's own kind check is unchanged.
+- `IExternalProviders`: `HasToken`, `ReadToken()`, `CreateTokenAsync()` without a kind.
+- Web: `ExternalProvidersForm` (new, after `TariffEditorForm` on the Installation tab, hidden in a
+  host with no kinds); `ExternalProviderPanel` drops the token block for a pointer; the state sentence
+  moved to `ExternalProviderStateText` so both say it the same way.
+- The `wrong-kind` refusal can no longer be produced by a client; the code stays in contract 1.x.
+
+**Hardware/runtime quirks.** None new. On an installation that ran #402's tariff plugin, the first
+start keeps that plugin connecting with its old token; a solar forecast plugin set up with its own
+token from #405 (if anyone did) must be given the shared one.
+
+**Tests.** `ProviderTokensTests` (migration cases), `ProviderHubRegistrationTests` (one token opens
+both hubs, a new one closes both, a pre-#406 tariff token is adopted end to end),
+`ExternalProvidersFormTests` (token reveal/make/read-only, the kinds table, live updates, resources),
+reworked `ExternalProviderPanelTests`; the rest adapted to the new signatures.
+
+**Files.** `src/Gleanvolt.Core/Interfaces/{IExternalProviders,ISecretStore}.cs`,
+`src/Gleanvolt.Providers.Server/{ProviderTokens,ProviderTokenAuthentication,ExternalProviderRegistry,ProviderHub}.cs`,
+`src/Gleanvolt.Web/Components/{ExternalProvidersForm.razor,ExternalProviderPanel.razor,ExternalProviderStateText.cs,Pages/PvSystem.razor}`,
+`src/Gleanvolt.Web/NoExternalProviders.cs`, `SettingsText(.cs).resx`, `ProviderContracts.cs` (doc only),
+the two plugin samples' `Program.cs` and READMEs, `Gleanvolt.Providers.Client/README.md`, docs
+(`PROVIDERS.md`, `CONFIGURATION.md`, `HTTP_API.md`, `DECISIONS.md`), the manual's en/cs Settings,
+Grid tariff and Solar forecast pages, a new `settings-external-providers.png` and regenerated Settings
+screenshots, and the tests above.
+
+---
+
 ## 2026-11-15 — The solar forecast as an external provider, with a sample (#388)
 
 **What.** A program outside Gleanvolt can supply the solar forecast instead of Solcast. It connects

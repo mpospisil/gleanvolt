@@ -47,7 +47,7 @@ internal sealed class TestHost : IAsyncDisposable
         _app.MapExternalProviders();
         await _app.StartAsync();
 
-        Token = await Registry.CreateTokenAsync(EchoHub.Kind);
+        Token = await Registry.CreateTokenAsync();
     }
 
     public void Configure(Microsoft.AspNetCore.Http.Connections.Client.HttpConnectionOptions options, string? token = null)

@@ -19,7 +19,7 @@ builder.Services.AddGleanvoltTariffProvider<SampleTariff>(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
     options.Token = builder.Configuration["Gleanvolt:Token"]
-        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Settings → Tariff → External.");
+        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Settings → External providers.");
     options.ProviderId = "tariff-sample";
     options.Name = "Tariff sample";
 });

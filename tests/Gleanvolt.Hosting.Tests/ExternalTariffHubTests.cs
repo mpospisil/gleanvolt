@@ -76,7 +76,7 @@ public sealed class ExternalTariffHubTests : IAsyncLifetime
         await _app.StartAsync();
 
         Assert.True(Settings.Save(TariffSettings.None with { Provider = TariffProviderIds.External }).Saved);
-        _token = await Registry.CreateTokenAsync(TariffContract.Kind);
+        _token = await Registry.CreateTokenAsync();
     }
 
     public async Task DisposeAsync()

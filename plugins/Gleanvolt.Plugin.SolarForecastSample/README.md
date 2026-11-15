@@ -16,7 +16,8 @@ It is not part of the container image or the release packages.
 ## Run it
 
 1. In Gleanvolt, open **Settings → Solar forecast**, choose **External** and save.
-2. Under **Token**, make a token and copy it.
+2. Under **External providers**, make a token and copy it, or copy the one already there: every
+   plugin uses the same token.
 3. Run the sample:
 
    ```sh

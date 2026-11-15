@@ -15,19 +15,22 @@ public interface IExternalProviders
     /// <summary>The kind <paramref name="kind"/>, or null when this build does not have it.</summary>
     ExternalProviderStatus? Find(string kind) => All.FirstOrDefault(status => string.Equals(status.Kind, kind, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>
-    /// Makes a new token for <paramref name="kind"/> and returns it. Replaces the old token and closes
-    /// the current session, since the usual reason to regenerate is a token that leaked.
-    /// </summary>
-    Task<string> CreateTokenAsync(string kind);
+    /// <summary>Whether the provider token exists (#406). Without it, nothing can connect.</summary>
+    bool HasToken => All.Any(status => status.HasToken);
 
     /// <summary>
-    /// <paramref name="kind"/>'s token, or null when it has none. For Settings to reveal to a
-    /// signed-in owner, like the API keys; never for the API.
+    /// Makes a new provider token and returns it: one for every kind (#406). Replaces the old token and
+    /// closes every session, since the usual reason to regenerate is a token that leaked.
     /// </summary>
-    string? ReadToken(string kind);
+    Task<string> CreateTokenAsync();
 
-    /// <summary>Raised when any kind's status changes: a session, its data, its token.</summary>
+    /// <summary>
+    /// The provider token, or null when there is none. For Settings to reveal to a signed-in owner,
+    /// like the API keys; never for the API.
+    /// </summary>
+    string? ReadToken();
+
+    /// <summary>Raised when any kind's status changes: a session, its data, the token.</summary>
     event Action? Changed;
 }
 
@@ -51,7 +54,7 @@ public enum ExternalProviderState
 /// <param name="Kind">The kind's id, e.g. <c>tariff</c>.</param>
 /// <param name="Name">The kind's name in English.</param>
 /// <param name="HubPath">Where its hub is on the web port.</param>
-/// <param name="HasToken">Whether a token exists. Without one, nothing can connect.</param>
+/// <param name="HasToken">Whether the provider token exists; the same for every kind since #406. Without it, nothing can connect.</param>
 /// <param name="State">The session.</param>
 /// <param name="ProviderId">The attached or last provider's id.</param>
 /// <param name="ProviderName">Its name.</param>
