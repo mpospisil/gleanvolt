@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Forecasting;
 using Gleanvolt.Infrastructure.Solcast;
 
@@ -21,15 +22,18 @@ public class SolcastAccountEditorTests
 
     private readonly CountingHandler _handler = new();
 
-    private (SolcastAccountEditor Editor, SolcastForecastService Service) Create(SolcastOptions? environment = null, ISetupState? setup = null)
+    private readonly SolarForecastStore _forecast =
+        new(new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 8, 9, 6, 0, 0, TimeSpan.Zero)));
+
+    private (SolcastAccountEditor Editor, SolcastSource Source) Create(SolcastOptions? environment = null, ISetupState? setup = null)
     {
         var options = Options.Create(environment ?? new SolcastOptions());
         var store = new SolcastAccountStore(new InMemorySecretStore(), options);
-        var service = new SolcastForecastService(
-            new Factory(_handler), store, NullLogger<SolcastForecastService>.Instance,
+        var source = new SolcastSource(
+            new Factory(_handler), store, _forecast, NullLogger<SolcastSource>.Instance,
             new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 8, 9, 6, 0, 0, TimeSpan.Zero)));
 
-        return (new SolcastAccountEditor(store, service, NullLogger<SolcastAccountEditor>.Instance, setup), service);
+        return (new SolcastAccountEditor(store, source, NullLogger<SolcastAccountEditor>.Instance, setup), source);
     }
 
     [Fact]
@@ -103,20 +107,20 @@ public class SolcastAccountEditorTests
     [Fact]
     public async Task RemovingWithNoEnvironmentDropsTheForecastAndSpendsNothing()
     {
-        var (editor, service) = Create();
+        var (editor, source) = Create();
         await editor.SaveAsync("page-key", "page-site");
 
         editor.Remove();
 
         Assert.Equal(1, _handler.Calls);
         Assert.Equal(SolcastAccountSource.None, editor.Read().Source);
-        Assert.Null(service.GetForecast(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+        Assert.Null(_forecast.GetForecast(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
     }
 
     [Fact]
     public async Task RemovingHandsBackToTheEnvironmentAndKeepsTheForecast()
     {
-        var (editor, service) = Create(new SolcastOptions { ApiKey = "env-key", ResourceId = "env-site" });
+        var (editor, source) = Create(new SolcastOptions { ApiKey = "env-key", ResourceId = "env-site" });
         await editor.SaveAsync("page-key", "page-site");
         var changes = 0;
         editor.Changed += () => changes++;
@@ -126,18 +130,18 @@ public class SolcastAccountEditorTests
         var settings = editor.Read();
         Assert.Equal(SolcastAccountSource.Environment, settings.Source);
         Assert.Equal("env-site", settings.ResourceId);
-        Assert.NotNull(service.GetForecast(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
+        Assert.NotNull(_forecast.GetForecast(DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
         Assert.Equal(1, changes);
     }
 
     [Fact]
     public async Task EveryFetchIsNewsToThePage()
     {
-        var (editor, service) = Create(new SolcastOptions { ApiKey = "env-key", ResourceId = "env-site" });
+        var (editor, source) = Create(new SolcastOptions { ApiKey = "env-key", ResourceId = "env-site" });
         var changes = 0;
         editor.Changed += () => changes++;
 
-        await service.RefreshAsync();
+        await source.RequestRefreshAsync();
 
         Assert.Equal(1, changes);
     }

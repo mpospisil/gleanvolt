@@ -4,6 +4,44 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — Solar forecast: the store split from its sources (#387)
+
+**What.** A refactor with no visible change. The solar forecast now has a host-side store that every
+reader is served from and a runtime-switched source seam, so an external forecast (#388) can publish
+to the same place Solcast does. Behaviour, logs, entities and the API are unchanged. The decision is
+in DECISIONS.md.
+
+**How.**
+- Core: `SolarForecastStore` implements `ISolarForecastService` and `ISolarForecastRefresh` from one
+  immutable state (snapshot, retained history, day summaries), replaced whole by `Publish` and
+  `Forget`, with a `Changed` event. `SolarForecastSnapshot`, `SolarForecastOrigin` and
+  `SolarForecastSourceIds` are new models. `ISolarForecastSource` is new; `ISolarForecastRefresh` no
+  longer has `RefreshAsync`. `SolarForecastHistory.Retained()` gives the history as an immutable
+  forecast so the store can hold it without a lock on the read side.
+- Infrastructure: `SolcastForecastService` becomes `SolcastSource`. It keeps the account, the fetch,
+  the refused-account memory and the status, and publishes to the store with origin `solcast`.
+- Hosting: `SolarForecastOptions` (`SolarForecast:Source`) and `SolarForecastSources`, which picks
+  the active source through `IOptionsMonitor` and raises `Switched` when it changes.
+  `SolarForecastRefreshWorker` keeps its schedule (night sleep included), asks only the active source,
+  and wakes on a switch. `SolcastAccountEditor` takes `SolcastSource`.
+
+**Tests.** The Solcast tests moved to `SolcastSourceTests` and read back through the store, with two
+new ones (the published origin; forgetting leaves another source's forecast). New
+`SolarForecastStoreTests`: snapshot replacement, queries from forecast and history, `Forget`,
+`Changed`, and readers during publishes. The worker tests gain source selection: the selected source
+only, unset or any case is Solcast, an unknown id asks nothing, a reload with the same source is no
+switch, and a switch asks the new source at once.
+
+**Files.** `src/Gleanvolt.Core/{Interfaces/ISolarForecastRefresh.cs,Interfaces/ISolarForecastSource.cs,Models/SolarForecastSnapshot.cs,Strategies/SolarForecastStore.cs,Strategies/SolarForecastHistory.cs}`,
+`src/Gleanvolt.Infrastructure/Solcast/{SolcastSource.cs,SolcastAccountStore.cs}`,
+`src/Gleanvolt.Hosting/{SolarForecastRefreshWorker.cs,GleanvoltHostingExtensions.cs,Forecasting/SolarForecastSources.cs,Forecasting/SolcastAccountEditor.cs}`,
+`tests/Gleanvolt.Core.Tests/Strategies/SolarForecastStoreTests.cs`,
+`tests/Gleanvolt.Infrastructure.Tests/SolcastSourceTests.cs`,
+`tests/Gleanvolt.Hosting.Tests/{SolarForecastRefreshWorkerTests.cs,SolcastAccountEditorTests.cs}`,
+`tests/Gleanvolt.Api.Tests/Fakes.cs`, `docs/{CONFIGURATION.md,DECISIONS.md,IMPLEMENTATION_LOG.md}`.
+
+---
+
 ## 2026-11-15 — Tariff sample: debugging with the token in user secrets (#401)
 
 **What.** The tariff sample can be started from the debugger with its token kept as a user secret,

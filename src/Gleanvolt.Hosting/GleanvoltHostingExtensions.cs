@@ -389,7 +389,7 @@ public static class GleanvoltHostingExtensions
 
         // No Authorization header here: it is set on each request from the account store, so a key
         // saved on Settings is used by the next fetch rather than by the next start.
-        services.AddHttpClient(SolcastForecastService.HttpClientName, (provider, client) =>
+        services.AddHttpClient(SolcastSource.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<SolcastOptions>>().Value;
             if (!string.IsNullOrWhiteSpace(options.BaseUrl))
@@ -398,16 +398,20 @@ public static class GleanvoltHostingExtensions
             }
         });
 
-        // Single instance shared as both the injectable query interface and (via the refresh worker) a
-        // service warmed at startup.
-        services.AddSingleton<SolcastForecastService>();
-        services.AddSingleton<ISolarForecastService>(provider => provider.GetRequiredService<SolcastForecastService>());
+        // The forecast is held in one store whichever source it came from (issue #387): every reader
+        // of ISolarForecastService and the refresh worker's schedule are served from it, and a source
+        // only publishes to it. A host with a forecast of its own replaces ISolarForecastService by
+        // registering later, as before.
+        services.AddSingleton<SolarForecastStore>();
+        services.AddSingleton<ISolarForecastService>(provider => provider.GetRequiredService<SolarForecastStore>());
+        services.AddSingleton<ISolarForecastRefresh>(provider => provider.GetRequiredService<SolarForecastStore>());
 
-        // Registered by interface so that a host with another forecast source replaces it the same
-        // way it replaces the reader -- by registering later. Before this, the refresh worker took
-        // the concrete type, so the only way to be rid of it was to remove its service descriptor,
-        // and until you did the process kept demanding a Solcast API key it had no use for.
-        services.AddSingleton<ISolarForecastRefresh>(provider => provider.GetRequiredService<SolcastForecastService>());
+        // The sources, one active at a time by SolarForecast:Source, switched without a restart. The
+        // worker asks only the active one, so a source that is not selected spends no call.
+        services.Configure<SolarForecastOptions>(configuration.GetSection(SolarForecastOptions.SectionName));
+        services.AddSingleton<SolcastSource>();
+        services.AddSingleton<ISolarForecastSource>(provider => provider.GetRequiredService<SolcastSource>());
+        services.AddSingleton<SolarForecastSources>();
         services.AddHostedService<SolarForecastRefreshWorker>();
         services.AddSingleton<ISolcastAccountEditor, SolcastAccountEditor>();
 
