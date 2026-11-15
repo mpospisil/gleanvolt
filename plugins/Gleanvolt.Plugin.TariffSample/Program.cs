@@ -7,6 +7,13 @@ using Gleanvolt.Plugin.TariffSample;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// The host reads user secrets only in Development, and not every debug launcher sets that. Read them
+// always, so a token stored with `dotnet user-secrets set Gleanvolt:Token gvp_...` is found however the
+// sample is started. Command-line arguments and environment variables still take precedence.
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddGleanvoltTariffProvider<SampleTariff>(options =>
 {

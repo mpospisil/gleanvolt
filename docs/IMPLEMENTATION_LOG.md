@@ -4,6 +4,23 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-15 — Tariff sample: debugging with the token in user secrets (#401)
+
+**What.** The tariff sample can be started from the debugger with its token kept as a user secret,
+rather than typed on the command line.
+
+**How.** `Program.cs` adds user secrets in every environment, then environment variables and the
+command line again, so those still take precedence. `Host.CreateApplicationBuilder` reads user
+secrets only in Development, and not every launcher sets it. `Properties/launchSettings.json` gives
+`dotnet run` and Visual Studio a Development profile with the polling file watcher, and
+`.vscode/launch.json` gains a launch entry for the sample. The README shows the `dotnet user-secrets`
+command.
+
+**Files.** `plugins/Gleanvolt.Plugin.TariffSample/{Program.cs,README.md,Properties/launchSettings.json}`,
+`.vscode/launch.json`.
+
+---
+
 ## 2026-11-15 — External data providers: the framework and the low tariff (#389, #386, #401)
 
 **What.** A program outside Gleanvolt can now supply the low tariff. It connects to the web port at
