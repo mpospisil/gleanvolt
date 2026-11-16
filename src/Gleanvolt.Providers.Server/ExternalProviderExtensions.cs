@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Gleanvolt.Core.Interfaces;
@@ -68,6 +69,18 @@ public static class ExternalProviderExtensions
 
         return endpoints;
     }
+
+    /// <summary>
+    /// Maps <c>/external/{kind}/page</c> (#410): a redirect to the kind's provider page with a fresh ticket,
+    /// the theme and the viewer's culture. The caller puts it behind the web UI's login; the ticket is
+    /// what lets the provider trust the browser that arrives, so whoever can open this can use the page.
+    /// 404 while no provider with a page is attached.
+    /// </summary>
+    public static RouteHandlerBuilder MapExternalProviderPages(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGet(ExternalProviderStatus.PagePathFor("{kind}"), (string kind, ExternalProviderRegistry registry, TimeProvider time) =>
+            registry.PageLink(kind, "auto", CultureInfo.CurrentUICulture.Name, time.GetUtcNow()) is { } link
+                ? Results.Redirect(link.AbsoluteUri)
+                : Results.NotFound());
 
     private static void AddShared(IServiceCollection services)
     {

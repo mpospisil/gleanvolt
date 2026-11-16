@@ -91,6 +91,11 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
             return (RefusalCodes.Invalid, "The hello needs a name and an id of lowercase letters, digits and dashes.");
         }
 
+        if (hello.PageUrl is { } page && (!page.IsAbsoluteUri || (page.Scheme != Uri.UriSchemeHttp && page.Scheme != Uri.UriSchemeHttps)))
+        {
+            return (RefusalCodes.Invalid, "The page URL must be an absolute http or https address.");
+        }
+
         if (Context.User?.FindFirst(ProviderTokenAuthentication.KindClaim)?.Value is not { } claimed
             || !string.Equals(claimed, kind.Id, StringComparison.OrdinalIgnoreCase))
         {

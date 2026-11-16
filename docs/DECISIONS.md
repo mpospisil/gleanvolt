@@ -4,6 +4,77 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-16 — A provider brings its own page, shown in a frame; the Volkswagen feed copied into a plugin (#410)
+
+**Found.** #408 let a program outside Gleanvolt read the car, but the car feed that matters here,
+volkswagen.de, needs its owner: a cold sign-in always makes Volkswagen email a one-time code, and the
+built-in feed has Gleanvolt's Car page for that. A plugin had nowhere to ask. Drawing a sign-in in
+Gleanvolt for every plugin's account would put each provider's flow (codes, consent screens, pairing)
+into the protocol. Copying the built-in feed into `plugins/Gleanvolt.Plugin.Volkswagen` showed what
+else a car feed leans on that the SDK doesn't give it.
+
+**Decided.**
+- **The provider serves its own page; Gleanvolt frames it.** `ProviderHello.PageUrl` (optional; tariff
+  and solar-forecast to 1.2, vehicle to 1.1) says where. The Car page shows it in an `iframe` with
+  *Open in a new tab*, and Settings → External providers links to it, while the provider is connected.
+  Gleanvolt draws nothing of it and the protocol carries no sign-in messages.
+- **A ticket, not a login of the plugin's own.** The browser reaches the plugin directly, so its URL is
+  open to the LAN, and a *Sign in* button pressed over and over is how a VW account gets locked. The
+  frame and the link point at Gleanvolt's `/external/<kind>/page`, behind the web login, which
+  redirects to `PageUrl` with `gvticket` (expiry and provider id, HMAC-SHA256 under the shared provider
+  token, 2 minutes), `theme` and `culture`. The ticket is never in Gleanvolt's HTML, and the frame's
+  `src` stays the same across renders, so a status change doesn't reload the plugin's page mid sign-in.
+  `UseGleanvoltProviderPage()` in the SDK checks the ticket, sets the plugin's own 8-hour cookie and
+  answers 403 otherwise; static files and Blazor's `/_framework`, `/_content` and `/_blazor` need none,
+  since an interactive component can only start from markers rendered into a page that needed the
+  ticket. Whoever can open Gleanvolt's Car page can therefore use the plugin's page: the same trust,
+  not a second one.
+- **The SDK references the ASP.NET Core shared framework.** The middleware needs it. One package
+  rather than a second `.Pages` package; the cost is that every provider, page or not, runs on the
+  ASP.NET Core runtime.
+- **The Volkswagen plugin is a copy.** The built-in `Vehicle:Website` stays; the plugin is built with
+  the solution, never packed, never in the image or the release, and runs only with *An external
+  provider* chosen, so the two never share the VW account. Its README lists every change from the
+  built-in and why.
+
+**What moving a car into a plugin cost.** The built-in's 1 140 lines became about 1 730 in the plugin
+(its page, storage, poller and `Program.cs` included); the login chain and the page parser are
+unchanged. What changed: the account moves from Gleanvolt's settings and secret store
+into the plugin's page and a `0600` file; the reading is the contract's (and a time to full over 48 h
+is dropped rather than sending a reading Gleanvolt refuses whole); the sign-in states lose their
+phrases and Czech; the poll cadence decides from the car's own charge state; a read within 30 s answers
+with the last one, since the SDK asks after every hello; any exception stops the feed, not only HTTP
+failures; and the page resumes the feed directly. Plus a page (one Blazor component) and a container
+of its own, outside `deploy.sh`.
+
+**Gaps in the SDK, found by the copy.**
+- **No secret store.** The plugin writes the password and the session cookie jar as `0600` files, as
+  Gleanvolt's store does on Linux, but without DPAPI on Windows and with no shared place a plugin could
+  ask for. A provider author has to get this right alone.
+- **No "is a charging session open".** The built-in reads every 5 minutes while Gleanvolt's charge
+  control has a session open. The plugin can only go by the car's last report, so between plugging in
+  and the car's first "charging" it reads every 15. A field in the vehicle welcome, or a message when a
+  session opens and closes, would close it.
+- **No phrases.** `ProviderStatus.Message` is English, so a Czech Gleanvolt shows the plugin's status in
+  English; the built-in has `Phrase`s. The page gets `culture` but has no resources of its own yet.
+- **No way to ship a plugin.** It is built and loaded by hand, and `deploy.sh` doesn't know it.
+
+**Recommendation.** Keep the built-in car feeds in Gleanvolt for now, and make new cars plugins. Move
+volkswagen.de and MyŠkoda out only after the plugin has run against the real ID.4 through charges
+(plugged in → charging → complete), and after the SDK has a secret store, a charging-session signal in
+the vehicle contract, and status phrases, so a moved feed loses nothing an owner sees. What moving would
+gain is real: the login scraping, which breaks when Volkswagen changes its site, could then be fixed
+and shipped without a Gleanvolt release.
+
+**Consequences accepted.** The plugin's page must be reachable from the browser, not just from
+Gleanvolt. A Gleanvolt opened over HTTPS blocks an `http://` page as mixed content (the new-tab link is
+the way out). A page that sends `X-Frame-Options: DENY` can't be framed; Gleanvolt sends no CSP, so
+nothing on its side blocks one. In the frame, a page on another host than Gleanvolt's is a third party,
+and over `http` the browser won't send its cookie there: it works for the ticket's 2 minutes plus the
+Blazor circuit, and a reload in the frame can answer 403. On the same host (the Pi) the cookie works.
+
+---
+
 ## 2026-11-15 — The car as an external provider: a feed that pushes, and `NeedsOwner` on every kind's status (#408)
 
 **Found.** Every car Gleanvolt can read so far needed code in Gleanvolt: a client per manufacturer

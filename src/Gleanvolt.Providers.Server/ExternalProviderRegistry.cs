@@ -88,6 +88,30 @@ public sealed class ExternalProviderRegistry : IExternalProviders
 
     public string? ReadToken() => Tokens.Read();
 
+    /// <summary>
+    /// The address of <paramref name="kind"/>'s page with a fresh ticket and the viewer's theme and culture
+    /// (#410), or null when no provider with a page is attached or there is no token.
+    /// </summary>
+    public Uri? PageLink(string kind, string theme, string culture, DateTimeOffset now)
+    {
+        if (Find(kind) is not { HasPage: true, PageUrl: { } page, ProviderId: { } providerId } || Tokens.Read() is not { } token)
+        {
+            return null;
+        }
+
+        var ticket = ProviderPage.CreateTicket(token, providerId, now + ProviderPage.TicketLifetime);
+        var query = string.Join('&',
+            $"{ProviderPage.TicketParameter}={Uri.EscapeDataString(ticket)}",
+            $"{ProviderPage.ThemeParameter}={Uri.EscapeDataString(theme)}",
+            $"{ProviderPage.CultureParameter}={Uri.EscapeDataString(culture)}");
+        var builder = new UriBuilder(page)
+        {
+            Query = string.IsNullOrEmpty(page.Query) ? query : page.Query.TrimStart('?') + "&" + query,
+        };
+
+        return builder.Uri;
+    }
+
     public async Task<string> CreateTokenAsync()
     {
         var token = Tokens.Create()

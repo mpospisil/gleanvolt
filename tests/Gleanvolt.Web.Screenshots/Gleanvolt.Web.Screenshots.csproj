@@ -38,6 +38,8 @@
     <ProjectReference Include="..\..\src\Gleanvolt.Web\Gleanvolt.Web.csproj" />
     <!-- For the real driver lists, so the device forms offer what a real install offers. -->
     <ProjectReference Include="..\..\src\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
+    <!-- The Volkswagen plugin's own page, rendered into the Car page's frame for the manual (#410). -->
+    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.Volkswagen\Gleanvolt.Plugin.Volkswagen.csproj" />
   </ItemGroup>
 
 </Project>

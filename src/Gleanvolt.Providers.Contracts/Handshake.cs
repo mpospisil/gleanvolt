@@ -14,13 +14,21 @@ namespace Gleanvolt.Providers.Contracts;
 /// <param name="ContractMajor">The kind's contract major the provider was built against. A different major is refused.</param>
 /// <param name="ContractMinor">The minor. A higher minor than the host's is accepted; the host ignores what it does not know.</param>
 /// <param name="Capabilities">Optional features the provider supports, by name. Empty for now.</param>
+/// <param name="PageUrl">
+/// The provider's own web page, for the owner (#410): where they sign in to the provider's account, enter a
+/// one-time code or pair a device. Gleanvolt shows it in a frame and links to it, adding a short-lived
+/// ticket and the viewer's theme and culture (<see cref="ProviderPage"/>). Absolute, http or https, and
+/// reachable from the owner's browser, not only from Gleanvolt. Null when the provider has no page. Added
+/// in tariff 1.2, solar-forecast 1.2 and vehicle 1.1; an older host ignores it.
+/// </param>
 public sealed record ProviderHello(
     string ProviderId,
     string Name,
     string Version,
     int ContractMajor,
     int ContractMinor,
-    IReadOnlyList<string>? Capabilities = null);
+    IReadOnlyList<string>? Capabilities = null,
+    Uri? PageUrl = null);
 
 /// <summary>
 /// The host's answer to <see cref="ProviderHello"/>. A kind that has more to tell its provider (the

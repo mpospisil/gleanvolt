@@ -32,6 +32,13 @@
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.TariffSample\Gleanvolt.Plugin.TariffSample.csproj" />
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.SolarForecastSample\Gleanvolt.Plugin.SolarForecastSample.csproj" />
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.VehicleSample\Gleanvolt.Plugin.VehicleSample.csproj" />
+    <!-- The Volkswagen plugin's mapping, checked against Gleanvolt's own validator (#410). -->
+    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.Volkswagen\Gleanvolt.Plugin.Volkswagen.csproj" />
+  </ItemGroup>
+
+  <!-- The built-in feed's real capture, reused for the plugin's copy (#410): one file, not two. -->
+  <ItemGroup>
+    <None Include="..\Gleanvolt.Infrastructure.Tests\Fixtures\VwWebsite\charging-status.json" Link="Fixtures\VwWebsite\charging-status.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

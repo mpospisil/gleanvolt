@@ -1132,4 +1132,10 @@
   <data name="ExternalState_OffVehicle" xml:space="preserve">
     <value>Vypnuto. Zapne se volbou Externí zdroj dat na stránce Auto, uložením a restartem.</value>
   </data>
+  <data name="ExternalPage" xml:space="preserve">
+    <value>Stránka</value>
+  </data>
+  <data name="ExternalOpenPage" xml:space="preserve">
+    <value>Otevřít</value>
+  </data>
 </root>

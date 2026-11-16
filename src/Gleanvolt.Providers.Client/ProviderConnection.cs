@@ -183,7 +183,8 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
             _options.Name,
             _options.Version ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0",
             _contractMajor,
-            _contractMinor);
+            _contractMinor,
+            PageUrl: _options.PageUrl);
 
         var welcome = await Connection.InvokeAsync<TWelcome>(ProviderMethods.Hello, hello, stoppingToken).ConfigureAwait(false);
 
@@ -231,6 +232,11 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
         if (string.IsNullOrWhiteSpace(_options.ProviderId) || string.IsNullOrWhiteSpace(_options.Name))
         {
             throw new InvalidOperationException("ProviderOptions.ProviderId and Name are required.");
+        }
+
+        if (_options.PageUrl is { } page && (!page.IsAbsoluteUri || (page.Scheme != Uri.UriSchemeHttp && page.Scheme != Uri.UriSchemeHttps)))
+        {
+            throw new InvalidOperationException("ProviderOptions.PageUrl must be an absolute http or https address the owner's browser can reach.");
         }
     }
 

@@ -81,6 +81,20 @@ public class ExternalProvidersFormTests : BunitContext
     }
 
     [Fact]
+    public void AProviderWithAPageIsLinkedThroughGleanvoltsRedirect()
+    {
+        _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "volkswagen", ProviderName: "Volkswagen", Since: Now, PageUrl: new Uri("http://192.168.2.7:8095/")));
+
+        var form = RenderForm();
+
+        var link = form.Find("#external-providers-vehicle-page");
+        Assert.Equal("/external/vehicle/page", link.GetAttribute("href"));
+        Assert.Equal("_blank", link.GetAttribute("target"));
+        Assert.Empty(form.FindAll("#external-providers-tariff-page"));
+    }
+
+    [Fact]
     public void WithoutATokenItSaysToMakeOne()
     {
         var form = RenderForm();

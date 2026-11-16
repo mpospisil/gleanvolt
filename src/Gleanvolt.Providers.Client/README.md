@@ -25,6 +25,12 @@ The SDK connects, retries with a backoff until Gleanvolt answers, says hello aft
 publishes once after every accepted hello, answers Gleanvolt's refresh requests, and waits longer
 after a refusal. Every refusal and every problem Gleanvolt finds in the data is logged.
 
+A provider that needs its owner (to sign in, enter an emailed code, pair a device) can serve a page of
+its own, which Gleanvolt shows: set `options.PageUrl`, and guard the page with
+`app.UseGleanvoltProviderPage()`, which admits only a browser Gleanvolt sent with a short-lived
+ticket. The SDK references the ASP.NET Core shared framework for that, so a provider runs on the
+ASP.NET Core runtime.
+
 The protocol, the tokens and the limits on the data are described in
 [docs/PROVIDERS.md](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
 

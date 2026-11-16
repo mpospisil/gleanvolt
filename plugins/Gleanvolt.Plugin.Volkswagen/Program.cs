@@ -1,0 +1,71 @@
+using Gleanvolt.Plugin.Volkswagen.Components;
+using Gleanvolt.Plugin.Volkswagen.Volkswagen;
+using Gleanvolt.Providers.Client;
+using Gleanvolt.Providers.Client.Vehicle;
+using Microsoft.AspNetCore.DataProtection;
+
+// The volkswagen.de car feed as an external provider for Gleanvolt (#410): a copy of the built-in
+// Vehicle:Website feed, with its own page for the account, the sign-in and the emailed code, which
+// Gleanvolt shows on its Car page. Run it only with "An external provider" chosen on the Car page, so it
+// and the built-in feed never use the VW account at the same time. See README.md.
+
+var builder = WebApplication.CreateBuilder(args);
+
+// User secrets however it is started, as the samples do; environment variables and the command line win.
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
+
+// Where the page listens, and the address the owner's browser opens it at. They differ when it listens on
+// every interface (a container): Gleanvolt must be told an address a browser can reach.
+var listen = builder.Configuration["Urls"] ?? "http://localhost:8095";
+builder.WebHost.UseUrls(listen);
+var pageUrl = builder.Configuration["Gleanvolt:PageUrl"]
+    ?? listen.Split(';')[0].Replace("0.0.0.0", "localhost", StringComparison.Ordinal).Replace("+", "localhost", StringComparison.Ordinal);
+
+var volkswagen = builder.Configuration.GetSection(VolkswagenOptions.SectionName).Get<VolkswagenOptions>() ?? new VolkswagenOptions();
+builder.Services.AddSingleton(volkswagen);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<DataFiles>();
+builder.Services.AddSingleton<AccountStore>();
+builder.Services.AddSingleton<VwWebsiteSessionStore>();
+builder.Services.AddSingleton(provider => new VwWebsiteClient(
+    provider.GetRequiredService<VolkswagenOptions>(),
+    provider.GetRequiredService<AccountStore>(),
+    provider.GetRequiredService<VwWebsiteSessionStore>(),
+    provider.GetRequiredService<ILogger<VwWebsiteClient>>(),
+    provider.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<VwWebsiteSignIn>();
+
+builder.Services.AddGleanvoltVehicleProvider<VolkswagenFeed>(options =>
+{
+    options.Endpoint = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
+    options.Token = builder.Configuration["Gleanvolt:Token"]
+        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Gleanvolt's Settings → External providers.");
+    options.ProviderId = "volkswagen";
+    options.Name = "Volkswagen";
+    options.PageUrl = new Uri(pageUrl);
+});
+
+// The feed the SDK asks is the one the page and the poller use.
+builder.Services.AddSingleton(provider => (VolkswagenFeed)provider.GetRequiredService<IVehicleSource>());
+builder.Services.AddSingleton<VolkswagenPoller>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<VolkswagenPoller>());
+
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+
+// Blazor's own keys (circuits, antiforgery), beside the account in the data directory rather than in a
+// home directory a container forgets.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(Path.GetFullPath(volkswagen.DataDirectory), "keys")))
+    .SetApplicationName("gleanvolt-plugin-volkswagen");
+
+var app = builder.Build();
+
+// Everything after it answers only a browser Gleanvolt sent, with a ticket.
+app.UseGleanvoltProviderPage();
+app.UseAntiforgery();
+app.MapStaticAssets();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+
+app.Run();

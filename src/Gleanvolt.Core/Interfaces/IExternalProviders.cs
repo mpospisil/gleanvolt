@@ -67,6 +67,7 @@ public enum ExternalProviderState
 /// <param name="StatusMessage">Its message with that report.</param>
 /// <param name="Unanswered">True when the host's last request got no answer in time.</param>
 /// <param name="NeedsOwner">True when the provider said only the owner can fix what is wrong: a login, a consent screen.</param>
+/// <param name="PageUrl">The attached or last provider's own page (#410), as it said in its hello, or null.</param>
 public sealed record ExternalProviderStatus(
     string Kind,
     string Name,
@@ -83,4 +84,18 @@ public sealed record ExternalProviderStatus(
     bool? Healthy = null,
     string? StatusMessage = null,
     bool Unanswered = false,
-    bool NeedsOwner = false);
+    bool NeedsOwner = false,
+    Uri? PageUrl = null)
+{
+    /// <summary>
+    /// Where the web UI opens the provider's page (#410): a Gleanvolt address behind the web login that
+    /// redirects to <see cref="PageUrl"/> with a fresh ticket. The ticket is never in a page's HTML.
+    /// </summary>
+    public string PagePath => PagePathFor(Kind);
+
+    /// <summary>Whether the provider's page can be opened now: one is attached and has a page.</summary>
+    public bool HasPage => State == ExternalProviderState.Connected && PageUrl is not null;
+
+    /// <summary>The page path of <paramref name="kind"/>.</summary>
+    public static string PagePathFor(string kind) => "/external/" + kind + "/page";
+}

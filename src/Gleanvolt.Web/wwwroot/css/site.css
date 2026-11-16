@@ -2735,3 +2735,13 @@ label.check {
 .external-provider-address dd {
     margin: 0;
 }
+
+/* A provider's own page in a frame (#410): the width of the column, tall enough for a sign-in form. */
+.external-provider-page iframe {
+    display: block;
+    width: 100%;
+    min-height: 28rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: transparent;
+}

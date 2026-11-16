@@ -21,9 +21,17 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <!--
+    For a provider's own page (#410): UseGleanvoltProviderPage is ASP.NET Core middleware. A provider
+    without a page runs on the ASP.NET Core runtime too, which is the cost of one package; see
+    docs/DECISIONS.md.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>

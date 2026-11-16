@@ -72,6 +72,7 @@
                     <th>@SettingsText.ExternalKind</th>
                     <th>@SettingsText.ExternalHub</th>
                     <th>@SettingsText.ExternalStatus</th>
+                    <th>@SettingsText.ExternalPage</th>
                 </tr>
             </thead>
             <tbody>
@@ -82,6 +83,13 @@
                         <td><code>@status.HubPath</code></td>
                         <td class="@(status.State == ExternalProviderState.Connected ? null : "muted")">
                             @ExternalProviderStateText.Describe(status, Time.LocalTimeZone)
+                        </td>
+                        <td>
+                            @* The provider's own page (#410), through Gleanvolt's redirect that adds the ticket. *@
+                            @if (status.HasPage)
+                            {
+                                <a id="external-providers-@(status.Kind)-page" href="@status.PagePath" target="_blank" rel="noopener">@SettingsText.ExternalOpenPage</a>
+                            }
                         </td>
                     </tr>
                 }
