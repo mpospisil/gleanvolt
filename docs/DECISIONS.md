@@ -4,6 +4,39 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-16 — On the device, the plugin's page needed framing allowed and Blazor's script restored (#410)
+
+**Found.** The first run of the Volkswagen plugin on the Pi, against the real ID.4:
+- The page rendered, but no button worked: the image had no `_framework/blazor.web.js` (404). The
+  SDK adds the pack that carries it only when it sees `.razor` files at restore, and the Dockerfile
+  restores from the project file alone, before the sources are copied. A local `dotnet run` or
+  `publish` has the files, which is why it worked in the debugger.
+- The frame stayed empty ("refused to connect"). A Blazor page sends `X-Frame-Options: SAMEORIGIN`
+  (antiforgery) and `Content-Security-Policy: frame-ancestors 'self'` (interactive server rendering),
+  and Gleanvolt on :8090 is another origin than the plugin on :8095. After that was allowed for the
+  endpoint, it was still refused: the owner opens Gleanvolt as `gleanvolt.local`, and the endpoint the
+  plugin connects to is `192.168.2.7`.
+- Once those were fixed: the cold sign-in asked for the emailed code once, the browser was
+  remembered, readings arrived. During a FastNoBattery charge the car showed *Idle* until the car
+  itself reported again: the reading's time is the car's last report, which predated the charge.
+
+**Decided.**
+- **Keep the frame.** Dropping it for the *Open in a new tab* link alone was considered. The faults
+  were configuration, not the design, and the frame works once the addresses are right.
+- `RequiresAspNetWebAssets` in the plugin's project file, so the script is in the image however the
+  restore is run.
+- The plugin turns off antiforgery's `X-Frame-Options` and sets `frame-ancestors` to `'self'` plus
+  Gleanvolt's endpoint, or to `Gleanvolt:FrameAncestors` when set. It is not opened to every site:
+  over https the plugin's cookie is `SameSite=None`, so a page anywhere could frame a working
+  *Sign in* button.
+
+**Consequences accepted.** Whoever runs a plugin with a page has to name the addresses the browser
+opens Gleanvolt at, and give the page the same host name, or the frame is refused or a reload in it
+answers 403. *Open in a new tab* works regardless. Gleanvolt could pass its own browser origin in the
+signed ticket so the plugin needs no setting. That is not done.
+
+---
+
 ## 2026-11-16 — A provider brings its own page, shown in a frame; the Volkswagen feed copied into a plugin (#410)
 
 **Found.** #408 let a program outside Gleanvolt read the car, but the car feed that matters here,

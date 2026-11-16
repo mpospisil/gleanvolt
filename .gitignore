@@ -442,3 +442,6 @@ src/Gleanvolt.Worker/data/
 *.db
 *.db-wal
 *.db-shm
+
+# The Volkswagen plugin's data directory from a local run: the VW account and session (#410).
+plugins/Gleanvolt.Plugin.Volkswagen/data/

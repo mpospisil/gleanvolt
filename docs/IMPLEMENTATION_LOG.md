@@ -4,6 +4,44 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-16 — The Volkswagen plugin on the Pi: Blazor's script in the image, and a page Gleanvolt may frame (#410)
+
+**What.** Fixes from the first run of `plugins/Gleanvolt.Plugin.Volkswagen` on the Pi against the
+real ID.4. The page rendered but did nothing, and Gleanvolt's frame was refused.
+
+**How.**
+- `Gleanvolt.Plugin.Volkswagen.csproj`: `<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>`. The
+  Web SDK sets it only when `Content` has a `.razor` file (`Microsoft.NET.Sdk.Web.ProjectSystem.targets`),
+  and the Dockerfile's restore runs from the csproj alone, so `Microsoft.AspNetCore.App.Internal.Assets`
+  was never restored and `publish` left out `_framework/blazor.web.js`.
+- `Program.cs`: `AddAntiforgery(SuppressXFrameOptionsHeader = true)`, and
+  `AddInteractiveServerRenderMode(ContentSecurityFrameAncestorsPolicy = "'self' <origin>")`. The origin
+  is `Gleanvolt:Endpoint`'s, or the new `Gleanvolt:FrameAncestors` setting.
+- README: the setting, and on the Pi `PageUrl` and `FrameAncestors` on the host name the browser uses
+  (`gleanvolt.local`). PROVIDERS.md: ASP.NET Core's two anti-framing defaults, and that another port
+  is another origin.
+
+**Hardware quirks.**
+- The browser reaches Gleanvolt as `gleanvolt.local:8090`, while the container connects to
+  `192.168.2.7:8090`, because a `.local` name usually doesn't resolve inside a container. Framing is
+  decided by the first, so the plugin can't derive it from its endpoint.
+- The page on `192.168.2.7` inside a Gleanvolt on `gleanvolt.local` is a third party. Its `Lax` cookie
+  isn't sent there over http, so the page uses the same host name.
+
+**Tested on the device.**
+- Ticketless 403.
+- Gleanvolt's redirect behind its login.
+- A cold sign-in with one emailed code, after which the browser was remembered.
+- Readings published.
+- During a charge, the car's state followed its next report (the first reading showed *Idle*,
+  captured before the charge started).
+- The frame working from `gleanvolt.local`.
+
+**Files.** `plugins/Gleanvolt.Plugin.Volkswagen/Gleanvolt.Plugin.Volkswagen.csproj`, `Program.cs`,
+`README.md`; `docs/PROVIDERS.md`, `docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
+
+---
+
 ## 2026-11-16 — A provider's own page in a frame, and the Volkswagen feed as a plugin (#410)
 
 **What.** Part 1: a provider can bring its own web page, and Gleanvolt shows it. The hello carries

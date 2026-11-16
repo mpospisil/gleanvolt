@@ -114,9 +114,21 @@ docker run -d --name gleanvolt-volkswagen --restart unless-stopped \
   -v gleanvolt-volkswagen:/data \
   -e Gleanvolt__Endpoint=http://192.168.2.7:8090 \
   -e Gleanvolt__Token=gvp_... \
-  -e Gleanvolt__PageUrl=http://192.168.2.7:8095/ \
+  -e Gleanvolt__PageUrl=http://gleanvolt.local:8095/ \
+  -e "Gleanvolt__FrameAncestors=http://gleanvolt.local:8090 http://192.168.2.7:8090" \
   gleanvolt-volkswagen
 ```
+
+Use the **name you open Gleanvolt at** in the browser for both of the last two, not the address the
+plugin connects to:
+
+- `Gleanvolt:FrameAncestors` lists every address the browser opens Gleanvolt at. One left out shows
+  "refused to connect" in the frame: the page allows only these to frame it.
+- `Gleanvolt:PageUrl` uses the same host name as Gleanvolt. On another host (`192.168.2.7` while
+  Gleanvolt is `gleanvolt.local`), the browser treats the page as a third party in the frame and drops
+  its cookie over http, so a reload inside the frame answers 403.
+
+`Gleanvolt:Endpoint` stays an address the container can resolve: a `.local` name usually isn't one.
 
 The image runs as the non-root `app` user (UID 1654), and `/data` is that user's alone. A named volume
 takes those permissions over; a bind-mounted host directory must be `chown 1654:1654` and `chmod 700`.
