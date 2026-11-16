@@ -4,6 +4,7 @@
     "Gleanvolt.Plugin.VehicleSample": {
       "commandName": "Project",
       "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:8096",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "DOTNET_USE_POLLING_FILE_WATCHER": "true"
