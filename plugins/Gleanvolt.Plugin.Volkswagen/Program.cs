@@ -37,9 +37,15 @@ builder.Services.AddSingleton(provider => new VwWebsiteClient(
     provider.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton<VwWebsiteSignIn>();
 
+var gleanvolt = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
+
+// Who may show the page in a frame: Gleanvolt, at the address the browser opens it at. Its endpoint by
+// default; set Gleanvolt:FrameAncestors when the browser reaches Gleanvolt by another name.
+var frameAncestors = "'self' " + (builder.Configuration["Gleanvolt:FrameAncestors"] ?? gleanvolt.GetLeftPart(UriPartial.Authority));
+
 builder.Services.AddGleanvoltVehicleProvider<VolkswagenFeed>(options =>
 {
-    options.Endpoint = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
+    options.Endpoint = gleanvolt;
     options.Token = builder.Configuration["Gleanvolt:Token"]
         ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Gleanvolt's Settings → External providers.");
     options.ProviderId = "volkswagen";
@@ -54,6 +60,10 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Volksw
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+// Antiforgery sends X-Frame-Options: SAMEORIGIN, and Gleanvolt on another port is another origin: the
+// frame would stay empty. The frame-ancestors policy below says who may frame the page instead.
+builder.Services.AddAntiforgery(options => options.SuppressXFrameOptionsHeader = true);
+
 // Blazor's own keys (circuits, antiforgery), beside the account in the data directory rather than in a
 // home directory a container forgets.
 builder.Services.AddDataProtection()
@@ -66,6 +76,7 @@ var app = builder.Build();
 app.UseGleanvoltProviderPage();
 app.UseAntiforgery();
 app.MapStaticAssets();
-app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode(options =>
+    options.ContentSecurityFrameAncestorsPolicy = frameAncestors);
 
 app.Run();
