@@ -171,8 +171,11 @@ forms keeps the ticket in the form's address, since the cookie may not be sent i
   container publishes its port to the LAN and sets `pageUrl` to the LAN address.
 - If Gleanvolt is opened over HTTPS, an `http://` page is blocked as mixed content, in the frame and
   through the redirect. Use **Open in a new tab**, or serve the page over HTTPS too.
-- A page that wants to be framed must not send `X-Frame-Options: DENY` or a `frame-ancestors` that
-  leaves Gleanvolt out. Gleanvolt sends no CSP today, so nothing on its side blocks the frame.
+- A page that wants to be framed must not send `X-Frame-Options` or a `frame-ancestors` that leaves
+  Gleanvolt out, and another port is another origin. ASP.NET Core sends both by default on a Blazor
+  page (`SAMEORIGIN` from antiforgery, `frame-ancestors 'self'` from interactive server rendering):
+  the Volkswagen plugin turns off the first and sets the second to Gleanvolt's address. Gleanvolt
+  sends no CSP today, so nothing on its side blocks the frame.
 - In the frame, a page on another host than Gleanvolt's (another IP address, not just another port)
   is a third party. Browsers send its cookie there only over HTTPS (`SameSite=None; Secure`), so an
   `http` page on another host works for as long as the ticket does, and a reload inside the frame may

@@ -41,6 +41,7 @@ password and VIN. The password is never shown back.
 | `Gleanvolt:Token` | | The token from Gleanvolt's **Settings → External providers**. Required |
 | `Urls` | `http://localhost:8095` | Where the page listens. In a container, `http://0.0.0.0:8095` |
 | `Gleanvolt:PageUrl` | `Urls`, with `0.0.0.0` read as `localhost` | The page's address **as the owner's browser reaches it**, e.g. `http://192.168.2.7:8095/` |
+| `Gleanvolt:FrameAncestors` | `Gleanvolt:Endpoint`'s origin | Who may show the page in a frame (CSP `frame-ancestors`), e.g. `http://gleanvolt.local:8090` when the browser reaches Gleanvolt by another name than the endpoint |
 | `Volkswagen:DataDirectory` | `data` | Where the account and the session are kept |
 | `Volkswagen:PollInterval` | `00:05:00` | How often to read while the car says it is charging |
 | `Volkswagen:IdlePollInterval` | `00:15:00` | How often to read otherwise |

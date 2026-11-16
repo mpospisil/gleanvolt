@@ -12,6 +12,13 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <UserSecretsId>gleanvolt-plugin-volkswagen</UserSecretsId>
+
+    <!--
+      Blazor's script (_framework/blazor.web.js) comes in a pack the SDK adds only when it sees .razor
+      files at restore. The Dockerfile restores from the project file alone, before the sources are
+      copied, so without this the image has no script and the page's buttons do nothing.
+    -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
