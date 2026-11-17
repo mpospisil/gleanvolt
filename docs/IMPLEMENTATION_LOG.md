@@ -35,6 +35,12 @@ session in it, and its `DataFiles` is gone.
 - Docs: PROVIDERS.md (**Secrets**), the client README, and the plugin README (the data directory, the
   change rows, the not-done list).
 
+**Also fixed: a race from #414.** CI failed `TheSdkKeepsTheSessionAndSaysWhenItChanges` once. The
+SDK's `SetSession` compared and set the session without a lock. The welcome and Gleanvolt's repeat
+on attach arrive on different threads, so both could see "no session yet" and raise `SessionChanged`
+twice for the same closed state. The compare-and-set is now under a lock. The test then passed 15
+runs in a row.
+
 **On the device (2026-11-17).** The plugin image from this branch ran on the Pi against the data
 volume from #410. It read `account.json` and `session.json` as they were, read VW without asking for
 a code, and published (SOC 80 %). The files stayed `0600 app:app` in a `0700` directory.
@@ -42,6 +48,7 @@ a code, and published (SOC 80 %). The files stayed `0600 app:app` in a `0700` di
 **Files.** `src/Gleanvolt.Providers.Client/ProviderSecretStore.cs` (new), `Gleanvolt.Providers.Client.csproj`,
 `README.md`; `plugins/Gleanvolt.Plugin.Volkswagen/Program.cs`, `Volkswagen/VolkswagenAccount.cs`,
 `VwWebsiteSessionStore.cs`, `DataFiles.cs` (deleted), `README.md`;
+`src/Gleanvolt.Providers.Client/Vehicle/VehicleProvider.cs` (the race);
 `tests/Gleanvolt.Providers.Tests/ProviderSecretStoreTests.cs` (new),
 `tests/Gleanvolt.Hosting.Tests/VolkswagenPluginTests.cs`, `tests/Gleanvolt.Web.Screenshots/ProviderPageScreenshot.cs`;
 `docs/PROVIDERS.md`, `docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
