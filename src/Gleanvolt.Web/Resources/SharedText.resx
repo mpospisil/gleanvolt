@@ -113,13 +113,9 @@
     <comment>A session that started in one charge mode and ended in another.</comment>
   </data>
   <!-- Sessions -->
-  <data name="WeatherLine" xml:space="preserve">
-    <value>{0}, {1} cloud</value>
-    <comment>{0} is a temperature, {1} a percentage of sky covered by cloud.</comment>
-  </data>
-  <data name="WeatherLineWithCondition" xml:space="preserve">
-    <value>{0}, {1}, {2} cloud</value>
-    <comment>{0} is the weather provider's own description (not translated), {1} a temperature, {2} the cloud percentage.</comment>
+  <data name="WeatherClouds" xml:space="preserve">
+    <value>{0} cloud</value>
+    <comment>{0} is a percentage of sky covered by cloud. One part of a session's weather line, joined with the provider's description and the temperature by commas.</comment>
   </data>
   <data name="DayForecastLine" xml:space="preserve">
     <value>{0} (p10 {1} – p90 {2})</value>

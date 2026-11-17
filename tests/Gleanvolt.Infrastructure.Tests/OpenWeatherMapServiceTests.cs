@@ -43,10 +43,10 @@ public sealed class OpenWeatherMapServiceTests
 
         Assert.NotNull(reading);
         var observation = reading!.Observation;
-        Assert.Equal(19.62, observation.TemperatureCelsius, 2);
-        Assert.Equal(101_700, observation.PressurePascals, 2);
-        Assert.Equal(51, observation.HumidityPercent, 2);
-        Assert.Equal(5, observation.CloudsPercent, 2);
+        Assert.Equal(19.62, observation.TemperatureCelsius!.Value, 2);
+        Assert.Equal(101_700, observation.PressurePascals!.Value, 2);
+        Assert.Equal(51, observation.HumidityPercent!.Value, 2);
+        Assert.Equal(5, observation.CloudsPercent!.Value, 2);
         Assert.Equal(10_000, observation.VisibilityMetres);
         Assert.Equal("Clear", observation.Condition);
         Assert.Equal("clear sky", observation.ConditionDescription);

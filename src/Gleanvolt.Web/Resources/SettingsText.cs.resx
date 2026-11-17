@@ -1138,4 +1138,28 @@
   <data name="ExternalOpenPage" xml:space="preserve">
     <value>Otevřít</value>
   </data>
+  <data name="WeatherSource" xml:space="preserve">
+    <value>Zdroj počasí</value>
+  </data>
+  <data name="WeatherSource_NotProvided" xml:space="preserve">
+    <value>Bez počasí</value>
+  </data>
+  <data name="WeatherSource_External" xml:space="preserve">
+    <value>Externí</value>
+  </data>
+  <data name="WeatherSourceSaved" xml:space="preserve">
+    <value>Uloženo. Zdroj počasí: {0}.</value>
+  </data>
+  <data name="WeatherNotProvided" xml:space="preserve">
+    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat, vyberte OpenWeather nebo Externí.</value>
+  </data>
+  <data name="WeatherExternalIntro" xml:space="preserve">
+    <value>Počasí posílá zdroj připojený tady, například plugin OpenWeather. Gleanvolt se ho zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí. Dokud je vybrána volba Externí, OpenWeatherMap se nevolá a jeho klíč zůstává uložený pro chvíli, kdy OpenWeather znovu vyberete.</value>
+  </data>
+  <data name="WeatherExternalWizard" xml:space="preserve">
+    <value>Zdroj připojíte po dokončení nastavení v Nastavení: najdete tam adresu, token i vlastní stránku zdroje.</value>
+  </data>
+  <data name="WeatherExternalPageIntro" xml:space="preserve">
+    <value>{0} má vlastní stránku, zobrazenou tady: zadejte na ní jeho nastavení, například klíč API. Stránka pochází přímo od zdroje, ne od Gleanvoltu.</value>
+  </data>
 </root>

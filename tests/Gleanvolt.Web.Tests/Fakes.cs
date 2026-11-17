@@ -1538,3 +1538,31 @@ internal sealed class FakeSolarForecastSourceSelection : ISolarForecastSourceSel
 
     public event Action? Changed;
 }
+
+internal sealed class FakeWeatherSourceSelection : IWeatherSourceSelection
+{
+    public WeatherSource Selected { get; set; } = WeatherSource.NotProvided;
+
+    public bool IsChosen { get; set; }
+
+    public List<WeatherSource> Chosen { get; } = [];
+
+    /// <summary>When set, every choice is refused with it.</summary>
+    public SettingsSaveResult? Refusal { get; set; }
+
+    public SettingsSaveResult Select(WeatherSource source)
+    {
+        if (Refusal is { } refused)
+        {
+            return refused;
+        }
+
+        Chosen.Add(source);
+        Selected = source;
+        IsChosen = true;
+        Changed?.Invoke();
+        return SettingsSaveResult.Success;
+    }
+
+    public event Action? Changed;
+}

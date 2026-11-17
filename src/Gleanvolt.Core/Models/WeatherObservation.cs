@@ -16,7 +16,11 @@ namespace Gleanvolt.Core.Models;
 /// <see cref="ChargingSessionSample.VehicleSocCapturedAt"/>: a reading without its own timestamp cannot
 /// be told apart from a live one, and these are typically a few minutes old.
 /// </param>
-/// <param name="TemperatureCelsius">Air temperature, °C.</param>
+/// <param name="TemperatureCelsius">
+/// Air temperature, °C. This and the three figures after it are null when the provider didn't report
+/// them (#424): an external provider, a home weather station say, may have no cloud cover, and an unknown
+/// must not read as 0 °C or a clear sky. OpenWeatherMap reports all four.
+/// </param>
 /// <param name="PressurePascals">Atmospheric pressure at station level, Pa.</param>
 /// <param name="HumidityPercent">Relative humidity, %.</param>
 /// <param name="CloudsPercent">
@@ -31,10 +35,10 @@ namespace Gleanvolt.Core.Models;
 /// <param name="ConditionDescription">Its longer form, e.g. <c>light rain</c>, <c>broken clouds</c>.</param>
 public sealed record WeatherObservation(
     DateTimeOffset ObservedAt,
-    double TemperatureCelsius,
-    double PressurePascals,
-    double HumidityPercent,
-    double CloudsPercent,
+    double? TemperatureCelsius,
+    double? PressurePascals,
+    double? HumidityPercent,
+    double? CloudsPercent,
     double? VisibilityMetres,
     string Condition,
     string ConditionDescription);

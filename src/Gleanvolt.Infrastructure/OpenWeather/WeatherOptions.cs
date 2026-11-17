@@ -17,6 +17,14 @@ public sealed class WeatherOptions
 {
     public const string SectionName = "Weather";
 
+    /// <summary>
+    /// Where the weather comes from (#424): <c>NotProvided</c>, <c>OpenWeather</c> or <c>External</c>,
+    /// in any case. Settings and the setup wizard write it to the overrides file. Unset, it is worked out
+    /// as before the choice existed: OpenWeather while a key is configured, nothing otherwise. A value
+    /// that names no source is logged and treated as unset.
+    /// </summary>
+    public string? Source { get; init; }
+
     /// <summary>Base address of the OpenWeatherMap API.</summary>
     public string BaseUrl { get; init; } = "https://api.openweathermap.org/";
 
@@ -35,4 +43,17 @@ public sealed class WeatherOptions
     /// that. A timeout costs one null column.
     /// </summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// How long Gleanvolt waits for an external provider to answer a request for the weather (#424).
+    /// Longer than <see cref="RequestTimeout"/>: the provider makes its own call to its weather service
+    /// before it can answer.
+    /// </summary>
+    public TimeSpan ExternalRequestTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// How old a reading an external provider sent may be and still be used without asking again (#424).
+    /// A session that opens a few minutes after the provider published takes that reading.
+    /// </summary>
+    public TimeSpan ExternalReadingMaxAge { get; init; } = TimeSpan.FromMinutes(10);
 }

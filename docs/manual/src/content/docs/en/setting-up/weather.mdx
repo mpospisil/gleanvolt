@@ -1,18 +1,32 @@
 ---
 title: Weather
-description: Record the weather during each charge, with a free OpenWeatherMap key.
+description: Record the weather during each charge, from OpenWeatherMap or from a provider of your own.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
 
-With a weather key, Gleanvolt records what the sky was doing at the start and the end of each charge:
-the temperature, the clouds, sunrise and sunset. You see it in each charge's history, which helps
-explain a charge that took longer than expected.
+Gleanvolt can record what the sky was doing at the start and the end of each charge: the temperature,
+the clouds, sunrise and sunset. You see it in each charge's history, which helps explain a charge that
+took longer than expected.
 
 It is optional, and changes nothing about how the car charges. It also needs your home's location, which
 the setup wizard's **Site** step asks for.
 
-## Get a key
+## Choose where the weather comes from
+
+Open **Settings** and find **Weather** (or the setup wizard's **Extras** step). Under **Source**, choose:
+
+- **Not provided**: no weather is recorded.
+- **OpenWeather**: Gleanvolt asks OpenWeatherMap itself, with a free key you enter here.
+- **External**: a separate program sends the weather to Gleanvolt, for example the OpenWeather plugin.
+
+Press **Save**. There is no need to restart.
+
+If you already had an OpenWeatherMap key before this choice existed, **OpenWeather** is chosen for you.
+
+## OpenWeather
+
+### Get a key
 
 <Steps>
 
@@ -22,19 +36,19 @@ the setup wizard's **Site** step asks for.
 
 </Steps>
 
-## Enter it in Gleanvolt
+### Enter it in Gleanvolt
 
 <Steps>
 
-1. Open **Settings**, and find **Weather**. (Or the setup wizard's **Extras** step.)
+1. Under **Weather**, choose **OpenWeather**.
 
 2. Paste the key in **API key**.
 
-3. Press **Save and check**. There is no need to restart.
+3. Press **Save and check**. This also saves **OpenWeather** as the source.
 
 </Steps>
 
-![The weather section on Settings, with an API key saved.](../../../../assets/screenshots/settings-weather.png)
+![The weather section on Settings, with OpenWeather chosen and an API key saved.](../../../../assets/screenshots/settings-weather.png)
 
 :::note[A new key can take a couple of hours]
 OpenWeatherMap sometimes takes a while to switch on a new key. If the check fails straight after you
@@ -42,3 +56,25 @@ created it, the key is still saved, and starts working on its own.
 :::
 
 Gleanvolt asks for the weather twice per charge, well within the free plan.
+
+## An external provider
+
+An external provider is a program that runs next to Gleanvolt and sends it the weather. The
+OpenWeather plugin is one: it reads OpenWeatherMap the same way, with its own page for the key.
+
+<Steps>
+
+1. Under **Weather**, choose **External** and press **Save**.
+
+2. Start the provider with Gleanvolt's address and the provider token from
+   **Settings → External providers**. The plugin's README says how.
+
+3. Once it connects, its own page appears under **Weather**. For the OpenWeather plugin, enter the
+   OpenWeatherMap key there and press **Save and check**.
+
+</Steps>
+
+![The weather section on Settings, with the OpenWeather plugin connected and its page shown.](../../../../assets/screenshots/settings-weather-external.png)
+
+Gleanvolt asks the provider when a charge starts and when it ends. If the provider isn't running or
+doesn't answer within 15 seconds, that charge is recorded without the weather. Nothing else is affected.

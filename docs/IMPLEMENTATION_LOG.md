@@ -4,6 +4,69 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — The weather as an external provider, and the OpenWeather plugin (#424)
+
+**What.** The weather a charging session is recorded with can come from nowhere, from the built-in
+OpenWeatherMap integration, or from an external provider on a new `weather` hub. The choice is
+`Weather:Source`, on Settings → Weather, in the wizard and in `gleanvolt setup`, applied without a
+restart. `plugins/Gleanvolt.Plugin.OpenWeather` is a copy of the built-in as such a provider, with its
+own page for the key, shown in a frame under Settings → Weather. Phase 1 of 2: #425 removes the
+built-in once #426 ships plugins.
+
+**How.**
+- **Contract** (`Providers.Contracts/Weather.cs`, kind `weather` 1.0, `/providers/weather`):
+  `IWeatherHub.Publish(WeatherData)`, `IWeatherClient.RefreshRequested` and `SiteChanged`, and a
+  `WeatherWelcome` carrying `WeatherSite` (latitude, longitude, IANA zone). `WeatherData` mirrors
+  `WeatherReading` flat, SI units, everything but `ObservedAt` optional.
+- **SDK** (`Providers.Client/Weather`): `AddGleanvoltWeatherProvider<T>`, `IWeatherSource`,
+  `WeatherProviderConnection`. Publishes after every hello, answers every refresh, `PublishNowAsync`.
+- **Core**: `WeatherSource` enum, `IWeatherSourceSelection`, `IWeatherService.Source` (a default member,
+  so the API needs no new dependency), `WeatherReadingValidator`. `WeatherObservation`'s temperature,
+  pressure, humidity and cloud cover are nullable.
+- **Hosting** (`Hosting/Weather`): `WeatherSourceSelection` (the choice, saved to the overrides file;
+  unset follows the key), `SelectedWeatherService` (the one `IWeatherService`), `ExternalWeatherService`
+  (holds the last accepted reading; asks with `BeginRequest` and waits on a `TaskCompletionSource` keyed
+  by the request id, as `ExternalVehicleFeed` does), `WeatherHub`, `ExternalWeatherSelectionWatcher`.
+  `Weather:ExternalRequestTimeout` (15 s) and `Weather:ExternalReadingMaxAge` (10 min) are new options.
+- **Setup and CLI**: `Weather:Source` is an allowed, non-secret setup key, validated by name; the CLI
+  asks for the source and only for OpenWeather the key. The schema lists the three values.
+- **Web**: `WeatherKeyForm` gets the source picker (as `SolcastAccountForm` has); the key form shows
+  under OpenWeather, the provider's page and panel under External (only a note in the wizard). Saving a
+  key also chooses OpenWeather. `ExternalProviderPage` takes an `Intro`. The session line leaves out
+  missing figures (`WeatherClouds` replaces the two `WeatherLine` resources). Settings → External
+  providers lists the kind.
+- **Plugin**: `OpenWeatherClient` (the data/2.5 call and mapping, copied, throwing a typed failure),
+  `OpenWeatherFeed` (the SDK's source: one call per 10 minutes, failures as statuses with codes and
+  en/cs messages), `StatusReporter`, `ApiKeyStore` (SDK secret store, page key wins over
+  `OpenWeather:ApiKey`), a Blazor page laid out like the Volkswagen plugin's, a Dockerfile, a README with
+  the list of what changed.
+- **Not run against the real installation yet.** Everything above is tested on a TestServer with
+  OpenWeatherMap's answers faked; the Pi test (a real session recorded with the plugin's weather) is
+  the issue's remaining box.
+
+**Docs.** `PROVIDERS.md` (the kind, the SDK, the plugin), `CONFIGURATION.md` (`Weather:Source` and the
+two new options), `DATA.md` (nullable figures), `PRIVACY.md`, `HTTP_API.md` (`weatherSource`),
+`WEB_UI.md`; the manual's Weather page rewritten (en, cs), and its Settings, wizard and privacy pages.
+Screenshots: `settings-weather` (now with the source), `settings-weather-external` (new, the plugin's
+page in the frame), `wizard-extras`; others re-fingerprinted. The checked-in OpenAPI contract.
+
+**Files.** New: `Providers.Contracts/Weather.cs`, `Providers.Client/Weather/WeatherProvider.cs`,
+`Core/Models/WeatherSource.cs`, `Core/Interfaces/IWeatherSourceSelection.cs`,
+`Core/Configuration/WeatherReadingValidator.cs`, `Hosting/Weather/*.cs`, `plugins/Gleanvolt.Plugin.OpenWeather/`.
+Changed: `Core/Models/WeatherObservation.cs`, `Core/Interfaces/IWeatherService.cs`,
+`Infrastructure/OpenWeather/WeatherOptions.cs`, `Infrastructure/Sessions/SqliteChargingSessionStore.cs`,
+`Api/Contracts/{ForecastContracts,ControlContracts}.cs`, `Api/Endpoints/StatusEndpoints.cs`,
+`Hosting/GleanvoltHostingExtensions.cs`, `Hosting/Setup/SetupDocument.cs`, `Hosting/Cli/GleanvoltCli.cs`,
+`Web/Components/{WeatherKeyForm,ExternalProviderPage,ExternalProvidersForm}.razor`,
+`Web/Components/SessionFormatting.cs`, `Web/Components/Pages/Wizard.razor`,
+`Web/Resources/{SettingsText,ServiceText,SharedText}{,.cs}.resx`, `Gleanvolt.slnx`, `.gitignore`.
+Tests: `Core.Tests/Configuration/WeatherReadingValidatorTests.cs`,
+`Hosting.Tests/{ExternalWeatherHubTests,OpenWeatherPluginTests,WeatherSourceSelectionTests}.cs`,
+additions to `CliTests`, `SetupDocumentTests`, `ProviderHubRegistrationTests`,
+`Web.Tests/{WeatherKeyFormTests,SessionWeatherLineTests}.cs`, and the screenshot fixtures.
+
+---
+
 ## 2026-11-17 — The runtime charge settings outlive a restart (#421)
 
 **What.** Minimum battery SOC, SOC resume margin, min solar surplus and low tariff only (FastNoBattery

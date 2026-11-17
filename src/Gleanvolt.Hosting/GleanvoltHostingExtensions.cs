@@ -30,6 +30,7 @@ using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Sessions;
 using Gleanvolt.Infrastructure.OpenWeather;
+using Gleanvolt.Hosting.Weather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Api;
 using Gleanvolt.Web;
@@ -447,8 +448,17 @@ public static class GleanvoltHostingExtensions
         // every call -- the same arrangement as the Solcast account.
         services.AddSingleton<WeatherKeyStore>();
         services.AddSingleton<OpenWeatherMapService>();
-        services.AddSingleton<IWeatherService>(provider => provider.GetRequiredService<OpenWeatherMapService>());
         services.AddSingleton<IWeatherKeyEditor, WeatherKeyEditor>();
+
+        // Where the weather comes from (#424): none, OpenWeatherMap, or an external provider publishing on
+        // its hub. Chosen on Settings and applied without a restart; every reader gets the selected one.
+        // Choosing External is what turns the hub on, as for the tariff and the solar forecast.
+        services.AddSingleton<WeatherSourceSelection>();
+        services.AddSingleton<IWeatherSourceSelection>(provider => provider.GetRequiredService<WeatherSourceSelection>());
+        services.AddSingleton<ExternalWeatherService>();
+        services.AddSingleton<IWeatherService, SelectedWeatherService>();
+        services.AddExternalProvider<WeatherHub>(WeatherHub.Kind);
+        services.AddHostedService<ExternalWeatherSelectionWatcher>();
 
         // Forecast-driven EV charge control (issue #10). Disabled by default -- it writes to the
         // charger and the control register addresses must be verified first (see EvChargerRegister).

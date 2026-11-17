@@ -43,6 +43,9 @@ public sealed class SetupDocument
     /// <summary>The OpenWeatherMap API key: a secret.</summary>
     public const string WeatherApiKey = "Weather:ApiKey";
 
+    /// <summary>Where the weather comes from (#424): NotProvided, OpenWeather or External.</summary>
+    public const string WeatherSourceKey = "Weather:Source";
+
     /// <summary>The site's time zone.</summary>
     public const string TimeZone = "Controller:TimeZone";
 
@@ -57,6 +60,7 @@ public sealed class SetupDocument
         SolcastApiKey,
         SolcastResourceId,
         WeatherApiKey,
+        WeatherSourceKey,
         .. EvSettingKeys.All,
         .. IntegrationSettingKeys.Plain,
         IntegrationSettingKeys.MqttPassword,
@@ -253,6 +257,14 @@ public sealed class SetupDocument
                         Phrase.Of("Config.ApiKeyBadName", new PhraseArg.Text(name)));
                 }
             }
+        }
+
+        if (Values.TryGetValue(WeatherSourceKey, out var weatherSource) && !string.IsNullOrWhiteSpace(weatherSource)
+            && Weather.WeatherSourceSelection.Parse(weatherSource) is null)
+        {
+            problems.Add(
+                $"{WeatherSourceKey} ('{weatherSource.Trim()}') must be NotProvided, OpenWeather or External.",
+                Phrase.Of("Config.SetupBadWeatherSource", new PhraseArg.Text(weatherSource.Trim())));
         }
 
         var hasKey = Values.TryGetValue(SolcastApiKey, out var apiKey) && !string.IsNullOrWhiteSpace(apiKey);

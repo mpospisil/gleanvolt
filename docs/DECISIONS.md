@@ -4,6 +4,53 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — The weather as an external provider: a pulled kind, chosen on Settings (#424)
+
+**Found.** The weather was the last data source only one built-in service could supply:
+`OpenWeatherMapService` behind `IWeatherService`. It is not a forecast. The session recorder asks for
+the current conditions twice per charging session, and `GET /forecast?weather=true` asks too; nothing
+in charge control reads them. That is unlike the other kinds: the tariff and the solar forecast are
+held and planned on, and the car pushes when it changes. The stored figures were also not nullable,
+and OpenWeather's own mapping turned a missing cloud cover into 0 %, a clear sky.
+
+**Decided.**
+- **One switch, `Weather:Source`** = `NotProvided` | `OpenWeather` | `External`, chosen on Settings
+  (and in the wizard and `gleanvolt setup`), saved in the overrides file and applied at once. The
+  kind's `IsEnabled` reads it, as for the tariff and the solar forecast.
+- **Unset follows the key.** An installation that never chose gets OpenWeather while a key is
+  configured and `NotProvided` otherwise, worked out on every read. An upgrade changes nothing, and a
+  key saved later turns the weather on as before. No migration writes anything.
+- **One `IWeatherService` follows the choice** (`SelectedWeatherService`), over the built-in and
+  `ExternalWeatherService`. The recorder, `/forecast` and `/health` didn't change; `/health` gained
+  `weatherSource`.
+- **Pulled, with a short hold.** A reading received in the last 10 minutes is used as is; otherwise the
+  host sends `RefreshRequested` and waits up to 15 s, host-side, for a publish quoting it. Judged by when
+  the reading arrived, not by its `observedAt`: OpenWeatherMap's observation is often 15 minutes old the
+  moment it is read, and asking again would fetch the same one. No answer means no weather on that
+  session, as a failed OpenWeatherMap call meant before. No fallback to the built-in.
+- **SI on the wire**, as `WeatherObservation` stores it. A reading in °F or hPa is refused by range,
+  not converted. Everything but `observedAt` is optional and absent means unknown, so temperature,
+  pressure, humidity and cloud cover became nullable through the model, the store reader (the columns
+  were already nullable), the API (`WeatherResponse`) and the session line, which leaves out what is
+  missing.
+- **The plugin is a copy** (`plugins/Gleanvolt.Plugin.OpenWeather`), as #410 copied volkswagen.de.
+  The built-in stays until #425; its README lists what the copy changed. The main ones: failures
+  become a status Gleanvolt shows (a refused key needs the owner), at most one call per 10 minutes
+  since the SDK also asks after every hello, and the key lives in the SDK's secret store.
+- **The provider page frame takes an intro.** `ExternalProviderPage` said "sign in to the car's
+  account"; the weather passes its own line.
+
+**Consequences accepted.**
+- A session can wait up to 15 s for the weather at open and close with External chosen and a silent
+  provider. The recorder runs on its own loop, so charging is not held.
+- `weatherConfigured` is true with External chosen whether or not a provider is connected, because the
+  provider, not Gleanvolt, knows whether it has a key.
+- The OpenAPI document changed: four weather figures may now be `null`, and `/health` has
+  `weatherSource`. A client that assumed the figures were always numbers must allow null.
+- Phase 2 (#425) can't remove the built-in until #426 ships plugins.
+
+---
+
 ## 2026-11-17 — The runtime charge settings outlive a restart (#421)
 
 **Found.** Since #413 a restart resumes the mode with its target or limit, but the numbers that tune it

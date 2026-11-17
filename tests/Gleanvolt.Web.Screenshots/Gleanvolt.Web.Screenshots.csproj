@@ -40,6 +40,8 @@
     <ProjectReference Include="..\..\src\Gleanvolt.Hosting\Gleanvolt.Hosting.csproj" />
     <!-- The Volkswagen plugin's own page, rendered into the Car page's frame for the manual (#410). -->
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.Volkswagen\Gleanvolt.Plugin.Volkswagen.csproj" />
+    <!-- The OpenWeather plugin's own page, rendered into the Settings frame for the manual (#424). -->
+    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.OpenWeather\Gleanvolt.Plugin.OpenWeather.csproj" />
   </ItemGroup>
 
 </Project>

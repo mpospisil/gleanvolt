@@ -83,6 +83,7 @@ internal static class StatusEndpoints
                 ForecastAvailable: today is not null,
                 ForecastRetrievedAt: today?.RetrievedAt,
                 WeatherConfigured: weather.IsConfigured,
+                WeatherSource: weather.Source,
                 VehicleAvailable: reading is not null,
                 VehicleAgeSeconds: vehicleAge?.TotalSeconds is { } vehicleSeconds ? Math.Max(0, vehicleSeconds) : null,
                 VehicleStale: reading?.IsStaleAt(now, host.VehicleMaxAge) ?? false,

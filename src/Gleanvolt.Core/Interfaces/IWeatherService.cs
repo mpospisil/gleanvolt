@@ -23,6 +23,12 @@ public interface IWeatherService
     bool IsConfigured { get; }
 
     /// <summary>
+    /// Where the weather comes from (#424). A service that is one provider says which by being configured
+    /// or not; the one the host registers follows the choice on Settings.
+    /// </summary>
+    WeatherSource Source => IsConfigured ? WeatherSource.OpenWeather : WeatherSource.NotProvided;
+
+    /// <summary>
     /// The current conditions, or <c>null</c> when the service is unconfigured or the fetch failed for
     /// any reason — a bad key, a rate limit, a timeout, an outage.
     ///

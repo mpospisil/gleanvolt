@@ -736,4 +736,49 @@
   <data name="ProviderStatus_Detail" xml:space="preserve">
     <value>{0}</value>
   </data>
+  <data name="Weather_NoObservedAt" xml:space="preserve">
+    <value>Údaj nemá čas pozorování.</value>
+  </data>
+  <data name="Weather_Future" xml:space="preserve">
+    <value>Počasí je pozorované {0} {1}, víc než {2} před hodinami Gleanvoltu.</value>
+  </data>
+  <data name="Weather_TooOld" xml:space="preserve">
+    <value>Počasí je pozorované {0} {1}, před víc než {2}.</value>
+  </data>
+  <data name="Weather_OlderThanHeld" xml:space="preserve">
+    <value>Údaj je starší než ten, který Gleanvolt má, pozorovaný {0} {1}.</value>
+  </data>
+  <data name="Weather_Temperature" xml:space="preserve">
+    <value>Teplota je {0} °C; musí být −90 až 60 °C.</value>
+  </data>
+  <data name="Weather_Pressure" xml:space="preserve">
+    <value>Tlak je {0} Pa; musí být 85 000 až 110 000 Pa (hPa × 100).</value>
+  </data>
+  <data name="Weather_Humidity" xml:space="preserve">
+    <value>Vlhkost je {0}; musí být 0 až 100 %.</value>
+  </data>
+  <data name="Weather_Clouds" xml:space="preserve">
+    <value>Oblačnost je {0}; musí být 0 až 100 %.</value>
+  </data>
+  <data name="Weather_Visibility" xml:space="preserve">
+    <value>Viditelnost je {0} m; musí být 0 až 100 km, v metrech.</value>
+  </data>
+  <data name="Weather_ConditionTooLong" xml:space="preserve">
+    <value>Stav počasí je delší než {0} znaků.</value>
+  </data>
+  <data name="Weather_DescriptionTooLong" xml:space="preserve">
+    <value>Popis počasí je delší než {0} znaků.</value>
+  </data>
+  <data name="Weather_SunsetBeforeSunrise" xml:space="preserve">
+    <value>Západ slunce není po východu slunce.</value>
+  </data>
+  <data name="Weather_Empty" xml:space="preserve">
+    <value>Údaj nic neříká: potřebuje aspoň teplotu nebo stav počasí.</value>
+  </data>
+  <data name="Weather_UnknownSource" xml:space="preserve">
+    <value>{0} není zdroj počasí.</value>
+  </data>
+  <data name="Config_SetupBadWeatherSource" xml:space="preserve">
+    <value>Weather:Source ('{0}') musí být NotProvided, OpenWeather nebo External.</value>
+  </data>
 </root>

@@ -36,6 +36,8 @@ public sealed class SettingsScreenshots : ScreenshotTest
     private readonly FakeExternalProviders _providers = new();
     // Solcast, with External on offer, as the controller registers them (#388).
     private readonly FakeSolarForecastSourceSelection _forecastSources = new();
+    // OpenWeather, chosen, with the key saved on Settings (#424).
+    private readonly FakeWeatherSourceSelection _weatherSources = new() { Selected = WeatherSource.OpenWeather, IsChosen = true };
     private readonly FakeEvEditor _car = new();
     private readonly FakeIntegrationsEditor _integrations = new();
 
@@ -81,6 +83,8 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _providers.Set(new ExternalProviderStatus("solar-forecast", "Solar forecast", "/providers/solar-forecast", HasToken: false, ExternalProviderState.Off));
         _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", HasToken: false, ExternalProviderState.Off));
         Services.AddSingleton<ISolarForecastSourceSelection>(_forecastSources);
+        Services.AddSingleton<IWeatherSourceSelection>(_weatherSources);
+        _providers.Set(new ExternalProviderStatus("weather", "Weather", "/providers/weather", HasToken: false, ExternalProviderState.Off));
         Services.AddSingleton<IIntegrationsEditor>(_integrations);
         Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
         Services.AddSingleton<IDeviceDiscovery>(new NoDiscovery());
@@ -121,6 +125,24 @@ public sealed class SettingsScreenshots : ScreenshotTest
     [Fact]
     public void The_weather() =>
         Capture(RenderPage<PvSystem>("/settings"), "settings-weather", selector: "#weather-editor");
+
+    /// <summary>
+    /// The weather from an external provider (#424): the OpenWeather plugin connected, with its own page
+    /// in the frame, where the owner enters the OpenWeatherMap key.
+    /// </summary>
+    [Fact]
+    public void The_weather_external()
+    {
+        _weatherSources.Selected = WeatherSource.External;
+        _providers.Set(new ExternalProviderStatus(
+            "weather", "Weather", "/providers/weather", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "openweather", ProviderName: "OpenWeather", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-4), Healthy: true, PageUrl: new Uri("http://192.168.2.7:8096/")));
+        _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
+
+        Capture(RenderPage<PvSystem>("/settings"), "settings-weather-external", selector: "#weather-editor",
+            frames: new Dictionary<string, string> { ["/external/weather/page"] = ProviderPageScreenshot.OpenWeather(Now) });
+    }
 
     [Fact]
     public void The_tariff_table() =>

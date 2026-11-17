@@ -50,6 +50,8 @@ public sealed class SetupScreenshots : ScreenshotTest
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
+        // The weather source (#424): nothing chosen yet on a new installation.
+        Services.AddSingleton<IWeatherSourceSelection>(new FakeWeatherSourceSelection());
         Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
         Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));

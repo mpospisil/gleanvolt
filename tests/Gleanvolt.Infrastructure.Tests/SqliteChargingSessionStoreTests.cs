@@ -329,16 +329,16 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         var stored = (await store.ExportAsync(session.Id, Ct))!.Session;
 
         // The pair is the whole point: a session that started under a clear sky and ended in rain.
-        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius, 2);
-        Assert.Equal(5, stored.WeatherAtStart.CloudsPercent, 2);
+        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius!.Value, 2);
+        Assert.Equal(5, stored.WeatherAtStart.CloudsPercent!.Value, 2);
         Assert.Equal("Clear", stored.WeatherAtStart.Condition);
         Assert.Equal("clear sky", stored.WeatherAtStart.ConditionDescription);
-        Assert.Equal(101_700, stored.WeatherAtStart.PressurePascals, 2);
-        Assert.Equal(51, stored.WeatherAtStart.HumidityPercent, 2);
+        Assert.Equal(101_700, stored.WeatherAtStart.PressurePascals!.Value, 2);
+        Assert.Equal(51, stored.WeatherAtStart.HumidityPercent!.Value, 2);
         Assert.Equal(10_000, stored.WeatherAtStart.VisibilityMetres);
         Assert.Equal(Noon, stored.WeatherAtStart.ObservedAt);
 
-        Assert.Equal(92, stored.WeatherAtEnd!.CloudsPercent, 2);
+        Assert.Equal(92, stored.WeatherAtEnd!.CloudsPercent!.Value, 2);
         Assert.Equal("Rain", stored.WeatherAtEnd.Condition);
 
         Assert.Equal(Noon.AddHours(-6), stored.Sunrise);
@@ -361,7 +361,7 @@ public sealed class SqliteChargingSessionStoreTests : IDisposable
         await store.CompleteSessionAsync(Closed(session) with { WeatherAtStart = null, WeatherAtEnd = null }, Ct);
 
         var stored = (await store.GetSessionsAsync(Noon.AddDays(-1), Noon.AddDays(1), Ct)).Single();
-        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius, 2);
+        Assert.Equal(19.6, stored.WeatherAtStart!.TemperatureCelsius!.Value, 2);
         Assert.Null(stored.WeatherAtEnd);
     }
 

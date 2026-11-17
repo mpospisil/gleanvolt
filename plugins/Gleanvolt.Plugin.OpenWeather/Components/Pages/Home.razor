@@ -1,0 +1,204 @@
+@page "/"
+@using System.Globalization
+@implements IDisposable
+@inject ApiKeyStore Key
+@inject OpenWeatherClient Client
+@inject OpenWeatherFeed Feed
+@inject Gleanvolt.Providers.Client.Weather.WeatherProviderConnection Connection
+@inject TimeProvider Time
+
+@*
+    The plugin's page (#424), shown on Gleanvolt's Settings under Weather: the plugin's status, the site
+    Gleanvolt gave it, the last reading, and the OpenWeatherMap key, which is never shown back. Opening
+    the page calls nothing; only "Save and check" reaches OpenWeatherMap.
+*@
+
+<PageTitle>OpenWeather</PageTitle>
+
+<h1>OpenWeather</h1>
+
+<p id="status" class="@StatusClass">@StatusText</p>
+
+<section>
+    <h2>@PageText.Site</h2>
+
+    <p class="muted">@PageText.SiteFromGleanvolt</p>
+
+    <dl>
+        <dt>@PageText.Location</dt>
+        <dd id="site">@SiteText</dd>
+    </dl>
+</section>
+
+<section>
+    <h2>@PageText.LastReading</h2>
+
+    @if (Feed.LastReading is { } reading)
+    {
+        <dl id="reading">
+            <dt>@PageText.Conditions</dt>
+            <dd id="reading-condition">@(Text(reading.ConditionDescription) ?? Text(reading.Condition) ?? PageText.NotSaid.ToString())</dd>
+            <dt>@PageText.Temperature</dt>
+            <dd id="reading-temperature">@Number(reading.TemperatureCelsius, "0.0", " °C")</dd>
+            <dt>@PageText.Clouds</dt>
+            <dd id="reading-clouds">@Number(reading.CloudsPercent, "0", " %")</dd>
+            <dt>@PageText.Humidity</dt>
+            <dd>@Number(reading.HumidityPercent, "0", " %")</dd>
+            <dt>@PageText.Pressure</dt>
+            <dd>@Number(reading.PressurePascals / 100, "0", " hPa")</dd>
+            <dt>@PageText.Visibility</dt>
+            <dd>@Number(reading.VisibilityMetres / 1000, "0.#", " km")</dd>
+            <dt>@PageText.Daylight</dt>
+            <dd>@(reading.Sunrise is { } rise ? Clock(rise) : "?") – @(reading.Sunset is { } set ? Clock(set) : "?")</dd>
+            <dt>@PageText.Observed</dt>
+            <dd id="reading-observed">@Local(reading.ObservedAt)</dd>
+            <dt>@PageText.Asked</dt>
+            <dd>@(Feed.LastReadAt is { } at ? Local(at) : PageText.NotSaid.ToString())</dd>
+        </dl>
+    }
+    else
+    {
+        <p class="muted" id="reading-none">@PageText.NoReadingYet</p>
+    }
+</section>
+
+<section>
+    <h2>@PageText.KeyHeading</h2>
+
+    <p class="muted">@PageText.KeyIntro</p>
+
+    <label for="api-key">@PageText.ApiKey</label>
+    <input id="api-key" type="password" autocomplete="new-password" spellcheck="false" @bind="_key" @bind:event="oninput"
+           placeholder="@(Key.Current is null ? PageText.KeyNotSet.ToString() : PageText.KeySaved.ToString())" disabled="@_busy" />
+
+    <p class="muted" id="key-source">
+        @(Key.Source switch
+        {
+            ApiKeySource.Page => PageText.SourcePage,
+            ApiKeySource.Environment => PageText.SourceEnvironment,
+            _ => PageText.SourceNone,
+        })
+        @PageText.KeptAs.Format(Key.IsEncrypted ? PageText.KeptEncrypted.ToString() : PageText.KeptOwnerOnly.ToString())
+    </p>
+
+    <div class="actions">
+        <button type="button" id="key-save" disabled="@(_busy || _key.Trim().Length == 0)" @onclick="SaveAsync">
+            @(_busy ? PageText.Checking : PageText.SaveAndCheck)
+        </button>
+        @if (Key.Source == ApiKeySource.Page)
+        {
+            <button type="button" id="key-remove" class="secondary" disabled="@_busy" @onclick="Remove">@PageText.Remove</button>
+        }
+    </div>
+
+    @if (_message is { } message)
+    {
+        <p id="key-message" class="@(_messageIsError ? "error" : "ok")">@message</p>
+    }
+</section>
+
+@code {
+    private string _key = string.Empty;
+    private Words? _message;
+    private bool _messageIsError;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        Feed.Changed += Refresh;
+        Connection.Welcomed += OnWelcomed;
+    }
+
+    public void Dispose()
+    {
+        Feed.Changed -= Refresh;
+        Connection.Welcomed -= OnWelcomed;
+    }
+
+    private void OnWelcomed(WeatherWelcome welcome) => Refresh();
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    private string StatusText => Feed.Status switch
+    {
+        null => PageText.StatusWaiting.ToString(),
+        { Healthy: true } => PageText.StatusReading.ToString(),
+        _ => (Feed.StatusWords ?? PageText.StatusNotReading).ToString(),
+    };
+
+    private string? StatusClass => Feed.Status switch
+    {
+        { Healthy: true } => "ok",
+        { NeedsOwner: true } => "error",
+        _ => null,
+    };
+
+    private string SiteText => Connection.Site switch
+    {
+        null => PageText.NotConnected.ToString(),
+        { Latitude: { } lat, Longitude: { } lon } => string.Create(CultureInfo.InvariantCulture, $"{lat:0.####}, {lon:0.####}"),
+        _ => PageText.NoLocationShort.ToString(),
+    };
+
+    private async Task SaveAsync()
+    {
+        if (_busy || _key.Trim().Length == 0)
+        {
+            return;
+        }
+
+        _busy = true;
+        _message = null;
+
+        try
+        {
+            var key = _key.Trim();
+            var kept = Key.Save(key);
+            _key = string.Empty;
+            Feed.KeyChanged();
+
+            var check = await Client.CheckKeyAsync(key, Connection.Site?.Latitude, Connection.Site?.Longitude, CancellationToken.None);
+            _messageIsError = !kept || check != KeyCheck.Accepted;
+            _message = !kept ? PageText.KeyNotKept
+                : check switch
+                {
+                    KeyCheck.Accepted => PageText.KeyAccepted,
+                    KeyCheck.Refused => PageText.KeyRefusedOnSave,
+                    _ => PageText.KeyCheckFailed,
+                };
+
+            // A good key: Gleanvolt gets a reading now, and with it the status clears.
+            if (check == KeyCheck.Accepted && Connection.IsAttached)
+            {
+                await Connection.PublishNowAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Remove()
+    {
+        Key.Clear();
+        Feed.KeyChanged();
+        _messageIsError = false;
+        _message = Key.Current is null ? PageText.KeyRemovedNone : PageText.KeyRemovedEnvironment;
+    }
+
+    private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string Number(double? value, string format, string unit) =>
+        value is { } number ? number.ToString(format, CultureInfo.CurrentCulture) + unit : PageText.NotSaid.ToString();
+
+    private TimeZoneInfo Zone => Connection.Site?.TimeZone is { Length: > 0 } id && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+        ? found
+        : Time.LocalTimeZone;
+
+    private string Local(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, Zone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    private string Clock(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, Zone).ToString("HH:mm", CultureInfo.InvariantCulture);
+}
