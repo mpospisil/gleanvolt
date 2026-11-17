@@ -6,6 +6,7 @@ using Gleanvolt.Core.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using static System.FormattableString;
 
 namespace Gleanvolt.Api.Endpoints;
 
@@ -328,7 +329,72 @@ internal static class ControlEndpoints
                 + "restarts. Writes nothing to hardware itself; the mode does, on the next poll.")
             .Produces<LowTariffOnlyResponse>();
 
-        api.MapGet("/charging/until-full", (IUntilFullSettings settings, ChargeControlStatusHolder status) =>
+        api.MapGet("/charging/settings", (IForecastRuntimeSettings forecast, ISolarGridSettings solarGrid) =>
+                Results.Ok(ChargingSettings(forecast, solarGrid)))
+            .WithName("getChargingSettings")
+            .WithSummary("Minimum battery SOC, SOC resume margin and min solar surplus")
+            .WithDescription(
+                "The three day-to-day numbers as the controller is using them now: the runtime values, which "
+                + "start from configuration and follow any change made from the web UI, Home Assistant or "
+                + "this API. GET /status carries the same object as 'settings'.")
+            .Produces<ChargingSettingsResponse>();
+
+        api.MapPut("/charging/settings", (
+            ChargingSettingsRequest body,
+            HttpContext http,
+            IForecastRuntimeSettings forecast,
+            ISolarGridSettings solarGrid) =>
+        {
+            // Every field checked before any is written, so a refused request leaves all three as they
+            // were rather than half applied.
+            var problems = new List<SettingsProblemResponse>();
+            Check(problems, "minBatterySocPercent", body.MinBatterySocPercent,
+                RuntimeSettingLimits.MinBatterySocPercentMin, RuntimeSettingLimits.MinBatterySocPercentMax, "%");
+            Check(problems, "socResumeMarginPercent", body.SocResumeMarginPercent,
+                RuntimeSettingLimits.SocResumeMarginPercentMin, RuntimeSettingLimits.SocResumeMarginPercentMax, "%");
+            Check(problems, "minSolarSurplusWatts", body.MinSolarSurplusWatts,
+                RuntimeSettingLimits.MinSolarSurplusWattsMin, RuntimeSettingLimits.MinSolarSurplusWattsMax, " W");
+
+            if (problems.Count > 0)
+            {
+                return Results.Problem(
+                    title: "Settings not changed",
+                    detail: string.Join(" ", problems.Select(p => $"{p.Field}: {p.Message}")),
+                    statusCode: StatusCodes.Status400BadRequest,
+                    extensions: new Dictionary<string, object?> { ["problems"] = problems });
+            }
+
+            var source = http.Source();
+
+            if (body.MinBatterySocPercent is { } floor)
+            {
+                forecast.SetMinBatterySocFloorPercent(floor, source);
+            }
+
+            if (body.SocResumeMarginPercent is { } margin)
+            {
+                forecast.SetFloorResumeMarginPercent(margin, source);
+            }
+
+            if (body.MinSolarSurplusWatts is { } surplus)
+            {
+                solarGrid.SetMinSurplusWatts(surplus, source);
+            }
+
+            return Results.Ok(ChargingSettings(forecast, solarGrid));
+        })
+            .WithName("setChargingSettings")
+            .WithSummary("Change minimum battery SOC, SOC resume margin or min solar surplus")
+            .WithDescription(
+                "Any subset: a field left out is left as it is. The same ranges as the web UI and the Home "
+                + "Assistant numbers — minimum battery SOC 0–100 %, SOC resume margin 0–50 %, min solar "
+                + "surplus 0–20000 W. A value out of range is a 400 that lists every problem under "
+                + "'problems', and nothing is written. Applies from the next poll, to a running mode too, "
+                + "and does not persist across restarts. Writes no hardware.")
+            .Produces<ChargingSettingsResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        api.MapGet("/charging/until-full",(IUntilFullSettings settings, ChargeControlStatusHolder status) =>
                 Results.Ok(UntilFull(settings, status)))
             .WithName("getUntilFull")
             .WithSummary("Whether forecasted runs until the car is full")
@@ -355,6 +421,21 @@ internal static class ControlEndpoints
                 + "taken over, or charging is stopped. A session running with it on is resumed after a "
                 + "restart. Starts nothing itself; applies from the next poll, to a running session too.")
             .Produces<UntilFullResponse>();
+    }
+
+    internal static ChargingSettingsResponse ChargingSettings(IForecastRuntimeSettings forecast, ISolarGridSettings solarGrid) => new(
+        forecast.MinBatterySocFloorPercent,
+        forecast.FloorResumeMarginPercent,
+        solarGrid.MinSurplusWatts);
+
+    private static void Check(
+        List<SettingsProblemResponse> problems, string field, double? value, double min, double max, string unit)
+    {
+        if (value is { } given && (double.IsNaN(given) || given < min || given > max))
+        {
+            problems.Add(new SettingsProblemResponse(
+                field, Invariant($"{given} is outside {min}–{max}{unit}.")));
+        }
     }
 
     private static UntilFullResponse UntilFull(IUntilFullSettings settings, ChargeControlStatusHolder status) => new(

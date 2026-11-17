@@ -435,3 +435,33 @@ internal sealed class FakeExternalProviders : IExternalProviders
         remove { }
     }
 }
+
+/// <summary>Both runtime-settings seams in one fake, recording who changed what.</summary>
+internal sealed class FakeChargingSettings : IForecastRuntimeSettings, ISolarGridSettings
+{
+    public List<(string Setting, double Value, string Source)> Changes { get; } = [];
+
+    public double MinBatterySocFloorPercent { get; private set; } = 20;
+
+    public double FloorResumeMarginPercent { get; private set; } = 5;
+
+    public double MinSurplusWatts { get; private set; } = 1400;
+
+    public void SetMinBatterySocFloorPercent(double percent, string source)
+    {
+        Changes.Add((nameof(MinBatterySocFloorPercent), percent, source));
+        MinBatterySocFloorPercent = percent;
+    }
+
+    public void SetFloorResumeMarginPercent(double percent, string source)
+    {
+        Changes.Add((nameof(FloorResumeMarginPercent), percent, source));
+        FloorResumeMarginPercent = percent;
+    }
+
+    public void SetMinSurplusWatts(double watts, string source)
+    {
+        Changes.Add((nameof(MinSurplusWatts), watts, source));
+        MinSurplusWatts = watts;
+    }
+}

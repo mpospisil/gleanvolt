@@ -370,7 +370,7 @@ public sealed class HomeAssistantMqttWorker : BackgroundService
         }
     }
 
-    private IEnumerable<(string ObjectId, double Value)> CurrentNumberValues()
+    internal IEnumerable<(string ObjectId, double Value)> CurrentNumberValues()
     {
         yield return (HaDiscovery.MinBatterySocNumber, _forecastSettings.MinBatterySocFloorPercent);
         yield return (HaDiscovery.ResumeMarginNumber, _forecastSettings.FloorResumeMarginPercent);

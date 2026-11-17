@@ -51,6 +51,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     internal FakeUntilFullSettings UntilFull { get; } = new();
 
+    internal FakeChargingSettings Settings { get; } = new();
+
     internal FakeExternalProviders Providers { get; } = new();
 
     /// <summary>
@@ -111,6 +113,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
         builder.Services.AddSingleton<ITariffEditor>(Tariff);
         builder.Services.AddSingleton<ILowTariffSettings>(LowTariff);
         builder.Services.AddSingleton<IUntilFullSettings>(UntilFull);
+        builder.Services.AddSingleton<IForecastRuntimeSettings>(Settings);
+        builder.Services.AddSingleton<ISolarGridSettings>(Settings);
         builder.Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule(Tariff, clock));
         builder.Services.AddSingleton<IExternalProviders>(Providers);
 

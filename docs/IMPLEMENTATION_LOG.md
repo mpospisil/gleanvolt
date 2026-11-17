@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — The runtime charge settings over the API (#392)
+
+**What.** `GET` and `PUT /api/v1/charging/settings` read and change **Minimum battery SOC**, **SOC
+resume margin** and **Min solar surplus**, the three numbers the web UI and the MQTT numbers could
+already change. `/status` carries the same object as `settings`. For the Home Assistant integration
+(#394), scripts and the MCP server.
+
+**How.**
+- The endpoints read and write the singletons the web UI and MQTT already use,
+  `IForecastRuntimeSettings` and `ISolarGridSettings`, so there is still one value with three doors.
+  No new state, and the restart rule stays the same: back to configuration (#421 is about changing
+  that).
+- `PUT` takes any subset (nullable fields). Every given field is checked before any is written, so a
+  400 with `problems: [{field, message}]` leaves all three as they were. The setters log the change with
+  `API (<key name>)` as the source, like the other actions.
+- `Core/Models/RuntimeSettingLimits`: the ranges in one place (0–100 %, 0–50 %, 0–20000 W), used by the
+  API's check, the MQTT number discovery and the web inputs' `min`/`max`. The web surplus input had no
+  `max` before. It has one now, matching MQTT.
+- `/status` reads `settings` when it is served, not from the poll snapshot, so a `PUT` shows at once.
+  Like `forecast` and `vehicleSource`, it is null in the status a control action answers with.
+- MQTT needed no change: the worker republishes the numbers from the same singletons with every status
+  publish, so an API change reaches Home Assistant within one poll. `CurrentNumberValues` is now
+  internal so a test can check that.
+
+**Why not start-call parameters.** These describe the house, not one charge, and they are retuned while
+a mode runs. As parameters of `POST /charging/start` they would need a stop and start to change, and
+they would overwrite what the web UI set. Same shape as `/charging/low-tariff-only` and
+`/charging/until-full`.
+
+**Files.** `Api/Endpoints/ControlEndpoints.cs`, `Api/Endpoints/StatusEndpoints.cs`,
+`Api/Contracts/ControlContracts.cs`, `Api/Contracts/StatusContracts.cs`,
+`Core/Models/RuntimeSettingLimits.cs`, `Hosting/HomeAssistant/HaDiscovery.cs`,
+`Hosting/HomeAssistant/HomeAssistantMqttWorker.cs`, `Web/Components/Plan/ForecastedTab.razor`,
+`Web/Components/Plan/SolarGridTab.razor`, `docs/HTTP_API.md`. Tests:
+`Api.Tests/ChargingSettingsEndpointTests.cs`, `Api.Tests/OpenApiContract.json`, `Api.Tests/Fakes.cs`,
+`Api.Tests/ApiTestHost.cs`, `Hosting.Tests/HaButtonCommandTests.cs`.
+
+**After release.** Refresh `gleanvolt-mcp`'s `contract/openapi.json`.
+
+---
+
 ## 2026-11-17 — Resume the charge mode after a restart (#413)
 
 **What.** A restart takes up the mode that was running, with its target, fast limit or until full, as

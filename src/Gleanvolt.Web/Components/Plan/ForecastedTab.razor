@@ -73,7 +73,7 @@
                 </p>
             </InfoTip>
         </div>
-        <input id="min-battery-soc" type="number" step="1" min="0" max="100"
+        <input id="min-battery-soc" type="number" step="1" min="@RuntimeSettingLimits.MinBatterySocPercentMin" max="@RuntimeSettingLimits.MinBatterySocPercentMax"
                @bind="_minBatterySocPercent" @bind:event="onchange" @bind:after="OnMinBatterySocSelected" />
     </div>
 
@@ -86,7 +86,7 @@
                 </p>
             </InfoTip>
         </div>
-        <input id="resume-margin" type="number" step="1" min="0" max="50"
+        <input id="resume-margin" type="number" step="1" min="@RuntimeSettingLimits.SocResumeMarginPercentMin" max="@RuntimeSettingLimits.SocResumeMarginPercentMax"
                @bind="_resumeMarginPercent" @bind:event="onchange" @bind:after="OnResumeMarginSelected" />
     </div>
 </section>

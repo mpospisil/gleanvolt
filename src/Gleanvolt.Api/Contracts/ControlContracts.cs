@@ -63,6 +63,36 @@ public sealed record LowTariffOnlyRequest(bool? FastNoBattery = null, bool? Sola
 public sealed record LowTariffOnlyResponse(bool FastNoBattery, bool SolarGrid, bool TariffKnown);
 
 /// <summary>
+/// Change any of the three day-to-day numbers (issue #392). A field left out, or null, is left as it is.
+/// Every field is checked before any is written: one out of range refuses the whole request.
+/// </summary>
+/// <param name="MinBatterySocPercent">The SOC the home battery is kept above, 0–100 %.</param>
+/// <param name="SocResumeMarginPercent">How far above that minimum the battery must recover before a paused charge resumes, 0–50 %.</param>
+/// <param name="MinSolarSurplusWatts">The surplus <c>solarGrid</c> needs before the grid may help the car, 0–20000 W.</param>
+public sealed record ChargingSettingsRequest(
+    double? MinBatterySocPercent = null,
+    double? SocResumeMarginPercent = null,
+    double? MinSolarSurplusWatts = null);
+
+/// <summary>
+/// The three day-to-day numbers as the controller is using them: the runtime values, which start from
+/// configuration and follow any change made from the web UI, Home Assistant or the API. A change takes
+/// effect on the next poll, including for a mode already running; it does not persist across restarts.
+/// </summary>
+/// <param name="MinBatterySocPercent">The SOC the home battery is kept above.</param>
+/// <param name="SocResumeMarginPercent">How far above that minimum the battery must recover before a paused charge resumes.</param>
+/// <param name="MinSolarSurplusWatts">The surplus <c>solarGrid</c> needs before the grid may help the car.</param>
+public sealed record ChargingSettingsResponse(
+    double MinBatterySocPercent,
+    double SocResumeMarginPercent,
+    double MinSolarSurplusWatts);
+
+/// <summary>One reason a settings change was refused.</summary>
+/// <param name="Field">The request field, as named in the body.</param>
+/// <param name="Message">What is wrong with it, with the range it has to be in.</param>
+public sealed record SettingsProblemResponse(string Field, string Message);
+
+/// <summary>
 /// Change <i>until full</i> for <c>forecasted</c> (issue #279): with it on, one session runs over several
 /// days, stood down at night, until the car is full, it is unplugged, or the mode is stopped.
 /// </summary>

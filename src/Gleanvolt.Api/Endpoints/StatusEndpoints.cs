@@ -13,10 +13,19 @@ internal static class StatusEndpoints
 {
     internal static void MapStatus(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/status", (ChargeControlStatusHolder holder, ISolarForecastService forecast, IServiceProvider services) =>
+        api.MapGet("/status", (
+            ChargeControlStatusHolder holder,
+            ISolarForecastService forecast,
+            IForecastRuntimeSettings forecastSettings,
+            ISolarGridSettings solarGrid,
+            IServiceProvider services) =>
             holder.Current is { } status
-                // The feed is looked up rather than injected: a host without a car has none registered.
-                ? Results.Ok(StatusResponse.From(status, forecast.Current, services.GetService<ConfiguredVehicleFeed>()?.Service))
+                ? Results.Ok(StatusResponse.From(
+                    status,
+                    forecast.Current,
+                    // The feed is looked up rather than injected: a host without a car has none registered.
+                    services.GetService<ConfiguredVehicleFeed>()?.Service,
+                    ControlEndpoints.ChargingSettings(forecastSettings, solarGrid)))
                 : ApiResults.NotPolled())
             .WithName("getStatus")
             .WithSummary("The live state of the site")
