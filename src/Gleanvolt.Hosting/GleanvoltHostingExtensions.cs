@@ -732,6 +732,22 @@ public static class GleanvoltHostingExtensions
                 provider.GetRequiredService<ILogger<Gleanvolt.Hosting.Resume.ChargeModeFile>>());
         });
 
+        // The numbers that tune the modes (#421): kept beside the mode once somebody changes one, so a
+        // resumed mode runs as it did before. Read by ForecastRuntimeSettings, SolarGridSettings and
+        // LowTariffSettings when they are created.
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var path = Path.IsPathRooted(options.SettingsStatePath)
+                ? options.SettingsStatePath
+                : Path.Combine(environment.ContentRootPath, options.SettingsStatePath);
+
+            return new Gleanvolt.Hosting.Resume.ChargeSettingsFile(
+                Path.GetFullPath(path),
+                provider.GetRequiredService<ILogger<Gleanvolt.Hosting.Resume.ChargeSettingsFile>>());
+        });
+
         // The one way controlled charging is started or stopped (issue #89): the button surfaces call
         // this, it writes the charger's use-mode, and only then does the mode above move. Nothing else
         // writes the use-mode, and nothing here writes anything until somebody presses something.

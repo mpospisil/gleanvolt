@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — The runtime charge settings outlive a restart (#421)
+
+**What.** Minimum battery SOC, SOC resume margin, min solar surplus and low tariff only (FastNoBattery
+and SolarGrid) are kept in `data/charge-settings.json` once changed, and read back at startup. Before,
+a mode resumed after a restart (#413) ran with the configured numbers instead of the ones it ran with.
+
+**How.**
+- `Hosting/Resume/ChargeSettingsFile`: loads `SavedChargeSettings` (five nullable fields) once, and
+  `Update(change)` applies a change under a lock and writes atomically (temp file and rename, as
+  `ChargeModeFile`). An unreadable file (bad JSON, `null`, a wrong type) logs a warning and counts as
+  empty; a failed write logs and the in-memory value stands.
+- `ForecastRuntimeSettings`, `SolarGridSettings` and `LowTariffSettings` take an optional
+  `ChargeSettingsFile`. A saved value replaces the configured one at construction, with an
+  *"as last set (configured …)"* log line; a set that changes the value updates its field in the file
+  inside the setting's own lock, so the file can't end up behind the memory. The parameter is optional
+  so the mode tests that build these by hand keep working without a file.
+- Null means "never changed", so a value nobody touched keeps following `appsettings.json`.
+- One file for all five, separate from `charge-mode.json`: the settings don't depend on the mode and
+  `ChargeModeFile` rewrites every 5 minutes while a mode runs.
+- No hardware involved; the battery hold stays off at every start.
+
+**Docs.** The "doesn't survive a restart" wording is gone from the class and interface comments, the
+API contracts and endpoint descriptions, `HTTP_API.md`, `HOME_ASSISTANT.md` (whose intro still said
+the service always starts Off with nothing persisted, stale since #413), `MODE_SOLAR_GRID.md`,
+`MODE_FAST_NO_BATTERY.md` and `WEB_UI.md`. `CHARGE_CONTROL.md`'s restart section lists the settings and
+the new key. The Plan tab tooltips said *Not kept after a restart*; they now say it is kept (en and cs),
+which changed five screenshot fingerprints but no pixels. The restart dialog still said the mode isn't
+kept (stale since #413); fixed in both languages. Manual: the updating page (en, cs).
+
+**Files.** `Hosting/Resume/ChargeSettingsFile.cs` (new), `Hosting/Forecasting/ForecastRuntimeSettings.cs`,
+`Hosting/SolarGrid/SolarGridSettings.cs`, `Hosting/Tariff/LowTariffSettings.cs`,
+`Hosting/Configuration/ChargeControlOptions.cs`, `Hosting/GleanvoltHostingExtensions.cs`,
+`Core/Interfaces/{IForecastRuntimeSettings,ISolarGridSettings,ILowTariffSettings}.cs`,
+`Api/Contracts/ControlContracts.cs`, `Api/Endpoints/ControlEndpoints.cs`,
+`Web/Resources/{PlanText,SharedText}{,.cs}.resx`, docs as above. Tests:
+`Hosting.Tests/ChargeSettingsPersistenceTests.cs` — every value back after rebuilding the host over the
+same file, a flag turned off over a configured on, untouched values following a changed config, no
+write without a change, three kinds of unreadable file, and the startup log line.
+
+---
+
 ## 2026-11-17 — The runtime charge settings over the API (#392)
 
 **What.** `GET` and `PUT /api/v1/charging/settings` read and change **Minimum battery SOC**, **SOC

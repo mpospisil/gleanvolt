@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — The runtime charge settings outlive a restart (#421)
+
+**Found.** Since #413 a restart resumes the mode with its target or limit, but the numbers that tune it
+came back at their configured values: minimum battery SOC, SOC resume margin, min solar surplus and
+low tariff only for FastNoBattery and SolarGrid. A Forecasted charge set to keep 40 % in the battery
+came back with the configured floor after a deploy, and nothing said so. The rule they followed,
+"runtime only, like the battery hold", made sense while the mode itself came back Off.
+
+**Decided.**
+- **Kept in `data/charge-settings.json`** (`ChargeControl:SettingsStatePath`), separate from
+  `charge-mode.json`: the settings hold with no mode running and are kept whether or not the mode is
+  resumed. Written atomically on every change; changes are rare, so there is no refresh timer.
+- **Only values somebody changed are stored.** Each field is null until set from the web UI, MQTT or
+  the API, and a null keeps following its configuration, so a config edit still reaches every value
+  nobody touched. A changed value wins over the config until it is changed again.
+- **Nothing resets them automatically.** The startup log names each value taken from the file with the
+  configured one beside it. Deleting the file while Gleanvolt is stopped goes back to config.
+- **A file that can't be read** is logged and ignored: every value comes from configuration, and the
+  next change replaces the file.
+- **The battery hold stays out**: it is a command to the inverter with a duration, off at every start
+  on purpose. Fast's basis, amount and departure and the target drafts also stay out; they belong to
+  the next press, not to the house.
+
+**Consequences accepted.** Nothing in the web UI shows that a value differs from the configured one;
+the log does. A value set back to exactly its configured number stays stored, so a later config change
+doesn't reach it. A failed write is logged and the change applies until the next restart.
+
+---
+
 ## 2026-11-17 — A restart resumes the mode that was running (#413)
 
 **Found.** On 2026-11-16 at 22:49 Gleanvolt was restarted during a FastNoBattery charge (16 A, 5.9 kWh

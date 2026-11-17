@@ -325,8 +325,8 @@ internal static class ControlEndpoints
             .WithDescription(
                 "With it on, fastNoBattery waits through high tariff and charges flat out once low tariff "
                 + "starts, and high tariff pauses solarGrid, sun or not. A wait is never read as a full car. "
-                + "Applies from the next poll, to a running mode too, and does not persist across "
-                + "restarts. Writes nothing to hardware itself; the mode does, on the next poll.")
+                + "Applies from the next poll, to a running mode too, and is kept across restarts. "
+                + "Writes nothing to hardware itself; the mode does, on the next poll.")
             .Produces<LowTariffOnlyResponse>();
 
         api.MapGet("/charging/settings", (IForecastRuntimeSettings forecast, ISolarGridSettings solarGrid) =>
@@ -390,7 +390,7 @@ internal static class ControlEndpoints
                 + "Assistant numbers — minimum battery SOC 0–100 %, SOC resume margin 0–50 %, min solar "
                 + "surplus 0–20000 W. A value out of range is a 400 that lists every problem under "
                 + "'problems', and nothing is written. Applies from the next poll, to a running mode too, "
-                + "and does not persist across restarts. Writes no hardware.")
+                + "and is kept across restarts. Writes no hardware.")
             .Produces<ChargingSettingsResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest);
 

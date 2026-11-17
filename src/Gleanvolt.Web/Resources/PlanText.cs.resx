@@ -178,10 +178,10 @@
     <value>Minimální solární přebytek (W)</value>
   </data>
   <data name="MinSurplusTip" xml:space="preserve">
-    <value>Pod touto hodnotou se nabíjení pozastaví, místo aby se odebíralo ze sítě. Síť přidá nanejvýš minimální výkon nabíječky (asi 4,1 kW při 6 A na třech fázích) minus tuto hodnotu; když ji nastavíte na tento výkon nebo výš, síť nepomůže nikdy. Je to také hranice, kterou musí překročit zbytek dnešní předpovědi. Po restartu se nezachová.</value>
+    <value>Pod touto hodnotou se nabíjení pozastaví, místo aby se odebíralo ze sítě. Síť přidá nanejvýš minimální výkon nabíječky (asi 4,1 kW při 6 A na třech fázích) minus tuto hodnotu; když ji nastavíte na tento výkon nebo výš, síť nepomůže nikdy. Je to také hranice, kterou musí překročit zbytek dnešní předpovědi. Zachová se i po restartu.</value>
   </data>
   <data name="SolarGridLowTariffHint" xml:space="preserve">
-    <value>Ve vysokém tarifu auto čeká, ať svítí, nebo ne, a jakmile začne nízký tarif, nabíjí jako výše. Režim ale i tak končí s koncem využitelného slunce, takže nízký tarif, který začne po setmění, tu nic nenabije. Po restartu se nezachová.</value>
+    <value>Ve vysokém tarifu auto čeká, ať svítí, nebo ne, a jakmile začne nízký tarif, nabíjí jako výše. Režim ale i tak končí s koncem využitelného slunce, takže nízký tarif, který začne po setmění, tu nic nenabije. Zachová se i po restartu.</value>
   </data>
   <data name="SunUntil" xml:space="preserve">
     <value>Slunce do</value>
@@ -277,7 +277,7 @@
     <value>Minimální SOC baterie (%)</value>
   </data>
   <data name="MinBatterySocTip" xml:space="preserve">
-    <value>Nejnižší úroveň, na kterou smí domácí baterie klesnout, když pomáhá nabíjet auto. Když ji dosáhne, nabíjení se pozastaví, dokud se baterie nenabije zpět o rezervu pro obnovení (níže). Plán může držet vyšší mez, pokud podle předpovědi baterie potřebuje víc, aby byla do termínu plánu plná. Hodnota je společná s režimem Targeted, takže změna tady platí i tam. Po restartu se nezachová.</value>
+    <value>Nejnižší úroveň, na kterou smí domácí baterie klesnout, když pomáhá nabíjet auto. Když ji dosáhne, nabíjení se pozastaví, dokud se baterie nenabije zpět o rezervu pro obnovení (níže). Plán může držet vyšší mez, pokud podle předpovědi baterie potřebuje víc, aby byla do termínu plánu plná. Hodnota je společná s režimem Targeted, takže změna tady platí i tam. Zachová se i po restartu.</value>
   </data>
   <data name="ResumeMarginTopic" xml:space="preserve">
     <value>Rezerva SOC pro obnovení (%)</value>
@@ -286,7 +286,7 @@
     <value>Rezerva SOC pro obnovení (%)</value>
   </data>
   <data name="ResumeMarginTip" xml:space="preserve">
-    <value>O kolik nad mez se musí baterie znovu nabít, než se pozastavené nabíjení obnoví. Zvyšte ji, pokud se nabíjení v hraničních dnech opakovaně spouští a zastavuje. Po restartu se nezachová.</value>
+    <value>O kolik nad mez se musí baterie znovu nabít, než se pozastavené nabíjení obnoví. Zvyšte ji, pokud se nabíjení v hraničních dnech opakovaně spouští a zastavuje. Zachová se i po restartu.</value>
   </data>
   <data name="NoPollYet" xml:space="preserve">
     <value>Zatím neproběhlo žádné čtení.</value>
@@ -421,7 +421,7 @@
     <value>Bez času nabíjení začne hned. S časem se nabíjení odloží a začne co nejpozději tak, aby skončilo před vaším odjezdem. Auto nabíjené nad 80 % tak na vysokém stavu nabití stráví minuty, ne celou noc — a právě dlouhé stání na vysokém nabití baterii opotřebovává. Nabíjí se stále naplno; posouvá se jen začátek. Nastavený čas odstraníte tlačítkem Vymazat v kalendáři.</value>
   </data>
   <data name="FastLowTariffHint" xml:space="preserve">
-    <value>Ve vysokém tarifu auto čeká a nabíjí naplno, jakmile začne nízký tarif. Nabíječka po připojení auta sama spustí nabíjení, takže auto připojené ve vysokém tarifu chvíli odebírá, než ho další čtení zastaví. Po restartu se nezachová.</value>
+    <value>Ve vysokém tarifu auto čeká a nabíjí naplno, jakmile začne nízký tarif. Nabíječka po připojení auta sama spustí nabíjení, takže auto připojené ve vysokém tarifu chvíli odebírá, než ho další čtení zastaví. Zachová se i po restartu.</value>
   </data>
   <data name="StartFastTopic" xml:space="preserve">
     <value>Nabíjet naplno</value>
@@ -691,7 +691,7 @@
     <value>Nabíjení skončí několik minut před tímto časem, aby bylo auto nabité a už neodebíralo. Nejvýš {0} dopředu.</value>
   </data>
   <data name="MinBatterySocTargetedTip" xml:space="preserve">
-    <value>Pod touto úrovní má přednost domácí baterie: slunce nabíjí ji a auto dostane ze sítě jen to, co potřebuje, aby bylo včas nabité. Na této úrovni a nad ní bere auto i solární přebytek. Domácí baterie v tomto režimu auto nikdy nenabíjí. Za slabého slunce může plán držet vyšší mez, aby se baterie stihla dobít. Hodnota je společná s režimem Forecasted, takže změna tady platí i tam. Po restartu se nezachová.</value>
+    <value>Pod touto úrovní má přednost domácí baterie: slunce nabíjí ji a auto dostane ze sítě jen to, co potřebuje, aby bylo včas nabité. Na této úrovni a nad ní bere auto i solární přebytek. Domácí baterie v tomto režimu auto nikdy nenabíjí. Za slabého slunce může plán držet vyšší mez, aby se baterie stihla dobít. Hodnota je společná s režimem Forecasted, takže změna tady platí i tam. Zachová se i po restartu.</value>
   </data>
   <data name="PreviewTopic" xml:space="preserve">
     <value>Náhled plánu</value>

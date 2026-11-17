@@ -4,8 +4,7 @@ namespace Gleanvolt.Core.Interfaces;
 /// The one number the <see cref="Enums.ChargeControlMode.SolarGrid"/> mode is steered by: how much
 /// surplus the sun has to be providing before the grid may help the car. Seeded from configuration and
 /// settable at runtime (the web UI and a Home Assistant number), exactly like
-/// <see cref="IForecastRuntimeSettings"/> — and, like it, a runtime change does not persist across
-/// restarts.
+/// <see cref="IForecastRuntimeSettings"/> — and, like it, a runtime change survives a restart.
 /// </summary>
 public interface ISolarGridSettings
 {

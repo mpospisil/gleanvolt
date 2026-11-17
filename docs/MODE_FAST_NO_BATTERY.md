@@ -126,7 +126,7 @@ so the rule leans on power and treats the status as a corroborating signal:
 With a [grid tariff](CONFIGURATION.md#grid-tariff-the-tariff-section) set up, **Low tariff only** — a checkbox on the
 *Fast* tab, the **Fast low tariff only** switch in Home Assistant, or `PUT /charging/low-tariff-only` —
 makes the mode wait through high tariff and charge flat out once low tariff starts. The boot value is
-`ChargeControl:Fast:LowTariffOnly` (`false`); a runtime change doesn't survive a restart.
+`ChargeControl:Fast:LowTariffOnly` (`false`); a runtime change is kept across restarts.
 
 - **A wait is not a finished car.** The car is "finished" only while the mode is asking it to charge,
   so hours of no draw through high tariff end nothing, and when low tariff starts the car gets a fresh
