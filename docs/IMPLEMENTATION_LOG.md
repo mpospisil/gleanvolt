@@ -4,6 +4,50 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — A secret store in the provider SDK (#416)
+
+**What.** `IProviderSecretStore` in `Gleanvolt.Providers.Client`: a provider's own secrets, with the
+protection Gleanvolt's store gives its built-in feeds. The Volkswagen plugin keeps its account and
+session in it, and its `DataFiles` is gone.
+
+**How.**
+- SDK: `ProviderSecretStore`. `Read`, `Write` and `Delete` by name; `Directory` and `IsEncrypted`.
+  - Linux and macOS: `UnixCreateMode` `0600` files in a `0700` directory.
+  - Windows: `ProtectedData.Protect` with `CurrentUser` and the entropy
+    `"Gleanvolt provider secret store v1"`.
+  - Writes go to `<name>.tmp` and then `File.Move(overwrite)`; a leftover temporary file is replaced
+    by the next write.
+  - Read errors (`IOException`, `UnauthorizedAccessException`, `CryptographicException`) read as null.
+    A missing directory deletes as success.
+  - Names must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$` and not end in `.tmp`.
+  - `AddGleanvoltProviderSecrets(directory)` is a `TryAddSingleton`.
+  - New package reference: `System.Security.Cryptography.ProtectedData` 10.0.0.
+- Plugin: `AccountStore` and `VwWebsiteSessionStore` take `IProviderSecretStore`.
+  `VwWebsiteSessionStore.Protection` says DPAPI or `0600` from `IsEncrypted`. `Program.cs` registers
+  the store on `Volkswagen:DataDirectory`. `DataFiles.cs` is deleted.
+- Tests: `ProviderSecretStoreTests` (15).
+  - Round trip and replace; missing; delete.
+  - On Linux: `0600` and `0700`, and a file written before the store reads.
+  - On Windows: no plain text in the file.
+  - A leftover `.tmp` is harmless; unsafe names are refused; an unwritable directory gives `false`;
+    registration.
+  - The plugin and screenshot tests use the store in place of `DataFiles`.
+- Docs: PROVIDERS.md (**Secrets**), the client README, and the plugin README (the data directory, the
+  change rows, the not-done list).
+
+**On the device (2026-11-17).** The plugin image from this branch ran on the Pi against the data
+volume from #410. It read `account.json` and `session.json` as they were, read VW without asking for
+a code, and published (SOC 80 %). The files stayed `0600 app:app` in a `0700` directory.
+
+**Files.** `src/Gleanvolt.Providers.Client/ProviderSecretStore.cs` (new), `Gleanvolt.Providers.Client.csproj`,
+`README.md`; `plugins/Gleanvolt.Plugin.Volkswagen/Program.cs`, `Volkswagen/VolkswagenAccount.cs`,
+`VwWebsiteSessionStore.cs`, `DataFiles.cs` (deleted), `README.md`;
+`tests/Gleanvolt.Providers.Tests/ProviderSecretStoreTests.cs` (new),
+`tests/Gleanvolt.Hosting.Tests/VolkswagenPluginTests.cs`, `tests/Gleanvolt.Web.Screenshots/ProviderPageScreenshot.cs`;
+`docs/PROVIDERS.md`, `docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
+
+---
+
 ## 2026-11-17 — A provider's status in the viewer's language, and the Volkswagen page in Czech (#415)
 
 **What.** A provider reports a status code, which Gleanvolt words in the viewer's language, plus its

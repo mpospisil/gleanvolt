@@ -66,6 +66,16 @@ installation: Gleanvolt acts on what they send.
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
 
+**Secrets.** A provider that holds an account (a password, a session's cookies, an API key) keeps it
+with `services.AddGleanvoltProviderSecrets(directory)` and `IProviderSecretStore` (#416): `Read`,
+`Write` and `Delete` by name, one text value each. On Linux and macOS a value is a file readable and
+writable by the provider's user alone (`0600`), in a directory only that user can enter (`0700`), and
+is not encrypted. On Windows it is encrypted with DPAPI for the current user. Every write replaces the
+old value in one step. A name is a plain file name (letters, digits, `.`, `-`, `_`), so no name reaches
+outside the directory. `IsEncrypted` says which protection applies, so a provider can tell its owner.
+Give the directory a volume of its own, and keep it out of backups and shares you wouldn't give the
+password to.
+
 ## The token
 
 Every provider connects with one token, made on Settings under **External providers** with **Make a

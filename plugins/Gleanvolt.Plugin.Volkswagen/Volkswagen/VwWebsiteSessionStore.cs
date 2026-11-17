@@ -1,3 +1,4 @@
+using Gleanvolt.Providers.Client;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,10 +17,10 @@ namespace Gleanvolt.Plugin.Volkswagen.Volkswagen;
 /// holds them is signed in as the owner. They are never logged and never rendered, and a failure to
 /// save is not allowed to take the process down.</para>
 ///
-/// <para>Copied from the built-in. Changed: <see cref="DataFiles"/> in place of Gleanvolt's
-/// <c>ISecretStore</c> (#410), which a plugin does not have.</para>
+/// <para>Copied from the built-in. Changed: the SDK's <see cref="IProviderSecretStore"/> (#416) in
+/// place of Gleanvolt's <c>ISecretStore</c>, which a plugin does not have.</para>
 /// </summary>
-public sealed class VwWebsiteSessionStore(DataFiles files)
+public sealed class VwWebsiteSessionStore(IProviderSecretStore files)
 {
     private const string FileName = "session.json";
 
@@ -30,7 +31,9 @@ public sealed class VwWebsiteSessionStore(DataFiles files)
     };
 
     /// <summary>What protects the saved session, for a sentence that has to mention it. Never the cookies.</summary>
-    public Words Protection => files.Describe();
+    public Words Protection => files.IsEncrypted
+        ? new Words("files in {0}, encrypted for this Windows user (DPAPI)", "soubory v {0}, šifrované pro tohoto uživatele Windows (DPAPI)").Format(files.Directory)
+        : new Words("files in {0}, readable only by the plugin's user (0600)", "soubory v {0}, čitelné jen pro uživatele pluginu (0600)").Format(files.Directory);
 
     /// <summary>Whether a saved session exists to try. Says nothing about whether it still works.</summary>
     public bool Exists => files.Read(FileName) is not null;

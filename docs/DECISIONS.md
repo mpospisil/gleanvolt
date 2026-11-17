@@ -4,6 +4,38 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — A secret store in the provider SDK, its own rather than Gleanvolt's (#416)
+
+**Found.** Gleanvolt keeps its car accounts and session cookies in `ISecretStore`: `0600` files on
+Linux, DPAPI on Windows. The SDK had nothing like it. The Volkswagen plugin (#410) wrote its account,
+password included, and its session with its own `DataFiles`: `0600` on Linux, but on Windows
+readable by anyone the folder lets in. Every provider holding an account would have had to get this
+right alone.
+
+**Decided.**
+- **The SDK's own store, not Gleanvolt's moved.** `IProviderSecretStore` and `ProviderSecretStore` in
+  `Gleanvolt.Providers.Client` (MIT), registered with `AddGleanvoltProviderSecrets(directory)`.
+  Gleanvolt's `FileSecretStore` and `DpapiSecretStore` stay in Infrastructure, under its own licence.
+  Moving them would have relicensed that code and made Gleanvolt's secret handling a public package's
+  API. The two are small enough that two copies cost less than that.
+- **The same protection as Gleanvolt's store:** owner-only files (`0600` in a `0700` directory) on
+  Linux and macOS, not encrypted; DPAPI for the current user on Windows, with entropy of its own. An
+  atomic write (temporary file, then a move) leaves the old value after a crash. An unreadable value
+  reads as absent, as in Gleanvolt: the owner is asked again rather than the provider failing.
+- **DPAPI directly, not ASP.NET Core Data Protection.** Data Protection on Linux keeps its keys as
+  plain files beside the data, which is no better than `0600` files and adds key handling. The cost
+  is a `System.Security.Cryptography.ProtectedData` reference, which Infrastructure already has.
+- **A name is a plain file name** (letters, digits, `.`, `-`, `_`, not `*.tmp`), checked on every call,
+  so no name reaches outside the directory. Names map to files unchanged, so the Volkswagen plugin's
+  existing `account.json` and `session.json` read as they are. On the Pi that means no new sign-in.
+- **Secrets only.** The store doesn't cover a provider's other state. A provider with settings that
+  aren't secret can keep them however it likes.
+
+**Consequences accepted.** On Windows, a value written before the store (plain text) doesn't open,
+and the owner signs in once more. The Windows half is tested only on Windows, and CI runs Linux.
+
+---
+
 ## 2026-11-17 — A provider's status in the viewer's language: codes Gleanvolt words, detail per language (#415)
 
 **Found.** `ProviderStatus.Message` was free English text. The built-in feeds report with `Phrase`s,

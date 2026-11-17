@@ -28,7 +28,9 @@ var pageUrl = builder.Configuration["Gleanvolt:PageUrl"]
 var volkswagen = builder.Configuration.GetSection(VolkswagenOptions.SectionName).Get<VolkswagenOptions>() ?? new VolkswagenOptions();
 builder.Services.AddSingleton(volkswagen);
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<DataFiles>();
+// The account and the session, through the SDK's secret store (#416): 0600 files on Linux, DPAPI on
+// Windows. The names are the ones the plugin used before it, so an existing data directory still reads.
+builder.Services.AddGleanvoltProviderSecrets(volkswagen.DataDirectory);
 builder.Services.AddSingleton<AccountStore>();
 builder.Services.AddSingleton<VwWebsiteSessionStore>();
 builder.Services.AddSingleton(provider => new VwWebsiteClient(

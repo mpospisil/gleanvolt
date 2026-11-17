@@ -5,6 +5,7 @@ using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Hosting.Vehicles.External;
 using Gleanvolt.Plugin.Volkswagen.Volkswagen;
+using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Vehicle;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -163,7 +164,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
             Timeout = TimeSpan.FromSeconds(5),
         };
 
-        var files = new DataFiles(_options);
+        var files = new ProviderSecretStore(_options.DataDirectory);
         _account = new AccountStore(files);
         Assert.True(_account.Save("owner@example.com", "hunter2", "wvgzzze2zpe999999"));
         _client = new VwWebsiteClient(_options, _account, new VwWebsiteSessionStore(files), time: _time);
@@ -361,7 +362,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
     [Fact]
     public void Without_an_account_the_owner_is_needed()
     {
-        var files = new DataFiles(new VolkswagenOptions { DataDirectory = Path.Combine(_directory, "empty") });
+        var files = new ProviderSecretStore(Path.Combine(_directory, "empty"));
         var account = new AccountStore(files);
         using var client = new VwWebsiteClient(_options, account, new VwWebsiteSessionStore(files));
         var feed = new VolkswagenFeed(_options, account, client, _time, NullLogger<VolkswagenFeed>.Instance);
