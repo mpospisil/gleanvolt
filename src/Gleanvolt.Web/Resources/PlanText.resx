@@ -186,10 +186,10 @@
     <value>Minimum solar surplus (W)</value>
   </data>
   <data name="MinSurplusTip" xml:space="preserve">
-    <value>Below this, the car pauses instead of using the grid. The grid adds at most the charger's minimum power (about 4.1 kW at 6 A on three phases) minus this value; set it at or above that and the grid never helps. The rest of today's forecast must also exceed this value for the mode to keep running. Not kept after a restart.</value>
+    <value>Below this, the car pauses instead of using the grid. The grid adds at most the charger's minimum power (about 4.1 kW at 6 A on three phases) minus this value; set it at or above that and the grid never helps. The rest of today's forecast must also exceed this value for the mode to keep running. Kept after a restart.</value>
   </data>
   <data name="SolarGridLowTariffHint" xml:space="preserve">
-    <value>In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends when the day's useful sun is over, so a low tariff that starts after dark charges nothing here. Not kept after a restart.</value>
+    <value>In high tariff the car waits, sun or not, and charges as above once low tariff starts. The mode still ends when the day's useful sun is over, so a low tariff that starts after dark charges nothing here. Kept after a restart.</value>
   </data>
   <data name="SunUntil" xml:space="preserve">
     <value>Sun until</value>
@@ -288,7 +288,7 @@
     <value>Minimum battery SOC (%)</value>
   </data>
   <data name="MinBatterySocTip" xml:space="preserve">
-    <value>The lowest the home battery may go while it helps charge the car. When it gets there, the car pauses until the battery has recovered by the resume margin below. The plan may keep a higher floor when the forecast says the battery needs it to be full by the deadline. Shared with the Targeted mode, so a change here applies there too. Not kept after a restart.</value>
+    <value>The lowest the home battery may go while it helps charge the car. When it gets there, the car pauses until the battery has recovered by the resume margin below. The plan may keep a higher floor when the forecast says the battery needs it to be full by the deadline. Shared with the Targeted mode, so a change here applies there too. Kept after a restart.</value>
   </data>
   <data name="ResumeMarginTopic" xml:space="preserve">
     <value>SOC resume margin (%)</value>
@@ -297,7 +297,7 @@
     <value>SOC resume margin (%)</value>
   </data>
   <data name="ResumeMarginTip" xml:space="preserve">
-    <value>How far above the floor the battery must recover before a paused session restarts. Raise it if the car starts and stops repeatedly on a borderline day. Not kept after a restart.</value>
+    <value>How far above the floor the battery must recover before a paused session restarts. Raise it if the car starts and stops repeatedly on a borderline day. Kept after a restart.</value>
   </data>
   <data name="NoPollYet" xml:space="preserve">
     <value>No poll has completed yet.</value>
@@ -433,7 +433,7 @@
     <value>With no time set, the charge starts straight away. With a time, the charge is delayed and starts as late as possible while still finishing before you leave — so a car charged above 80% spends minutes there instead of the whole night, which is what actually wears the battery. It still charges at full power; only the start moves. To remove a time, open the calendar and press Clear.</value>
   </data>
   <data name="FastLowTariffHint" xml:space="preserve">
-    <value>In high tariff the car waits, and it charges at full power once low tariff starts. The charger starts a car by itself when it is plugged in, so a car plugged in during high tariff draws power briefly until the next poll stops it. Not kept after a restart.</value>
+    <value>In high tariff the car waits, and it charges at full power once low tariff starts. The charger starts a car by itself when it is plugged in, so a car plugged in during high tariff draws power briefly until the next poll stops it. Kept after a restart.</value>
   </data>
   <data name="StartFastTopic" xml:space="preserve">
     <value>Charge at maximum</value>
@@ -708,7 +708,7 @@
     <value>Charging finishes a few minutes before this time, so the car is ready and no longer drawing. At most {0} ahead.</value>
   </data>
   <data name="MinBatterySocTargetedTip" xml:space="preserve">
-    <value>Below this level the home battery comes first: the sun charges it, and the car gets only what it needs from the grid to be ready on time. At or above it, the car also takes the solar surplus. The home battery never charges the car in this mode. On a poor-sun day the plan may keep a higher floor so the battery can still refill. Shared with the Forecasted mode, so a change here applies there too. Not kept after a restart.</value>
+    <value>Below this level the home battery comes first: the sun charges it, and the car gets only what it needs from the grid to be ready on time. At or above it, the car also takes the solar surplus. The home battery never charges the car in this mode. On a poor-sun day the plan may keep a higher floor so the battery can still refill. Shared with the Forecasted mode, so a change here applies there too. Kept after a restart.</value>
   </data>
   <data name="PreviewTopic" xml:space="preserve">
     <value>Preview plan</value>

@@ -6,8 +6,8 @@ namespace Gleanvolt.Core.Interfaces;
 /// The owner's <b>low tariff only</b> option for the modes that buy from the grid (issue #274): with it
 /// on, <see cref="ChargeControlMode.FastNoBattery"/> and <see cref="ChargeControlMode.SolarGrid"/> wait
 /// through high tariff and charge in low. Seeded from configuration and settable at runtime from the web
-/// UI and Home Assistant, exactly like <see cref="ISolarGridSettings"/> — and, like it, a runtime change
-/// does not persist across restarts.
+/// UI, Home Assistant and the API, exactly like <see cref="ISolarGridSettings"/> — and, like it, a runtime
+/// change survives a restart.
 ///
 /// <para>A flag is only a wish. With no tariff selected there is nothing to wait for, and the flag is
 /// ignored: the host says so in the status rather than pretending the mode is waiting.</para>

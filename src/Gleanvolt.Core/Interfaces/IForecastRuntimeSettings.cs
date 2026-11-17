@@ -6,8 +6,7 @@ namespace Gleanvolt.Core.Interfaces;
 /// recover before the car comes back. Both protect the battery; the mode takes no amount for the car
 /// (issue #249 — that is the car's own charge limit, or Targeted). Seeded from configuration and settable
 /// at runtime (e.g. from Home Assistant number entities), exactly like
-/// <see cref="IChargeControlModeSelector"/>. Unlike the mode, runtime changes do not persist across
-/// restarts.
+/// <see cref="IChargeControlModeSelector"/>. Like the mode, a runtime change survives a restart (#421).
 /// </summary>
 public interface IForecastRuntimeSettings
 {

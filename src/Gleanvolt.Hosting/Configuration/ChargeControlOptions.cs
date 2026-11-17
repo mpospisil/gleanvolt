@@ -38,6 +38,13 @@ public sealed class ChargeControlOptions
     /// </summary>
     public string ModeStatePath { get; init; } = "data/charge-mode.json";
 
+    /// <summary>
+    /// Where the runtime numbers that tune the modes are kept once somebody changes one (#421): the
+    /// minimum battery SOC and resume margin, the minimum solar surplus and the low-tariff-only flags.
+    /// Relative to the content root unless absolute, beside <see cref="ModeStatePath"/>.
+    /// </summary>
+    public string SettingsStatePath { get; init; } = "data/charge-settings.json";
+
     /// <summary>Voltage used to convert between watts and the charger's amp setpoint.</summary>
     public double NominalVoltage { get; init; } = 230;
 

@@ -12,8 +12,10 @@ controller, so they cannot disagree about what the charger is doing: the last on
 the others show it within a poll interval. The same rules apply on every surface:
 
 - **A restart resumes the charge mode that was running**, with its target or amount, and the Overview
-  says so ([After a restart](CHARGE_CONTROL.md#after-a-restart)). The other controls on Charging plan
-  come back at their configured values. Settings saved on **Settings** and **Car** are kept.
+  says so ([After a restart](CHARGE_CONTROL.md#after-a-restart)). Minimum battery SOC, SOC resume
+  margin, min solar surplus and the low-tariff-only checkboxes are kept as last set; the other controls
+  on Charging plan come back at their configured values. Settings saved on **Settings** and **Car** are
+  kept.
 - `FastNoBattery`, `Targeted` and `SolarGrid` switch the mode back to `Off` by themselves when they
   finish.
 - A charger that refuses the use-mode write says so on the page, instead of leaving a mode running

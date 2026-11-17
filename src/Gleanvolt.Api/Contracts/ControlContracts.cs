@@ -52,7 +52,7 @@ public sealed record LowTariffOnlyRequest(bool? FastNoBattery = null, bool? Sola
 
 /// <summary>
 /// <i>Low tariff only</i> as the controller is using it. Takes effect on the next poll, including for a
-/// mode already running; it does not persist across restarts.
+/// mode already running, and is kept across restarts.
 /// </summary>
 /// <param name="FastNoBattery">Whether <c>fastNoBattery</c> waits for low tariff.</param>
 /// <param name="SolarGrid">Whether <c>solarGrid</c> does.</param>
@@ -77,7 +77,7 @@ public sealed record ChargingSettingsRequest(
 /// <summary>
 /// The three day-to-day numbers as the controller is using them: the runtime values, which start from
 /// configuration and follow any change made from the web UI, Home Assistant or the API. A change takes
-/// effect on the next poll, including for a mode already running; it does not persist across restarts.
+/// effect on the next poll, including for a mode already running, and is kept across restarts.
 /// </summary>
 /// <param name="MinBatterySocPercent">The SOC the home battery is kept above.</param>
 /// <param name="SocResumeMarginPercent">How far above that minimum the battery must recover before a paused charge resumes.</param>

@@ -163,12 +163,19 @@ the battery hold apply as they would to a mode you picked.
   mode as a new one.
 - A charger that doesn't answer at startup is retried every poll for ten minutes. Picking a mode in that
   time wins over the resume.
-- The runtime settings — minimum battery SOC, **Low tariff only**, Solar + grid's minimum — aren't kept;
-  they come back at their configured values.
+- **The numbers that tune the modes are kept too** (#421): minimum battery SOC, SOC resume margin, min
+  solar surplus and low tariff only for `FastNoBattery` and `SolarGrid`. Kept in
+  `data/charge-settings.json` (`ChargeControl:SettingsStatePath`) once one is changed from the web UI,
+  MQTT or the API, and written on every change. A value never changed follows its configuration, so a
+  config edit still reaches it; a changed one wins over the config until it is changed again. The log
+  says at startup which values came from the file. A file that can't be read is logged and ignored.
+  To go back to the configured values, stop Gleanvolt and delete the file.
+- **The battery hold isn't kept**: it is a command to the inverter, and it is off at every start.
 
 ```jsonc
 "ChargeControl": {
   "ResumeWithin": "12:00:00",                // the longest absence most modes are resumed after
-  "ModeStatePath": "data/charge-mode.json"   // where the running mode is kept
+  "ModeStatePath": "data/charge-mode.json",  // where the running mode is kept
+  "SettingsStatePath": "data/charge-settings.json" // where the changed runtime numbers are kept
 }
 ```

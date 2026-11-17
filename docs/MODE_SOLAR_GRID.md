@@ -70,7 +70,8 @@ held and the house on the grid for nothing.
   charging, so an average hovering on the 6 A floor does not flap it; a pause or the end of the mode
   releases it at once. Without the hold the bridge still runs, but the inverter serves the gap from the
   pack; a warning says so when the mode is selected.
-- **Nothing survives a restart**, the minimum set at runtime included.
+- **A restart keeps the minimum** as it was last set, and resumes a running `SolarGrid`; see
+  [After a restart](CHARGE_CONTROL.md#after-a-restart).
 
 ## SolarGrid on low tariff only
 
