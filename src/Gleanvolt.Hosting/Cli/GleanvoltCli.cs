@@ -345,7 +345,14 @@ public static class GleanvoltCli
                 Ask(console, configuration, values, SetupDocument.SolcastResourceId, "Solcast rooftop site resource id");
             }
 
-            AskSecret(console, values, SetupDocument.WeatherApiKey, "OpenWeatherMap API key");
+            // The key only for OpenWeatherMap (#424); an external provider is set up on Settings.
+            var weather = Ask(console, configuration, values, SetupDocument.WeatherSourceKey,
+                "Weather: NotProvided, OpenWeather or External");
+            if (Weather.WeatherSourceSelection.Parse(weather) == WeatherSource.OpenWeather)
+            {
+                AskSecret(console, values, SetupDocument.WeatherApiKey, "OpenWeatherMap API key");
+            }
+
             console.Out.WriteLine("The car, the tariff, Home Assistant and the API are set on Settings, or with setup --file.");
             console.Out.WriteLine();
         }
@@ -542,6 +549,11 @@ public static class GleanvoltCli
             {
                 leaf["writeOnly"] = true;
                 leaf["description"] = "The web UI password, at least 8 characters. Saved only as a hash; prints a recovery key.";
+            }
+            else if (key == SetupDocument.WeatherSourceKey)
+            {
+                leaf["enum"] = new JsonArray("NotProvided", "OpenWeather", "External");
+                leaf["description"] = "Where the weather a charging session records comes from. Any case.";
             }
             else if (SetupDocument.IsSecret(key))
             {

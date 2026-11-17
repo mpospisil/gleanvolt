@@ -133,6 +133,25 @@ public sealed class SetupDocumentTests : IDisposable
     }
 
     [Fact]
+    public void The_weather_source_is_a_plain_setting_in_any_case()
+    {
+        // #424: the wizard and setup --file choose it; it goes to the overrides file, not the secrets.
+        var result = Document(("Weather:Source", "external")).Apply(Target());
+
+        Assert.True(result.Applied, string.Join("; ", result.Problems));
+        Assert.Equal("external", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
+    }
+
+    [Fact]
+    public void A_weather_source_that_names_none_is_refused()
+    {
+        var problems = Document(("Weather:Source", "meteoblue")).Validate(Target().Configuration);
+
+        Assert.Contains("must be NotProvided, OpenWeather or External", Assert.Single(problems));
+        Assert.Equal("Config.SetupBadWeatherSource", problems.Phrases[0]!.Key);
+    }
+
+    [Fact]
     public void Applied_twice_the_second_step_keeps_the_first()
     {
         Assert.True(Document(("Pv:Inverter:Host", "192.168.1.10")).Apply(Target()).Applied);

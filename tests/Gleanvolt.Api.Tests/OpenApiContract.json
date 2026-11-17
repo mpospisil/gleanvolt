@@ -496,7 +496,8 @@
       "vehicleAvailable": "boolean (required)",
       "vehicleStale": "boolean (required)",
       "version": "string (required)",
-      "weatherConfigured": "boolean (required)"
+      "weatherConfigured": "boolean (required)",
+      "weatherSource": "$WeatherSource (required)"
     },
     "LowTariffOnlyRequest": {
       "fastNoBattery": "boolean?",
@@ -820,14 +821,15 @@
     },
     "VehicleSourceState": "enum[ok|degraded|needsOwner]",
     "WeatherResponse": {
-      "cloudsPercent": "number|string(double) (required)",
+      "cloudsPercent": "number|string(double)? (required)",
       "condition": "string (required)",
       "conditionDescription": "string (required)",
-      "humidityPercent": "number|string(double) (required)",
+      "humidityPercent": "number|string(double)? (required)",
       "observedAt": "string(date-time) (required)",
-      "pressurePascals": "number|string(double) (required)",
-      "temperatureCelsius": "number|string(double) (required)",
+      "pressurePascals": "number|string(double)? (required)",
+      "temperatureCelsius": "number|string(double)? (required)",
       "visibilityMetres": "number|string(double)? (required)"
-    }
+    },
+    "WeatherSource": "enum[notProvided|openWeather|external]"
   }
 }

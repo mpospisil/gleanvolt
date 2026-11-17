@@ -1,0 +1,32 @@
+@*
+    The page's shell. Gleanvolt opens it with ?theme=auto|light|dark (#410, #424): auto follows the browser,
+    as Gleanvolt itself does; light or dark pins it. Read from the first request only: the interactive
+    part that follows has no request of its own. The language comes with ?culture= (#415), set by the
+    request localization in Program.cs.
+*@
+<!DOCTYPE html>
+<html lang="@(Words.Czech ? "cs" : "en")" data-theme="@Theme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <title>OpenWeather</title>
+    <HeadOutlet />
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string Theme => HttpContext?.Request.Query[ProviderPage.ThemeParameter].ToString() switch
+    {
+        "light" => "light",
+        "dark" => "dark",
+        _ => "auto",
+    };
+}

@@ -15,6 +15,8 @@ internal static class SessionFormatting
     /// <summary>
     /// One weather reading in a line: what it was like, how warm, and how much cloud. Cloud is the
     /// figure that explains a session, so it is never dropped even when the condition already implies it.
+    /// A figure the provider didn't report is left out rather than shown as a dash (#424); a reading
+    /// always has a temperature or a condition.
     /// </summary>
     public static string FormatWeather(WeatherObservation weather)
     {
@@ -23,11 +25,15 @@ internal static class SessionFormatting
             : weather.ConditionDescription;
 
         // The condition is the weather provider's own words, and stays in its language.
-        var temperature = Units.Temperature(weather.TemperatureCelsius);
-        var clouds = Units.Percent(weather.CloudsPercent);
-        return string.IsNullOrWhiteSpace(condition)
-            ? Localized.Format(SharedText.WeatherLine, temperature, clouds)
-            : Localized.Format(SharedText.WeatherLineWithCondition, condition, temperature, clouds);
+        string?[] parts =
+        [
+            string.IsNullOrWhiteSpace(condition) ? null : condition,
+            weather.TemperatureCelsius is { } celsius ? Units.Temperature(celsius) : null,
+            weather.CloudsPercent is { } clouds ? Localized.Format(SharedText.WeatherClouds, Units.Percent(clouds)) : null,
+        ];
+
+        var line = string.Join(", ", parts.Where(part => part is not null));
+        return line.Length == 0 ? Units.Missing : line;
     }
 
     /// <summary>

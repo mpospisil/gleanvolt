@@ -259,6 +259,33 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public async Task The_OpenWeatherMap_key_is_asked_for_only_when_OpenWeather_is_chosen()
+    {
+        // #424. A password exists; no search; the charger; the site; no Solcast; OpenWeather and its key.
+        var openWeather = string.Join('\n',
+            "n", "192.168.1.10", "192.168.1.11", "50", "14", "Europe/Prague", "", "", "OpenWeather", "weather-secret", "y") + "\n";
+
+        Assert.Equal(0, await Run(Context(openWeather, current: (WebPasswordStore.Key, "hash")), "setup"));
+
+        Assert.Equal("OpenWeather", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
+        Assert.Equal("weather-secret", _secrets.Read(SecretNames.WeatherApiKey));
+        Assert.Contains("OpenWeatherMap API key", _out.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_external_weather_source_asks_for_no_key()
+    {
+        var external = string.Join('\n',
+            "n", "192.168.1.10", "192.168.1.11", "50", "14", "Europe/Prague", "", "", "External", "y") + "\n";
+
+        Assert.Equal(0, await Run(Context(external, current: (WebPasswordStore.Key, "hash")), "setup"));
+
+        Assert.Equal("External", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
+        Assert.DoesNotContain("OpenWeatherMap API key", _out.ToString(), StringComparison.Ordinal);
+        Assert.Null(_secrets.Read(SecretNames.WeatherApiKey));
+    }
+
+    [Fact]
     public async Task A_swapped_choice_is_said_and_allowed()
     {
         _found =

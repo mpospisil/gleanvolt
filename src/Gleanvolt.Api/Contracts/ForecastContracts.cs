@@ -141,19 +141,22 @@ public sealed record ForecastPeriodResponse(
 
 /// <summary>Conditions at the site, from the configured weather provider.</summary>
 /// <param name="ObservedAt">When the provider made the observation.</param>
-/// <param name="TemperatureCelsius">Air temperature.</param>
-/// <param name="PressurePascals">Barometric pressure at station level, in Pa.</param>
-/// <param name="HumidityPercent">Relative humidity.</param>
-/// <param name="CloudsPercent">Cloud cover — the figure that matters to the roof.</param>
+/// <param name="TemperatureCelsius">Air temperature, or null when the provider didn't report it.</param>
+/// <param name="PressurePascals">Barometric pressure at station level, in Pa, or null when not reported.</param>
+/// <param name="HumidityPercent">Relative humidity, or null when not reported.</param>
+/// <param name="CloudsPercent">
+/// Cloud cover — the figure that matters to the roof — or null when not reported. OpenWeatherMap reports
+/// all four; an external weather provider (#424) may not.
+/// </param>
 /// <param name="VisibilityMetres">Visibility, or null when the provider omitted it.</param>
 /// <param name="Condition">The provider's short condition code, e.g. "Clouds".</param>
 /// <param name="ConditionDescription">The provider's longer description, e.g. "broken clouds".</param>
 public sealed record WeatherResponse(
     DateTimeOffset ObservedAt,
-    double TemperatureCelsius,
-    double PressurePascals,
-    double HumidityPercent,
-    double CloudsPercent,
+    double? TemperatureCelsius,
+    double? PressurePascals,
+    double? HumidityPercent,
+    double? CloudsPercent,
     double? VisibilityMetres,
     string Condition,
     string ConditionDescription)

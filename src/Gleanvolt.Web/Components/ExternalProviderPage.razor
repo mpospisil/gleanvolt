@@ -20,7 +20,7 @@
     var name = status.ProviderName ?? status.Name;
 
     <div class="external-provider-page" id="external-@(status.Kind)-page">
-        <p class="muted">@Localized.Format(CarText.ExternalPageIntro, name)</p>
+        <p class="muted">@Localized.Format(Intro ?? CarText.ExternalPageIntro, name)</p>
 
         <iframe id="external-@(status.Kind)-frame" src="@status.PagePath" title="@Localized.Format(CarText.ExternalPageFrameTitle, name)"
                 referrerpolicy="no-referrer"></iframe>
@@ -38,6 +38,12 @@
 
     /// <summary>The kind's id, e.g. <c>vehicle</c>.</summary>
     [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The line above the frame, with <c>{0}</c> for the provider's name. The car's, about signing in to
+    /// its account, when not given; the weather's says its settings are entered there (#424).
+    /// </summary>
+    [Parameter] public string? Intro { get; set; }
 
     protected override void OnInitialized() => Providers.Changed += Refresh;
 

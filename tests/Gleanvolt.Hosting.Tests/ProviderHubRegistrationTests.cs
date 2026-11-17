@@ -1,6 +1,8 @@
 using System.Net;
 using Gleanvolt.Core.Interfaces;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Providers.Contracts.SolarForecast;
+using Gleanvolt.Providers.Contracts.Weather;
 using Gleanvolt.Providers.Contracts.Tariff;
 using Gleanvolt.Web;
 using Microsoft.AspNetCore.Builder;
@@ -113,12 +115,38 @@ public sealed class ProviderHubRegistrationTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, await NegotiateAsync(app, old, TariffContract.HubPath));
         Assert.Equal(HttpStatusCode.OK, await NegotiateAsync(app, old, SolarForecastContract.HubPath));
+        Assert.Equal(HttpStatusCode.OK, await NegotiateAsync(app, old, WeatherContract.HubPath));
 
         var token = await providers.CreateTokenAsync();
 
         Assert.Equal(HttpStatusCode.Unauthorized, await NegotiateAsync(app, old, TariffContract.HubPath));
         Assert.Equal(HttpStatusCode.Unauthorized, await NegotiateAsync(app, old, SolarForecastContract.HubPath));
         Assert.Equal(HttpStatusCode.OK, await NegotiateAsync(app, token, SolarForecastContract.HubPath));
+        Assert.Equal(HttpStatusCode.Unauthorized, await NegotiateAsync(app, old, WeatherContract.HubPath));
+    }
+
+    [Fact]
+    public async Task TheWeatherFollowsTheSelectionAndItsKindIsListed()
+    {
+        // #424: every reader gets the service that follows Settings' choice; with no key and no choice,
+        // that is no weather, as before the choice existed.
+        await using var app = Build(("Web:Enabled", "false"), ("Api:Enabled", "true"), ("Api:Keys:test", "an-api-key-0123456789"));
+        app.UseGleanvolt();
+        await app.StartAsync();
+
+        var weather = app.Services.GetRequiredService<IWeatherService>();
+        Assert.IsType<Gleanvolt.Hosting.Weather.SelectedWeatherService>(weather);
+        Assert.Equal(WeatherSource.NotProvided, weather.Source);
+        Assert.False(weather.IsConfigured);
+
+        var kind = app.Services.GetRequiredService<IExternalProviders>().Find(WeatherContract.Kind);
+        Assert.NotNull(kind);
+        Assert.Equal(ExternalProviderState.Off, kind.State);
+
+        Assert.True(app.Services.GetRequiredService<IWeatherSourceSelection>().Select(WeatherSource.External).Saved);
+        Assert.Equal(WeatherSource.External, weather.Source);
+        Assert.True(weather.IsConfigured);
+        Assert.Equal(ExternalProviderState.Waiting, app.Services.GetRequiredService<IExternalProviders>().Find(WeatherContract.Kind)!.State);
     }
 
     [Fact]

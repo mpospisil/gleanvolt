@@ -157,6 +157,10 @@ public sealed record ControlActionResponse(
 /// <param name="ForecastAvailable">Whether a usable solar forecast is in hand.</param>
 /// <param name="ForecastRetrievedAt">When it was fetched.</param>
 /// <param name="WeatherConfigured">Whether a weather provider is configured at all.</param>
+/// <param name="WeatherSource">
+/// Where the weather comes from (#424): <c>notProvided</c>, <c>openWeather</c> or <c>external</c>. With
+/// <c>external</c>, <paramref name="WeatherConfigured"/> is true whether or not the provider is connected.
+/// </param>
 /// <param name="VehicleAvailable">Whether any vehicle reading has arrived.</param>
 /// <param name="VehicleAgeSeconds">How old that reading is.</param>
 /// <param name="VehicleStale">Whether it is past the configured maximum age — a dead feed rather than an old number.</param>
@@ -186,6 +190,7 @@ public sealed record HealthResponse(
     bool ForecastAvailable,
     DateTimeOffset? ForecastRetrievedAt,
     bool WeatherConfigured,
+    WeatherSource WeatherSource,
     bool VehicleAvailable,
     double? VehicleAgeSeconds,
     bool VehicleStale,

@@ -145,7 +145,7 @@ cat > ~/gleanvolt-site.json <<'EOF'
   "Controller": { "TimeZone": "Europe/Prague" },
   "ChargeControl": { "Forecast": { "BatteryCapacityKWh": 9 } },
   "Solcast": { "ApiKey": "…", "ResourceId": "…" },
-  "Weather": { "ApiKey": "…" }
+  "Weather": { "Source": "OpenWeather", "ApiKey": "…" }
 }
 EOF
 ```
@@ -153,6 +153,8 @@ EOF
 - `Driver`, `Host`, `Port`, `UnitId` come from the device's search result. If it has a `topology`
   (a Huawei inverter behind an EMMA), add `"Topology": "emma"` to the inverter.
 - `Id` is lowercase letters, digits, `-` or `_`.
+- `Weather:Source` is `OpenWeather` with a key, or `NotProvided` when the user doesn't want the weather.
+  `External` (a weather plugin) is for later, on Settings; don't set it here.
 - Leave out what the user didn't give: the `Solcast` and `Weather` blocks, the battery, the name. Never
   write an empty placeholder: an empty value means "remove the saved one".
 - Every key the file may hold: `/opt/gleanvolt/Gleanvolt.Worker setup --print-schema`. Anything else is

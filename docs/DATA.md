@@ -107,7 +107,7 @@ What the sky **did**, beside what the forecast expected. Needs the
 | `WeatherAtEnd` | The conditions when it closed. `null` while a session is open, and when that fetch failed — neither is an error |
 | `Sunrise` / `Sunset` | The daylight bounds of the day it **started** on |
 
-Each reading carries `TemperatureCelsius`, `PressureHpa`, `HumidityPercent`, `CloudsPercent`, `VisibilityMetres` (`null` when unreported), `Condition` (`Clear`, `Rain`, `Snow`…), `ConditionDescription` (`light rain`) and `ObservedAt` — the time the *provider* stamped the reading, since these are typically a few minutes old and a reading without its own timestamp can't be told from a live one.
+Each reading carries `TemperatureCelsius`, `PressureHpa`, `HumidityPercent`, `CloudsPercent`, `VisibilityMetres` (each `null` when unreported: OpenWeatherMap reports all but sometimes visibility, an [external provider](PROVIDERS.md#the-weather-kind) may leave any of them out, #424), `Condition` (`Clear`, `Rain`, `Snow`…), `ConditionDescription` (`light rain`) and `ObservedAt` — the time the *provider* stamped the reading, since these are typically a few minutes old and a reading without its own timestamp can't be told from a live one.
 
 Sunrise and sunset belong to the day the session **started** on. These are plain columns, so they can
 be grouped by in SQL.

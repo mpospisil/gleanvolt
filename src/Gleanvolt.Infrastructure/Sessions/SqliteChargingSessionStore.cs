@@ -712,10 +712,11 @@ public sealed class SqliteChargingSessionStore : IChargingSessionStore, IDisposa
             ? null
             : new WeatherObservation(
                 ObservedAt: Instant(reader.GetString(firstOrdinal)),
-                TemperatureCelsius: reader.GetDouble(firstOrdinal + 1),
-                PressurePascals: reader.GetDouble(firstOrdinal + 2) * 100, // the column is in hPa
-                HumidityPercent: reader.GetDouble(firstOrdinal + 3),
-                CloudsPercent: reader.GetDouble(firstOrdinal + 4),
+                // Null when the provider didn't report it (#424): an external provider may not.
+                TemperatureCelsius: NullableDouble(reader, firstOrdinal + 1),
+                PressurePascals: NullableDouble(reader, firstOrdinal + 2) * 100, // the column is in hPa
+                HumidityPercent: NullableDouble(reader, firstOrdinal + 3),
+                CloudsPercent: NullableDouble(reader, firstOrdinal + 4),
                 VisibilityMetres: NullableDouble(reader, firstOrdinal + 5),
                 Condition: reader.IsDBNull(firstOrdinal + 6) ? string.Empty : reader.GetString(firstOrdinal + 6),
                 ConditionDescription: reader.IsDBNull(firstOrdinal + 7) ? string.Empty : reader.GetString(firstOrdinal + 7));

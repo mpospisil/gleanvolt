@@ -102,11 +102,8 @@
   <data name="ModeChange" xml:space="preserve">
     <value>{0} → {1}</value>
   </data>
-  <data name="WeatherLine" xml:space="preserve">
-    <value>{0}, oblačnost {1}</value>
-  </data>
-  <data name="WeatherLineWithCondition" xml:space="preserve">
-    <value>{0}, {1}, oblačnost {2}</value>
+  <data name="WeatherClouds" xml:space="preserve">
+    <value>oblačnost {0}</value>
   </data>
   <data name="DayForecastLine" xml:space="preserve">
     <value>{0} (p10 {1} – p90 {2})</value>

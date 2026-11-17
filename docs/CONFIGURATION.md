@@ -214,6 +214,19 @@ Records **what the sky was doing** at the start and end of each charging session
 read against its day. Off unless configured: with no key and no
 [coordinates](#the-pv-system-the-pv-section), no weather call is ever made.
 
+**Where it comes from: `Weather:Source`** (#424), chosen under **Settings → Installation → Weather**, in
+the setup wizard's Extras step, or with `gleanvolt setup`. A choice applies at once and is saved in
+`pv-system.json` for the next start.
+
+| `Weather:Source` | |
+|---|---|
+| `NotProvided` | No weather. Sessions are recorded without it |
+| `OpenWeather` | Built in: OpenWeatherMap, with the key below |
+| `External` | An [external provider](PROVIDERS.md#the-weather-kind) publishes it, e.g. the OpenWeather plugin. OpenWeatherMap is not called; the key stays for when OpenWeather is chosen again |
+| unset | As before the choice existed: `OpenWeather` while a key is configured, `NotProvided` otherwise |
+
+Any case is accepted. A value that names none of these is logged and treated as unset.
+
 **Getting a key.** Register at [openweathermap.org](https://openweathermap.org/) — the free plan is
 enough — and copy the API key from your account's API keys page.
 
@@ -227,9 +240,12 @@ A key saved in the web UI wins over it; **Remove** goes back to it.
 
 ```jsonc
 "Weather": {
+  "Source": "OpenWeather",      // NotProvided, OpenWeather or External; unset follows the key
   "BaseUrl": "https://api.openweathermap.org/",
   "Units": "metric",            // °C and metres; changing this changes what the stored numbers mean
-  "RequestTimeout": "00:00:05"  // a slow provider is abandoned, never waited for
+  "RequestTimeout": "00:00:05", // a slow provider is abandoned, never waited for
+  "ExternalRequestTimeout": "00:00:15", // how long an external provider has to answer
+  "ExternalReadingMaxAge": "00:10:00"   // an external reading this recent is used without asking again
 }
 ```
 

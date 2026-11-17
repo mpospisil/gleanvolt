@@ -96,6 +96,11 @@ Your approximate home location leaves your network **only** if you configure Ope
 needs coordinates to return weather for the right place. Solcast is addressed by a site identifier you
 created on their side, so Gleanvolt does not send coordinates there.
 
+With `Weather:Source` = `External` (#424), Gleanvolt calls nobody for the weather: it gives the site's
+latitude, longitude and time zone to the connected weather provider, on your network, and that program
+decides what it sends where. The OpenWeather plugin sends its key and those coordinates to
+`api.openweathermap.org`, as the built-in does, and keeps the key in its own data directory.
+
 There is no other outbound connection. Gleanvolt does not check for updates, does not phone home, and
 contacts no host that is not in the table above.
 

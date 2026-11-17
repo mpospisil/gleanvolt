@@ -805,4 +805,61 @@
     <value>{0}</value>
     <comment>An external provider's status with no code (#415): {0} the provider's own words, in the viewer's language when it gave one.</comment>
   </data>
+  <data name="Weather_NoObservedAt" xml:space="preserve">
+    <value>The reading has no observation time.</value>
+  </data>
+  <data name="Weather_Future" xml:space="preserve">
+    <value>The weather was observed at {0} {1}, more than {2} ahead of Gleanvolt's clock.</value>
+    <comment>{0} a date, {1} a time, {2} a duration.</comment>
+  </data>
+  <data name="Weather_TooOld" xml:space="preserve">
+    <value>The weather was observed at {0} {1}, more than {2} ago.</value>
+    <comment>{0} a date, {1} a time, {2} a duration.</comment>
+  </data>
+  <data name="Weather_OlderThanHeld" xml:space="preserve">
+    <value>The reading is older than the reading Gleanvolt holds, observed {0} {1}.</value>
+    <comment>{0} a date, {1} a time.</comment>
+  </data>
+  <data name="Weather_Temperature" xml:space="preserve">
+    <value>The temperature is {0} °C; it must be −90 to 60 °C.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Weather_Pressure" xml:space="preserve">
+    <value>The pressure is {0} Pa; it must be 85 000 to 110 000 Pa (hPa × 100).</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Weather_Humidity" xml:space="preserve">
+    <value>The humidity is {0}; it must be 0 to 100 %.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Weather_Clouds" xml:space="preserve">
+    <value>The cloud cover is {0}; it must be 0 to 100 %.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Weather_Visibility" xml:space="preserve">
+    <value>The visibility is {0} m; it must be 0 to 100 km, in metres.</value>
+    <comment>{0} the number sent.</comment>
+  </data>
+  <data name="Weather_ConditionTooLong" xml:space="preserve">
+    <value>The condition is longer than {0} characters.</value>
+    <comment>{0} the limit.</comment>
+  </data>
+  <data name="Weather_DescriptionTooLong" xml:space="preserve">
+    <value>The condition description is longer than {0} characters.</value>
+    <comment>{0} the limit.</comment>
+  </data>
+  <data name="Weather_SunsetBeforeSunrise" xml:space="preserve">
+    <value>Sunset is not after sunrise.</value>
+  </data>
+  <data name="Weather_Empty" xml:space="preserve">
+    <value>The reading says nothing: it needs at least a temperature or a condition.</value>
+  </data>
+  <data name="Weather_UnknownSource" xml:space="preserve">
+    <value>{0} is not a weather source.</value>
+    <comment>{0} what was asked for.</comment>
+  </data>
+  <data name="Config_SetupBadWeatherSource" xml:space="preserve">
+    <value>Weather:Source ('{0}') must be NotProvided, OpenWeather or External.</value>
+    <comment>{0} the value given. The three names are configuration values and stay as they are.</comment>
+  </data>
 </root>

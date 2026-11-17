@@ -5,13 +5,14 @@ otherwise get from a built-in source. It runs in its own process, on the same ma
 one, connects to Gleanvolt's web port, and sends its data over a public, versioned contract. A
 provider that crashes or hangs can only make its own data stale. It cannot slow the controller down.
 
-There are three **kinds** of provider:
+There are four **kinds** of provider:
 
 | Kind | Replaces | Hub | Turned on by |
 | --- | --- | --- | --- |
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
 | `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
+| `weather` | OpenWeatherMap | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -55,6 +56,10 @@ A car provider uses `AddGleanvoltVehicleProvider<T>` and an `IVehicleSource` who
 connection is `VehicleProviderConnection`: call `PublishNowAsync` whenever the car reports something
 new, since Gleanvolt doesn't poll a car provider.
 
+A weather provider uses `AddGleanvoltWeatherProvider<T>` and an `IWeatherSource` whose
+`GetReadingAsync(WeatherSite site, …)` returns a `WeatherData`, or null when it has nothing (no key yet,
+the service down: say why with `ReportStatusAsync`). Its connection is `WeatherProviderConnection`.
+
 Three complete providers send fixed data:
 [`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
 [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
@@ -65,6 +70,11 @@ installation: Gleanvolt acts on what they send.
 [`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen) is a real one: a copy
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
+
+[`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424): a
+copy of the built-in OpenWeatherMap integration as a weather provider, with its own page for the key,
+which Gleanvolt shows under **Settings → Weather**. Its README lists what changed from the built-in.
+#425 replaces the built-in with it once #426 ships plugins; until then it is not part of the release.
 
 **Secrets.** A provider that holds an account (a password, a session's cookies, an API key) keeps it
 with `services.AddGleanvoltProviderSecrets(directory)` and `IProviderSecretStore` (#416): `Read`,
@@ -239,9 +249,11 @@ and the `Welcome` says which version the host speaks.
 | `tariff` | 1 | 3 |
 | `solar-forecast` | 1 | 3 |
 | `vehicle` | 1 | 3 |
+| `weather` | 1 | 0 |
 
 The minors grew with `pageUrl` in the hello (#410). Vehicle 1.2 added the charging session (#414).
-All three went up by one with the status's `code` and `messages` (#415).
+All three went up by one with the status's `code` and `messages` (#415). The weather kind (#424)
+started at 1.0 with all of these.
 
 ## The tariff kind
 
@@ -481,6 +493,76 @@ The feed's health, as the Overview, Health and **Car feed** show it:
 
 There is no fallback to another feed while the provider is away.
 
+## The weather kind
+
+Hub: `/providers/weather`. A program outside Gleanvolt reads the weather at the site and publishes it.
+It is the **current conditions**, not a forecast: Gleanvolt records them on a charging session when the
+session opens and when it closes, and nothing in charge control reads them. The OpenWeather plugin
+(`plugins/Gleanvolt.Plugin.OpenWeather`) is one, and the reference: OpenWeatherMap, with its own page
+for the key.
+
+**`Hello(hello)` → `WeatherWelcome`.** On top of the common fields, the welcome carries where the site
+is, as `site`, so the location is not configured twice. `latitude` and `longitude` are `null` when the
+owner has not entered them: report `not-set-up` rather than guess a place.
+
+```json
+"site": { "latitude": 50.08, "longitude": 14.42, "timeZone": "Europe/Prague" }
+```
+
+**`Publish(data)` → `PublishResult`.** Offers a reading. It is held if it passes every check. If any
+check fails, nothing changes, and the result lists the problems in English.
+
+```json
+{
+  "observedAt": "2026-11-17T08:50:00+00:00",
+  "inReplyTo": null,
+  "temperatureCelsius": 4.5,
+  "pressurePascals": 101300,
+  "humidityPercent": 80,
+  "cloudsPercent": 40,
+  "visibilityMetres": 10000,
+  "condition": "Clouds",
+  "conditionDescription": "scattered clouds",
+  "sunrise": "2026-11-17T06:05:00+00:00",
+  "sunset": "2026-11-17T15:12:00+00:00"
+}
+```
+
+- Everything but `observedAt` is optional. Absent means unknown, never zero: a session records a
+  missing cloud cover as unknown, not as a clear sky.
+- **SI units**: °C, Pa (hPa × 100), %, metres. There is no unit option.
+- `observedAt` is when the weather service observed it, not when the provider sent it.
+- `condition` and `conditionDescription` are in English, as the service gives them. Gleanvolt shows
+  them as they are.
+- `sunrise` and `sunset` are for the site's day.
+
+The data must meet these rules:
+
+- `observedAt` is no more than 5 minutes ahead of Gleanvolt's clock and no older than 3 hours.
+- It is not older than the reading Gleanvolt holds. The same time is accepted: a service that has
+  not observed again since is a valid answer.
+- Temperature −90 to 60 °C. Pressure 85 000 to 110 000 Pa. Humidity and cloud cover 0 to 100 %.
+  Visibility 0 to 100 km.
+- `condition` at most 100 characters, `conditionDescription` at most 200.
+- `sunset` is after `sunrise` when both are given.
+- At least a temperature or a condition.
+
+**`RefreshRequested(request)`**, from Gleanvolt, asks for the weather now: answer with `Publish`, with
+`inReplyTo` set to `request.id`, within 15 seconds (`Weather:ExternalRequestTimeout`). Gleanvolt asks
+when a charging session opens or closes, and when `GET /api/v1/forecast?weather=true` is called, unless
+it holds a reading it received in the last 10 minutes (`Weather:ExternalReadingMaxAge`). A provider that
+read the weather a few minutes ago may answer with that reading: the OpenWeather plugin reads
+OpenWeatherMap at most once every 10 minutes. A request with no answer shows on Settings.
+
+**`SiteChanged(site)`**, from Gleanvolt, says the site moved while connected. The location is read at
+start, so for now a change arrives as a new welcome after the restart.
+
+**What Gleanvolt does with it.** The reading is what a session is recorded with: `WeatherAtStart`,
+`WeatherAtEnd`, sunrise and sunset, on the Sessions pages and in `GET /api/v1/sessions`.
+`weatherSource` in `GET /api/v1/status` says `external`, and `weatherConfigured` is `true` whether or
+not the provider is connected. A provider that is disconnected, silent or refused means a session
+recorded without the weather; nothing falls back to OpenWeatherMap.
+
 ## The protocol, for a client in another language
 
 The hubs are [ASP.NET Core SignalR](https://learn.microsoft.com/aspnet/core/signalr/introduction)
@@ -510,5 +592,5 @@ The hello may carry `"pageUrl":"http://…"`; see [the provider's own page](#the
 A provider in another language checks the ticket itself, as described there.
 
 The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
-(solar forecast only), `VehicleChanged` and `ChargingSessionChanged` (vehicle only) and `Goodbye` on
+(solar forecast and weather), `VehicleChanged` and `ChargingSessionChanged` (vehicle only) and `Goodbye` on
 the provider.

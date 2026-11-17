@@ -1162,4 +1162,33 @@
   <data name="ExternalOpenPage" xml:space="preserve">
     <value>Open</value>
   </data>
+  <data name="WeatherSource" xml:space="preserve">
+    <value>Source</value>
+    <comment>Label above the choice of where the weather comes from: not provided, OpenWeather or External.</comment>
+  </data>
+  <data name="WeatherSource_NotProvided" xml:space="preserve">
+    <value>Not provided</value>
+    <comment>The weather source that records no weather.</comment>
+  </data>
+  <data name="WeatherSource_External" xml:space="preserve">
+    <value>External</value>
+    <comment>The weather source whose readings another program publishes to Gleanvolt.</comment>
+  </data>
+  <data name="WeatherSourceSaved" xml:space="preserve">
+    <value>Saved. Weather source: {0}.</value>
+    <comment>{0} the source now in use.</comment>
+  </data>
+  <data name="WeatherNotProvided" xml:space="preserve">
+    <value>Sessions are recorded without the weather. Choose OpenWeather or External to record it.</value>
+  </data>
+  <data name="WeatherExternalIntro" xml:space="preserve">
+    <value>The weather comes from the provider connected here, for example the OpenWeather plugin. Gleanvolt asks it when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather. OpenWeatherMap is not called while External is selected, and its key is kept for when you choose OpenWeather again.</value>
+  </data>
+  <data name="WeatherExternalWizard" xml:space="preserve">
+    <value>Connect the provider once setup is finished, on Settings: its address, the token and its own page are there.</value>
+  </data>
+  <data name="WeatherExternalPageIntro" xml:space="preserve">
+    <value>{0} has a page of its own, shown here: enter its settings, such as an API key, there. It comes from the provider itself, not from Gleanvolt.</value>
+    <comment>{0} the provider's name.</comment>
+  </data>
 </root>

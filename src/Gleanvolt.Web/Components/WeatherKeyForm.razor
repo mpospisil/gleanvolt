@@ -1,6 +1,9 @@
+@using Microsoft.Extensions.DependencyInjection
+@implements IDisposable
 @inject IWeatherKeyEditor Editor
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+@inject IServiceProvider Services
 
 @*
     The OpenWeatherMap key: the weather each charging session ran in. The same arrangement as the
@@ -13,6 +16,14 @@
     Secret instead, and only behind a login.
 *@
 
+@*
+    Above the key, the source (#424): no weather, OpenWeatherMap, or an external provider that publishes
+    over its hub, such as the OpenWeather plugin. Choosing one and saving applies at once, and the section
+    below follows the choice. While External is selected OpenWeatherMap is not called, and the key stays
+    for when it is chosen again. Saving a key also chooses OpenWeather, since that is what a key is for.
+    In the wizard no provider can connect yet, so External only records the choice there.
+*@
+
 <section class="controls pv-editor weather-editor" id="weather-editor">
     <div class="section-head tip-head">
         <h2>@SettingsText.Weather</h2>
@@ -22,6 +33,57 @@
         </InfoTip>
     </div>
 
+    @if (Sources is { } sources)
+    {
+        <div class="control">
+            <span class="control-label" id="weather-source-label">@SettingsText.WeatherSource</span>
+            <div class="seg" role="radiogroup" id="weather-source-choice" aria-labelledby="weather-source-label">
+                @foreach (var value in Enum.GetValues<WeatherSource>())
+                {
+                    var source = value;
+
+                    <label class="seg-opt">
+                        <input type="radio" name="weather-source" id="weather-source-@Id(source)" disabled="@(ReadOnly || _busy)"
+                               checked="@(source == _source)" @onchange="() => PickSource(source)" />
+                        @SourceLabel(source)
+                    </label>
+                }
+            </div>
+            @if (_source != sources.Selected)
+            {
+                <span class="hint" id="weather-source-unsaved">@Localized.Format(SettingsText.ForecastSourceUnsaved, SourceLabel(sources.Selected))</span>
+            }
+        </div>
+
+        @if (!ReadOnly && _source != sources.Selected)
+        {
+            <div class="control actions">
+                <button type="button" class="primary" id="weather-source-save" disabled="@_busy" @onclick="SaveSource">@SettingsText.SaveButton</button>
+                <button type="button" class="secondary" id="weather-source-cancel" disabled="@_busy" @onclick="CancelSource">@SettingsText.Cancel</button>
+            </div>
+        }
+    }
+
+    @if (Shown == WeatherSource.NotProvided)
+    {
+        <p class="muted" id="weather-not-provided">@SettingsText.WeatherNotProvided</p>
+    }
+    else if (Shown == WeatherSource.External)
+    {
+        @if (InWizard)
+        {
+            <p class="muted" id="weather-external-wizard">@SettingsText.WeatherExternalWizard</p>
+        }
+        else
+        {
+            <p class="muted" id="weather-external-intro">@SettingsText.WeatherExternalIntro</p>
+
+            <ExternalProviderPage Kind="weather" Intro="@SettingsText.WeatherExternalPageIntro" />
+            <ExternalProviderPanel Kind="weather" ReadOnly="ReadOnly" />
+        }
+    }
+    else
+    {
     <p class="muted">@SettingsText.WeatherIntro</p>
 
     <p class="muted" id="weather-status" role="status">
@@ -70,6 +132,8 @@
         </div>
     }
 
+    }
+
     @if (_errors.Count > 0)
     {
         <ul class="error" id="weather-errors">
@@ -94,10 +158,91 @@
     private bool _messageIsError;
     private bool _busy;
 
+    // The source picked on the page, saved or not; the saved one is Sources.Selected.
+    private WeatherSource _source = WeatherSource.OpenWeather;
+
+    /// <summary>In the setup wizard: no provider can connect yet, so External only records the choice.</summary>
+    [Parameter] public bool InWizard { get; set; }
+
+    // Optional: a host without the selection (a test host) offers OpenWeatherMap alone, as before #424.
+    // Resolved once, in OnInitialized: Dispose runs after the prerender's request scope is disposed.
+    private IWeatherSourceSelection? Sources { get; set; }
+
+    // What the section below the choice is about: the picked source, or OpenWeatherMap without a choice.
+    private WeatherSource Shown => Sources is null ? WeatherSource.OpenWeather : _source;
+
     // The password in force, not the startup one, so a password set on /setup unlocks this at once.
     private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
-    protected override void OnInitialized() => Reload();
+    protected override void OnInitialized()
+    {
+        Sources = Services.GetService<IWeatherSourceSelection>();
+        _source = Sources?.Selected ?? WeatherSource.OpenWeather;
+        Reload();
+
+        if (Sources is { } sources)
+        {
+            sources.Changed += OnSourceChanged;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Sources is { } sources)
+        {
+            sources.Changed -= OnSourceChanged;
+        }
+    }
+
+    // Another tab or the configuration switched it: follow, unless the owner is in the middle of a choice.
+    private void OnSourceChanged() => _ = InvokeAsync(() => StateHasChanged());
+
+    private void PickSource(WeatherSource source)
+    {
+        _source = source;
+        _message = null;
+        _errors = [];
+    }
+
+    private void CancelSource()
+    {
+        _source = Sources?.Selected ?? WeatherSource.OpenWeather;
+        _errors = [];
+    }
+
+    private void SaveSource()
+    {
+        if (ReadOnly || _busy || Sources is not { } sources)
+        {
+            return;
+        }
+
+        var result = sources.Select(_source);
+
+        if (!result.Saved)
+        {
+            _errors = Localized.Say(result.Problems, result.ProblemPhrases);
+            return;
+        }
+
+        _errors = [];
+        _messageIsError = false;
+        _message = Localized.Format(SettingsText.WeatherSourceSaved, SourceLabel(sources.Selected));
+    }
+
+    private static string SourceLabel(WeatherSource source) => source switch
+    {
+        WeatherSource.NotProvided => SettingsText.WeatherSource_NotProvided,
+        WeatherSource.OpenWeather => "OpenWeather",
+        _ => SettingsText.WeatherSource_External,
+    };
+
+    private static string Id(WeatherSource source) => source switch
+    {
+        WeatherSource.NotProvided => "not-provided",
+        WeatherSource.OpenWeather => "openweather",
+        _ => "external",
+    };
 
     private void Reload()
     {
@@ -134,6 +279,14 @@
             }
 
             Reload();
+
+            // A key is for OpenWeatherMap: saving one under that choice, not yet saved, makes it the source.
+            if (Sources is { } sources && sources.Selected != WeatherSource.OpenWeather
+                && sources.Select(WeatherSource.OpenWeather) is { Saved: false } refused)
+            {
+                _errors = Localized.Say(refused.Problems, refused.ProblemPhrases);
+            }
+
             _messageIsError = !result.Persisted || result.Check is WeatherKeyCheck.Refused;
             _message = !result.Persisted
                 ? SettingsText.InUseNotKept
