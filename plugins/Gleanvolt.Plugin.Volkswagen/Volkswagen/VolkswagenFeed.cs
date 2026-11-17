@@ -31,6 +31,7 @@ public sealed class VolkswagenFeed : IVehicleSource
 
     private volatile bool _blocked;
     private ProviderStatus? _status;
+    private Words? _statusWords;
     private VehicleReading? _last;
     private DateTimeOffset? _lastReadAt;
 
@@ -43,7 +44,7 @@ public sealed class VolkswagenFeed : IVehicleSource
         _logger = logger;
 
         // Another account or car: read nothing until the owner has signed in with it.
-        account.IdentityChanged += () => Stop("The account changed. Press Sign in on the plugin's page.");
+        account.IdentityChanged += () => Stop(PageText.AccountChanged);
     }
 
     /// <summary>Raised when the status or the last reading changed: for the page, and for Gleanvolt.</summary>
@@ -56,10 +57,14 @@ public sealed class VolkswagenFeed : IVehicleSource
     public DateTimeOffset? LastReadAt => _lastReadAt;
 
     /// <summary>What Gleanvolt is told about the plugin, or null before anything is known.</summary>
-    public ProviderStatus? Status =>
-        !_account.Current.IsComplete
-            ? new ProviderStatus(false, "The Volkswagen account is not entered yet. Enter it on the plugin's page, on Gleanvolt's Car page.", NeedsOwner: true)
-            : _status;
+    public ProviderStatus? Status => !_account.Current.IsComplete ? NotSetUp : _status;
+
+    /// <summary>Why it isn't reading, in both languages, for the page; null while it reads.</summary>
+    public Words? StatusWords => !_account.Current.IsComplete ? PageText.NotSetUp : _statusWords;
+
+    // Gleanvolt words the code itself (#415); the English is for a Gleanvolt older than vehicle 1.3.
+    private static readonly ProviderStatus NotSetUp = new(
+        false, PageText.NotSetUp.En, NeedsOwner: true, Code: ProviderStatusCodes.NotSetUp);
 
     /// <summary>Whether reads are stopped until the owner signs in.</summary>
     public bool IsBlocked => _blocked || !_account.Current.IsComplete;
@@ -113,15 +118,13 @@ public sealed class VolkswagenFeed : IVehicleSource
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 _logger.LogWarning("Asking volkswagen.de for the car failed ({Reason}).", ex.Message);
-                Stop($"volkswagen.de was unreachable ({ex.Message}).");
+                Stop(PageText.Unreachable.Format(ex.Message));
                 return _last;
             }
 
             if (reading is null)
             {
-                Stop(_client.AwaitingCode
-                    ? "volkswagen.de wants a one-time code."
-                    : "volkswagen.de did not answer with a reading.");
+                Stop(_client.AwaitingCode ? PageText.WantsCode : PageText.NoReading);
                 return _last;
             }
 
@@ -139,11 +142,21 @@ public sealed class VolkswagenFeed : IVehicleSource
     /// Stops reading until the owner signs in on the page, and tells Gleanvolt the owner is needed. Nothing
     /// is sent to VW until then.
     /// </summary>
-    public void Stop(string what)
+    public void Stop(Words what)
     {
         _blocked = true;
-        _logger.LogWarning("Stopped reading the car until the owner signs in on the plugin's page: {What}", what);
-        SetStatus(new ProviderStatus(false, $"{what} Sign in again on the plugin's page; the feed resumes once you have. The charge is unaffected.", NeedsOwner: true));
+        _logger.LogWarning("Stopped reading the car until the owner signs in on the plugin's page: {What}", what.En);
+
+        // needs-sign-in, which Gleanvolt words itself, with what happened in both languages (#415). The
+        // English sentence is what a Gleanvolt older than vehicle 1.3 shows.
+        var detail = what.Then(PageText.ResumesAfterSignIn);
+        _statusWords = detail;
+        SetStatus(new ProviderStatus(
+            false,
+            $"{what.En} Sign in again on the plugin's page; the feed resumes once you have. The charge is unaffected.",
+            NeedsOwner: true,
+            Code: ProviderStatusCodes.NeedsSignIn,
+            Messages: detail.All));
     }
 
     /// <summary>The owner signed in on the page: back on the clock, starting with a read now.</summary>
@@ -166,6 +179,11 @@ public sealed class VolkswagenFeed : IVehicleSource
 
     private void SetStatus(ProviderStatus status)
     {
+        if (status.Healthy)
+        {
+            _statusWords = null;
+        }
+
         _status = status;
         Changed?.Invoke();
     }

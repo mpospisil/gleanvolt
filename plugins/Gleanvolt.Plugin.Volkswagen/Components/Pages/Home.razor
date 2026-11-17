@@ -21,40 +21,35 @@
 <p id="status" class="@StatusClass">@StatusText</p>
 
 <section>
-    <h2>The last reading</h2>
+    <h2>@PageText.LastReading</h2>
 
     @if (Feed.LastReading is { } reading)
     {
         <dl id="reading">
-            <dt>State of charge</dt>
-            <dd id="reading-soc">@(reading.SocPercent is { } soc ? $"{soc:0} %" : "not said")</dd>
-            <dt>Range</dt>
-            <dd>@(reading.RangeMetres is { } metres ? $"{metres / 1000:0} km" : "not said")</dd>
-            <dt>Plug</dt>
+            <dt>@PageText.Soc</dt>
+            <dd id="reading-soc">@(reading.SocPercent is { } soc ? $"{soc:0} %" : PageText.NotSaid.ToString())</dd>
+            <dt>@PageText.Range</dt>
+            <dd>@(reading.RangeMetres is { } metres ? $"{metres / 1000:0} km" : PageText.NotSaid.ToString())</dd>
+            <dt>@PageText.Plug</dt>
             <dd id="reading-plug">@Plug(reading.PlugState)</dd>
-            <dt>Charging</dt>
-            <dd id="reading-charge">@Charge(reading.ChargeState)@(reading.ChargeTimeRemaining is { } left && reading.ChargeState == CarChargeState.Charging ? $", {left.TotalHours:0}:{left.Minutes:00} to go" : null)</dd>
-            <dt>Captured by the car</dt>
+            <dt>@PageText.Charging</dt>
+            <dd id="reading-charge">@Charge(reading.ChargeState)@(reading.ChargeTimeRemaining is { } left && reading.ChargeState == CarChargeState.Charging ? ", " + PageText.ToGo.Format($"{(int)left.TotalHours}:{left.Minutes:00}") : null)</dd>
+            <dt>@PageText.CapturedByCar</dt>
             <dd id="reading-captured">@Local(reading.CapturedAt)</dd>
-            <dt>Asked</dt>
-            <dd>@(Feed.LastReadAt is { } at ? Local(at) : "not yet")</dd>
+            <dt>@PageText.Asked</dt>
+            <dd>@(Feed.LastReadAt is { } at ? Local(at) : PageText.NotYet.ToString())</dd>
         </dl>
     }
     else
     {
-        <p class="muted" id="reading-none">No reading yet.</p>
+        <p class="muted" id="reading-none">@PageText.NoReadingYet</p>
     }
 </section>
 
 <section>
-    <h2>Sign in to volkswagen.de</h2>
+    <h2>@PageText.SignInHeading</h2>
 
-    <p class="muted">
-        A cold sign-in always makes Volkswagen email a one-time code. Once you have entered it, this
-        browser is remembered, so a restart of the plugin should not need another. If Volkswagen asks for a
-        code again, the plugin stops reading the car until you sign in here; it never signs in by itself on a
-        clock, which is how an account gets locked.
-    </p>
+    <p class="muted">@PageText.SignInIntro</p>
 
     @if (SignIn.State is { Message: { } message } state)
     {
@@ -63,37 +58,37 @@
 
     @if (SignIn.State.Step == SignInStep.CodeRequired)
     {
-        <label for="code">The code from the email</label>
+        <label for="code">@PageText.CodeLabel</label>
         <input id="code" autocomplete="one-time-code" inputmode="numeric" @bind="_code" @bind:event="oninput" />
         <div class="actions">
-            <button type="button" id="code-submit" disabled="@_busy" @onclick="SubmitCodeAsync">Submit the code</button>
+            <button type="button" id="code-submit" disabled="@_busy" @onclick="SubmitCodeAsync">@PageText.SubmitCode</button>
         </div>
     }
 
     <div class="actions">
         <button type="button" id="signin" class="@(SignIn.State.Step == SignInStep.CodeRequired ? "secondary" : null)"
-                disabled="@(_busy || !Account.Current.IsComplete)" @onclick="SignInAsync">Sign in</button>
-        <button type="button" id="forget" class="secondary" disabled="@_busy" @onclick="Forget">Forget the session</button>
+                disabled="@(_busy || !Account.Current.IsComplete)" @onclick="SignInAsync">@PageText.SignIn</button>
+        <button type="button" id="forget" class="secondary" disabled="@_busy" @onclick="Forget">@PageText.Forget</button>
     </div>
 
-    <p class="muted">@(Session.Exists ? "A signed-in session is saved." : "No session is saved.") Kept as @Session.Protection.</p>
+    <p class="muted">@(Session.Exists ? PageText.SessionSaved : PageText.NoSession) @PageText.KeptAs.Format(Session.Protection)</p>
 </section>
 
 <section>
-    <h2>The account</h2>
+    <h2>@PageText.AccountHeading</h2>
 
-    <label for="username">VW ID (email)</label>
+    <label for="username">@PageText.VwId</label>
     <input id="username" type="email" autocomplete="username" @bind="_username" />
 
-    <label for="password">Password</label>
+    <label for="password">@PageText.Password</label>
     <input id="password" type="password" autocomplete="current-password" @bind="_password"
-           placeholder="@(string.IsNullOrEmpty(Account.Current.Password) ? null : "Saved. Leave empty to keep it.")" />
+           placeholder="@(string.IsNullOrEmpty(Account.Current.Password) ? null : PageText.PasswordSaved.ToString())" />
 
-    <label for="vin">VIN</label>
+    <label for="vin">@PageText.Vin</label>
     <input id="vin" autocomplete="off" @bind="_vin" />
 
     <div class="actions">
-        <button type="button" id="account-save" class="secondary" disabled="@_busy" @onclick="SaveAccount">Save the account</button>
+        <button type="button" id="account-save" class="secondary" disabled="@_busy" @onclick="SaveAccount">@PageText.SaveAccount</button>
     </div>
 
     @if (_accountMessage is { } saved)
@@ -101,10 +96,7 @@
         <p id="account-message" class="@(_accountFailed ? "error" : "muted")">@saved</p>
     }
 
-    <p class="muted">
-        The password and the session are passwords to your Volkswagen account, which also unlocks and locates
-        the car. They are kept in the plugin's data directory, never logged and never shown here again.
-    </p>
+    <p class="muted">@PageText.AccountWarning</p>
 </section>
 
 @code {
@@ -112,7 +104,7 @@
     private string _password = string.Empty;
     private string _vin = string.Empty;
     private string _code = string.Empty;
-    private string? _accountMessage;
+    private Words? _accountMessage;
     private bool _accountFailed;
     private bool _busy;
 
@@ -136,10 +128,9 @@
 
     private string StatusText => Feed.Status switch
     {
-        null => "Waiting for the first reading.",
-        { Healthy: true } => "Reading the car.",
-        { Message: { } message } => message,
-        _ => "Not reading the car.",
+        null => PageText.StatusWaiting.ToString(),
+        { Healthy: true } => PageText.StatusReading.ToString(),
+        _ => (Feed.StatusWords ?? PageText.StatusNotReading).ToString(),
     };
 
     private string? StatusClass => Feed.Status switch
@@ -154,8 +145,8 @@
         _accountFailed = !Account.Save(_username, _password, _vin);
         _password = string.Empty;
         _accountMessage = _accountFailed
-            ? "The account could not be saved: the data directory is not writable."
-            : Account.Current.IsComplete ? "Saved. Press Sign in." : "Saved. The VW ID, the password and the VIN are all needed.";
+            ? PageText.AccountNotSaved
+            : Account.Current.IsComplete ? PageText.AccountSavedSignIn : PageText.AccountIncomplete;
     }
 
     private async Task SignInAsync()
@@ -196,7 +187,7 @@
     private void Forget()
     {
         SignIn.SignOut();
-        Feed.Stop("You forgot the session.");
+        Feed.Stop(PageText.Forgotten);
     }
 
     // Signed in: back on the clock, starting with a read now.
@@ -214,18 +205,18 @@
         return TimeZoneInfo.ConvertTime(at, zone).ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static string Plug(CarPlugState? state) => state switch
+    private static Words Plug(CarPlugState? state) => state switch
     {
-        CarPlugState.Connected => "connected",
-        CarPlugState.Disconnected => "disconnected",
-        _ => "not said",
+        CarPlugState.Connected => PageText.PlugConnected,
+        CarPlugState.Disconnected => PageText.PlugDisconnected,
+        _ => PageText.NotSaid,
     };
 
-    private static string Charge(CarChargeState? state) => state switch
+    private static Words Charge(CarChargeState? state) => state switch
     {
-        CarChargeState.Charging => "charging",
-        CarChargeState.Complete => "complete",
-        CarChargeState.Idle => "not charging",
-        _ => "not said",
+        CarChargeState.Charging => PageText.ChargeCharging,
+        CarChargeState.Complete => PageText.ChargeComplete,
+        CarChargeState.Idle => PageText.ChargeIdle,
+        _ => PageText.NotSaid,
     };
 }

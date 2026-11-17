@@ -30,7 +30,7 @@ public sealed class VwWebsiteSessionStore(DataFiles files)
     };
 
     /// <summary>What protects the saved session, for a sentence that has to mention it. Never the cookies.</summary>
-    public string Protection => files.Describe();
+    public Words Protection => files.Describe();
 
     /// <summary>Whether a saved session exists to try. Says nothing about whether it still works.</summary>
     public bool Exists => files.Read(FileName) is not null;

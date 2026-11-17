@@ -257,6 +257,67 @@ public sealed class ProviderFrameworkTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TheStatusCodeAndItsLanguagesAreKept()
+    {
+        await using var connection = await _host.ConnectAsync();
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+
+        await connection.InvokeAsync("ReportStatus", new ProviderStatus(
+            false, "The login expired. Sign in again.", NeedsOwner: true, Code: ProviderStatusCodes.NeedsSignIn,
+            Messages: new Dictionary<string, string> { ["en"] = "The login expired.", ["cs-CZ"] = "Přihlášení vypršelo." }));
+
+        var status = _host.Registry.Find(EchoHub.Kind)!;
+        Assert.Equal("needs-sign-in", status.StatusCode);
+        Assert.Equal("Přihlášení vypršelo.", status.StatusMessages!["cs-cz"]);
+        Assert.Equal("sign in on the provider's page. The login expired.", status.StatusSaid!.Value.English);
+    }
+
+    [Fact]
+    public async Task AStatusKeepsOnlyWhatReadsAsLanguagesAndSentences()
+    {
+        await using var connection = await _host.ConnectAsync();
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+        var messages = new Dictionary<string, string>
+        {
+            ["en"] = new string('a', 5000),
+            ["not a tag"] = "dropped",
+            ["cs"] = " ",
+        };
+
+        for (var i = 0; i < 40; i++)
+        {
+            messages[$"x{(char)('a' + i / 26)}{(char)('a' + i % 26)}"] = "kept until the limit";
+        }
+
+        await connection.InvokeAsync("ReportStatus", new ProviderStatus(false, Code: new string('c', 65), Messages: messages));
+
+        var status = _host.Registry.Find(EchoHub.Kind)!;
+        Assert.Null(status.StatusCode);
+        Assert.Equal(16, status.StatusMessages!.Count);
+        Assert.Equal(1000, status.StatusMessages["en"].Length);
+        Assert.False(status.StatusMessages.ContainsKey("not a tag"));
+        Assert.False(status.StatusMessages.ContainsKey("cs"));
+    }
+
+    [Fact]
+    public async Task ANewSessionForgetsTheLastStatus()
+    {
+        await using (var first = await _host.ConnectAsync())
+        {
+            await first.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+            await first.InvokeAsync("ReportStatus", new ProviderStatus(false, Code: ProviderStatusCodes.Unreachable,
+                Messages: new Dictionary<string, string> { ["en"] = "Down." }));
+        }
+
+        await using var second = await _host.ConnectAsync();
+        await second.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+
+        var status = _host.Registry.Find(EchoHub.Kind)!;
+        Assert.Null(status.StatusCode);
+        Assert.Null(status.StatusMessages);
+    }
+
+    [Fact]
     public async Task TheSdkSaysHelloAgainAfterTheConnectionDrops()
     {
         using var sdk = new EchoConnection(Options());

@@ -4,6 +4,60 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — A provider's status in the viewer's language, and the Volkswagen page in Czech (#415)
+
+**What.** A provider reports a status code, which Gleanvolt words in the viewer's language, plus its
+own detail per language. The Volkswagen plugin uses it, and its page follows the language Gleanvolt
+opens it with.
+
+**How.**
+- Contracts: `ProviderStatus(…, Code, Messages)`; `ProviderStatusCodes` (7 codes and `All`); minors
+  tariff 1.3, solar-forecast 1.3, vehicle 1.3.
+- Core: `PhraseArg.Translations` (value equality, JSON tag `translations`, `For(culture)`);
+  `ProviderStatusText.Of(code, messages, message)`; `ExternalProviderStatus.StatusCode`,
+  `StatusMessages` and `StatusSaid`.
+- Server: `ProviderSessions.Reported` keeps the code (≤ 64 characters) and the messages (language
+  tags only, ≤ 16, ≤ 1 000 characters each). A new session clears both.
+- Web: `Localized` renders `Translations`. `ServiceText` en and cs have `ProviderStatus_*` (the 7 codes,
+  `WithDetail`, `Detail`). `ExternalProviderPanel` shows `StatusSaid`.
+- Hosting: `ExternalVehicleFeed`'s health and owner action quote `StatusSaid` through `PhraseArg.Said`.
+- API: `ExternalProviderResponse.StatusCode` and `StatusText`; OpenAPI snapshot regenerated.
+- Plugin:
+  - `Words`, `PageText`: every page, sign-in and status text in en and cs.
+  - `VolkswagenFeed` reports `not-set-up` and `needs-sign-in` with the detail in both languages, and
+    `StatusWords` for its page.
+  - `UseRequestLocalization` (query, then cookie) plus a middleware that sets the culture cookie on a
+    ticketed request with `?culture=`.
+  - `<html lang>` follows the culture; `DataFiles.Describe` is bilingual too.
+- Tests:
+  - `ProviderStatusTextTests` (Core, 12): wording, precedence, fallback, equality and JSON.
+  - `ProviderFrameworkTests`: kept, bounded, cleared on a new session.
+  - `ExternalProviderPanelTests`: English and Czech rendering.
+  - `VolkswagenPluginTests`: the codes, the Czech texts, the page's status clearing.
+
+**Checked by hand.** The plugin ran locally and was opened with a ticket and `culture=cs`, then with
+`culture=en`. The prerender was Czech, with `<html lang="cs">` and the culture cookie set. In
+puppeteer, Blazor's WebSocket connected, and *Save the account* answered "Uloženo. Je potřeba VW ID,
+heslo i VIN." in Czech and the English sentence in English. The circuit runs in the cookie's culture.
+
+**Quirks.** Run from `bin/` in Production, the plugin serves no `_framework/blazor.web.js`: static web
+assets come from the publish output or, in Development, from the build's manifest. A local check
+needs `ASPNETCORE_ENVIRONMENT=Development` or a published folder. Razor encodes non-ASCII as entities,
+so a raw `curl | grep` for Czech text finds nothing.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/Handshake.cs`, `Tariff.cs`, `SolarForecast.cs`, `Vehicle.cs`;
+`src/Gleanvolt.Core/Models/Phrase.cs`, `ProviderStatusText.cs` (new), `Interfaces/IExternalProviders.cs`;
+`src/Gleanvolt.Providers.Server/ProviderSessions.cs`; `src/Gleanvolt.Hosting/Vehicles/External/ExternalVehicleFeed.cs`;
+`src/Gleanvolt.Api/Contracts/ProviderContracts.cs`; `src/Gleanvolt.Web/Components/Localized.cs`,
+`ExternalProviderPanel.razor`, `Resources/ServiceText.resx`, `ServiceText.cs.resx`;
+`src/Gleanvolt.Providers.Client/README.md`; `plugins/Gleanvolt.Plugin.Volkswagen/Program.cs`,
+`Components/App.razor`, `Components/Pages/Home.razor`, `Volkswagen/Words.cs` (new), `PageText.cs` (new),
+`VolkswagenFeed.cs`, `VwWebsiteSignIn.cs`, `VwWebsiteClient.cs`, `VwWebsiteSessionStore.cs`, `DataFiles.cs`,
+`README.md`; tests as above and `tests/Gleanvolt.Api.Tests/OpenApiContract.json`; `docs/PROVIDERS.md`,
+`docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
+
+---
+
 ## 2026-11-17 — The car provider is told when a charging session is open (vehicle 1.2, #414)
 
 **What.** Gleanvolt tells a car provider whether its charge control has a charging session open, so

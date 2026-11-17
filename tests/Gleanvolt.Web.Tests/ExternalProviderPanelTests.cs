@@ -90,6 +90,32 @@ public class ExternalProviderPanelTests : BunitContext
     }
 
     [Fact]
+    public void SaysTheStatusInTheViewersLanguage()
+    {
+        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", true, ExternalProviderState.Connected,
+            ProviderId: "spot", ProviderName: "Spot prices", Since: Now, Healthy: false, NeedsOwner: true,
+            StatusMessage: "The login expired. Sign in again on the provider's page.", StatusCode: "needs-sign-in",
+            StatusMessages: new Dictionary<string, string> { ["en"] = "The login expired.", ["cs"] = "Přihlášení vypršelo." }));
+
+        Assert.Equal("The provider needs you: sign in on the provider's page. The login expired.",
+            RenderPanel().Find("#external-tariff-unhealthy").TextContent.Trim());
+
+        var ui = System.Globalization.CultureInfo.CurrentUICulture;
+        System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("cs");
+
+        try
+        {
+            var czech = RenderPanel().Find("#external-tariff-unhealthy").TextContent.Trim();
+            Assert.Contains("přihlaste se na stránce poskytovatele. Přihlášení vypršelo.", czech);
+            Assert.DoesNotContain("expired", czech);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = ui;
+        }
+    }
+
+    [Fact]
     public void OffSaysHowToTurnItOn()
     {
         _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", true, ExternalProviderState.Off));

@@ -81,6 +81,7 @@ public static partial class Localized
         PhraseArg.Mode mode => ChargeModeTabs.Label(mode.Value),
         PhraseArg.Said said => Say(said.Phrase, said.English, zone),
         PhraseArg.List list => string.Join(SharedText.ListSeparator, list.Items.Select(item => Argument(item, zone))),
+        PhraseArg.Translations translations => translations.For(CultureInfo.CurrentUICulture),
         _ => arg.ToString(),
     };
 

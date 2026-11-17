@@ -2,7 +2,9 @@ using Gleanvolt.Plugin.Volkswagen.Components;
 using Gleanvolt.Plugin.Volkswagen.Volkswagen;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Vehicle;
+using Gleanvolt.Providers.Contracts;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Localization;
 
 // The volkswagen.de car feed as an external provider for Gleanvolt (#410): a copy of the built-in
 // Vehicle:Website feed, with its own page for the account, the sign-in and the emailed code, which
@@ -72,8 +74,31 @@ builder.Services.AddDataProtection()
 
 var app = builder.Build();
 
+// The page in the viewer's language (#415): Gleanvolt opens it with ?culture=en or cs. The query decides
+// the first request; a cookie carries it to Blazor's circuit, whose requests have no query of their own,
+// and to a reload in the frame.
+app.UseRequestLocalization(options =>
+{
+    options.SetDefaultCulture("en").AddSupportedCultures("en", "cs").AddSupportedUICultures("en", "cs");
+    options.RequestCultureProviders = [new QueryStringRequestCultureProvider(), new CookieRequestCultureProvider()];
+});
+
 // Everything after it answers only a browser Gleanvolt sent, with a ticket.
 app.UseGleanvoltProviderPage();
+
+app.Use((context, next) =>
+{
+    if (context.Request.Query.ContainsKey(ProviderPage.CultureParameter)
+        && context.Features.Get<IRequestCultureFeature>() is { } culture)
+    {
+        context.Response.Cookies.Append(
+            CookieRequestCultureProvider.DefaultCookieName,
+            CookieRequestCultureProvider.MakeCookieValue(culture.RequestCulture),
+            new CookieOptions { HttpOnly = true, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/" });
+    }
+
+    return next(context);
+});
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode(options =>

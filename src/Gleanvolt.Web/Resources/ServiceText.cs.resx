@@ -709,4 +709,31 @@
   <data name="Config_ExternalAndLiveFeed" xml:space="preserve">
     <value>Vehicle:External by byl zapnutý vedle živého zdroje výrobce. Instalace čte auto z jednoho zdroje.</value>
   </data>
+  <data name="ProviderStatus_NotSetUp" xml:space="preserve">
+    <value>účet ještě není zadaný; zadejte ho na stránce poskytovatele</value>
+  </data>
+  <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
+    <value>přihlaste se na stránce poskytovatele</value>
+  </data>
+  <data name="ProviderStatus_NeedsCode" xml:space="preserve">
+    <value>na stránce poskytovatele zadejte kód, který vám přišel</value>
+  </data>
+  <data name="ProviderStatus_Unreachable" xml:space="preserve">
+    <value>jeho služba není dostupná</value>
+  </data>
+  <data name="ProviderStatus_RateLimited" xml:space="preserve">
+    <value>jeho služba omezuje počet požadavků; zkusí to znovu později</value>
+  </data>
+  <data name="ProviderStatus_Refused" xml:space="preserve">
+    <value>jeho služba odmítla účet nebo požadavek</value>
+  </data>
+  <data name="ProviderStatus_ServiceChanged" xml:space="preserve">
+    <value>jeho služba odpověděla nečekaným způsobem; poskytovatel možná potřebuje aktualizaci</value>
+  </data>
+  <data name="ProviderStatus_WithDetail" xml:space="preserve">
+    <value>{0}. {1}</value>
+  </data>
+  <data name="ProviderStatus_Detail" xml:space="preserve">
+    <value>{0}</value>
+  </data>
 </root>

@@ -698,15 +698,15 @@
   </data>
   <data name="ExternalVehicle_ProviderNeedsOwner" xml:space="preserve">
     <value>{0} needs you: {1}</value>
-    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+    <comment>{0} the provider's name, {1} what it said: Gleanvolt's words for its status code and its detail (#415).</comment>
   </data>
   <data name="ExternalVehicle_NeedsOwner" xml:space="preserve">
     <value>{0} needs you: {1}</value>
-    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+    <comment>{0} the provider's name, {1} what it said: Gleanvolt's words for its status code and its detail (#415).</comment>
   </data>
   <data name="ExternalVehicle_ProviderUnhealthy" xml:space="preserve">
     <value>{0} cannot read the car: {1}</value>
-    <comment>{0} the provider's name, {1} what it said, in English.</comment>
+    <comment>{0} the provider's name, {1} what it said: Gleanvolt's words for its status code and its detail (#415).</comment>
   </data>
   <data name="ExternalVehicle_Refused" xml:space="preserve">
     <value>{0}'s last reading was refused; the problems are listed on the Car page.</value>
@@ -768,5 +768,41 @@
   </data>
   <data name="Config_ExternalAndLiveFeed" xml:space="preserve">
     <value>Vehicle:External would be on beside a manufacturer's live feed. An installation reads its car from one feed.</value>
+  </data>
+  <data name="ProviderStatus_NotSetUp" xml:space="preserve">
+    <value>the account isn't entered yet; enter it on the provider's page</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
+    <value>sign in on the provider's page</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_NeedsCode" xml:space="preserve">
+    <value>enter the code you were sent, on the provider's page</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_Unreachable" xml:space="preserve">
+    <value>its service can't be reached</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_RateLimited" xml:space="preserve">
+    <value>its service is limiting requests; it tries again later</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_Refused" xml:space="preserve">
+    <value>its service refused the account or the request</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_ServiceChanged" xml:space="preserve">
+    <value>its service answered in a way it doesn't understand; it may need an update</value>
+    <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
+  </data>
+  <data name="ProviderStatus_WithDetail" xml:space="preserve">
+    <value>{0}. {1}</value>
+    <comment>An external provider's status (#415): {0} Gleanvolt's words for its code, {1} the provider's own detail, in the viewer's language when it gave one.</comment>
+  </data>
+  <data name="ProviderStatus_Detail" xml:space="preserve">
+    <value>{0}</value>
+    <comment>An external provider's status with no code (#415): {0} the provider's own words, in the viewer's language when it gave one.</comment>
   </data>
 </root>

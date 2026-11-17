@@ -123,6 +123,42 @@ sent by email. For the car, that shows the sign-in band on every page and sets t
 **Car feed** entity to `NeedsOwner`. `needsOwner` was added in tariff and solar-forecast 1.1; an
 older host ignores it.
 
+**The status in the viewer's language** (#415; tariff, solar-forecast and vehicle 1.3). One status
+goes to every viewer, and Gleanvolt is in English or Czech for each of them, so a provider can't
+translate it for whoever reads it. Say what happened with a `code`, which Gleanvolt words itself, and
+put any detail in `messages`, one text per language:
+
+```json
+{
+  "healthy": false, "needsOwner": true,
+  "code": "needs-sign-in",
+  "messages": { "en": "The account changed.", "cs": "Účet se změnil." },
+  "message": "The account changed. Sign in again on the plugin's page."
+}
+```
+
+| `code` | What Gleanvolt says (English) |
+| --- | --- |
+| `not-set-up` | the account isn't entered yet; enter it on the provider's page |
+| `needs-sign-in` | sign in on the provider's page |
+| `needs-code` | enter the code you were sent, on the provider's page |
+| `unreachable` | its service can't be reached |
+| `rate-limited` | its service is limiting requests; it tries again later |
+| `refused` | its service refused the account or the request |
+| `service-changed` | its service answered in a way it doesn't understand; it may need an update |
+
+- **With a code Gleanvolt knows,** it shows its own words, then the detail from `messages` in the
+  viewer's language. `message` isn't shown: it is the whole English sentence for an older Gleanvolt,
+  which ignores `code` and `messages`.
+- **Without one** (or with a code Gleanvolt doesn't know), it shows `messages` in the viewer's
+  language, or `message`.
+- `messages` is keyed by language tag: `en`, `cs`, or with a region, `cs-CZ`. Gleanvolt picks the
+  viewer's tag, then its language, then `en`, then `message`. It keeps at most 16 languages of 1 000
+  characters each, and drops a key that isn't a language tag or an empty text, without refusing the
+  status.
+- `GET /api/v1/providers` returns `statusCode` and `statusText` (the English as Gleanvolt words it)
+  beside `statusMessage`.
+
 ## The provider's own page
 
 A provider that needs the owner (to sign in to an account, enter a code sent by email, pair a device)
@@ -190,11 +226,12 @@ and the `Welcome` says which version the host speaks.
 
 | Kind | Major | Minor |
 | --- | --- | --- |
-| `tariff` | 1 | 2 |
-| `solar-forecast` | 1 | 2 |
-| `vehicle` | 1 | 2 |
+| `tariff` | 1 | 3 |
+| `solar-forecast` | 1 | 3 |
+| `vehicle` | 1 | 3 |
 
 The minors grew with `pageUrl` in the hello (#410). Vehicle 1.2 added the charging session (#414).
+All three went up by one with the status's `code` and `messages` (#415).
 
 ## The tariff kind
 

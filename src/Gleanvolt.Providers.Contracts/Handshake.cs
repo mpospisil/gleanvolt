@@ -94,7 +94,15 @@ public sealed record RefreshRequest(RequestId Id, DateTimeOffset RequestedAt);
 
 /// <summary>
 /// How the provider itself is doing, beside its data: a source that failed, a login that expired. The
-/// owner sees it next to the session on Gleanvolt's Settings.
+/// owner sees it next to the session on Gleanvolt's Settings, and for the car on the Car page and in the
+/// band asking for the owner.
+///
+/// <para>One status goes to every viewer, each in their own language (#415). Say what happened with a
+/// <see cref="Code"/> from <see cref="ProviderStatusCodes"/>, which Gleanvolt words itself, and add any
+/// detail in <see cref="Messages"/>, one text per language. <see cref="Message"/> stays the whole
+/// sentence in English for a host older than the minor that added these. A host that knows the code
+/// shows its own words and <see cref="Messages"/>, not <see cref="Message"/>; without a code it shows
+/// <see cref="Messages"/> in the viewer's language, or <see cref="Message"/>.</para>
 /// </summary>
 /// <param name="Healthy">False when the provider cannot currently get its data.</param>
 /// <param name="Message">What to show the owner, in English, or null.</param>
@@ -103,7 +111,53 @@ public sealed record RefreshRequest(RequestId Id, DateTimeOffset RequestedAt);
 /// Gleanvolt then asks the owner to act rather than waiting for it to clear. Added in tariff 1.1 and
 /// solar-forecast 1.1, and in vehicle from 1.0; a host that does not know it reads the status as unhealthy.
 /// </param>
-public sealed record ProviderStatus(bool Healthy, string? Message = null, bool NeedsOwner = false);
+/// <param name="Code">
+/// What happened, from <see cref="ProviderStatusCodes"/>, or null. Gleanvolt words it in the viewer's
+/// language, with the detail after it. A code it doesn't know is shown as no code. Added in tariff 1.3,
+/// solar-forecast 1.3 and vehicle 1.3.
+/// </param>
+/// <param name="Messages">
+/// The detail in more languages: a language tag (<c>en</c>, <c>cs</c>, or with a region, <c>cs-CZ</c>)
+/// to the text. Gleanvolt shows the viewer's language, then <c>en</c>, then <see cref="Message"/>. At most
+/// 16 languages of 1 000 characters each; the rest is dropped. Added with <see cref="Code"/>.
+/// </param>
+public sealed record ProviderStatus(
+    bool Healthy,
+    string? Message = null,
+    bool NeedsOwner = false,
+    string? Code = null,
+    IReadOnlyDictionary<string, string>? Messages = null);
+
+/// <summary>
+/// The status codes Gleanvolt words itself, in every language it speaks (#415). Use the one that fits and
+/// put anything more specific in the detail.
+/// </summary>
+public static class ProviderStatusCodes
+{
+    /// <summary>The provider has no account or settings yet: the owner enters them on its page.</summary>
+    public const string NotSetUp = "not-set-up";
+
+    /// <summary>The owner has to sign in on the provider's page.</summary>
+    public const string NeedsSignIn = "needs-sign-in";
+
+    /// <summary>The service sent the owner a code (email, text message) to enter on the provider's page.</summary>
+    public const string NeedsCode = "needs-code";
+
+    /// <summary>The service can't be reached: no network, DNS, a timeout, a server error.</summary>
+    public const string Unreachable = "unreachable";
+
+    /// <summary>The service is limiting requests; the provider tries again later.</summary>
+    public const string RateLimited = "rate-limited";
+
+    /// <summary>The service refused the account or the request: a wrong password, a revoked key, consent withdrawn.</summary>
+    public const string Refused = "refused";
+
+    /// <summary>The service answered in a way the provider doesn't understand: it may need an update.</summary>
+    public const string ServiceChanged = "service-changed";
+
+    /// <summary>Every code, in the order above.</summary>
+    public static IReadOnlyList<string> All { get; } = [NotSetUp, NeedsSignIn, NeedsCode, Unreachable, RateLimited, Refused, ServiceChanged];
+}
 
 /// <summary>What the host made of published data.</summary>
 /// <param name="Accepted">Whether it was stored. Data with any problem is refused as a whole.</param>
