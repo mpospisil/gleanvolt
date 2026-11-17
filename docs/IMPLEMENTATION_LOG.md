@@ -4,6 +4,65 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — Shipping plugins with Gleanvolt, starting with OpenWeather (#426)
+
+**What.** The OpenWeather plugin from #424 is released with Gleanvolt: an image per release
+(`ghcr.io/mpospisil/gleanvolt-plugin-openweather`, amd64 and arm64, Gleanvolt's tags), a compose service
+under the `openweather` profile on the Pi and the NAS, a deploy that runs it when `.env` says
+`GLEANVOLT_PLUGINS=openweather`, and a self-contained zip per platform for Windows and Linux without
+Docker. A plugin on Gleanvolt's own machine now needs only the token: Gleanvolt sends the browser to its
+`localhost` page under the name the browser opened Gleanvolt at.
+
+**How.**
+- *Same-machine pages.* `ProviderHub` notes at the hello whether the provider connected from a loopback
+  address (IPv4, IPv6 and IPv4-mapped) and gave a loopback `pageUrl`. `ProviderSessions.PageAddress`
+  then swaps in the viewer's host, which `/external/<kind>/page` passes from `Request.Host`; the
+  page's port, path and query stay. The status keeps the `pageUrl` as sent. The SDK's
+  `ProviderPageFraming.Sources` gives `frame-ancestors` for it (`http://*:<port> https://*:<port>` for a
+  loopback endpoint), used by the OpenWeather and Volkswagen plugins.
+- *Image.* The plugin's Dockerfile takes `VERSION`/`SOURCE_REVISION` like the controller's, carries the
+  licence files and label. `.dockerignore` now keeps `plugins/*/data/` out, since that image copies its
+  whole project folder and a developer's `data/` holds the OpenWeatherMap key. `publish-image.yml` has a
+  `plugins` job (matrix of shipped plugins, one buildx push for both platforms, no manifest juggling
+  since there is no Windows image).
+- *Compose.* Host network, `Gleanvolt__Endpoint=http://localhost:${WEB_PORT}`, the token from
+  `GLEANVOLT_PROVIDER_TOKEN`, data in `plugins/openweather` (bind mount), `OPENWEATHER_API_KEY` falling
+  back to `WEATHER_API_KEY`. The NAS file has the same service, and `gleanvolt-init` chowns and
+  `chmod 700`s its directory.
+- *Deploy.* `_lib.sh` reads `.env` values with `env_value`, validates `GLEANVOLT_PLUGINS` against
+  `KNOWN_PLUGINS`, refuses without the token, prepares `plugins/<name>` through the existing throwaway
+  container (now `ensure_owned_dir`, which the logs/data loop became), adds the profiles, and after `up`
+  removes the container of a known plugin not on the list (`up` leaves an inactive profile's container
+  running, and `--remove-orphans` doesn't touch it).
+- *Release.* Each publish leg also publishes the plugin self-contained (single-file on Windows), zips it
+  under its own top-level folder and smoke-tests it from the zip with
+  `.github/scripts/smoke-test-plugin.py`: alive against an absent Gleanvolt, `403` without a ticket,
+  `200` and Blazor's script with one (the script signs a ticket the way `ProviderPage` does). The
+  release job requires the plugin zips and the notes mention them. `publish-winget.yml`'s asset regex
+  was anchored on `^gleanvolt-<version>-win-x64.zip`, which the plugin's zip would otherwise also match.
+
+**Quirks.**
+- `docker compose up` doesn't stop a service whose profile is no longer active, and `--remove-orphans`
+  doesn't count it as an orphan; hence the explicit removal.
+- Chrome accepts `http://*:8090` in `frame-ancestors` for an IP address, `localhost` and a name alike
+  (checked headless, with a wrong-port control that was refused).
+- A new GHCR package starts private; it needs making public once after the first push.
+
+**Verified.** All tests in Release (Providers 72, Hosting 1058, the rest unchanged). The plugin image built
+locally, ran as uid 1654 with `/data` at 700, and kept retrying an unreachable Gleanvolt. The smoke test
+passed against both a plain and a single-file self-contained linux-x64 publish. Manual build and link
+check pass. Not yet: the workflows on a real tag, and the Pi deploy with the profile and a recorded
+session.
+
+**Files.** `src/Gleanvolt.Providers.Server/{ProviderHub,ProviderSessions,ExternalProviderRegistry,ExternalProviderExtensions}.cs`,
+`src/Gleanvolt.Providers.Client/{ProviderPageMiddleware.cs,README.md}`, `plugins/Gleanvolt.Plugin.OpenWeather/{Dockerfile,Program.cs,README.md}`,
+`plugins/Gleanvolt.Plugin.Volkswagen/Program.cs`, `.dockerignore`, `.github/workflows/{publish-image,release,publish-winget}.yml`,
+`.github/scripts/smoke-test-plugin.py`, `deploy/{docker-compose.yml,docker-compose.nas.yml,_lib.sh,.env.example,README.md}`,
+`docs/{PROVIDERS,NAS,DECISIONS,IMPLEMENTATION_LOG}.md`, the manual's weather and installation pages (en, cs),
+`tests/Gleanvolt.Providers.Tests/{ProviderPageTests,TestHost}.cs`, `tests/Gleanvolt.Hosting.Tests/DockerfileTests.cs`.
+
+---
+
 ## 2026-11-17 — The weather as an external provider, and the OpenWeather plugin (#424)
 
 **What.** The weather a charging session is recorded with can come from nowhere, from the built-in

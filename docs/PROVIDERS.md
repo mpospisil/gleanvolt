@@ -74,7 +74,7 @@ of the built-in volkswagen.de feed, run as a plugin, with its own page for the a
 [`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424): a
 copy of the built-in OpenWeatherMap integration as a weather provider, with its own page for the key,
 which Gleanvolt shows under **Settings → Weather**. Its README lists what changed from the built-in.
-#425 replaces the built-in with it once #426 ships plugins; until then it is not part of the release.
+It is the first [shipped plugin](#shipped-plugins) (#426); #425 then replaces the built-in with it.
 
 **Secrets.** A provider that holds an account (a password, a session's cookies, an API key) keeps it
 with `services.AddGleanvoltProviderSecrets(directory)` and `IProviderSecretStore` (#416): `Read`,
@@ -190,6 +190,14 @@ carries no sign-in messages: the page is entirely the provider's.
 `invalid`. `pageUrl` was added in tariff 1.2, solar-forecast 1.2 and vehicle 1.1; an older host
 ignores it, and an older provider simply doesn't send it.
 
+**A provider on Gleanvolt's machine** (#426) may say `http://localhost:<port>/`. When it connected
+from a loopback address and its `pageUrl` is a loopback one, Gleanvolt's redirect puts the host name the
+browser opened Gleanvolt at in its place, keeping the page's port: `http://gleanvolt.local:8096/` for a
+browser at `http://gleanvolt.local:8090`, `http://192.168.2.7:8096/` for one at the address. `localhost`
+would be the viewer's own machine, and another name than Gleanvolt's makes the page a third party in the
+frame (below). The status and the API still show the `pageUrl` as sent. A loopback `pageUrl` from a
+provider on another machine is left alone: it means that machine's browser.
+
 **Where the owner sees it.** For a car provider, the Car page shows the page in a frame under
 *External provider*, with an **Open in a new tab** link beside it. **Settings → External providers**
 links to the page of each kind's provider that has one. Both show only while the provider is
@@ -230,13 +238,44 @@ forms keeps the ticket in the form's address, since the cookie may not be sent i
 - A page that wants to be framed must not send `X-Frame-Options` or a `frame-ancestors` that leaves
   Gleanvolt out, and another port is another origin. ASP.NET Core sends both by default on a Blazor
   page (`SAMEORIGIN` from antiforgery, `frame-ancestors 'self'` from interactive server rendering):
-  the Volkswagen plugin turns off the first and sets the second to Gleanvolt's address. Gleanvolt
-  sends no CSP today, so nothing on its side blocks the frame.
+  the Volkswagen and OpenWeather plugins turn off the first and set the second with the SDK's
+  `ProviderPageFraming.Sources(endpoint, configured)`: Gleanvolt's address, or, for a Gleanvolt on the
+  same machine, any host on Gleanvolt's port (`http://*:8090 https://*:8090`), since the browser may
+  reach it by any name. Gleanvolt sends no CSP today, so nothing on its side blocks the frame.
 - In the frame, a page on another host than Gleanvolt's (another IP address, not just another port)
   is a third party. Browsers send its cookie there only over HTTPS (`SameSite=None; Secure`), so an
   `http` page on another host works for as long as the ticket does, and a reload inside the frame may
   answer `403`. Opening the page again from Gleanvolt brings a new ticket. On the same host, the
   cookie works over `http`.
+
+## Shipped plugins
+
+Most plugins are built with the solution and run by hand. A **shipped** one is released with Gleanvolt
+(#426), from the same tag and with the same version, wherever Gleanvolt is:
+
+| Plugin | Kind | Image | Compose profile | Port | Release zip |
+| --- | --- | --- | --- | --- | --- |
+| [OpenWeather](../plugins/Gleanvolt.Plugin.OpenWeather) | weather | `ghcr.io/mpospisil/gleanvolt-plugin-openweather` | `openweather` | 8096 | `gleanvolt-plugin-openweather-<version>-<rid>.zip` |
+
+Only a plugin that replaces or stands in for a built-in ships. The samples and the Volkswagen copy don't.
+
+- **In Docker** (the Pi, a NAS): the image, `linux/amd64` and `linux/arm64`, with Gleanvolt's tags:
+  `latest`, the version, `sha-…`. The compose files run it under the plugin's profile, on the host's
+  network beside the controller, with `Gleanvolt:Endpoint` at `http://localhost:<WEB_PORT>`, its data in
+  `plugins/<name>` (uid 1654, mode 700), and the provider token from `GLEANVOLT_PROVIDER_TOKEN` in `.env`.
+  On the Pi, `GLEANVOLT_PLUGINS=openweather` in `.env` turns it on; both deploy scripts pull and recreate
+  it with the controller, from the same `IMAGE_TAG`, and remove a plugin taken off the list. See
+  [deploy/README.md](../deploy/README.md#shipped-plugins).
+- **Without Docker** (Windows, a Linux host with the `.deb` or a zip): a self-contained zip per platform,
+  attached to the release beside Gleanvolt's, started by hand like Gleanvolt's zip. Not in the winget
+  package and not in the `.deb`. The plugin's README has the commands.
+
+Its page needs no address of its own in either case: the plugin says `http://localhost:<port>/`, and
+Gleanvolt sends the browser to it under the name the browser opened Gleanvolt at
+([above](#the-providers-own-page)).
+
+A plugin's contract is Gleanvolt's at that version, so the two are upgraded together: an image pinned
+to another version than the controller's may be refused at the hello (`contract-major`).
 
 ## Contract versions
 

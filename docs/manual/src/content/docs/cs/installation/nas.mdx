@@ -38,7 +38,7 @@ místech:
 | Nastavení | Změňte na | Proč |
 |---|---|---|
 | `TZ:` `${TZ:-Europe/Prague}` | Své časové pásmo za `:-`, např. `${TZ:-Europe/Berlin}` | Aby den v historii začínal o vaší půlnoci |
-| `${GLEANVOLT_DIR:-.}` (čtyři místa) | Složku na NAS, kde to postup pro váš NAS níže uvádí | Kam si Gleanvolt ukládá nastavení a historii |
+| `${GLEANVOLT_DIR:-.}` (všechna místa) | Složku na NAS, kde to postup pro váš NAS níže uvádí | Kam si Gleanvolt ukládá nastavení a historii |
 | `${WEB_PORT:-8090}` | Jiné číslo, jen pokud port 8090 na NAS už něco používá | Port, na kterém Gleanvolt otevřete |
 
 ## Instalace
@@ -151,3 +151,8 @@ v pořádku: při každém spuštění jednou proběhne, předá Gleanvoltu jeho
   oprávnění NAS povolte zápis uživateli 1654.
 - **Zastavit službu v Gleanvoltu ho nezastaví.** Zásada restartu se změnila na „always“. Vraťte ji na
   `on-failure`.
+
+## Plugin pro počasí
+
+Jak zaznamenávat počasí z OpenWeatherMap přes plugin OpenWeather, který vychází s každou verzí, popisuje
+[Spuštění pluginu OpenWeather](../../setting-up/weather/#spuštění-pluginu-openweather).

@@ -19,6 +19,11 @@ public class DockerfileTests
 
     public static TheoryData<string> Dockerfiles => new("Dockerfile", "Dockerfile.windows");
 
+    /// <summary>Every image build that stamps a version: Gleanvolt's two and each shipped plugin's (#426).</summary>
+    public static TheoryData<string> VersionedDockerfiles => new("Dockerfile", "Dockerfile.windows", ShippedPluginDockerfile);
+
+    private const string ShippedPluginDockerfile = "plugins/Gleanvolt.Plugin.OpenWeather/Dockerfile";
+
     [Theory]
     [MemberData(nameof(Dockerfiles))]
     public void EveryProjectUnderSrcIsRestoredByTheImageBuild(string dockerfile)
@@ -46,7 +51,7 @@ public class DockerfileTests
     /// startup and to Home Assistant, which is a lie that no build error would ever surface.
     /// </summary>
     [Theory]
-    [MemberData(nameof(Dockerfiles))]
+    [MemberData(nameof(VersionedDockerfiles))]
     public void TheImageBuildsDefaultVersionIsTheProductLineInDirectoryBuildProps(string dockerfile)
     {
         var expected = $"ARG VERSION={MajorMinorVersion()}.0-dev";
@@ -66,6 +71,21 @@ public class DockerfileTests
 
         Assert.True(match.Success, "Directory.Build.props no longer declares <MajorMinorVersion>.");
         return match.Groups[1].Value.Trim();
+    }
+
+    /// <summary>
+    /// A plugin image copies its whole project folder (#426), and a plugin run from the repository keeps
+    /// its secrets in <c>data/</c> there: an OpenWeatherMap key, a car account. They must stay out of
+    /// the build context, as the worker's own <c>data/</c> does.
+    /// </summary>
+    [Fact]
+    public void APluginsDataDirectoryNeverReachesAnImage()
+    {
+        var ignored = File.ReadAllLines(Path.Combine(Root, ".dockerignore")).Select(line => line.Trim());
+
+        Assert.Contains("plugins/*/data/", ignored);
+        Assert.Contains("COPY plugins/Gleanvolt.Plugin.OpenWeather/ plugins/Gleanvolt.Plugin.OpenWeather/",
+            File.ReadAllText(Path.Combine(Root, ShippedPluginDockerfile)), StringComparison.Ordinal);
     }
 
     [Fact]

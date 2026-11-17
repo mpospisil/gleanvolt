@@ -8,9 +8,9 @@ Gleanvolt shows under **Settings → Weather**.
 Gleanvolt records the weather on each charging session, when it opens and when it closes. Nothing in
 charge control reads it.
 
-> **Not for the image or the release, yet.** The plugin is built with the solution so a change that
-> breaks it is seen. It is not in Gleanvolt's container image or the release packages until #426 ships
-> plugins. Then #425 removes the built-in, and this plugin becomes the way to get OpenWeatherMap's
+> **Shipped with Gleanvolt** (#426): an image, `ghcr.io/mpospisil/gleanvolt-plugin-openweather`, and a
+> zip per platform on each release, from the same tag as Gleanvolt. Run the same version as your
+> Gleanvolt. #425 then removes the built-in, and this plugin becomes the way to get OpenWeatherMap's
 > weather.
 
 > **One source at a time.** Run it with **External** chosen under **Weather** on Gleanvolt's Settings.
@@ -89,34 +89,53 @@ On a different host than Gleanvolt, over `http`, the browser won't keep the page
 Gleanvolt's frame, so a reload inside the frame may answer 403: open Settings again. See
 [the known limits](../../docs/PROVIDERS.md#the-providers-own-page).
 
-## Run it on the Pi
+## Run it from a release
 
-Its own container, outside the compose stack and `deploy.sh`, which never touch it until #426. Build the
-image for the Pi on a development machine, from the repository root, and copy it over:
+Choose **External** under **Weather** on Gleanvolt's Settings, and have the token from **Settings →
+External providers** at hand. On the same machine as Gleanvolt, the token is all it needs: it connects to
+`http://localhost:8090`, says its page is `http://localhost:8096/`, and Gleanvolt sends the browser there
+under the name the browser opened Gleanvolt at (#426). On another machine, set `Gleanvolt:Endpoint`,
+`Gleanvolt:PageUrl` and `Gleanvolt:FrameAncestors` as in [Run it while developing](#run-it-while-developing).
+
+**The Pi, with the deploy scripts.** `GLEANVOLT_PLUGINS=openweather` and `GLEANVOLT_PROVIDER_TOKEN` in
+`/opt/gleanvolt/.env`, then deploy: see
+[Shipped plugins](../../deploy/README.md#shipped-plugins). The compose service is
+`gleanvolt-plugin-openweather` under the `openweather` profile, its data in `plugins/openweather`.
+
+**Docker, by hand:**
 
 ```sh
-docker build --platform linux/arm64 -f plugins/Gleanvolt.Plugin.OpenWeather/Dockerfile -t gleanvolt-openweather .
-docker save gleanvolt-openweather | ssh martin@192.168.2.7 docker load
-```
+sudo mkdir -p /opt/gleanvolt/plugins/openweather
+sudo chown 1654:1654 /opt/gleanvolt/plugins/openweather && sudo chmod 700 /opt/gleanvolt/plugins/openweather
 
-Then on the Pi:
-
-```sh
-docker run -d --name gleanvolt-openweather --restart unless-stopped \
-  -p 8096:8096 \
-  -v gleanvolt-openweather:/data \
-  -e Gleanvolt__Endpoint=http://192.168.2.7:8090 \
+docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
+  --network host \
   -e Gleanvolt__Token=gvp_... \
-  -e Gleanvolt__PageUrl=http://gleanvolt.local:8096/ \
-  -e "Gleanvolt__FrameAncestors=http://gleanvolt.local:8090 http://192.168.2.7:8090" \
-  gleanvolt-openweather
+  -v /opt/gleanvolt/plugins/openweather:/data \
+  ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
 ```
-
-Use the **name you open Gleanvolt at** in the browser for both of the last two, as for the Volkswagen
-plugin; see its README for why. `Gleanvolt:Endpoint` stays an address the container can resolve.
 
 The image runs as the non-root `app` user (UID 1654), and `/data` is that user's alone. A named volume
 takes those permissions over; a bind-mounted host directory must be `chown 1654:1654` and `chmod 700`.
+On a bridge network instead of the host's, publish the port (`-p 8096:8096`) and set the three addresses
+above, since the plugin no longer shares Gleanvolt's `localhost`.
+
+**Windows, or Linux without Docker.** Download `gleanvolt-plugin-openweather-<version>-<platform>.zip`
+from the release, unzip it, and start it in its folder, which then holds `data/`:
+
+```powershell
+.\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+```
+
+It listens on `localhost` only, so its page opens in a browser on that machine. For another device, add
+`--Urls=http://0.0.0.0:8096` and allow it through the firewall. It stops when its terminal closes.
+
+**Building the image yourself**, for a change not yet released:
+
+```sh
+docker build --platform linux/arm64 -f plugins/Gleanvolt.Plugin.OpenWeather/Dockerfile -t gleanvolt-plugin-openweather .
+docker save gleanvolt-plugin-openweather | ssh martin@192.168.2.7 docker load
+```
 
 ## What changed from the built-in, and why
 

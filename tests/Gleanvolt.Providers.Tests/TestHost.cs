@@ -1,3 +1,4 @@
+using System.Net;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Providers.Contracts;
@@ -51,18 +52,20 @@ internal sealed class TestHost : IAsyncDisposable
         Token = await Registry.CreateTokenAsync();
     }
 
-    public void Configure(Microsoft.AspNetCore.Http.Connections.Client.HttpConnectionOptions options, string? token = null)
+    public void Configure(Microsoft.AspNetCore.Http.Connections.Client.HttpConnectionOptions options, string? token = null, IPAddress? from = null)
     {
-        options.HttpMessageHandlerFactory = _ => Server.CreateHandler();
+        options.HttpMessageHandlerFactory = _ => from is null
+            ? Server.CreateHandler()
+            : Server.CreateHandler(context => context.Connection.RemoteIpAddress = from);
         options.Transports = HttpTransportType.LongPolling;
         options.AccessTokenProvider = () => Task.FromResult<string?>(token ?? Token);
     }
 
-    /// <summary>A raw connection, for checking the protocol itself.</summary>
-    public async Task<HubConnection> ConnectAsync(string? token = null)
+    /// <summary>A raw connection, for checking the protocol itself; <paramref name="from"/> is the address it comes from.</summary>
+    public async Task<HubConnection> ConnectAsync(string? token = null, IPAddress? from = null)
     {
         var connection = new HubConnectionBuilder()
-            .WithUrl(new Uri(Server.BaseAddress, EchoHub.Path), options => Configure(options, token))
+            .WithUrl(new Uri(Server.BaseAddress, EchoHub.Path), options => Configure(options, token, from))
             .Build();
         await connection.StartAsync();
         return connection;

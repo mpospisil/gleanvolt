@@ -16,6 +16,9 @@ name: Publish image
 #   :<version>-linux-arm64       single platform, for pinning
 #   :<version>-linux-amd64
 #   :<version>-nanoserver-ltsc2022
+#
+# Each shipped plugin (#426) is its own image, ghcr.io/mpospisil/gleanvolt-plugin-<name>, with the same
+# public tags as a Linux-only manifest list (amd64, arm64). See the plugins job.
 
 on:
   push:
@@ -143,6 +146,75 @@ jobs:
           # create` then rejects the per-arch tag outright: "is a manifest list", and specifying a
           # manifest list as a source is not supported. Off, so each per-arch tag stays a plain
           # single-platform image.
+          provenance: false
+
+  # The plugins shipped with Gleanvolt (#426), each its own image beside the controller's, from the same
+  # commit and with the same tags, so IMAGE_TAG pins a controller and its plugins together. Linux only:
+  # on Windows a plugin is a release zip (release.yml), not a container. Both platforms in one buildx
+  # push, which makes the multi-platform list itself -- there is no Windows image to annotate, so the
+  # controller's per-platform jobs and manifest job would buy nothing here. The Dockerfile cross-compiles
+  # and its runtime stage has no RUN, so this needs no QEMU either.
+  plugins:
+    needs: version
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plugin: openweather
+            dockerfile: plugins/Gleanvolt.Plugin.OpenWeather/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The controller's public tags, on ghcr.io/<owner>/gleanvolt-plugin-<name>.
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gleanvolt-plugin-${{ matrix.plugin }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
+          # Stated, as for the controller: GitHub's detection does not recognise PolyForm.
+          labels: |
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.version.outputs.assembly }}
+            SOURCE_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=plugin-${{ matrix.plugin }}
+          cache-to: type=gha,mode=max,scope=plugin-${{ matrix.plugin }}
+          # A plain two-platform list, as `docker pull` on the Pi expects; see the controller's job.
           provenance: false
 
   windows:

@@ -4,6 +4,61 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — Shipping plugins: an image and a compose profile each, a zip for Windows (#426)
+
+**Found.** Plugins were built with the solution and run by hand; none was in an image, a release or
+`deploy.sh` (#410's "no way to ship a plugin"). #425 removes the built-in OpenWeather, so the plugin from
+#424 has to reach installations the way Gleanvolt does. Two things made a plugin beside Gleanvolt awkward
+to configure: its page needed an address the owner's browser reaches (`Gleanvolt:PageUrl`), and a list of
+the names Gleanvolt is opened at (`Gleanvolt:FrameAncestors`), both of which the person deploying had to
+know and type.
+
+**Decided.**
+- **Which plugins ship:** only those that replace or stand in for a built-in. OpenWeather first. The
+  samples and the Volkswagen copy don't, until chosen.
+- **Container (Pi, NAS):** one image per shipped plugin, `ghcr.io/mpospisil/gleanvolt-plugin-<name>`,
+  from `publish-image.yml`'s new `plugins` job, `linux/amd64` and `linux/arm64` in one buildx push, with
+  the controller's public tags (`latest`, the version, `major.minor`, `major`, branch, `sha-…`). No
+  Windows container: the controller's Nano Server image stays alone.
+- **Compose:** a service per plugin under a profile named after it (`openweather`), on the host's network
+  like the controller, `Gleanvolt:Endpoint` at `http://localhost:<WEB_PORT>`, its data a bind mount
+  `plugins/<name>` (uid 1654, mode 700), the token from `GLEANVOLT_PROVIDER_TOKEN` in `.env`, and
+  `OPENWEATHER_API_KEY` falling back to `WEATHER_API_KEY` so the built-in's key carries over. The NAS
+  compose file has it too, under the same profile, and `gleanvolt-init` prepares its directory.
+- **Turning one on:** `GLEANVOLT_PLUGINS=openweather` in the Pi's `.env`, read by both deploy scripts,
+  which add the profiles to their own, refuse to start a plugin without the token (it would stop and
+  restart every few seconds), prepare its directory, pull and recreate it with the controller from the
+  same `IMAGE_TAG`, and remove a plugin taken off the list. A list in `.env`, not a third script: which
+  plugins run is a property of the installation, not of a deploy.
+- **A plugin on Gleanvolt's machine needs no addresses.** When a provider connects from a loopback
+  address and its `pageUrl` is loopback, Gleanvolt's `/external/<kind>/page` redirect puts in the host
+  name the browser used for Gleanvolt, keeping the page's port. The page is then same-site with Gleanvolt
+  whatever the browser called it, so its cookie works over `http`. The SDK's
+  `ProviderPageFraming.Sources` makes the matching `frame-ancestors`: any host on Gleanvolt's port when
+  the endpoint is loopback. Checked in Chrome: `http://*:8090` lets the page be framed from
+  `127.0.0.1`, `localhost` and the LAN address, and refuses another port.
+- **Windows, and Linux without Docker:** a self-contained zip per RID on each release,
+  `gleanvolt-plugin-openweather-<version>-<rid>.zip`, smoke-tested from the zip like Gleanvolt's
+  (it starts, waits for an absent Gleanvolt, serves its page behind the ticket and Blazor's script).
+  Started by hand, not by Gleanvolt; not in the winget package, whose asset pattern is now anchored on
+  `gleanvolt-<version>` so the plugin's zip can't become a second installer; not in the `.deb`.
+- **Version coupling:** the plugin is released with Gleanvolt from the same tag and should run at the
+  same version. Independent plugin releases are a later step.
+
+**Consequences accepted.**
+- A new token on Settings disconnects the plugin until `.env` has it and a deploy has run. Gleanvolt
+  doesn't hand the token to a plugin it didn't start.
+- Any page on port 8090 of any host may frame a plugin page on the same machine. The ticket still decides
+  who sees it, and the page acts only for a browser Gleanvolt sent.
+- On Windows the owner runs a second program in a second terminal, and its page is reachable only from
+  that PC unless it is started listening on all interfaces. Gleanvolt starting shipped plugins itself
+  would remove both, and is not done.
+- A new GHCR package is private until made public once in its package settings.
+- `docker compose up` on a NAS UI that ignores profiles starts the plugin with everything else; without a
+  token it restarts in a loop. The NAS docs say to set the token or delete the service.
+
+---
+
 ## 2026-11-17 — The weather as an external provider: a pulled kind, chosen on Settings (#424)
 
 **Found.** The weather was the last data source only one built-in service could supply:

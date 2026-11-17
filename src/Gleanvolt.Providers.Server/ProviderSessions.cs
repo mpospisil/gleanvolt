@@ -25,6 +25,7 @@ public sealed partial class ProviderSessions
     private HubCallerContext? _context;
     private int _contractMinor;
     private PendingRequest? _pending;
+    private bool _pageOnThisHost;
 
     internal ProviderSessions(ProviderKind kind, bool hasToken, TimeProvider time, ILogger logger, Func<string, IClientProxy> client)
     {
@@ -87,7 +88,7 @@ public sealed partial class ProviderSessions
     /// Attaches <paramref name="context"/> as the session, or says why not: null when attached, else a
     /// refusal code. Replaces the same provider's older connection, which is told goodbye and closed.
     /// </summary>
-    internal (string? Code, string? Reason) Attach(HubCallerContext context, ProviderHello hello)
+    internal (string? Code, string? Reason) Attach(HubCallerContext context, ProviderHello hello, bool pageOnThisHost = false)
     {
         HubCallerContext? replaced = null;
 
@@ -107,6 +108,7 @@ public sealed partial class ProviderSessions
             _context = context;
             _contractMinor = hello.ContractMinor;
             _pending = null;
+            _pageOnThisHost = pageOnThisHost && hello.PageUrl is not null;
             _status = _status with
             {
                 State = ExternalProviderState.Connected,
@@ -133,6 +135,28 @@ public sealed partial class ProviderSessions
         _logger.LogInformation("The {Kind} provider {Provider} ({Name} {Version}) is connected.", Kind.Name, hello.ProviderId, hello.Name, hello.Version);
         Changed?.Invoke();
         return (null, null);
+    }
+
+    /// <summary>
+    /// Where the browser opens the attached provider's page (#426). A provider on Gleanvolt's own machine
+    /// that gave a loopback page (<c>http://localhost:8096/</c>, a plugin container on the host's network)
+    /// is opened at <paramref name="viewerHost"/>, the name the browser reached Gleanvolt at, on the
+    /// page's own port: <c>localhost</c> would be the viewer's machine, and another name than Gleanvolt's
+    /// makes the page a third party in the frame. Any other page as the provider gave it.
+    /// </summary>
+    internal Uri? PageAddress(string? viewerHost)
+    {
+        lock (_gate)
+        {
+            if (_status.PageUrl is not { } page)
+            {
+                return null;
+            }
+
+            return _pageOnThisHost && !string.IsNullOrEmpty(viewerHost)
+                ? new UriBuilder(page) { Host = viewerHost }.Uri
+                : page;
+        }
     }
 
     /// <summary>The connection is gone. Nothing changes unless it is the attached one.</summary>

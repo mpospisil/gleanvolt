@@ -90,11 +90,15 @@ public sealed class ExternalProviderRegistry : IExternalProviders
 
     /// <summary>
     /// The address of <paramref name="kind"/>'s page with a fresh ticket and the viewer's theme and culture
-    /// (#410), or null when no provider with a page is attached or there is no token.
+    /// (#410), or null when no provider with a page is attached or there is no token. A provider on this
+    /// machine with a loopback page is given <paramref name="viewerHost"/>, the name the browser opened
+    /// Gleanvolt at (#426).
     /// </summary>
-    public Uri? PageLink(string kind, string theme, string culture, DateTimeOffset now)
+    public Uri? PageLink(string kind, string theme, string culture, DateTimeOffset now, string? viewerHost = null)
     {
-        if (Find(kind) is not { HasPage: true, PageUrl: { } page, ProviderId: { } providerId } || Tokens.Read() is not { } token)
+        if (Find(kind) is not { HasPage: true, ProviderId: { } providerId }
+            || For(kind)?.PageAddress(viewerHost) is not { } page
+            || Tokens.Read() is not { } token)
         {
             return null;
         }

@@ -29,7 +29,9 @@ A provider that needs its owner (to sign in, enter an emailed code, pair a devic
 its own, which Gleanvolt shows: set `options.PageUrl`, and guard the page with
 `app.UseGleanvoltProviderPage()`, which admits only a browser Gleanvolt sent with a short-lived
 ticket. The SDK references the ASP.NET Core shared framework for that, so a provider runs on the
-ASP.NET Core runtime.
+ASP.NET Core runtime. `ProviderPageFraming.Sources(endpoint, configured)` gives the page's
+`frame-ancestors`. On Gleanvolt's own machine, a `PageUrl` of `http://localhost:<port>/` is enough:
+Gleanvolt sends the browser to it under the name the browser opened Gleanvolt at.
 
 A car provider that reads the car on a clock can follow Gleanvolt's charging session:
 `VehicleProviderConnection.Session` says whether one is open, and `SessionChanged` is raised when that

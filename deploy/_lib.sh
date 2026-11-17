@@ -20,6 +20,63 @@ ssh_pi() { ssh $SSH_OPTS "$PI_HOST" "$@"; }
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
+# The plugins released with Gleanvolt (#426): each is the compose service gleanvolt-plugin-<name> under
+# the profile <name>, with its data in plugins/<name>. GLEANVOLT_PLUGINS in the Pi's .env picks which run.
+KNOWN_PLUGINS="openweather"
+
+# env_value <name>: the value the Pi's .env gives <name> on its last line for it, without quotes or a
+# trailing comment. Empty when it is not set.
+env_value() {
+    ssh_pi "grep -E '^$1=' '$REMOTE_DIR/.env' 2>/dev/null | tail -n 1" \
+        | cut -d= -f2- \
+        | sed -e 's/[[:space:]]#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//' \
+        || true
+}
+
+# ensure_owned_dir <subdir> <mode> <consequence>
+#
+# Makes sure $REMOTE_DIR/<subdir> exists and uid 1654, the images' non-root user, can write to it,
+# setting <mode> (e.g. 700) when it has to be created or fixed. The ssh user cannot chown to another
+# uid -- but the Docker daemon is root, and Docker is already a hard requirement here, so a throwaway
+# container does what sudo would. Idempotent: it changes something only when the check says so.
+ensure_owned_dir() {
+    local subdir=$1 mode=$2 consequence=$3
+
+    if ssh_pi "sh -s '$REMOTE_DIR/$subdir'" <<'REMOTE_CHECK'; then
+    dir=$1
+    [ -d "$dir" ] || exit 1
+    # Writable by uid 1654 means: owned by it, or world-writable. The ssh user's own -w test would
+    # answer a different question entirely, since it is not the user that runs inside the container.
+    [ "$(stat -c %u "$dir")" = 1654 ] && exit 0
+    perms=$(stat -c %a "$dir")
+    case ${perms#${perms%?}} in 2|3|6|7) exit 0 ;; esac
+    exit 1
+REMOTE_CHECK
+        return 0
+    fi
+
+    local chmod_step="" chmod_hint=""
+    if [ -n "$mode" ]; then
+        chmod_step=" && chmod $mode /target/$subdir"
+        chmod_hint="
+    sudo chmod $mode $REMOTE_DIR/$subdir"
+    fi
+
+    say "Preparing $REMOTE_DIR/$subdir (owned by uid 1654)"
+    if ! ssh_pi "docker run --rm -v '$REMOTE_DIR:/target' alpine \
+            sh -c 'mkdir -p /target/$subdir && chown -R 1654:1654 /target/$subdir$chmod_step'"; then
+        cat >&2 <<EOF
+error: could not prepare $REMOTE_DIR/$subdir, and it is needed: $consequence.
+
+Create it by hand on the Pi:
+
+    sudo mkdir -p $REMOTE_DIR/$subdir
+    sudo chown -R 1654:1654 $REMOTE_DIR/$subdir$chmod_hint
+EOF
+        exit 1
+    fi
+}
+
 # deploy_stack <profiles-csv>
 #
 # profiles-csv is passed to Compose as COMPOSE_PROFILES, e.g. "mosquitto,homeassistant" or "" for the
@@ -51,43 +108,8 @@ EOF
     #
     # SQLite puts its -wal and -shm next to the database, so for data/ it really is the directory
     # that has to be writable, not just the file.
-    for subdir in logs data; do
-        case $subdir in
-            logs) consequence="its log files would go nowhere" ;;
-            data) consequence="no charging session would ever be recorded" ;;
-        esac
-
-        if ssh_pi "sh -s '$REMOTE_DIR/$subdir'" <<'REMOTE_CHECK'; then
-    dir=$1
-    [ -d "$dir" ] || exit 1
-    # Writable by uid 1654 means: owned by it, or world-writable. The ssh user's own -w test would
-    # answer a different question entirely, since it is not the user that runs inside the container.
-    [ "$(stat -c %u "$dir")" = 1654 ] && exit 0
-    perms=$(stat -c %a "$dir")
-    case ${perms#${perms%?}} in 2|3|6|7) exit 0 ;; esac
-    exit 1
-REMOTE_CHECK
-            continue
-        fi
-
-        # Create it, and hand it to uid 1654. The ssh user cannot chown to another uid -- but the
-        # Docker daemon is root, and Docker is already a hard requirement here, so a throwaway
-        # container does what sudo would. Idempotent: this runs only when the check above said
-        # something was wrong.
-        say "Preparing $REMOTE_DIR/$subdir (owned by uid 1654)"
-        if ! ssh_pi "docker run --rm -v '$REMOTE_DIR:/target' alpine \
-                sh -c 'mkdir -p /target/$subdir && chown -R 1654:1654 /target/$subdir'"; then
-            cat >&2 <<EOF
-error: could not prepare $REMOTE_DIR/$subdir, and the controller needs it: $consequence.
-
-Create it by hand on the Pi:
-
-    sudo mkdir -p $REMOTE_DIR/$subdir
-    sudo chown -R 1654:1654 $REMOTE_DIR/$subdir
-EOF
-            exit 1
-        fi
-    done
+    ensure_owned_dir logs "" "its log files would go nowhere"
+    ensure_owned_dir data "" "no charging session would ever be recorded"
 
     case ",$profiles," in
         *,mosquitto,*)
@@ -143,6 +165,45 @@ EOF
         exit 1
     fi
 
+    # The shipped plugins to run (#426), from .env, on top of the script's own profiles: under either
+    # script, since a plugin belongs to the controller's side of the stack, not Home Assistant's.
+    local plugin enabled=""
+    for plugin in $(env_value GLEANVOLT_PLUGINS | tr ',' ' '); do
+        case " $KNOWN_PLUGINS " in
+            *" $plugin "*) enabled="$enabled $plugin" ;;
+            *)
+                cat >&2 <<EOF
+error: GLEANVOLT_PLUGINS in $REMOTE_DIR/.env names "$plugin", which is not a shipped plugin.
+
+The shipped plugins are: $KNOWN_PLUGINS
+EOF
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -n "$enabled" ]; then
+        # Without the token a plugin stops at start, and its restart policy brings it back to stop
+        # again, every few seconds, for as long as nobody looks.
+        if [ -z "$(env_value GLEANVOLT_PROVIDER_TOKEN)" ]; then
+            cat >&2 <<EOF
+error: GLEANVOLT_PLUGINS in $REMOTE_DIR/.env asks for:$enabled -- but GLEANVOLT_PROVIDER_TOKEN is not set.
+
+Every plugin signs in to Gleanvolt with the provider token. Make one in the web UI, under Settings ->
+External providers -> Make a token, put it in .env on the Pi, and deploy again:
+
+    ssh $PI_HOST 'nano $REMOTE_DIR/.env'      # GLEANVOLT_PROVIDER_TOKEN=gvp_...
+EOF
+            exit 1
+        fi
+
+        for plugin in $enabled; do
+            # 700, as the image makes it: the directory holds the plugin's secrets, such as an API key.
+            ensure_owned_dir "plugins/$plugin" 700 "the $plugin plugin could not keep its settings"
+            profiles="${profiles:+$profiles,}$plugin"
+        done
+    fi
+
     # tar over ssh rather than rsync: one less thing that has to be installed on a Lite image. This
     # directory mirrors $REMOTE_DIR exactly, so the paths need no rewriting on the way over.
     # mosquitto.conf travels unconditionally too, even for a controller-only deploy: which files
@@ -182,6 +243,21 @@ EOF
     say "Starting"
     ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose up -d --remove-orphans"
 
+    # A plugin taken off GLEANVOLT_PLUGINS is stopped and removed: `up` leaves a service whose profile
+    # is not active alone, and --remove-orphans only removes services the file no longer has. Its data
+    # directory stays, so putting it back on the list brings it back as it was.
+    for plugin in $KNOWN_PLUGINS; do
+        case " $enabled " in
+            *" $plugin "*) ;;
+            *)
+                if ssh_pi "docker container inspect gleanvolt-plugin-$plugin >/dev/null 2>&1"; then
+                    say "Removing the $plugin plugin (not in GLEANVOLT_PLUGINS)"
+                    ssh_pi "docker rm -f gleanvolt-plugin-$plugin >/dev/null"
+                fi
+                ;;
+        esac
+    done
+
     say "Status"
     ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' docker compose ps"
 
@@ -204,6 +280,11 @@ EOF
         next="$next
     Web UI: http://gleanvolt.local:${web_port:-8090}  (or http://${PI_HOST#*@}:${web_port:-8090})"
     fi
+
+    for plugin in $enabled; do
+        next="$next
+    The $plugin plugin: its page is on Settings in the web UI; logs: docker compose logs -f gleanvolt-plugin-$plugin"
+    done
 
     cat <<EOF
 

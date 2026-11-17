@@ -49,7 +49,11 @@ jobs:
           # appx -- and this release carries none of those: it carries three zips and ten NuGet
           # packages. Without this the action would find no assets at all, or, worse, find the Linux
           # ones.
-          installers-regex: '-win-x64\.zip$'
+          #
+          # Anchored on Gleanvolt's own name and a version: a shipped plugin's zip (#426),
+          # gleanvolt-plugin-openweather-<version>-win-x64.zip, also ends in -win-x64.zip and must not
+          # become a second installer of this package.
+          installers-regex: '^gleanvolt-[0-9][0-9A-Za-z.+-]*-win-x64\.zip$'
 
           # On a dispatch there is no release event to read the tag from, so the input supplies it.
           release-tag: ${{ inputs.tag || github.event.release.tag_name }}

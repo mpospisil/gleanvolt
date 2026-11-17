@@ -3,7 +3,7 @@ title: Weather
 description: Record the weather during each charge, from OpenWeatherMap or from a provider of your own.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 Gleanvolt can record what the sky was doing at the start and the end of each charge: the temperature,
 the clouds, sunrise and sunset. You see it in each charge's history, which helps explain a charge that
@@ -66,8 +66,8 @@ OpenWeather plugin is one: it reads OpenWeatherMap the same way, with its own pa
 
 1. Under **Weather**, choose **External** and press **Save**.
 
-2. Start the provider with Gleanvolt's address and the provider token from
-   **Settings → External providers**. The plugin's README says how.
+2. Start the provider with the provider token from **Settings → External providers**. For the
+   OpenWeather plugin, see [Run the OpenWeather plugin](#run-the-openweather-plugin) below.
 
 3. Once it connects, its own page appears under **Weather**. For the OpenWeather plugin, enter the
    OpenWeatherMap key there and press **Save and check**.
@@ -78,3 +78,93 @@ OpenWeather plugin is one: it reads OpenWeatherMap the same way, with its own pa
 
 Gleanvolt asks the provider when a charge starts and when it ends. If the provider isn't running or
 doesn't answer within 15 seconds, that charge is recorded without the weather. Nothing else is affected.
+
+## Run the OpenWeather plugin
+
+The OpenWeather plugin comes with each Gleanvolt release, as a container and as a download. Use the same
+version as your Gleanvolt. Each way starts with the token:
+
+<Steps>
+
+1. Open **Settings → External providers** and press **Make a token**. Copy the token, which starts with
+   `gvp_`.
+
+2. Start the plugin, as shown for your installation below.
+
+3. Under **Weather**, choose **External** and press **Save**. The plugin's page appears there once it
+   connects.
+
+</Steps>
+
+<Tabs syncKey="install">
+<TabItem label="Docker">
+
+Make the plugin's folder, then start it next to Gleanvolt. Put your token in place of `gvp_...`:
+
+```bash
+sudo mkdir -p /opt/gleanvolt/plugins/openweather
+sudo chown 1654:1654 /opt/gleanvolt/plugins/openweather
+sudo chmod 700 /opt/gleanvolt/plugins/openweather
+
+docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
+  --network host \
+  -e Gleanvolt__Token=gvp_... \
+  -v /opt/gleanvolt/plugins/openweather:/data \
+  ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
+```
+
+The folder keeps the OpenWeatherMap key, and only the plugin can read it. If Gleanvolt isn't on port
+8090, add `-e Gleanvolt__Endpoint=http://localhost:<its port>`.
+
+</TabItem>
+<TabItem label="NAS">
+
+The file you pasted from [NAS](../../installation/nas/) already has the plugin, switched off. In your
+NAS's container app, edit the project's file:
+
+1. Find `${GLEANVOLT_PROVIDER_TOKEN:-}` and put your token after `:-`, so it reads
+   `${GLEANVOLT_PROVIDER_TOKEN:-gvp_...}`.
+2. Delete the line `profiles: ["openweather"]`.
+3. Save, and start the project again.
+
+</TabItem>
+<TabItem label="Windows">
+
+<Steps>
+
+1. From the [releases page](https://github.com/mpospisil/gleanvolt/releases), download
+   `gleanvolt-plugin-openweather-<version>-win-x64.zip` for your Gleanvolt's version, and unzip it.
+
+2. In a new terminal, go to the `gleanvolt-plugin-openweather` folder and start it with your token:
+
+   ```powershell
+   .\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+   ```
+
+</Steps>
+
+Like Gleanvolt, it stops when its window closes. Its page opens only in a browser on this PC. To open it
+from your phone too, add `--Urls=http://0.0.0.0:8096` and allow it through the firewall on private
+networks.
+
+</TabItem>
+<TabItem label="Linux">
+
+With the `.deb`, Docker is the simplest way: see the **Docker** tab. Or download
+`gleanvolt-plugin-openweather-<version>-linux-arm64.zip` (`linux-x64` on a PC), unzip it, and in its
+folder:
+
+```bash
+./Gleanvolt.Plugin.OpenWeather --Gleanvolt:Token=gvp_... --Urls=http://0.0.0.0:8096
+```
+
+It runs until you stop it, and doesn't start with the computer.
+
+</TabItem>
+</Tabs>
+
+The plugin's page uses port 8096 on the same computer as Gleanvolt. Gleanvolt opens it under the same
+name you opened Gleanvolt at, so `gleanvolt.local` and the address both work.
+
+If you make a new token, the plugin disconnects until you start it with the new one.
+

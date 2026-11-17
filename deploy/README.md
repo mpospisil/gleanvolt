@@ -42,7 +42,8 @@ install — see [Setting it up](#setting-it-up).
 ## What you deploy
 
 One container, `gleanvolt-controller`. It uses about 75 MB of memory and needs 8 GB of disk, so any
-64-bit Pi runs it.
+64-bit Pi runs it. [Shipped plugins](#shipped-plugins), such as the weather, are a container each beside
+it, when you turn them on.
 
 > **Home Assistant?** Don't run the Home Assistant container on a low-powered Pi (less than 2 GB of
 > RAM). To connect Gleanvolt to a Home Assistant you already run, or to run Home Assistant and a broker
@@ -271,9 +272,12 @@ build.
 2. Copies `docker-compose.yml` from your **local** `deploy/` directory, overwriting the Pi's copy
    (with `deploy.sh`, `mosquitto.conf` too).
 3. With `deploy.sh` only, seeds Home Assistant's config files if they don't already exist.
-4. `docker compose pull`.
-5. `docker compose up -d --remove-orphans` — recreates only what actually changed.
-6. Prints the container status and the URLs.
+4. Reads `GLEANVOLT_PLUGINS` from `.env` and adds those [plugins](#shipped-plugins), after checking the
+   token is there and preparing their directories.
+5. `docker compose pull`.
+6. `docker compose up -d --remove-orphans` — recreates only what actually changed.
+7. Removes the container of a plugin taken off `GLEANVOLT_PLUGINS`.
+8. Prints the container status and the URLs.
 
 ### What survives an update
 
@@ -287,6 +291,7 @@ Everything that is state, because none of it lives inside a container:
 | `data/pv-system.json`, `data/tariff.json` | what was saved on **Settings**: the installation's edits, and the [grid tariff](../docs/CONFIGURATION.md#grid-tariff-the-tariff-section) |
 | `data/vw-website-session.json`, `data/skoda-api-key.json` | **the car's sign-in.** Bearer-equivalent, mode `0600` — see below |
 | `logs/` | the controller's own log files |
+| `plugins/<name>/` | a [shipped plugin](#shipped-plugins)'s settings, such as the OpenWeatherMap key |
 
 `docker compose down` and even `docker rm -f` on any single container are equally safe, for the same
 reason. What *is* overwritten every deploy is the compose files — so edit those
@@ -520,6 +525,45 @@ docker compose logs gleanvolt-controller | grep "starting\."
 See [Updating a running deployment](#updating-a-running-deployment) for upgrades, rollbacks and
 pinning.
 
+## Shipped plugins
+
+Some features come as plugins released with Gleanvolt (#426): their own container, from the same release,
+connected to the controller as an [external provider](../docs/PROVIDERS.md#shipped-plugins). One so far:
+
+| Plugin | What it does | Port |
+|---|---|---|
+| `openweather` | the weather each charging session ran in, from OpenWeatherMap | 8096 |
+
+To run one:
+
+1. In the web UI, under **Settings → External providers**, press **Make a token** and copy it.
+2. On the Pi, in `/opt/gleanvolt/.env`:
+
+   ```bash
+   GLEANVOLT_PLUGINS=openweather
+   GLEANVOLT_PROVIDER_TOKEN=gvp_...
+   ```
+
+3. Deploy as usual, with either script. It adds the plugin's compose profile, prepares
+   `/opt/gleanvolt/plugins/openweather` (uid 1654, mode 700), and pulls and starts the plugin with the
+   controller, from the same `IMAGE_TAG`.
+4. Under **Settings → Weather**, choose **External** and save. The plugin's page appears there: enter the
+   OpenWeatherMap key and press **Save and check**. `WEATHER_API_KEY` in `.env`, if you have one, is its
+   key until then.
+
+The page is the Pi's own port 8096, which your browser opens inside Settings; Gleanvolt sends it there
+under the name you opened Gleanvolt at, so `gleanvolt.local` and the address both work. `OPENWEATHER_PORT`
+moves it.
+
+Take a plugin off `GLEANVOLT_PLUGINS` and the next deploy removes its container. Its directory under
+`plugins/` stays, so putting it back brings it back as it was.
+
+A new token on Settings disconnects every plugin until `.env` has it too and you deploy again. Without
+the token the deploy refuses to start a plugin, which would otherwise stop and restart every few seconds.
+
+The deploy scripts check what they can. When you run `docker compose` on the Pi yourself, the profile is
+yours to add: `COMPOSE_PROFILES=openweather docker compose up -d`.
+
 ## Which image you get
 
 Everything publishes to one package, `ghcr.io/mpospisil/gleanvolt`, as a multi-platform
@@ -536,6 +580,9 @@ platform-specific to configure, and `IMAGE_TAG` never needs a suffix.
 | `1.0.0-nanoserver-ltsc2022` | that release, Windows Nano Server only |
 
 Day to day you want the bare name.
+
+Each [shipped plugin](#shipped-plugins) is its own package, `ghcr.io/mpospisil/gleanvolt-plugin-<name>`,
+with the same tags, for arm64 and amd64 only; `IMAGE_TAG` pins it and the controller together.
 
 If a new release's bare tag isn't there yet, its single-platform tag usually is:
 `IMAGE_TAG=1.1.0-linux-arm64`.
@@ -583,6 +630,7 @@ Nothing that matters is inside a container. Every path is a bind mount under `/o
 | `/opt/gleanvolt/.env` | (environment) | secrets, `chmod 600` | yes |
 | `/opt/gleanvolt/data` | `/app/data` | `sessions.db` — charging-session history; `energy.db` — the site's 15-minute energy history; `pv-system.json` and `tariff.json` — what was saved on Settings | **critical** |
 | `/opt/gleanvolt/logs` | `/app/logs` | controller log files | no |
+| `/opt/gleanvolt/plugins/<name>` | `/data` | a [shipped plugin](#shipped-plugins)'s settings and secrets, such as the OpenWeatherMap key; `chmod 700` | yes |
 | `/opt/gleanvolt/docker-compose.yml` | — | redeployed from git | no |
 
 **Back up** `data/` above all: `sessions.db` and `energy.db` **cannot be regenerated**. Stop the
