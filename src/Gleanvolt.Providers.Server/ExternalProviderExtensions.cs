@@ -77,8 +77,8 @@ public static class ExternalProviderExtensions
     /// 404 while no provider with a page is attached.
     /// </summary>
     public static RouteHandlerBuilder MapExternalProviderPages(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapGet(ExternalProviderStatus.PagePathFor("{kind}"), (string kind, ExternalProviderRegistry registry, TimeProvider time) =>
-            registry.PageLink(kind, "auto", CultureInfo.CurrentUICulture.Name, time.GetUtcNow()) is { } link
+        endpoints.MapGet(ExternalProviderStatus.PagePathFor("{kind}"), (string kind, HttpContext context, ExternalProviderRegistry registry, TimeProvider time) =>
+            registry.PageLink(kind, "auto", CultureInfo.CurrentUICulture.Name, time.GetUtcNow(), context.Request.Host.Host) is { } link
                 ? Results.Redirect(link.AbsoluteUri)
                 : Results.NotFound());
 

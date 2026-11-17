@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using Gleanvolt.Providers.Contracts;
 using Microsoft.AspNetCore.SignalR;
@@ -49,7 +50,7 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
 
         if (code is null)
         {
-            (code, reason) = Sessions.Attach(Context, hello);
+            (code, reason) = Sessions.Attach(Context, hello, PageOnThisHost(hello));
         }
 
         if (code is not null)
@@ -115,6 +116,15 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
 
         return (null, null);
     }
+
+    /// <summary>
+    /// Whether the provider runs on Gleanvolt's own machine and gave a loopback page (#426): it connected
+    /// from a loopback address, so its <c>localhost</c> is Gleanvolt's.
+    /// </summary>
+    private bool PageOnThisHost(ProviderHello hello) =>
+        hello.PageUrl is { IsLoopback: true }
+        && Context.GetHttpContext()?.Connection.RemoteIpAddress is { } remote
+        && IPAddress.IsLoopback(remote.IsIPv4MappedToIPv6 ? remote.MapToIPv4() : remote);
 
     private async Task CloseSoonAsync()
     {

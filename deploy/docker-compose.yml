@@ -20,6 +20,11 @@
 # default, so a controller-only run neither starts nor waits on a broker that was never asked for. See
 # docs/HOME_ASSISTANT.md for running the broker and Home Assistant beside it.
 #
+# Shipped plugins (#426) are services too, one per plugin, each under its own profile named after it
+# (`openweather`). They are opt-in the same way, but by .env rather than by script: GLEANVOLT_PLUGINS
+# lists the ones to run, and both deploy scripts add them to their own profiles. See "Shipped plugins"
+# in deploy/README.md.
+#
 # All three services run on the host's network (issue #268), not on a compose bridge network. The
 # controller then sees the Pi's real interface, so anything that works out the LAN's range from the
 # interfaces finds the LAN and not Docker's 172.x network, and the three reach each other on
@@ -263,6 +268,7 @@ services:
       # without it. Two calls per session, so any free OpenWeatherMap plan covers it. Which site it asks
       # about is PV_LATITUDE/PV_LONGITUDE above -- where the array is is a fact about the array.
       Weather__ApiKey: ${WEATHER_API_KEY:-}
+      # Or from the OpenWeather plugin below (#424, #426): choose "External" under Settings -> Weather.
 
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
       # that: the service always boots in mode Off and takes control only when a mode is selected
@@ -315,6 +321,46 @@ services:
       driver: json-file
       options:
         max-size: "10m"
+        max-file: "3"
+
+  # The OpenWeather plugin (#424, #426): the weather from OpenWeatherMap, as an external provider. Runs
+  # with "External" chosen under Settings -> Weather, and shows its own page for the key there. Released
+  # with Gleanvolt from the same tag, so IMAGE_TAG pins both and a deploy never mixes two versions.
+  gleanvolt-plugin-openweather:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-openweather:${IMAGE_TAG:-latest}
+    container_name: gleanvolt-plugin-openweather
+    # Nothing in it stops itself on purpose, so anything but `docker compose stop` brings it back.
+    restart: unless-stopped
+    profiles: ["openweather"]
+    init: true
+    # The host's network, as the controller: it reaches Gleanvolt on localhost, and its page is the
+    # Pi's own :OPENWEATHER_PORT, which the owner's browser opens inside Settings. Gleanvolt sends the
+    # browser there under the name it opened Gleanvolt at (gleanvolt.local, or the address), because the
+    # plugin connects from this same machine.
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${OPENWEATHER_PORT:-8096}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      # The token from Settings -> External providers. Without it the plugin stops at start and says so;
+      # the deploy scripts refuse to start it without one.
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${OPENWEATHER_PORT:-8096}/
+      # Who may show the page in a frame. Unset: Gleanvolt on this machine at any name, on WEB_PORT.
+      Gleanvolt__FrameAncestors: ${OPENWEATHER_FRAME_ANCESTORS:-}
+      # Optional: a key entered on the plugin's page wins over it. WEATHER_API_KEY, the built-in's, is the
+      # fallback, so an installation moving to the plugin brings its key along.
+      OpenWeather__ApiKey: ${OPENWEATHER_API_KEY:-${WEATHER_API_KEY:-}}
+    volumes:
+      # The OpenWeatherMap key and the page's own keys. Owned by uid 1654, mode 700: the deploy scripts
+      # prepare it.
+      - ./plugins/openweather:/data
+    # About 60 MB in use.
+    mem_limit: ${OPENWEATHER_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
         max-file: "3"
 
   homeassistant:

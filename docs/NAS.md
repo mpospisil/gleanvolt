@@ -21,11 +21,11 @@ directory to the controller's user.
 Copy [`docker-compose.nas.yml`](../deploy/docker-compose.nas.yml) into the NAS's container UI as it is. It differs
 from the Pi's `docker-compose.yml` in four ways:
 
-- **Only the controller.** No broker, no Home Assistant, no profiles. If you already run Home Assistant
-  and a broker elsewhere, add their settings as in
+- **Only the controller**, and the [weather plugin](#the-weather-plugin) when you ask for it. No broker,
+  no Home Assistant. If you already run Home Assistant and a broker elsewhere, add their settings as in
   [To a Home Assistant you already run](HOME_ASSISTANT.md#to-a-home-assistant-you-already-run).
 - **A one-shot `gleanvolt-init` container** runs before the controller, as root, and changes the owner
-  of `data/` and `logs/` to uid 1654, the controller's user. It then exits, and a NAS UI shows it as
+  of `data/`, `logs/` and `plugins/openweather/` to uid 1654, the controller's user. It then exits, and a NAS UI shows it as
   *stopped* or *exited (0)*. That is its normal state, not a fault.
 - **`GLEANVOLT_DIR`** says where `data/` and `logs/` are. The default, `.`, is the folder the compose
   file is in.
@@ -46,6 +46,21 @@ Then start it. The web UI is at `http://gleanvolt.local:8090` (or `http://<nas-a
 opens on the setup wizard: choose a
 password, let it find the inverter and the charger, and restart from the last step. See
 [The setup wizard](WEB_UI.md#the-setup-wizard) for what to expect after that.
+
+## The weather plugin
+
+The weather each charging session ran in can come from the OpenWeather plugin, released with Gleanvolt
+(#426). It is in the compose file under the `openweather` profile and doesn't start unless asked for:
+
+1. In the web UI, under **Settings → External providers**, press **Make a token** and copy it.
+2. Set `GLEANVOLT_PROVIDER_TOKEN` to it and `COMPOSE_PROFILES` to `openweather`, where you set `TZ`
+   (or start it with `docker compose --profile openweather up -d`).
+3. Under **Settings → Weather**, choose **External** and save, then enter the OpenWeatherMap key on the
+   plugin's page that appears there.
+
+Its page is the NAS's port 8096 (`OPENWEATHER_PORT`). Its key is kept in `plugins/openweather/` beside
+`data/`. A NAS UI that ignores profiles starts it with everything else: without a token it stops at once
+and keeps restarting, so either set the token or delete its service from the file.
 
 ## Things that go wrong on a NAS
 

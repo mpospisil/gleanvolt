@@ -33,3 +33,6 @@ docs/
 # published alongside the app -- found by actually inspecting a built image.
 logs/
 src/Gleanvolt.Worker/data/
+# A plugin's data directory when run from the repository (#426): the OpenWeatherMap key, a car account.
+# The plugin image copies its whole project folder, and these must not travel with it.
+plugins/*/data/

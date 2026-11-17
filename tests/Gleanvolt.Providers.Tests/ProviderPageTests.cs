@@ -115,6 +115,63 @@ public sealed class ProviderPageTests : IAsyncLifetime
         Assert.False(ProviderPage.VerifyTicket(query[ProviderPage.TicketParameter], _host.Token, "echo-one", _host.Time.GetUtcNow() + ProviderPage.TicketLifetime));
     }
 
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("::1")]
+    [InlineData("::ffff:127.0.0.1")]
+    public async Task APluginOnThisMachineIsOpenedAtTheNameTheBrowserUsed(string from)
+    {
+        // A plugin container on the host's network (#426): it says localhost, which to the browser is the
+        // viewer's own machine.
+        await using var connection = await _host.ConnectAsync(from: IPAddress.Parse(from));
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello() with { PageUrl = new Uri("http://localhost:8096/?view=key") });
+
+        var location = await RedirectAsync("gleanvolt.local:8090");
+
+        Assert.Equal("gleanvolt.local", location.Host);
+        Assert.Equal(8096, location.Port);
+        Assert.Contains("view=key", location.Query);
+        Assert.Equal(new Uri("http://localhost:8096/?view=key"), _host.Registry.Find(EchoHub.Kind)!.PageUrl);
+
+        Assert.Equal("192.168.2.7", (await RedirectAsync("192.168.2.7:8090")).Host);
+    }
+
+    [Fact]
+    public async Task ALocalhostPageFromAnotherMachineIsLeftAsItSaid()
+    {
+        // A plugin elsewhere that says localhost means the developer's own browser.
+        await using var connection = await _host.ConnectAsync(from: IPAddress.Parse("192.168.2.30"));
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello() with { PageUrl = new Uri("http://localhost:8096/") });
+
+        Assert.Equal("localhost", (await RedirectAsync("gleanvolt.local:8090")).Host);
+    }
+
+    [Fact]
+    public async Task APageAtAnAddressIsLeftAsItSaidEvenFromThisMachine()
+    {
+        await using var connection = await _host.ConnectAsync(from: IPAddress.Loopback);
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello() with { PageUrl = new Uri("http://192.168.2.7:8096/") });
+
+        Assert.Equal("192.168.2.7", (await RedirectAsync("gleanvolt.local:8090")).Host);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8090", null, "http://*:8090 https://*:8090")]
+    [InlineData("http://127.0.0.1:8090", null, "http://*:8090 https://*:8090")]
+    [InlineData("http://192.168.2.7:8090", null, "http://192.168.2.7:8090")]
+    [InlineData("http://localhost:8090", " http://gleanvolt.local:8090 ", "http://gleanvolt.local:8090")]
+    public void ThePageMayBeFramedByGleanvoltAtTheNamesItCanHave(string endpoint, string? configured, string expected) =>
+        Assert.Equal(expected, ProviderPageFraming.Sources(new Uri(endpoint), configured));
+
+    private async Task<Uri> RedirectAsync(string host)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/external/{EchoHub.Kind}/page");
+        request.Headers.Host = host;
+        var response = await _host.Server.CreateClient().SendAsync(request);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location!;
+    }
+
     [Fact]
     public async Task WithoutAProviderWithAPageThereIsNothingToRedirectTo()
     {

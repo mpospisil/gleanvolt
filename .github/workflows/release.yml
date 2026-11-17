@@ -359,6 +359,51 @@ jobs:
             --exe "unpacked/${{ matrix.rid }}/${{ matrix.exe }}" \
             --version "${{ needs.version.outputs.version }}"
 
+      # The shipped plugins (#426), one zip each per RID, self-contained like Gleanvolt's: on Windows, and
+      # anywhere without Docker, this is how a plugin is installed -- the container route is its image
+      # from publish-image.yml. Its own top-level directory, so it unpacks beside Gleanvolt, not over it.
+      # Not in the winget package, whose installer is Gleanvolt's zip alone (publish-winget.yml).
+      - name: Publish the OpenWeather plugin for ${{ matrix.rid }}
+        run: |
+          dotnet publish plugins/Gleanvolt.Plugin.OpenWeather/Gleanvolt.Plugin.OpenWeather.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            -p:BuildNumber=${{ needs.version.outputs.build }} \
+            -p:SourceRevisionId=${{ github.sha }} \
+            ${{ needs.version.outputs.suffix }} \
+            ${{ matrix.publish_args }} \
+            --output plugin-publish/gleanvolt-plugin-openweather
+          cp LICENSE LICENSE-MIT THIRD-PARTY-NOTICES.md plugin-publish/gleanvolt-plugin-openweather/
+          cp plugins/Gleanvolt.Plugin.OpenWeather/README.md plugin-publish/gleanvolt-plugin-openweather/
+
+      - name: Zip the plugin (Linux)
+        if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          (cd plugin-publish && zip -qr "../artifacts/gleanvolt-plugin-openweather-${VERSION}-${{ matrix.rid }}.zip" gleanvolt-plugin-openweather)
+          unzip -q "artifacts/gleanvolt-plugin-openweather-${VERSION}-${{ matrix.rid }}.zip" -d plugin-unpacked
+
+      - name: Zip the plugin (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Compress-Archive -Path "plugin-publish/gleanvolt-plugin-openweather" `
+            -DestinationPath "artifacts/gleanvolt-plugin-openweather-$env:VERSION-${{ matrix.rid }}.zip"
+          Expand-Archive -Path "artifacts/gleanvolt-plugin-openweather-$env:VERSION-${{ matrix.rid }}.zip" -DestinationPath plugin-unpacked
+
+      # From the zip, as for Gleanvolt: it starts, serves its page behind the ticket guard, and keeps
+      # trying a Gleanvolt that isn't there rather than stopping.
+      - name: Smoke-test the OpenWeather plugin
+        run: |
+          python .github/scripts/smoke-test-plugin.py \
+            --exe "plugin-unpacked/gleanvolt-plugin-openweather/Gleanvolt.Plugin.OpenWeather${{ runner.os == 'Windows' && '.exe' || '' }}"
+
       - name: Upload the ${{ matrix.rid }} zip
         uses: actions/upload-artifact@v4
         with:
@@ -522,6 +567,13 @@ jobs:
               echo "No zip for $rid; the publish matrix and this list disagree." >&2
               exit 1
             fi
+            # The shipped plugins (#426): #425 makes the weather depend on this one.
+            for plugin in openweather; do
+              if [ ! -f "artifacts/gleanvolt-plugin-${plugin}-${VERSION}-${rid}.zip" ]; then
+                echo "No $plugin plugin zip for $rid; the publish job and this list disagree." >&2
+                exit 1
+              fi
+            done
           done
 
           # install.sh finds the package by these names in SHA256SUMS, so a release without one of them
@@ -664,6 +716,13 @@ jobs:
             echo "Or download a self-contained build below and run it — no .NET installation needed."
             echo "\`gleanvolt-${VERSION}-win-x64.zip\` for Windows, \`linux-arm64\` for a Raspberry Pi,"
             echo "\`linux-x64\` for an x64 Linux host or NAS."
+            echo
+            echo "### Shipped plugins"
+            echo
+            echo "\`gleanvolt-plugin-openweather-${VERSION}-<platform>.zip\` is the weather from OpenWeatherMap, run"
+            echo "beside Gleanvolt with **External** chosen under Settings → Weather. In Docker it is the image"
+            echo "\`ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gleanvolt-plugin-openweather:${VERSION}\`, and the \`openweather\`"
+            echo "profile of the compose stack. The README inside the zip says how to run it."
             echo
             echo "The \`.nupkg\` files are the libraries, for building on the controller directly."
             echo "They are attached here rather than pushed to a feed."

@@ -35,10 +35,12 @@ services:
     image: busybox:1.37
     container_name: gleanvolt-init
     user: "0:0"
-    command: ["chown", "-R", "1654:1654", "/data", "/logs"]
+    # The OpenWeather plugin's directory too (#426), closed to everyone else: it holds an API key.
+    command: ["sh", "-c", "chown -R 1654:1654 /data /logs /plugins/openweather && chmod 700 /plugins/openweather"]
     volumes:
       - ${GLEANVOLT_DIR:-.}/data:/data
       - ${GLEANVOLT_DIR:-.}/logs:/logs
+      - ${GLEANVOLT_DIR:-.}/plugins/openweather:/plugins/openweather
     restart: "no"
     network_mode: none
 
@@ -78,4 +80,35 @@ services:
       driver: json-file
       options:
         max-size: "10m"
+        max-file: "3"
+
+  # The OpenWeather plugin (#424, #426): the weather, with "External" chosen under Settings -> Weather.
+  # Opt-in: it starts only with the `openweather` profile (`docker compose --profile openweather up -d`,
+  # or COMPOSE_PROFILES=openweather where the NAS UI takes environment variables) and with
+  # GLEANVOLT_PROVIDER_TOKEN set to the token from Settings -> External providers. docs/NAS.md has it.
+  gleanvolt-plugin-openweather:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-openweather:${IMAGE_TAG:-latest}
+    container_name: gleanvolt-plugin-openweather
+    restart: unless-stopped
+    profiles: ["openweather"]
+    init: true
+    # On the host's network like the controller: it reaches Gleanvolt on localhost, and Gleanvolt sends
+    # the browser to its page under the name the browser opened Gleanvolt at.
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${OPENWEATHER_PORT:-8096}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${OPENWEATHER_PORT:-8096}/
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/openweather:/data
+    mem_limit: ${OPENWEATHER_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
         max-file: "3"

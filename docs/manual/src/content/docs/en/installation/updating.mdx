@@ -70,6 +70,11 @@ Then the `docker run …` command from [Docker](../docker/).
 </TabItem>
 </Tabs>
 
+If you run the [OpenWeather plugin](../../setting-up/weather/#run-the-openweather-plugin), update it to
+the same version: a plugin from another version may not connect. In Docker, pull and recreate its
+container too; on Windows, download its zip for the new version and unzip it over the old one. Its key is
+kept.
+
 ## Backup
 
 Everything Gleanvolt knows is in one folder called `data`: your settings, your charging history and the

@@ -113,3 +113,28 @@ public static class ProviderPageExtensions
         return app.UseMiddleware<ProviderPageMiddleware>(Options.Create(options.Value));
     }
 }
+
+/// <summary>Who may show a provider's page in a frame: the CSP <c>frame-ancestors</c> sources.</summary>
+public static class ProviderPageFraming
+{
+    /// <summary>
+    /// The sources that may frame the page, for <c>frame-ancestors</c> after <c>'self'</c>.
+    /// <paramref name="configured"/> wins when given. Otherwise Gleanvolt's <paramref name="endpoint"/>
+    /// origin, except for an endpoint on this machine (#426): the browser then reaches Gleanvolt by a name
+    /// the provider can't know (<c>gleanvolt.local</c>, an address), and Gleanvolt opens the page under
+    /// that same name, so any host on Gleanvolt's port may frame it. The ticket still decides who sees it.
+    /// </summary>
+    public static string Sources(Uri endpoint, string? configured)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured.Trim();
+        }
+
+        return endpoint.IsLoopback
+            ? $"http://*:{endpoint.Port} https://*:{endpoint.Port}"
+            : endpoint.GetLeftPart(UriPartial.Authority);
+    }
+}

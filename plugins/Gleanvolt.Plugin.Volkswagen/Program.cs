@@ -44,8 +44,9 @@ builder.Services.AddSingleton<VwWebsiteSignIn>();
 var gleanvolt = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
 
 // Who may show the page in a frame: Gleanvolt, at the address the browser opens it at. Its endpoint by
-// default; set Gleanvolt:FrameAncestors when the browser reaches Gleanvolt by another name.
-var frameAncestors = "'self' " + (builder.Configuration["Gleanvolt:FrameAncestors"] ?? gleanvolt.GetLeftPart(UriPartial.Authority));
+// default, or any name on its port when Gleanvolt is on this machine (#426); set Gleanvolt:FrameAncestors
+// when the browser reaches Gleanvolt by another name.
+var frameAncestors = "'self' " + ProviderPageFraming.Sources(gleanvolt, builder.Configuration["Gleanvolt:FrameAncestors"]);
 
 builder.Services.AddGleanvoltVehicleProvider<VolkswagenFeed>(options =>
 {

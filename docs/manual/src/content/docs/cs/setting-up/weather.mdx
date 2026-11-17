@@ -3,7 +3,7 @@ title: Počasí
 description: Zaznamenávejte počasí během každého nabíjení z OpenWeatherMap nebo z vlastního zdroje.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 Gleanvolt může zaznamenat, jak vypadala obloha na začátku a na konci každého nabíjení: teplotu,
 oblačnost, východ a západ slunce. Uvidíte to v historii každého nabíjení a pomůže to vysvětlit
@@ -67,8 +67,8 @@ OpenWeather: čte OpenWeatherMap stejně, jen má pro klíč vlastní stránku.
 
 1. V části **Počasí** vyberte **Externí** a klikněte na **Uložit**.
 
-2. Spusťte zdroj s adresou Gleanvoltu a tokenem pro externí zdroje z **Nastavení → Externí zdroje dat**.
-   Jak na to, popisuje README pluginu.
+2. Spusťte zdroj s tokenem pro externí zdroje z **Nastavení → Externí zdroje dat**. Pro plugin
+   OpenWeather viz [Spuštění pluginu OpenWeather](#spuštění-pluginu-openweather) níže.
 
 3. Jakmile se připojí, objeví se v části **Počasí** jeho vlastní stránka. U pluginu OpenWeather na ní
    zadejte klíč OpenWeatherMap a klikněte na **Uložit a ověřit**.
@@ -79,3 +79,93 @@ OpenWeather: čte OpenWeatherMap stejně, jen má pro klíč vlastní stránku.
 
 Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí. Pokud zdroj neběží nebo do 15 sekund
 neodpoví, nabíjení se zaznamená bez počasí. Na ničem jiném to nic nemění.
+
+## Spuštění pluginu OpenWeather
+
+Plugin OpenWeather vychází s každou verzí Gleanvoltu, jako kontejner i ke stažení. Použijte stejnou verzi,
+jakou má váš Gleanvolt. Vždy se začíná tokenem:
+
+<Steps>
+
+1. Otevřete **Nastavení → Externí zdroje dat** a klikněte na **Vytvořit token**. Token, který začíná
+   `gvp_`, si zkopírujte.
+
+2. Spusťte plugin podle vaší instalace, jak ukazuje návod níže.
+
+3. V části **Počasí** vyberte **Externí** a klikněte na **Uložit**. Jakmile se plugin připojí, objeví se
+   tam jeho stránka.
+
+</Steps>
+
+<Tabs syncKey="install">
+<TabItem label="Docker">
+
+Vytvořte složku pro plugin a spusťte ho vedle Gleanvoltu. Místo `gvp_...` vložte svůj token:
+
+```bash
+sudo mkdir -p /opt/gleanvolt/plugins/openweather
+sudo chown 1654:1654 /opt/gleanvolt/plugins/openweather
+sudo chmod 700 /opt/gleanvolt/plugins/openweather
+
+docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
+  --network host \
+  -e Gleanvolt__Token=gvp_... \
+  -v /opt/gleanvolt/plugins/openweather:/data \
+  ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
+```
+
+Ve složce je uložený klíč OpenWeatherMap a číst ho může jen plugin. Pokud Gleanvolt neběží na portu
+8090, přidejte `-e Gleanvolt__Endpoint=http://localhost:<jeho port>`.
+
+</TabItem>
+<TabItem label="NAS">
+
+Soubor, který jste vložili podle návodu [NAS](../../installation/nas/), plugin už obsahuje, jen vypnutý.
+V aplikaci pro kontejnery na NAS upravte soubor projektu:
+
+1. Najděte `${GLEANVOLT_PROVIDER_TOKEN:-}` a za `:-` vložte svůj token, aby to vypadalo takto:
+   `${GLEANVOLT_PROVIDER_TOKEN:-gvp_...}`.
+2. Smažte řádek `profiles: ["openweather"]`.
+3. Uložte a projekt znovu spusťte.
+
+</TabItem>
+<TabItem label="Windows">
+
+<Steps>
+
+1. Ze [stránky s verzemi](https://github.com/mpospisil/gleanvolt/releases) stáhněte
+   `gleanvolt-plugin-openweather-<verze>-win-x64.zip` pro verzi vašeho Gleanvoltu a rozbalte ho.
+
+2. V novém terminálu přejděte do složky `gleanvolt-plugin-openweather` a spusťte plugin se svým tokenem:
+
+   ```powershell
+   .\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+   ```
+
+</Steps>
+
+Stejně jako Gleanvolt se zastaví, když jeho okno zavřete. Jeho stránka se otevře jen v prohlížeči na
+tomto počítači. Pokud ji chcete otevírat i z telefonu, přidejte `--Urls=http://0.0.0.0:8096` a povolte
+plugin přes bránu firewall pro privátní sítě.
+
+</TabItem>
+<TabItem label="Linux">
+
+S balíčkem `.deb` je nejjednodušší Docker: viz záložka **Docker**. Nebo stáhněte
+`gleanvolt-plugin-openweather-<verze>-linux-arm64.zip` (na PC `linux-x64`), rozbalte ho a v jeho složce
+spusťte:
+
+```bash
+./Gleanvolt.Plugin.OpenWeather --Gleanvolt:Token=gvp_... --Urls=http://0.0.0.0:8096
+```
+
+Běží, dokud ho nezastavíte, a po zapnutí počítače se sám nespustí.
+
+</TabItem>
+</Tabs>
+
+Stránka pluginu používá port 8096 na stejném počítači jako Gleanvolt. Gleanvolt ji otevře pod stejným
+názvem, pod jakým jste otevřeli Gleanvolt, takže funguje `gleanvolt.local` i adresa.
+
+Pokud vytvoříte nový token, plugin se odpojí, dokud ho nespustíte s novým.
+

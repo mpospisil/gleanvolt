@@ -37,7 +37,7 @@ shown:
 | Setting | Change it to | Why |
 |---|---|---|
 | `TZ:` `${TZ:-Europe/Prague}` | Your time zone after `:-`, e.g. `${TZ:-Europe/Berlin}` | So each day's history starts at your midnight |
-| `${GLEANVOLT_DIR:-.}` (four places) | A folder on your NAS, where your NAS's steps below say so | Where Gleanvolt keeps its settings and history |
+| `${GLEANVOLT_DIR:-.}` (every place) | A folder on your NAS, where your NAS's steps below say so | Where Gleanvolt keeps its settings and history |
 | `${WEB_PORT:-8090}` | Another number, only if 8090 is already used on your NAS | The port you open Gleanvolt on |
 
 ## Install
@@ -150,3 +150,8 @@ normal: it runs once at each start, to give Gleanvolt its folders, and then stop
   your NAS's permission settings.
 - **Stop service in Gleanvolt doesn't stop it.** The restart policy was changed to "always". Set it back to
   `on-failure`.
+
+## The weather plugin
+
+To record the weather from OpenWeatherMap through the OpenWeather plugin, which comes with each release,
+see [Run the OpenWeather plugin](../../setting-up/weather/#run-the-openweather-plugin).
