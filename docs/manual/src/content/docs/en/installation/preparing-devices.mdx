@@ -17,6 +17,7 @@ What to check depends on the brand:
 | Huawei SUN2000 inverter | Modbus TCP, **Enable (Unrestricted)** | FusionSolar app, as the installer |
 | Huawei SCharger | Modbus TCP | FusionSolar app |
 | go-e charger | **Local HTTP API v2** | go-e app |
+| Shelly TopAC charger | Nothing; its **password** must be **off** | Shelly app |
 
 Both devices also need to be **connected to your home network**, by cable or Wi-Fi, and switched on.
 
@@ -74,6 +75,22 @@ control it.
 </Steps>
 
 This needs a go-e with hardware version 3 or later: a Gemini, Gemini flex, HOMEfix or HOME+ V3 or V4.
+
+## Shelly TopAC charger
+
+The Shelly TopAC Portable EV Charger answers on your network as it comes. Check three settings in the
+Shelly app:
+
+<Steps>
+
+1. **Authentication** must be **off**. Gleanvolt can't sign in to the charger yet. It is off unless you
+   set a password.
+
+2. Switch off **auto balance**. It lowers the charging current by itself, against Gleanvolt.
+
+3. Switch off **auto charge**, so a car you plug in waits for Gleanvolt instead of starting at full power.
+
+</Steps>
 
 ## Only one controller at a time
 

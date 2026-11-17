@@ -6,6 +6,7 @@ using Gleanvolt.Infrastructure.Modbus;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
+using Gleanvolt.Devices.Shelly;
 
 namespace Gleanvolt.Discovery;
 
@@ -200,9 +201,10 @@ public sealed class DeviceScanner
                             + "inverter's own LAN port, or a Pocket WiFi 3.0+ with Modbus TCP enabled."));
                     }
                     else if (page is not null
-                        && await GoeAsync(host, port, hostTimeout.Token).ConfigureAwait(false) is { } goe)
+                        && (await GoeAsync(host, port, hostTimeout.Token).ConfigureAwait(false)
+                            ?? await ShellyTopAcAsync(host, port, hostTimeout.Token).ConfigureAwait(false)) is { } charger)
                     {
-                        report(goe);
+                        report(charger);
                     }
 
                     continue;
@@ -224,22 +226,35 @@ public sealed class DeviceScanner
 
     // A go-e's local HTTP API v2, asked through the driver's own probe: one filtered /api/status, a read. Anything
     // else answering HTTP -- a router, a printer, a go-e with the API off -- is not reported: every LAN has those.
-    private async Task<DiscoveredDevice?> GoeAsync(string host, int port, CancellationToken cancellationToken)
+    private Task<DiscoveredDevice?> GoeAsync(string host, int port, CancellationToken cancellationToken) =>
+        HttpChargerAsync(host, port, new GoeChargerDriverFactory(), probe => new DiscoveredDevice(
+            host, port, null, DiscoveryFinding.GoeCharger, PvDeviceRole.Charger, "go-e Charger", "local HTTP API v2", null,
+            SupportTier.Expected, true,
+            $"Car state {probe.Reading:0} on go-e's local HTTP API v2. Untested on hardware; if evcc or the go-e "
+            + "app's own PV surplus charging drives it, hand control over rather than adding Gleanvolt alongside.",
+            Driver: GoeChargerDriverFactory.DriverId), cancellationToken);
+
+    // A Shelly TopAC's RPC API (#429): one work_state read. Other Shellies answer /rpc too, but have no charger
+    // service, so the probe does not take them for one.
+    private Task<DiscoveredDevice?> ShellyTopAcAsync(string host, int port, CancellationToken cancellationToken) =>
+        HttpChargerAsync(host, port, new ShellyTopAcChargerDriverFactory(), probe => new DiscoveredDevice(
+            host, port, null, DiscoveryFinding.ShellyCharger, PvDeviceRole.Charger, "Shelly TopAC Portable EV Charger",
+            "local RPC API", null, SupportTier.Expected, true,
+            $"Work state {probe.Reading:0} on the Shelly's local RPC API. Untested on hardware; switch off the Shelly's "
+            + "auto balance and auto charge, and hand control over if evcc already drives it.",
+            Driver: ShellyTopAcChargerDriverFactory.DriverId), cancellationToken);
+
+    // An HTTP charger family asked through its driver's own probe, on a client that passes only reads.
+    private async Task<DiscoveredDevice?> HttpChargerAsync(
+        string host, int port, IEvChargerDriverFactory family, Func<EvChargerProbeResult, DiscoveredDevice> found,
+        CancellationToken cancellationToken)
     {
         try
         {
             using var http = _httpClientFactory(new DeviceConfig { Host = host, Port = port });
-            var driver = new GoeChargerDriverFactory().Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true });
+            var driver = family.Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true });
             var probe = await driver.ProbeAsync(cancellationToken).ConfigureAwait(false);
-
-            return probe.Recognised
-                ? new DiscoveredDevice(
-                    host, port, null, DiscoveryFinding.GoeCharger, PvDeviceRole.Charger, "go-e Charger", "local HTTP API v2", null,
-                    SupportTier.Expected, true,
-                    $"Car state {probe.Reading:0} on go-e's local HTTP API v2. Untested on hardware; if evcc or the go-e "
-                    + "app's own PV surplus charging drives it, hand control over rather than adding Gleanvolt alongside.",
-                    Driver: GoeChargerDriverFactory.DriverId)
-                : null;
+            return probe.Recognised ? found(probe) : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException
             || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))

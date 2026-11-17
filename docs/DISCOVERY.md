@@ -23,9 +23,9 @@ dotnet publish src/Gleanvolt.Discovery.Cli -c Release -r linux-x64 --self-contai
 ```
 
 It tries ports 502 (Modbus TCP), 8899 (the usual RS485 bridge) and 80 (where it recognises a SolaX
-dongle's web page, which is not Modbus, or a go-e's local API), unit ids `1,0,2,3,4,5,247`, and names each
+dongle's web page, which is not Modbus, or a go-e's or a Shelly TopAC's local API), unit ids `1,0,2,3,4,5,247`, and names each
 box from its serial number (SolaX), its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of
-it), its phase voltages (Huawei SCharger) or its API (go-e), with the driver to use and the support tier
+it), its phase voltages (Huawei SCharger) or its API (go-e, Shelly TopAC), with the driver to use and the support tier
 from [SUPPORTED_PV_SYSTEMS.md](SUPPORTED_PV_SYSTEMS.md). Under the
 table it prints what it found in the form of configuration lines; enter the addresses on **Settings →
 Installation** (or in the wizard), or optionally paste the lines into `.env`:

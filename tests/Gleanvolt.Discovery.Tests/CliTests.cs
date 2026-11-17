@@ -161,6 +161,24 @@ public class CliTests
     }
 
     [Fact]
+    public void A_shelly_topac_brings_its_driver_and_no_unit_id_into_the_configuration()
+    {
+        var lines = DiscoveryConfiguration.EnvironmentLines(
+        [
+            new DiscoveredDevice("192.168.2.31", 80, null, DiscoveryFinding.ShellyCharger, PvDeviceRole.Charger,
+                "Shelly TopAC Portable EV Charger", "local RPC API", null, SupportTier.Expected, true, "note", Driver: "shelly-topac"),
+        ]);
+
+        Assert.Equal(
+        [
+            "Pv__Chargers__0__Driver=shelly-topac",
+            "Pv__Chargers__0__Model=Shelly TopAC Portable EV Charger",
+            "Pv__Chargers__0__Host=192.168.2.31",
+            "Pv__Chargers__0__Port=80",
+        ], lines);
+    }
+
+    [Fact]
     public void An_sCharger_brings_its_driver_into_the_configuration()
     {
         var lines = DiscoveryConfiguration.EnvironmentLines(

@@ -4,6 +4,65 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — Shelly TopAC Portable EV Charger over its local RPC API (#429)
+
+**What.** A charger driver for the Shelly TopAC Portable EV Charger 11 kW (EVE01-11R, 6–16 A, three phases),
+`shelly-topac`, in its own package `Gleanvolt.Devices.Shelly`. Offered in Settings' charger drop-down, found by
+the wizard's search and `gleanvolt-discover`, and documented in the reference docs and the manual (en, cs).
+Tier Expected: every recording is synthetic.
+
+**How.**
+- *Driver* (`ShellyTopAcChargerDriver`). Every call is `GET /rpc/<Method>?owner=%22service:0%22&role=%22…%22`.
+  `ReadAsync` reads `work_state` and `phase_info` (both required), `start_charging` and `current_limit`
+  (best-effort), and `Service.GetConfig` once. `ReadSettingsAsync` reads `start_charging` and `current_limit`
+  and throws on either, as the contract asks. Writes are `Number.Set current_limit` and `Boolean.Set
+  start_charging`. A set answers `null`; an error is a non-2xx, or a `{code, message}` frame, and throws with
+  the charger's message.
+- *Pause* is `start_charging=false` plus a remembered `_paused`, as go-e's: a pause under a stop writes
+  nothing, and a resume writes the limit and then `start_charging=true`.
+- *Status.* `StatusOf(work_state, start_charging)`: free → Available, insert → Preparing, wait → Preparing
+  or SuspendedEvse, charging → Charging, pause → SuspendedEvse, complete/end → SuspendedEv only while started,
+  error → Faulted, anything else → Unknown.
+- *Power.* `WattsOf` takes `total_power` as kW unless Σ V·I over the three phases (≥ 100 W) is nearer the raw
+  figure, then as W. It is never negative.
+- *Probe.* `work_state` with a `charger_…` value is recognised, and the reading is the `ShellyWorkState`
+  number. A 401, a 404 or another JSON answer is "not recognised" with the HTTP status.
+- *Snapshot.* The driver's five reads. None carries the device id, the MAC or the Wi-Fi settings.
+- *Host.* Registered after go-e in `ChargerDrivers`. The existing HTTP client, read-only handler and snapshot
+  needed no change.
+- *Discovery.* `DeviceScanner` asks a web port for a go-e and then for the TopAC, through one
+  `HttpChargerAsync` helper. There is a new finding, `ShellyCharger`, and the `.env` lines carry the driver
+  and no unit id.
+- *Text.* "Test connection" for an HTTP charger says "reports state {1}" (en, cs), no longer go-e's "car state".
+
+**Quirks.**
+- `HttpClient` sends a relative URI's `"` as `%22` once it is joined to the base address. So recordings keyed
+  by the literal `"` did not match what the replay saw, and the requests are now written pre-escaped.
+- evcc's TopAC driver is "all rights reserved", not MIT: facts only (state names, kW), no code.
+- Shelly's Gen2 password is HTTP digest, and the charger client sends none: v1 needs it off, and a read
+  explains a 401.
+- The TopAC's 16 A ceiling is below `ChargeControlOptions`'s class default of 20 A. The shipped
+  `appsettings.json` sets 16, so a real install passes; the container test states 16, because the slim
+  builder does not load appsettings.
+
+**Files.**
+- New: `src/Gleanvolt.Devices.Shelly/` (driver, factory, `ShellyWorkState`, csproj);
+  `tests/Gleanvolt.Devices.Shelly.Tests/` (the shared HTTP charger suite and 22 of its own tests, four
+  synthetic fixtures and their README).
+- Host: `Gleanvolt.Hosting/ChargerDrivers.cs`, `Gleanvolt.Hosting.csproj`, `Configuration/PvSystemEditor.cs`.
+- Discovery: `DeviceScanner.cs`, `DiscoveryResults.cs`, `DiscoveryConfiguration.cs`, `DiscoveryOptions.cs`,
+  `Cli/ReportWriter.cs`, the csproj.
+- Web: `Resources/ServiceText.resx`, `ServiceText.cs.resx`.
+- Tests: `Hosting.Tests/InverterDriverSelectionTests.cs`, `Discovery.Tests/DeviceScannerTests.cs`, `CliTests.cs`.
+- Build: `Gleanvolt.slnx`, `Dockerfile`, `Dockerfile.windows`, `.github/workflows/release.yml` (pack list and
+  expected packages).
+- Docs: `SUPPORTED_CHARGERS.md` (and its copies in `SUPPORTED_PV_SYSTEMS.md` and `README.md`),
+  `SUPPORTED_PV_SYSTEMS.md`, `CHARGER_SETUP.md`, `CONFIGURATION.md`, `DISCOVERY.md`, `RELEASING.md`,
+  `DECISIONS.md`, `CONTRIBUTING.md`, `deploy/.env.example`, the two skills, and the manual's `index`,
+  `preparing-devices` and `finding-devices` pages (en, cs).
+
+---
+
 ## 2026-11-17 — Shipping plugins with Gleanvolt, starting with OpenWeather (#426)
 
 **What.** The OpenWeather plugin from #424 is released with Gleanvolt: an image per release

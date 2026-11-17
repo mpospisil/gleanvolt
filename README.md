@@ -60,7 +60,7 @@ Every mode stops by itself when the car is full or unplugged. The service always
 | Others | — | — | Not supported yet (GoodWe is planned) |
 <!-- end include -->
 
-**EV chargers** — over Modbus TCP, or a go-e over its local HTTP API:
+**EV chargers** — over Modbus TCP, or a go-e or a Shelly TopAC over its local HTTP API:
 
 <!-- include: docs/SUPPORTED_CHARGERS.md#chargers-at-a-glance -->
 | Manufacturer | Models | Driver | Tier |
@@ -68,6 +68,7 @@ Every mode stops by itself when the car is full or unplugged. The service always
 | [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
 | [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
 | [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac) | TopAC Portable EV Charger 11 kW (EVE01-11R) | `shelly-topac` | Expected |
 | Others | — | — | Not supported yet |
 <!-- end include -->
 

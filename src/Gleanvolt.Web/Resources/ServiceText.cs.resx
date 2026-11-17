@@ -118,7 +118,7 @@
     <value>{0} odpovídá, ale registr provozního režimu ukazuje {1}, což žádná nabíječka nehlásí. Není to adresa střídače?</value>
   </data>
   <data name="Probe_ChargerApiOk" xml:space="preserve">
-    <value>{0} odpovídá: API nabíječky hlásí stav auta {1}.</value>
+    <value>{0} odpovídá: API nabíječky hlásí stav {1}.</value>
   </data>
   <data name="Probe_ChargerApiImplausible" xml:space="preserve">
     <value>{0} odpovídá (HTTP {1}), ale ne API zvolené nabíječky. Je zapnuté její místní HTTP API?</value>

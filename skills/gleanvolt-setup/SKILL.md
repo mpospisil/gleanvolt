@@ -70,6 +70,7 @@ Ask which inverter and which charger the user has, then check with them:
 | Huawei SUN2000 | Modbus TCP, **Enable (Unrestricted)** | FusionSolar app, as the installer (SDongle or EMMA page) |
 | Huawei SCharger | Modbus TCP | FusionSolar app, the charger's commissioning page |
 | go-e (hardware v3+) | **Local HTTP API v2** | go-e app → Internet → Advanced settings. Switch off its "Eco" mode. |
+| Shelly TopAC | Nothing to switch on; its **password must be off** | Shelly app. Switch off auto balance and auto charge. |
 
 A Huawei inverter also needs a Huawei smart meter (DTSU666-H/DDSU666-H) or an EMMA.
 

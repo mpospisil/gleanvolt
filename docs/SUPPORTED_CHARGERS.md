@@ -13,6 +13,7 @@ One charger is supported per installation. A tester's register snapshots
 | [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
 | [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
 | [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac) | TopAC Portable EV Charger 11 kW (EVE01-11R) | `shelly-topac` | Expected |
 | Others | — | — | Not supported yet |
 
 ### SolaX chargers
@@ -76,6 +77,20 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
 - **A pause is the force state *off***, because the go-e refuses a current below 6 A.
 - **The current and the force state are settings the go-e keeps**; Gleanvolt writes them only when they
   change.
+- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
+
+### Shelly TopAC
+
+Driver `shelly-topac`, over the charger's local RPC API on port 80. What to switch off first:
+**[Setting up a Shelly TopAC](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#shelly-topac)**.
+
+| Model | Driver | Tier | Notes |
+|---|---|---|---|
+| [**TopAC Portable EV Charger 11 kW**](https://www.shelly.com/blogs/documentation/topac-portable-ev-charger-eve01-11r) (EVE01-11R), 6–16 A, three phases | `shelly-topac` | Expected | Its password must be off: Gleanvolt does not send one yet |
+
+- **A pause is *start charging* off**, because the charger's range starts at 6 A.
+- **Shelly's auto balance fights the setpoint.** Gleanvolt logs a warning while it is on.
+- **The power's unit is checked**, against volts × amps, because Shelly's documentation does not state it.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
 ### Other chargers

@@ -4,6 +4,57 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — Shelly TopAC over its RPC API: a pause is start_charging off, power's unit is checked, no password yet (#429)
+
+**Context.** [Issue #429](https://github.com/mpospisil/gleanvolt/issues/429), the second charger reached over
+HTTP, after go-e (#352). The source is Shelly's
+[TopAC Portable EV Charger](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger)
+page: virtual components under the owner `service:0` (`work_state`, `phase_info`, `current_limit`,
+`start_charging`) and `Service.GetConfig`. The page documents only `charger_free` among the work states and
+shows `phase_info` with zeros. evcc's `charger/shelly-topac.go` filled both gaps (the other seven state names,
+and `total_power` multiplied by 1000), but that file says it is **not** under evcc's MIT licence, "all rights
+reserved". Only those facts were taken from it, no code; the driver is written from Shelly's page.
+
+**Decision — GETs with the quotes already escaped.** Shelly's RPC takes `GET /rpc/<Method>?owner="service:0"&…`
+and answers a GET with the bare result, `{"value": …}`. So the existing HTTP plumbing (reads marked with
+`ChargerHttp.Read`, the dry-run handler, `HttpDump` replay, snapshots) fits unchanged. The requests are
+written with `%22`, not `"`: once `HttpClient` joins a relative URI to the base address the quotes go out
+escaped, so writing them escaped keeps one spelling for the wire, the recordings and the snapshot.
+
+**Decision — a pause is `start_charging` off, remembered by the driver,** exactly as go-e's force state is.
+The TopAC's range is 6–16 A and the loop pauses by writing 0. Settings then read back "allowed, 0 A", and the
+next setpoint of 6 A or more writes the limit first and then starts again. Status follows go-e's rule: wait,
+complete and end are the car's only while `start_charging` is on; the charger's own `pause` is always the
+charger's. Neither our stop nor our pause can read as "the car is full".
+
+**Decision — power's unit is checked, not assumed.** `total_power` is read as kW (evcc's reading), unless the
+sum of volts × amps over the phases says it is already watts. Below 100 W there is nothing to tell them
+apart by, and kW stands. A wrong guess would otherwise show 1000 times the power, and a session's energy with it.
+
+**Decision — no password yet.** Shelly ships with authentication off, and its Gen2 auth is HTTP digest. The
+host's charger client sends no credentials, and adding them means a secret in the configuration, a field in
+Settings and a test of digest against a device nobody here has. So v1 needs authentication off. A 401 is
+explained in the log, and "Test connection" shows it as "HTTP 401". A charger password is a follow-up if a tester needs one.
+
+**Decision — Shelly's own controls are warned about, never written.** Auto balance (a Shelly EM's load
+management) lowers the current by itself; the driver reads `Service.GetConfig` once and logs a warning while it
+is on. Auto charge starts a car on plug-in, as a SolaX does, and is only logged. The docs say to switch both
+off. Only `current_limit` and `start_charging` are ever written, only on a change.
+
+**Decision — discovery asks a web server for the TopAC after go-e.** A host on port 80 that is neither a SolaX
+dongle nor a go-e is asked for `work_state`; a `charger_…` answer is finding `ShellyCharger`, driver
+`shelly-topac`, no unit id. Other Shellies answer `/rpc` but have no charger service, so they say nothing. The
+go-e check and this one now share one helper.
+
+**Consequences accepted.** Expected tier on synthetic fixtures; a tester's snapshot has to confirm the work
+states, the power unit, that `start_charging` reads back what was written, and whether `current_limit` minds
+the loop's write rate. The TopAC is the first charger whose ceiling (16 A) is below `ChargeControlOptions`'s
+class default (20 A). The shipped `appsettings.json` sets 16, so an owner who raised it has to lower it, and
+the configuration check says so. The "Test connection" message for an HTTP charger now says "state" rather
+than go-e's "car state".
+
+---
+
 ## 2026-11-17 — Shipping plugins: an image and a compose profile each, a zip for Windows (#426)
 
 **Found.** Plugins were built with the solution and run by hand; none was in an image, a release or

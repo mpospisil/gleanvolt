@@ -1,0 +1,71 @@
+{
+  "format": "gleanvolt-http-dump",
+  "formatVersion": 1,
+  "driver": "shelly-topac",
+  "family": "Shelly TopAC Portable EV Charger 11 kW",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC, written from Shelly's TopAC API documentation (shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) until a tester's snapshot replaces it (#429). No car, not started, 16 A limit.",
+  "responses": {
+    "rpc/Enum.GetStatus?owner=%22service:0%22&role=%22work_state%22": {
+      "value": "charger_free",
+      "source": "",
+      "last_update_ts": 1763390000
+    },
+    "rpc/Object.GetStatus?owner=%22service:0%22&role=%22phase_info%22": {
+      "value": {
+        "counter": {
+          "total": 1234.56,
+          "minute_ts": 1763390000,
+          "by_minute": [
+            0,
+            0,
+            0
+          ]
+        },
+        "total_current": 0.0,
+        "total_power": 0.0,
+        "total_act_energy": 1234.56,
+        "phase_a": {
+          "voltage": 231.0,
+          "current": 0.0,
+          "power": 0.0
+        },
+        "phase_b": {
+          "voltage": 231.0,
+          "current": 0.0,
+          "power": 0.0
+        },
+        "phase_c": {
+          "voltage": 231.0,
+          "current": 0.0,
+          "power": 0.0
+        }
+      },
+      "source": "sys",
+      "last_update_ts": 1763390000
+    },
+    "rpc/Number.GetStatus?owner=%22service:0%22&role=%22current_limit%22": {
+      "value": 16,
+      "source": "sys",
+      "last_update_ts": 1763390000
+    },
+    "rpc/Boolean.GetStatus?owner=%22service:0%22&role=%22start_charging%22": {
+      "value": false,
+      "source": "sys",
+      "last_update_ts": 1763390000
+    },
+    "rpc/Service.GetConfig?id=0": {
+      "id": 0,
+      "auto_charge": false,
+      "global_charge_limit": 0,
+      "global_time_limit": 0,
+      "auto_balance": {
+        "enable": false,
+        "em_ip": null,
+        "max_current": 16,
+        "exclude_self_current": false
+      }
+    }
+  }
+}

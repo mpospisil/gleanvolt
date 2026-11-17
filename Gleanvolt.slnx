@@ -5,6 +5,7 @@
     <Project Path="src/Gleanvolt.Devices.Solax/Gleanvolt.Devices.Solax.csproj" />
     <Project Path="src/Gleanvolt.Devices.Huawei/Gleanvolt.Devices.Huawei.csproj" />
     <Project Path="src/Gleanvolt.Devices.GoE/Gleanvolt.Devices.GoE.csproj" />
+    <Project Path="src/Gleanvolt.Devices.Shelly/Gleanvolt.Devices.Shelly.csproj" />
     <Project Path="src/Gleanvolt.Api/Gleanvolt.Api.csproj" />
     <Project Path="src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj" />
     <Project Path="src/Gleanvolt.Web/Gleanvolt.Web.csproj" />
@@ -37,5 +38,6 @@
     <Project Path="tests/Gleanvolt.Devices.Solax.Tests/Gleanvolt.Devices.Solax.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Devices.Huawei.Tests/Gleanvolt.Devices.Huawei.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Devices.GoE.Tests/Gleanvolt.Devices.GoE.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Devices.Shelly.Tests/Gleanvolt.Devices.Shelly.Tests.csproj" />
   </Folder>
 </Solution>

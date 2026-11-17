@@ -16,7 +16,7 @@ public static class DiscoveryConfiguration
     {
         var usable = devices
             .Where(device => device is { Identified: true, Role: not null, Tier: not null }
-                && (device.UnitId is not null || device.Finding == DiscoveryFinding.GoeCharger)
+                && (device.UnitId is not null || device.Finding is DiscoveryFinding.GoeCharger or DiscoveryFinding.ShellyCharger)
                 && device.Tier is not SupportTier.NotSupported)
             .ToList();
 
@@ -55,11 +55,11 @@ public static class DiscoveryConfiguration
 
     private static IEnumerable<string> Lines(DiscoveredDevice device, string model, string host, string port, string unitId)
     {
-        // go-e's model already says the brand.
+        // go-e's and Shelly's models already say the brand.
         var brand = device.Finding switch
         {
             DiscoveryFinding.HuaweiDevice => "Huawei ",
-            DiscoveryFinding.GoeCharger => string.Empty,
+            DiscoveryFinding.GoeCharger or DiscoveryFinding.ShellyCharger => string.Empty,
             _ => "SolaX ",
         };
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(model)}={brand}{device.Model}";

@@ -86,7 +86,7 @@ Installation**. The keys below are the reference behind those forms.
   "Chargers": [                    // a list; exactly one entry is supported
     {
       "Id": "charger",             // slug: the charger's identity within the system
-      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks", "huawei-22kt" or "goe" (untested)
+      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks", "huawei-22kt", "goe" or "shelly-topac" (untested)
       "Name": "Garage wallbox",
       "Model": "SolaX X1/X3-HAC",
       "Host": "192.168.2.6", "Port": 502, "UnitId": 1
