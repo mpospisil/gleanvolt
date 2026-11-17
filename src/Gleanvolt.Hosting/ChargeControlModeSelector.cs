@@ -6,8 +6,8 @@ namespace Gleanvolt.Hosting;
 /// <summary>
 /// Thread-safe runtime charge-control mode (see <see cref="IChargeControlModeSelector"/>). Registered
 /// as a singleton and always started in <see cref="ChargeControlMode.Off"/>: the service takes no
-/// control of the charger until somebody asks, so a restart after a crash, a power cut or a deploy
-/// leaves the charger exactly as its owner set it. A runtime change does not persist across restarts.
+/// control of the charger until somebody asks, or until the poll loop resumes the mode that was running
+/// before a restart (#413, see <see cref="Resume.ChargeModeFile"/>), through the same start a button uses.
 /// </summary>
 public sealed class ChargeControlModeSelector : IChargeControlModeSelector
 {

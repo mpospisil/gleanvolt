@@ -63,8 +63,8 @@ internal static class ControlEndpoints
                     pack: limits.Pack,
                     now: time.GetUtcNow(),
                     departBy: body.Fast?.DepartBy,
-                    // The targeted mode's horizon, and for the same reason it has one: neither can
-                    // promise anything past what a request that does not survive a restart can carry.
+                    // The targeted mode's horizon: a schedule further ahead than that is not one this
+                    // mode should be holding on the owner's behalf.
                     maxHorizon: limits.MaxHorizon);
 
                 if (!composed.Accepted)

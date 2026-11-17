@@ -175,7 +175,7 @@ is yours; what happens inside it is the forecast's to decide.
 - **`planId` is advisory.** Send it back and the response's `forecastMovedSinceQuote` says whether the
   forecast has been refreshed since you were shown that plan. Nothing is stored server-side, nothing
   expires, and a start never fails because of it.
-- **The limits follow the request's rules**: cleared by `/charging/stop`, and not surviving a restart.
+- **The limits follow the request's rules**: cleared by `/charging/stop`, and resumed with it after a restart.
 
 `POST /charging/start` with `mode: "targeted"` accepts the same `editable` inside its `target`.
 

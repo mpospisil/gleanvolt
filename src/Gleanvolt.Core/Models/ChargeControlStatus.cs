@@ -85,6 +85,10 @@ namespace Gleanvolt.Core.Models;
 /// A Forecasted session running with <b>until full</b> on (issue #279): since when, and which day of it
 /// this is. Null whenever Forecasted is not the mode driving or the option is off.
 /// </param>
+/// <param name="ResumedAt">
+/// When a restart took this mode up again by itself (#413), for as long as that mode runs; null once
+/// the mode changes, and for a mode somebody selected.
+/// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
     bool DryRun,
@@ -119,7 +123,8 @@ public sealed record ChargeControlStatus(
     LowTariffStatus? LowTariff = null,
     bool ChargerStoodDown = false,
     DateTimeOffset? WaitUntil = null,
-    UntilFullStatus? UntilFull = null)
+    UntilFullStatus? UntilFull = null,
+    DateTimeOffset? ResumedAt = null)
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;

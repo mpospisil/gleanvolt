@@ -71,10 +71,10 @@
     <value>The departure time is in the past.</value>
   </data>
   <data name="Request_TooFarAhead" xml:space="preserve">
-    <value>A departure more than {0} away is too far: a charge that does not survive a restart cannot reliably promise that.</value>
+    <value>A departure more than {0} away is too far ahead to schedule.</value>
   </data>
   <data name="Request_TooFarAheadForecast" xml:space="preserve">
-    <value>A departure more than {0} away is too far: neither the forecast nor a request that does not survive a restart can reliably promise that.</value>
+    <value>A departure more than {0} away is too far: the forecast cannot reliably promise that.</value>
   </data>
   <data name="Request_DepartureNeedsAmount" xml:space="preserve">
     <value>A departure time needs an amount to plan from — say how much energy, or what state of charge, the car needs.</value>

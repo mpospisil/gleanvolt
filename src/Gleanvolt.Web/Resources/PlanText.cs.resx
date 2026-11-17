@@ -91,7 +91,7 @@
     <value>režim nabíjení</value>
   </data>
   <data name="ChargeModeTip" xml:space="preserve">
-    <value>Spuštěním kteréhokoli režimu níže se nabíječka přepne do režimu Fast; Off nabíjení zastaví, ať běží jakýkoli režim. Po restartu se nic nezachová — služba nastartuje v režimu Off a nic nezapíše, dokud tady něco nestisknete. Fast (no battery) a Targeted se samy vypnou, jakmile auto dobije, Solar + grid po skončení využitelného slunce. Řádek výše to ukáže sám.</value>
+    <value>Spuštěním kteréhokoli režimu níže se nabíječka přepne do režimu Fast; Off nabíjení zastaví, ať běží jakýkoli režim. Po restartu se režim, který běžel, sám obnoví i s cílem nebo limitem, pokud mezitím neuplynul čas odjezdu; jinak služba nastartuje v režimu Off a nic nezapíše, dokud tady něco nestisknete. Fast (no battery) a Targeted se samy vypnou, jakmile auto dobije, Solar + grid po skončení využitelného slunce. Řádek výše to ukáže sám.</value>
   </data>
   <data name="HoldTopic" xml:space="preserve">
     <value>Blokace vybíjení baterie</value>
@@ -703,7 +703,7 @@
     <value>Zrušit</value>
   </data>
   <data name="PreviewTip" xml:space="preserve">
-    <value>Náhled nic nezapisuje — je to stejný plánovač, který běží při každém čtení, jen se ptá, co by se stalo, kdybyste začali teď. Požadavek se při restartu služby nezachová: pokud se služba v noci restartuje, auto přestane nabíjet a nic vás na to neupozorní.</value>
+    <value>Náhled nic nezapisuje — je to stejný plánovač, který běží při každém čtení, jen se ptá, co by se stalo, kdybyste začali teď. Běžící cíl se při restartu služby zachová: nabíjení se samo obnoví a započítá, co už bylo dodáno.</value>
   </data>
   <data name="IfYouStartNow" xml:space="preserve">
     <value>Plán, pokud začnete teď</value>

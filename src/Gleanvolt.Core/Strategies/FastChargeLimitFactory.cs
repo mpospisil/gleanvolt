@@ -64,8 +64,7 @@ public static class FastChargeLimitFactory
     /// it needs to be in the future.
     /// </param>
     /// <param name="maxHorizon">
-    /// How far ahead a departure may be set. Beyond it a request that does not survive a restart cannot
-    /// honestly promise anything. Ignored when no departure is given.
+    /// How far ahead a departure may be set. Ignored when no departure is given.
     /// </param>
     public static Result Create(
         FastChargeBasis basis,
@@ -92,8 +91,7 @@ public static class FastChargeLimitFactory
             if (maxHorizon is { } horizon && departure - now > horizon)
             {
                 return Result.Rejected(
-                    Invariant($"A departure more than {horizon.TotalHours:F0} hours away is further than a charge ")
-                    + "that does not survive a restart can honestly promise.", Phrase.Of("Request.TooFarAhead", new PhraseArg.Duration(horizon)));
+                    Invariant($"A departure more than {horizon.TotalHours:F0} hours away is too far ahead to schedule."), Phrase.Of("Request.TooFarAhead", new PhraseArg.Duration(horizon)));
             }
 
             // The one combination that cannot be honoured: with no amount there is no duration to work

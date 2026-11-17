@@ -9,7 +9,7 @@ namespace Gleanvolt.Hosting.Forecasting;
 /// Thread-safe runtime forecast settings (see <see cref="IForecastRuntimeSettings"/>). Registered as a
 /// singleton and seeded from <see cref="ForecastChargeOptions"/>; the configured values are only the
 /// boot defaults, and a change made from Home Assistant does not survive a restart — the same contract
-/// as the charge-control mode and the battery hold.
+/// as the battery hold.
 /// </summary>
 public sealed class ForecastRuntimeSettings : IForecastRuntimeSettings
 {

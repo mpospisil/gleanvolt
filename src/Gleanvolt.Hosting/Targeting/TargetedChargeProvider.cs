@@ -90,6 +90,25 @@ public sealed class TargetedChargeProvider : ITargetedChargePreview
     /// <summary>Energy the charger has delivered since the active request was activated, in watt-hours.</summary>
     public double DeliveredWh => _delivered.EnergyWattHours;
 
+    /// <summary>The active request, or null when none has been made.</summary>
+    public TargetedChargeRequest? Request => _selector.Request;
+
+    /// <summary>
+    /// Takes up a request saved before a restart (#413): sets it as it was, keeping its activation, and
+    /// carries on counting from what had been delivered, so the car is not promised the energy it already
+    /// has. Call it before the first <see cref="Update"/>, from the poll loop.
+    /// </summary>
+    public void Restore(TargetedChargeRequest request, double deliveredWh, string source)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        _selector.Set(request, source);
+        _activatedAt = request.ActivatedAt;
+        _delivered.Restore(deliveredWh);
+        _lastSignature = null;
+        _lastStrategy = null;
+    }
+
     /// <summary>
     /// Folds one telemetry reading into the target's progress and returns the current plan, or null
     /// when nothing has been requested.

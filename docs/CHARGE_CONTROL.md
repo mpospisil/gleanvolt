@@ -139,3 +139,36 @@ the least a battery loan will bridge for `Forecasted` (the floor with the loan o
 `SolarGrid`. Without a usable forecast they stay on, stood down, until you switch them off.
 `Forecasted` with [**Until full**](MODE_FORECASTED.md#until-full) on stands the charger down for the
 night instead, and carries on the next morning.
+
+## After a restart
+
+A restart resumes the mode that was running, with what it needs: Targeted's target, a fast charge's
+amount and departure, Forecasted's **Until full**. It is started the way a button starts it, so the
+log and the Overview say *"Resumed after Gleanvolt restarted at 22:49"*, and the restart wait (#192) and
+the battery hold apply as they would to a mode you picked.
+
+- **Kept in `data/charge-mode.json`**, beside `tariff.json`, written when the mode or its parameters
+  change and every 5 minutes while a mode runs, with the energy delivered so far. A target or an amount
+  carries on counting from there, so the car is not promised again what it already has. After a power
+  cut, up to 5 minutes of delivery is not counted.
+- **The shutdown pause stays.** Stopping Gleanvolt still pauses the car and releases the hold, in case it
+  doesn't come back. The car stays paused only for as long as the restart takes.
+- **Not resumed when its end passed while Gleanvolt was down**: a Targeted departure, a scheduled fast
+  charge's departure, an amount already delivered. It stays `Off`, and the log says why.
+- **Not resumed after a long absence.** `ChargeControl:ResumeWithin` (12 hours by default) limits how
+  long Gleanvolt may have been down. Targeted, a scheduled fast charge and **Until full** aren't limited
+  by it: their own end decides. `"00:00:00"` turns resuming off, and every restart comes back `Off`.
+- **An unplugged car doesn't matter.** The resumed mode waits for it, as a mode you pick does.
+- **A new session.** The session history ends the old one as `ServiceStopped` and records the resumed
+  mode as a new one.
+- A charger that doesn't answer at startup is retried every poll for ten minutes. Picking a mode in that
+  time wins over the resume.
+- The runtime settings — minimum battery SOC, **Low tariff only**, Solar + grid's minimum — aren't kept;
+  they come back at their configured values.
+
+```jsonc
+"ChargeControl": {
+  "ResumeWithin": "12:00:00",                // the longest absence most modes are resumed after
+  "ModeStatePath": "data/charge-mode.json"   // where the running mode is kept
+}
+```

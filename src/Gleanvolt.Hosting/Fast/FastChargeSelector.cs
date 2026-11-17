@@ -10,10 +10,8 @@ namespace Gleanvolt.Hosting.Fast;
 /// empty state waiting to be filled but the <see cref="Core.Enums.FastChargeBasis.Full"/> case: charge
 /// until the car says stop, exactly as the mode behaved before it could be given an amount.
 ///
-/// <para><b>Not persisted across restarts</b>, like the mode selector and the targeted request beside
-/// it. A dropped limit here is the mildest of the three — the charge simply runs to full instead of
-/// stopping at a number — but the rule is the same one, and one exception would be the beginning of
-/// the end of it.</para>
+/// <para>Held in memory only; a restart that resumes the fast charge puts the limit back (#413, see
+/// <see cref="FastChargeProvider.Restore"/>).</para>
 /// </summary>
 public sealed class FastChargeSelector : IFastChargeSelector
 {

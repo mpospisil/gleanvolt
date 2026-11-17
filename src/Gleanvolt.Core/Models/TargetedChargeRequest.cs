@@ -63,7 +63,7 @@ namespace Gleanvolt.Core.Models;
 ///
 /// <para>Here rather than on the plan because they are part of what was <b>asked for</b>, not part of
 /// what was computed: they follow the request's rules, are set through the same seam, are cleared with
-/// it, and do not survive a restart.</para>
+/// it, and are resumed with it after a restart (#413).</para>
 /// </param>
 public sealed record TargetedChargeRequest(
     double RequiredEnergyWh,

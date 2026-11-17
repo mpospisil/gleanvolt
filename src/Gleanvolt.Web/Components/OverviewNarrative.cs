@@ -39,6 +39,13 @@ public static class OverviewNarrative
             sentences.Add(why);
         }
 
+        // A restart took the mode up by itself (#413): said while that mode runs, so an owner who finds it
+        // charging knows nobody pressed anything.
+        if (status.ResumedAt is { } resumed)
+        {
+            sentences.Add(Localized.Format(DashboardText.ResumedAfterRestart, TimeZoneInfo.ConvertTime(resumed, zone)));
+        }
+
         // The house is not in it: the figures right under the headline already say what the roof,
         // the battery and the grid are doing, and saying it twice made the headline five lines long.
         return sentences;

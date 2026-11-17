@@ -154,4 +154,20 @@ public class OverviewNarrativeTests
 
         Assert.Contains("no tariff is configured, so it charges at any hour", text);
     }
+
+    [Fact]
+    public void Says_a_restart_resumed_the_mode_in_the_site_zone()
+    {
+        // 09:49 UTC is 11:49 in Prague in summer: the site's zone, not the server's.
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery) with
+        {
+            ResumedAt = new DateTimeOffset(2026, 8, 12, 9, 49, 0, TimeSpan.Zero),
+        });
+
+        Assert.EndsWith("Resumed after Gleanvolt restarted at 11:49, as if selected again.", text);
+    }
+
+    [Fact]
+    public void Says_nothing_of_a_restart_for_a_mode_somebody_selected() =>
+        Assert.DoesNotContain("restarted", Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery)));
 }

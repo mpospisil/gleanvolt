@@ -587,14 +587,14 @@ public static class GleanvoltHostingExtensions
         // ...and how much of it to deliver before stopping (issue #119). A stopping condition, not a
         // plan: the limit is runtime state belonging to one charge, so like the mode and the targeted
         // request it starts empty -- which is the Full case, and the behaviour this mode had before it
-        // could be given an amount.
+        // could be given an amount -- unless a restart resumes the fast charge it belonged to (#413).
         services.AddSingleton<IFastChargeSelector, FastChargeSelector>();
         services.AddSingleton<FastChargeProvider>();
 
         // Targeted charging (issue #80): a stated amount of energy by a stated departure time, with the
         // grid block placed over the sunniest hours it can reach. The request itself is runtime state rather than
-        // configuration -- it belongs to one trip -- so the selector starts empty and, like the mode,
-        // does not survive a restart.
+        // configuration -- it belongs to one trip -- so the selector starts empty, and is filled again
+        // only when a restart resumes the Targeted charge it belonged to (#413).
         services.Configure<TargetedChargeOptions>(configuration.GetSection(TargetedChargeOptions.SectionName));
         services.AddSingleton<ITargetedChargeSelector, TargetedChargeSelector>();
         services.AddSingleton<TargetedChargeProvider>();
@@ -711,13 +711,26 @@ public static class GleanvoltHostingExtensions
         });
 
         // Runtime charge-control mode, changed at runtime (e.g. by HA). It is deliberately NOT seeded
-        // from configuration: the service always starts in Off, holding no control over the charger,
-        // and only takes it when somebody asks. A restart is then never a surprise — after a crash, a
-        // power cut or a deploy the charger is left exactly as its owner set it, rather than being
-        // grabbed by whatever mode happened to be in a config file.
+        // from configuration: the service starts in Off, holding no control over the charger, rather
+        // than grabbing it with whatever mode happened to be in a config file.
         services.AddSingleton<IChargeControlModeSelector>(provider => new ChargeControlModeSelector(
             ChargeControlMode.Off,
             provider.GetRequiredService<ILogger<ChargeControlModeSelector>>()));
+
+        // ...and the one exception (#413): the mode that was running before a restart, with its target
+        // or limit, kept beside tariff.json and taken up again by the poll loop, as if selected again.
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var path = Path.IsPathRooted(options.ModeStatePath)
+                ? options.ModeStatePath
+                : Path.Combine(environment.ContentRootPath, options.ModeStatePath);
+
+            return new Gleanvolt.Hosting.Resume.ChargeModeFile(
+                Path.GetFullPath(path),
+                provider.GetRequiredService<ILogger<Gleanvolt.Hosting.Resume.ChargeModeFile>>());
+        });
 
         // The one way controlled charging is started or stopped (issue #89): the button surfaces call
         // this, it writes the charger's use-mode, and only then does the mode above move. Nothing else

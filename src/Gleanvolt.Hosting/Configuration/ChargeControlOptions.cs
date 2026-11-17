@@ -17,11 +17,26 @@ public sealed class ChargeControlOptions
     /// reads agree with the writes and a dry run behaves like a real one. Use it to validate both
     /// against your charger before letting it write for real.
     ///
-    /// <para>Note there is deliberately no boot-mode setting here: the service always starts in
-    /// <see cref="Gleanvolt.Core.Enums.ChargeControlMode.Off"/> and takes control only when asked, so a
-    /// restart never grabs the charger on its own.</para>
+    /// <para>Note there is deliberately no boot-mode setting here: the service starts in
+    /// <see cref="Gleanvolt.Core.Enums.ChargeControlMode.Off"/>, and the only mode it takes up on its own
+    /// is the one it was running before a restart (#413, see <see cref="ResumeWithin"/>), never one from
+    /// a config file.</para>
     /// </summary>
     public bool DryRun { get; init; }
+
+    /// <summary>
+    /// After a restart, the mode that was running is resumed (#413) when Gleanvolt was down for no longer
+    /// than this. A Targeted charge, a scheduled fast charge and Forecasted until full are resumed however
+    /// long the absence, until their own end has passed. Zero turns resuming off: every restart comes
+    /// back Off, as before #413.
+    /// </summary>
+    public TimeSpan ResumeWithin { get; init; } = TimeSpan.FromHours(12);
+
+    /// <summary>
+    /// Where the running mode and what it needs are kept for <see cref="ResumeWithin"/> (#413). Relative
+    /// to the content root unless absolute, beside <c>tariff.json</c> on the same bind mount.
+    /// </summary>
+    public string ModeStatePath { get; init; } = "data/charge-mode.json";
 
     /// <summary>Voltage used to convert between watts and the charger's amp setpoint.</summary>
     public double NominalVoltage { get; init; } = 230;

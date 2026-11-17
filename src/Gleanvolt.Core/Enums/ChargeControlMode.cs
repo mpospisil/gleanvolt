@@ -42,8 +42,8 @@ public enum ChargeControlMode
     /// finish in time, so a sunnier afternoon than forecast shrinks it before any of it is bought. When
     /// there is not enough time left for the request, it charges flat out and reports how far short it
     /// will fall rather than pretending otherwise. The home battery keeps its priority throughout, and
-    /// the discharge hold arms while the grid block runs so the pack never feeds the car. The request
-    /// does not survive a restart. Like the other modes it only acts while the charger's own use-mode
+    /// the discharge hold arms while the grid block runs so the pack never feeds the car. A restart
+    /// resumes the request while its departure is ahead (#413). Like the other modes it only acts while the charger's own use-mode
     /// is Fast.
     /// </summary>
     Targeted,

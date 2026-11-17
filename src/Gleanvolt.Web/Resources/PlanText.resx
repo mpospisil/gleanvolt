@@ -97,7 +97,7 @@
     <value>charge mode</value>
   </data>
   <data name="ChargeModeTip" xml:space="preserve">
-    <value>Starting any mode below switches the charger to Fast; Off stops the car, whatever mode was running. Nothing survives a restart — the service starts in Off and writes nothing until you press something here. Fast (no battery) and Targeted switch off by themselves when the car is done, and Solar + grid when the day's useful sun is over; the line above updates by itself.</value>
+    <value>Starting any mode below switches the charger to Fast; Off stops the car, whatever mode was running. After a restart, the mode that was running resumes by itself, with its target or limit, unless its departure has passed; otherwise the service starts in Off and writes nothing until you press something here. Fast (no battery) and Targeted switch off by themselves when the car is done, and Solar + grid when the day's useful sun is over; the line above updates by itself.</value>
   </data>
   <data name="HoldTopic" xml:space="preserve">
     <value>Battery discharge hold</value>
@@ -720,7 +720,7 @@
     <value>Cancel</value>
   </data>
   <data name="PreviewTip" xml:space="preserve">
-    <value>The preview writes nothing — it asks the same planner the poll loop runs what would happen if you started now. The request does not survive a restart of the service: if it restarts overnight, the car stops charging and you will not be told.</value>
+    <value>The preview writes nothing — it asks the same planner the poll loop runs what would happen if you started now. A running target is kept across a restart of the service: the charge resumes by itself and counts what it had already delivered.</value>
   </data>
   <data name="IfYouStartNow" xml:space="preserve">
     <value>The plan, if you start now</value>

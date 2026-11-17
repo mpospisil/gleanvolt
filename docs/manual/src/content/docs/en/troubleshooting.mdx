@@ -107,8 +107,8 @@ That is expected: a car needs at least about 4.1 kW on three phases, and Gleanvo
 buy the difference. See [How Gleanvolt decides](../how-it-works/basics/).
 
 **A charge I planned for the night didn't happen.**
-Gleanvolt restarted in between, for example for an update. Modes and plans don't survive a restart.
-Start it again after a restart.
+Gleanvolt was off when the departure passed, or for longer than 12 hours, so it didn't resume the mode
+after starting again. Its log says why, in a line starting *Not resuming after the restart*.
 
 **Charging stopped and the mode is Off again.**
 Every mode stops by itself when it's done: the car is full or unplugged, the amount was delivered, the

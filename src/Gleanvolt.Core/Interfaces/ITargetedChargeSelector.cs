@@ -12,9 +12,9 @@ namespace Gleanvolt.Core.Interfaces;
 /// <see cref="Enums.ChargeControlMode.Targeted"/> with nothing requested is a state the controller can
 /// report rather than a state that cannot be expressed.</para>
 ///
-/// <para><b>Not persisted.</b> The request drops on a restart exactly as the mode does. That is
-/// consistent with every other runtime setting here, and it is the one whose loss is discovered at
-/// 05:00 with a flat car — which is why it is said out loud in docs/MODE_TARGETED.md rather than left implied.</para>
+/// <para><b>Resumed after a restart</b> (#413) with the Targeted mode it belongs to, while its departure
+/// is ahead: the poll loop keeps it on disk and restores it, with what it had delivered, before the mode
+/// is started again. The selector itself holds it only in memory.</para>
 /// </summary>
 public interface ITargetedChargeSelector
 {

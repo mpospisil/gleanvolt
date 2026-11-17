@@ -528,6 +528,9 @@
   <data name="HighTariffWaiting" xml:space="preserve">
     <value>Platí vysoký tarif; nabíjení čeká na nízký tarif (zapnuto Jen nízký tarif).</value>
   </data>
+  <data name="ResumedAfterRestart" xml:space="preserve">
+    <value>Režim se po restartu Gleanvoltu v {0:HH:mm} obnovil sám, jako by byl znovu zvolen.</value>
+  </data>
   <data name="LowTariffIgnored" xml:space="preserve">
     <value>Je zapnuto Jen nízký tarif, ale žádný tarif není nastaven, takže se nabíjí kdykoli.</value>
   </data>
