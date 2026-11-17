@@ -161,8 +161,8 @@ znovu.</li>
 To je v pořádku: auto potřebuje na třech fázích alespoň asi 4,1 kW a Gleanvolt raději pozastaví, než aby
 rozdíl kupoval. Viz <a href="../how-it-works/basics/">Jak Gleanvolt rozhoduje</a>.</p>
 <p><strong>Nabíjení naplánované na noc neproběhlo.</strong>
-Gleanvolt se mezitím restartoval, například kvůli aktualizaci. Režimy a plány restart nepřežijí. Po
-restartu ho spusťte znovu.</p>
+Gleanvolt byl vypnutý, když uplynul čas odjezdu, nebo déle než 12 hodin, takže po spuštění režim
+neobnovil. Proč, uvádí jeho log na řádku začínajícím <em>Not resuming after the restart</em>.</p>
 <p><strong>Nabíjení skončilo a režim je zase Off.</strong>
 Každý režim skončí sám, když je hotovo: auto je plné nebo odpojené, množství bylo dodané, uplynul čas
 odjezdu, nebo skončilo dnešní slunce. Proč, napíše stránka nabíjení v <strong>Nabíjení</strong>.</p>
