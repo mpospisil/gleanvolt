@@ -66,6 +66,12 @@ namespace Gleanvolt.Api.Contracts;
 /// provider) and its name. Null when no feed reads the car, and in the status a control action answers
 /// with: read it from GET /status.
 /// </param>
+/// <param name="Settings">
+/// Minimum battery SOC, SOC resume margin and min solar surplus as the controller is using them now
+/// (issue #392) — the same object as GET /charging/settings, read when the status is served rather than
+/// at the last poll, so a change made elsewhere shows at once. Null in the status a control action
+/// answers with: read it from GET /status.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -95,10 +101,14 @@ public sealed record StatusResponse(
     LowTariffStatusResponse? LowTariff = null,
     UntilFullStatusResponse? UntilFull = null,
     ForecastOriginResponse? Forecast = null,
-    VehicleSourceResponse? VehicleSource = null)
+    VehicleSourceResponse? VehicleSource = null,
+    ChargingSettingsResponse? Settings = null)
 {
     internal static StatusResponse From(
-        ChargeControlStatus status, SolarForecastSnapshot? forecast = null, IVehicleUpdateService? vehicleFeed = null) => new(
+        ChargeControlStatus status,
+        SolarForecastSnapshot? forecast = null,
+        IVehicleUpdateService? vehicleFeed = null,
+        ChargingSettingsResponse? settings = null) => new(
         status.Timestamp,
         status.Mode,
         status.State,
@@ -131,7 +141,8 @@ public sealed record StatusResponse(
         status.LowTariff is { } low ? new LowTariffStatusResponse(low.Waiting, low.Until, low.Ignored) : null,
         status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null,
         forecast is { } held ? new ForecastOriginResponse(held.Origin.SourceId, held.Origin.Name, held.Forecast.RetrievedAt, held.ReceivedAt) : null,
-        vehicleFeed is { } feed ? new VehicleSourceResponse(feed.Manufacturer, feed.DisplayName, feed.Health.State) : null);
+        vehicleFeed is { } feed ? new VehicleSourceResponse(feed.Manufacturer, feed.DisplayName, feed.Health.State) : null,
+        settings);
 }
 
 /// <summary>The feed the car is read from.</summary>

@@ -41,6 +41,25 @@
         ]
       }
     },
+    "/api/v1/charging/settings": {
+      "get": {
+        "operationId": "getChargingSettings",
+        "parameters": [],
+        "requestBody": null,
+        "responses": [
+          "200 application/json $ChargingSettingsResponse"
+        ]
+      },
+      "put": {
+        "operationId": "setChargingSettings",
+        "parameters": [],
+        "requestBody": "application/json $ChargingSettingsRequest",
+        "responses": [
+          "200 application/json $ChargingSettingsResponse",
+          "400 application/problem\u002Bjson $ProblemDetails"
+        ]
+      }
+    },
     "/api/v1/charging/start": {
       "post": {
         "operationId": "startCharging",
@@ -292,6 +311,16 @@
     "ChargeControlState": "enum[disabled|idle|charging|paused]",
     "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|targetReached|departurePassed|noSunLeftToday|chargerTakenOver|]",
     "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded|chargerStoodDown|chargerRearmed]",
+    "ChargingSettingsRequest": {
+      "minBatterySocPercent": "number|string(double)?",
+      "minSolarSurplusWatts": "number|string(double)?",
+      "socResumeMarginPercent": "number|string(double)?"
+    },
+    "ChargingSettingsResponse": {
+      "minBatterySocPercent": "number|string(double) (required)",
+      "minSolarSurplusWatts": "number|string(double) (required)",
+      "socResumeMarginPercent": "number|string(double) (required)"
+    },
     "ControlActionResponse": {
       "fast": "any",
       "forecastMovedSinceQuote": "boolean?",
@@ -634,6 +663,7 @@
       "lowTariff": "any",
       "mode": "$ChargeControlMode (required)",
       "sessionEnergyWh": "number|string(double) (required)",
+      "settings": "any",
       "solarPowerWatts": "number|string(double) (required)",
       "state": "$ChargeControlState (required)",
       "surplusWatts": "number|string(double)? (required)",

@@ -453,8 +453,8 @@ public sealed class HaDiscovery
         yield return Sensor("loaned_today", "Battery loaned today", template: "{{ value_json.loaned_kwh }}", unit: "kWh", deviceClass: "energy");
         yield return Sensor("loan_power", "Battery loan power", template: "{{ value_json.loan_w }}", unit: "W", deviceClass: "power", stateClass: "measurement");
 
-        yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: 0, max: 100, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
-        yield return Number(ResumeMarginNumber, "SOC resume margin", min: 0, max: 50, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
+        yield return Number(MinBatterySocNumber, "Minimum battery SOC", min: RuntimeSettingLimits.MinBatterySocPercentMin, max: RuntimeSettingLimits.MinBatterySocPercentMax, step: 5, unit: "%", icon: "mdi:battery-arrow-down");
+        yield return Number(ResumeMarginNumber, "SOC resume margin", min: RuntimeSettingLimits.SocResumeMarginPercentMin, max: RuntimeSettingLimits.SocResumeMarginPercentMax, step: 1, unit: "%", icon: "mdi:battery-arrow-up");
         yield return Config("switch", UntilFullSwitch, new Dictionary<string, object?>
         {
             ["name"] = "Forecasted until full",
@@ -574,7 +574,7 @@ public sealed class HaDiscovery
         // The solar-grid mode's one number and its one verdict. Published unconditionally, like the
         // other modes' controls, so the minimum can be set before the button is pressed. The sensor is
         // the answer to "when will this switch itself off?" -- absent unless the mode is driving.
-        yield return Number(MinSolarSurplusNumber, "Min solar surplus", min: 0, max: 20000, step: 100, unit: "W", icon: "mdi:solar-power-variant");
+        yield return Number(MinSolarSurplusNumber, "Min solar surplus", min: RuntimeSettingLimits.MinSolarSurplusWattsMin, max: RuntimeSettingLimits.MinSolarSurplusWattsMax, step: 100, unit: "W", icon: "mdi:solar-power-variant");
 
         // Low tariff only (#274), beside the controls of the two modes it narrows. Published whatever
         // the tariff, like the tariff's own entities: one can be set up on Settings at any moment, and

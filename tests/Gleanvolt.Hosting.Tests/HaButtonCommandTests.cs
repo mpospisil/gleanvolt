@@ -43,6 +43,8 @@ public class HaButtonCommandTests
         Options.Create(new FastChargeOptions()),
         Options.Create(new SolarGridChargeOptions()),
         NullLogger<Gleanvolt.Hosting.Tariff.LowTariffSettings>.Instance);
+    private readonly ForecastRuntimeSettings _forecastSettings = new(
+        Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 }), NullLogger<ForecastRuntimeSettings>.Instance);
     private readonly UntilFullSettings _untilFull =
         new(Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 }), NullLogger<UntilFullSettings>.Instance);
 
@@ -66,6 +68,23 @@ public class HaButtonCommandTests
 
         Assert.Equal(3500, _solarGrid.MinSurplusWatts);
         Assert.Empty(_actions.Starts);
+    }
+
+    [Fact]
+    public void ANumberChangedElsewhereIsWhatTheWorkerPublishes()
+    {
+        // The API (#392) and the web UI write the same singletons the numbers read, so a change made
+        // there reaches Home Assistant with the next status publish, no MQTT command involved.
+        var worker = Worker();
+
+        _forecastSettings.SetMinBatterySocFloorPercent(45, "API (ha)");
+        _forecastSettings.SetFloorResumeMarginPercent(12, "API (ha)");
+        _solarGrid.SetMinSurplusWatts(2700, "API (ha)");
+
+        var published = worker.CurrentNumberValues().ToDictionary(n => n.ObjectId, n => n.Value);
+        Assert.Equal(45, published[HaDiscovery.MinBatterySocNumber]);
+        Assert.Equal(12, published[HaDiscovery.ResumeMarginNumber]);
+        Assert.Equal(2700, published[HaDiscovery.MinSolarSurplusNumber]);
     }
 
     [Theory]
@@ -515,8 +534,7 @@ public class HaButtonCommandTests
             Options.Create(new BatteryHoldOptions()),
             _actions,
             new BatteryHoldSelector(initialHold: false, NullLogger<BatteryHoldSelector>.Instance),
-            new ForecastRuntimeSettings(
-                Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 }), NullLogger<ForecastRuntimeSettings>.Instance),
+            _forecastSettings,
             _target,
             _fast,
             new NoopShutdown(),

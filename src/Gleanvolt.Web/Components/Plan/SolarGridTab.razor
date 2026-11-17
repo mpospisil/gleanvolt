@@ -40,7 +40,7 @@
             </p>
         </InfoTip>
     </div>
-    <input id="min-solar-surplus" type="number" step="100" min="0"
+    <input id="min-solar-surplus" type="number" step="100" min="@RuntimeSettingLimits.MinSolarSurplusWattsMin" max="@RuntimeSettingLimits.MinSolarSurplusWattsMax"
            @bind="_minSurplusWatts" @bind:event="onchange" @bind:after="OnMinSurplusSelected" />
 </div>
 
