@@ -10,7 +10,7 @@ public static class VehicleContract
     public const int Major = 1;
 
     /// <summary>Grows with every addition an older provider can ignore.</summary>
-    public const int Minor = 1;
+    public const int Minor = 2;
 
     /// <summary>The hub's path on Gleanvolt's web port.</summary>
     public const string HubPath = "/providers/vehicle";
@@ -46,6 +46,14 @@ public interface IVehicleClient : IProviderClient
     /// <paramref name="car"/> from now on.
     /// </summary>
     Task VehicleChanged(VehicleInfo car);
+
+    /// <summary>
+    /// Gleanvolt's charge control opened or closed a charging session, or the mode of an open one
+    /// changed (1.2, #414). Read the car more often while <see cref="ChargingSessionInfo.Open"/>: the car's
+    /// own charge state only says so once the car has reported it, often minutes after the plug-in.
+    /// A provider older than 1.2 never sees it.
+    /// </summary>
+    Task ChargingSessionChanged(ChargingSessionInfo session);
 }
 
 /// <summary>An accepted vehicle hello: the car Gleanvolt is configured for, so it is not configured twice.</summary>
@@ -53,6 +61,27 @@ public sealed record VehicleWelcome : Welcome
 {
     /// <summary>The car as Gleanvolt knows it.</summary>
     public VehicleInfo Car { get; init; } = new(string.Empty, string.Empty, string.Empty, string.Empty, null, string.Empty);
+
+    /// <summary>
+    /// Whether Gleanvolt has a charging session open as the provider says hello (1.2, #414); then
+    /// <see cref="IVehicleClient.ChargingSessionChanged"/> follows every change. Null from a Gleanvolt
+    /// older than 1.2: go by the car's own charge state.
+    /// </summary>
+    public ChargingSessionInfo? Session { get; init; }
+}
+
+/// <summary>
+/// Gleanvolt's charging session, as a car feed needs it to choose how often to read (#414). Open while a
+/// charge mode other than Off runs, the charger sees the car, and the session has not ended (the car
+/// full, a target reached). The rule Gleanvolt's own car feeds read by.
+/// </summary>
+/// <param name="Open">Whether a session is open.</param>
+/// <param name="Since">When Gleanvolt saw it open; null when closed.</param>
+/// <param name="Mode">The charge mode's name, e.g. "FastNoBattery" or "SolarOnly"; null when closed. For logs and display: new modes appear without a contract change.</param>
+public sealed record ChargingSessionInfo(bool Open, DateTimeOffset? Since = null, string? Mode = null)
+{
+    /// <summary>No session open.</summary>
+    public static ChargingSessionInfo Closed { get; } = new(false);
 }
 
 /// <summary>

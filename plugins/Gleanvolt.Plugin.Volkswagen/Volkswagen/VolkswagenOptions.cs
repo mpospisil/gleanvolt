@@ -23,8 +23,8 @@ public sealed class VolkswagenOptions
     public string DataDirectory { get; set; } = "data";
 
     /// <summary>
-    /// How often to ask while the car says it is charging. The built-in asks Gleanvolt's charge control
-    /// whether a session is open; a plugin can't see that, so the car's own last charge state decides.
+    /// How often to ask while Gleanvolt has a charging session open (vehicle 1.2, #414) or the car last
+    /// said it is charging.
     /// </summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
 

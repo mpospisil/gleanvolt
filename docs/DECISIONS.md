@@ -4,6 +4,40 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — The car provider is told when a charging session is open (vehicle 1.2, #414)
+
+**Found.** The built-in car feeds read every 5 minutes while Gleanvolt's charge control has a
+session open, and every 15 otherwise. A provider couldn't see the session, so the Volkswagen plugin
+went by the car's own last charge state. On the Pi on 2026-11-16, the first reading after a
+FastNoBattery charge started still said *Idle*. The next read was due up to 15 minutes later.
+
+**Decided.**
+- **State, pushed.** Vehicle 1.2 puts `session` (`open`, `since`, `mode`) in the welcome and sends
+  `ChargingSessionChanged` on a change. The rule is the built-in feeds' own, now one property:
+  `ChargeControlStatus.ChargingSessionOpen` (a mode other than Off, the car connected, the mode not
+  ended). VW and Škoda read it from there too.
+- **Open or closed, and the mode's name as text.** The mode is for logs and display. A string keeps
+  new modes out of the contract. Energy and targets stay out until a provider needs them.
+- **Gleanvolt doesn't send a `RefreshRequested` when a session opens.** A refresh is Gleanvolt waiting
+  60 s for an answer and marking the feed *didn't answer* without one. A session opening needs neither.
+  The provider decides: the Volkswagen plugin reads at once, within its 30-second floor.
+- **The car's own state still counts.** The plugin reads every 5 minutes while a session is open
+  **or** the car says it is charging, as the Škoda feed does. A charge Gleanvolt didn't start (from
+  the car, at a public charger) is followed too. With a Gleanvolt older than 1.2, only the car decides.
+- **Only to a provider at 1.2 or later.** `ProviderSessions` keeps the minor from the hello. A 1.1
+  client would only log that it has no handler.
+- **One send at a time, always the latest state.** Charge control reports every few seconds, and the
+  state is also said when a provider attaches, to cover a change between its welcome and its attach.
+  Two fire-and-forget sends could arrive out of order and leave the provider with the older state. A
+  test caught that. Each send now reads the state when it goes, under a semaphore, and an unchanged
+  state isn't sent to the same connection twice. The SDK ignores a state it already holds.
+
+**Consequences accepted.** Closed → open → closed within one send can reach the provider as a
+single "closed": it is a state, not a stream of events. A provider disconnected while a session
+opens keeps its last state until its next welcome.
+
+---
+
 ## 2026-11-16 — On the device, the plugin's page needed framing allowed and Blazor's script restored (#410)
 
 **Found.** The first run of the Volkswagen plugin on the Pi, against the real ID.4:

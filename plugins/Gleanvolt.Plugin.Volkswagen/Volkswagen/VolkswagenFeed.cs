@@ -64,10 +64,20 @@ public sealed class VolkswagenFeed : IVehicleSource
     /// <summary>Whether reads are stopped until the owner signs in.</summary>
     public bool IsBlocked => _blocked || !_account.Current.IsComplete;
 
-    /// <summary>How long to wait before the next read: never while stopped.</summary>
+    /// <summary>
+    /// Whether Gleanvolt has a charging session open (#414), from the SDK. False from a Gleanvolt that
+    /// doesn't say, which leaves the car's own charge state to decide.
+    /// </summary>
+    public bool ChargingSessionOpen { get; set; }
+
+    /// <summary>
+    /// How long to wait before the next read: never while stopped; <see cref="VolkswagenOptions.PollInterval"/>
+    /// while Gleanvolt has a session open or the car last said it is charging (a charge started from the
+    /// car or at a public charger), as the built-in feeds do; otherwise the idle interval.
+    /// </summary>
     public TimeSpan NextDelay =>
         IsBlocked ? Timeout.InfiniteTimeSpan
-        : _last?.ChargeState == CarChargeState.Charging ? _options.PollInterval
+        : ChargingSessionOpen || _last?.ChargeState == CarChargeState.Charging ? _options.PollInterval
         : _options.IdlePollInterval;
 
     /// <summary>The SDK's call: after a hello, for <i>Ask the car</i>, and from the poller.</summary>
@@ -183,6 +193,7 @@ public sealed class VolkswagenPoller : BackgroundService
         // Here rather than when the loop starts: the first hello can come before it. A new session starts
         // with no status in Gleanvolt, so it is said again after every hello.
         connection.Welcomed += welcome => _ = ReportAsync(force: true);
+        connection.SessionChanged += OnSessionChanged;
         feed.Changed += OnChanged;
     }
 
@@ -218,6 +229,19 @@ public sealed class VolkswagenPoller : BackgroundService
 
     /// <summary>Reads now, rather than at the next tick: after a sign-in on the page.</summary>
     public void Wake() => _wake.TrySetResult();
+
+    // A session opening reads the car at once, rather than at the end of an idle wait, and from then on
+    // every PollInterval (#414). The car may not have reported the plug-in yet; the next read catches it.
+    private void OnSessionChanged(ChargingSessionInfo? session)
+    {
+        var opened = session is { Open: true } && !_feed.ChargingSessionOpen;
+        _feed.ChargingSessionOpen = session is { Open: true };
+
+        if (opened)
+        {
+            Wake();
+        }
+    }
 
     private void OnChanged()
     {

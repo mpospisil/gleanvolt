@@ -31,6 +31,11 @@ its own, which Gleanvolt shows: set `options.PageUrl`, and guard the page with
 ticket. The SDK references the ASP.NET Core shared framework for that, so a provider runs on the
 ASP.NET Core runtime.
 
+A car provider that reads the car on a clock can follow Gleanvolt's charging session:
+`VehicleProviderConnection.Session` says whether one is open, and `SessionChanged` is raised when that
+changes. Read more often while a session is open. With a Gleanvolt older than vehicle 1.2 it is
+`null`; go by the car's own charge state then.
+
 The protocol, the tokens and the limits on the data are described in
 [docs/PROVIDERS.md](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
 

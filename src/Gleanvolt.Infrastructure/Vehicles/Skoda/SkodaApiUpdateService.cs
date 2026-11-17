@@ -158,10 +158,7 @@ public sealed class SkodaApiUpdateService(
     /// charge started from the car or a public charger is followed too.
     /// </summary>
     private bool IsCharging =>
-        (status?.Current is { } current
-         && current.Mode != ChargeControlMode.Off
-         && current.CarConnected
-         && !current.SessionCompleted)
+        status?.Current?.ChargingSessionOpen == true
         || _lastReading?.ChargeState == VehicleChargeState.Charging;
 
     public async Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
