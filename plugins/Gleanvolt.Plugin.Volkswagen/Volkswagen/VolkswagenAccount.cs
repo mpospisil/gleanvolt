@@ -1,3 +1,4 @@
+using Gleanvolt.Providers.Client;
 using System.Text.Json;
 
 namespace Gleanvolt.Plugin.Volkswagen.Volkswagen;
@@ -19,8 +20,8 @@ public sealed record VolkswagenAccount(string Username, string Password, string 
     public override string ToString() => $"{Username} ({Vin})";
 }
 
-/// <summary>Keeps the account in the data directory.</summary>
-public sealed class AccountStore(DataFiles files)
+/// <summary>Keeps the account in the data directory, through the SDK's secret store (#416).</summary>
+public sealed class AccountStore(IProviderSecretStore files)
 {
     private const string FileName = "account.json";
 

@@ -60,11 +60,12 @@ The account is not configuration: you enter it on the page.
 - `account.json`: the VW ID, **the password** and the VIN.
 - `session.json`: the signed-in session's cookies. **Whoever has them is signed in as you.**
 
-That account also unlocks and locates the car. The plugin has no secret store: both files are plain
-JSON, written readable and writable by the plugin's user alone (`0600`) in a directory only that user
-can open (`0700`). That is what Gleanvolt's own secret store does on Linux, but nothing is encrypted.
+That account also unlocks and locates the car. Both go through the SDK's secret store (#416), which
+does what Gleanvolt's own store does. On Linux they are plain JSON, readable and writable by the
+plugin's user alone (`0600`), in a directory only that user can open (`0700`): nothing is encrypted.
 What protects them is those permissions, and who can read the disk or the Docker volume: anyone with
-root on the machine, or the SD card in their hand, has them. Never put the directory in a backup or a
+root on the machine, or the SD card in their hand, has them. On Windows they are encrypted with DPAPI
+for the user the plugin runs as, so they open for that user only, on that machine. Never put the directory in a backup or a
 share you wouldn't give the password to, and never in the repository. Neither file is ever logged.
 
 `keys/` beside them holds the page's own ASP.NET Core keys (its Blazor circuits), not your account.
@@ -149,8 +150,8 @@ result of #410: what moving a car feed into a plugin costs.
 | The reading | `VehicleState`, with a source id | The contract's `VehicleReading`; no source id | Gleanvolt names a provider's reading after the provider |
 | Time to full over 48 hours | Kept, up to 7 days | Left out; the rest of the reading is sent | Gleanvolt refuses a whole reading over 48 hours; the built-in's holder never checked |
 | The car's target SOC (`TargetSocPercent`) | Parsed, unused | Not copied | Nothing used it, and the contract has no field for it |
-| Account | `Vehicle:Website:Username`, `:Password`, `:Vin`, on the Car page, in the secret store | Entered on the plugin's page, in `account.json` | A plugin has no Gleanvolt settings or secret store. A new VW ID or VIN forgets the session; a new password alone doesn't |
-| Session cookies | `ISecretStore` (`0600` files on Linux, DPAPI on Windows) | `session.json`, `0600` | **Gap: the SDK has no secret store.** On Windows, nothing like DPAPI |
+| Account | `Vehicle:Website:Username`, `:Password`, `:Vin`, on the Car page, in the secret store | Entered on the plugin's page, in `account.json` (the SDK's secret store) | A plugin has no Gleanvolt settings or secret store. A new VW ID or VIN forgets the session; a new password alone doesn't |
+| Session cookies | `ISecretStore` (`0600` files on Linux, DPAPI on Windows) | `session.json`, through the SDK's `IProviderSecretStore` (#416): the same protection | A plugin has no Gleanvolt secret store; the SDK has its own since #416 |
 | Sign-in states and the page | `VehicleSignInState` with phrases, in English and Czech | A small record of its own; every text in English and Czech in `PageText` (`Words`), chosen by the `culture` Gleanvolt opens the page with (#415) | Gleanvolt's phrases and resources are its own. A culture cookie carries the language to Blazor's circuit, whose requests have no query |
 | Status messages | `VehicleSourceHealth` with phrases | `ProviderStatus` with a code (`not-set-up`, `needs-sign-in`), which Gleanvolt words itself, and the detail in English and Czech (#415) | The English `message` remains for a Gleanvolt older than vehicle 1.3 |
 | How often to read | 5 min while Gleanvolt's charge control has a session open (`ChargeControlStatusHolder`), 15 otherwise | 5 min while Gleanvolt has a session open (vehicle 1.2's `ChargingSessionChanged`, #414) **or** the car last said it is charging, 15 otherwise; a read at once when a session opens | The SDK carries the session since #414. The car's own state also counts, so a charge started from the car or at a public charger is followed, as the built-in Škoda feed does. With a Gleanvolt older than 1.2, only the car's state decides |
@@ -168,5 +169,6 @@ until you sign in.
 
 ## Not done here
 
-- A secret store in the SDK, so the account and the session aren't plain `0600` files on Windows: #416.
-- Tested against the real ID.4 through a charge on 2026-11-16 (see #410's comments); nothing left from that.
+Nothing from #410 is left open. The plugin ran against the real ID.4 through a charge on 2026-11-16
+(see #410's comments). The SDK gaps it found are closed: the charging session (#414), the status in
+the viewer's language (#415), and the secret store (#416).

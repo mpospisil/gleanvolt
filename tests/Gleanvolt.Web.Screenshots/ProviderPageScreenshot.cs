@@ -29,7 +29,7 @@ internal static class ProviderPageScreenshot
             context.JSInterop.Mode = JSRuntimeMode.Loose;
 
             var options = new VolkswagenOptions { DataDirectory = directory };
-            var files = new DataFiles(options);
+            var files = new ProviderSecretStore(options.DataDirectory);
             var account = new AccountStore(files);
             account.Save("owner@example.com", "not-a-real-password", "WVGZZZE2ZPE000001");
             var session = new VwWebsiteSessionStore(files);

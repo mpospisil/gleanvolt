@@ -36,6 +36,10 @@ A car provider that reads the car on a clock can follow Gleanvolt's charging ses
 changes. Read more often while a session is open. With a Gleanvolt older than vehicle 1.2 it is
 `null`; go by the car's own charge state then.
 
+A provider that holds an account keeps it in `IProviderSecretStore`, registered with
+`services.AddGleanvoltProviderSecrets(directory)`: owner-only (`0600`) files on Linux and macOS,
+DPAPI-encrypted files on Windows, every write atomic.
+
 Gleanvolt shows a provider's status in each viewer's language: report it with a code from
 `ProviderStatusCodes`, which Gleanvolt words itself, and the detail in `ProviderStatus.Messages`, one
 text per language.

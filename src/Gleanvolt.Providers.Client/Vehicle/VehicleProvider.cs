@@ -31,6 +31,7 @@ public sealed class VehicleProviderConnection : ProviderConnection<VehicleWelcom
 {
     private readonly IVehicleSource _source;
     private VehicleInfo? _car;
+    private readonly Lock _sessionGate = new();
     private volatile ChargingSessionInfo? _session;
 
     public VehicleProviderConnection(
@@ -91,15 +92,20 @@ public sealed class VehicleProviderConnection : ProviderConnection<VehicleWelcom
         });
     }
 
-    // Gleanvolt says the state again whenever a provider attaches, so an unchanged one is not news.
+    // Gleanvolt says the state again whenever a provider attaches, so an unchanged one is not news. The
+    // welcome and that repeat arrive on different threads, often at once: the check and the set are one
+    // step, or both would see the old state and raise the change twice.
     private void SetSession(ChargingSessionInfo? session)
     {
-        if (session == _session)
+        lock (_sessionGate)
         {
-            return;
-        }
+            if (session == _session)
+            {
+                return;
+            }
 
-        _session = session;
+            _session = session;
+        }
 
         if (session is { Open: true })
         {
