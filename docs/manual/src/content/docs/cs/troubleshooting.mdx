@@ -108,8 +108,8 @@ To je v pořádku: auto potřebuje na třech fázích alespoň asi 4,1 kW a Glea
 rozdíl kupoval. Viz [Jak Gleanvolt rozhoduje](../how-it-works/basics/).
 
 **Nabíjení naplánované na noc neproběhlo.**
-Gleanvolt se mezitím restartoval, například kvůli aktualizaci. Režimy a plány restart nepřežijí. Po
-restartu ho spusťte znovu.
+Gleanvolt byl vypnutý, když uplynul čas odjezdu, nebo déle než 12 hodin, takže po spuštění režim
+neobnovil. Proč, uvádí jeho log na řádku začínajícím *Not resuming after the restart*.
 
 **Nabíjení skončilo a režim je zase Off.**
 Každý režim skončí sám, když je hotovo: auto je plné nebo odpojené, množství bylo dodané, uplynul čas

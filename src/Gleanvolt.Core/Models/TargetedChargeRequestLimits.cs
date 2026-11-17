@@ -9,8 +9,7 @@ namespace Gleanvolt.Core.Models;
 /// to see. Each surface hands over the values its host bound for it.</para>
 /// </summary>
 /// <param name="MaxHorizon">
-/// How far ahead a departure may be set. Beyond it neither the forecast nor a request that does not
-/// survive a restart can honestly promise anything.
+/// How far ahead a departure may be set. Beyond it the forecast cannot honestly promise anything.
 /// </param>
 /// <param name="BatteryCapacityWh">
 /// The car's usable capacity in Wh, or 0 when it has not been configured. Zero withdraws the SOC-based

@@ -4,6 +4,72 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — Resume the charge mode after a restart (#413)
+
+**What.** A restart takes up the mode that was running, with its target, fast limit or until full, as
+if it had been selected again, and the log and the Overview say so. A mode whose end passed while
+Gleanvolt was down, or (for the modes without an end of their own) an absence over
+`ChargeControl:ResumeWithin`, stays Off with a log line saying why.
+
+**How.**
+- `Hosting/Resume/SavedChargeMode`: the mode, `SavedAt`, `UntilFull`, `FastLimit` + `FastDeliveredWh`,
+  `TargetedRequest` + `TargetedDeliveredWh`. `DiffersFrom` compares the parameters, not the energy or
+  the time; a request's forbidden windows are compared by value, since one read from disk never shares
+  the list with the one in memory.
+- `Hosting/Resume/ChargeModeFile`: `data/charge-mode.json` (`ChargeControl:ModeStatePath`), JSON with
+  string enums, written atomically (`.tmp`, then a move). `Track` every poll writes on a change or every
+  `RefreshInterval` (5 min) while a mode runs; `Flush` on `StopAsync` writes the last poll stamped now,
+  and does nothing when nothing was tracked, so a resume still pending at shutdown leaves the file as
+  it was. An unreadable file is nothing saved.
+- `Hosting/Resume/ChargeModeResume.Decide`: pure, one rule per mode (see DECISIONS.md).
+- `PollingService`: `PrepareResume` at the top of `ExecuteAsync` decides, and restores through
+  `TargetedChargeProvider.Restore` / `FastChargeProvider.Restore` (the selector set with the original
+  `ActivatedAt`, so the provider doesn't reset its meter, then `EnergyIntegrator.Restore(deliveredWh)`),
+  or sets until full. `ResumeAsync` (was `ResumeUntilFullAsync`) calls `IChargeActions.StartAsync(mode,
+  "restart")` each poll until it lands, the owner picks a mode, or 10 minutes pass. The file is tracked
+  only once no resume is pending, after the end-of-session block.
+- `ChargeControlStatus.ResumedAt`, carried while the resumed mode runs; `OverviewNarrative` adds
+  *"Resumed after Gleanvolt restarted at 22:49, as if selected again."* (`DashboardText.ResumedAfterRestart`, en + cs).
+  Not in the API or Home Assistant.
+- `UntilFullSessionFile` keeps the session start for the day count. With no `charge-mode.json` (an
+  upgrade) its session is still resumed, as `Forecasted` + until full.
+- `ChargeControl:ResumeWithin` (`12:00:00`) in `ChargeControlOptions` and appsettings.json.
+- Text that said a mode, target or limit doesn't survive a restart: the selectors and their
+  interfaces, `ChargeControlMode.Targeted`, the horizon refusals (`Request.TooFarAhead`,
+  `Request.TooFarAheadForecast`, en + cs), `PlanText.ChargeModeTip` and `PreviewTip` (en + cs).
+
+**Hardware.** Nothing new is written: the resume goes through the same use-mode write a button makes.
+The shutdown pause stays, so the car sees one pause as long as the restart. The charger's flaky link
+(about 45 dropouts a day) is why a refused start is retried for 10 minutes rather than given up.
+
+**Tests.** `ChargeModeResumeTests` (each mode's rule), `ChargeModeFileTests` (round trips with a
+constrained request and a deferred limit, change and refresh writes, flush, an unreadable file),
+`ChargeModeResumeLoopTests` (through the poll loop over two process lifetimes: a fast charge resumes
+and keeps counting, a target survives, a passed departure stays Off and writes Off, Off stays Off, the
+owner's pick beats a pending resume), `OverviewNarrativeTests` (the sentence). The until-full restart
+test passes unchanged through the fallback.
+
+**Not checked on the Pi yet.**
+
+**Files.** `src/Gleanvolt.Hosting/Resume/` (new: `SavedChargeMode.cs`, `ChargeModeFile.cs`,
+`ChargeModeResume.cs`), `PollingService.cs`, `GleanvoltHostingExtensions.cs`,
+`Configuration/ChargeControlOptions.cs`, `Fast/FastChargeProvider.cs`, `Fast/FastChargeSelector.cs`,
+`Targeting/TargetedChargeProvider.cs`, `Targeting/TargetedChargeSelector.cs`,
+`Forecasting/UntilFullSessionFile.cs`, `Forecasting/ForecastRuntimeSettings.cs`,
+`ChargeControlModeSelector.cs`, `BatteryHoldSelector.cs`; `src/Gleanvolt.Core/Strategies/EnergyIntegrator.cs`,
+`Models/ChargeControlStatus.cs`, `Models/TargetedChargeRequest.cs`, `Models/TargetedChargeRequestLimits.cs`,
+`Enums/ChargeControlMode.cs`, `Strategies/FastChargeLimitFactory.cs`, `Strategies/TargetedChargeRequestFactory.cs`,
+`Interfaces/I{ChargeControlMode,FastCharge,TargetedCharge}Selector.cs`, `Interfaces/IForecastRuntimeSettings.cs`;
+`src/Gleanvolt.Api/Endpoints/ControlEndpoints.cs`; `src/Gleanvolt.Web/Components/OverviewNarrative.cs`,
+`Resources/{Dashboard,Plan,Service}Text{,.cs}.resx`; `src/Gleanvolt.Worker/appsettings.json`;
+`tests/Gleanvolt.Hosting.Tests/ChargeModeResume{,Loop}Tests.cs` (new),
+`tests/Gleanvolt.Web.Tests/OverviewNarrativeTests.cs`; `docs/CHARGE_CONTROL.md` (**After a restart**),
+`MODE_TARGETED.md`, `MODE_FAST_NO_BATTERY.md`, `MODE_FORECASTED.md`, `WEB_UI.md`, `HTTP_API.md`,
+`DECISIONS.md`, `IMPLEMENTATION_LOG.md`; manual en + cs: `using/modes/{fast,targeted,forecasted}.mdx`,
+`installation/updating.mdx`, `troubleshooting.mdx`.
+
+---
+
 ## 2026-11-17 — A secret store in the provider SDK (#416)
 
 **What.** `IProviderSecretStore` in `Gleanvolt.Providers.Client`: a provider's own secrets, with the

@@ -41,9 +41,15 @@ public sealed class EnergyIntegrator
     }
 
     /// <summary>Clears the total and forgets the last sample (e.g. a new session, or a new day).</summary>
-    public void Reset()
+    public void Reset() => Restore(0);
+
+    /// <summary>
+    /// Starts again from <paramref name="energyWattHours"/> already counted, with no last sample: a
+    /// total carried over a restart (#413), so the time the service was down adds nothing to it.
+    /// </summary>
+    public void Restore(double energyWattHours)
     {
-        EnergyWattHours = 0;
+        EnergyWattHours = Math.Max(0, energyWattHours);
         _lastSample = null;
         _lastPowerWatts = 0;
     }

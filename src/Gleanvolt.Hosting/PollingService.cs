@@ -6,6 +6,7 @@ using Gleanvolt.Core.Strategies;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
+using Gleanvolt.Hosting.Resume;
 using Gleanvolt.Hosting.SolarGrid;
 using Gleanvolt.Hosting.Targeting;
 using static System.FormattableString;
@@ -66,13 +67,21 @@ public sealed class PollingService : BackgroundService
     private readonly ILowTariffSettings? _lowTariff;
     private bool _fastWaitingForLowTariff;
 
-    // Forecasted until full (#279): the owner's flag, and the session kept on disk so a restart resumes
-    // it. A resume that the charger refuses (its link is flaky, and a reboot is when it is likeliest to
-    // be down) is tried again every poll for ResumeWindow, the file kept meanwhile.
+    // Forecasted until full (#279): the owner's flag, and the session kept on disk to count its days.
     private readonly IUntilFullSettings? _untilFull;
     private readonly UntilFullSessionFile? _untilFullSession;
+
+    // The running mode kept on disk, and taken up again after a restart (#413). A resume the charger
+    // refuses (its link is flaky, and a reboot is when it is likeliest to be down) is tried again every
+    // poll for ResumeWindow, the file left as it was meanwhile.
+    private readonly ChargeModeFile? _modeFile;
+    private readonly TimeSpan _resumeWithin;
+    private ChargeControlMode? _resuming;
     private DateTimeOffset? _resumeUntil;
     private static readonly TimeSpan ResumeWindow = TimeSpan.FromMinutes(10);
+
+    // The mode a restart took up, and when, for the Overview to say so until the mode changes.
+    private (ChargeControlMode Mode, DateTimeOffset At)? _resumed;
 
     private readonly ILogger<PollingService> _logger;
     private readonly TimeProvider _timeProvider;
@@ -124,10 +133,13 @@ public sealed class PollingService : BackgroundService
         ITariffSchedule? tariff = null,
         ILowTariffSettings? lowTariff = null,
         IUntilFullSettings? untilFull = null,
-        UntilFullSessionFile? untilFullSession = null)
+        UntilFullSessionFile? untilFullSession = null,
+        ChargeModeFile? modeFile = null)
     {
         _untilFull = untilFull;
         _untilFullSession = untilFullSession;
+        _modeFile = modeFile;
+        _resumeWithin = chargeControlOptions.Value.ResumeWithin;
         _solarGrid = solarGrid;
         _tariff = tariff;
         _lowTariff = lowTariff;
@@ -155,8 +167,12 @@ public sealed class PollingService : BackgroundService
     // still reach the charger. Without this we'd leave the charger drawing at our last setpoint.
     // The battery hold too: a family whose hold is a lasting setting (Huawei, #323) would otherwise leave
     // the battery blocked while nothing runs to release it. SolaX's command lapses on its own and does nothing.
+    // The pause stays although the mode is resumed on the next start (#413): it is what protects a car
+    // whose Gleanvolt does not come back. The mode file is written once more first, so the next start
+    // measures the absence from this moment and carries the energy of the last poll.
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        _modeFile?.Flush(_timeProvider.GetUtcNow());
         await _chargingControl.PauseOnShutdownAsync(cancellationToken);
 
         if (_batteryHoldOptions.Enabled)
@@ -178,7 +194,7 @@ public sealed class PollingService : BackgroundService
     {
         _logger.LogInformation(
             "Charge control at startup: mode {Mode} ({Writes}) — the charger is left as its owner set it "
-            + "until a mode is selected. It can be changed at runtime.",
+            + "until a mode is selected or the one running before the restart is resumed. It can be changed at runtime.",
             _mode.Mode,
             _chargeControlDryRun ? "dry run — no writes" : "live — writing to the charger");
 
@@ -189,10 +205,7 @@ public sealed class PollingService : BackgroundService
                 ? $", hold off — the battery charges and discharges normally until asked otherwise ({(_batteryHoldOptions.DryRun ? "dry run — no writes" : "live — writing to the inverter")})"
                 : string.Empty);
 
-        if (_untilFull is not null && _untilFullSession is { Restorable: true })
-        {
-            _resumeUntil = _timeProvider.GetUtcNow() + ResumeWindow;
-        }
+        PrepareResume();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -236,7 +249,7 @@ public sealed class PollingService : BackgroundService
                 // energy the car already has.
                 var fastCharge = Planned("fast charge progress", () => _fastCharge.Update(state));
 
-                await ResumeUntilFullAsync(stoppingToken);
+                await ResumeAsync(stoppingToken);
 
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
@@ -293,6 +306,13 @@ public sealed class PollingService : BackgroundService
                 if (_resumeUntil is null)
                 {
                     _untilFullSession?.Track(untilFull, state.Timestamp);
+                    _modeFile?.Track(Saved(mode, untilFull, state.Timestamp));
+                }
+
+                // Said on the Overview for as long as the resumed mode runs; any change of mode ends it.
+                if (_resumed is { } resumed && resumed.Mode != mode)
+                {
+                    _resumed = null;
                 }
 
                 // Charging as it stands after the block above, so a mode that has just ended itself lets
@@ -354,7 +374,8 @@ public sealed class PollingService : BackgroundService
                     WaitUntil: mode != ChargeControlMode.Off ? result.WaitUntil : null,
                     UntilFull: untilFull && _untilFullSession?.Since is { } since
                         ? new UntilFullStatus(since, _untilFullSession.Day(state.Timestamp) ?? 1)
-                        : null));
+                        : null,
+                    ResumedAt: _resumed?.At));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -397,6 +418,119 @@ public sealed class PollingService : BackgroundService
     }
 
     /// <summary>
+    /// Decides, once at startup, whether to take up the mode that was running before the restart
+    /// (#413), and if so puts back what it needs — the target, the fast limit and what each had
+    /// delivered, the until-full flag — before the first poll meters anything. Starting the mode itself
+    /// is left to <see cref="ResumeAsync"/>, which can retry it.
+    ///
+    /// <para>A file from before #413 is not there, and an until-full session kept by
+    /// <see cref="UntilFullSessionFile"/> stands in for it, so an upgrade does not lose that session.</para>
+    /// </summary>
+    private void PrepareResume()
+    {
+        var now = _timeProvider.GetUtcNow();
+        var saved = _modeFile?.Saved;
+
+        if (saved is null && _untilFull is not null && _untilFullSession is { Restorable: true, Since: { } since })
+        {
+            saved = new SavedChargeMode(ChargeControlMode.Forecasted, now, UntilFull: true);
+            _logger.LogInformation("Forecasted until full was running at shutdown (since {Since:yyyy-MM-dd HH:mm}).", since);
+        }
+
+        if (ChargeModeResume.Decide(saved, now, _resumeWithin) is not { } decision)
+        {
+            return;
+        }
+
+        if (!decision.Resume)
+        {
+            _logger.LogInformation("Not resuming after the restart: {Reason}. Charge control stays Off.", decision.Reason);
+            return;
+        }
+
+        _logger.LogInformation("Resuming after the restart, as if selected again: {Reason}.", decision.Reason);
+
+        switch (saved!.Mode)
+        {
+            case ChargeControlMode.Targeted:
+                _targetedCharge.Restore(saved.TargetedRequest!, saved.TargetedDeliveredWh, "restart");
+                break;
+
+            case ChargeControlMode.FastNoBattery when saved.FastLimit is { } limit:
+                _fastCharge.Restore(limit, saved.FastDeliveredWh, "restart");
+                break;
+
+            case ChargeControlMode.Forecasted:
+                _untilFull?.SetUntilFull(saved.UntilFull, "restart");
+                break;
+        }
+
+        _resuming = saved.Mode;
+        _resumeUntil = now + ResumeWindow;
+    }
+
+    /// <summary>
+    /// Starts the mode <see cref="PrepareResume"/> chose, through the same start a button press uses, so
+    /// the charger is armed in Fast, the restart-wait rule (#192) applies to a paused car, and the mode's
+    /// own first cycle decides the rest — stand down for the night, wait for the tariff, re-arm the
+    /// hold. Tried every poll until it lands, the owner picks a mode, or <see cref="ResumeWindow"/> runs
+    /// out; until then the mode file is left as it was.
+    /// </summary>
+    private async Task ResumeAsync(CancellationToken cancellationToken)
+    {
+        if (_resumeUntil is not { } until || _resuming is not { } mode)
+        {
+            return;
+        }
+
+        if (_mode.Mode != ChargeControlMode.Off)
+        {
+            // The owner chose for themselves in the meantime.
+            _logger.LogInformation("Not resuming {Mode}: {Chosen} was selected first.", mode, _mode.Mode);
+            StopResuming();
+            return;
+        }
+
+        if (_timeProvider.GetUtcNow() > until)
+        {
+            _logger.LogWarning(
+                "Could not resume {Mode} within {Minutes:F0} min of starting; it stays Off.", mode, ResumeWindow.TotalMinutes);
+            StopResuming();
+            return;
+        }
+
+        var started = await _chargeActions.StartAsync(mode, "restart", cancellationToken);
+
+        if (started.Succeeded)
+        {
+            _logger.LogInformation("Resumed {Mode} after the restart.", mode);
+            _resumed = (mode, _timeProvider.GetUtcNow());
+            StopResuming();
+        }
+        else
+        {
+            _logger.LogWarning("Could not resume {Mode} yet ({Reason}); trying again next poll.", mode, started.Message);
+        }
+    }
+
+    private void StopResuming()
+    {
+        _resuming = null;
+        _resumeUntil = null;
+    }
+
+    /// <summary>The mode as it stands after this cycle, with what a restart would need to take it up.</summary>
+    private SavedChargeMode Saved(ChargeControlMode mode, bool untilFull, DateTimeOffset now) => mode switch
+    {
+        ChargeControlMode.Targeted => new(mode, now, TargetedRequest: _targetedCharge.Request, TargetedDeliveredWh: _targetedCharge.DeliveredWh),
+        ChargeControlMode.FastNoBattery => _fastCharge.Limit is { } limit
+            ? new(mode, now, FastLimit: limit, FastDeliveredWh: _fastCharge.DeliveredWh)
+            : new(mode, now),
+        ChargeControlMode.Forecasted => new(mode, now, UntilFull: untilFull),
+        _ => new(mode, now),
+    };
+
+    /// <summary>
     /// What happens once, at the moment a mode is selected, rather than on every poll: the warning
     /// below, and arming the fast mode's discharge hold.
     ///
@@ -405,48 +539,6 @@ public sealed class PollingService : BackgroundService
     /// charges (a button that silently did nothing would be worse), but the inverter will serve the car
     /// from the battery, which is the opposite of the intent.</para>
     /// </summary>
-    /// <summary>
-    /// Restores a Forecasted session that was running with <b>until full</b> on when the service stopped
-    /// (#279, decision 1), through the same start a button press uses, so the charger is armed in Fast
-    /// and the mode's first cycle stands it down again if it is night. Tried every poll until it lands,
-    /// the owner picks a mode, or <see cref="ResumeWindow"/> runs out; then the file follows the mode.
-    /// </summary>
-    private async Task ResumeUntilFullAsync(CancellationToken cancellationToken)
-    {
-        if (_resumeUntil is not { } until)
-        {
-            return;
-        }
-
-        if (_mode.Mode != ChargeControlMode.Off)
-        {
-            // Resumed on an earlier poll, or the owner chose for themselves in the meantime.
-            _resumeUntil = null;
-            return;
-        }
-
-        if (_timeProvider.GetUtcNow() > until)
-        {
-            _logger.LogWarning(
-                "Could not resume Forecasted until full within {Minutes:F0} min of starting; it stays Off.",
-                ResumeWindow.TotalMinutes);
-            _resumeUntil = null;
-            return;
-        }
-
-        _untilFull!.SetUntilFull(true, "restart");
-        var started = await _chargeActions.StartAsync(ChargeControlMode.Forecasted, "restart (until full)", cancellationToken);
-
-        if (started.Succeeded)
-        {
-            _resumeUntil = null;
-        }
-        else
-        {
-            _logger.LogWarning("Could not resume Forecasted until full yet ({Reason}); trying again next poll.", started.Message);
-        }
-    }
-
     private void OnModeEntry(ChargeControlMode mode)
     {
         if (mode == _lastMode)

@@ -4,6 +4,43 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — A restart resumes the mode that was running (#413)
+
+**Found.** On 2026-11-16 at 22:49 Gleanvolt was restarted during a FastNoBattery charge (16 A, 5.9 kWh
+in). The shutdown paused the car, the start came back Off, and the car stayed `ChargePaused` until
+the mode was picked again four minutes later. Unattended, it would have stayed paused until morning.
+The rule that every start is Off (decided with the mode selector, kept since) made any `deploy.sh` run
+cost a charge. Only Forecasted until full (#279) was exempt.
+
+**Decided.**
+- **The running mode and what it needs go to `data/charge-mode.json`**: the mode, Targeted's request,
+  the fast limit, until full, and the energy each had delivered. The poll loop writes it when any of
+  these change, every 5 minutes while a mode runs, and once more on a clean shutdown. That last write
+  is also the "last seen up" time the absence is measured from.
+- **Resumed as if selected again**: the target or limit is put back with its original activation, its
+  meter seeded with what was delivered, then `IChargeActions.StartAsync(mode, "restart")`. The charger
+  goes to Fast, the restart wait (#192) and the hold follow from the mode as for a button press. A
+  refused start is retried every poll for 10 minutes; a mode the owner picks first wins.
+- **When not:** a Targeted or scheduled-fast departure that passed while down, an amount already
+  delivered, or an absence longer than `ChargeControl:ResumeWithin` (12 h; 0 turns resuming off).
+  Targeted, a scheduled fast charge and until full ignore the absence limit; their own end decides.
+  The car being unplugged doesn't matter: the resumed mode waits, as one picked by hand does.
+- **The shutdown pause and the hold release stay**, for the Gleanvolt that doesn't come back.
+- **A new session**: the old one ends `ServiceStopped`, the resumed mode opens another. Continuing it
+  would mean reopening a closed row for a gap of seconds.
+- **`until-full.json` stays, for the day count only**; with no `charge-mode.json` (an upgrade) it
+  still resumes its session once.
+- **Not the runtime settings (#392).** Minimum SOC, low tariff only and the solar-grid minimum still
+  come back at their configured values; they belong to a separate decision on settings, not to a
+  running charge.
+
+**Consequences accepted.** After a power cut, up to 5 minutes of delivery is lost from the count, so a
+target or an amount can be overshot by that much. A resumed mode with no car plugged in holds the mode
+until the car comes or the owner stops it, as a picked one would. The Overview says the mode was
+resumed until the mode changes; Home Assistant and the API don't get a new field.
+
+---
+
 ## 2026-11-17 — A secret store in the provider SDK, its own rather than Gleanvolt's (#416)
 
 **Found.** Gleanvolt keeps its car accounts and session cookies in `ISecretStore`: `0600` files on

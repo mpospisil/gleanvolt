@@ -5,16 +5,14 @@ namespace Gleanvolt.Hosting.Forecasting;
 
 /// <summary>
 /// A Forecasted session running with <b>until full</b> on, kept on disk while it lasts (issue #279,
-/// decision 1). The mode selector is deliberately not persisted, and for a session that lasts an
-/// afternoon that is right; one meant to last a week would be set back to Off by any deploy or reboot.
-/// So this one session, and nothing else, is: the poll loop writes the file when it starts, deletes it
-/// when it ends, and on startup restores the mode from it.
+/// decision 1): the poll loop writes the file when it starts and deletes it when it ends. Since #413 every
+/// mode is resumed after a restart from <see cref="Resume.ChargeModeFile"/>, and this file is left with
+/// the day count; it still stands in for that file when upgrading from a version without it.
 ///
 /// <para>The file holds when the session started, which is also what the day count is measured from:
 /// day 1 is the day it was started, and a restart carries on counting rather than starting again.</para>
 ///
-/// <para>A file that cannot be read is logged and treated as no session: a restart then comes back to
-/// Off, as it does for every other mode.</para>
+/// <para>A file that cannot be read is logged and treated as no session: the day count starts again.</para>
 /// </summary>
 public sealed class UntilFullSessionFile
 {
@@ -38,7 +36,7 @@ public sealed class UntilFullSessionFile
     /// <summary>Where the session is kept.</summary>
     public string Path { get; }
 
-    /// <summary>Whether the file named a running session when the service started: the mode to restore.</summary>
+    /// <summary>Whether the file named a running session when the service started.</summary>
     public bool Restorable { get; }
 
     /// <summary>When the running session started, or null when none is running.</summary>
@@ -64,7 +62,7 @@ public sealed class UntilFullSessionFile
             {
                 Write(now);
                 _since = now;
-                _logger.LogInformation("Forecasted until full started; kept in {Path} so a restart resumes it.", Path);
+                _logger.LogInformation("Forecasted until full started; kept in {Path} to count its days.", Path);
             }
             else
             {
@@ -100,18 +98,16 @@ public sealed class UntilFullSessionFile
         {
             if (JsonNode.Parse(File.ReadAllText(Path))?["since"]?.GetValue<DateTimeOffset>() is { } since)
             {
-                _logger.LogInformation(
-                    "Forecasted until full was running at shutdown (since {Since:yyyy-MM-dd HH:mm}); resuming it.", since);
                 return since;
             }
 
-            _logger.LogWarning("{Path} names no session start, so Forecasted until full is not resumed.", Path);
+            _logger.LogWarning("{Path} names no session start, so the until-full day count starts again.", Path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
             or InvalidOperationException or FormatException)
         {
             _logger.LogWarning(
-                "{Path} could not be read ({Reason}), so Forecasted until full is not resumed.", Path, ex.Message);
+                "{Path} could not be read ({Reason}), so the until-full day count starts again.", Path, ex.Message);
         }
 
         return null;

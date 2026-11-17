@@ -149,7 +149,7 @@ public static class TargetedChargeRequestFactory
         {
             return Result.Rejected(
                 Invariant($"A departure more than {limits.MaxHorizon.TotalHours:F0} hours away is further than ")
-                + "the forecast — or a request that does not survive a restart — can honestly promise.", Phrase.Of("Request.TooFarAheadForecast", new PhraseArg.Duration(limits.MaxHorizon)));
+                + "the forecast can honestly promise.", Phrase.Of("Request.TooFarAheadForecast", new PhraseArg.Duration(limits.MaxHorizon)));
         }
 
         var request = new TargetedChargeRequest(askedWh, departBy, now, soc, socNow) with

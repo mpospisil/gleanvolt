@@ -13,9 +13,9 @@ namespace Gleanvolt.Core.Interfaces;
 /// the ordinary case — <see cref="Enums.FastChargeBasis.Full"/> — rather than a state that cannot be
 /// expressed. A null <see cref="Limit"/> is therefore a normal, valid state and not a missing one.</para>
 ///
-/// <para><b>Not persisted.</b> The limit drops on a restart exactly as the mode does, and for the same
-/// reason: after a crash or a deploy the charger is left as its owner set it rather than being grabbed
-/// by whatever was in a file.</para>
+/// <para><b>Resumed after a restart</b> (#413) with the fast charge it belongs to: the poll loop keeps it
+/// on disk and restores it, with what it had delivered, before the mode is started again. The selector
+/// itself holds it only in memory.</para>
 /// </summary>
 public interface IFastChargeSelector
 {

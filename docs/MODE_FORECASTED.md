@@ -122,13 +122,10 @@ takes.
   taken over (`ChargerTakenOver`), or you press **Off**.
 - **One session.** The session history keeps it as one charge, with each night's stand-down and each
   morning's re-arm as events, and the Overview's session card reads *"Forecasted · until full · day 2"*.
-- **It survives a restart.** The charge mode is otherwise never restored: a restart comes back to Off.
-  A session running with **Until full** on is the one exception, because a deploy or a reboot would end a
-  week-long charge. It is kept in `data/until-full.json` while it lasts, and on startup the mode is started
-  again the way a button starts it: the charger goes to `Fast`, and the first poll stands it straight back
-  down if it is night. A charger that does not answer at startup is retried every poll for ten minutes.
-  The day count carries on; the session history records the restart as a new session, as it does for any
-  restart.
+- **It survives a restart**, however long Gleanvolt was down: a deploy or a reboot would otherwise end a
+  week-long charge. It is resumed like any mode (see [After a restart](CHARGE_CONTROL.md#after-a-restart)),
+  and the first poll stands the charger straight back down if it is night. `data/until-full.json` keeps
+  the session's start, so the day count carries on.
 
 With it off, `Forecasted` ends with the day's sun, as before. The option itself is a runtime setting:
 `ChargeControl:Forecast:UntilFull` is only its value at boot.
@@ -171,7 +168,7 @@ budget moving by a whole kWh) and at `Debug` otherwise. The summary logs once, a
   "Forecast": {
     "FullByTime": "19:00:00",        // evening deadline (local time) for a 100% battery
     "UntilFull": false,              // boot value of "Until full": one session over several days
-    "UntilFullSessionPath": "data/until-full.json", // such a session, kept so a restart resumes it
+    "UntilFullSessionPath": "data/until-full.json", // such a session's start, for the day count
     "BatteryCapacityKWh": 9.0,       // REQUIRED, no default: USABLE capacity (see the warning below), not nameplate
     "ChargeEfficiency": 0.95,
     "BaselineHouseLoadWatts": 350,   // house load for an hour neither the history nor the live profile knows yet

@@ -7,8 +7,8 @@ namespace Gleanvolt.Hosting;
 /// singleton and always started OFF, so a restart leaves the battery free to charge and discharge
 /// until somebody asks for a hold. Configuration cannot arm it at boot: the hold is a command with a
 /// duration rather than a stored setting, so an unattended restart that re-armed it would silently
-/// keep the pack idle. A runtime change does not persist across restarts, the same contract as
-/// <see cref="ChargeControlModeSelector"/>.
+/// keep the pack idle. A runtime change does not persist across restarts; a resumed mode that wants the
+/// hold (#413) arms it again itself.
 /// </summary>
 public sealed class BatteryHoldSelector : IBatteryHoldSelector
 {

@@ -544,6 +544,9 @@
   <data name="HighTariffWaiting" xml:space="preserve">
     <value>High tariff; charging waits for low tariff (Low tariff only is on).</value>
   </data>
+  <data name="ResumedAfterRestart" xml:space="preserve">
+    <value>Resumed after Gleanvolt restarted at {0:HH:mm}, as if selected again.</value>
+  </data>
   <data name="LowTariffIgnored" xml:space="preserve">
     <value>Low tariff only is on, but no tariff is configured, so it charges at any hour.</value>
   </data>

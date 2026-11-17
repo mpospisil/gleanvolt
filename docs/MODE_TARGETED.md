@@ -118,8 +118,8 @@ sent. Just in time stays available.
 - **It returns itself to `Off`** when the target is met, when the departure passes, or when the car
   stops drawing at its own limit — the same arrangement `FastNoBattery` uses.
 
-> ⚠️ **The request does not survive a restart**, nor does the mode. If the service restarts overnight,
-> nothing will be charging and nothing will have told you.
+- **A restart resumes it** with the same target, counting what was already delivered, unless the
+  departure passed while Gleanvolt was down. See [After a restart](CHARGE_CONTROL.md#after-a-restart).
 
 ## Charging priority: cheapest, or just in time
 

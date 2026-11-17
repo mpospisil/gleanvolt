@@ -11,8 +11,9 @@ The web UI, [Home Assistant](HOME_ASSISTANT.md) and the [HTTP API](HTTP_API.md) 
 controller, so they cannot disagree about what the charger is doing: the last one to press wins, and
 the others show it within a poll interval. The same rules apply on every surface:
 
-- **The charge mode and the controls on Charging plan don't survive a restart**: the controller
-  always starts in charge mode **Off**. Settings saved on **Settings** and **Car** are kept.
+- **A restart resumes the charge mode that was running**, with its target or amount, and the Overview
+  says so ([After a restart](CHARGE_CONTROL.md#after-a-restart)). The other controls on Charging plan
+  come back at their configured values. Settings saved on **Settings** and **Car** are kept.
 - `FastNoBattery`, `Targeted` and `SolarGrid` switch the mode back to `Off` by themselves when they
   finish.
 - A charger that refuses the use-mode write says so on the page, instead of leaving a mode running

@@ -3,9 +3,9 @@ using Gleanvolt.Core.Enums;
 namespace Gleanvolt.Core.Interfaces;
 
 /// <summary>
-/// The runtime charge-control mode (Off / Solar / Force). Seeded from configuration at startup, then
-/// changeable at runtime (e.g. from Home Assistant) without restarting. The polling loop reads
-/// <see cref="Mode"/> each cycle.
+/// The runtime charge-control mode. Starts Off, then changeable at runtime (e.g. from Home Assistant)
+/// without restarting; after a restart the poll loop selects the mode that was running again (#413).
+/// The polling loop reads <see cref="Mode"/> each cycle.
 /// </summary>
 public interface IChargeControlModeSelector
 {

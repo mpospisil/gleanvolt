@@ -100,6 +100,26 @@ public sealed class FastChargeProvider
     /// <summary>Energy the charger has delivered since the active limit was set, in watt-hours.</summary>
     public double DeliveredWh => _delivered.EnergyWattHours;
 
+    /// <summary>The active limit, or null for a charge to full.</summary>
+    public FastChargeLimit? Limit => _selector.Limit;
+
+    /// <summary>
+    /// Takes up a limit saved before a restart (#413): sets it as it was, keeping its activation, and
+    /// carries on counting from what had been delivered rather than from zero. Call it before the first
+    /// <see cref="Update"/>, from the poll loop.
+    /// </summary>
+    public void Restore(FastChargeLimit limit, double deliveredWh, string source)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+
+        _selector.Set(limit, source);
+        _activatedAt = limit.ActivatedAt;
+        _delivered.Restore(deliveredWh);
+        _observedPowerWatts = null;
+        _reportedMet = false;
+        _lastPlanSignature = null;
+    }
+
     /// <summary>
     /// Folds one telemetry reading into the limit's progress and returns it, or null when no limit is
     /// set — which is the ordinary <see cref="Core.Enums.FastChargeBasis.Full"/> case and not a failure.

@@ -67,10 +67,10 @@
     <value>Čas odjezdu je v minulosti.</value>
   </data>
   <data name="Request_TooFarAhead" xml:space="preserve">
-    <value>Odjezd za víc než {0} je příliš daleko: nabíjení, které se při restartu nezachová, nemůže tak dlouhý termín spolehlivě slíbit.</value>
+    <value>Odjezd za víc než {0} je příliš daleko na naplánování.</value>
   </data>
   <data name="Request_TooFarAheadForecast" xml:space="preserve">
-    <value>Odjezd za víc než {0} je příliš daleko: předpověď ani požadavek, který se při restartu nezachová, nemohou tak dlouhý termín spolehlivě slíbit.</value>
+    <value>Odjezd za víc než {0} je příliš daleko: předpověď tak dlouhý termín nemůže spolehlivě slíbit.</value>
   </data>
   <data name="Request_DepartureNeedsAmount" xml:space="preserve">
     <value>Pro čas odjezdu je potřeba zadat množství — kolik energie nebo jaký stav nabití auto potřebuje. Bez toho není podle čeho časovat.</value>

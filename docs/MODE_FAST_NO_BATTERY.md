@@ -43,7 +43,7 @@ By default the **car** decides when it has had enough. You can instead say how m
   car took under an earlier mode does not count towards this amount.
 - **Whichever comes first wins.** A car that reaches its own limit at 12 kWh of the 20 asked for ends
   the mode there and says how far short it got.
-- **It does not survive a restart**, like the mode itself and the targeted request.
+- **A restart keeps it**, with what was delivered; see [After a restart](CHARGE_CONTROL.md#after-a-restart).
 
 ## When? (the departure)
 
@@ -81,9 +81,8 @@ or three hours; it is the nine hours of *sitting* at 95% that does the damage. P
   follows. A car that is not ready at the moment you said you were leaving has run out of the window
   it was given.
 
-> ⚠️ **A deferred charge does not survive a restart**, nor do the mode and the amount. A charge
-> deferred to 04:02 and lost to a 23:00 restart is discovered at 07:00 with a car that never charged. If
-> you restart in the evening, set it again afterwards.
+- **A restart resumes a deferred charge** however long Gleanvolt was down, unless the departure passed
+  meanwhile.
 
 ## The hold, and who owns it
 
@@ -147,8 +146,6 @@ makes the mode wait through high tariff and charge flat out once low tariff star
 
 ## What FastNoBattery doesn't do
 
-- **It doesn't survive a restart.** Like every mode, the service comes back in `Off`. The charger keeps
-  its last setpoint until a mode is selected; the inverter's hold lapses within `BatteryHold:Duration`.
 - **It doesn't change the charger's use-mode while it runs.** Starting it wrote `Fast` once and
   ending it writes `Stop`; in between, like every other mode, it only moves the current setpoint.
 - **It doesn't act on a charger that isn't in `Fast`.** If the read-back says anything else — someone

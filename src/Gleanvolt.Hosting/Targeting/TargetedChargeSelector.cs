@@ -7,11 +7,8 @@ namespace Gleanvolt.Hosting.Targeting;
 /// Thread-safe holder for the active <see cref="TargetedChargeRequest"/> (see
 /// <see cref="ITargetedChargeSelector"/>), registered as a singleton and started empty.
 ///
-/// <para><b>Not persisted across restarts</b>, exactly like the mode selector beside it. The reasoning
-/// is the same — after a crash, a power cut or a deploy the charger is left as its owner set it rather
-/// than being grabbed by whatever was in a file — but the consequence is sharper here, because a
-/// dropped request is discovered at 05:00 with a flat car. It is documented in docs/MODE_TARGETED.md for that
-/// reason.</para>
+/// <para>Held in memory only; a restart that resumes the Targeted mode puts the request back, with what
+/// it had delivered (#413, see <see cref="TargetedChargeProvider.Restore"/>).</para>
 /// </summary>
 public sealed class TargetedChargeSelector : ITargetedChargeSelector
 {
