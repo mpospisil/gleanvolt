@@ -64,12 +64,19 @@ public sealed class ExternalVehicleFeed : IVehicleUpdateService
     public bool IsPushed => true;
 
     public string? OwnerAction => Health.IsBlocked
-        ? $"{DisplayName} needs you: {Session?.StatusMessage ?? "see the provider"}"
+        ? $"{DisplayName} needs you: {Said(Session).English}"
         : null;
 
     public Phrase? OwnerActionPhrase => OwnerAction is null
         ? null
-        : Phrase.Of("ExternalVehicle.NeedsOwner", new PhraseArg.Text(DisplayName), new PhraseArg.Text(Session?.StatusMessage ?? string.Empty));
+        : Phrase.Of("ExternalVehicle.NeedsOwner", new PhraseArg.Text(DisplayName), Said(Session));
+
+    // What the provider said about itself, in every language (#415): Gleanvolt's words for its code, then
+    // its detail. "see the provider" when it said nothing.
+    private static PhraseArg.Said Said(ExternalProviderStatus? session) =>
+        session?.StatusSaid is { } said
+            ? new PhraseArg.Said(said.Phrase, said.English)
+            : new PhraseArg.Said(null, "see the provider");
 
     public VehicleSourceHealth Health
     {
@@ -99,12 +106,12 @@ public sealed class ExternalVehicleFeed : IVehicleUpdateService
 
             if (session.Healthy == false)
             {
-                var message = session.StatusMessage ?? "no reason given";
+                var said = session.StatusSaid is { } text ? new PhraseArg.Said(text.Phrase, text.English) : new PhraseArg.Said(null, "no reason given");
                 return session.NeedsOwner
-                    ? VehicleSourceHealth.NeedsOwner($"{name} needs you: {message}",
-                        Phrase.Of("ExternalVehicle.ProviderNeedsOwner", new PhraseArg.Text(name), new PhraseArg.Text(message)))
-                    : VehicleSourceHealth.Degraded($"{name} cannot read the car: {message}",
-                        Phrase.Of("ExternalVehicle.ProviderUnhealthy", new PhraseArg.Text(name), new PhraseArg.Text(message)));
+                    ? VehicleSourceHealth.NeedsOwner($"{name} needs you: {said.English}",
+                        Phrase.Of("ExternalVehicle.ProviderNeedsOwner", new PhraseArg.Text(name), said))
+                    : VehicleSourceHealth.Degraded($"{name} cannot read the car: {said.English}",
+                        Phrase.Of("ExternalVehicle.ProviderUnhealthy", new PhraseArg.Text(name), said));
             }
 
             if (_askFailed is { } failed)

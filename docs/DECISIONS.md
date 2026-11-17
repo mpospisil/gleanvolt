@@ -4,6 +4,48 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-17 — A provider's status in the viewer's language: codes Gleanvolt words, detail per language (#415)
+
+**Found.** `ProviderStatus.Message` was free English text. The built-in feeds report with `Phrase`s,
+so a Czech Gleanvolt showed the Volkswagen plugin's "Stopped reading the car until…" in English on the
+Car page, on Settings and in the band asking for the owner. The provider can't translate it for the
+reader: one status goes to every viewer. The plugin's own page got `culture` from Gleanvolt and
+ignored it.
+
+**Decided.**
+- **Codes and per-language detail, both** (tariff, solar-forecast and vehicle 1.3). `ProviderStatus`
+  gains `Code`, from a fixed list in `ProviderStatusCodes` that Gleanvolt words itself in every
+  language it ships (`not-set-up`, `needs-sign-in`, `needs-code`, `unreachable`, `rate-limited`,
+  `refused`, `service-changed`), and `Messages`, the provider's detail keyed by language tag. Codes
+  alone would cover the common cases but say nothing specific. Messages alone would make every
+  provider translate the common cases.
+- **With a known code, `Message` isn't shown.** It stays the whole English sentence for an older
+  Gleanvolt. Shown beside Gleanvolt's words for the code, it would say the same thing twice. Without a
+  code (or with one Gleanvolt doesn't know), the detail is `Messages` in the viewer's language, or
+  `Message`.
+- **One phrase argument for someone else's translations.** `PhraseArg.Translations(texts, english)`
+  renders the viewer's tag, then its language, then `en`, then the English. It is stored with
+  phrases, so it compares by value and has a JSON tag. `ProviderStatusText.Of` builds the phrase
+  (`ProviderStatus.WithDetail`: Gleanvolt's words, then the detail). `ExternalProviderStatus.StatusSaid`
+  carries it to the Settings panel and to the car feed's health and owner action.
+- **Kept as sent, within bounds.** A code over 64 characters is dropped. At most 16 languages of
+  1 000 characters each are kept; a key that isn't a language tag, or an empty text, is dropped
+  rather than refusing the status. The API returns `statusCode` and `statusText` (English as
+  Gleanvolt words it) beside `statusMessage`.
+- **The plugin's page in English and Czech without resource files.** `Words(En, Cs)` holds both
+  texts side by side; the page renders the current UI culture, and a status sends both as `Messages`.
+  Request localization takes `?culture=` from Gleanvolt's redirect, and a culture cookie carries it
+  to Blazor's circuit, whose requests have no query. A `.resx` and a localizer would be the norm in
+  Gleanvolt.Web. For a sample plugin of about sixty texts, the pairs side by side are easier to keep
+  in step.
+
+**Consequences accepted.** A provider that wants its detail in Czech has to send Czech: Gleanvolt
+translates only its own codes. The list of codes grows only with Gleanvolt, and a provider that
+needs another code says it in the detail until then. The MCP server's checked-in OpenAPI copy lags by
+two fields until it is regenerated.
+
+---
+
 ## 2026-11-17 — The car provider is told when a charging session is open (vehicle 1.2, #414)
 
 **Found.** The built-in car feeds read every 5 minutes while Gleanvolt's charge control has a

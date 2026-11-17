@@ -68,6 +68,8 @@ public enum ExternalProviderState
 /// <param name="Unanswered">True when the host's last request got no answer in time.</param>
 /// <param name="NeedsOwner">True when the provider said only the owner can fix what is wrong: a login, a consent screen.</param>
 /// <param name="PageUrl">The attached or last provider's own page (#410), as it said in its hello, or null.</param>
+/// <param name="StatusCode">The code with that report (#415), as sent: one Gleanvolt words, or one it doesn't know.</param>
+/// <param name="StatusMessages">The report's detail in more languages (#415), language tag to text, or null.</param>
 public sealed record ExternalProviderStatus(
     string Kind,
     string Name,
@@ -85,8 +87,17 @@ public sealed record ExternalProviderStatus(
     string? StatusMessage = null,
     bool Unanswered = false,
     bool NeedsOwner = false,
-    Uri? PageUrl = null)
+    Uri? PageUrl = null,
+    string? StatusCode = null,
+    IReadOnlyDictionary<string, string>? StatusMessages = null)
 {
+    /// <summary>
+    /// What the provider last said about itself, worded for every language (#415): Gleanvolt's own words
+    /// for <see cref="StatusCode"/>, then the detail in the viewer's language. The English is for the log,
+    /// the API and Home Assistant. Null with nothing to say.
+    /// </summary>
+    public (Phrase? Phrase, string English)? StatusSaid => ProviderStatusText.Of(StatusCode, StatusMessages, StatusMessage);
+
     /// <summary>
     /// Where the web UI opens the provider's page (#410): a Gleanvolt address behind the web login that
     /// redirects to <see cref="PageUrl"/> with a fresh ticket. The ticket is never in a page's HTML.

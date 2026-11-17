@@ -5,6 +5,7 @@ using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Hosting.Vehicles.External;
 using Gleanvolt.Plugin.Volkswagen.Volkswagen;
+using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Vehicle;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -223,7 +224,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
     [Fact]
     public void A_stopped_feed_reads_nothing_even_with_a_session_open()
     {
-        _feed.Stop("Stopped for the test.");
+        _feed.Stop(new Words("Stopped for the test.", "Zastaveno pro test."));
         _feed.ChargingSessionOpen = true;
 
         Assert.Equal(Timeout.InfiniteTimeSpan, _feed.NextDelay);
@@ -240,6 +241,48 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
         Assert.Equal(new { Healthy = false, NeedsOwner = true }, new { _feed.Status!.Healthy, _feed.Status.NeedsOwner });
         Assert.Contains("Sign in again on the plugin's page", _feed.Status.Message);
         Assert.Equal(Timeout.InfiniteTimeSpan, _feed.NextDelay);
+
+        // Gleanvolt words the code; the detail comes in both languages (#415).
+        Assert.Equal(ProviderStatusCodes.NeedsSignIn, _feed.Status.Code);
+        Assert.Equal(
+            "volkswagen.de did not answer with a reading. Reading resumes once you have signed in on the plugin's page. The charge is unaffected.",
+            _feed.Status.Messages!["en"]);
+        Assert.StartsWith("volkswagen.de neodpověděl s údaji o autě.", _feed.Status.Messages["cs"]);
+    }
+
+    [Fact]
+    public void The_page_and_the_status_follow_the_viewers_language()
+    {
+        _feed.Stop(PageText.Forgotten);
+        var ui = System.Globalization.CultureInfo.CurrentUICulture;
+
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("cs-CZ");
+            Assert.StartsWith("Relaci jste zapomněli.", _feed.StatusWords!.ToString());
+            Assert.Equal("Přihlásit se", PageText.SignIn.ToString());
+            Assert.StartsWith("Volkswagen vám poslal", VwWebsiteSignIn.Describe(VwWebsiteLoginStep.OneTimeCodeRequired, afterCode: false).Message!.ToString());
+
+            System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en");
+            Assert.StartsWith("You forgot the session.", _feed.StatusWords!.ToString());
+            Assert.Equal("Sign in", PageText.SignIn.ToString());
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = ui;
+        }
+    }
+
+    [Fact]
+    public async Task A_new_reading_clears_what_the_page_says_about_a_stop()
+    {
+        _feed.Stop(PageText.AccountChanged);
+        _feed.Resume();
+
+        await _feed.ReadAsync(CancellationToken.None);
+
+        Assert.True(_feed.Status!.Healthy);
+        Assert.Null(_feed.StatusWords);
     }
 
     [Fact]
@@ -292,7 +335,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
         await _feed.ReadAsync(CancellationToken.None);
         var sent = Requests;
 
-        _feed.Stop("You forgot the session.");
+        _feed.Stop(PageText.Forgotten);
         _time.Advance(TimeSpan.FromHours(1));
         await _feed.ReadAsync(CancellationToken.None);
 
@@ -326,6 +369,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
         Assert.True(feed.IsBlocked);
         Assert.True(feed.Status!.NeedsOwner);
         Assert.Contains("not entered yet", feed.Status.Message);
+        Assert.Equal(ProviderStatusCodes.NotSetUp, feed.Status.Code);
     }
 
     [Fact]

@@ -20,11 +20,11 @@ public enum SignInStep
 }
 
 /// <summary>What the page shows about the sign-in.</summary>
-public sealed record SignInState(SignInStep Step, string? Message = null)
+public sealed record SignInState(SignInStep Step, Words? Message = null)
 {
     public static readonly SignInState Unknown = new(SignInStep.Unknown);
 
-    public static readonly SignInState NotConfigured = new(SignInStep.NotConfigured, "Enter the VW ID, the password and the VIN, and save.");
+    public static readonly SignInState NotConfigured = new(SignInStep.NotConfigured, PageText.SignInNotConfigured);
 }
 
 /// <summary>
@@ -33,7 +33,7 @@ public sealed record SignInState(SignInStep Step, string? Message = null)
 /// refreshing a browser must never replay a password.
 ///
 /// <para>Copied from the built-in. Changed: its own small state record in place of Gleanvolt's
-/// <c>VehicleSignInState</c> and its phrases (the plugin's page is English only); the account comes from
+/// <c>VehicleSignInState</c> and its phrases, with texts of its own in English and Czech (#415); the account comes from
 /// <see cref="AccountStore"/>; the messages name the plugin's page, not Gleanvolt's settings keys.</para>
 /// </summary>
 public sealed class VwWebsiteSignIn(AccountStore account, VwWebsiteClient client)
@@ -64,7 +64,7 @@ public sealed class VwWebsiteSignIn(AccountStore account, VwWebsiteClient client
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return _state = new SignInState(SignInStep.CodeRequired, "Enter the code from the email.");
+            return _state = new SignInState(SignInStep.CodeRequired, PageText.SignInEnterCode);
         }
 
         var step = await client.SubmitCodeAsync(code, cancellationToken).ConfigureAwait(false);
@@ -80,32 +80,20 @@ public sealed class VwWebsiteSignIn(AccountStore account, VwWebsiteClient client
 
     internal static SignInState Describe(VwWebsiteLoginStep step, bool afterCode) => step switch
     {
-        VwWebsiteLoginStep.SignedIn => new(SignInStep.SignedIn,
-            "Signed in. This browser is remembered, so a restart should not need another code."),
+        VwWebsiteLoginStep.SignedIn => new(SignInStep.SignedIn, PageText.SignInSignedIn),
 
         // The ordinary path on a cold login, not an error: said plainly so it does not read as one.
-        VwWebsiteLoginStep.OneTimeCodeRequired when !afterCode => new(SignInStep.CodeRequired,
-            "Volkswagen has emailed a one-time code. Enter it below."),
+        VwWebsiteLoginStep.OneTimeCodeRequired when !afterCode => new(SignInStep.CodeRequired, PageText.SignInCodeEmailed),
 
-        VwWebsiteLoginStep.OneTimeCodeRequired => new(SignInStep.CodeRequired,
-            "That code was not accepted. Check the newest email (an earlier one will not work) and try again. "
-            + "The challenge is still open, so this does not need starting over."),
+        VwWebsiteLoginStep.OneTimeCodeRequired => new(SignInStep.CodeRequired, PageText.SignInCodeRefused),
 
-        VwWebsiteLoginStep.OwnerActionRequired => new(SignInStep.Failed,
-            "Volkswagen is showing a consent or terms screen. Open volkswagen.de in a browser, clear it there, "
-            + "then sign in here again."),
+        VwWebsiteLoginStep.OwnerActionRequired => new(SignInStep.Failed, PageText.SignInConsent),
 
-        VwWebsiteLoginStep.CredentialsRequired => new(SignInStep.Failed,
-            "The VW ID or the password was not accepted. Check them above."),
+        VwWebsiteLoginStep.CredentialsRequired => new(SignInStep.Failed, PageText.SignInCredentials),
 
         // Nothing left this machine, so none of the lockout advice below applies.
-        VwWebsiteLoginStep.NoChallenge => new(SignInStep.Failed,
-            "There is no code challenge open, so that code was not sent anywhere. Press Sign in to start one. "
-            + "If Volkswagen does not email a new code, press Forget the session first and then Sign in: that "
-            + "discards a challenge left over from an earlier attempt."),
+        VwWebsiteLoginStep.NoChallenge => new(SignInStep.Failed, PageText.SignInNoChallenge),
 
-        _ => new(SignInStep.Failed,
-            "The sign-in did not complete. If this repeats, wait a few minutes rather than retrying: a replayed "
-            + "login at a real identity provider risks locking the account."),
+        _ => new(SignInStep.Failed, PageText.SignInFailed),
     };
 }

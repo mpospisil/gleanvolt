@@ -383,7 +383,9 @@
       "providerVersion": "string? (required)",
       "since": "string(date-time)? (required)",
       "state": "$ExternalProviderState (required)",
+      "statusCode": "string?",
       "statusMessage": "string? (required)",
+      "statusText": "string?",
       "unanswered": "boolean (required)"
     },
     "ExternalProviderState": "enum[off|waiting|connected|disconnected]",

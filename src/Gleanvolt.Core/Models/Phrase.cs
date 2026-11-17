@@ -48,6 +48,7 @@ public sealed record Phrase(string Key, IReadOnlyList<PhraseArg> Args)
 [JsonDerivedType(typeof(Said), "said")]
 [JsonDerivedType(typeof(List), "list")]
 [JsonDerivedType(typeof(Mode), "mode")]
+[JsonDerivedType(typeof(Translations), "translations")]
 public abstract record PhraseArg
 {
     private PhraseArg()
@@ -93,5 +94,41 @@ public abstract record PhraseArg
         public bool Equals(List? other) => other is not null && Items.SequenceEqual(other.Items);
 
         public override int GetHashCode() => Items.Aggregate(0, HashCode.Combine);
+    }
+
+    /// <summary>
+    /// Text someone else wrote in several languages, such as an external provider's status (#415): a
+    /// language tag (<c>en</c>, <c>cs</c>, <c>cs-CZ</c>) to the text. The UI shows the viewer's
+    /// language, then <c>en</c>, then <paramref name="English"/>.
+    /// </summary>
+    public sealed record Translations(IReadOnlyDictionary<string, string> Texts, string English) : PhraseArg
+    {
+        public bool Equals(Translations? other) =>
+            other is not null
+            && English == other.English
+            && Texts.Count == other.Texts.Count
+            && Texts.All(text => other.Texts.TryGetValue(text.Key, out var value) && value == text.Value);
+
+        public override int GetHashCode() =>
+            Texts.OrderBy(text => text.Key, StringComparer.Ordinal)
+                .Aggregate(English.GetHashCode(StringComparison.Ordinal), (hash, text) => HashCode.Combine(hash, text.Key, text.Value));
+
+        /// <summary>The text for <paramref name="culture"/>: its full tag, its language, <c>en</c>, then <see cref="English"/>.</summary>
+        public string For(System.Globalization.CultureInfo culture)
+        {
+            for (var current = culture; !string.IsNullOrEmpty(current.Name); current = current.Parent)
+            {
+                if (Find(current.Name) is { } text)
+                {
+                    return text;
+                }
+            }
+
+            return Find("en") ?? English;
+        }
+
+        // Tags compare without case: a provider may send "cs-cz".
+        private string? Find(string tag) =>
+            Texts.FirstOrDefault(text => string.Equals(text.Key, tag, StringComparison.OrdinalIgnoreCase)) is { Value: { Length: > 0 } value } ? value : null;
     }
 }

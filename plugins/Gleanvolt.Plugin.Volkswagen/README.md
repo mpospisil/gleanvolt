@@ -151,8 +151,8 @@ result of #410: what moving a car feed into a plugin costs.
 | The car's target SOC (`TargetSocPercent`) | Parsed, unused | Not copied | Nothing used it, and the contract has no field for it |
 | Account | `Vehicle:Website:Username`, `:Password`, `:Vin`, on the Car page, in the secret store | Entered on the plugin's page, in `account.json` | A plugin has no Gleanvolt settings or secret store. A new VW ID or VIN forgets the session; a new password alone doesn't |
 | Session cookies | `ISecretStore` (`0600` files on Linux, DPAPI on Windows) | `session.json`, `0600` | **Gap: the SDK has no secret store.** On Windows, nothing like DPAPI |
-| Sign-in states | `VehicleSignInState` with phrases, in English and Czech | A small record of its own, English only | Gleanvolt's phrases and resources are its own. **Gap:** the page gets `culture` and ignores it |
-| Status messages | `VehicleSourceHealth` with phrases | `ProviderStatus` messages in English | **Gap:** the contract carries no phrase, so Gleanvolt shows the provider's English in a Czech UI |
+| Sign-in states and the page | `VehicleSignInState` with phrases, in English and Czech | A small record of its own; every text in English and Czech in `PageText` (`Words`), chosen by the `culture` Gleanvolt opens the page with (#415) | Gleanvolt's phrases and resources are its own. A culture cookie carries the language to Blazor's circuit, whose requests have no query |
+| Status messages | `VehicleSourceHealth` with phrases | `ProviderStatus` with a code (`not-set-up`, `needs-sign-in`), which Gleanvolt words itself, and the detail in English and Czech (#415) | The English `message` remains for a Gleanvolt older than vehicle 1.3 |
 | How often to read | 5 min while Gleanvolt's charge control has a session open (`ChargeControlStatusHolder`), 15 otherwise | 5 min while Gleanvolt has a session open (vehicle 1.2's `ChargingSessionChanged`, #414) **or** the car last said it is charging, 15 otherwise; a read at once when a session opens | The SDK carries the session since #414. The car's own state also counts, so a charge started from the car or at a public charger is followed, as the built-in Škoda feed does. With a Gleanvolt older than 1.2, only the car's state decides |
 | Back on the clock after a sign-in | The worker watches the client's sign-in counter every minute | The page calls `Resume` and wakes the reader | The page and the reads share one process |
 | What stops it | A code wanted, no reading, an HTTP failure or a timeout | **Any** exception too | Otherwise the clock would carry on, and an unexpected failure could become a sign-in on a clock |
@@ -168,5 +168,5 @@ until you sign in.
 
 ## Not done here
 
-- Tested against the real ID.4 through a charge: see the PR.
-- The plugin's page in Czech.
+- A secret store in the SDK, so the account and the session aren't plain `0600` files on Windows: #416.
+- Tested against the real ID.4 through a charge on 2026-11-16 (see #410's comments); nothing left from that.

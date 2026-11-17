@@ -1,10 +1,11 @@
 @*
     The page's shell. Gleanvolt opens it with ?theme=auto|light|dark (#410): auto follows the browser,
     as Gleanvolt itself does; light or dark pins it. Read from the first request only: the interactive
-    part that follows has no request of its own.
+    part that follows has no request of its own. The language comes with ?culture= (#415), set by the
+    request localization in Program.cs.
 *@
 <!DOCTYPE html>
-<html lang="en" data-theme="@Theme">
+<html lang="@(Words.Czech ? "cs" : "en")" data-theme="@Theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

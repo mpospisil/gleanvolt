@@ -15,7 +15,7 @@ namespace Gleanvolt.Providers.Server;
 /// <para>Also tracks the host's requests: one outstanding at a time, marked unanswered when the
 /// provider has not quoted it within the timeout.</para>
 /// </summary>
-public sealed class ProviderSessions
+public sealed partial class ProviderSessions
 {
     private readonly Lock _gate = new();
     private readonly TimeProvider _time;
@@ -117,6 +117,8 @@ public sealed class ProviderSessions
                 Healthy = null,
                 StatusMessage = null,
                 NeedsOwner = false,
+                StatusCode = null,
+                StatusMessages = null,
                 Unanswered = false,
                 PageUrl = hello.PageUrl,
             };
@@ -228,11 +230,50 @@ public sealed class ProviderSessions
         lock (_gate)
         {
             // Only an unhealthy provider can need its owner: "healthy, and needs you" is read as healthy.
-            _status = _status with { Healthy = status.Healthy, StatusMessage = status.Message, NeedsOwner = !status.Healthy && status.NeedsOwner };
+            _status = _status with
+            {
+                Healthy = status.Healthy,
+                StatusMessage = Clip(status.Message),
+                NeedsOwner = !status.Healthy && status.NeedsOwner,
+                StatusCode = status.Code is { Length: > 0 and <= 64 } code ? code : null,
+                StatusMessages = Languages(status.Messages),
+            };
         }
 
         Changed?.Invoke();
     }
+
+    /// <summary>The most languages a status keeps, and the longest text in each (#415).</summary>
+    internal const int MaxStatusLanguages = 16;
+
+    internal const int MaxStatusLength = 1000;
+
+    private static string? Clip(string? text) => text is { Length: > MaxStatusLength } ? text[..MaxStatusLength] : text;
+
+    // A status is shown on pages and sent to Home Assistant: keep it to what reads as a language tag and
+    // a sentence. A tag that isn't one, or an empty text, is dropped rather than refusing the status.
+    private static IReadOnlyDictionary<string, string>? Languages(IReadOnlyDictionary<string, string>? messages)
+    {
+        if (messages is null)
+        {
+            return null;
+        }
+
+        var kept = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (tag, text) in messages)
+        {
+            if (kept.Count < MaxStatusLanguages && LanguageTag().IsMatch(tag ?? string.Empty) && !string.IsNullOrWhiteSpace(text))
+            {
+                kept.TryAdd(tag!, Clip(text)!);
+            }
+        }
+
+        return kept.Count > 0 ? kept : null;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$")]
+    private static partial System.Text.RegularExpressions.Regex LanguageTag();
 
     /// <summary>
     /// Starts a request to the attached session: its id and connection, or null when none is attached.

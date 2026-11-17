@@ -22,6 +22,14 @@ namespace Gleanvolt.Api.Contracts;
 /// <param name="StatusMessage">Its message with that report.</param>
 /// <param name="Unanswered">True when it did not answer Gleanvolt's last request in time.</param>
 /// <param name="NeedsOwner">True when the provider said only the owner can fix it: an expired login, a consent screen.</param>
+/// <param name="StatusCode">
+/// The code with that report (#415), e.g. <c>needs-sign-in</c>, <c>needs-code</c>, <c>unreachable</c>,
+/// or null. One of the provider contract's <c>ProviderStatusCodes</c>, or one Gleanvolt doesn't know.
+/// </param>
+/// <param name="StatusText">
+/// That report in English as Gleanvolt words it: its words for the code, then the provider's detail. Null
+/// when the provider said nothing.
+/// </param>
 public sealed record ExternalProviderResponse(
     string Kind,
     string Name,
@@ -37,7 +45,9 @@ public sealed record ExternalProviderResponse(
     bool? Healthy,
     string? StatusMessage,
     bool Unanswered,
-    bool NeedsOwner = false)
+    bool NeedsOwner = false,
+    string? StatusCode = null,
+    string? StatusText = null)
 {
     internal static ExternalProviderResponse From(ExternalProviderStatus status) => new(
         status.Kind,
@@ -54,5 +64,7 @@ public sealed record ExternalProviderResponse(
         status.Healthy,
         status.StatusMessage,
         status.Unanswered,
-        status.NeedsOwner);
+        status.NeedsOwner,
+        status.StatusCode,
+        status.StatusSaid?.English);
 }

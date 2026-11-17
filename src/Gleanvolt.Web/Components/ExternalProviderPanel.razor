@@ -50,7 +50,8 @@
         @if (status.Healthy == false)
         {
             <p class="@(status.NeedsOwner ? "error" : "warning")" id="external-@(status.Kind)-unhealthy">
-                @Localized.Format(status.NeedsOwner ? SettingsText.ExternalNeedsOwner : SettingsText.ExternalUnhealthy, status.StatusMessage ?? string.Empty)
+                @Localized.Format(status.NeedsOwner ? SettingsText.ExternalNeedsOwner : SettingsText.ExternalUnhealthy,
+                    status.StatusSaid is { } said ? Localized.Say(said.Phrase, said.English, Time.LocalTimeZone) : string.Empty)
             </p>
         }
 

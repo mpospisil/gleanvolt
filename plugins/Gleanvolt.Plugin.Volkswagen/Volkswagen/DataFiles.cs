@@ -19,9 +19,9 @@ public sealed class DataFiles
     }
 
     /// <summary>What protects the files, for a sentence that has to mention it.</summary>
-    public string Describe() => OperatingSystem.IsWindows()
-        ? $"files in {_directory}, protected only by the folder's permissions"
-        : $"files in {_directory}, readable only by the plugin's user (0600)";
+    public Words Describe() => OperatingSystem.IsWindows()
+        ? new Words("files in {0}, protected only by the folder's permissions", "soubory v {0}, chráněné jen oprávněními složky").Format(_directory)
+        : new Words("files in {0}, readable only by the plugin's user (0600)", "soubory v {0}, čitelné jen pro uživatele pluginu (0600)").Format(_directory);
 
     public string? Read(string name)
     {
