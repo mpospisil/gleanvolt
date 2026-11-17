@@ -123,6 +123,13 @@ public sealed record ChargeControlStatus(
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;
+
+    /// <summary>
+    /// Whether a charging session is open: a mode other than Off, the car connected, and the mode not
+    /// ended. The car feeds read more often while it is (#414): the built-in ones from here, an external
+    /// provider from the vehicle contract's <c>ChargingSession</c>.
+    /// </summary>
+    public bool ChargingSessionOpen => Mode != ChargeControlMode.Off && CarConnected && !SessionCompleted;
 }
 
 /// <summary>

@@ -62,11 +62,7 @@ public sealed class VwWebsiteUpdateService(
             ? Timeout.InfiniteTimeSpan
             : IsCharging ? options.PollInterval : options.IdlePollInterval;
 
-    private bool IsCharging =>
-        status.Current is { } current
-        && current.Mode != ChargeControlMode.Off
-        && current.CarConnected
-        && !current.SessionCompleted;
+    private bool IsCharging => status.Current?.ChargingSessionOpen == true;
 
     public async Task<VehicleState?> FetchAsync(CancellationToken cancellationToken)
     {

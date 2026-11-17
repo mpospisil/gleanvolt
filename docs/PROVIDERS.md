@@ -192,9 +192,9 @@ and the `Welcome` says which version the host speaks.
 | --- | --- | --- |
 | `tariff` | 1 | 2 |
 | `solar-forecast` | 1 | 2 |
-| `vehicle` | 1 | 1 |
+| `vehicle` | 1 | 2 |
 
-The minors grew with `pageUrl` in the hello (#410).
+The minors grew with `pageUrl` in the hello (#410). Vehicle 1.2 added the charging session (#414).
 
 ## The tariff kind
 
@@ -345,6 +345,13 @@ one by it. Anything the owner hasn't entered is empty or `null`.
 The pack (capacity, efficiency, phases, currents) stays in Gleanvolt's `Ev:Vehicles[0]`. A provider
 never supplies it.
 
+From vehicle 1.2 the welcome also carries `session`: whether Gleanvolt has a charging session open
+as the provider says hello. It is `null` from an older Gleanvolt.
+
+```json
+"session": { "open": true, "since": "2026-11-16T22:53:55+00:00", "mode": "FastNoBattery" }
+```
+
 **`Publish(reading)` → `PublishResult`.** Offers what the car last said about itself. It is stored if
 it passes every check; if any check fails, nothing changes, and the result lists the problems in
 English.
@@ -387,6 +394,23 @@ keeps the last reading.
 
 **`VehicleChanged(car)`**, from Gleanvolt, says the car changed while connected. The car is read at
 start, so for now a change arrives as a new welcome after the restart.
+
+**`ChargingSessionChanged(session)`**, from Gleanvolt (vehicle 1.2, #414), says a charging session
+opened or closed, or an open session's mode changed. A session is open while a charge mode other than
+Off runs, the charger sees the car, and the mode hasn't ended. The built-in car feeds use the same
+rule. `since` is when Gleanvolt saw it open; `mode` is the mode's name, for logs and display. New
+modes appear without a contract change, so don't branch on it. Closed is `{"open": false}`.
+
+It is sent only on a change, and once more when a provider attaches, so the state is never missed
+between the welcome and the attach. It goes only to a provider that said hello with vehicle 1.2 or
+later.
+
+What it is for: **a provider that reads the car on a clock reads more often while a session is
+open.** The car's own `charging` arrives only once the car has reported it, often minutes after the
+plug-in. The built-in volkswagen.de feed reads every 5 minutes while a session is open and every 15
+otherwise. The Volkswagen plugin does the same, also reads at once when a session opens, and falls
+back to the car's own charge state with an older Gleanvolt. In the .NET SDK,
+`VehicleProviderConnection.Session` holds it, and `SessionChanged` is raised when it changes.
 
 **Read-only.** The kind carries no commands to the car: no start or stop, no target SOC, no wake-up.
 
@@ -439,4 +463,5 @@ The hello may carry `"pageUrl":"http://…"`; see [the provider's own page](#the
 A provider in another language checks the ticket itself, as described there.
 
 The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
-(solar forecast only), `VehicleChanged` (vehicle only) and `Goodbye` on the provider.
+(solar forecast only), `VehicleChanged` and `ChargingSessionChanged` (vehicle only) and `Goodbye` on
+the provider.

@@ -4,6 +4,52 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-17 — The car provider is told when a charging session is open (vehicle 1.2, #414)
+
+**What.** Gleanvolt tells a car provider whether its charge control has a charging session open, so
+a provider that reads the car on a clock can read more often while one is, as the built-in feeds do.
+The Volkswagen plugin uses it.
+
+**How.**
+- Contracts: `VehicleContract.Minor` 2. New `ChargingSessionInfo(Open, Since, Mode)` with `Closed`.
+  `VehicleWelcome.Session` (null from an older host). `IVehicleClient.ChargingSessionChanged`,
+  `ProviderMethods.ChargingSessionChanged`. Named `…Info` beside `VehicleInfo`, since Core already
+  has a `ChargingSession`.
+- Core: `ChargeControlStatus.ChargingSessionOpen`, the rule `VwWebsiteUpdateService` and
+  `SkodaApiUpdateService` had inline. Both now use it.
+- Server: `ProviderSessions.ContractMinor`, from the hello. New
+  `Hosting/Vehicles/External/ChargingSessionNotifier` (singleton + hosted service, registered
+  whatever the feed). It watches `ChargeControlStatusHolder.Updated` and `ExternalProviderRegistry.Changed`,
+  keeps `Current` (with `Since` from the first open status), and sends the latest state to the vehicle
+  provider at 1.2 or later through `IHubContext`. Sends are serialized and deduplicated per connection.
+  `VehicleHub.CreateWelcome` adds `Session`.
+- SDK: `VehicleProviderConnection.Session` and `SessionChanged`, from the welcome and the message; a
+  repeat of the held state is ignored.
+- Plugin: `VolkswagenFeed.ChargingSessionOpen`; `NextDelay` is the 5-minute interval while it is set
+  or the car says charging. `VolkswagenPoller` sets it from `SessionChanged` and wakes on an opening.
+- Tests (`ExternalVehicleHubTests`): a session open at hello is in the welcome; opening and closing
+  are said once each across repeated statuses; a 1.1 provider gets nothing; the SDK keeps the session
+  and raises one change per real change. `VolkswagenPluginTests`: a session open reads on the
+  charging clock before the car says so; a stopped feed stays stopped.
+- Docs: PROVIDERS.md (version table, the welcome's `session`, the message, the method list), the
+  client README, and the plugin's README and options.
+
+**Quirks.** The first version sent the attach-time state and a change as two independent sends. In
+the SDK test, the older "closed" sometimes landed after "open" and won. Serializing the sends, and
+sending the state as it is when each send runs, fixed it. Six consecutive runs passed.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/Vehicle.cs`, `Handshake.cs`;
+`src/Gleanvolt.Core/Models/ChargeControlStatus.cs`;
+`src/Gleanvolt.Infrastructure/Vehicles/VwWebsite/VwWebsiteUpdateService.cs`,
+`Vehicles/Skoda/SkodaApiUpdateService.cs`; `src/Gleanvolt.Providers.Server/ProviderSessions.cs`;
+`src/Gleanvolt.Hosting/Vehicles/External/ChargingSessionNotifier.cs` (new), `VehicleHub.cs`,
+`GleanvoltHostingExtensions.cs`; `src/Gleanvolt.Providers.Client/Vehicle/VehicleProvider.cs`,
+`README.md`; `plugins/Gleanvolt.Plugin.Volkswagen/Volkswagen/VolkswagenFeed.cs`,
+`VolkswagenOptions.cs`, `README.md`; `tests/Gleanvolt.Hosting.Tests/ExternalVehicleHubTests.cs`,
+`VolkswagenPluginTests.cs`; `docs/PROVIDERS.md`, `docs/DECISIONS.md`, `docs/IMPLEMENTATION_LOG.md`.
+
+---
+
 ## 2026-11-16 — The Volkswagen plugin on the Pi: Blazor's script in the image, and a page Gleanvolt may frame (#410)
 
 **What.** Fixes from the first run of `plugins/Gleanvolt.Plugin.Volkswagen` on the Pi against the

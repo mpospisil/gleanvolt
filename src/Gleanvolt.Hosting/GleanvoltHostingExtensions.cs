@@ -987,6 +987,11 @@ public static class GleanvoltHostingExtensions
 
         services.AddExternalProvider<VehicleHub>(VehicleHub.Kind);
 
+        // Whether a charging session is open, for the car provider's cadence (#414). Registered either
+        // way, since the hub's welcome reads it; it sends nothing with no provider attached.
+        services.AddSingleton<ChargingSessionNotifier>();
+        services.AddHostedService(provider => provider.GetRequiredService<ChargingSessionNotifier>());
+
         // Registered whether or not a service exists: with none it logs that fact once and stops, which
         // is a supported installation rather than a misconfigured one.
         // Asking the car because somebody wants to know, as opposed to because a clock said so

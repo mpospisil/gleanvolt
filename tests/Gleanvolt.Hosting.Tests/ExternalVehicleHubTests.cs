@@ -44,6 +44,8 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 15, 9, 0, 0, TimeSpan.Zero));
 
+    private readonly ChargeControlStatusHolder _status = new();
+
     private WebApplication? _app;
     private string _token = string.Empty;
 
@@ -273,6 +275,80 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task ASessionOpenAsTheProviderSaysHelloIsInTheWelcome()
+    {
+        await StartAsync();
+        _status.Set(Session(ChargeControlMode.FastNoBattery));
+        await using var connection = await ConnectAsync();
+
+        var welcome = await connection.InvokeAsync<VehicleWelcome>("Hello", Hello());
+
+        Assert.Equal(new ChargingSessionInfo(true, _time.GetUtcNow(), "FastNoBattery"), welcome.Session);
+    }
+
+    [Fact]
+    public async Task OpeningAndClosingASessionIsSaidOnceEach()
+    {
+        await StartAsync();
+        await using var connection = await ConnectAsync();
+        var heard = new List<ChargingSessionInfo>();
+        connection.On<ChargingSessionInfo>(ProviderMethods.ChargingSessionChanged, session => { lock (heard) { heard.Add(session); } });
+        Assert.Null((await connection.InvokeAsync<VehicleWelcome>("Hello", Hello())).Session?.Mode);
+        await Eventually(() => Count(heard) == 1, "a new provider is told the state once it attaches");
+
+        var opened = _time.GetUtcNow();
+        _status.Set(Session(ChargeControlMode.Solar));
+        _time.Advance(TimeSpan.FromSeconds(7));
+        _status.Set(Session(ChargeControlMode.Solar));
+        await Eventually(() => Count(heard) == 2, "the session opening should be said");
+
+        _status.Set(Session(ChargeControlMode.Solar) with { SessionEndReason = ChargingSessionEndReason.SessionComplete });
+        _status.Set(Session(ChargeControlMode.Off));
+        await Eventually(() => Count(heard) == 3, "the session closing should be said");
+        await Task.Delay(100);
+
+        Assert.Equal(
+            [ChargingSessionInfo.Closed, new ChargingSessionInfo(true, opened, "Solar"), ChargingSessionInfo.Closed],
+            heard);
+    }
+
+    [Fact]
+    public async Task AnOlderProviderIsNotSentTheMessage()
+    {
+        await StartAsync();
+        await using var connection = await ConnectAsync();
+        var heard = 0;
+        connection.On<ChargingSessionInfo>(ProviderMethods.ChargingSessionChanged, _ => Interlocked.Increment(ref heard));
+        Assert.True((await connection.InvokeAsync<VehicleWelcome>("Hello", Hello() with { ContractMinor = 1 })).Accepted);
+
+        _status.Set(Session(ChargeControlMode.FastNoBattery));
+        await Task.Delay(200);
+
+        Assert.Equal(0, heard);
+    }
+
+    [Fact]
+    public async Task TheSdkKeepsTheSessionAndSaysWhenItChanges()
+    {
+        await StartAsync();
+        using var sample = Sample();
+        var changes = new List<ChargingSessionInfo?>();
+        sample.SessionChanged += session => { lock (changes) { changes.Add(session); } };
+
+        await sample.StartAsync(CancellationToken.None);
+        await Eventually(() => sample.Session is { Open: false }, "the welcome says no session is open");
+
+        _status.Set(Session(ChargeControlMode.Targeted));
+        await Eventually(() => sample.Session is { Open: true, Mode: "Targeted" }, "the opening should reach the SDK");
+        await Task.Delay(100);
+
+        // The welcome's closed state, then the opening: the repeat on attaching is not news.
+        Assert.Equal([ChargingSessionInfo.Closed, new ChargingSessionInfo(true, _time.GetUtcNow(), "Targeted")], changes);
+
+        await sample.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task ThePollingWorkerLeavesAPushedFeedAlone()
     {
         await StartAsync();
@@ -316,6 +392,9 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
         builder.Services.AddSingleton<IVehicleStateRefresh>(provider => new VehicleStateRefresh(
             provider.GetRequiredService<ConfiguredVehicleFeed>(), provider.GetRequiredService<VehicleStateHolder>()));
         builder.Services.AddExternalProvider<VehicleHub>(VehicleHub.Kind);
+        builder.Services.AddSingleton(_status);
+        builder.Services.AddSingleton<ChargingSessionNotifier>();
+        builder.Services.AddHostedService(provider => provider.GetRequiredService<ChargingSessionNotifier>());
 
         _app = builder.Build();
         _app.UseAuthentication();
@@ -372,6 +451,17 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
             BatteryHoldEnabled: false, BatteryHoldRequested: false, BatteryHoldActive: false,
             BatteryHoldTargetWatts: null, Plan: null, LoanPowerWatts: 0, SessionEnergyWh: 0,
             LoanedTodayWh: 0, TomorrowForecastWh: null, Timestamp: DateTimeOffset.UtcNow);
+
+    private static int Count<T>(List<T> list)
+    {
+        lock (list)
+        {
+            return list.Count;
+        }
+    }
+
+    // A charge-control status with a session open in mode, or closed with Off.
+    private ChargeControlStatus Session(ChargeControlMode mode) => HaStatus() with { Mode = mode, Timestamp = _time.GetUtcNow() };
 
     private static async Task Eventually(Func<bool> condition, string because)
     {

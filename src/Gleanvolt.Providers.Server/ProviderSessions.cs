@@ -23,6 +23,7 @@ public sealed class ProviderSessions
     private readonly Func<string, IClientProxy> _client;
     private ExternalProviderStatus _status;
     private HubCallerContext? _context;
+    private int _contractMinor;
     private PendingRequest? _pending;
 
     internal ProviderSessions(ProviderKind kind, bool hasToken, TimeProvider time, ILogger logger, Func<string, IClientProxy> client)
@@ -68,6 +69,21 @@ public sealed class ProviderSessions
     public bool IsCurrent(string connectionId) => ConnectionId == connectionId;
 
     /// <summary>
+    /// The contract minor the attached provider said hello with, or null with none attached. A message
+    /// added in a later minor is sent only to a provider that knows it (#414).
+    /// </summary>
+    public int? ContractMinor
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _status.State == ExternalProviderState.Connected && _context is not null ? _contractMinor : null;
+            }
+        }
+    }
+
+    /// <summary>
     /// Attaches <paramref name="context"/> as the session, or says why not: null when attached, else a
     /// refusal code. Replaces the same provider's older connection, which is told goodbye and closed.
     /// </summary>
@@ -89,6 +105,7 @@ public sealed class ProviderSessions
             }
 
             _context = context;
+            _contractMinor = hello.ContractMinor;
             _pending = null;
             _status = _status with
             {

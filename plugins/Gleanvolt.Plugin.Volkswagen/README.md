@@ -43,7 +43,7 @@ password and VIN. The password is never shown back.
 | `Gleanvolt:PageUrl` | `Urls`, with `0.0.0.0` read as `localhost` | The page's address **as the owner's browser reaches it**, e.g. `http://192.168.2.7:8095/` |
 | `Gleanvolt:FrameAncestors` | `Gleanvolt:Endpoint`'s origin | Who may show the page in a frame (CSP `frame-ancestors`), e.g. `http://gleanvolt.local:8090` when the browser reaches Gleanvolt by another name than the endpoint |
 | `Volkswagen:DataDirectory` | `data` | Where the account and the session are kept |
-| `Volkswagen:PollInterval` | `00:05:00` | How often to read while the car says it is charging |
+| `Volkswagen:PollInterval` | `00:05:00` | How often to read while Gleanvolt has a charging session open, or the car says it is charging |
 | `Volkswagen:IdlePollInterval` | `00:15:00` | How often to read otherwise |
 | `Volkswagen:MinimumTimeBetweenReads` | `00:00:30` | A read asked for sooner answers with the last reading |
 | `Volkswagen:MinimumTimeBetweenLogins` | `00:05:00` | The floor between credential sign-ins |
@@ -153,7 +153,7 @@ result of #410: what moving a car feed into a plugin costs.
 | Session cookies | `ISecretStore` (`0600` files on Linux, DPAPI on Windows) | `session.json`, `0600` | **Gap: the SDK has no secret store.** On Windows, nothing like DPAPI |
 | Sign-in states | `VehicleSignInState` with phrases, in English and Czech | A small record of its own, English only | Gleanvolt's phrases and resources are its own. **Gap:** the page gets `culture` and ignores it |
 | Status messages | `VehicleSourceHealth` with phrases | `ProviderStatus` messages in English | **Gap:** the contract carries no phrase, so Gleanvolt shows the provider's English in a Czech UI |
-| How often to read | 5 min while Gleanvolt's charge control has a session open (`ChargeControlStatusHolder`), 15 otherwise | 5 min while **the car** last said it is charging, 15 otherwise | **Gap:** a plugin can't see whether a charging session is open. Between plugging in and the car's first "charging" report, it reads every 15 minutes, where the built-in already reads every 5 |
+| How often to read | 5 min while Gleanvolt's charge control has a session open (`ChargeControlStatusHolder`), 15 otherwise | 5 min while Gleanvolt has a session open (vehicle 1.2's `ChargingSessionChanged`, #414) **or** the car last said it is charging, 15 otherwise; a read at once when a session opens | The SDK carries the session since #414. The car's own state also counts, so a charge started from the car or at a public charger is followed, as the built-in Škoda feed does. With a Gleanvolt older than 1.2, only the car's state decides |
 | Back on the clock after a sign-in | The worker watches the client's sign-in counter every minute | The page calls `Resume` and wakes the reader | The page and the reads share one process |
 | What stops it | A code wanted, no reading, an HTTP failure or a timeout | **Any** exception too | Otherwise the clock would carry on, and an unexpected failure could become a sign-in on a clock |
 | A changed account | Takes a restart | Stops reading until you sign in | No credentials are replayed that you didn't ask to use |

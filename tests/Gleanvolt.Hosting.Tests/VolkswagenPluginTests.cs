@@ -195,7 +195,7 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
         Assert.Equal(_options.IdlePollInterval, _feed.NextDelay);
     }
 
-    /// <summary>The built-in asks whether Gleanvolt has a session open; the plugin asks the car.</summary>
+    /// <summary>A charge started from the car or at a public charger is followed too.</summary>
     [Fact]
     public async Task A_car_that_says_it_is_charging_is_read_on_the_charging_clock()
     {
@@ -204,6 +204,29 @@ public sealed class VolkswagenPluginFeedTests : IDisposable
         await _feed.ReadAsync(CancellationToken.None);
 
         Assert.Equal(_options.PollInterval, _feed.NextDelay);
+    }
+
+    /// <summary>
+    /// Gleanvolt's session open, before the car has reported the charge (#414): the built-in's rule.
+    /// </summary>
+    [Fact]
+    public async Task A_session_open_in_Gleanvolt_is_read_on_the_charging_clock_before_the_car_says_so()
+    {
+        await _feed.ReadAsync(CancellationToken.None);
+        Assert.Equal(_options.IdlePollInterval, _feed.NextDelay);
+
+        _feed.ChargingSessionOpen = true;
+
+        Assert.Equal(_options.PollInterval, _feed.NextDelay);
+    }
+
+    [Fact]
+    public void A_stopped_feed_reads_nothing_even_with_a_session_open()
+    {
+        _feed.Stop("Stopped for the test.");
+        _feed.ChargingSessionOpen = true;
+
+        Assert.Equal(Timeout.InfiniteTimeSpan, _feed.NextDelay);
     }
 
     [Fact]

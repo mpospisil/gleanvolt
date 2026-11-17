@@ -23,22 +23,43 @@ public interface IVehicleSource
 /// <see cref="IVehicleClient.RefreshRequested"/>, publishes again when the car changes, and publishes
 /// whenever the provider calls <see cref="PublishNowAsync"/>. A car provider mostly publishes on its own
 /// events (plugging in, a charge starting, a step in SOC); Gleanvolt does not poll it.
+///
+/// <para>It also keeps whether Gleanvolt has a charging session open (<see cref="Session"/>, #414), for a
+/// provider that reads the car on a clock: read more often while one is.</para>
 /// </summary>
 public sealed class VehicleProviderConnection : ProviderConnection<VehicleWelcome>
 {
     private readonly IVehicleSource _source;
     private VehicleInfo? _car;
+    private volatile ChargingSessionInfo? _session;
 
     public VehicleProviderConnection(
         IOptions<ProviderOptions> options, IVehicleSource source, ILogger<VehicleProviderConnection> logger)
         : base(options.Value, VehicleContract.HubPath, VehicleContract.Major, VehicleContract.Minor, logger)
     {
         _source = source;
-        Welcomed += welcome => _car = welcome.Car;
+        Welcomed += welcome =>
+        {
+            _car = welcome.Car;
+            SetSession(welcome.Session);
+        };
     }
 
     /// <summary>The car: the welcome's, or the latest change. Null before the first hello.</summary>
     public VehicleInfo? Car => _car;
+
+    /// <summary>
+    /// Whether Gleanvolt has a charging session open: the welcome's, or the latest
+    /// <see cref="IVehicleClient.ChargingSessionChanged"/>. Null before the first hello, and from a
+    /// Gleanvolt older than vehicle 1.2, which doesn't say: go by the car's own charge state then.
+    /// </summary>
+    public ChargingSessionInfo? Session => _session;
+
+    /// <summary>
+    /// <see cref="Session"/> changed: a session opened or closed, or an open one's mode changed. Raised
+    /// on the connection's thread; keep it short.
+    /// </summary>
+    public event Action<ChargingSessionInfo?>? SessionChanged;
 
     /// <summary>
     /// Asks the source and publishes, unprompted: for a provider that has just seen the car change.
@@ -62,6 +83,41 @@ public sealed class VehicleProviderConnection : ProviderConnection<VehicleWelcom
             _ = Task.Run(() => PublishAsync(null, CancellationToken.None));
             return Task.CompletedTask;
         });
+
+        connection.On<ChargingSessionInfo>(ProviderMethods.ChargingSessionChanged, session =>
+        {
+            SetSession(session);
+            return Task.CompletedTask;
+        });
+    }
+
+    // Gleanvolt says the state again whenever a provider attaches, so an unchanged one is not news.
+    private void SetSession(ChargingSessionInfo? session)
+    {
+        if (session == _session)
+        {
+            return;
+        }
+
+        _session = session;
+
+        if (session is { Open: true })
+        {
+            Logger.LogInformation("Gleanvolt has a charging session open ({Mode}).", session.Mode);
+        }
+        else if (session is not null)
+        {
+            Logger.LogInformation("Gleanvolt has no charging session open.");
+        }
+
+        try
+        {
+            SessionChanged?.Invoke(session);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "A handler of the charging session failed.");
+        }
     }
 
     protected override Task OnWelcomedAsync(VehicleWelcome welcome, CancellationToken cancellationToken) =>

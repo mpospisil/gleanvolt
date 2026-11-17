@@ -22,6 +22,7 @@ public sealed class VehicleHub(
     VehicleStateHolder holder,
     ConfiguredVehicleFeed configured,
     EvInfo car,
+    ChargingSessionNotifier session,
     TimeProvider time)
     : ProviderHub<IVehicleClient, VehicleWelcome>(registry, host), IVehicleHub
 {
@@ -43,7 +44,7 @@ public sealed class VehicleHub(
         car.BatteryCapacityWh > 0 ? car.BatteryCapacityWh / 1000 : null,
         TariffHub.IanaId(zone));
 
-    protected override VehicleWelcome CreateWelcome() => new() { Car = Info(car, time.LocalTimeZone) };
+    protected override VehicleWelcome CreateWelcome() => new() { Car = Info(car, time.LocalTimeZone), Session = session.Current };
 
     public Task<PublishResult> Publish(VehicleReading reading)
     {

@@ -154,4 +154,5 @@ public static class ProviderMethods
     public const string RefreshRequested = "RefreshRequested";
     public const string SiteChanged = "SiteChanged";
     public const string VehicleChanged = "VehicleChanged";
+    public const string ChargingSessionChanged = "ChargingSessionChanged";
 }
