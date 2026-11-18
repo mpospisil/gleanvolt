@@ -29,8 +29,10 @@ to do until a weather provider connects.
   resources went (en and cs), `WeatherBuiltInRetired` came, three were reworded.
 - *Setup.* `SetupDocument` no longer allows `Weather:ApiKey`; `SetupTarget` lost `Weather`; the CLI asks
   NotProvided or External only; `OptionalSettings.Weather` is "External chosen".
-- *Deploy.* The controller's `Weather__ApiKey` line left the compose file; the plugin's
-  `OPENWEATHER_API_KEY` still falls back to `WEATHER_API_KEY`. `.env.example`s say so.
+- *Deploy.* The controller keeps `Weather__ApiKey: ${WEATHER_API_KEY}` in the compose file, only so the
+  migration recognises an installation whose key lived in `.env` (removing it, as first merged, left such
+  an installation on NotProvided: found on the Pi, fixed the same day). The plugin's
+  `OPENWEATHER_API_KEY` falls back to `WEATHER_API_KEY`. `.env.example`s say so.
 
 **Quirks.** None from hardware. The overrides file is the only durable place for the notice: a marker
 next to the choice, rather than a field of its own, because the notice has to outlive a restart and the

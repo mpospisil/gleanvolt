@@ -27,6 +27,10 @@ the same call ran.
 - **The old key is deleted, not handed over.** The secret store's `weather-api-key` is removed at the
   first start, whatever the source. Gleanvolt has no channel to give a plugin a secret, and adding one
   for a single migration would outlive it. The owner enters the key on the plugin's page.
+- **`Weather:ApiKey` still reaches the controller, for recognition only.** As first merged, the Pi's
+  compose file stopped passing `WEATHER_API_KEY` to the controller, and the Pi, whose key lived only in
+  `.env`, stayed on NotProvided with no notice. The line is back; the key is used only to recognise the
+  installation and is never sent anywhere.
 - **`Weather:ApiKey` is ignored with a warning, not refused.** Unlike the moved keys in
   `RetiredConfigurationKeys`, it decided nothing that would now silently point elsewhere, and the Pi's
   compose file still passes `WEATHER_API_KEY` on, to the plugin, so `.env` keeps working.

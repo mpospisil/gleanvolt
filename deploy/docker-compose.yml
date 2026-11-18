@@ -264,8 +264,13 @@ services:
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
       # The weather each charging session ran in comes from an external provider since #425, such as
-      # the OpenWeather plugin below: choose "External" under Settings -> Weather. Nothing to set here;
-      # WEATHER_API_KEY goes to the plugin now, not to the controller.
+      # the OpenWeather plugin below: choose "External" under Settings -> Weather.
+      #
+      # WEATHER_API_KEY, the removed built-in's key, still reaches the controller, but only so that an
+      # installation that used the built-in is recognised and moved to External at its first start
+      # (#425); it is never sent anywhere, and a warning asks for it to move to OPENWEATHER_API_KEY.
+      # Without this line an installation whose key lived only in .env would lose its weather silently.
+      Weather__ApiKey: ${WEATHER_API_KEY:-}
 
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
       # that: the service always boots in mode Off and takes control only when a mode is selected

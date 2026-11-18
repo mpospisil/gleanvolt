@@ -245,8 +245,9 @@ after the upgrade, an installation that used it (that source chosen, or a key wi
   its own;
 - logs one warning, and shows a notice under **Settings → Weather**, until a weather provider connects.
 
-`Weather__ApiKey` (`WEATHER_API_KEY`) is no longer read; while it is set, each start logs one warning.
-The Pi's compose file passes `WEATHER_API_KEY` to the plugin while `OPENWEATHER_API_KEY` is unset, so a
+`Weather__ApiKey` (`WEATHER_API_KEY`) is used for nothing but that recognition; while it is set, each
+start logs a warning asking for it to move to `OPENWEATHER_API_KEY`. The Pi's compose file still passes
+it to the controller, for the recognition, and to the plugin while `OPENWEATHER_API_KEY` is unset, so a
 key kept in `.env` carries over. `Weather:BaseUrl`, `Units` and `RequestTimeout` are gone and ignored.
 A setup document with `Weather:Source` = `OpenWeather` or a `Weather:ApiKey` is refused.
 
