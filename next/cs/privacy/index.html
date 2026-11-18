@@ -109,7 +109,7 @@ někdo doma, kdy auto přijíždí a odjíždí a kdy je domácnost vzhůru. Pro
 </tr>
 <tr>
 <td>Hesla a klíče</td>
-<td>Heslo k účtu auta, klíče Solcast a počasí a další</td>
+<td>Heslo k účtu auta, klíč Solcast a další</td>
 <td>Dokud je neodstraníte</td>
 </tr>
 </tbody>
@@ -144,11 +144,6 @@ Spojení není šifrované (prosté HTTP), takže ji používejte jen v domácí
 <td>Několikrát denně</td>
 </tr>
 <tr>
-<td><strong>OpenWeatherMap</strong> (počasí)</td>
-<td>Váš klíč a <strong>poloha vašeho domu</strong></td>
-<td>Dvakrát za nabíjení</td>
-</tr>
-<tr>
 <td><strong>Volkswagen, Škoda nebo portál VW Group Data Act</strong> (stav baterie auta)</td>
 <td>Přihlášení k vašemu účtu a VIN auta, výrobci auta</td>
 <td>Při čtení auta</td>
@@ -158,8 +153,8 @@ Spojení není šifrované (prosté HTTP), takže ji používejte jen v domácí
 <p>Požadavky na výrobce auta jdou k němu a řídí se jeho zásadami ochrany soukromí. Gleanvolt se přihlašuje
 jako vy, s údaji, které jste mu dali, a uchovává si jen stav baterie auta, dojezd, stav připojení a
 nabíjení a čas, kdy to auto nahlásilo. VIN se do historie neukládá.</p>
-<p><strong>Poloha vašeho domu</strong> opouští vaši síť jen tehdy, když nastavíte počasí, které ji potřebuje.</p>
-<p>S <strong>externím</strong> zdrojem počasí Gleanvolt předá polohu vašeho domu tomuto programu a o tom, kam ji pošle,
-rozhoduje program: plugin OpenWeather ji s vaším klíčem posílá do OpenWeatherMap, stejně jako by to
-udělal Gleanvolt.</p>
+<p>Gleanvolt sám <strong>polohu vašeho domu</strong> mimo vaši síť neposílá nikam.</p>
+<p>Kvůli počasí ji Gleanvolt předá programu pro počasí ve vaší síti a o tom, kam ji pošle, rozhoduje tento
+program: plugin OpenWeather ji s vaším klíčem posílá do OpenWeatherMap, nejvýš jednou za 10 minut, když
+se na počasí ptá nabíjení. Klíč si plugin ukládá ve vlastní složce.</p>
 <p>Nic jiného se nikdy nekontaktuje.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/gleanvolt/next/cs/troubleshooting/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Předchozí<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Řešení potíží a časté otázky</span></span></a><a href="/gleanvolt/next/cs/glossary/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Další<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Slovníček</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
