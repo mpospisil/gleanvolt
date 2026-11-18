@@ -93,7 +93,7 @@ Each step saves as it goes, so a reload or a closed browser loses nothing that w
 3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it, so setup spends
    none of the day's Solcast calls.
 4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
-5. **Extras** (optional). The tariff, the weather source and the OpenWeatherMap key, the Home Assistant (MQTT) link and the
+5. **Extras** (optional). The tariff, the weather source, the Home Assistant (MQTT) link and the
    API with its keys.
 6. **Finish.** What is still missing, each with a link to its step; the recommended and optional
    settings not yet set; and **Start Gleanvolt**, which restarts it out of setup mode and then opens
@@ -226,11 +226,13 @@ devices — the inverter and each charger with model, address and unit id. See
 location and orientation, capacity, the inverter and the charger. The Solcast, weather, tariff, MQTT
 and API forms below it work the same way, with their secrets going to the secret store.
 
-The **Weather** section starts with where the weather comes from (#424): **Not provided**,
-**OpenWeather** (the key below it) or **External**. Like the solar forecast's source, a choice applies at
-once and is saved for the next start. With **External** it shows the provider's own page in a frame, as
-the Car page does for a car provider, and the provider's session. Saving an OpenWeatherMap key also
-chooses OpenWeather.
+The **Weather** section is where the weather comes from (#424): **Not provided** or **External**. Like
+the solar forecast's source, a choice applies at once and is saved for the next start. With
+**External** it names the OpenWeather plugin as the ready-made provider and shows the provider's own
+page in a frame, as the Car page does for a car provider, with the provider's session. Since #425 there
+is no key here: the OpenWeatherMap key is entered on the plugin's page. After the upgrade that removed
+the built-in OpenWeather, an installation that used it has **External** chosen for it and a notice
+saying what to do, until a weather provider connects.
 
 - **A save is checked by the same rules as startup.** If they refuse it, nothing is written and the
   page says why, so a saved file can never stop the controller from starting.
@@ -415,7 +417,7 @@ starts Gleanvolt; each saves for the next start and says to restart.
 | `setup --file site.json` | Checks the file and applies it. Lists every problem and exits 1 if there is any; exits 0 when saved. |
 | `setup --validate site.json` | Checks the file only. Writes nothing. |
 | `setup --print-schema` | Prints the JSON schema of what a setup file may hold. |
-| `setup` | Asks for each setting in turn, as the wizard does: the password (when none is set), a device search, the addresses, the location, the time zone, the home battery, the Solcast key, the weather source (`NotProvided`, `OpenWeather` or `External`) and, for OpenWeather, its key. Passwords and keys are not echoed. |
+| `setup` | Asks for each setting in turn, as the wizard does: the password (when none is set), a device search, the addresses, the location, the time zone, the home battery, the Solcast key, the weather source (`NotProvided` or `External`). Passwords and keys are not echoed. |
 | `set-password`, `reset-password` | Sets a new web UI password, signs every browser out on the next start, and prints a new recovery key. Being able to run this as the service user is the proof a recovery key would otherwise be. |
 | `discover [--json]` | The device search, as `gleanvolt-discover` (see [Finding your devices](DISCOVERY.md)). |
 

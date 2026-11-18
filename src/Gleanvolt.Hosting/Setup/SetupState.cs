@@ -2,7 +2,6 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Tariff;
-using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web.Auth;
 
@@ -56,7 +55,10 @@ public sealed class SetupState : ISetupState
         var tariff = _services.GetService<TariffSettingsFile>()?.Read().Provider is { } provider
             && provider != TariffProviderIds.None;
 
-        var weather = _services.GetService<WeatherKeyStore>()?.Current is not null || fromConfiguration.Weather;
+        // The weather is set up when it comes from a provider (#425): the running choice, else the file's.
+        var weather = _services.GetService<IWeatherSourceSelection>() is { } weatherSource
+            ? weatherSource.Selected == WeatherSource.External
+            : fromConfiguration.Weather;
 
         return SetupStatusEvaluator.Evaluate(
             fresh, _host, fromConfiguration with { Solcast = solcast, Tariff = tariff, Weather = weather });

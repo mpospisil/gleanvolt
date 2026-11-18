@@ -4,6 +4,59 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-18 — The built-in OpenWeather removed; the OpenWeather plugin replaces it (#425)
+
+**What.** Gleanvolt no longer calls OpenWeatherMap. The weather comes from nowhere or from an external
+provider; the OpenWeather plugin, shipped since #426, is the ready-made one. An installation that used
+the built-in is moved to External at its first start, its stored key is deleted, and Settings says what
+to do until a weather provider connects.
+
+**How.**
+- *Removal.* `src/Gleanvolt.Infrastructure/OpenWeather/` is gone (the service and the key store),
+  `WeatherOptions` moved to `src/Gleanvolt.Hosting/Weather/` without the OpenWeatherMap fields,
+  `IWeatherKeyEditor`, `WeatherKey.cs` and `Hosting/Forecasting/WeatherKeyEditor.cs` deleted, the HTTP
+  client registration dropped. `SelectedWeatherService` asks the external service or nothing.
+- *Enum.* `WeatherSource` lost `OpenWeather`. `IWeatherSourceSelection` lost `IsChosen` and gained
+  `BuiltInRetired`; `IWeatherService.Source`'s default says `External` when configured.
+- *Migration.* `WeatherSourceSelection`'s constructor reads `Weather:Source`, the secret store's
+  `weather-api-key` and `Weather:ApiKey` (the shipped placeholder is no key). Used the built-in → writes
+  `Weather:Source=External` and `Weather:BuiltInRetired=true` to the overrides file under its lock, logs a
+  warning with what to run. Any stored key is deleted; a configured key gets one warning. A later reload
+  with `OpenWeather` in it is read as External. `ProviderConnected()` clears the flag in memory and in the
+  file; the watcher calls it on the registry's `Changed` when the weather kind is connected.
+- *UI.* `WeatherKeyForm` became `WeatherForm`: the notice (`#weather-built-in-retired`), two choices,
+  and for External the intro naming the OpenWeather plugin, its page and its session panel. Thirteen
+  resources went (en and cs), `WeatherBuiltInRetired` came, three were reworded.
+- *Setup.* `SetupDocument` no longer allows `Weather:ApiKey`; `SetupTarget` lost `Weather`; the CLI asks
+  NotProvided or External only; `OptionalSettings.Weather` is "External chosen".
+- *Deploy.* The controller's `Weather__ApiKey` line left the compose file; the plugin's
+  `OPENWEATHER_API_KEY` still falls back to `WEATHER_API_KEY`. `.env.example`s say so.
+
+**Quirks.** None from hardware. The overrides file is the only durable place for the notice: a marker
+next to the choice, rather than a field of its own, because the notice has to outlive a restart and the
+choice is already written there.
+
+**Verified.** All tests in Release. New: the migration cases (chosen built-in, Settings key, environment
+key, placeholder, NotProvided kept with the key still deleted, the notice across a restart and cleared
+once), a provider connecting clears the notice through the real hub, the form's notice and two choices,
+setup documents refusing the built-in. OpenAPI contract regenerated (`WeatherSource` loses
+`openWeather`). Screenshots regenerated; `settings-weather` now shows the post-upgrade notice. Manual
+build and link check pass. Not yet: the Pi upgrade with the notice, and weather recorded again once the
+plugin runs with its key.
+
+**Files.** Removed: `src/Gleanvolt.Infrastructure/OpenWeather/{OpenWeatherMapService,WeatherKeyStore}.cs`,
+`src/Gleanvolt.Core/{Models/WeatherKey,Interfaces/IWeatherKeyEditor}.cs`,
+`src/Gleanvolt.Hosting/Forecasting/WeatherKeyEditor.cs`, `tests/Gleanvolt.Infrastructure.Tests/OpenWeatherMapServiceTests.cs`.
+Changed: `src/Gleanvolt.Core/{Models/WeatherSource,Interfaces/IWeatherSourceSelection,Interfaces/IWeatherService,Interfaces/ISecretStore}.cs`,
+`src/Gleanvolt.Hosting/Weather/*`, `src/Gleanvolt.Hosting/{GleanvoltHostingExtensions,Cli/GleanvoltCli,Setup/SetupDocument,Setup/SetupState,Setup/SetupStatusEvaluator}.cs`,
+`src/Gleanvolt.Web/Components/WeatherForm.razor` (was `WeatherKeyForm`), the Settings and Service resources,
+tests in Hosting, Web and Screenshots, `tests/Gleanvolt.Api.Tests/OpenApiContract.json`, `deploy/`,
+`.env.example`, `docs/{CONFIGURATION,PRIVACY,WEB_UI,PROVIDERS,DATA,HTTP_API,DECISIONS,IMPLEMENTATION_LOG}.md`,
+the plugin's README, the setup skill, and the manual's weather, settings and privacy pages (en, cs) with
+their screenshots.
+
+---
+
 ## 2026-11-17 — Shipping plugins with Gleanvolt, starting with OpenWeather (#426)
 
 **What.** The OpenWeather plugin from #424 is released with Gleanvolt: an image per release

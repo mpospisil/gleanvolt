@@ -1,7 +1,8 @@
 # OpenWeather: the weather as a plugin
 
-A copy of Gleanvolt's built-in OpenWeatherMap integration, run outside Gleanvolt as an external weather
-provider (#424). It reads the current conditions at the site from OpenWeatherMap's free
+OpenWeatherMap as an external weather provider for Gleanvolt (#424): since #425 the only way Gleanvolt
+gets OpenWeatherMap's weather, which it no longer calls itself. It began as a copy of the built-in
+integration. It reads the current conditions at the site from OpenWeatherMap's free
 current-weather endpoint, publishes them to Gleanvolt, and serves its own page for the API key, which
 Gleanvolt shows under **Settings → Weather**.
 
@@ -10,12 +11,12 @@ charge control reads it.
 
 > **Shipped with Gleanvolt** (#426): an image, `ghcr.io/mpospisil/gleanvolt-plugin-openweather`, and a
 > zip per platform on each release, from the same tag as Gleanvolt. Run the same version as your
-> Gleanvolt. #425 then removes the built-in, and this plugin becomes the way to get OpenWeatherMap's
-> weather.
+> Gleanvolt.
 
-> **One source at a time.** Run it with **External** chosen under **Weather** on Gleanvolt's Settings.
-> Gleanvolt then doesn't call OpenWeatherMap itself. To go back, choose **OpenWeather** there: the key
-> saved in Gleanvolt is still there.
+> **Run it with External chosen** under **Weather** on Gleanvolt's Settings. An installation that used
+> the built-in has External chosen for it at its first start after #425, and a notice there until this
+> connects. The key Gleanvolt kept is deleted, not handed over: enter it on this plugin's page, or pass
+> it as `OPENWEATHER_API_KEY` (the Pi's compose file falls back to the old `WEATHER_API_KEY`).
 
 ## What it does
 
@@ -139,8 +140,9 @@ docker save gleanvolt-plugin-openweather | ssh martin@192.168.2.7 docker load
 
 ## What changed from the built-in, and why
 
-The code is a copy of `src/Gleanvolt.Infrastructure/OpenWeather/` (`OpenWeatherMapService`,
-`WeatherKeyStore`, `WeatherOptions`) and of the key's place on Settings (`WeatherKeyForm`).
+The code is a copy of what was `src/Gleanvolt.Infrastructure/OpenWeather/` (`OpenWeatherMapService`,
+`WeatherKeyStore`, `WeatherOptions`) and of the key's place on Settings (`WeatherKeyForm`), all removed
+from Gleanvolt in #425.
 
 | What | Built-in | Plugin | Why |
 | --- | --- | --- | --- |

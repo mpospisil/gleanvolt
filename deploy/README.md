@@ -239,7 +239,7 @@ Keys and switches, each of which the wizard's **Forecast** and **Extras** steps 
 ```bash
 SOLCAST_API_KEY=...            # the solar forecast
 SOLCAST_RESOURCE_ID=...
-WEATHER_API_KEY=...            # weather at each end of a session
+OPENWEATHER_API_KEY=...        # the OpenWeather plugin's key (see Shipped plugins)
 API_ENABLED=true               # the HTTP API, with one key (generate one with: openssl rand -hex 32)
 API_KEY=...                    # becomes Api__Keys__client
 ```
@@ -548,8 +548,13 @@ To run one:
    `/opt/gleanvolt/plugins/openweather` (uid 1654, mode 700), and pulls and starts the plugin with the
    controller, from the same `IMAGE_TAG`.
 4. Under **Settings → Weather**, choose **External** and save. The plugin's page appears there: enter the
-   OpenWeatherMap key and press **Save and check**. `WEATHER_API_KEY` in `.env`, if you have one, is its
-   key until then.
+   OpenWeatherMap key and press **Save and check**. `OPENWEATHER_API_KEY` in `.env`, or the older
+   `WEATHER_API_KEY`, is its key until then.
+
+**Upgrading from the built-in OpenWeather** (#425): the controller moves the weather to **External** by
+itself and says so under **Settings → Weather**. Turn the plugin on as above, and enter the key on its
+page again: the one saved on Settings before is deleted, not handed over. A key in `WEATHER_API_KEY`
+carries over.
 
 The page is the Pi's own port 8096, which your browser opens inside Settings; Gleanvolt sends it there
 under the name you opened Gleanvolt at, so `gleanvolt.local` and the address both work. `OPENWEATHER_PORT`

@@ -830,6 +830,6 @@
       "temperatureCelsius": "number|string(double)? (required)",
       "visibilityMetres": "number|string(double)? (required)"
     },
-    "WeatherSource": "enum[notProvided|openWeather|external]"
+    "WeatherSource": "enum[notProvided|external]"
   }
 }

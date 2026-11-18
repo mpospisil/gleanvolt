@@ -12,7 +12,7 @@ There are four **kinds** of provider:
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
 | `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
-| `weather` | OpenWeatherMap | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
+| `weather` | The built-in OpenWeatherMap, removed in #425 | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -71,10 +71,11 @@ installation: Gleanvolt acts on what they send.
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
 
-[`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424): a
-copy of the built-in OpenWeatherMap integration as a weather provider, with its own page for the key,
-which Gleanvolt shows under **Settings → Weather**. Its README lists what changed from the built-in.
-It is the first [shipped plugin](#shipped-plugins) (#426); #425 then replaces the built-in with it.
+[`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424):
+OpenWeatherMap as a weather provider, with its own page for the key, which Gleanvolt shows under
+**Settings → Weather**. It began as a copy of the built-in integration, and its README lists what
+changed. It is the first [shipped plugin](#shipped-plugins) (#426), and since #425 the only way to get
+OpenWeatherMap's weather: the built-in is gone.
 
 **Secrets.** A provider that holds an account (a password, a session's cookies, an API key) keeps it
 with `services.AddGleanvoltProviderSecrets(directory)` and `IProviderSecretStore` (#416): `Read`,
@@ -536,9 +537,9 @@ There is no fallback to another feed while the provider is away.
 
 Hub: `/providers/weather`. A program outside Gleanvolt reads the weather at the site and publishes it.
 It is the **current conditions**, not a forecast: Gleanvolt records them on a charging session when the
-session opens and when it closes, and nothing in charge control reads them. The OpenWeather plugin
-(`plugins/Gleanvolt.Plugin.OpenWeather`) is one, and the reference: OpenWeatherMap, with its own page
-for the key.
+session opens and when it closes, and nothing in charge control reads them. Gleanvolt has no weather source of its
+own (#425). The OpenWeather plugin (`plugins/Gleanvolt.Plugin.OpenWeather`) is the reference provider,
+and the one released with Gleanvolt: OpenWeatherMap, with its own page for the key.
 
 **`Hello(hello)` → `WeatherWelcome`.** On top of the common fields, the welcome carries where the site
 is, as `site`, so the location is not configured twice. `latitude` and `longitude` are `null` when the
@@ -600,7 +601,7 @@ start, so for now a change arrives as a new welcome after the restart.
 `WeatherAtEnd`, sunrise and sunset, on the Sessions pages and in `GET /api/v1/sessions`.
 `weatherSource` in `GET /api/v1/status` says `external`, and `weatherConfigured` is `true` whether or
 not the provider is connected. A provider that is disconnected, silent or refused means a session
-recorded without the weather; nothing falls back to OpenWeatherMap.
+recorded without the weather; there is nothing to fall back to.
 
 ## The protocol, for a client in another language
 

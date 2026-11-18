@@ -5,17 +5,18 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Weather;
-using Gleanvolt.Infrastructure.OpenWeather;
 
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
-/// The weather source (#424): an installation that never chose keeps what it had, a choice is saved for
-/// the next start and used at once, and a value that names no source is ignored.
+/// The weather source (#424, #425): NotProvided or External, saved for the next start and used at once;
+/// and the move off the removed built-in OpenWeather, which an installation that used it gets at its
+/// first start: External chosen, the old key deleted, and a notice until a provider connects.
 /// </summary>
 public sealed class WeatherSourceSelectionTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "gleanvolt-weather-source-" + Guid.NewGuid().ToString("N"));
+    private readonly RecordingSecretStore _secrets = new();
 
     public WeatherSourceSelectionTests() => Directory.CreateDirectory(_root);
 
@@ -24,88 +25,120 @@ public sealed class WeatherSourceSelectionTests : IDisposable
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     [Fact]
-    public void WithNoKeyAndNoChoiceThereIsNoWeather()
+    public void WithNothingConfiguredThereIsNoWeatherAndNothingToSay()
     {
         var selection = Selection();
 
         Assert.Equal(WeatherSource.NotProvided, selection.Selected);
-        Assert.False(selection.IsChosen);
-    }
-
-    [Fact]
-    public void AKeyInTheEnvironmentKeepsOpenWeatherAfterTheUpgrade()
-    {
-        var selection = Selection(("Weather:ApiKey", "env-key"));
-
-        Assert.Equal(WeatherSource.OpenWeather, selection.Selected);
-        Assert.False(selection.IsChosen);
-    }
-
-    [Fact]
-    public void TheShippedPlaceholderIsNoKey() =>
-        Assert.Equal(WeatherSource.NotProvided, Selection(("Weather:ApiKey", WeatherKeyStore.PlaceholderKey)).Selected);
-
-    [Fact]
-    public void AKeySavedOnSettingsLaterTurnsTheWeatherOnAsItAlwaysDid()
-    {
-        var secrets = new RecordingSecretStore();
-        var selection = Selection(secrets);
-        Assert.Equal(WeatherSource.NotProvided, selection.Selected);
-
-        new WeatherKeyStore(secrets, Options.Create(new WeatherOptions())).Save("page-key");
-
-        // The selection's own store reads the secret store at start, so a fresh one stands for the next start;
-        // the running one is told through the key store the page uses, below.
-        Assert.Equal(WeatherSource.OpenWeather, Selection(secrets).Selected);
-    }
-
-    [Fact]
-    public void AKeySavedThroughTheRunningStoreIsSeenAtOnce()
-    {
-        var configuration = Configuration();
-        var key = new WeatherKeyStore(new RecordingSecretStore(), Options.Create(new WeatherOptions()));
-        var selection = new WeatherSourceSelection(Monitor(configuration), key, configuration, NullLogger<WeatherSourceSelection>.Instance);
-
-        key.Save("page-key");
-
-        Assert.Equal(WeatherSource.OpenWeather, selection.Selected);
+        Assert.False(selection.BuiltInRetired);
+        Assert.False(File.Exists(OverridesPath));
     }
 
     [Theory]
     [InlineData("External", WeatherSource.External)]
     [InlineData("external", WeatherSource.External)]
     [InlineData(" notprovided ", WeatherSource.NotProvided)]
-    [InlineData("OPENWEATHER", WeatherSource.OpenWeather)]
-    public void TheConfiguredSourceWinsInAnyCase(string value, WeatherSource expected)
+    public void TheConfiguredSourceIsUsedInAnyCase(string value, WeatherSource expected)
     {
-        var selection = Selection(("Weather:Source", value), ("Weather:ApiKey", "env-key"));
+        var selection = Selection(("Weather:Source", value));
 
         Assert.Equal(expected, selection.Selected);
-        Assert.True(selection.IsChosen);
+        Assert.False(selection.BuiltInRetired);
     }
 
     [Theory]
     [InlineData("meteoblue")]
-    [InlineData("2")]
-    public void ASourceThatNamesNothingIsIgnored(string value)
-    {
-        var selection = Selection(("Weather:Source", value), ("Weather:ApiKey", "env-key"));
+    [InlineData("1")]
+    public void ASourceThatNamesNothingIsIgnored(string value) =>
+        Assert.Equal(WeatherSource.NotProvided, Selection(("Weather:Source", value)).Selected);
 
-        Assert.Equal(WeatherSource.OpenWeather, selection.Selected);
-        Assert.False(selection.IsChosen);
+    [Theory]
+    [InlineData("OpenWeather")]
+    [InlineData("openweather")]
+    public void AChosenBuiltInBecomesExternalWithTheNoticeAndIsRewritten(string value)
+    {
+        var selection = Selection(("Weather:Source", value));
+
+        Assert.Equal(WeatherSource.External, selection.Selected);
+        Assert.True(selection.BuiltInRetired);
+
+        var stored = PvSystemOverrides.Read(OverridesPath);
+        Assert.Equal("External", stored[WeatherSourceSelection.Key]);
+        Assert.Equal("true", stored[WeatherSourceSelection.RetiredNoticeKey]);
+    }
+
+    [Fact]
+    public void AKeySavedOnSettingsWithNothingChosenMovesToTheProviderAndTheKeyIsDeleted()
+    {
+        // Before #424 there was no choice: a key was the built-in in use.
+        _secrets.Write(SecretNames.WeatherApiKey, "owm-key");
+
+        var selection = Selection();
+
+        Assert.Equal(WeatherSource.External, selection.Selected);
+        Assert.True(selection.BuiltInRetired);
+        Assert.Null(_secrets.Read(SecretNames.WeatherApiKey));
+    }
+
+    [Fact]
+    public void AKeyInTheEnvironmentWithNothingChosenMovesToTheProvider()
+    {
+        var selection = Selection(("Weather:ApiKey", "env-key"));
+
+        Assert.Equal(WeatherSource.External, selection.Selected);
+        Assert.True(selection.BuiltInRetired);
+    }
+
+    [Fact]
+    public void TheShippedPlaceholderIsNoKey() =>
+        Assert.Equal(WeatherSource.NotProvided, Selection(("Weather:ApiKey", "your-openweathermap-api-key")).Selected);
+
+    [Fact]
+    public void NotProvidedChosenStaysSoAndTheUnreadKeyIsStillDeleted()
+    {
+        _secrets.Write(SecretNames.WeatherApiKey, "owm-key");
+
+        var selection = Selection(("Weather:Source", "NotProvided"), ("Weather:ApiKey", "env-key"));
+
+        Assert.Equal(WeatherSource.NotProvided, selection.Selected);
+        Assert.False(selection.BuiltInRetired);
+        Assert.Null(_secrets.Read(SecretNames.WeatherApiKey));
+    }
+
+    [Fact]
+    public void TheNoticeOutlivesARestartAndGoesWhenAProviderConnects()
+    {
+        Selection(("Weather:Source", "OpenWeather"));
+
+        // The next start: the file says External now, and still that the owner hasn't been answered.
+        var next = Selection();
+        Assert.Equal(WeatherSource.External, next.Selected);
+        Assert.True(next.BuiltInRetired);
+
+        var changes = 0;
+        next.Changed += () => changes++;
+        next.ProviderConnected();
+
+        Assert.False(next.BuiltInRetired);
+        Assert.Equal(1, changes);
+        Assert.False(PvSystemOverrides.Read(OverridesPath).ContainsKey(WeatherSourceSelection.RetiredNoticeKey));
+        Assert.False(Selection().BuiltInRetired);
+
+        // Nothing to clear the second time.
+        next.ProviderConnected();
+        Assert.Equal(1, changes);
     }
 
     [Fact]
     public void AChoiceIsSavedForTheNextStartAndUsedAtOnce()
     {
-        var selection = Selection(("Weather:ApiKey", "env-key"));
+        var selection = Selection();
         var changes = 0;
         selection.Changed += () => changes++;
 
         Assert.True(selection.Select(WeatherSource.External).Saved);
 
         Assert.Equal(WeatherSource.External, selection.Selected);
-        Assert.True(selection.IsChosen);
         Assert.Equal("External", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
         Assert.Equal(1, changes);
 
@@ -113,18 +146,10 @@ public sealed class WeatherSourceSelectionTests : IDisposable
         Assert.True(selection.Select(WeatherSource.External).Saved);
         Assert.Equal(1, changes);
 
-        // The next start reads it back.
-        Assert.Equal(WeatherSource.External, Selection(("Weather:ApiKey", "env-key")).Selected);
-    }
-
-    [Fact]
-    public void AChoiceOfNotProvidedHoldsEvenWithAKey()
-    {
-        var selection = Selection(("Weather:ApiKey", "env-key"));
-
-        Assert.True(selection.Select(WeatherSource.NotProvided).Saved);
-
-        Assert.Equal(WeatherSource.NotProvided, selection.Selected);
+        // The next start reads it back, with nothing to migrate.
+        var next = Selection();
+        Assert.Equal(WeatherSource.External, next.Selected);
+        Assert.False(next.BuiltInRetired);
     }
 
     [Fact]
@@ -139,15 +164,10 @@ public sealed class WeatherSourceSelectionTests : IDisposable
         Assert.False(File.Exists(OverridesPath));
     }
 
-    private WeatherSourceSelection Selection(params (string Key, string Value)[] values) =>
-        Selection(new RecordingSecretStore(), values);
-
-    private WeatherSourceSelection Selection(ISecretStore secrets, params (string Key, string Value)[] values)
+    private WeatherSourceSelection Selection(params (string Key, string Value)[] values)
     {
         var configuration = Configuration(values);
-        var options = Monitor(configuration);
-        var key = new WeatherKeyStore(secrets, Options.Create(options.CurrentValue));
-        return new WeatherSourceSelection(options, key, configuration, NullLogger<WeatherSourceSelection>.Instance);
+        return new WeatherSourceSelection(Monitor(configuration), _secrets, configuration, NullLogger<WeatherSourceSelection>.Instance);
     }
 
     // As the host composes it: what it started with, then the overrides file the page writes.

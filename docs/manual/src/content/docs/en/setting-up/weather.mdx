@@ -1,6 +1,6 @@
 ---
 title: Weather
-description: Record the weather during each charge, from OpenWeatherMap or from a provider of your own.
+description: Record the weather during each charge, from OpenWeatherMap through the OpenWeather plugin.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -17,16 +17,14 @@ the setup wizard's **Site** step asks for.
 Open **Settings** and find **Weather** (or the setup wizard's **Extras** step). Under **Source**, choose:
 
 - **Not provided**: no weather is recorded.
-- **OpenWeather**: Gleanvolt asks OpenWeatherMap itself, with a free key you enter here.
-- **External**: a separate program sends the weather to Gleanvolt, for example the OpenWeather plugin.
+- **External**: a separate program sends the weather to Gleanvolt. The OpenWeather plugin, which comes
+  with Gleanvolt, is the ready-made one: it reads the weather from OpenWeatherMap.
 
 Press **Save**. There is no need to restart.
 
-If you already had an OpenWeatherMap key before this choice existed, **OpenWeather** is chosen for you.
+## Record the weather with the OpenWeather plugin
 
-## OpenWeather
-
-### Get a key
+### Get an OpenWeatherMap key
 
 <Steps>
 
@@ -36,48 +34,41 @@ If you already had an OpenWeatherMap key before this choice existed, **OpenWeath
 
 </Steps>
 
-### Enter it in Gleanvolt
-
-<Steps>
-
-1. Under **Weather**, choose **OpenWeather**.
-
-2. Paste the key in **API key**.
-
-3. Press **Save and check**. This also saves **OpenWeather** as the source.
-
-</Steps>
-
-![The weather section on Settings, with OpenWeather chosen and an API key saved.](../../../../assets/screenshots/settings-weather.png)
-
 :::note[A new key can take a couple of hours]
 OpenWeatherMap sometimes takes a while to switch on a new key. If the check fails straight after you
 created it, the key is still saved, and starts working on its own.
 :::
 
-Gleanvolt asks for the weather twice per charge, well within the free plan.
-
-## An external provider
-
-An external provider is a program that runs next to Gleanvolt and sends it the weather. The
-OpenWeather plugin is one: it reads OpenWeatherMap the same way, with its own page for the key.
+### Connect the plugin
 
 <Steps>
 
 1. Under **Weather**, choose **External** and press **Save**.
 
-2. Start the provider with the provider token from **Settings → External providers**. For the
-   OpenWeather plugin, see [Run the OpenWeather plugin](#run-the-openweather-plugin) below.
+2. Start the plugin with the provider token from **Settings → External providers**: see
+   [Run the OpenWeather plugin](#run-the-openweather-plugin) below.
 
-3. Once it connects, its own page appears under **Weather**. For the OpenWeather plugin, enter the
-   OpenWeatherMap key there and press **Save and check**.
+3. Once it connects, its own page appears under **Weather**. Enter the OpenWeatherMap key there and
+   press **Save and check**.
 
 </Steps>
 
 ![The weather section on Settings, with the OpenWeather plugin connected and its page shown.](../../../../assets/screenshots/settings-weather-external.png)
 
-Gleanvolt asks the provider when a charge starts and when it ends. If the provider isn't running or
-doesn't answer within 15 seconds, that charge is recorded without the weather. Nothing else is affected.
+Gleanvolt asks the plugin when a charge starts and when it ends, and the plugin asks OpenWeatherMap at
+most once every 10 minutes, well within the free plan. If the plugin isn't running or doesn't answer
+within 15 seconds, that charge is recorded without the weather. Nothing else is affected.
+
+## If you used OpenWeather in Gleanvolt before
+
+Gleanvolt used to ask OpenWeatherMap itself, with the key entered under **Weather**. That is gone: the
+weather from OpenWeatherMap now comes only through the OpenWeather plugin. After the update, Gleanvolt
+chooses **External** for you and says so under **Weather**, until the plugin connects:
+
+![The weather section on Settings after the update, saying that the weather now comes from the OpenWeather plugin.](../../../../assets/screenshots/settings-weather.png)
+
+The key you saved in Gleanvolt is not kept. Start the plugin as below, and enter your key again on its
+page. Until then, charges are recorded without the weather.
 
 ## Run the OpenWeather plugin
 

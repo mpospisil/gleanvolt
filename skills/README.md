@@ -10,7 +10,7 @@ Cursor, Gemini CLI and others). They are also listed on [Agensi](https://www.age
 
 The [user manual](https://mpospisil.github.io/gleanvolt/latest/en/) is the source of truth. The
 skills link to it for each step and don't replace it. The agent never handles the web UI password or its
-recovery key. It takes a Solcast or OpenWeatherMap key only when the user agrees to give it. The skills
+recovery key. It takes a Solcast key only when the user agrees to give it. The skills
 contain no scripts: every command is written out in `SKILL.md`.
 
 ## Using one without Agensi

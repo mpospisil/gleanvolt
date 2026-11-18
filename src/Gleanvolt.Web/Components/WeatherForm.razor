@@ -1,0 +1,181 @@
+@using Microsoft.Extensions.DependencyInjection
+@implements IDisposable
+@inject IOptions<WebOptions> Web
+@inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+@inject IServiceProvider Services
+
+@*
+    Where the weather each charging session ran in comes from (#424, #425): nowhere, or an external
+    provider that publishes over its hub, such as the OpenWeather plugin. Gleanvolt calls no weather
+    service itself since #425. Choosing one and saving applies at once, and the section below follows the
+    choice. In the wizard no provider can connect yet, so External only records the choice there.
+
+    An installation that used the built-in OpenWeather is moved to External at its first start after the
+    upgrade, and this says so until a weather provider connects.
+*@
+
+<section class="controls pv-editor weather-editor" id="weather-editor">
+    <div class="section-head tip-head">
+        <h2>@SettingsText.Weather</h2>
+        <InfoTip Topic="@SettingsText.WeatherTopic" Group="settings-info" Wide="true">
+            <p>@SettingsText.WeatherTip1</p>
+        </InfoTip>
+    </div>
+
+    @if (Sources is { BuiltInRetired: true })
+    {
+        <p class="warning" id="weather-built-in-retired" role="status">@SettingsText.WeatherBuiltInRetired</p>
+    }
+
+    @if (Sources is { } sources)
+    {
+        <div class="control">
+            <span class="control-label" id="weather-source-label">@SettingsText.WeatherSource</span>
+            <div class="seg" role="radiogroup" id="weather-source-choice" aria-labelledby="weather-source-label">
+                @foreach (var value in Enum.GetValues<WeatherSource>())
+                {
+                    var source = value;
+
+                    <label class="seg-opt">
+                        <input type="radio" name="weather-source" id="weather-source-@Id(source)" disabled="@ReadOnly"
+                               checked="@(source == _source)" @onchange="() => PickSource(source)" />
+                        @SourceLabel(source)
+                    </label>
+                }
+            </div>
+            @if (_source != sources.Selected)
+            {
+                <span class="hint" id="weather-source-unsaved">@Localized.Format(SettingsText.ForecastSourceUnsaved, SourceLabel(sources.Selected))</span>
+            }
+        </div>
+
+        @if (!ReadOnly && _source != sources.Selected)
+        {
+            <div class="control actions">
+                <button type="button" class="primary" id="weather-source-save" @onclick="SaveSource">@SettingsText.SaveButton</button>
+                <button type="button" class="secondary" id="weather-source-cancel" @onclick="CancelSource">@SettingsText.Cancel</button>
+            </div>
+        }
+
+        @if (_source == WeatherSource.External)
+        {
+            @if (InWizard)
+            {
+                <p class="muted" id="weather-external-wizard">@SettingsText.WeatherExternalWizard</p>
+            }
+            else
+            {
+                <p class="muted" id="weather-external-intro">@SettingsText.WeatherExternalIntro</p>
+
+                <ExternalProviderPage Kind="weather" Intro="@SettingsText.WeatherExternalPageIntro" />
+                <ExternalProviderPanel Kind="weather" ReadOnly="ReadOnly" />
+            }
+        }
+        else
+        {
+            <p class="muted" id="weather-not-provided">@SettingsText.WeatherNotProvided</p>
+        }
+    }
+
+    @if (_errors.Count > 0)
+    {
+        <ul class="error" id="weather-errors">
+            @foreach (var error in _errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_message is { } message)
+    {
+        <p class="muted" id="weather-message">@message</p>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<string> _errors = [];
+    private string? _message;
+
+    // The source picked on the page, saved or not; the saved one is Sources.Selected.
+    private WeatherSource _source = WeatherSource.NotProvided;
+
+    // The viewer's culture, for the renders a change elsewhere asks for (#290).
+    private readonly ViewerCulture _viewer = new();
+
+    /// <summary>In the setup wizard: no provider can connect yet, so External only records the choice.</summary>
+    [Parameter] public bool InWizard { get; set; }
+
+    // Optional: a host without the selection (a test host) has no weather section to offer.
+    // Resolved once, in OnInitialized: Dispose runs after the prerender's request scope is disposed.
+    private IWeatherSourceSelection? Sources { get; set; }
+
+    // The password in force, not the startup one, so a password set on /setup unlocks this at once.
+    private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
+
+    protected override void OnInitialized()
+    {
+        Sources = Services.GetService<IWeatherSourceSelection>();
+        _source = Sources?.Selected ?? WeatherSource.NotProvided;
+
+        if (Sources is { } sources)
+        {
+            sources.Changed += OnSourceChanged;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Sources is { } sources)
+        {
+            sources.Changed -= OnSourceChanged;
+        }
+    }
+
+    // Another tab, the configuration or a provider connecting changed it: follow, keeping a choice in progress.
+    private void OnSourceChanged() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
+
+    private void PickSource(WeatherSource source)
+    {
+        _source = source;
+        _message = null;
+        _errors = [];
+    }
+
+    private void CancelSource()
+    {
+        _source = Sources?.Selected ?? WeatherSource.NotProvided;
+        _errors = [];
+    }
+
+    private void SaveSource()
+    {
+        if (ReadOnly || Sources is not { } sources)
+        {
+            return;
+        }
+
+        var result = sources.Select(_source);
+
+        if (!result.Saved)
+        {
+            _errors = Localized.Say(result.Problems, result.ProblemPhrases);
+            return;
+        }
+
+        _errors = [];
+        _message = Localized.Format(SettingsText.WeatherSourceSaved, SourceLabel(sources.Selected));
+    }
+
+    private static string SourceLabel(WeatherSource source) => source switch
+    {
+        WeatherSource.NotProvided => SettingsText.WeatherSource_NotProvided,
+        _ => SettingsText.WeatherSource_External,
+    };
+
+    private static string Id(WeatherSource source) => source switch
+    {
+        WeatherSource.NotProvided => "not-provided",
+        _ => "external",
+    };
+}

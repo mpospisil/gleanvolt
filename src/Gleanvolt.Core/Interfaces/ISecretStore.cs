@@ -74,7 +74,10 @@ public static class SecretNames
     /// <summary>The Solcast API key and rooftop site, when entered on Settings rather than in the environment (#286).</summary>
     public const string SolcastAccount = "solcast-account";
 
-    /// <summary>The OpenWeatherMap API key, when entered on Settings rather than in the environment.</summary>
+    /// <summary>
+    /// The built-in OpenWeather's key, as Settings saved it until #425. No longer read: deleted at the
+    /// first start after the built-in was removed. The OpenWeather plugin keeps its own.
+    /// </summary>
     public const string WeatherApiKey = "weather-api-key";
 
     /// <summary>The Home Assistant MQTT broker password, when entered on Settings.</summary>

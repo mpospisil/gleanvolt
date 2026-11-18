@@ -81,7 +81,6 @@ Only these, and every one of them is **off until you configure it**.
 | Service | Host | What is sent | When |
 |---|---|---|---|
 | Solcast solar forecast | `api.solcast.com.au` | Your Solcast API key and the rooftop-site identifier you registered *with Solcast* | Only if you configure both. Every three hours by default |
-| OpenWeatherMap | `api.openweathermap.org` | Your API key and **your site's latitude and longitude** | Only if you configure an API key and coordinates |
 | Volkswagen Group portal | `identity.vwgroup.io`, `eu-data-act.drivesomethinggreater.com` | Your account credentials, to sign in; then requests for your car's charging state | Only if you configure a vehicle account |
 | Volkswagen website | `www.volkswagen.de` | Your account credentials, to sign in; your car's VIN, to ask about that car | Only if you configure it |
 | Škoda Connect | `public.api.connect.skoda-auto.cz` | Your account credentials, to sign in; your car's VIN | Only if you configure it |
@@ -92,21 +91,21 @@ an account you already have. It keeps only what it needs from the reply: state o
 range, time remaining, whether the car is plugged in and charging, and when the car reported it. Your
 VIN is used to address the request and is not written to either database or published over MQTT.
 
-Your approximate home location leaves your network **only** if you configure OpenWeatherMap, which
-needs coordinates to return weather for the right place. Solcast is addressed by a site identifier you
-created on their side, so Gleanvolt does not send coordinates there.
+Gleanvolt sends your coordinates to no outside service. Solcast is addressed by a site identifier you
+created on their side.
 
-With `Weather:Source` = `External` (#424), Gleanvolt calls nobody for the weather: it gives the site's
-latitude, longitude and time zone to the connected weather provider, on your network, and that program
-decides what it sends where. The OpenWeather plugin sends its key and those coordinates to
-`api.openweathermap.org`, as the built-in does, and keeps the key in its own data directory.
+For the weather (#424, #425) Gleanvolt calls nobody: with `Weather:Source` = `External` it gives the
+site's latitude, longitude and time zone to the connected weather provider, on your network, and that
+program decides what it sends where. The OpenWeather plugin sends its key and those coordinates to
+`api.openweathermap.org`, which is how your approximate home location leaves your network if you run
+it, and keeps the key in its own data directory.
 
 There is no other outbound connection. Gleanvolt does not check for updates, does not phone home, and
 contacts no host that is not in the table above.
 
 ## Credentials
 
-Vehicle-account passwords, the MQTT broker password, the Solcast key and the OpenWeatherMap key are
+Vehicle-account passwords, the MQTT broker password and the Solcast key are
 secrets, and Gleanvolt is built so they never need to be in a configuration file you might commit or
 copy.
 
